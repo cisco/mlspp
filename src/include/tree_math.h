@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <cstddef>
+#include <algorithm>
 
 // The below functions provide the index calculus for the tree
 // structures used in MLS.  They are premised on a "flat"

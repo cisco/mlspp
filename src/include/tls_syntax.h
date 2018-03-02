@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include <algorithm>
 
 // Note: Different namespace because this is TLS-generic (might
 // want to pull it out later).  Also, avoids confusables ending up
@@ -44,6 +45,8 @@ public:
   {}
   vector(parent&& other)
     : parent(other)
+  {}
+  vector()
   {}
 };
 
