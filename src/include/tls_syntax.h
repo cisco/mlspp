@@ -47,6 +47,7 @@ public:
     : parent(other)
   {}
   vector()
+    : parent()
   {}
 };
 
