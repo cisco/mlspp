@@ -38,7 +38,7 @@ TEST_CASE("Group creation", "[state]")
     auto group_add = states[0].add(user_init_keys[1]);
 
     // Process the GroupAdd
-    states[0].handle(group_add);
+    states[0] = states[0].handle(group_add);
     states.emplace(
       stp + 1, identity_privs[1], init_privs[1], group_add, group_add.init_key);
 
@@ -56,7 +56,7 @@ TEST_CASE("Group creation", "[state]")
       State::join(identity_privs[1], init_privs[1], group_init_key);
 
     // Process the UserAdd
-    states[0].handle(user_add);
+    states[0] = states[0].handle(user_add);
     states.emplace(
       stp + 1, identity_privs[1], init_privs[1], user_add, group_init_key);
     REQUIRE(states[0] == states[1]);
@@ -72,7 +72,7 @@ TEST_CASE("Group creation", "[state]")
       auto group_add = states[i - 1].add(user_init_keys[i]);
 
       for (auto& state : states) {
-        state.handle(group_add);
+        state = state.handle(group_add);
       }
 
       states.emplace(stp + i,
@@ -100,7 +100,7 @@ TEST_CASE("Group creation", "[state]")
         State::join(identity_privs[i], init_privs[i], group_init_key);
 
       for (auto& state : states) {
-        state.handle(user_add);
+        state = state.handle(user_add);
       }
 
       states.emplace(
@@ -129,7 +129,7 @@ TEST_CASE("Group update and removal", "[state]")
     auto user_add = State::join(identity_priv, leaf_priv, group_init_key);
 
     for (auto& state : states) {
-      state.handle(user_add);
+      state = state.handle(user_add);
     }
 
     states.emplace(stp + i, identity_priv, leaf_priv, user_add, group_init_key);
@@ -147,9 +147,9 @@ TEST_CASE("Group update and removal", "[state]")
 
       for (size_t j = 0; j < group_size; j += 1) {
         if (i == j) {
-          states[j].handle(update, new_leaf);
+          states[j] = states[j].handle(update, new_leaf);
         } else {
-          states[j].handle(update);
+          states[j] = states[j].handle(update);
         }
       }
 
@@ -165,7 +165,7 @@ TEST_CASE("Group update and removal", "[state]")
       auto remove = states[i].remove(i + 1);
 
       for (size_t j = 0; j < i; j += 1) {
-        states[j].handle(remove);
+        states[j] = states[j].handle(remove);
       }
 
       for (size_t j = 0; j < i; j += 1) {

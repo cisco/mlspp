@@ -8,6 +8,19 @@
 
 namespace mls {
 
+struct MLSCiphertext
+{
+  uint32_t epoch;
+  uint32_t sequence;
+  tls::opaque<2> ciphertext;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSCiphertext& obj);
+
+tls::istream&
+operator>>(tls::istream& in, MLSCiphertext& obj);
+
 class State
 {
 public:
@@ -67,19 +80,26 @@ public:
   // done a little more explicitly with a copy constructor.
 
   // Handle a UserAdd (for existing participants only)
-  void handle(const Handshake<UserAdd>& user_add);
+  State handle(const Handshake<UserAdd>& user_add) const;
 
   // Handle a GroupAdd (for existing participants only)
-  void handle(const Handshake<GroupAdd>& group_add);
+  State handle(const Handshake<GroupAdd>& group_add) const;
 
   // Handle an Update (for the participant that sent the update)
-  void handle(const Handshake<Update>& update, const DHPrivateKey& leaf_priv);
+  State handle(const Handshake<Update>& update,
+               const DHPrivateKey& leaf_priv) const;
 
   // Handle an Update (for the other participants)
-  void handle(const Handshake<Update>& update);
+  State handle(const Handshake<Update>& update) const;
 
   // Handle a Remove (for the remaining participants, obviously)
-  void handle(const Handshake<Remove>& remove);
+  State handle(const Handshake<Remove>& remove) const;
+
+  ///
+  /// Message Protection
+  ///
+  MLSCiphertext protect(const bytes& content) const;
+  bytes unprotect(const MLSCiphertext& message) const;
 
 private:
   uint32_t _index;
