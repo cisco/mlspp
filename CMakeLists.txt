@@ -19,7 +19,7 @@ MESSAGE( STATUS "OPENSSL_INCLUDE_DIR: " ${OPENSSL_INCLUDE_DIR} )
 
 ###
 ### Library Config
-### 
+###
 
 set(LIB_NAME "${PROJECT_NAME}")
 
@@ -35,10 +35,11 @@ file(GLOB LIB_HEADER_FILES "${LIBRARY_INCLUDE_PATH}/*.h")
 file(GLOB LIB_SOURCE_FILES "${LIBRARY_SRC_PATH}/*.cpp")
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES} ${LIB_HEADER_FILES})
+target_link_libraries(mls ${OPENSSL_LIBRARIES})
 
 ###
 ### Test Config
-### 
+###
 
 enable_testing()
 add_subdirectory(test)
