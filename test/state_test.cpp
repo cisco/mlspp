@@ -36,11 +36,12 @@ TEST_CASE("Group creation", "[state]")
 
     // Create a GroupAdd for the new participant
     auto group_add = states[0].add(user_init_keys[1]);
+    auto group_init_key = states[0].group_init_key();
 
     // Process the GroupAdd
     states[0] = states[0].handle(group_add);
     states.emplace(
-      stp + 1, identity_privs[1], init_privs[1], group_add, group_add.init_key);
+      stp + 1, identity_privs[1], init_privs[1], group_add, group_init_key);
 
     REQUIRE(states[0] == states[1]);
   }
@@ -70,16 +71,14 @@ TEST_CASE("Group creation", "[state]")
     // Each participant invites the next
     for (size_t i = 1; i < group_size; i += 1) {
       auto group_add = states[i - 1].add(user_init_keys[i]);
+      auto group_init_key = states[i - 1].group_init_key();
 
       for (auto& state : states) {
         state = state.handle(group_add);
       }
 
-      states.emplace(stp + i,
-                     identity_privs[i],
-                     init_privs[i],
-                     group_add,
-                     group_add.init_key);
+      states.emplace(
+        stp + i, identity_privs[i], init_privs[i], group_add, group_init_key);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {

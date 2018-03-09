@@ -10,7 +10,7 @@ namespace mls {
 
 struct MLSCiphertext
 {
-  uint32_t epoch;
+  epoch_t epoch;
   uint32_t sequence;
   tls::opaque<2> ciphertext;
 };
@@ -106,7 +106,8 @@ private:
   DHPrivateKey _leaf_priv;
   SignaturePrivateKey _identity_priv;
 
-  uint32_t _epoch;
+  epoch_t _prior_epoch;
+  epoch_t _epoch;
   bytes _group_id;
   Tree<MerkleNode> _identity_tree;
   Tree<RatchetNode> _ratchet_tree;
@@ -123,19 +124,26 @@ private:
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
 
+  // Spawn a new state (with a fresh epoch) from this state
+  State spawn(const epoch_t& epoch) const;
+
   // Inner logic for UserAdd and GroupInitKey constructors
+  template<typename Message>
   void init_from_details(const SignaturePrivateKey& identity_priv,
                          const DHPrivateKey& leaf_priv,
                          const GroupInitKey& group_init_key,
-                         const bytes& message);
+                         const Handshake<Message>& message);
 
   // Inner logic shared by UserAdd and GroupAdd handlers
-  void add_inner(const SignaturePublicKey& identity_key, const bytes& message);
+  template<typename Message>
+  void add_inner(const SignaturePublicKey& identity_key,
+                 const Handshake<Message>& message);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
+  template<typename Message>
   void update_leaf(uint32_t index,
                    const std::vector<RatchetNode>& path,
-                   const bytes& message,
+                   const Handshake<Message>& message,
                    const optional<DHPrivateKey>& leaf_priv);
 
   // Derive the sercrets for an epoch, given some new entropy

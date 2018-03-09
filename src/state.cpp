@@ -22,11 +22,14 @@ operator>>(tls::istream& in, MLSCiphertext& obj)
 /// Constructors
 ///
 
+static const epoch_t zero_epoch{ 0, 0, 0, 0, 0, 0, 0, 0 };
+
 State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   : _index(0)
   , _leaf_priv(DHPrivateKey::generate())
   , _identity_priv(identity_priv)
-  , _epoch(0)
+  , _prior_epoch()
+  , _epoch(zero_epoch)
   , _group_id(group_id)
   , _message_master_secret()
   , _init_secret()
@@ -66,7 +69,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   writer << group_add;
   auto message = writer.bytes();
 
-  init_from_details(identity_priv, leaf_priv, group_init_key, message);
+  init_from_details(identity_priv, leaf_priv, group_init_key, group_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
@@ -81,7 +84,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   writer << user_add;
   auto message = writer.bytes();
 
-  init_from_details(identity_priv, leaf_priv, group_init_key, message);
+  init_from_details(identity_priv, leaf_priv, group_init_key, user_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
@@ -91,7 +94,8 @@ State::State(const SignaturePrivateKey& identity_priv,
   , _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  bytes dummy(1); // XXX Need one octet to keep HkdfLabel happy
+  Handshake<None> dummy;
+  dummy.sign(identity_priv); // XXX(rlb@ipv.sx) To allow marshal
   init_from_details(identity_priv, leaf_priv, group_init_key, dummy);
 }
 
@@ -105,6 +109,7 @@ State::join(const SignaturePrivateKey& identity_priv,
             const GroupInitKey& group_init_key)
 {
   State temp_state(identity_priv, leaf_priv, group_init_key);
+  temp_state._epoch = group_init_key.epoch;
 
   // Leaf key isn't included in the direct path, but is needed here
   auto path = temp_state._ratchet_tree.direct_path(temp_state._index);
@@ -145,26 +150,31 @@ State::remove(uint32_t index) const
 State
 State::handle(const Handshake<UserAdd>& user_add) const
 {
+  // Verify that the user_add addresse this state
+  if (user_add.prior_epoch != _epoch) {
+    throw InvalidParameterError("Invalid epoch");
+  }
+
   // Verify the incoming message against the **new** identity tree
-  // TODO(rlb@ipv.sx) Verify that the new identity tree is a successor to the
-  // old one
-  auto new_identity_root = user_add.init_key.identity_root();
-  if (!user_add.verify(new_identity_root)) {
+  auto temp_identity_tree = _identity_tree;
+  auto identity_leaf = MerkleNode::leaf(user_add.identity_key.to_bytes());
+  temp_identity_tree.add(identity_leaf);
+  if (!user_add.verify(temp_identity_tree.root().value())) {
     throw InvalidParameterError("UserAdd is not from a member of the group");
   }
 
-  if (user_add.signer_index != user_add.init_key.group_size - 1) {
+  if (user_add.signer_index != _identity_tree.size()) {
     throw InvalidParameterError("UserAdd is not from the new member");
   }
 
   // Create a copy of the current state
-  State next = *this;
+  auto next = spawn(user_add.epoch());
 
   // Update the ratchet tree
   next._ratchet_tree.add(user_add.message.path);
 
   // Add to symmetric state
-  next.add_inner(user_add.identity_key, user_add.to_bytes());
+  next.add_inner(user_add.identity_key, user_add);
 
   return next;
 }
@@ -182,7 +192,7 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   }
 
   // Create a copy of the current state
-  State next = *this;
+  auto next = spawn(group_add.epoch());
 
   // Add the new leaf to the ratchet tree
   auto init_key = group_add.message.init_key.init_key;
@@ -194,7 +204,7 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   next._ratchet_tree.add(RatchetNode(leaf_key));
 
   // Add to symmetric state
-  next.add_inner(identity_key, group_add.to_bytes());
+  next.add_inner(identity_key, group_add);
 
   return next;
 }
@@ -211,10 +221,9 @@ State::handle(const Handshake<Update>& update,
     throw InvalidParameterError("Improper self-Update handler call");
   }
 
-  State next = *this;
+  auto next = spawn(update.epoch());
 
-  next.update_leaf(
-    update.signer_index, update.message.path, update.to_bytes(), leaf_priv);
+  next.update_leaf(update.signer_index, update.message.path, update, leaf_priv);
 
   next._leaf_priv = leaf_priv;
 
@@ -233,11 +242,11 @@ State::handle(const Handshake<Update>& update) const
       "Improper Update handler call; use self-update");
   }
 
-  State next = *this;
+  auto next = spawn(update.epoch());
 
   next.update_leaf(update.signer_index,
                    update.message.path,
-                   update.to_bytes(),
+                   update,
                    std::experimental::nullopt);
 
   return next;
@@ -250,11 +259,11 @@ State::handle(const Handshake<Remove>& remove) const
     throw InvalidParameterError("Remove is not from a member of the group");
   }
 
-  State next = *this;
+  auto next = spawn(remove.epoch());
 
   next.update_leaf(remove.message.removed,
                    remove.message.path,
-                   remove.to_bytes(),
+                   remove,
                    std::experimental::nullopt);
 
   // TODO: Update identity tree and ratchet tree with blank nodes
@@ -281,24 +290,37 @@ operator==(const State& lhs, const State& rhs)
   // Uncomment for debug info
   /*
   std::cout << "== == == == ==" << std::endl
-         << "_epoch " << epoch << std::endl
-         << "_group_id " << group_id << std::endl
-         << "_identity_tree " << identity_tree << std::endl
-         << "_ratchet_tree " << ratchet_tree << std::endl
-         << "_message_master_secret " << message_master_secret << std::endl
-         << "_init_secret " << init_secret << std::endl
-         << "_add_priv " << add_priv << std::endl;
+            << "_prior_epoch " << lhs._prior_epoch << " " << rhs._prior_epoch
+            << std::endl
+            << "_epoch " << epoch << " " << lhs._epoch << " " << rhs._epoch
+            << std::endl
+            << "_group_id " << group_id << std::endl
+            << "_identity_tree " << identity_tree << std::endl
+            << "_ratchet_tree " << ratchet_tree << std::endl
+            << "_message_master_secret " << message_master_secret << std::endl
+            << "_init_secret " << init_secret << std::endl
+            << "_add_priv " << add_priv << std::endl;
   */
 
   return epoch && group_id && identity_tree && ratchet_tree &&
          message_master_secret && init_secret && add_priv;
 }
 
+State
+State::spawn(const epoch_t& epoch) const
+{
+  auto next = *this;
+  next._prior_epoch = _epoch;
+  next._epoch = epoch;
+  return next;
+}
+
+template<typename Message>
 void
 State::init_from_details(const SignaturePrivateKey& identity_priv,
                          const DHPrivateKey& leaf_priv,
                          const GroupInitKey& group_init_key,
-                         const bytes& message)
+                         const Handshake<Message>& handshake)
 {
   auto tree_size = group_init_key.group_size;
   _index = tree_size;
@@ -315,33 +337,36 @@ State::init_from_details(const SignaturePrivateKey& identity_priv,
   auto ratchet_leaf = RatchetNode(_leaf_priv);
   _ratchet_tree.add(ratchet_leaf);
 
-  _epoch = group_init_key.epoch + 1;
+  _prior_epoch = group_init_key.epoch;
+  _epoch = next_epoch(_prior_epoch, handshake.message);
+
   _group_id = group_init_key.group_id;
 
   // XXX(rlb@ipv.sx) Verify that this is populated?
   auto tree_priv = *(_ratchet_tree.root().private_key());
   auto update_secret = tree_priv.derive(group_init_key.add_key);
-  derive_epoch_keys(true, update_secret, message);
+  derive_epoch_keys(true, update_secret, handshake.to_bytes());
 }
 
+template<typename Message>
 void
-State::add_inner(const SignaturePublicKey& identity_key, const bytes& message)
+State::add_inner(const SignaturePublicKey& identity_key,
+                 const Handshake<Message>& handshake)
 {
-  _epoch += 1;
-
   auto identity_leaf = MerkleNode::leaf(identity_key.to_bytes());
   _identity_tree.add(identity_leaf);
 
   // NB: complementary to init_from_details
   auto tree_key = _ratchet_tree.root().public_key();
   auto update_secret = _add_priv.derive(tree_key);
-  derive_epoch_keys(true, update_secret, message);
+  derive_epoch_keys(true, update_secret, handshake.to_bytes());
 }
 
+template<typename Message>
 void
 State::update_leaf(uint32_t index,
                    const std::vector<RatchetNode>& path_in,
-                   const bytes& message,
+                   const Handshake<Message>& handshake,
                    const optional<DHPrivateKey>& leaf_priv)
 {
   std::vector<RatchetNode> path = path_in;
@@ -353,8 +378,10 @@ State::update_leaf(uint32_t index,
 
   // XXX(rlb@ipv.sx) Verify that this is populated?
   auto update_secret = *(_ratchet_tree.root().secret());
-  derive_epoch_keys(false, update_secret, message);
-  _epoch += 1;
+  derive_epoch_keys(false, update_secret, handshake.to_bytes());
+
+  _prior_epoch = _epoch;
+  _epoch = next_epoch(_prior_epoch, handshake.message);
 }
 
 void
@@ -383,17 +410,15 @@ State::derive_epoch_keys(bool add,
   _add_priv = DHPrivateKey::derive(add_secret);
 }
 
-template<typename T>
-Handshake<T>
-State::sign(const T& body) const
+template<typename Message>
+Handshake<Message>
+State::sign(const Message& body) const
 {
   auto copath = _identity_tree.copath(_index);
 
-  Handshake<T> handshake{ body,
-                          _epoch - 1, // XXX(rlb@ipv.sx) Should be more general
-                          group_init_key(),
-                          _index,
-                          copath };
+  Handshake<Message> handshake{
+    body, _epoch, uint32_t(_identity_tree.size()), _index, copath
+  };
 
   handshake.sign(_identity_priv);
   return handshake;
@@ -403,6 +428,10 @@ template<typename T>
 bool
 State::verify_now(const Handshake<T>& message) const
 {
+  if (message.prior_epoch != _epoch) {
+    return false;
+  }
+
   auto root = _identity_tree.root().value();
   return message.verify(root);
 }

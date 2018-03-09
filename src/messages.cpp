@@ -212,4 +212,10 @@ operator>>(tls::istream& in, Remove& obj)
   return in >> obj.removed >> obj.path;
 }
 
+tls::ostream&
+operator<<(tls::ostream& out, const EpochInfo& obj)
+{
+  return out << obj.prior_epoch << obj.msg_type << obj.message;
+}
+
 } // namespace mls

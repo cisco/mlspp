@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <experimental/optional>
 #include <stdexcept>
 #include <vector>
@@ -14,6 +15,8 @@ template<typename T>
 using optional = std::experimental::optional<T>;
 
 typedef std::vector<uint8_t> bytes;
+
+typedef std::array<uint64_t, 8> epoch_t;
 
 ///
 /// Hash prefixes

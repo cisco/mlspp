@@ -34,7 +34,7 @@ tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj);
 
 // struct {
-//     uint32 epoch;
+//     uint64 epoch;
 //     uint32 group_size;
 //     tls::opaque group_id<0..2^16-1>;
 //     CipherSuite cipher_suite;                // OMITTED
@@ -44,7 +44,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 // } GroupInitKey;
 struct GroupInitKey
 {
-  uint32_t epoch;
+  epoch_t epoch;
   uint32_t group_size;
   tls::opaque<2> group_id;
   DHPublicKey add_key;
@@ -174,9 +174,10 @@ operator>>(tls::istream& in, Remove& obj);
 //         case remove:    Remove;
 //     };
 //
-//     uint32 prior_epoch;
-//     GroupInitKey init_key;
+//     uint64 prior_epoch;
+//     uint64 current_epoch;
 //
+//     uint32 group_size;
 //     uint32 signer_index;
 //     MerkleNode identity_proof<1..2^16-1>;
 //     SignaturePublicKey identity_key;
@@ -196,13 +197,15 @@ struct Handshake
 {
   Message message;
 
-  uint32_t prior_epoch;
-  GroupInitKey init_key;
+  epoch_t prior_epoch;
 
+  uint32_t group_size;
   uint32_t signer_index;
   tls::vector<MerkleNode, 2> identity_proof;
   SignaturePublicKey identity_key;
   tls::opaque<2, 1> signature;
+
+  epoch_t epoch() const { return next_epoch(prior_epoch, message); }
 
   void sign(const SignaturePrivateKey& identity_priv)
   {
@@ -218,8 +221,7 @@ struct Handshake
       return false;
     }
 
-    Tree<MerkleNode> identity_tree(
-      init_key.group_size, signer_index, identity_proof);
+    Tree<MerkleNode> identity_tree(group_size, signer_index, identity_proof);
 
     auto leaf = MerkleNode::leaf(identity_key.to_bytes());
     identity_tree.update(signer_index, leaf);
@@ -235,7 +237,7 @@ struct Handshake
     tls::opaque<3> message = msg_out.bytes();
 
     tls::ostream out;
-    out << Message::type << message << prior_epoch << init_key << signer_index
+    out << Message::type << message << prior_epoch << group_size << signer_index
         << identity_proof << identity_key;
     return out.bytes();
   }
@@ -253,7 +255,7 @@ bool
 operator==(const Handshake<Message>& lhs, const Handshake<Message>& rhs)
 {
   return (lhs.message == rhs.message) && (lhs.prior_epoch == rhs.prior_epoch) &&
-         (lhs.init_key == rhs.init_key) &&
+         (lhs.group_size == rhs.group_size) &&
          (lhs.signer_index == rhs.signer_index) &&
          (lhs.identity_proof == rhs.identity_proof) &&
          (lhs.identity_key == rhs.identity_key) &&
@@ -285,9 +287,44 @@ operator>>(tls::istream& in, Handshake<Message>& obj)
   tls::istream msg_in(message);
   msg_in >> obj.message;
 
-  in >> obj.prior_epoch >> obj.init_key >> obj.signer_index >>
+  in >> obj.prior_epoch >> obj.group_size >> obj.signer_index >>
     obj.identity_proof >> obj.identity_key >> obj.signature;
   return in;
+}
+
+// Epoch evolution
+//
+// struct {
+//    uint64 prior_epoch;
+//    HandshakeType msg_type;
+//    opaque message<0..2^24-1>;
+// } EpochInfo;
+struct EpochInfo
+{
+  epoch_t prior_epoch;
+  HandshakeType msg_type;
+  tls::opaque<3> message;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const EpochInfo& obj);
+
+template<typename Message>
+epoch_t
+next_epoch(const epoch_t& prior, const Message& message)
+{
+  tls::ostream msgw;
+  msgw << message;
+
+  EpochInfo info{ prior, Message::type, msgw.bytes() };
+  tls::ostream infow;
+  infow << info;
+
+  auto digest = SHA256Digest(infow.bytes()).digest();
+  epoch_t out;
+  std::copy(digest.begin(), digest.begin() + out.size(), out.begin());
+
+  return out;
 }
 
 } // namespace mls

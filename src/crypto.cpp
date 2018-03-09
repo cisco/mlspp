@@ -157,7 +157,7 @@ hkdf_extract(const bytes& salt, const bytes& ikm)
 //     uint16 length = Length;
 //     opaque label<7..255> = "mls10 " + Label;
 //     opaque group_id<0..2^16-1> = ID;
-//     uint32 epoch = Epoch;
+//     uint64 epoch = Epoch;
 //     opaque message<1..2^16-1> = Msg
 // } HkdfLabel;
 struct HKDFLabel
@@ -165,7 +165,7 @@ struct HKDFLabel
   uint16_t length;
   tls::opaque<1, 7> label;
   tls::opaque<2> group_id;
-  uint32_t epoch;
+  epoch_t epoch;
   tls::opaque<2, 1> message;
 };
 
@@ -180,7 +180,7 @@ bytes
 derive_secret(const bytes& secret,
               const std::string& label,
               const bytes& group_id,
-              uint32_t epoch,
+              const epoch_t& epoch,
               const bytes& message)
 {
   std::string mls_label = std::string("mls10 ") + label;

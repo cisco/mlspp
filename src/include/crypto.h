@@ -114,7 +114,7 @@ bytes
 derive_secret(const bytes& secret,
               const std::string& label,
               const bytes& group_id,
-              uint32_t epoch,
+              const epoch_t& epoch,
               const bytes& message);
 
 class DHPublicKey

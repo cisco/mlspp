@@ -19,6 +19,9 @@ tls_round_trip(const T& before)
   return after;
 }
 
+static const epoch_t epoch_val = { 0x00, 0x01, 0x02, 0x03,
+                                   0x04, 0x05, 0x06, 0x07 };
+
 TEST_CASE("Basic message serialization", "[messages]")
 {
   auto identity_priv = SignaturePrivateKey::generate();
@@ -29,7 +32,7 @@ TEST_CASE("Basic message serialization", "[messages]")
   UserInitKey user_init_key;
   user_init_key.generate(identity_priv);
 
-  GroupInitKey group_init_key{ 0x01010101,
+  GroupInitKey group_init_key{ epoch_val,
                                3,
                                { 0x03, 0x03, 0x03, 0x03 },
                                dh_pub,
@@ -72,20 +75,16 @@ TEST_CASE("Handshake serialization", "[messages]")
   RatchetNode ratchet(dh_pub);
 
   // Simulate a 3-node Merkle tree with the signer in position 1
+  uint32_t group_size = 3;
+  uint32_t signer_index = 0;
+  std::vector<MerkleNode> copath = { merkle, merkle };
   auto root = ((merkle + merkle) + merkle).value();
 
   UserInitKey user_init_key;
   user_init_key.generate(identity_priv);
 
-  GroupInitKey group_init_key{ 0x01010101,
-                               3,
-                               { 0x03, 0x03, 0x03, 0x03 },
-                               dh_pub,
-                               { merkle + merkle, merkle },
-                               { ratchet, ratchet } };
-
   Handshake<None> initial{
-    None{}, 0x01010101, group_init_key, 1, { merkle, merkle }
+    None{}, epoch_val, group_size, signer_index, copath
     // identity_key omitted
     // signature omitted
   };
@@ -95,9 +94,7 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("None")
   {
-    Handshake<None> before{
-      {}, 0x01010101, group_init_key, 1, { merkle, merkle }
-    };
+    Handshake<None> before{ {}, epoch_val, group_size, signer_index, copath };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
@@ -106,11 +103,9 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("UserAdd")
   {
-    Handshake<UserAdd> before{ { { ratchet, ratchet } },
-                               0x01010101,
-                               group_init_key,
-                               1,
-                               { merkle, merkle } };
+    Handshake<UserAdd> before{
+      { { ratchet, ratchet } }, epoch_val, group_size, signer_index, copath
+    };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
@@ -120,7 +115,7 @@ TEST_CASE("Handshake serialization", "[messages]")
   SECTION("GroupAdd")
   {
     Handshake<GroupAdd> before{
-      { user_init_key }, 0x01010101, group_init_key, 1, { merkle, merkle }
+      { user_init_key }, epoch_val, group_size, signer_index, copath
     };
 
     before.sign(identity_priv);
@@ -130,11 +125,9 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("Update")
   {
-    Handshake<Update> before{ { { ratchet, ratchet } },
-                              0x01010101,
-                              group_init_key,
-                              1,
-                              { merkle, merkle } };
+    Handshake<Update> before{
+      { { ratchet, ratchet } }, epoch_val, group_size, signer_index, copath
+    };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
@@ -144,13 +137,25 @@ TEST_CASE("Handshake serialization", "[messages]")
   SECTION("Remove")
   {
     Handshake<Remove> before{ { 0x42, { ratchet, ratchet } },
-                              0x01010101,
-                              group_init_key,
-                              1,
-                              { merkle, merkle } };
+                              epoch_val,
+                              group_size,
+                              signer_index,
+                              copath };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
     REQUIRE(after.verify(root));
   }
+}
+
+TEST_CASE("Epoch evolution", "[messages]")
+{
+  auto first = epoch_val;
+  None message;
+  auto second = next_epoch(first, message);
+  REQUIRE(first != second);
+
+  auto before = epoch_val;
+  auto after = tls_round_trip(before);
+  REQUIRE(before == after);
 }
