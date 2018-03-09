@@ -117,6 +117,18 @@ derive_secret(const bytes& secret,
               const epoch_t& epoch,
               const bytes& message);
 
+bytes
+aes_gcm_encrypt(uint64_t seq,
+                const bytes& key,
+                const bytes& iv,
+                const bytes& plaintext);
+
+bytes
+aes_gcm_decrypt(uint64_t seq,
+                const bytes& key,
+                const bytes& iv,
+                const bytes& ciphertext);
+
 class DHPublicKey
 {
 public:

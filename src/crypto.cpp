@@ -51,6 +51,13 @@ TypedDelete(BIGNUM* ptr)
 }
 
 template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
 EC_KEY*
 TypedDup(EC_KEY* ptr)
 {
@@ -201,6 +208,81 @@ derive_secret(const bytes& secret,
   //
   hkdf_label.push_back(0x01);
   return hmac_sha256(secret, hkdf_label);
+}
+
+static bytes
+message_nonce(uint64_t seq, const bytes& iv)
+{
+  bytes nonce = iv;
+  for (int i = 0; i < 8; i += 1) {
+    nonce[nonce.size() - i - 1] ^= uint8_t(seq >> (8 * i));
+  }
+  return nonce;
+}
+
+#define GCM_TAG_LEN 16
+
+bytes
+aes_gcm_encrypt(uint64_t seq,
+                const bytes& key,
+                const bytes& iv,
+                const bytes& plaintext)
+{
+  // TODO(rlb@ipv.sx) Check key, IV have correct size
+  auto nonce = message_nonce(seq, iv);
+  bytes ciphertext(plaintext.size() + GCM_TAG_LEN);
+  int dummy;
+
+  // TODO(rlb@ipv.sx) Check for errors and throw
+  Scoped<EVP_CIPHER_CTX> ctx(EVP_CIPHER_CTX_new());
+
+  EVP_EncryptInit_ex(
+    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), iv.data());
+  EVP_EncryptUpdate(
+    ctx.get(), ciphertext.data(), &dummy, plaintext.data(), plaintext.size());
+  EVP_EncryptFinal(ctx.get(), nullptr, &dummy);
+
+  EVP_CIPHER_CTX_ctrl(ctx.get(),
+                      EVP_CTRL_GCM_GET_TAG,
+                      GCM_TAG_LEN,
+                      ciphertext.data() + plaintext.size());
+
+  return ciphertext;
+}
+
+bytes
+aes_gcm_decrypt(uint64_t seq,
+                const bytes& key,
+                const bytes& iv,
+                const bytes& ciphertext)
+{
+  // TODO(rlb@ipv.sx) Check key, IV have correct size
+  // TODO(rlb@ipv.sx) Check ciphertext is sufficiently large
+  auto nonce = message_nonce(seq, iv);
+  bytes plaintext(ciphertext.size() - GCM_TAG_LEN);
+  int dummy;
+
+  bytes tag(GCM_TAG_LEN);
+  std::copy(ciphertext.end() - GCM_TAG_LEN, ciphertext.end(), tag.begin());
+
+  // TODO(rlb@ipv.sx) Check for errors and throw
+  Scoped<EVP_CIPHER_CTX> ctx(EVP_CIPHER_CTX_new());
+  EVP_DecryptInit_ex(
+    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), iv.data());
+  EVP_DecryptUpdate(
+    ctx.get(), plaintext.data(), &dummy, ciphertext.data(), ciphertext.size());
+
+  EVP_CIPHER_CTX_ctrl(ctx.get(),
+                      EVP_CTRL_GCM_SET_TAG,
+                      GCM_TAG_LEN,
+                      (void*)(ciphertext.data() + plaintext.size()));
+
+  int rv = EVP_DecryptFinal(ctx.get(), nullptr, &dummy);
+  if (rv <= 0) {
+    throw OpenSSLError::current();
+  }
+
+  return ciphertext;
 }
 
 ///
