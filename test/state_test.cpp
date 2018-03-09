@@ -113,7 +113,7 @@ TEST_CASE("Group creation", "[state]")
   }
 }
 
-TEST_CASE("Group update and removal", "[state]")
+TEST_CASE("Operations on a running group", "[state]")
 {
   std::vector<State> states;
   states.reserve(group_size);
@@ -169,6 +169,21 @@ TEST_CASE("Group update and removal", "[state]")
 
       for (size_t j = 0; j < i; j += 1) {
         REQUIRE(states[j] == states[0]);
+      }
+    }
+  }
+
+  SECTION("Each node can send and be received")
+  {
+    std::string message = "hello world";
+    bytes content(message.begin(), message.end());
+
+    for (auto& sender : states) {
+      auto encrypted = sender.protect(content);
+
+      for (const auto& receiver : states) {
+        auto decrypted = receiver.unprotect(encrypted);
+        REQUIRE(decrypted == content);
       }
     }
   }

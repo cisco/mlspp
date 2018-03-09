@@ -11,7 +11,8 @@ namespace mls {
 struct MLSCiphertext
 {
   epoch_t epoch;
-  uint32_t sequence;
+  uint64_t sequence;
+  uint32_t sender_index;
   tls::opaque<2> ciphertext;
 };
 
@@ -98,7 +99,7 @@ public:
   ///
   /// Message Protection
   ///
-  MLSCiphertext protect(const bytes& content) const;
+  MLSCiphertext protect(const bytes& content);
   bytes unprotect(const MLSCiphertext& message) const;
 
 private:
@@ -112,6 +113,7 @@ private:
   Tree<MerkleNode> _identity_tree;
   Tree<RatchetNode> _ratchet_tree;
 
+  uint64_t _last_seq = 0;
   bytes _message_master_secret;
   bytes _init_secret;
   DHPrivateKey _add_priv;
@@ -146,10 +148,14 @@ private:
                    const Handshake<Message>& message,
                    const optional<DHPrivateKey>& leaf_priv);
 
-  // Derive the sercrets for an epoch, given some new entropy
+  // Derive the secrets for an epoch, given some new entropy
   void derive_epoch_keys(bool add,
                          const bytes& update_secret,
                          const bytes& message);
+
+  // Derive the encryptiong parameters for a given sender
+  bytes sender_key(uint32_t index) const;
+  bytes sender_iv(uint32_t index) const;
 
   // Create a signed Handshake message, given a payload
   template<typename T>

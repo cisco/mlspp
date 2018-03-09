@@ -35,8 +35,8 @@ TEST_CASE("SHA-256 hash produces correct values", "[crypto]")
 TEST_CASE("AES-GCM encryption and decryption work", "[crypto]")
 {
   auto key = from_hex("000102030405060708090a0b0c0d0e0f");
-  auto iv = from_hex("10111213141010101010101010");
-  uint64_t seq = 0x05060708090a0b0c;
+  auto iv = from_hex("101112131010101010101010");
+  uint64_t seq = 0x0405060708090a0b;
 
   auto plaintext = from_hex("a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0");
   auto ciphertext = from_hex("648ea30fafef164fb77dfd5567874b9e"

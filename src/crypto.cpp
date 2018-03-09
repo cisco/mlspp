@@ -165,7 +165,7 @@ hkdf_extract(const bytes& salt, const bytes& ikm)
 //     opaque label<7..255> = "mls10 " + Label;
 //     opaque group_id<0..2^16-1> = ID;
 //     uint64 epoch = Epoch;
-//     opaque message<1..2^16-1> = Msg
+//     opaque message<0..2^16-1> = Msg
 // } HkdfLabel;
 struct HKDFLabel
 {
@@ -173,7 +173,7 @@ struct HKDFLabel
   tls::opaque<1, 7> label;
   tls::opaque<2> group_id;
   epoch_t epoch;
-  tls::opaque<2, 1> message;
+  tls::opaque<2, 0> message;
 };
 
 tls::ostream&
@@ -237,7 +237,7 @@ aes_gcm_encrypt(uint64_t seq,
   Scoped<EVP_CIPHER_CTX> ctx(EVP_CIPHER_CTX_new());
 
   EVP_EncryptInit_ex(
-    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), iv.data());
+    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), nonce.data());
   EVP_EncryptUpdate(
     ctx.get(), ciphertext.data(), &dummy, plaintext.data(), plaintext.size());
   EVP_EncryptFinal(ctx.get(), nullptr, &dummy);
@@ -262,27 +262,27 @@ aes_gcm_decrypt(uint64_t seq,
   bytes plaintext(ciphertext.size() - GCM_TAG_LEN);
   int dummy;
 
-  bytes tag(GCM_TAG_LEN);
-  std::copy(ciphertext.end() - GCM_TAG_LEN, ciphertext.end(), tag.begin());
+  bytes tag(ciphertext.end() - GCM_TAG_LEN, ciphertext.end());
 
   // TODO(rlb@ipv.sx) Check for errors and throw
   Scoped<EVP_CIPHER_CTX> ctx(EVP_CIPHER_CTX_new());
+
   EVP_DecryptInit_ex(
-    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), iv.data());
+    ctx.get(), EVP_aes_128_gcm(), nullptr, key.data(), nonce.data());
   EVP_DecryptUpdate(
-    ctx.get(), plaintext.data(), &dummy, ciphertext.data(), ciphertext.size());
+    ctx.get(), plaintext.data(), &dummy, ciphertext.data(), plaintext.size());
 
   EVP_CIPHER_CTX_ctrl(ctx.get(),
                       EVP_CTRL_GCM_SET_TAG,
-                      GCM_TAG_LEN,
-                      (void*)(ciphertext.data() + plaintext.size()));
+                      tag.size(),
+                      static_cast<void*>(tag.data()));
 
   int rv = EVP_DecryptFinal(ctx.get(), nullptr, &dummy);
-  if (rv <= 0) {
+  if (rv != 1) {
     throw OpenSSLError::current();
   }
 
-  return ciphertext;
+  return plaintext;
 }
 
 ///

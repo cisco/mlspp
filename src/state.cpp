@@ -272,6 +272,37 @@ State::handle(const Handshake<Remove>& remove) const
 }
 
 ///
+/// Message protection
+///
+
+// TODO(rlb@ipv.sx) Messages should be signed as well
+
+MLSCiphertext
+State::protect(const bytes& pt)
+{
+  auto key = sender_key(_index);
+  auto iv = sender_iv(_index);
+  auto seq = _last_seq;
+  auto ct = aes_gcm_encrypt(seq, key, iv, pt);
+
+  _last_seq += 1;
+
+  return MLSCiphertext{ _epoch, seq, _index, ct };
+}
+
+bytes
+State::unprotect(const MLSCiphertext& ct) const
+{
+  if (ct.epoch != _epoch) {
+    throw InvalidParameterError("Invalid epoch");
+  }
+
+  auto key = sender_key(ct.sender_index);
+  auto iv = sender_iv(ct.sender_index);
+  return aes_gcm_decrypt(ct.sequence, key, iv, ct.ciphertext);
+}
+
+///
 /// Inner logic and convenience functions
 ///
 
@@ -408,6 +439,33 @@ State::derive_epoch_keys(bool add,
     derive_secret(epoch_secret, "add", _group_id, _epoch, message);
 
   _add_priv = DHPrivateKey::derive(add_secret);
+}
+
+std::string
+sender_label(uint32_t index)
+{
+  std::string label(4, '\0');
+  label[0] = char(index >> 24);
+  label[1] = char(index >> 16);
+  label[2] = char(index >> 8);
+  label[3] = char(index);
+  return label;
+}
+
+bytes
+State::sender_key(uint32_t index) const
+{
+  auto label = sender_label(index);
+  return derive_secret(
+    _message_master_secret, "key " + label, _group_id, _epoch, {});
+}
+
+bytes
+State::sender_iv(uint32_t index) const
+{
+  auto label = sender_label(index);
+  return derive_secret(
+    _message_master_secret, "iv " + label, _group_id, _epoch, {});
 }
 
 template<typename Message>
