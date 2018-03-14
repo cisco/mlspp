@@ -8,13 +8,8 @@ template<typename T>
 T
 tls_round_trip(const T& before)
 {
-  tls::ostream w;
-  w << before;
-
   T after;
-  tls::istream r(w.bytes());
-  r >> after;
-
+  tls::unmarshal(tls::marshal(before), after);
   REQUIRE(before == after);
   return after;
 }

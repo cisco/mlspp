@@ -231,21 +231,11 @@ struct Handshake
 
   bytes to_be_signed() const
   {
-    tls::ostream msg_out;
-    msg_out << message;
-
-    tls::opaque<3> message = msg_out.bytes();
+    tls::opaque<3> message_data = tls::marshal(message);
 
     tls::ostream out;
-    out << Message::type << message << prior_epoch << group_size << signer_index
-        << identity_proof << identity_key;
-    return out.bytes();
-  }
-
-  bytes to_bytes() const
-  {
-    tls::ostream out;
-    out << *this;
+    out << Message::type << message_data << prior_epoch << group_size
+        << signer_index << identity_proof << identity_key;
     return out.bytes();
   }
 };
@@ -284,8 +274,7 @@ operator>>(tls::istream& in, Handshake<Message>& obj)
 
   tls::opaque<3> message;
   in >> message;
-  tls::istream msg_in(message);
-  msg_in >> obj.message;
+  tls::unmarshal(message, obj.message);
 
   in >> obj.prior_epoch >> obj.group_size >> obj.signer_index >>
     obj.identity_proof >> obj.identity_key >> obj.signature;
@@ -313,10 +302,7 @@ template<typename Message>
 epoch_t
 next_epoch(const epoch_t& prior, const Message& message)
 {
-  tls::ostream msgw;
-  msgw << message;
-
-  EpochInfo info{ prior, Message::type, msgw.bytes() };
+  EpochInfo info{ prior, Message::type, tls::marshal(message) };
   tls::ostream infow;
   infow << info;
 

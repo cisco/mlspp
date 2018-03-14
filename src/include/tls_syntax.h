@@ -229,4 +229,22 @@ operator>>(istream& in, vector<T, head, min, max>& data)
   return in;
 }
 
+// Abbreviations
+template<typename T>
+std::vector<uint8_t>
+marshal(const T& value)
+{
+  ostream w;
+  w << value;
+  return w.bytes();
+}
+
+template<typename T>
+void
+unmarshal(const std::vector<uint8_t>& data, T& value)
+{
+  istream r(data);
+  r >> value;
+}
+
 } // namespace tls

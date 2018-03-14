@@ -376,7 +376,7 @@ State::init_from_details(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx) Verify that this is populated?
   auto tree_priv = *(_ratchet_tree.root().private_key());
   auto update_secret = tree_priv.derive(group_init_key.add_key);
-  derive_epoch_keys(true, update_secret, handshake.to_bytes());
+  derive_epoch_keys(true, update_secret, tls::marshal(handshake));
 }
 
 template<typename Message>
@@ -390,7 +390,7 @@ State::add_inner(const SignaturePublicKey& identity_key,
   // NB: complementary to init_from_details
   auto tree_key = _ratchet_tree.root().public_key();
   auto update_secret = _add_priv.derive(tree_key);
-  derive_epoch_keys(true, update_secret, handshake.to_bytes());
+  derive_epoch_keys(true, update_secret, tls::marshal(handshake));
 }
 
 template<typename Message>
@@ -409,7 +409,7 @@ State::update_leaf(uint32_t index,
 
   // XXX(rlb@ipv.sx) Verify that this is populated?
   auto update_secret = *(_ratchet_tree.root().secret());
-  derive_epoch_keys(false, update_secret, handshake.to_bytes());
+  derive_epoch_keys(false, update_secret, tls::marshal(handshake));
 
   _prior_epoch = _epoch;
   _epoch = next_epoch(_prior_epoch, handshake.message);

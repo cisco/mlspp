@@ -102,6 +102,8 @@ public:
   MLSCiphertext protect(const bytes& content);
   bytes unprotect(const MLSCiphertext& message) const;
 
+  epoch_t epoch() const { return _epoch; }
+
 private:
   uint32_t _index;
   DHPrivateKey _leaf_priv;
