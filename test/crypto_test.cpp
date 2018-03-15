@@ -89,13 +89,11 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
 
   SECTION("Via TLS syntax")
   {
-    tls::ostream w;
-    w << gX;
-    REQUIRE(w.bytes() == from_hex(header + raw));
+    auto data = tls::marshal(gX);
+    REQUIRE(data == from_hex(header + raw));
 
-    tls::istream r(w.bytes());
     DHPublicKey gX2;
-    r >> gX2;
+    tls::unmarshal(data, gX2);
     REQUIRE(gX2 == gX);
   }
 }
@@ -144,19 +142,14 @@ TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
 
   SECTION("Directly")
   {
-    auto data = gX.to_bytes();
-    SignaturePublicKey parsed(data);
+    SignaturePublicKey parsed(gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
   SECTION("Via TLS syntax")
   {
-    tls::ostream w;
-    w << gX;
-
-    tls::istream r(w.bytes());
     SignaturePublicKey gX2;
-    r >> gX2;
+    tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
 }
