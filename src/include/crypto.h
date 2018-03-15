@@ -76,6 +76,13 @@ public:
     _raw = raw;
   }
 
+  T* release()
+  {
+    T* out = _raw;
+    _raw = nullptr;
+    return out;
+  }
+
   void clear()
   {
     if (_raw != nullptr) {
@@ -166,15 +173,11 @@ public:
   DHPrivateKey() = default;
   DHPrivateKey(const DHPrivateKey& other);
   DHPrivateKey(DHPrivateKey&& other);
-  DHPrivateKey(const bytes& data);
   DHPrivateKey& operator=(const DHPrivateKey& other);
   DHPrivateKey& operator=(DHPrivateKey&& other);
 
   bool operator==(const DHPrivateKey& other) const;
   bool operator!=(const DHPrivateKey& other) const;
-
-  bytes to_bytes() const;
-  void reset(const bytes& data);
 
   bytes derive(DHPublicKey pub) const;
   DHPublicKey public_key() const;
@@ -184,6 +187,12 @@ private:
   DHPublicKey _pub;
 
   DHPrivateKey(EC_KEY* key);
+
+  // XXX(rlb@ipv.sx) The format for private keys here is
+  // non-standard, because OpenSSL's private key serialization
+  // routines are wonky.
+  friend tls::ostream& operator<<(tls::ostream& out, const DHPrivateKey& obj);
+  friend tls::istream& operator>>(tls::istream& in, DHPrivateKey& obj);
 };
 
 tls::ostream&
@@ -237,7 +246,6 @@ public:
   SignaturePrivateKey() = default;
   SignaturePrivateKey(const SignaturePrivateKey& other);
   SignaturePrivateKey(SignaturePrivateKey&& other);
-  SignaturePrivateKey(const bytes& data);
   SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
   SignaturePrivateKey& operator=(SignaturePrivateKey&& other);
 
@@ -247,19 +255,18 @@ public:
   bytes sign(const bytes& message) const;
   SignaturePublicKey public_key() const;
 
-  bytes to_bytes() const;
-  void reset(const bytes& data);
-
 private:
   Scoped<EC_KEY> _key;
   SignaturePublicKey _pub;
 
   SignaturePrivateKey(EC_KEY* key);
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePrivateKey& obj);
-tls::istream&
-operator>>(tls::istream& in, SignaturePrivateKey& obj);
+  // XXX(rlb@ipv.sx) The format for private keys here is
+  // non-standard, because OpenSSL's private key serialization
+  // routines are wonky.
+  friend tls::ostream& operator<<(tls::ostream& out,
+                                  const SignaturePrivateKey& obj);
+  friend tls::istream& operator>>(tls::istream& in, SignaturePrivateKey& obj);
+};
 
 } // namespace mls

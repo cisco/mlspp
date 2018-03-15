@@ -440,11 +440,6 @@ DHPrivateKey::DHPrivateKey(DHPrivateKey&& other)
   , _pub(std::move(other._pub))
 {}
 
-DHPrivateKey::DHPrivateKey(const bytes& data)
-{
-  reset(data);
-}
-
 DHPrivateKey&
 DHPrivateKey::operator=(const DHPrivateKey& other)
 {
@@ -510,55 +505,40 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
 
-bytes
-DHPrivateKey::to_bytes() const
-{
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2d_ECPrivateKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
-
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2d_ECPrivateKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
-}
-
-void
-DHPrivateKey::reset(const bytes& data)
-{
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!d2i_ECPrivateKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
-}
-
 tls::ostream&
 operator<<(tls::ostream& out, const DHPrivateKey& obj)
 {
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
+  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
+  int len = BN_num_bytes(dN);
+
+  tls::opaque<1> d(len);
+  BN_bn2bin(dN, d.data());
+
+  tls::opaque<1> pub = obj._pub.to_bytes();
+
+  return out << d << pub;
 }
 
 tls::istream&
 operator>>(tls::istream& in, DHPrivateKey& obj)
 {
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
+  tls::opaque<1> d, pub;
+  in >> d >> pub;
+
+  const uint8_t* ptr = pub.data();
+  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
+  EC_KEY* temp = key.get();
+  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
+    throw OpenSSLError::current();
+  }
+
+  Scoped<EC_GROUP> group = defaultECGroup();
+  EC_KEY_set_group(key.get(), group.get());
+
+  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
+  EC_KEY_set_private_key(key.get(), dN.get());
+
+  obj = DHPrivateKey(key.release());
   return in;
 }
 
@@ -719,11 +699,6 @@ SignaturePrivateKey::SignaturePrivateKey(SignaturePrivateKey&& other)
   , _pub(std::move(other._pub))
 {}
 
-SignaturePrivateKey::SignaturePrivateKey(const bytes& data)
-{
-  reset(data);
-}
-
 SignaturePrivateKey&
 SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
 {
@@ -744,6 +719,21 @@ SignaturePrivateKey::operator=(SignaturePrivateKey&& other)
   return *this;
 }
 
+bytes
+point_data(const EC_KEY* key)
+{
+  point_conversion_form_t form = POINT_CONVERSION_UNCOMPRESSED;
+  const EC_POINT* pt = EC_KEY_get0_public_key(key);
+  const EC_GROUP* group = EC_KEY_get0_group(key);
+
+  bytes data;
+  int len = 0;
+  len = EC_POINT_point2oct(group, pt, form, nullptr, len, nullptr);
+  data.resize(len);
+  EC_POINT_point2oct(group, pt, form, data.data(), len, nullptr);
+  return data;
+}
+
 bool
 SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
 {
@@ -755,8 +745,13 @@ SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
   const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
   const EC_GROUP* group = EC_KEY_get0_group(_key.get());
 
-  auto out =
-    (BN_cmp(d1, d2) == 0) && (EC_POINT_cmp(group, p1, p2, nullptr) == 0);
+  auto deq = BN_cmp(d1, d2);
+  auto peq = EC_POINT_cmp(group, p1, p2, nullptr);
+  if (peq == -1) {
+    throw OpenSSLError::current();
+  }
+
+  auto out = (deq == 0) && (peq == 0) && (_pub == other._pub);
   return out;
 }
 
@@ -795,55 +790,40 @@ SignaturePrivateKey::SignaturePrivateKey(EC_KEY* key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
 
-bytes
-SignaturePrivateKey::to_bytes() const
-{
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2d_ECPrivateKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
-
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2d_ECPrivateKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
-}
-
-void
-SignaturePrivateKey::reset(const bytes& data)
-{
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!d2i_ECPrivateKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
-}
-
 tls::ostream&
 operator<<(tls::ostream& out, const SignaturePrivateKey& obj)
 {
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
+  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
+  int len = BN_num_bytes(dN);
+
+  tls::opaque<1> d(len);
+  BN_bn2bin(dN, d.data());
+
+  tls::opaque<1> pub = obj._pub.to_bytes();
+
+  return out << d << pub;
 }
 
 tls::istream&
 operator>>(tls::istream& in, SignaturePrivateKey& obj)
 {
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
+  tls::opaque<1> d, pub;
+  in >> d >> pub;
+
+  const uint8_t* ptr = pub.data();
+  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
+  EC_KEY* temp = key.get();
+  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
+    throw OpenSSLError::current();
+  }
+
+  Scoped<EC_GROUP> group = defaultECGroup();
+  EC_KEY_set_group(key.get(), group.get());
+
+  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
+  EC_KEY_set_private_key(key.get(), dN.get());
+
+  obj = SignaturePrivateKey(key.release());
   return in;
 }
 

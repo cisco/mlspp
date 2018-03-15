@@ -105,38 +105,17 @@ TEST_CASE("Diffie-Hellman private keys serialize and deserialize", "[crypto]")
   auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
 
   std::string raw =
-    "3082016802010104200dd712c4747615f155efdd48a3f9e6c9f50de785d9bb1b"
-    "9d4f99583ff248133fa081fa3081f7020101302c06072a8648ce3d0101022100"
-    "ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"
-    "305b0420ffffffff00000001000000000000000000000000ffffffffffffffff"
-    "fffffffc04205ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce"
-    "3c3e27d2604b031500c49d360886e704936a6678e1139d26b7819f7e90044104"
-    "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296"
-    "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"
-    "022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc"
-    "632551020101a144034200045e2808231accb273fcb6d6fc1d0954e72239628a"
-    "8e2ba2e5c7cb9c299f98e747b185023591e72c2aaa7147a3c273140523675235"
-    "bd1ba8549046fb39545d4e47";
-  std::string header = "016c";
+    "200dd712c4747615f155efdd48a3f9e6c9f50de785d9bb1b9d4f99583ff248133f"
+    "4104"
+    "5e2808231accb273fcb6d6fc1d0954e72239628a8e2ba2e5c7cb9c299f98e747"
+    "b185023591e72c2aaa7147a3c273140523675235bd1ba8549046fb39545d4e47";
 
-  SECTION("Directly")
-  {
-    auto data = x.to_bytes();
-    REQUIRE(data == from_hex(raw));
+  auto marshaled = tls::marshal(x);
+  REQUIRE(marshaled == from_hex(raw));
 
-    DHPrivateKey parsed(data);
-    // XXX REQUIRE(parsed == x);
-  }
-
-  SECTION("Via TLS syntax")
-  {
-    auto marshaled = tls::marshal(x);
-    REQUIRE(marshaled == from_hex(header + raw));
-
-    DHPrivateKey x2;
-    tls::unmarshal(marshaled, x2);
-    // XXX REQUIRE(x2 == x);
-  }
+  DHPrivateKey x2;
+  tls::unmarshal(marshaled, x2);
+  REQUIRE(x2 == x);
 }
 
 TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
@@ -186,21 +165,7 @@ TEST_CASE("Signature private keys serialize and deserialize", "[crypto]")
 {
   auto x = SignaturePrivateKey::generate();
 
-  SECTION("Directly")
-  {
-    auto data = x.to_bytes();
-    SignaturePrivateKey parsed(data);
-    // XXX REQUIRE(parsed == x);
-  }
-
-  SECTION("Via TLS syntax")
-  {
-    tls::ostream w;
-    w << x;
-
-    tls::istream r(w.bytes());
-    SignaturePrivateKey x2;
-    r >> x2;
-    // XXX REQUIRE(x2 == x);
-  }
+  SignaturePrivateKey x2;
+  tls::unmarshal(tls::marshal(x), x2);
+  REQUIRE(x2 == x);
 }
