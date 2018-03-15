@@ -33,6 +33,13 @@ static const uint8_t dh_hash_prefix = 0x03;
 // The `typedef X parent` / `using parent::parent` construction here
 // imports the constructors of the parent.
 
+class NotImplementedError : public std::exception
+{
+public:
+  typedef std::exception parent;
+  using parent::parent;
+};
+
 class InvalidTLSSyntax : public std::invalid_argument
 {
 public:
@@ -68,7 +75,21 @@ public:
   using parent::parent;
 };
 
+class InvalidMessageTypeError : public std::invalid_argument
+{
+public:
+  typedef std::invalid_argument parent;
+  using parent::parent;
+};
+
 class MissingNodeError : public std::out_of_range
+{
+public:
+  typedef std::out_of_range parent;
+  using parent::parent;
+};
+
+class MissingStateError : public std::out_of_range
 {
 public:
   typedef std::out_of_range parent;

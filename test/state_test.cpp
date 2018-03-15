@@ -24,8 +24,10 @@ TEST_CASE("Group creation", "[state]")
   auto stp = states.begin();
   for (size_t i = 0; i < group_size; i += 1) {
     identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
+    auto init_priv = DHPrivateKey::generate();
     user_init_keys.emplace(uik + i);
-    auto init_priv = user_init_keys[i].generate(identity_privs[i]);
+    user_init_keys[i].init_key = init_priv.public_key();
+    user_init_keys[i].sign(identity_privs[i]);
     init_privs.emplace(inp + i, init_priv);
   }
 
@@ -40,8 +42,7 @@ TEST_CASE("Group creation", "[state]")
 
     // Process the GroupAdd
     states[0] = states[0].handle(group_add);
-    states.emplace(
-      stp + 1, identity_privs[1], init_privs[1], group_add, group_init_key);
+    states.emplace(stp + 1, identity_privs[1], init_privs[1], group_add);
 
     REQUIRE(states[0] == states[1]);
   }
@@ -58,8 +59,7 @@ TEST_CASE("Group creation", "[state]")
 
     // Process the UserAdd
     states[0] = states[0].handle(user_add);
-    states.emplace(
-      stp + 1, identity_privs[1], init_privs[1], user_add, group_init_key);
+    states.emplace(stp + 1, identity_privs[1], init_privs[1], user_add);
     REQUIRE(states[0] == states[1]);
   }
 
@@ -77,8 +77,7 @@ TEST_CASE("Group creation", "[state]")
         state = state.handle(group_add);
       }
 
-      states.emplace(
-        stp + i, identity_privs[i], init_privs[i], group_add, group_init_key);
+      states.emplace(stp + i, identity_privs[i], init_privs[i], group_add);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -102,8 +101,7 @@ TEST_CASE("Group creation", "[state]")
         state = state.handle(user_add);
       }
 
-      states.emplace(
-        stp + i, identity_privs[i], init_privs[i], user_add, group_init_key);
+      states.emplace(stp + i, identity_privs[i], init_privs[i], user_add);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -131,7 +129,7 @@ TEST_CASE("Operations on a running group", "[state]")
       state = state.handle(user_add);
     }
 
-    states.emplace(stp + i, identity_priv, leaf_priv, user_add, group_init_key);
+    states.emplace(stp + i, identity_priv, leaf_priv, user_add);
   }
 
   for (const auto& state : states) {

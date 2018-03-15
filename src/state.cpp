@@ -44,47 +44,39 @@ State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
 
 State::State(const SignaturePrivateKey& identity_priv,
              const DHPrivateKey& init_priv,
-             const Handshake<GroupAdd>& group_add,
-             const GroupInitKey& group_init_key)
+             const Handshake<GroupAdd>& group_add)
   : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
   , _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  auto prior_root = group_init_key.identity_root();
+  auto prior_root = group_add.message.group_init_key.identity_root();
   if (!group_add.verify(prior_root)) {
     throw InvalidParameterError("Group add is not from a member of the group");
   }
 
-  auto identity_key = group_add.message.init_key.identity_key;
-  auto init_key = group_add.message.init_key.init_key;
+  auto identity_key = group_add.message.user_init_key.identity_key;
+  auto init_key = group_add.message.user_init_key.init_key;
   if ((identity_key != identity_priv.public_key()) ||
       (init_key != init_priv.public_key())) {
     throw InvalidParameterError("Group add not targeted for this node");
   }
 
-  auto leaf_data = init_priv.derive(group_init_key.add_key);
+  auto leaf_data = init_priv.derive(group_add.message.group_init_key.add_key);
   auto leaf_priv = DHPrivateKey::derive(leaf_data);
 
-  tls::ostream writer;
-  writer << group_add;
-  auto message = writer.bytes();
-
-  init_from_details(identity_priv, leaf_priv, group_init_key, group_add);
+  init_from_details(
+    identity_priv, leaf_priv, group_add.message.group_init_key, group_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
              const DHPrivateKey& leaf_priv,
-             const Handshake<UserAdd>& user_add,
-             const GroupInitKey& group_init_key)
+             const Handshake<UserAdd>& user_add)
   : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
   , _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  tls::ostream writer;
-  writer << user_add;
-  auto message = writer.bytes();
-
-  init_from_details(identity_priv, leaf_priv, group_init_key, user_add);
+  init_from_details(
+    identity_priv, leaf_priv, user_add.message.group_init_key, user_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
@@ -115,7 +107,7 @@ State::join(const SignaturePrivateKey& identity_priv,
   auto path = temp_state._ratchet_tree.direct_path(temp_state._index);
   path.push_back(RatchetNode(leaf_priv));
 
-  return temp_state.sign(UserAdd{ path });
+  return temp_state.sign(UserAdd{ path, group_init_key });
 }
 
 Handshake<GroupAdd>
@@ -125,7 +117,7 @@ State::add(const UserInitKey& user_init_key) const
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  return sign(GroupAdd{ user_init_key });
+  return sign(GroupAdd{ user_init_key, group_init_key() });
 }
 
 Handshake<Update>
@@ -187,7 +179,7 @@ State::handle(const Handshake<GroupAdd>& group_add) const
     throw InvalidParameterError("GroupAdd is not from a member of the group");
   }
 
-  if (!group_add.message.init_key.verify()) {
+  if (!group_add.message.user_init_key.verify()) {
     throw InvalidParameterError("Invalid signature on init key in group add");
   }
 
@@ -195,8 +187,8 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   auto next = spawn(group_add.epoch());
 
   // Add the new leaf to the ratchet tree
-  auto init_key = group_add.message.init_key.init_key;
-  auto identity_key = group_add.message.init_key.identity_key;
+  auto init_key = group_add.message.user_init_key.init_key;
+  auto identity_key = group_add.message.user_init_key.identity_key;
 
   auto leaf_data = _add_priv.derive(init_key);
   auto leaf_key = DHPrivateKey::derive(leaf_data);
@@ -335,6 +327,12 @@ operator==(const State& lhs, const State& rhs)
 
   return epoch && group_id && identity_tree && ratchet_tree &&
          message_master_secret && init_secret && add_priv;
+}
+
+bool
+operator!=(const State& lhs, const State& rhs)
+{
+  return !(lhs == rhs);
 }
 
 State

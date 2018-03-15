@@ -21,7 +21,7 @@ struct UserInitKey
   SignaturePublicKey identity_key;
   tls::opaque<2> signature;
 
-  DHPrivateKey generate(const SignaturePrivateKey& identity_priv);
+  void sign(const SignaturePrivateKey& identity_priv);
   bool verify() const;
   bytes to_be_signed() const;
 };
@@ -95,6 +95,7 @@ struct UserAdd
 {
 public:
   tls::vector<RatchetNode, 2, 1> path;
+  GroupInitKey group_init_key;
 
   static const HandshakeType type;
 };
@@ -112,7 +113,8 @@ operator>>(tls::istream& in, UserAdd& obj);
 struct GroupAdd
 {
 public:
-  UserInitKey init_key;
+  UserInitKey user_init_key;
+  GroupInitKey group_init_key;
 
   static const HandshakeType type;
 };

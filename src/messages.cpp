@@ -5,17 +5,12 @@ namespace mls {
 
 // UserInitKey
 
-DHPrivateKey
-UserInitKey::generate(const SignaturePrivateKey& identity_priv)
+void
+UserInitKey::sign(const SignaturePrivateKey& identity_priv)
 {
-  DHPrivateKey init_priv = DHPrivateKey::generate();
-  init_key = init_priv.public_key();
   identity_key = identity_priv.public_key();
-
   auto tbs = to_be_signed();
   signature = identity_priv.sign(tbs);
-
-  return init_priv;
 }
 
 bool
@@ -131,19 +126,19 @@ const HandshakeType UserAdd::type = HandshakeType::user_add;
 bool
 operator==(const UserAdd& lhs, const UserAdd& rhs)
 {
-  return (lhs.path == rhs.path);
+  return (lhs.path == rhs.path) && (lhs.group_init_key == rhs.group_init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const UserAdd& obj)
 {
-  return out << obj.path;
+  return out << obj.path << obj.group_init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserAdd& obj)
 {
-  return in >> obj.path;
+  return in >> obj.path >> obj.group_init_key;
 }
 
 // GroupAdd
@@ -153,19 +148,20 @@ const HandshakeType GroupAdd::type = HandshakeType::group_add;
 bool
 operator==(const GroupAdd& lhs, const GroupAdd& rhs)
 {
-  return (lhs.init_key == rhs.init_key);
+  return (lhs.user_init_key == rhs.user_init_key) &&
+         (lhs.group_init_key == rhs.group_init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupAdd& obj)
 {
-  return out << obj.init_key;
+  return out << obj.user_init_key << obj.group_init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupAdd& obj)
 {
-  return in >> obj.init_key;
+  return in >> obj.user_init_key >> obj.group_init_key;
 }
 
 // Update

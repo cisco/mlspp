@@ -35,14 +35,12 @@ public:
   // Initialize a group from a GroupAdd (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
         const DHPrivateKey& init_priv,
-        const Handshake<GroupAdd>& group_add,
-        const GroupInitKey& group_init_key);
+        const Handshake<GroupAdd>& group_add);
 
   // Initialize a state from a UserAdd (for user-initiated join)
   State(const SignaturePrivateKey& identity_priv,
         const DHPrivateKey& leaf_priv,
-        const Handshake<UserAdd>& user_add,
-        const GroupInitKey& group_init_key);
+        const Handshake<UserAdd>& user_add);
 
   ///
   /// Message factories
@@ -127,6 +125,7 @@ private:
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
+  friend bool operator!=(const State& lhs, const State& rhs);
 
   // Spawn a new state (with a fresh epoch) from this state
   State spawn(const epoch_t& epoch) const;

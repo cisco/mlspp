@@ -24,8 +24,8 @@ TEST_CASE("Basic message serialization", "[messages]")
   auto dh_pub = DHPrivateKey::generate().public_key();
   RatchetNode ratchet(dh_pub);
 
-  UserInitKey user_init_key;
-  user_init_key.generate(identity_priv);
+  UserInitKey user_init_key{ DHPrivateKey::generate().public_key() };
+  user_init_key.sign(identity_priv);
 
   GroupInitKey group_init_key{ epoch_val,
                                3,
@@ -53,9 +53,15 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("None") { tls_round_trip(None{}); }
 
-  SECTION("UserAdd") { tls_round_trip(UserAdd{ { ratchet, ratchet } }); }
+  SECTION("UserAdd")
+  {
+    tls_round_trip(UserAdd{ { ratchet, ratchet }, group_init_key });
+  }
 
-  SECTION("GroupAdd") { tls_round_trip(GroupAdd{ user_init_key }); }
+  SECTION("GroupAdd")
+  {
+    tls_round_trip(GroupAdd{ user_init_key, group_init_key });
+  }
 
   SECTION("Update") { tls_round_trip(Update{ { ratchet, ratchet } }); }
 
@@ -75,8 +81,15 @@ TEST_CASE("Handshake serialization", "[messages]")
   std::vector<MerkleNode> copath = { merkle, merkle };
   auto root = ((merkle + merkle) + merkle).value();
 
-  UserInitKey user_init_key;
-  user_init_key.generate(identity_priv);
+  UserInitKey user_init_key{ DHPrivateKey::generate().public_key() };
+  user_init_key.sign(identity_priv);
+
+  GroupInitKey group_init_key{ epoch_val,
+                               3,
+                               { 0x03, 0x03, 0x03, 0x03 },
+                               dh_pub,
+                               { merkle, merkle },
+                               { ratchet, ratchet } };
 
   Handshake<None> initial{
     None{}, epoch_val, group_size, signer_index, copath
@@ -98,9 +111,11 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("UserAdd")
   {
-    Handshake<UserAdd> before{
-      { { ratchet, ratchet } }, epoch_val, group_size, signer_index, copath
-    };
+    Handshake<UserAdd> before{ { { ratchet, ratchet }, group_init_key },
+                               epoch_val,
+                               group_size,
+                               signer_index,
+                               copath };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
@@ -109,9 +124,11 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("GroupAdd")
   {
-    Handshake<GroupAdd> before{
-      { user_init_key }, epoch_val, group_size, signer_index, copath
-    };
+    Handshake<GroupAdd> before{ { user_init_key, group_init_key },
+                                epoch_val,
+                                group_size,
+                                signer_index,
+                                copath };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
