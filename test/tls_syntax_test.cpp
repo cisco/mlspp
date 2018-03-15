@@ -1,25 +1,25 @@
-#include "hex.h"
+#include "common.h"
 #include "tls_syntax.h"
 #include <catch.hpp>
 
 // Known-answer tests
 uint8_t val_uint8{ 0x11 };
-std::vector<uint8_t> enc_uint8 = from_hex("11");
+std::vector<uint8_t> enc_uint8 = mls::from_hex("11");
 
 uint16_t val_uint16{ 0x2222 };
-std::vector<uint8_t> enc_uint16 = from_hex("2222");
+std::vector<uint8_t> enc_uint16 = mls::from_hex("2222");
 
 uint32_t val_uint32{ 0x44444444 };
-std::vector<uint8_t> enc_uint32 = from_hex("44444444");
+std::vector<uint8_t> enc_uint32 = mls::from_hex("44444444");
 
 uint64_t val_uint64{ 0x8888888888888888 };
-std::vector<uint8_t> enc_uint64 = from_hex("8888888888888888");
+std::vector<uint8_t> enc_uint64 = mls::from_hex("8888888888888888");
 
 std::array<uint16_t, 4> val_array{ 1, 2, 3, 4 };
-std::vector<uint8_t> enc_array = from_hex("0001000200030004");
+std::vector<uint8_t> enc_array = mls::from_hex("0001000200030004");
 
 tls::vector<uint32_t, 3> val_vector{ 5, 6 };
-std::vector<uint8_t> enc_vector = from_hex("0000080000000500000006");
+std::vector<uint8_t> enc_vector = mls::from_hex("0000080000000500000006");
 
 struct ExampleStruct
 {
@@ -50,7 +50,7 @@ ExampleStruct val_struct{ 0x1111,
                           { 0x22, 0x22 },
                           { 0x33333333, 0x44444444, 0x55555555, 0x66666666 } };
 std::vector<uint8_t> enc_struct =
-  from_hex("11110002222233333333444444445555555566666666");
+  mls::from_hex("11110002222233333333444444445555555566666666");
 
 template<typename T>
 void

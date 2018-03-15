@@ -304,11 +304,9 @@ template<typename Message>
 epoch_t
 next_epoch(const epoch_t& prior, const Message& message)
 {
-  EpochInfo info{ prior, Message::type, tls::marshal(message) };
-  tls::ostream infow;
-  infow << info;
-
-  auto digest = SHA256Digest(infow.bytes()).digest();
+  EpochInfo info_str{ prior, Message::type, tls::marshal(message) };
+  auto info = tls::marshal(info_str);
+  auto digest = SHA256Digest(info).digest();
   epoch_t out;
   std::copy(digest.begin(), digest.begin() + out.size(), out.begin());
 

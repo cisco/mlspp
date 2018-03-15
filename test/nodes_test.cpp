@@ -1,5 +1,4 @@
 #include "common.h"
-#include "hex.h"
 #include "nodes.h"
 #include <catch.hpp>
 

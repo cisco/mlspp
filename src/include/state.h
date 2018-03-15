@@ -100,6 +100,7 @@ public:
   MLSCiphertext protect(const bytes& content);
   bytes unprotect(const MLSCiphertext& message) const;
 
+  epoch_t prior_epoch() const { return _prior_epoch; }
   epoch_t epoch() const { return _epoch; }
 
 private:

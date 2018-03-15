@@ -197,9 +197,7 @@ derive_secret(const bytes& secret,
     SHA256_DIGEST_LENGTH, vec_label, group_id, epoch, message
   };
 
-  tls::ostream writer;
-  writer << label_str;
-  auto hkdf_label = writer.bytes();
+  auto hkdf_label = tls::marshal(label_str);
 
   // We always extract Hash.length octets of output, in which case,
   // HKDF-Expand(Secret, Label) reduces to:

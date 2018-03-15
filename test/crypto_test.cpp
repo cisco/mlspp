@@ -1,5 +1,4 @@
 #include "crypto.h"
-#include "hex.h"
 #include <catch.hpp>
 #include <string>
 

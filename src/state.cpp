@@ -1,4 +1,5 @@
 #include "state.h"
+#include <iostream>
 
 namespace mls {
 
@@ -9,13 +10,13 @@ namespace mls {
 tls::ostream&
 operator<<(tls::ostream& out, const MLSCiphertext& obj)
 {
-  return out << obj.epoch << obj.sequence << obj.ciphertext;
+  return out << obj.epoch << obj.sequence << obj.sender_index << obj.ciphertext;
 }
 
 tls::istream&
 operator>>(tls::istream& in, MLSCiphertext& obj)
 {
-  return in >> obj.epoch >> obj.sequence >> obj.ciphertext;
+  return in >> obj.epoch >> obj.sequence >> obj.sender_index >> obj.ciphertext;
 }
 
 ///
