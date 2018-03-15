@@ -132,7 +132,7 @@ aes_gcm_decrypt(uint64_t seq,
 class DHPublicKey
 {
 public:
-  DHPublicKey();
+  DHPublicKey() = default;
   DHPublicKey(const DHPublicKey& other);
   DHPublicKey(DHPublicKey&& other);
   DHPublicKey(const bytes& data);
@@ -163,14 +163,18 @@ public:
   static DHPrivateKey generate();
   static DHPrivateKey derive(const bytes& secret);
 
-  DHPrivateKey() = delete;
+  DHPrivateKey() = default;
   DHPrivateKey(const DHPrivateKey& other);
   DHPrivateKey(DHPrivateKey&& other);
+  DHPrivateKey(const bytes& data);
   DHPrivateKey& operator=(const DHPrivateKey& other);
   DHPrivateKey& operator=(DHPrivateKey&& other);
 
   bool operator==(const DHPrivateKey& other) const;
   bool operator!=(const DHPrivateKey& other) const;
+
+  bytes to_bytes() const;
+  void reset(const bytes& data);
 
   bytes derive(DHPublicKey pub) const;
   DHPublicKey public_key() const;
@@ -181,6 +185,11 @@ private:
 
   DHPrivateKey(EC_KEY* key);
 };
+
+tls::ostream&
+operator<<(tls::ostream& out, const DHPrivateKey& obj);
+tls::istream&
+operator>>(tls::istream& in, DHPrivateKey& obj);
 
 // XXX(rlb@ipv.sx): There is a *ton* of repeated code between DH and
 // Signature keys, both here and in the corresponding .cpp file.

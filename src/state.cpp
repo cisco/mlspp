@@ -409,9 +409,6 @@ State::update_leaf(uint32_t index,
   // XXX(rlb@ipv.sx) Verify that this is populated?
   auto update_secret = *(_ratchet_tree.root().secret());
   derive_epoch_keys(false, update_secret, tls::marshal(handshake));
-
-  _prior_epoch = _epoch;
-  _epoch = next_epoch(_prior_epoch, handshake.message);
 }
 
 void

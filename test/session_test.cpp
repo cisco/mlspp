@@ -87,7 +87,7 @@ TEST_CASE("Session update and removal", "[session]")
 
   SECTION("Update")
   {
-    for (int i = 0; i < group_size - 1; i += 1) {
+    for (int i = 0; i < group_size; i += 1) {
       auto update = sessions[i].update();
       broadcast_and_check(sessions, update);
     }

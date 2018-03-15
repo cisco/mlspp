@@ -371,8 +371,6 @@ DHPublicKey::reset(const bytes& data)
   _key = key;
 }
 
-DHPublicKey::DHPublicKey() {}
-
 DHPublicKey::DHPublicKey(const EC_POINT* pt)
   : _key(EC_KEY_new_by_curve_name(DH_CURVE))
 {
@@ -442,6 +440,11 @@ DHPrivateKey::DHPrivateKey(DHPrivateKey&& other)
   , _pub(std::move(other._pub))
 {}
 
+DHPrivateKey::DHPrivateKey(const bytes& data)
+{
+  reset(data);
+}
+
 DHPrivateKey&
 DHPrivateKey::operator=(const DHPrivateKey& other)
 {
@@ -506,6 +509,58 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
   : _key(key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
+
+bytes
+DHPrivateKey::to_bytes() const
+{
+  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
+  int len = i2d_ECPrivateKey(temp_key, nullptr);
+  if (len == 0) {
+    // Technically, this is not necessarily an error, but in
+    // practice it always will be.
+    throw OpenSSLError::current();
+  }
+
+  bytes out(len);
+  unsigned char* data = out.data();
+  if (i2d_ECPrivateKey(temp_key, &data) == 0) {
+    throw OpenSSLError::current();
+  }
+
+  return out;
+}
+
+void
+DHPrivateKey::reset(const bytes& data)
+{
+  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
+  if (!key) {
+    throw OpenSSLError::current();
+  }
+
+  const uint8_t* ptr = data.data();
+  if (!d2i_ECPrivateKey(&key, &ptr, data.size())) {
+    throw OpenSSLError::current();
+  }
+
+  _key = key;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const DHPrivateKey& obj)
+{
+  tls::vector<uint8_t, 2> data = obj.to_bytes();
+  return out << data;
+}
+
+tls::istream&
+operator>>(tls::istream& in, DHPrivateKey& obj)
+{
+  tls::vector<uint8_t, 2> data;
+  in >> data;
+  obj.reset(data);
+  return in;
+}
 
 ///
 /// SignaturePublicKey
