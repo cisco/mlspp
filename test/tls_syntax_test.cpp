@@ -21,6 +21,12 @@ std::vector<uint8_t> enc_array = mls::from_hex("0001000200030004");
 tls::vector<uint32_t, 3> val_vector{ 5, 6 };
 std::vector<uint8_t> enc_vector = mls::from_hex("0000080000000500000006");
 
+std::pair<uint8_t, uint16_t> val_pair{ 0x00, 0x1234 };
+std::vector<uint8_t> enc_pair = mls::from_hex("001234");
+
+std::map<uint8_t, uint16_t> val_map{ { 0x00, 0x1234 }, { 0x01, 0x5678 } };
+std::vector<uint8_t> enc_map = mls::from_hex("000006001234015678");
+
 struct ExampleStruct
 {
   uint16_t a;
@@ -84,6 +90,10 @@ TEST_CASE("TLS ostream correctly marshals", "[tls_syntax]")
   SECTION("vector") { ostream_test(val_vector, enc_vector); }
 
   SECTION("struct") { ostream_test(val_struct, enc_struct); }
+
+  SECTION("pair") { ostream_test(val_pair, enc_pair); }
+
+  SECTION("map") { ostream_test(val_map, enc_map); }
 }
 
 template<typename T>
@@ -111,6 +121,10 @@ TEST_CASE("TLS istream correctly unmarshals", "[tls_syntax]")
   SECTION("vector") { istream_test(val_vector, enc_vector); }
 
   SECTION("struct") { istream_test(val_struct, enc_struct); }
+
+  SECTION("pair") { istream_test(val_pair, enc_pair); }
+
+  SECTION("map") { istream_test(val_map, enc_map); }
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

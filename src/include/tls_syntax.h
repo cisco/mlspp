@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <vector>
 
 // Note: Different namespace because this is TLS-generic (might
@@ -140,6 +141,29 @@ operator<<(ostream& out, const vector<T, head, min, max>& data)
   return out;
 }
 
+// Pair writer (same as two adjacent elements in a struct)
+template<typename T1, typename T2>
+ostream&
+operator<<(ostream& out, const std::pair<T1, T2>& data)
+{
+  return out << data.first << data.second;
+}
+
+// Map writer
+// XXX(rlb@ipv.sx) This is non-standard, and probably should be,
+// because it's non-canonical.  But it's good enough for using TLS
+// syntax to save and reconstitue objects.
+template<typename Key, typename T>
+ostream&
+operator<<(ostream& out, const std::map<Key, T>& data)
+{
+  // XXX(rlb@ipv.sx) This causes an extra copy, but saves some
+  // subtle messing around with constructors in tls::vector.
+  std::vector<std::pair<Key, T>> vec(data.begin(), data.end());
+  vector<std::pair<Key, T>, 3> tls_vec = vec;
+  return out << tls_vec;
+}
+
 class istream
 {
 public:
@@ -225,6 +249,31 @@ operator>>(istream& in, vector<T, head, min, max>& data)
 
   // Truncate the primary buffer
   in._buffer.erase(in._buffer.end() - size, in._buffer.end());
+
+  return in;
+}
+
+// Pair reader (same as two adjacent elements in a struct)
+template<typename T1, typename T2>
+istream&
+operator>>(istream& in, std::pair<T1, T2>& data)
+{
+  return in >> data.first >> data.second;
+}
+
+// Map reader
+// XXX(rlb@ipv.sx) This is non-standard, and probably should be,
+// because it's non-canonical.  But it's good enough for using TLS
+// syntax to save and reconstitute objects.
+template<typename Key, typename T>
+istream&
+operator>>(istream& in, std::map<Key, T>& data)
+{
+  vector<std::pair<Key, T>, 3> vec;
+  in >> vec;
+
+  data.clear();
+  data.insert(vec.begin(), vec.end());
 
   return in;
 }
