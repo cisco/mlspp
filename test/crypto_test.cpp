@@ -142,3 +142,26 @@ TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
     REQUIRE(gX2 == gX);
   }
 }
+
+TEST_CASE("Signature private keys serialize and deserialize", "[crypto]")
+{
+  auto x = SignaturePrivateKey::generate();
+
+  SECTION("Directly")
+  {
+    auto data = x.to_bytes();
+    SignaturePrivateKey parsed(data);
+    REQUIRE(parsed == x);
+  }
+
+  SECTION("Via TLS syntax")
+  {
+    tls::ostream w;
+    w << x;
+
+    tls::istream r(w.bytes());
+    SignaturePrivateKey x2;
+    r >> x2;
+    REQUIRE(x2 == x);
+  }
+}

@@ -613,8 +613,6 @@ SignaturePublicKey::reset(const bytes& data)
   _key = key;
 }
 
-SignaturePublicKey::SignaturePublicKey() {}
-
 SignaturePublicKey::SignaturePublicKey(const EC_POINT* pt)
   : _key(EC_KEY_new_by_curve_name(SIG_CURVE))
 {
@@ -665,6 +663,11 @@ SignaturePrivateKey::SignaturePrivateKey(SignaturePrivateKey&& other)
   : _key(std::move(other._key))
   , _pub(std::move(other._pub))
 {}
+
+SignaturePrivateKey::SignaturePrivateKey(const bytes& data)
+{
+  reset(data);
+}
 
 SignaturePrivateKey&
 SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
@@ -736,5 +739,57 @@ SignaturePrivateKey::SignaturePrivateKey(EC_KEY* key)
   : _key(key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
+
+bytes
+SignaturePrivateKey::to_bytes() const
+{
+  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
+  int len = i2d_ECPrivateKey(temp_key, nullptr);
+  if (len == 0) {
+    // Technically, this is not necessarily an error, but in
+    // practice it always will be.
+    throw OpenSSLError::current();
+  }
+
+  bytes out(len);
+  unsigned char* data = out.data();
+  if (i2d_ECPrivateKey(temp_key, &data) == 0) {
+    throw OpenSSLError::current();
+  }
+
+  return out;
+}
+
+void
+SignaturePrivateKey::reset(const bytes& data)
+{
+  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
+  if (!key) {
+    throw OpenSSLError::current();
+  }
+
+  const uint8_t* ptr = data.data();
+  if (!d2i_ECPrivateKey(&key, &ptr, data.size())) {
+    throw OpenSSLError::current();
+  }
+
+  _key = key;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const SignaturePrivateKey& obj)
+{
+  tls::vector<uint8_t, 2> data = obj.to_bytes();
+  return out << data;
+}
+
+tls::istream&
+operator>>(tls::istream& in, SignaturePrivateKey& obj)
+{
+  tls::vector<uint8_t, 2> data;
+  in >> data;
+  obj.reset(data);
+  return in;
+}
 
 } // namespace mls

@@ -193,7 +193,7 @@ private:
 class SignaturePublicKey
 {
 public:
-  SignaturePublicKey();
+  SignaturePublicKey() = default;
   SignaturePublicKey(const SignaturePublicKey& other);
   SignaturePublicKey(SignaturePublicKey&& other);
   SignaturePublicKey(const bytes& data);
@@ -225,9 +225,10 @@ class SignaturePrivateKey
 public:
   static SignaturePrivateKey generate();
 
-  SignaturePrivateKey() = delete;
+  SignaturePrivateKey() = default;
   SignaturePrivateKey(const SignaturePrivateKey& other);
   SignaturePrivateKey(SignaturePrivateKey&& other);
+  SignaturePrivateKey(const bytes& data);
   SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
   SignaturePrivateKey& operator=(SignaturePrivateKey&& other);
 
@@ -237,11 +238,19 @@ public:
   bytes sign(const bytes& message) const;
   SignaturePublicKey public_key() const;
 
+  bytes to_bytes() const;
+  void reset(const bytes& data);
+
 private:
   Scoped<EC_KEY> _key;
   SignaturePublicKey _pub;
 
   SignaturePrivateKey(EC_KEY* key);
 };
+
+tls::ostream&
+operator<<(tls::ostream& out, const SignaturePrivateKey& obj);
+tls::istream&
+operator>>(tls::istream& in, SignaturePrivateKey& obj);
 
 } // namespace mls
