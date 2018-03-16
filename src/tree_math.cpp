@@ -3,49 +3,49 @@
 namespace mls {
 namespace tree_math {
 
-static size_t
-log2(size_t x)
+static uint32_t
+log2(uint32_t x)
 {
   if (x == 0) {
     return 0;
   }
 
-  size_t k = 0;
+  uint32_t k = 0;
   while ((x >> k) > 0) {
     k += 1;
   }
   return k - 1;
 }
 
-static size_t
-level(size_t x)
+static uint32_t
+level(uint32_t x)
 {
   if ((x & 0x01) == 0) {
     return 0;
   }
 
-  size_t k = 0;
+  uint32_t k = 0;
   while (((x >> k) & 0x01) == 1) {
     k += 1;
   }
   return k;
 }
 
-static size_t
-node_width(size_t n)
+static uint32_t
+node_width(uint32_t n)
 {
   return 2 * (n - 1) + 1;
 }
 
-size_t
-root(size_t n)
+uint32_t
+root(uint32_t n)
 {
-  size_t w = node_width(n);
+  uint32_t w = node_width(n);
   return (1 << log2(w)) - 1;
 }
 
-size_t
-left(size_t x)
+uint32_t
+left(uint32_t x)
 {
   if (level(x) == 0) {
     return x;
@@ -54,30 +54,30 @@ left(size_t x)
   return x ^ (0x01 << (level(x) - 1));
 }
 
-size_t
-right(size_t x, size_t n)
+uint32_t
+right(uint32_t x, uint32_t n)
 {
   if (level(x) == 0) {
     return x;
   }
 
-  size_t r = x ^ (0x03 << (level(x) - 1));
+  uint32_t r = x ^ (0x03 << (level(x) - 1));
   while (r >= node_width(n)) {
     r = left(r);
   }
   return r;
 }
 
-static size_t
-parent_step(size_t x)
+static uint32_t
+parent_step(uint32_t x)
 {
   auto k = level(x);
-  size_t one = 1;
+  uint32_t one = 1;
   return (x | (one << k)) & ~(one << (k + 1));
 }
 
-size_t
-parent(size_t x, size_t n)
+uint32_t
+parent(uint32_t x, uint32_t n)
 {
   if (x == root(n)) {
     return x;
@@ -90,8 +90,8 @@ parent(size_t x, size_t n)
   return p;
 }
 
-size_t
-sibling(size_t x, size_t n)
+uint32_t
+sibling(uint32_t x, uint32_t n)
 {
   auto p = parent(x, n);
   if (x < p) {
@@ -104,8 +104,8 @@ sibling(size_t x, size_t n)
   return p;
 }
 
-static size_t
-subtree_size(size_t x, size_t n)
+static uint32_t
+subtree_size(uint32_t x, uint32_t n)
 {
   auto w = node_width(n);
   auto lr = (1 << level(x)) - 1;
@@ -117,16 +117,16 @@ subtree_size(size_t x, size_t n)
   return (lr + rr) / 2 + 1;
 }
 
-std::vector<size_t>
-frontier(size_t n)
+std::vector<uint32_t>
+frontier(uint32_t n)
 {
   if (n == 0) {
-    return std::vector<size_t>{};
+    return std::vector<uint32_t>{};
   }
 
   auto r = root(n);
   auto s = subtree_size(r, n);
-  std::vector<size_t> f;
+  std::vector<uint32_t> f;
   while (s != (1 << log2(s))) {
     auto l = left(r);
     r = right(r, n);
@@ -137,10 +137,10 @@ frontier(size_t n)
   return f;
 }
 
-std::vector<size_t>
-dirpath(size_t x, size_t n)
+std::vector<uint32_t>
+dirpath(uint32_t x, uint32_t n)
 {
-  std::vector<size_t> d;
+  std::vector<uint32_t> d;
   auto p = parent(x, n);
   auto r = root(n);
   while (p != r) {
@@ -150,8 +150,8 @@ dirpath(size_t x, size_t n)
   return d;
 }
 
-std::vector<size_t>
-copath(size_t x, size_t n)
+std::vector<uint32_t>
+copath(uint32_t x, uint32_t n)
 {
   auto d = dirpath(x, n);
 
@@ -160,18 +160,18 @@ copath(size_t x, size_t n)
     d.push_back(x);
   }
 
-  std::vector<size_t> c(d.size());
-  std::transform(d.begin(), d.end(), c.begin(), [n](size_t& x) -> size_t {
+  std::vector<uint32_t> c(d.size());
+  std::transform(d.begin(), d.end(), c.begin(), [n](uint32_t& x) -> uint32_t {
     return sibling(x, n);
   });
   return c;
 }
 
-std::vector<size_t>
-leaves(size_t n)
+std::vector<uint32_t>
+leaves(uint32_t n)
 {
-  std::vector<size_t> out(n);
-  for (size_t i = 0; i < n; i += 1) {
+  std::vector<uint32_t> out(n);
+  for (uint32_t i = 0; i < n; i += 1) {
     out[i] = 2 * i;
   }
   return out;

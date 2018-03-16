@@ -9,6 +9,8 @@ struct StringNode
 {
   std::string _value;
 
+  StringNode() = default;
+
   StringNode(const std::string& value)
     : _value(value)
   {}
@@ -42,6 +44,22 @@ operator<<(std::ostream& out, const StringNode& node)
 {
   out << node._value;
   return out;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const StringNode& node)
+{
+  tls::opaque<1> vec(node._value.begin(), node._value.end());
+  return out << vec;
+}
+
+tls::istream&
+operator>>(tls::istream& in, StringNode& node)
+{
+  tls::opaque<1> vec;
+  in >> vec;
+  node._value = std::string(vec.begin(), vec.end());
+  return in;
 }
 
 TEST_CASE("Trees can be created and updated", "[tree]")
@@ -104,4 +122,12 @@ TEST_CASE("Update of a leaf with direct path", "[tree]")
   t_full.update(2, x);
   t_copath.update(2, path);
   REQUIRE(t_full == t_copath);
+}
+
+TEST_CASE("TLS marshal / unmarshal", "[tree]")
+{
+  StringNode a{ "a" }, b{ "b" }, c{ "c" }, d{ "d" }, e{ "e" };
+  Tree<StringNode> before({ a, b, c, d, e }), after;
+  tls::unmarshal(tls::marshal(before), after);
+  REQUIRE(before == after);
 }

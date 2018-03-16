@@ -29,6 +29,10 @@ public:
   /// Constructors
   ///
 
+  // Default constructor does not have a useful semantic.  It should
+  // only be used for constructing blank states, e.g., for unmarshal
+  State() = default;
+
   // Initialize an empty group
   State(const bytes& group_id, const SignaturePrivateKey& identity_priv);
 
@@ -110,13 +114,13 @@ private:
 
   epoch_t _prior_epoch;
   epoch_t _epoch;
-  bytes _group_id;
+  tls::opaque<2> _group_id;
   Tree<MerkleNode> _identity_tree;
   Tree<RatchetNode> _ratchet_tree;
 
   uint64_t _last_seq = 0;
-  bytes _message_master_secret;
-  bytes _init_secret;
+  tls::opaque<1> _message_master_secret;
+  tls::opaque<1> _init_secret;
   DHPrivateKey _add_priv;
 
   // Used to construct an ephemeral state while creating a UserAdd
@@ -127,6 +131,10 @@ private:
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
+
+  // Serialize a state for storage
+  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
+  friend tls::istream& operator>>(tls::istream& in, State& obj);
 
   // Spawn a new state (with a fresh epoch) from this state
   State spawn(const epoch_t& epoch) const;

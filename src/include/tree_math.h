@@ -1,7 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 // The below functions provide the index calculus for the tree
@@ -33,33 +33,33 @@ namespace mls {
 namespace tree_math {
 
 // Node relationships
-size_t
-root(size_t n);
+uint32_t
+root(uint32_t n);
 
-size_t
-left(size_t x);
+uint32_t
+left(uint32_t x);
 
-size_t
-right(size_t x, size_t n);
+uint32_t
+right(uint32_t x, uint32_t n);
 
-size_t
-parent(size_t x, size_t n);
+uint32_t
+parent(uint32_t x, uint32_t n);
 
-size_t
-sibling(size_t x, size_t n);
+uint32_t
+sibling(uint32_t x, uint32_t n);
 
 // Slices through the tree
-std::vector<size_t>
-frontier(size_t n);
+std::vector<uint32_t>
+frontier(uint32_t n);
 
-std::vector<size_t>
-dirpath(size_t x, size_t n);
+std::vector<uint32_t>
+dirpath(uint32_t x, uint32_t n);
 
-std::vector<size_t>
-copath(size_t x, size_t n);
+std::vector<uint32_t>
+copath(uint32_t x, uint32_t n);
 
-std::vector<size_t>
-leaves(size_t n);
+std::vector<uint32_t>
+leaves(uint32_t n);
 
 } // namespace tree_math
 } // namespace mls

@@ -185,4 +185,13 @@ TEST_CASE("Operations on a running group", "[state]")
       }
     }
   }
+
+  SECTION("Each node's state survives a TLS marshal/unmarshal")
+  {
+    for (const auto& before : states) {
+      State after;
+      tls::unmarshal(tls::marshal(before), after);
+      REQUIRE(after == before);
+    }
+  }
 }
