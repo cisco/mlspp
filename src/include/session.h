@@ -2,6 +2,7 @@
 
 #include "common.h" // TODO(rlb@ipv.sx) Locally declare bytes
 #include "state.h"  // TODO(rlb@ipv.sx) Forward declare State
+#include "tls_syntax.h"
 #include <map>
 
 namespace mls {
@@ -14,6 +15,8 @@ public:
 
   // Create an unjoined session
   Session(const SignaturePrivateKey& identity_priv);
+
+  // Create an unjoined session (and auto-generate the identity key)
   Session();
 
   // Two sessions are considered equal if:
@@ -39,7 +42,7 @@ public:
 private:
   DHPrivateKey _next_leaf_priv;
   DHPrivateKey _init_priv;
-  bytes _user_init_key;
+  tls::opaque<2> _user_init_key;
   SignaturePrivateKey _identity_priv;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;
@@ -48,6 +51,9 @@ private:
   void add_state(const State& state);
   State& current_state();
   const State& current_state() const;
+
+  friend tls::ostream& operator<<(tls::ostream& out, const Session& obj);
+  friend tls::istream& operator>>(tls::istream& in, Session& obj);
 };
 
 } // namespace mls

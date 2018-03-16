@@ -206,4 +206,18 @@ Session::current_state()
   return _state.at(_current_epoch);
 }
 
+tls::ostream&
+operator<<(tls::ostream& out, const Session& obj)
+{
+  return out << obj._next_leaf_priv << obj._init_priv << obj._user_init_key
+             << obj._identity_priv << obj._state << obj._current_epoch;
+}
+
+tls::istream&
+operator>>(tls::istream& in, Session& obj)
+{
+  return in >> obj._next_leaf_priv >> obj._init_priv >> obj._user_init_key >>
+         obj._identity_priv >> obj._state >> obj._current_epoch;
+}
+
 } // namespace mls
