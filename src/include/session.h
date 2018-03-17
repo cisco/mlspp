@@ -34,9 +34,6 @@ public:
 
   void handle(const bytes& handshake);
 
-  bytes protect(const bytes& content);
-  bytes unprotect(const bytes& content) const;
-
   epoch_t current_epoch() const { return _current_epoch; }
 
 private:

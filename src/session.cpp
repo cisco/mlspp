@@ -146,26 +146,6 @@ Session::handle(const bytes& handshake)
   }
 }
 
-bytes
-Session::protect(const bytes& content)
-{
-  auto ciphertext = current_state().protect(content);
-  return tls::marshal(ciphertext);
-}
-
-bytes
-Session::unprotect(const bytes& ciphertext_bytes) const
-{
-  MLSCiphertext ciphertext;
-  tls::unmarshal(ciphertext_bytes, ciphertext);
-
-  if (_state.count(ciphertext.epoch) == 0) {
-    throw MissingStateError("No state available for message epoch");
-  }
-
-  return _state.at(ciphertext.epoch).unprotect(ciphertext);
-}
-
 void
 Session::make_init_key()
 {

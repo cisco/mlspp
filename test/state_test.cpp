@@ -171,21 +171,6 @@ TEST_CASE("Operations on a running group", "[state]")
     }
   }
 
-  SECTION("Each node can send and be received")
-  {
-    std::string message = "hello world";
-    bytes content(message.begin(), message.end());
-
-    for (auto& sender : states) {
-      auto encrypted = sender.protect(content);
-
-      for (const auto& receiver : states) {
-        auto decrypted = receiver.unprotect(encrypted);
-        REQUIRE(decrypted == content);
-      }
-    }
-  }
-
   SECTION("Each node's state survives a TLS marshal/unmarshal")
   {
     for (const auto& before : states) {

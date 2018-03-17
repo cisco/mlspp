@@ -4,22 +4,6 @@
 namespace mls {
 
 ///
-/// Ciphertext
-///
-
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj)
-{
-  return out << obj.epoch << obj.sequence << obj.sender_index << obj.ciphertext;
-}
-
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj)
-{
-  return in >> obj.epoch >> obj.sequence >> obj.sender_index >> obj.ciphertext;
-}
-
-///
 /// Constructors
 ///
 
@@ -262,37 +246,6 @@ State::handle(const Handshake<Remove>& remove) const
   // TODO: Update identity tree and ratchet tree with blank nodes
 
   return next;
-}
-
-///
-/// Message protection
-///
-
-// TODO(rlb@ipv.sx) Messages should be signed as well
-
-MLSCiphertext
-State::protect(const bytes& pt)
-{
-  auto key = sender_key(_index);
-  auto iv = sender_iv(_index);
-  auto seq = _last_seq;
-  auto ct = aes_gcm_encrypt(seq, key, iv, pt);
-
-  _last_seq += 1;
-
-  return MLSCiphertext{ _epoch, seq, _index, ct };
-}
-
-bytes
-State::unprotect(const MLSCiphertext& ct) const
-{
-  if (ct.epoch != _epoch) {
-    throw InvalidParameterError("Invalid epoch");
-  }
-
-  auto key = sender_key(ct.sender_index);
-  auto iv = sender_iv(ct.sender_index);
-  return aes_gcm_decrypt(ct.sequence, key, iv, ct.ciphertext);
 }
 
 ///

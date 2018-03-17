@@ -22,18 +22,6 @@ broadcast_and_check(std::vector<Session>& sessions, const bytes& message)
 
   // Verify that the epoch got updated
   REQUIRE(sessions[0].current_epoch() != initial_epoch);
-
-  // Verify that everyone can send and receive messages
-  bytes original{ 0x00, 0x01, 0x02, 0x03 };
-  for (auto& send : sessions) {
-    auto ct = send.protect(original);
-    REQUIRE(ct != original);
-
-    for (const auto& recv : sessions) {
-      auto pt = recv.unprotect(ct);
-      REQUIRE(pt == original);
-    }
-  }
 }
 
 TEST_CASE("Session creation", "[session]")
