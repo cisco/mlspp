@@ -7,7 +7,7 @@ namespace mls {
 /// Constructors
 ///
 
-static const epoch_t zero_epoch{ 0, 0, 0, 0, 0, 0, 0, 0 };
+static const epoch_t zero_epoch{ 0 };
 
 State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   : _index(0)

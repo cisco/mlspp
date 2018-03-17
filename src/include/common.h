@@ -53,13 +53,7 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(data);
 }
 
-typedef std::array<uint8_t, 8> epoch_t;
-
-static std::ostream&
-operator<<(std::ostream& out, const epoch_t& epoch)
-{
-  return out << to_hex(bytes(epoch.begin(), epoch.end()));
-}
+typedef uint32_t epoch_t;
 
 ///
 /// Hash prefixes

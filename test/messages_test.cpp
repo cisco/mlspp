@@ -14,8 +14,7 @@ tls_round_trip(const T& before)
   return after;
 }
 
-static const epoch_t epoch_val = { 0x00, 0x01, 0x02, 0x03,
-                                   0x04, 0x05, 0x06, 0x07 };
+static const epoch_t epoch_val = 0x01020304;
 
 TEST_CASE("Basic message serialization", "[messages]")
 {
