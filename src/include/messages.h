@@ -95,7 +95,6 @@ struct UserAdd
 {
 public:
   tls::vector<RatchetNode, 2, 1> path;
-  GroupInitKey group_init_key;
 
   static const HandshakeType type;
 };

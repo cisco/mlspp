@@ -59,7 +59,8 @@ TEST_CASE("Group creation", "[state]")
 
     // Process the UserAdd
     states[0] = states[0].handle(user_add);
-    states.emplace(stp + 1, identity_privs[1], init_privs[1], user_add);
+    states.emplace(
+      stp + 1, identity_privs[1], init_privs[1], user_add, group_init_key);
     REQUIRE(states[0] == states[1]);
   }
 
@@ -101,7 +102,8 @@ TEST_CASE("Group creation", "[state]")
         state = state.handle(user_add);
       }
 
-      states.emplace(stp + i, identity_privs[i], init_privs[i], user_add);
+      states.emplace(
+        stp + i, identity_privs[i], init_privs[i], user_add, group_init_key);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -129,7 +131,7 @@ TEST_CASE("Operations on a running group", "[state]")
       state = state.handle(user_add);
     }
 
-    states.emplace(stp + i, identity_priv, leaf_priv, user_add);
+    states.emplace(stp + i, identity_priv, leaf_priv, user_add, group_init_key);
   }
 
   for (const auto& state : states) {

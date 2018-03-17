@@ -126,19 +126,19 @@ const HandshakeType UserAdd::type = HandshakeType::user_add;
 bool
 operator==(const UserAdd& lhs, const UserAdd& rhs)
 {
-  return (lhs.path == rhs.path) && (lhs.group_init_key == rhs.group_init_key);
+  return (lhs.path == rhs.path);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const UserAdd& obj)
 {
-  return out << obj.path << obj.group_init_key;
+  return out << obj.path;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserAdd& obj)
 {
-  return in >> obj.path >> obj.group_init_key;
+  return in >> obj.path;
 }
 
 // GroupAdd

@@ -55,13 +55,13 @@ State::State(const SignaturePrivateKey& identity_priv,
 
 State::State(const SignaturePrivateKey& identity_priv,
              const DHPrivateKey& leaf_priv,
-             const Handshake<UserAdd>& user_add)
+             const Handshake<UserAdd>& user_add,
+             const GroupInitKey& group_init_key)
   : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
   , _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  init_from_details(
-    identity_priv, leaf_priv, user_add.message.group_init_key, user_add);
+  init_from_details(identity_priv, leaf_priv, group_init_key, user_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
@@ -92,7 +92,7 @@ State::join(const SignaturePrivateKey& identity_priv,
   auto path = temp_state._ratchet_tree.direct_path(temp_state._index);
   path.push_back(RatchetNode(leaf_priv));
 
-  return temp_state.sign(UserAdd{ path, group_init_key });
+  return temp_state.sign(UserAdd{ path });
 }
 
 Handshake<GroupAdd>

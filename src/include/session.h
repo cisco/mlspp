@@ -27,7 +27,7 @@ public:
   bytes user_init_key() const;
   bytes group_init_key() const;
 
-  bytes join(const bytes& group_init_key) const;
+  bytes join(const bytes& group_init_key);
   bytes add(const bytes& user_init_key) const;
   bytes update() const;
   bytes remove(uint32_t index) const;
@@ -40,6 +40,7 @@ private:
   DHPrivateKey _next_leaf_priv;
   DHPrivateKey _init_priv;
   tls::opaque<2> _user_init_key;
+  tls::opaque<2> _group_init_key;
   SignaturePrivateKey _identity_priv;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;

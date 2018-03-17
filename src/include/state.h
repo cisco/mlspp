@@ -30,7 +30,8 @@ public:
   // Initialize a state from a UserAdd (for user-initiated join)
   State(const SignaturePrivateKey& identity_priv,
         const DHPrivateKey& leaf_priv,
-        const Handshake<UserAdd>& user_add);
+        const Handshake<UserAdd>& user_add,
+        const GroupInitKey& group_init_key);
 
   ///
   /// Message factories
