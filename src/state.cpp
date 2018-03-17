@@ -126,8 +126,8 @@ State::remove(uint32_t index) const
 /// Message handlers
 ///
 
-void
-State::handle(const Handshake<UserAdd>& user_add)
+State
+State::handle(const Handshake<UserAdd>& user_add) const
 {
   // Verify the incoming message against the **new** identity tree
   // TODO(rlb@ipv.sx) Verify that the new identity tree is a successor to the
@@ -141,15 +141,20 @@ State::handle(const Handshake<UserAdd>& user_add)
     throw InvalidParameterError("UserAdd is not from the new member");
   }
 
+  // Create a copy of the current state
+  State next = *this;
+
   // Update the ratchet tree
-  _ratchet_tree.add(user_add.message.path);
+  next._ratchet_tree.add(user_add.message.path);
 
   // Add to symmetric state
-  add_inner(user_add.identity_key, user_add.to_bytes());
+  next.add_inner(user_add.identity_key, user_add.to_bytes());
+
+  return next;
 }
 
-void
-State::handle(const Handshake<GroupAdd>& group_add)
+State
+State::handle(const Handshake<GroupAdd>& group_add) const
 {
   // Verify the incoming message
   if (!verify_now(group_add)) {
@@ -160,6 +165,9 @@ State::handle(const Handshake<GroupAdd>& group_add)
     throw InvalidParameterError("Invalid signature on init key in group add");
   }
 
+  // Create a copy of the current state
+  State next = *this;
+
   // Add the new leaf to the ratchet tree
   auto init_key = group_add.message.init_key.init_key;
   auto identity_key = group_add.message.init_key.identity_key;
@@ -167,14 +175,17 @@ State::handle(const Handshake<GroupAdd>& group_add)
   auto leaf_data = _add_priv.derive(init_key);
   auto leaf_key = DHPrivateKey::derive(leaf_data);
 
-  _ratchet_tree.add(RatchetNode(leaf_key));
+  next._ratchet_tree.add(RatchetNode(leaf_key));
 
   // Add to symmetric state
-  add_inner(identity_key, group_add.to_bytes());
+  next.add_inner(identity_key, group_add.to_bytes());
+
+  return next;
 }
 
-void
-State::handle(const Handshake<Update>& update, const DHPrivateKey& leaf_priv)
+State
+State::handle(const Handshake<Update>& update,
+              const DHPrivateKey& leaf_priv) const
 {
   if (!verify_now(update)) {
     throw InvalidParameterError("Update is not from a member of the group");
@@ -184,14 +195,18 @@ State::handle(const Handshake<Update>& update, const DHPrivateKey& leaf_priv)
     throw InvalidParameterError("Improper self-Update handler call");
   }
 
-  update_leaf(
+  State next = *this;
+
+  next.update_leaf(
     update.signer_index, update.message.path, update.to_bytes(), leaf_priv);
 
-  _leaf_priv = leaf_priv;
+  next._leaf_priv = leaf_priv;
+
+  return next;
 }
 
-void
-State::handle(const Handshake<Update>& update)
+State
+State::handle(const Handshake<Update>& update) const
 {
   if (!verify_now(update)) {
     throw InvalidParameterError("Update is not from a member of the group");
@@ -202,25 +217,33 @@ State::handle(const Handshake<Update>& update)
       "Improper Update handler call; use self-update");
   }
 
-  update_leaf(update.signer_index,
-              update.message.path,
-              update.to_bytes(),
-              std::experimental::nullopt);
+  State next = *this;
+
+  next.update_leaf(update.signer_index,
+                   update.message.path,
+                   update.to_bytes(),
+                   std::experimental::nullopt);
+
+  return next;
 }
 
-void
-State::handle(const Handshake<Remove>& remove)
+State
+State::handle(const Handshake<Remove>& remove) const
 {
   if (!verify_now(remove)) {
     throw InvalidParameterError("Remove is not from a member of the group");
   }
 
-  update_leaf(remove.message.removed,
-              remove.message.path,
-              remove.to_bytes(),
-              std::experimental::nullopt);
+  State next = *this;
+
+  next.update_leaf(remove.message.removed,
+                   remove.message.path,
+                   remove.to_bytes(),
+                   std::experimental::nullopt);
 
   // TODO: Update identity tree and ratchet tree with blank nodes
+
+  return next;
 }
 
 ///
