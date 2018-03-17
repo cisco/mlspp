@@ -3,22 +3,6 @@
 namespace mls {
 
 ///
-/// Ciphertext
-///
-
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj)
-{
-  return out << obj.epoch << obj.sequence << obj.ciphertext;
-}
-
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj)
-{
-  return in >> obj.epoch >> obj.sequence >> obj.ciphertext;
-}
-
-///
 /// Constructors
 ///
 

@@ -8,19 +8,6 @@
 
 namespace mls {
 
-struct MLSCiphertext
-{
-  uint32_t epoch;
-  uint32_t sequence;
-  tls::opaque<2> ciphertext;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj);
-
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj);
-
 class State
 {
 public:
@@ -94,12 +81,6 @@ public:
 
   // Handle a Remove (for the remaining participants, obviously)
   State handle(const Handshake<Remove>& remove) const;
-
-  ///
-  /// Message Protection
-  ///
-  MLSCiphertext protect(const bytes& content) const;
-  bytes unprotect(const MLSCiphertext& message) const;
 
 private:
   uint32_t _index;
