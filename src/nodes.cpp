@@ -6,17 +6,6 @@
 
 namespace mls {
 
-// Convenience function to have byte strings print out as hex
-std::ostream&
-operator<<(std::ostream& out, const bytes& data)
-{
-  out.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    out << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return out;
-}
-
 ///
 /// MerkleNode
 ///

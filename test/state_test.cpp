@@ -24,8 +24,10 @@ TEST_CASE("Group creation", "[state]")
   auto stp = states.begin();
   for (size_t i = 0; i < group_size; i += 1) {
     identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
+    auto init_priv = DHPrivateKey::generate();
     user_init_keys.emplace(uik + i);
-    auto init_priv = user_init_keys[i].generate(identity_privs[i]);
+    user_init_keys[i].init_key = init_priv.public_key();
+    user_init_keys[i].sign(identity_privs[i]);
     init_privs.emplace(inp + i, init_priv);
   }
 
@@ -36,11 +38,11 @@ TEST_CASE("Group creation", "[state]")
 
     // Create a GroupAdd for the new participant
     auto group_add = states[0].add(user_init_keys[1]);
+    auto group_init_key = states[0].group_init_key();
 
     // Process the GroupAdd
     states[0] = states[0].handle(group_add);
-    states.emplace(
-      stp + 1, identity_privs[1], init_privs[1], group_add, group_add.init_key);
+    states.emplace(stp + 1, identity_privs[1], init_privs[1], group_add);
 
     REQUIRE(states[0] == states[1]);
   }
@@ -70,16 +72,13 @@ TEST_CASE("Group creation", "[state]")
     // Each participant invites the next
     for (size_t i = 1; i < group_size; i += 1) {
       auto group_add = states[i - 1].add(user_init_keys[i]);
+      auto group_init_key = states[i - 1].group_init_key();
 
       for (auto& state : states) {
         state = state.handle(group_add);
       }
 
-      states.emplace(stp + i,
-                     identity_privs[i],
-                     init_privs[i],
-                     group_add,
-                     group_add.init_key);
+      states.emplace(stp + i, identity_privs[i], init_privs[i], group_add);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -114,7 +113,7 @@ TEST_CASE("Group creation", "[state]")
   }
 }
 
-TEST_CASE("Group update and removal", "[state]")
+TEST_CASE("Operations on a running group", "[state]")
 {
   std::vector<State> states;
   states.reserve(group_size);
@@ -137,6 +136,32 @@ TEST_CASE("Group update and removal", "[state]")
 
   for (const auto& state : states) {
     REQUIRE(state == states[0]);
+  }
+
+  SECTION("TLS marshal / unmarshal round trip, followed by update")
+  {
+    for (auto& state : states) {
+      State temp;
+      tls::unmarshal(tls::marshal(state), temp);
+      state = temp;
+    }
+
+    for (size_t i = 0; i < group_size; i += 1) {
+      auto new_leaf = DHPrivateKey::generate();
+      auto update = states[i].update(new_leaf);
+
+      for (size_t j = 0; j < group_size; j += 1) {
+        if (i == j) {
+          states[j] = states[j].handle(update, new_leaf);
+        } else {
+          states[j] = states[j].handle(update);
+        }
+      }
+
+      for (const auto& state : states) {
+        REQUIRE(state == states[0]);
+      }
+    }
   }
 
   SECTION("Each node can update its leaf key")
@@ -171,6 +196,15 @@ TEST_CASE("Group update and removal", "[state]")
       for (size_t j = 0; j < i; j += 1) {
         REQUIRE(states[j] == states[0]);
       }
+    }
+  }
+
+  SECTION("Each node's state survives a TLS marshal/unmarshal")
+  {
+    for (const auto& before : states) {
+      State after;
+      tls::unmarshal(tls::marshal(before), after);
+      REQUIRE(after == before);
     }
   }
 }

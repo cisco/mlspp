@@ -76,6 +76,13 @@ public:
     _raw = raw;
   }
 
+  T* release()
+  {
+    T* out = _raw;
+    _raw = nullptr;
+    return out;
+  }
+
   void clear()
   {
     if (_raw != nullptr) {
@@ -114,13 +121,13 @@ bytes
 derive_secret(const bytes& secret,
               const std::string& label,
               const bytes& group_id,
-              uint32_t epoch,
+              const epoch_t& epoch,
               const bytes& message);
 
 class DHPublicKey
 {
 public:
-  DHPublicKey();
+  DHPublicKey() = default;
   DHPublicKey(const DHPublicKey& other);
   DHPublicKey(DHPublicKey&& other);
   DHPublicKey(const bytes& data);
@@ -151,7 +158,7 @@ public:
   static DHPrivateKey generate();
   static DHPrivateKey derive(const bytes& secret);
 
-  DHPrivateKey() = delete;
+  DHPrivateKey() = default;
   DHPrivateKey(const DHPrivateKey& other);
   DHPrivateKey(DHPrivateKey&& other);
   DHPrivateKey& operator=(const DHPrivateKey& other);
@@ -168,7 +175,18 @@ private:
   DHPublicKey _pub;
 
   DHPrivateKey(EC_KEY* key);
+
+  // XXX(rlb@ipv.sx) The format for private keys here is
+  // non-standard, because OpenSSL's private key serialization
+  // routines are wonky.
+  friend tls::ostream& operator<<(tls::ostream& out, const DHPrivateKey& obj);
+  friend tls::istream& operator>>(tls::istream& in, DHPrivateKey& obj);
 };
+
+tls::ostream&
+operator<<(tls::ostream& out, const DHPrivateKey& obj);
+tls::istream&
+operator>>(tls::istream& in, DHPrivateKey& obj);
 
 // XXX(rlb@ipv.sx): There is a *ton* of repeated code between DH and
 // Signature keys, both here and in the corresponding .cpp file.
@@ -181,7 +199,7 @@ private:
 class SignaturePublicKey
 {
 public:
-  SignaturePublicKey();
+  SignaturePublicKey() = default;
   SignaturePublicKey(const SignaturePublicKey& other);
   SignaturePublicKey(SignaturePublicKey&& other);
   SignaturePublicKey(const bytes& data);
@@ -213,7 +231,7 @@ class SignaturePrivateKey
 public:
   static SignaturePrivateKey generate();
 
-  SignaturePrivateKey() = delete;
+  SignaturePrivateKey() = default;
   SignaturePrivateKey(const SignaturePrivateKey& other);
   SignaturePrivateKey(SignaturePrivateKey&& other);
   SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
@@ -230,6 +248,13 @@ private:
   SignaturePublicKey _pub;
 
   SignaturePrivateKey(EC_KEY* key);
+
+  // XXX(rlb@ipv.sx) The format for private keys here is
+  // non-standard, because OpenSSL's private key serialization
+  // routines are wonky.
+  friend tls::ostream& operator<<(tls::ostream& out,
+                                  const SignaturePrivateKey& obj);
+  friend tls::istream& operator>>(tls::istream& in, SignaturePrivateKey& obj);
 };
 
 } // namespace mls

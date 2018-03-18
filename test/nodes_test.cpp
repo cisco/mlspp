@@ -1,5 +1,4 @@
 #include "common.h"
-#include "hex.h"
 #include "nodes.h"
 #include <catch.hpp>
 
@@ -36,14 +35,8 @@ TEST_CASE("Merkle tree nodes combine correctly", "[nodes]")
 TEST_CASE("Merkle tree nodes serialize and deserialize", "[nodes]")
 {
   auto before = MerkleNode::leaf(from_hex("00010203"));
-
-  tls::ostream w;
-  w << before;
-
   MerkleNode after;
-  tls::istream r(w.bytes());
-  r >> after;
-
+  tls::unmarshal(tls::marshal(before), after);
   REQUIRE(before == after);
 }
 
@@ -88,13 +81,7 @@ TEST_CASE("Ratchet tree nodes combine correctly", "[nodes]")
 TEST_CASE("Ratchet tree nodes serialize and deserialize", "[nodes]")
 {
   auto before = DHPrivateKey::generate().public_key();
-
-  tls::ostream w;
-  w << before;
-
   RatchetNode after;
-  tls::istream r(w.bytes());
-  r >> after;
-
+  tls::unmarshal(tls::marshal(before), after);
   REQUIRE(before == after);
 }

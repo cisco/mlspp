@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "tls_syntax.h"
 #include "tree_math.h"
 #include <algorithm>
 #include <iostream>
@@ -31,8 +32,8 @@ public:
   Tree(const std::vector<Node>& leaves)
     : _size(leaves.size())
   {
-    std::vector<size_t> new_nodes(_size);
-    for (size_t i = 0; i < _size; i += 1) {
+    std::vector<uint32_t> new_nodes(_size);
+    for (uint32_t i = 0; i < _size; i += 1) {
       new_nodes[i] = 2 * i;
       set(2 * i, leaves[i]);
     }
@@ -41,7 +42,7 @@ public:
   }
 
   // Construct a (partial) tree from a frontier
-  Tree(size_t size, std::vector<Node> F)
+  Tree(uint32_t size, std::vector<Node> F)
     : _size(size)
   {
     auto f = tree_math::frontier(size);
@@ -57,7 +58,7 @@ public:
   }
 
   // Construct a (partial) tree from a copath
-  Tree(size_t size, size_t index, std::vector<Node> C)
+  Tree(uint32_t size, uint32_t index, std::vector<Node> C)
     : _size(size)
   {
     if (index > size) {
@@ -118,7 +119,7 @@ public:
     update(_size - 1, path);
   }
 
-  void update(size_t index, Node leaf)
+  void update(uint32_t index, Node leaf)
   {
     if (index > _size) {
       throw InvalidIndexError("Leaf index greater than tree size");
@@ -128,7 +129,7 @@ public:
     build({ 2 * index });
   }
 
-  void update(size_t index, std::vector<Node> path)
+  void update(uint32_t index, std::vector<Node> path)
   {
     if (index > _size) {
       throw InvalidIndexError("Leaf index greater than tree size");
@@ -150,18 +151,18 @@ public:
 
   // Extractors
   // NB: All of these can throw if there are missing nodes
-  size_t size() const { return _size; }
+  uint32_t size() const { return _size; }
 
   std::vector<Node> leaves() const { return extract(tree_math::leaves(_size)); }
 
   Node root() const { return _nodes.at(tree_math::root(_size)); }
 
-  std::vector<Node> direct_path(size_t index) const
+  std::vector<Node> direct_path(uint32_t index) const
   {
     return extract(tree_math::dirpath(2 * index, _size));
   }
 
-  std::vector<Node> copath(size_t index) const
+  std::vector<Node> copath(uint32_t index) const
   {
     return extract(tree_math::copath(2 * index, _size));
   }
@@ -171,7 +172,7 @@ public:
     return extract(tree_math::frontier(_size));
   }
 
-  std::vector<Node> update_path(size_t index, Node newValue) const
+  std::vector<Node> update_path(uint32_t index, Node newValue) const
   {
     auto c = tree_math::copath(2 * index, _size);
     std::vector<Node> nodes;
@@ -193,19 +194,19 @@ public:
 
 private:
   uint32_t _size;
-  std::map<size_t, Node> _nodes;
+  std::map<uint32_t, Node> _nodes;
 
   // Compute intermediate nodes in the tree as much as possible
-  void build(const std::vector<size_t>& new_nodes)
+  void build(const std::vector<uint32_t>& new_nodes)
   {
-    std::set<size_t> toUpdate;
+    std::set<uint32_t> toUpdate;
     std::for_each(
-      new_nodes.begin(), new_nodes.end(), [this, &toUpdate](const size_t& x) {
+      new_nodes.begin(), new_nodes.end(), [this, &toUpdate](const uint32_t& x) {
         toUpdate.insert(tree_math::parent(x, _size));
       });
 
     while (toUpdate.size() > 0) {
-      std::set<size_t> nextToUpdate;
+      std::set<uint32_t> nextToUpdate;
 
       for (const auto& p : toUpdate) {
         auto l = tree_math::left(p);
@@ -249,7 +250,7 @@ private:
   // the need for a default constructor in Node classes.
   //
   // Return value: Whether a change was made
-  bool set(size_t i, Node n)
+  bool set(uint32_t i, Node n)
   {
     if (_nodes.count(i) == 0) {
       _nodes.emplace(i, n);
@@ -262,7 +263,7 @@ private:
     return false;
   }
 
-  std::vector<Node> extract(const std::vector<size_t>& indices) const
+  std::vector<Node> extract(const std::vector<uint32_t>& indices) const
   {
     std::vector<Node> out;
     out.reserve(indices.size());
@@ -272,7 +273,7 @@ private:
     return out;
   }
 
-  friend std::ostream& operator<<(std::ostream& out, Tree t)
+  friend std::ostream& operator<<(std::ostream& out, const Tree& t)
   {
     out << "Size: " << t._size << std::endl;
     out << "Nodes:" << std::endl;
@@ -280,6 +281,16 @@ private:
       out << "  [" << x.first << ": " << x.second << "]" << std::endl;
     }
     return out;
+  }
+
+  friend tls::ostream& operator<<(tls::ostream& out, const Tree& t)
+  {
+    return out << t._size << t._nodes;
+  }
+
+  friend tls::istream& operator>>(tls::istream& in, Tree& t)
+  {
+    return in >> t._size >> t._nodes;
   }
 };
 

@@ -51,6 +51,13 @@ TypedDelete(BIGNUM* ptr)
 }
 
 template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
 EC_KEY*
 TypedDup(EC_KEY* ptr)
 {
@@ -157,16 +164,16 @@ hkdf_extract(const bytes& salt, const bytes& ikm)
 //     uint16 length = Length;
 //     opaque label<7..255> = "mls10 " + Label;
 //     opaque group_id<0..2^16-1> = ID;
-//     uint32 epoch = Epoch;
-//     opaque message<1..2^16-1> = Msg
+//     uint64 epoch = Epoch;
+//     opaque message<0..2^16-1> = Msg
 // } HkdfLabel;
 struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1, 7> label;
   tls::opaque<2> group_id;
-  uint32_t epoch;
-  tls::opaque<2, 1> message;
+  epoch_t epoch;
+  tls::opaque<2> message;
 };
 
 tls::ostream&
@@ -180,7 +187,7 @@ bytes
 derive_secret(const bytes& secret,
               const std::string& label,
               const bytes& group_id,
-              uint32_t epoch,
+              const epoch_t& epoch,
               const bytes& message)
 {
   std::string mls_label = std::string("mls10 ") + label;
@@ -190,9 +197,7 @@ derive_secret(const bytes& secret,
     SHA256_DIGEST_LENGTH, vec_label, group_id, epoch, message
   };
 
-  tls::ostream writer;
-  writer << label_str;
-  auto hkdf_label = writer.bytes();
+  auto hkdf_label = tls::marshal(label_str);
 
   // We always extract Hash.length octets of output, in which case,
   // HKDF-Expand(Secret, Label) reduces to:
@@ -290,8 +295,6 @@ DHPublicKey::reset(const bytes& data)
 
   _key = key;
 }
-
-DHPublicKey::DHPublicKey() {}
 
 DHPublicKey::DHPublicKey(const EC_POINT* pt)
   : _key(EC_KEY_new_by_curve_name(DH_CURVE))
@@ -427,6 +430,43 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
 
+tls::ostream&
+operator<<(tls::ostream& out, const DHPrivateKey& obj)
+{
+  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
+  int len = BN_num_bytes(dN);
+
+  tls::opaque<1> d(len);
+  BN_bn2bin(dN, d.data());
+
+  tls::opaque<1> pub = obj._pub.to_bytes();
+
+  return out << d << pub;
+}
+
+tls::istream&
+operator>>(tls::istream& in, DHPrivateKey& obj)
+{
+  tls::opaque<1> d, pub;
+  in >> d >> pub;
+
+  const uint8_t* ptr = pub.data();
+  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
+  EC_KEY* temp = key.get();
+  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
+    throw OpenSSLError::current();
+  }
+
+  Scoped<EC_GROUP> group = defaultECGroup();
+  EC_KEY_set_group(key.get(), group.get());
+
+  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
+  EC_KEY_set_private_key(key.get(), dN.get());
+
+  obj = DHPrivateKey(key.release());
+  return in;
+}
+
 ///
 /// SignaturePublicKey
 ///
@@ -533,8 +573,6 @@ SignaturePublicKey::reset(const bytes& data)
   _key = key;
 }
 
-SignaturePublicKey::SignaturePublicKey() {}
-
 SignaturePublicKey::SignaturePublicKey(const EC_POINT* pt)
   : _key(EC_KEY_new_by_curve_name(SIG_CURVE))
 {
@@ -606,6 +644,21 @@ SignaturePrivateKey::operator=(SignaturePrivateKey&& other)
   return *this;
 }
 
+bytes
+point_data(const EC_KEY* key)
+{
+  point_conversion_form_t form = POINT_CONVERSION_UNCOMPRESSED;
+  const EC_POINT* pt = EC_KEY_get0_public_key(key);
+  const EC_GROUP* group = EC_KEY_get0_group(key);
+
+  bytes data;
+  int len = 0;
+  len = EC_POINT_point2oct(group, pt, form, nullptr, len, nullptr);
+  data.resize(len);
+  EC_POINT_point2oct(group, pt, form, data.data(), len, nullptr);
+  return data;
+}
+
 bool
 SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
 {
@@ -617,8 +670,13 @@ SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
   const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
   const EC_GROUP* group = EC_KEY_get0_group(_key.get());
 
-  auto out =
-    (BN_cmp(d1, d2) == 0) && (EC_POINT_cmp(group, p1, p2, nullptr) == 0);
+  auto deq = BN_cmp(d1, d2);
+  auto peq = EC_POINT_cmp(group, p1, p2, nullptr);
+  if (peq == -1) {
+    throw OpenSSLError::current();
+  }
+
+  auto out = (deq == 0) && (peq == 0) && (_pub == other._pub);
   return out;
 }
 
@@ -656,5 +714,42 @@ SignaturePrivateKey::SignaturePrivateKey(EC_KEY* key)
   : _key(key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
+
+tls::ostream&
+operator<<(tls::ostream& out, const SignaturePrivateKey& obj)
+{
+  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
+  int len = BN_num_bytes(dN);
+
+  tls::opaque<1> d(len);
+  BN_bn2bin(dN, d.data());
+
+  tls::opaque<1> pub = obj._pub.to_bytes();
+
+  return out << d << pub;
+}
+
+tls::istream&
+operator>>(tls::istream& in, SignaturePrivateKey& obj)
+{
+  tls::opaque<1> d, pub;
+  in >> d >> pub;
+
+  const uint8_t* ptr = pub.data();
+  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
+  EC_KEY* temp = key.get();
+  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
+    throw OpenSSLError::current();
+  }
+
+  Scoped<EC_GROUP> group = defaultECGroup();
+  EC_KEY_set_group(key.get(), group.get());
+
+  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
+  EC_KEY_set_private_key(key.get(), dN.get());
+
+  obj = SignaturePrivateKey(key.release());
+  return in;
+}
 
 } // namespace mls

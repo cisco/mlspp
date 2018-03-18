@@ -15,14 +15,17 @@ public:
   /// Constructors
   ///
 
+  // Default constructor does not have a useful semantic.  It should
+  // only be used for constructing blank states, e.g., for unmarshal
+  State() = default;
+
   // Initialize an empty group
   State(const bytes& group_id, const SignaturePrivateKey& identity_priv);
 
   // Initialize a group from a GroupAdd (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
         const DHPrivateKey& init_priv,
-        const Handshake<GroupAdd>& group_add,
-        const GroupInitKey& group_init_key);
+        const Handshake<GroupAdd>& group_add);
 
   // Initialize a state from a UserAdd (for user-initiated join)
   State(const SignaturePrivateKey& identity_priv,
@@ -82,18 +85,22 @@ public:
   // Handle a Remove (for the remaining participants, obviously)
   State handle(const Handshake<Remove>& remove) const;
 
+  epoch_t prior_epoch() const { return _prior_epoch; }
+  epoch_t epoch() const { return _epoch; }
+
 private:
   uint32_t _index;
   DHPrivateKey _leaf_priv;
   SignaturePrivateKey _identity_priv;
 
-  uint32_t _epoch;
-  bytes _group_id;
+  epoch_t _prior_epoch;
+  epoch_t _epoch;
+  tls::opaque<2> _group_id;
   Tree<MerkleNode> _identity_tree;
   Tree<RatchetNode> _ratchet_tree;
 
-  bytes _message_master_secret;
-  bytes _init_secret;
+  tls::opaque<1> _message_master_secret;
+  tls::opaque<1> _init_secret;
   DHPrivateKey _add_priv;
 
   // Used to construct an ephemeral state while creating a UserAdd
@@ -103,23 +110,35 @@ private:
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
+  friend bool operator!=(const State& lhs, const State& rhs);
+
+  // Serialize a state for storage
+  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
+  friend tls::istream& operator>>(tls::istream& in, State& obj);
+
+  // Spawn a new state (with a fresh epoch) from this state
+  State spawn(const epoch_t& epoch) const;
 
   // Inner logic for UserAdd and GroupInitKey constructors
+  template<typename Message>
   void init_from_details(const SignaturePrivateKey& identity_priv,
                          const DHPrivateKey& leaf_priv,
                          const GroupInitKey& group_init_key,
-                         const bytes& message);
+                         const Handshake<Message>& message);
 
   // Inner logic shared by UserAdd and GroupAdd handlers
-  void add_inner(const SignaturePublicKey& identity_key, const bytes& message);
+  template<typename Message>
+  void add_inner(const SignaturePublicKey& identity_key,
+                 const Handshake<Message>& message);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
+  template<typename Message>
   void update_leaf(uint32_t index,
                    const std::vector<RatchetNode>& path,
-                   const bytes& message,
+                   const Handshake<Message>& message,
                    const optional<DHPrivateKey>& leaf_priv);
 
-  // Derive the sercrets for an epoch, given some new entropy
+  // Derive the secrets for an epoch, given some new entropy
   void derive_epoch_keys(bool add,
                          const bytes& update_secret,
                          const bytes& message);
