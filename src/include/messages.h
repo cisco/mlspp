@@ -9,16 +9,18 @@
 namespace mls {
 
 // struct {
-//     CipherSuite cipher_suites<0..255>; // OMITTED
-//     DHPublicKey init_keys<1..2^16-1>;  // ONLY ONE
+//     CipherSuite cipher_suites<0..255>; // ignored
+//     DHPublicKey init_keys<1..2^16-1>;  // only use first
 //     SignaturePublicKey identity_key;
-//     SignatureScheme algorithm;         // OMITTED
+//     SignatureScheme algorithm;         // always 0
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
-  DHPublicKey init_key;
+  tls::vector<uint16_t, 1> cipher_suites;
+  tls::vector<DHPublicKey, 2> init_keys;
   SignaturePublicKey identity_key;
+  uint16_t algorithm = 0;
   tls::opaque<2> signature;
 
   void sign(const SignaturePrivateKey& identity_priv);
@@ -37,7 +39,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //     uint64 epoch;
 //     uint32 group_size;
 //     tls::opaque group_id<0..2^16-1>;
-//     CipherSuite cipher_suite;                // OMITTED
+//     CipherSuite cipher_suite;                // ignored
 //     DHPublicKey add_key;
 //     MerkleNode identity_frontier<0..2^16-1>;
 //     DHPublicKey ratchet_frontier<0..2^16-1>;
@@ -47,6 +49,7 @@ struct GroupInitKey
   epoch_t epoch;
   uint32_t group_size;
   tls::opaque<2> group_id;
+  uint16_t cipher_suite;
   DHPublicKey add_key;
   tls::vector<MerkleNode, 2> identity_frontier;
   tls::vector<RatchetNode, 2> ratchet_frontier;

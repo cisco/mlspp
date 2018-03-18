@@ -153,7 +153,10 @@ Session::handle(const bytes& handshake)
 void
 Session::make_init_key()
 {
-  auto user_init_key = UserInitKey{ _init_priv.public_key() };
+  auto user_init_key = UserInitKey{
+    {},                         // No cipher suites
+    { _init_priv.public_key() } // One init key
+  };
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }

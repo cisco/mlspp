@@ -23,12 +23,16 @@ TEST_CASE("Basic message serialization", "[messages]")
   auto dh_pub = DHPrivateKey::generate().public_key();
   RatchetNode ratchet(dh_pub);
 
-  UserInitKey user_init_key{ DHPrivateKey::generate().public_key() };
+  UserInitKey user_init_key{
+    {},                                       // No ciphersuites
+    { DHPrivateKey::generate().public_key() } // Only one init key
+  };
   user_init_key.sign(identity_priv);
 
   GroupInitKey group_init_key{ epoch_val,
                                3,
                                { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,
                                dh_pub,
                                { merkle, merkle },
                                { ratchet, ratchet } };
@@ -77,12 +81,13 @@ TEST_CASE("Handshake serialization", "[messages]")
   std::vector<MerkleNode> copath = { merkle, merkle };
   auto root = ((merkle + merkle) + merkle).value();
 
-  UserInitKey user_init_key{ DHPrivateKey::generate().public_key() };
+  UserInitKey user_init_key{ {}, { DHPrivateKey::generate().public_key() } };
   user_init_key.sign(identity_priv);
 
   GroupInitKey group_init_key{ epoch_val,
                                3,
                                { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,
                                dh_pub,
                                { merkle, merkle },
                                { ratchet, ratchet } };
