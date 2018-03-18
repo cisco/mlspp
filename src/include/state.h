@@ -99,7 +99,6 @@ private:
   Tree<MerkleNode> _identity_tree;
   Tree<RatchetNode> _ratchet_tree;
 
-  uint64_t _last_seq = 0;
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
   DHPrivateKey _add_priv;
@@ -143,10 +142,6 @@ private:
   void derive_epoch_keys(bool add,
                          const bytes& update_secret,
                          const bytes& message);
-
-  // Derive the encryptiong parameters for a given sender
-  bytes sender_key(uint32_t index) const;
-  bytes sender_iv(uint32_t index) const;
 
   // Create a signed Handshake message, given a payload
   template<typename T>
