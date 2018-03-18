@@ -294,7 +294,7 @@ operator<<(tls::ostream& out, const State& obj)
 {
   return out << obj._index << obj._leaf_priv << obj._identity_priv
              << obj._prior_epoch << obj._epoch << obj._group_id
-             << obj._identity_tree << obj._ratchet_tree << obj._last_seq
+             << obj._identity_tree << obj._ratchet_tree
              << obj._message_master_secret << obj._init_secret << obj._add_priv;
 }
 
@@ -303,8 +303,8 @@ operator>>(tls::istream& in, State& obj)
 {
   in >> obj._index >> obj._leaf_priv >> obj._identity_priv >>
     obj._prior_epoch >> obj._epoch >> obj._group_id >> obj._identity_tree >>
-    obj._ratchet_tree >> obj._last_seq >> obj._message_master_secret >>
-    obj._init_secret >> obj._add_priv;
+    obj._ratchet_tree >> obj._message_master_secret >> obj._init_secret >>
+    obj._add_priv;
 
   // Reinstate the private keys in the ratchet tree
   auto leaf = RatchetNode(obj._leaf_priv);
@@ -412,33 +412,6 @@ State::derive_epoch_keys(bool add,
     derive_secret(epoch_secret, "add", _group_id, _epoch, message);
 
   _add_priv = DHPrivateKey::derive(add_secret);
-}
-
-std::string
-sender_label(uint32_t index)
-{
-  std::string label(4, '\0');
-  label[0] = char(index >> 24);
-  label[1] = char(index >> 16);
-  label[2] = char(index >> 8);
-  label[3] = char(index);
-  return label;
-}
-
-bytes
-State::sender_key(uint32_t index) const
-{
-  auto label = sender_label(index);
-  return derive_secret(
-    _message_master_secret, "key " + label, _group_id, _epoch, {});
-}
-
-bytes
-State::sender_iv(uint32_t index) const
-{
-  auto label = sender_label(index);
-  return derive_secret(
-    _message_master_secret, "iv " + label, _group_id, _epoch, {});
 }
 
 template<typename Message>
