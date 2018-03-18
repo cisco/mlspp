@@ -24,14 +24,15 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << init_key << identity_key;
+  out << cipher_suites << init_keys << identity_key << algorithm;
   return out.bytes();
 }
 
 bool
 operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 {
-  return (lhs.init_key == rhs.init_key) &&
+  return (lhs.cipher_suites == rhs.cipher_suites) &&
+         (lhs.init_keys == rhs.init_keys) &&
          (lhs.identity_key == rhs.identity_key) &&
          (lhs.signature == rhs.signature);
 }
@@ -39,13 +40,15 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.init_key << obj.identity_key << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.identity_key
+             << obj.algorithm << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  return in >> obj.init_key >> obj.identity_key >> obj.signature;
+  return in >> obj.cipher_suites >> obj.init_keys >> obj.identity_key >>
+         obj.algorithm >> obj.signature;
 }
 
 // GroupInitKey

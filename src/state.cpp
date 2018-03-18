@@ -39,8 +39,10 @@ State::State(const SignaturePrivateKey& identity_priv,
     throw InvalidParameterError("Group add is not from a member of the group");
   }
 
+  // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
+  // algorithm.  Should do algorithm negotiation.
+  auto init_key = group_add.message.user_init_key.init_keys[0];
   auto identity_key = group_add.message.user_init_key.identity_key;
-  auto init_key = group_add.message.user_init_key.init_key;
   if ((identity_key != identity_priv.public_key()) ||
       (init_key != init_priv.public_key())) {
     throw InvalidParameterError("Group add not targeted for this node");
@@ -172,7 +174,8 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   auto next = spawn(group_add.epoch());
 
   // Add the new leaf to the ratchet tree
-  auto init_key = group_add.message.user_init_key.init_key;
+  // XXX(rlb@ipv.sx): Assumes only one initkey
+  auto init_key = group_add.message.user_init_key.init_keys[0];
   auto identity_key = group_add.message.user_init_key.identity_key;
 
   auto leaf_data = _add_priv.derive(init_key);

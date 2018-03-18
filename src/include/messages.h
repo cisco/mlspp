@@ -9,16 +9,18 @@
 namespace mls {
 
 // struct {
-//     CipherSuite cipher_suites<0..255>; // OMITTED
-//     DHPublicKey init_keys<1..2^16-1>;  // ONLY ONE
+//     CipherSuite cipher_suites<0..255>; // ignored
+//     DHPublicKey init_keys<1..2^16-1>;  // only use first
 //     SignaturePublicKey identity_key;
-//     SignatureScheme algorithm;         // OMITTED
+//     SignatureScheme algorithm;         // always 0
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
-  DHPublicKey init_key;
+  tls::vector<uint16_t, 1> cipher_suites;
+  tls::vector<DHPublicKey, 2> init_keys;
   SignaturePublicKey identity_key;
+  uint16_t algorithm = 0;
   tls::opaque<2> signature;
 
   void sign(const SignaturePrivateKey& identity_priv);

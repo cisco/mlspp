@@ -26,7 +26,7 @@ TEST_CASE("Group creation", "[state]")
     identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
     auto init_priv = DHPrivateKey::generate();
     user_init_keys.emplace(uik + i);
-    user_init_keys[i].init_key = init_priv.public_key();
+    user_init_keys[i].init_keys = { init_priv.public_key() };
     user_init_keys[i].sign(identity_privs[i]);
     init_privs.emplace(inp + i, init_priv);
   }
