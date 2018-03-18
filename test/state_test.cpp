@@ -138,6 +138,32 @@ TEST_CASE("Operations on a running group", "[state]")
     REQUIRE(state == states[0]);
   }
 
+  SECTION("TLS marshal / unmarshal round trip, followed by update")
+  {
+    for (auto& state : states) {
+      State temp;
+      tls::unmarshal(tls::marshal(state), temp);
+      state = temp;
+    }
+
+    for (size_t i = 0; i < group_size; i += 1) {
+      auto new_leaf = DHPrivateKey::generate();
+      auto update = states[i].update(new_leaf);
+
+      for (size_t j = 0; j < group_size; j += 1) {
+        if (i == j) {
+          states[j] = states[j].handle(update, new_leaf);
+        } else {
+          states[j] = states[j].handle(update);
+        }
+      }
+
+      for (const auto& state : states) {
+        REQUIRE(state == states[0]);
+      }
+    }
+  }
+
   SECTION("Each node can update its leaf key")
   {
     for (size_t i = 0; i < group_size; i += 1) {

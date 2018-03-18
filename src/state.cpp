@@ -301,10 +301,16 @@ operator<<(tls::ostream& out, const State& obj)
 tls::istream&
 operator>>(tls::istream& in, State& obj)
 {
-  return in >> obj._index >> obj._leaf_priv >> obj._identity_priv >>
-         obj._prior_epoch >> obj._epoch >> obj._group_id >>
-         obj._identity_tree >> obj._ratchet_tree >> obj._last_seq >>
-         obj._message_master_secret >> obj._init_secret >> obj._add_priv;
+  in >> obj._index >> obj._leaf_priv >> obj._identity_priv >>
+    obj._prior_epoch >> obj._epoch >> obj._group_id >> obj._identity_tree >>
+    obj._ratchet_tree >> obj._last_seq >> obj._message_master_secret >>
+    obj._init_secret >> obj._add_priv;
+
+  // Reinstate the private keys in the ratchet tree
+  auto leaf = RatchetNode(obj._leaf_priv);
+  obj._ratchet_tree.update(obj._index, leaf);
+
+  return in;
 }
 
 State
