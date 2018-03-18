@@ -173,7 +173,7 @@ struct HKDFLabel
   tls::opaque<1, 7> label;
   tls::opaque<2> group_id;
   epoch_t epoch;
-  tls::opaque<2, 0> message;
+  tls::opaque<2> message;
 };
 
 tls::ostream&
