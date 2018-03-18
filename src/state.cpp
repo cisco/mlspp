@@ -449,6 +449,7 @@ State::group_init_key() const
   return GroupInitKey{ _epoch,
                        uint32_t(_identity_tree.size()),
                        _group_id,
+                       0x0000, // ciphersuite, ignored
                        _add_priv.public_key(),
                        _identity_tree.frontier(),
                        _ratchet_tree.frontier() };

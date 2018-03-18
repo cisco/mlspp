@@ -32,6 +32,7 @@ TEST_CASE("Basic message serialization", "[messages]")
   GroupInitKey group_init_key{ epoch_val,
                                3,
                                { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,
                                dh_pub,
                                { merkle, merkle },
                                { ratchet, ratchet } };
@@ -86,6 +87,7 @@ TEST_CASE("Handshake serialization", "[messages]")
   GroupInitKey group_init_key{ epoch_val,
                                3,
                                { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,
                                dh_pub,
                                { merkle, merkle },
                                { ratchet, ratchet } };

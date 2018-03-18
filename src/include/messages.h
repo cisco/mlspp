@@ -39,7 +39,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //     uint64 epoch;
 //     uint32 group_size;
 //     tls::opaque group_id<0..2^16-1>;
-//     CipherSuite cipher_suite;                // OMITTED
+//     CipherSuite cipher_suite;                // ignored
 //     DHPublicKey add_key;
 //     MerkleNode identity_frontier<0..2^16-1>;
 //     DHPublicKey ratchet_frontier<0..2^16-1>;
@@ -49,6 +49,7 @@ struct GroupInitKey
   epoch_t epoch;
   uint32_t group_size;
   tls::opaque<2> group_id;
+  uint16_t cipher_suite;
   DHPublicKey add_key;
   tls::vector<MerkleNode, 2> identity_frontier;
   tls::vector<RatchetNode, 2> ratchet_frontier;

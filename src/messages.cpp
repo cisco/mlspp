@@ -64,6 +64,7 @@ bool
 operator==(const GroupInitKey& lhs, const GroupInitKey& rhs)
 {
   return (lhs.epoch == rhs.epoch) && (lhs.group_size == rhs.group_size) &&
+         (lhs.cipher_suite == rhs.cipher_suite) &&
          (lhs.group_id == rhs.group_id) && (lhs.add_key == rhs.add_key) &&
          (lhs.identity_frontier == rhs.identity_frontier) &&
          (lhs.ratchet_frontier == rhs.ratchet_frontier);
@@ -72,15 +73,16 @@ operator==(const GroupInitKey& lhs, const GroupInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const GroupInitKey& obj)
 {
-  return out << obj.epoch << obj.group_size << obj.group_id << obj.add_key
-             << obj.identity_frontier << obj.ratchet_frontier;
+  return out << obj.epoch << obj.group_size << obj.group_id << obj.cipher_suite
+             << obj.add_key << obj.identity_frontier << obj.ratchet_frontier;
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupInitKey& obj)
 {
-  return in >> obj.epoch >> obj.group_size >> obj.group_id >> obj.add_key >>
-         obj.identity_frontier >> obj.ratchet_frontier;
+  return in >> obj.epoch >> obj.group_size >> obj.group_id >>
+         obj.cipher_suite >> obj.add_key >> obj.identity_frontier >>
+         obj.ratchet_frontier;
 }
 
 // HandshakeType
