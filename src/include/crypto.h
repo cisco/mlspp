@@ -124,6 +124,31 @@ derive_secret(const bytes& secret,
               const epoch_t& epoch,
               const bytes& message);
 
+class AESGCM
+{
+public:
+  AESGCM() = delete;
+  AESGCM(const AESGCM& other) = delete;
+  AESGCM(AESGCM&& other) = delete;
+  AESGCM& operator=(const AESGCM& other) = delete;
+  AESGCM& operator=(AESGCM&& other) = delete;
+
+  AESGCM(const bytes& key, const bytes& nonce);
+
+  void set_aad(const bytes& key);
+  bytes encrypt(const bytes& plaintext);
+  bytes decrypt(const bytes& ciphertext);
+
+private:
+  bytes _key;
+  bytes _nonce;
+  bytes _aad;
+
+  // This raw pointer only ever references memory managed by
+  // OpenSSL, so it doesn't need to be scoped.
+  const EVP_CIPHER* _cipher;
+};
+
 class DHPublicKey
 {
 public:

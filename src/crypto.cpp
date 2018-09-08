@@ -209,6 +209,129 @@ derive_secret(const bytes& secret,
 }
 
 ///
+/// AESGCM
+///
+
+AESGCM::AESGCM(const bytes& key, const bytes& nonce)
+{
+  // XXX(rlb@ipv.sx): Break out constants for the key/IV sizes?
+
+  switch (_key.size()) {
+    case 16:
+      _cipher = EVP_aes_128_gcm();
+    case 24:
+      _cipher = EVP_aes_192_gcm();
+    case 32:
+      _cipher = EVP_aes_256_gcm();
+    default:
+      throw InvalidParameterError("Invalid AES key size");
+  }
+
+  if (nonce.size() != 12) {
+    throw InvalidParameterError("Invalid AES-GCM nonce size");
+  }
+
+  _key = key;
+  _nonce = nonce;
+}
+
+void
+AESGCM::set_aad(const bytes& aad)
+{
+  _aad = aad;
+}
+
+/*
+
+EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  EVP_EncryptInit (ctx, cipher, KEY, IV);
+  EVP_EncryptUpdate (ctx, NULL, &howmany, AAD, aad_len);
+  len = 0;
+  while(len <= in_len-128)
+  {
+     EVP_EncryptUpdate (ctx, CIPHERTEXT+len, &howmany, PLAINTEXT+len, 128);
+     len+=128;
+  }
+  EVP_EncryptUpdate (ctx, CIPHERTEXT+len, &howmany, PLAINTEXT+len, in_len -
+len); EVP_EncryptFinal (ctx, TAG, &howmany);
+
+*/
+bytes
+AESGCM::encrypt(const bytes& pt)
+{
+  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  if (ctx.get() == nullptr) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_EncryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+    throw OpenSSLError::current();
+  }
+
+  int dummy;
+  if (!EVP_EncryptUpdate(
+        ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+    throw OpenSSLError::current();
+  }
+
+  bytes ct(pt.size() + 16);
+  if (!EVP_EncryptUpdate(ctx.get(), ct.data(), &dummy, pt.data(), pt.size())) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_EncryptFinal(ctx.get(), ct.data() + pt.size(), &dummy)) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_CIPHER_CTX_ctrl(
+        ctx.get(), EVP_CTRL_GCM_GET_TAG, 16, ct.data() + pt.size())) {
+    throw OpenSSLError::current();
+  }
+
+  return ct;
+}
+
+bytes
+AESGCM::decrypt(const bytes& ct)
+{
+  if (ct.size() < 16) {
+    throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
+  }
+
+  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  if (ctx.get() == nullptr) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_DecryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+    throw OpenSSLError::current();
+  }
+
+  uint8_t* tag = const_cast<uint8_t*>(ct.data() + ct.size() - 16);
+  if (!EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, 16, tag)) {
+    throw OpenSSLError::current();
+  }
+
+  int dummy;
+  if (!EVP_DecryptUpdate(
+        ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+    throw OpenSSLError::current();
+  }
+
+  bytes pt(ct.size() - 16);
+  if (!EVP_DecryptUpdate(
+        ctx.get(), pt.data(), &dummy, ct.data(), ct.size() - 16)) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_DecryptFinal(ctx.get(), pt.data() + ct.size() - 16, &dummy)) {
+    throw OpenSSLError::current();
+  }
+
+  return pt;
+}
+
+///
 /// DHPublicKey
 ///
 
