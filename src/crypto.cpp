@@ -5,6 +5,7 @@
 #include "openssl/err.h"
 #include "openssl/hmac.h"
 #include "openssl/obj_mac.h"
+#include "openssl/rand.h"
 #include "openssl/sha.h"
 
 #include <string>
@@ -184,6 +185,16 @@ operator<<(tls::ostream& out, const HKDFLabel& obj)
 }
 
 bytes
+random_bytes(size_t size)
+{
+  bytes out(size);
+  if (!RAND_bytes(out.data(), out.size())) {
+    throw OpenSSLError::current();
+  }
+  return out;
+}
+
+bytes
 derive_secret(const bytes& secret,
               const std::string& label,
               const bytes& group_id,
@@ -214,20 +225,21 @@ derive_secret(const bytes& secret,
 
 AESGCM::AESGCM(const bytes& key, const bytes& nonce)
 {
-  // XXX(rlb@ipv.sx): Break out constants for the key/IV sizes?
-
-  switch (_key.size()) {
-    case 16:
+  switch (key.size()) {
+    case key_size_128:
       _cipher = EVP_aes_128_gcm();
-    case 24:
+      break;
+    case key_size_192:
       _cipher = EVP_aes_192_gcm();
-    case 32:
+      break;
+    case key_size_256:
       _cipher = EVP_aes_256_gcm();
+      break;
     default:
       throw InvalidParameterError("Invalid AES key size");
   }
 
-  if (nonce.size() != 12) {
+  if (nonce.size() != nonce_size) {
     throw InvalidParameterError("Invalid AES-GCM nonce size");
   }
 
@@ -241,21 +253,6 @@ AESGCM::set_aad(const bytes& aad)
   _aad = aad;
 }
 
-/*
-
-EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-  EVP_EncryptInit (ctx, cipher, KEY, IV);
-  EVP_EncryptUpdate (ctx, NULL, &howmany, AAD, aad_len);
-  len = 0;
-  while(len <= in_len-128)
-  {
-     EVP_EncryptUpdate (ctx, CIPHERTEXT+len, &howmany, PLAINTEXT+len, 128);
-     len+=128;
-  }
-  EVP_EncryptUpdate (ctx, CIPHERTEXT+len, &howmany, PLAINTEXT+len, in_len -
-len); EVP_EncryptFinal (ctx, TAG, &howmany);
-
-*/
 bytes
 AESGCM::encrypt(const bytes& pt)
 {
@@ -268,23 +265,26 @@ AESGCM::encrypt(const bytes& pt)
     throw OpenSSLError::current();
   }
 
-  int dummy;
-  if (!EVP_EncryptUpdate(
-        ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+  int outlen = pt.size() + tag_size;
+  bytes ct(pt.size() + tag_size);
+
+  if (_aad.size() > 0) {
+    if (!EVP_EncryptUpdate(
+          ctx.get(), nullptr, &outlen, _aad.data(), _aad.size())) {
+      throw OpenSSLError::current();
+    }
+  }
+
+  if (!EVP_EncryptUpdate(ctx.get(), ct.data(), &outlen, pt.data(), pt.size())) {
     throw OpenSSLError::current();
   }
 
-  bytes ct(pt.size() + 16);
-  if (!EVP_EncryptUpdate(ctx.get(), ct.data(), &dummy, pt.data(), pt.size())) {
-    throw OpenSSLError::current();
-  }
-
-  if (!EVP_EncryptFinal(ctx.get(), ct.data() + pt.size(), &dummy)) {
+  if (!EVP_EncryptFinal(ctx.get(), ct.data() + pt.size(), &outlen)) {
     throw OpenSSLError::current();
   }
 
   if (!EVP_CIPHER_CTX_ctrl(
-        ctx.get(), EVP_CTRL_GCM_GET_TAG, 16, ct.data() + pt.size())) {
+        ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, ct.data() + pt.size())) {
     throw OpenSSLError::current();
   }
 
@@ -294,7 +294,7 @@ AESGCM::encrypt(const bytes& pt)
 bytes
 AESGCM::decrypt(const bytes& ct)
 {
-  if (ct.size() < 16) {
+  if (ct.size() < tag_size) {
     throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
   }
 
@@ -307,24 +307,26 @@ AESGCM::decrypt(const bytes& ct)
     throw OpenSSLError::current();
   }
 
-  uint8_t* tag = const_cast<uint8_t*>(ct.data() + ct.size() - 16);
-  if (!EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, 16, tag)) {
+  uint8_t* tag = const_cast<uint8_t*>(ct.data() + ct.size() - tag_size);
+  if (!EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag)) {
     throw OpenSSLError::current();
   }
 
   int dummy;
+  if (_aad.size() > 0) {
+    if (!EVP_DecryptUpdate(
+          ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+      throw OpenSSLError::current();
+    }
+  }
+
+  bytes pt(ct.size() - tag_size);
   if (!EVP_DecryptUpdate(
-        ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+        ctx.get(), pt.data(), &dummy, ct.data(), ct.size() - tag_size)) {
     throw OpenSSLError::current();
   }
 
-  bytes pt(ct.size() - 16);
-  if (!EVP_DecryptUpdate(
-        ctx.get(), pt.data(), &dummy, ct.data(), ct.size() - 16)) {
-    throw OpenSSLError::current();
-  }
-
-  if (!EVP_DecryptFinal(ctx.get(), pt.data() + ct.size() - 16, &dummy)) {
+  if (!EVP_DecryptFinal(ctx.get(), pt.data() + ct.size() - tag_size, &dummy)) {
     throw OpenSSLError::current();
   }
 
@@ -417,6 +419,22 @@ DHPublicKey::reset(const bytes& data)
   }
 
   _key = key;
+}
+
+ECIESCiphertext
+DHPublicKey::encrypt(const bytes& plaintext)
+{
+  auto ephemeral = DHPrivateKey::generate();
+  auto zz = ephemeral.derive(*this);
+
+  auto key = SHA256Digest(0x00).write(zz).digest();
+  key.resize(AESGCM::key_size_128);
+  auto nonce = SHA256Digest(0x01).write(zz).digest();
+  nonce.resize(AESGCM::nonce_size);
+
+  AESGCM gcm(key, nonce);
+  auto content = gcm.encrypt(plaintext);
+  return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
 DHPublicKey::DHPublicKey(const EC_POINT* pt)
@@ -553,6 +571,20 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
 
+bytes
+DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext)
+{
+  auto zz = derive(ciphertext.ephemeral);
+
+  auto key = SHA256Digest(0x00).write(zz).digest();
+  key.resize(AESGCM::key_size_128);
+  auto nonce = SHA256Digest(0x01).write(zz).digest();
+  nonce.resize(AESGCM::nonce_size);
+
+  AESGCM gcm(key, nonce);
+  return gcm.decrypt(ciphertext.content);
+}
+
 tls::ostream&
 operator<<(tls::ostream& out, const DHPrivateKey& obj)
 {
@@ -588,6 +620,22 @@ operator>>(tls::istream& in, DHPrivateKey& obj)
 
   obj = DHPrivateKey(key.release());
   return in;
+}
+
+///
+/// ECIESCiphertext
+///
+
+tls::ostream&
+operator<<(tls::ostream& out, const ECIESCiphertext& obj)
+{
+  return out << obj.ephemeral << obj.content;
+}
+
+tls::istream&
+operator>>(tls::istream& in, ECIESCiphertext& obj)
+{
+  return in >> obj.ephemeral >> obj.content;
 }
 
 ///

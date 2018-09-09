@@ -115,6 +115,9 @@ private:
 };
 
 bytes
+random_bytes(size_t size);
+
+bytes
 hkdf_extract(const bytes& salt, const bytes& ikm);
 
 bytes
@@ -139,6 +142,12 @@ public:
   bytes encrypt(const bytes& plaintext);
   bytes decrypt(const bytes& ciphertext);
 
+  static const size_t key_size_128 = 16;
+  static const size_t key_size_192 = 24;
+  static const size_t key_size_256 = 32;
+  static const size_t nonce_size = 12;
+  static const size_t tag_size = 16;
+
 private:
   bytes _key;
   bytes _nonce;
@@ -148,6 +157,8 @@ private:
   // OpenSSL, so it doesn't need to be scoped.
   const EVP_CIPHER* _cipher;
 };
+
+struct ECIESCiphertext;
 
 class DHPublicKey
 {
@@ -164,6 +175,8 @@ public:
 
   bytes to_bytes() const;
   void reset(const bytes& data);
+
+  ECIESCiphertext encrypt(const bytes& plaintext);
 
 private:
   Scoped<EC_KEY> _key;
@@ -195,6 +208,8 @@ public:
   bytes derive(DHPublicKey pub) const;
   DHPublicKey public_key() const;
 
+  bytes decrypt(const ECIESCiphertext& ciphertext);
+
 private:
   Scoped<EC_KEY> _key;
   DHPublicKey _pub;
@@ -206,6 +221,16 @@ private:
   // routines are wonky.
   friend tls::ostream& operator<<(tls::ostream& out, const DHPrivateKey& obj);
   friend tls::istream& operator>>(tls::istream& in, DHPrivateKey& obj);
+};
+
+struct ECIESCiphertext
+{
+  DHPublicKey ephemeral;
+  tls::opaque<3> content;
+
+  friend tls::ostream& operator<<(tls::ostream& out,
+                                  const ECIESCiphertext& obj);
+  friend tls::istream& operator>>(tls::istream& in, ECIESCiphertext& obj);
 };
 
 tls::ostream&

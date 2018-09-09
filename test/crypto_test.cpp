@@ -31,6 +31,57 @@ TEST_CASE("SHA-256 hash produces correct values", "[crypto]")
   }
 }
 
+TEST_CASE("AES-GCM encryption produces correct values", "[crypto]")
+{
+  // https://tools.ietf.org/html/draft-mcgrew-gcm-test-01#section-4
+  auto key = from_hex("4c80cdefbb5d10da906ac73c3613a634");
+  auto nonce = from_hex("2e443b684956ed7e3b244cfe");
+  auto aad = from_hex("000043218765432100000000");
+  auto plaintext = from_hex("45000048699a000080114db7c0a80102"
+                            "c0a801010a9bf15638d3010000010000"
+                            "00000000045f736970045f7564700373"
+                            "69700963796265726369747902646b00"
+                            "0021000101020201");
+  auto ciphertext = from_hex("fecf537e729d5b07dc30df528dd22b76"
+                             "8d1b98736696a6fd348509fa13ceac34"
+                             "cfa2436f14a3f3cf65925bf1f4a13c5d"
+                             "15b21e1884f5ff6247aeabb786b93bce"
+                             "61bc17d768fd9732459018148f6cbe72"
+                             "2fd04796562dfdb4");
+
+  SECTION("For encryption")
+  {
+    AESGCM gcm(key, nonce);
+    gcm.set_aad(aad);
+    REQUIRE(gcm.encrypt(plaintext) == ciphertext);
+  }
+
+  SECTION("For decryption")
+  {
+    AESGCM gcm(key, nonce);
+    gcm.set_aad(aad);
+    REQUIRE(gcm.decrypt(ciphertext) == plaintext);
+  }
+
+  SECTION("For an encrypt/decrypt round-trip")
+  {
+    auto key = random_bytes(AESGCM::key_size_256);
+    auto nonce = random_bytes(AESGCM::nonce_size);
+    auto aad = random_bytes(100);
+    auto original = random_bytes(100);
+
+    AESGCM gcm1(key, nonce);
+    gcm1.set_aad(aad);
+    auto encrypted = gcm1.encrypt(original);
+
+    AESGCM gcm2(key, nonce);
+    gcm2.set_aad(aad);
+    auto decrypted = gcm2.decrypt(encrypted);
+
+    REQUIRE(decrypted == original);
+  }
+}
+
 TEST_CASE("Diffie-Hellman key pairs can be created and combined", "[crypto]")
 {
   auto x = DHPrivateKey::generate();
@@ -97,6 +148,18 @@ TEST_CASE("Diffie-Hellman private keys serialize and deserialize", "[crypto]")
   DHPrivateKey x2;
   tls::unmarshal(marshaled, x2);
   REQUIRE(x2 == x);
+}
+
+TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
+{
+  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto gX = x.public_key();
+
+  auto original = random_bytes(100);
+  auto encrypted = gX.encrypt(original);
+  auto decrypted = x.decrypt(encrypted);
+
+  REQUIRE(original == decrypted);
 }
 
 TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
