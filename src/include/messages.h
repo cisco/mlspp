@@ -2,7 +2,7 @@
 
 #include "common.h"
 #include "crypto.h"
-#include "nodes.h"
+#include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include "tree.h"
 

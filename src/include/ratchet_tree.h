@@ -7,6 +7,7 @@
 
 namespace mls {
 
+// TODO delete
 class MerkleNode
 {
 public:
@@ -44,6 +45,8 @@ public:
   const optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
 
+  void merge(const RatchetNode& other);
+
 private:
   optional<bytes> _secret;
   optional<DHPrivateKey> _priv;
@@ -55,6 +58,40 @@ private:
   friend std::ostream& operator<<(std::ostream& out, const RatchetNode& node);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetNode& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetNode& obj);
+};
+
+struct RatchetPath
+{
+  tls::vector<RatchetNode, 3> nodes;
+  tls::vector<ECIESCiphertext, 3> node_secrets;
+
+  friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
+  friend tls::ostream& operator<<(tls::ostream& out, const RatchetPath& obj);
+  friend tls::istream& operator>>(tls::istream& in, RatchetPath& obj);
+};
+
+class RatchetTree
+{
+public:
+  RatchetTree();
+  RatchetTree(const bytes& secret);
+  RatchetTree(const std::vector<bytes>& secrets);
+
+  RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
+  bytes decrypt(uint32_t from, RatchetPath& path) const;
+  void merge(uint32_t from, const RatchetPath& path);
+
+  uint32_t size() const;
+  bytes root_secret() const;
+
+private:
+  tls::vector<RatchetNode, 3> nodes;
+
+  uint32_t working_size(uint32_t from) const;
+
+  friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
+  friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
 
 } // namespace mls

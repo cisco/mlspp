@@ -2,7 +2,7 @@
 
 #include "crypto.h"
 #include "messages.h"
-#include "nodes.h"
+#include "ratchet_tree.h"
 #include "tree.h"
 #include <vector>
 

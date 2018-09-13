@@ -254,7 +254,7 @@ AESGCM::set_aad(const bytes& aad)
 }
 
 bytes
-AESGCM::encrypt(const bytes& pt)
+AESGCM::encrypt(const bytes& pt) const
 {
   Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
   if (ctx.get() == nullptr) {
@@ -292,7 +292,7 @@ AESGCM::encrypt(const bytes& pt)
 }
 
 bytes
-AESGCM::decrypt(const bytes& ct)
+AESGCM::decrypt(const bytes& ct) const
 {
   if (ct.size() < tag_size) {
     throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
@@ -371,6 +371,14 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
+  if (_key.get() == nullptr && other._key.get() == nullptr) {
+    return true;
+  } else if (_key.get() == nullptr) {
+    return false;
+  } else if (other._key.get() == nullptr) {
+    return false;
+  }
+
   // Raw pointers OK here because get0 methods return pointers to
   // memory managed by the EC_KEY.
   const EC_GROUP* group = EC_KEY_get0_group(_key.get());
@@ -422,7 +430,7 @@ DHPublicKey::reset(const bytes& data)
 }
 
 ECIESCiphertext
-DHPublicKey::encrypt(const bytes& plaintext)
+DHPublicKey::encrypt(const bytes& plaintext) const
 {
   auto ephemeral = DHPrivateKey::generate();
   auto zz = ephemeral.derive(*this);
@@ -549,7 +557,7 @@ DHPrivateKey::operator!=(const DHPrivateKey& other) const
 }
 
 bytes
-DHPrivateKey::derive(DHPublicKey pub) const
+DHPrivateKey::derive(const DHPublicKey& pub) const
 {
   bytes out(DH_OUTPUT_BYTES);
   // ECDH_compute_key shouldn't modify the private key, but it's
@@ -572,7 +580,7 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
 {}
 
 bytes
-DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext)
+DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 {
   auto zz = derive(ciphertext.ephemeral);
 

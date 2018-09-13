@@ -139,8 +139,8 @@ public:
   AESGCM(const bytes& key, const bytes& nonce);
 
   void set_aad(const bytes& key);
-  bytes encrypt(const bytes& plaintext);
-  bytes decrypt(const bytes& ciphertext);
+  bytes encrypt(const bytes& plaintext) const;
+  bytes decrypt(const bytes& ciphertext) const;
 
   static const size_t key_size_128 = 16;
   static const size_t key_size_192 = 24;
@@ -176,7 +176,7 @@ public:
   bytes to_bytes() const;
   void reset(const bytes& data);
 
-  ECIESCiphertext encrypt(const bytes& plaintext);
+  ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
   Scoped<EC_KEY> _key;
@@ -205,10 +205,10 @@ public:
   bool operator==(const DHPrivateKey& other) const;
   bool operator!=(const DHPrivateKey& other) const;
 
-  bytes derive(DHPublicKey pub) const;
+  bytes derive(const DHPublicKey& pub) const;
   DHPublicKey public_key() const;
 
-  bytes decrypt(const ECIESCiphertext& ciphertext);
+  bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
 private:
   Scoped<EC_KEY> _key;
