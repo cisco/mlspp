@@ -5,8 +5,8 @@ namespace mls {
 
 Session::Session(const bytes& group_id,
                  const SignaturePrivateKey& identity_priv)
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
   State root(group_id, identity_priv);
@@ -15,16 +15,16 @@ Session::Session(const bytes& group_id,
 }
 
 Session::Session(const SignaturePrivateKey& identity_priv)
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
   make_init_key();
 }
 
 Session::Session()
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(SignaturePrivateKey::generate())
 {
   make_init_key();
@@ -69,7 +69,7 @@ Session::join(const bytes& group_init_key_bytes)
   _group_init_key = group_init_key_bytes;
   GroupInitKey group_init_key;
   tls::unmarshal(group_init_key_bytes, group_init_key);
-  auto user_add = State::join(_identity_priv, _init_priv, group_init_key);
+  auto user_add = State::join(_identity_priv, _init_secret, group_init_key);
   return tls::marshal(user_add);
 }
 
@@ -85,7 +85,7 @@ Session::add(const bytes& user_init_key_bytes) const
 bytes
 Session::update() const
 {
-  auto update = current_state().update(_next_leaf_priv);
+  auto update = current_state().update(_next_leaf_secret);
   return tls::marshal(update);
 }
 
@@ -109,7 +109,8 @@ Session::handle(const bytes& handshake)
         // NB: Assumes that join() has been called previously
         GroupInitKey group_init_key;
         tls::unmarshal(_group_init_key, group_init_key);
-        add_state(State(_identity_priv, _init_priv, user_add, group_init_key));
+        add_state(
+          State(_identity_priv, _next_leaf_secret, user_add, group_init_key));
       } else {
         add_state(current_state().handle(user_add));
       }
@@ -120,7 +121,7 @@ Session::handle(const bytes& handshake)
       tls::unmarshal(handshake, group_add);
 
       if (_state.size() == 0) {
-        add_state(State(_identity_priv, _init_priv, group_add));
+        add_state(State(_identity_priv, _init_secret, group_add));
       } else {
         add_state(current_state().handle(group_add));
       }
@@ -130,9 +131,9 @@ Session::handle(const bytes& handshake)
       Handshake<Update> update;
       tls::unmarshal(handshake, update);
 
-      if (update.message.path.back() == _next_leaf_priv.public_key()) {
-        add_state(current_state().handle(update, _next_leaf_priv));
-        _next_leaf_priv = std::move(DHPrivateKey::generate());
+      if (update.signer_index == current_state().index()) {
+        add_state(current_state().handle(update, _next_leaf_secret));
+        _next_leaf_secret = random_bytes(32);
       } else {
         add_state(current_state().handle(update));
       }
@@ -153,9 +154,10 @@ Session::handle(const bytes& handshake)
 void
 Session::make_init_key()
 {
+  auto init_priv = DHPrivateKey::derive(_init_secret);
   auto user_init_key = UserInitKey{
-    {},                         // No cipher suites
-    { _init_priv.public_key() } // One init key
+    {},                        // No cipher suites
+    { init_priv.public_key() } // One init key
   };
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
@@ -191,20 +193,6 @@ Session::current_state()
   }
 
   return _state.at(_current_epoch);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Session& obj)
-{
-  return out << obj._next_leaf_priv << obj._init_priv << obj._user_init_key
-             << obj._identity_priv << obj._state << obj._current_epoch;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Session& obj)
-{
-  return in >> obj._next_leaf_priv >> obj._init_priv >> obj._user_init_key >>
-         obj._identity_priv >> obj._state >> obj._current_epoch;
 }
 
 } // namespace mls

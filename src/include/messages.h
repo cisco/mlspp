@@ -42,7 +42,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //     CipherSuite cipher_suite;                // ignored
 //     DHPublicKey add_key;
 //     MerkleNode identity_frontier<0..2^16-1>;
-//     DHPublicKey ratchet_frontier<0..2^16-1>;
+//     DHPublicKey ratchet_frontier<0..2^16-1>; // XXX changed
 // } GroupInitKey;
 struct GroupInitKey
 {
@@ -52,7 +52,7 @@ struct GroupInitKey
   uint16_t cipher_suite;
   DHPublicKey add_key;
   tls::vector<MerkleNode, 2> identity_frontier;
-  tls::vector<RatchetNode, 2> ratchet_frontier;
+  RatchetTree ratchet_tree;
 
   bytes identity_root() const;
 };
@@ -97,7 +97,7 @@ operator>>(tls::istream& in, None& obj);
 struct UserAdd
 {
 public:
-  tls::vector<RatchetNode, 2, 1> path;
+  RatchetPath path;
 
   static const HandshakeType type;
 };
@@ -115,6 +115,7 @@ operator>>(tls::istream& in, UserAdd& obj);
 struct GroupAdd
 {
 public:
+  RatchetPath path;
   UserInitKey user_init_key;
   GroupInitKey group_init_key;
 
@@ -134,7 +135,7 @@ operator>>(tls::istream& in, GroupAdd& obj);
 struct Update
 {
 public:
-  tls::vector<RatchetNode, 2, 1> path;
+  RatchetPath path;
 
   static const HandshakeType type;
 };
@@ -154,7 +155,7 @@ struct Remove
 {
 public:
   uint32_t removed;
-  tls::vector<RatchetNode, 2, 1> path;
+  RatchetPath path;
 
   static const HandshakeType type;
 };

@@ -200,6 +200,22 @@ operator>>(tls::istream& in, RatchetNode& obj)
 /// RatchetPath
 ///
 
+bool
+operator==(const RatchetPath& lhs, const RatchetPath& rhs)
+{
+  if (lhs.nodes.size() != rhs.nodes.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < lhs.nodes.size(); i += 1) {
+    if (lhs.nodes[i].public_key() != rhs.nodes[i].public_key()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 std::ostream&
 operator<<(std::ostream& out, const RatchetPath& obj)
 {
@@ -345,7 +361,6 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
   if (curr != root) {
     throw InvalidParameterError("Update path failed to reach the root");
   }
-
   return secret;
 }
 
@@ -369,6 +384,13 @@ uint32_t
 RatchetTree::size() const
 {
   return working_size(0);
+}
+
+RatchetNode
+RatchetTree::root() const
+{
+  auto root = tree_math::root(size());
+  return nodes[root];
 }
 
 bytes

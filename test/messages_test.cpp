@@ -18,10 +18,13 @@ static const epoch_t epoch_val = 0x01020304;
 
 TEST_CASE("Basic message serialization", "[messages]")
 {
+  auto random = random_bytes(32);
   auto identity_priv = SignaturePrivateKey::generate();
   auto merkle = MerkleNode::leaf(identity_priv.public_key().to_bytes());
   auto dh_pub = DHPrivateKey::generate().public_key();
-  RatchetNode ratchet(dh_pub);
+
+  RatchetTree ratchet_tree{ { random, random } };
+  auto ratchet_path = ratchet_tree.encrypt(0, random);
 
   UserInitKey user_init_key{
     {},                                       // No ciphersuites
@@ -29,13 +32,9 @@ TEST_CASE("Basic message serialization", "[messages]")
   };
   user_init_key.sign(identity_priv);
 
-  GroupInitKey group_init_key{ epoch_val,
-                               3,
-                               { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,
-                               dh_pub,
-                               { merkle, merkle },
-                               { ratchet, ratchet } };
+  GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,      dh_pub, { merkle, merkle },
+                               ratchet_tree };
 
   SECTION("UserInitKey")
   {
@@ -56,24 +55,26 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("None") { tls_round_trip(None{}); }
 
-  SECTION("UserAdd") { tls_round_trip(UserAdd{ { ratchet, ratchet } }); }
+  SECTION("UserAdd") { tls_round_trip(UserAdd{ ratchet_path }); }
 
   SECTION("GroupAdd")
   {
-    tls_round_trip(GroupAdd{ user_init_key, group_init_key });
+    tls_round_trip(GroupAdd{ ratchet_path, user_init_key, group_init_key });
   }
 
-  SECTION("Update") { tls_round_trip(Update{ { ratchet, ratchet } }); }
+  SECTION("Update") { tls_round_trip(Update{ ratchet_path }); }
 
-  SECTION("Remove") { tls_round_trip(Remove{ 0x42, { ratchet, ratchet } }); }
+  SECTION("Remove") { tls_round_trip(Remove{ 0x42, ratchet_path }); }
 }
 
 TEST_CASE("Handshake serialization", "[messages]")
 {
+  auto random = random_bytes(32);
   SignaturePrivateKey identity_priv = SignaturePrivateKey::generate();
   MerkleNode merkle = MerkleNode::leaf(identity_priv.public_key().to_bytes());
   auto dh_pub = DHPrivateKey::generate().public_key();
-  RatchetNode ratchet(dh_pub);
+  RatchetTree ratchet_tree{ { random, random } };
+  auto ratchet_path = ratchet_tree.encrypt(0, random);
 
   // Simulate a 3-node Merkle tree with the signer in position 1
   uint32_t group_size = 3;
@@ -84,13 +85,9 @@ TEST_CASE("Handshake serialization", "[messages]")
   UserInitKey user_init_key{ {}, { DHPrivateKey::generate().public_key() } };
   user_init_key.sign(identity_priv);
 
-  GroupInitKey group_init_key{ epoch_val,
-                               3,
-                               { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,
-                               dh_pub,
-                               { merkle, merkle },
-                               { ratchet, ratchet } };
+  GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
+                               0x0000,      dh_pub, { merkle, merkle },
+                               ratchet_tree };
 
   Handshake<None> initial{
     None{}, epoch_val, group_size, signer_index, copath
@@ -113,7 +110,7 @@ TEST_CASE("Handshake serialization", "[messages]")
   SECTION("UserAdd")
   {
     Handshake<UserAdd> before{
-      { { ratchet, ratchet } }, epoch_val, group_size, signer_index, copath
+      { ratchet_path }, epoch_val, group_size, signer_index, copath
     };
 
     before.sign(identity_priv);
@@ -123,7 +120,7 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("GroupAdd")
   {
-    Handshake<GroupAdd> before{ { user_init_key, group_init_key },
+    Handshake<GroupAdd> before{ { ratchet_path, user_init_key, group_init_key },
                                 epoch_val,
                                 group_size,
                                 signer_index,
@@ -137,7 +134,7 @@ TEST_CASE("Handshake serialization", "[messages]")
   SECTION("Update")
   {
     Handshake<Update> before{
-      { { ratchet, ratchet } }, epoch_val, group_size, signer_index, copath
+      { ratchet_path }, epoch_val, group_size, signer_index, copath
     };
 
     before.sign(identity_priv);
@@ -147,11 +144,9 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("Remove")
   {
-    Handshake<Remove> before{ { 0x42, { ratchet, ratchet } },
-                              epoch_val,
-                              group_size,
-                              signer_index,
-                              copath };
+    Handshake<Remove> before{
+      { 0x42, ratchet_path }, epoch_val, group_size, signer_index, copath
+    };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);

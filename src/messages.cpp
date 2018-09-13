@@ -67,14 +67,14 @@ operator==(const GroupInitKey& lhs, const GroupInitKey& rhs)
          (lhs.cipher_suite == rhs.cipher_suite) &&
          (lhs.group_id == rhs.group_id) && (lhs.add_key == rhs.add_key) &&
          (lhs.identity_frontier == rhs.identity_frontier) &&
-         (lhs.ratchet_frontier == rhs.ratchet_frontier);
+         (lhs.ratchet_tree == rhs.ratchet_tree);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupInitKey& obj)
 {
   return out << obj.epoch << obj.group_size << obj.group_id << obj.cipher_suite
-             << obj.add_key << obj.identity_frontier << obj.ratchet_frontier;
+             << obj.add_key << obj.identity_frontier << obj.ratchet_tree;
 }
 
 tls::istream&
@@ -82,7 +82,7 @@ operator>>(tls::istream& in, GroupInitKey& obj)
 {
   return in >> obj.epoch >> obj.group_size >> obj.group_id >>
          obj.cipher_suite >> obj.add_key >> obj.identity_frontier >>
-         obj.ratchet_frontier;
+         obj.ratchet_tree;
 }
 
 // HandshakeType
@@ -153,20 +153,20 @@ const HandshakeType GroupAdd::type = HandshakeType::group_add;
 bool
 operator==(const GroupAdd& lhs, const GroupAdd& rhs)
 {
-  return (lhs.user_init_key == rhs.user_init_key) &&
+  return (lhs.path == rhs.path) && (lhs.user_init_key == rhs.user_init_key) &&
          (lhs.group_init_key == rhs.group_init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupAdd& obj)
 {
-  return out << obj.user_init_key << obj.group_init_key;
+  return out << obj.path << obj.user_init_key << obj.group_init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupAdd& obj)
 {
-  return in >> obj.user_init_key >> obj.group_init_key;
+  return in >> obj.path >> obj.user_init_key >> obj.group_init_key;
 }
 
 // Update

@@ -65,6 +65,7 @@ struct RatchetPath
   tls::vector<RatchetNode, 3> nodes;
   tls::vector<ECIESCiphertext, 3> node_secrets;
 
+  friend bool operator==(const RatchetPath& lhs, const RatchetPath& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetPath& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetPath& obj);
@@ -82,6 +83,7 @@ public:
   void merge(uint32_t from, const RatchetPath& path);
 
   uint32_t size() const;
+  RatchetNode root() const;
   bytes root_secret() const;
 
 private:

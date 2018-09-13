@@ -1,5 +1,4 @@
 #include "state.h"
-
 namespace mls {
 
 ///
@@ -10,7 +9,6 @@ static const epoch_t zero_epoch{ 0 };
 
 State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   : _index(0)
-  , _leaf_priv(DHPrivateKey::generate())
   , _identity_priv(identity_priv)
   , _prior_epoch()
   , _epoch(zero_epoch)
@@ -18,19 +16,16 @@ State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   , _message_master_secret()
   , _init_secret()
   , _add_priv(DHPrivateKey::generate())
+  , _ratchet_tree(random_bytes(32))
 {
   auto identity_leaf = MerkleNode::leaf(_identity_priv.public_key().to_bytes());
   _identity_tree.add(identity_leaf);
-
-  auto ratchet_leaf = RatchetNode(_leaf_priv);
-  _ratchet_tree.add(ratchet_leaf);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
-             const DHPrivateKey& init_priv,
+             const bytes& init_secret,
              const Handshake<GroupAdd>& group_add)
-  : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
-  , _identity_priv(identity_priv)
+  : _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
   auto prior_root = group_add.message.group_init_key.identity_root();
@@ -40,6 +35,7 @@ State::State(const SignaturePrivateKey& identity_priv,
 
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
+  auto init_priv = DHPrivateKey::derive(init_secret);
   auto init_key = group_add.message.user_init_key.init_keys[0];
   auto identity_key = group_add.message.user_init_key.identity_key;
   if ((identity_key != identity_priv.public_key()) ||
@@ -48,33 +44,30 @@ State::State(const SignaturePrivateKey& identity_priv,
   }
 
   auto leaf_data = init_priv.derive(group_add.message.group_init_key.add_key);
-  auto leaf_priv = DHPrivateKey::derive(leaf_data);
 
   init_from_details(
-    identity_priv, leaf_priv, group_add.message.group_init_key, group_add);
+    identity_priv, leaf_data, group_add.message.group_init_key, group_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
-             const DHPrivateKey& leaf_priv,
+             const bytes& leaf_secret,
              const Handshake<UserAdd>& user_add,
              const GroupInitKey& group_init_key)
-  : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
-  , _identity_priv(identity_priv)
+  : _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  init_from_details(identity_priv, leaf_priv, group_init_key, user_add);
+  init_from_details(identity_priv, leaf_secret, group_init_key, user_add);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
-             const DHPrivateKey& leaf_priv,
+             const bytes& leaf_secret,
              const GroupInitKey& group_init_key)
-  : _leaf_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
-  , _identity_priv(identity_priv)
+  : _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
   Handshake<None> dummy;
   dummy.sign(identity_priv); // XXX(rlb@ipv.sx) To allow marshal
-  init_from_details(identity_priv, leaf_priv, group_init_key, dummy);
+  init_from_details(identity_priv, leaf_secret, group_init_key, dummy);
 }
 
 ///
@@ -83,15 +76,13 @@ State::State(const SignaturePrivateKey& identity_priv,
 
 Handshake<UserAdd>
 State::join(const SignaturePrivateKey& identity_priv,
-            const DHPrivateKey& leaf_priv,
+            const bytes& init_secret,
             const GroupInitKey& group_init_key)
 {
-  State temp_state(identity_priv, leaf_priv, group_init_key);
+  State temp_state(identity_priv, init_secret, group_init_key);
   temp_state._epoch = group_init_key.epoch;
 
-  // Leaf key isn't included in the direct path, but is needed here
-  auto path = temp_state._ratchet_tree.direct_path(temp_state._index);
-  path.push_back(RatchetNode(leaf_priv));
+  auto path = temp_state._ratchet_tree.encrypt(temp_state._index, init_secret);
 
   return temp_state.sign(UserAdd{ path });
 }
@@ -103,21 +94,24 @@ State::add(const UserInitKey& user_init_key) const
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  return sign(GroupAdd{ user_init_key, group_init_key() });
+  auto leaf_secret = _add_priv.derive(user_init_key.init_keys[0]);
+  auto path = _ratchet_tree.encrypt(_ratchet_tree.size(), leaf_secret);
+
+  return sign(GroupAdd{ path, user_init_key, group_init_key() });
 }
 
 Handshake<Update>
-State::update(DHPrivateKey leaf_priv) const
+State::update(const bytes& leaf_secret) const
 {
-  auto path = _ratchet_tree.update_path(_index, RatchetNode(leaf_priv));
+  auto path = _ratchet_tree.encrypt(_index, leaf_secret);
   return sign(Update{ path });
 }
 
 Handshake<Remove>
 State::remove(uint32_t index) const
 {
-  auto evict_priv = DHPrivateKey::generate();
-  auto path = _ratchet_tree.update_path(index, RatchetNode(evict_priv));
+  auto evict_secret = random_bytes(32);
+  auto path = _ratchet_tree.encrypt(index, evict_secret);
   return sign(Remove{ index, path });
 }
 
@@ -149,7 +143,9 @@ State::handle(const Handshake<UserAdd>& user_add) const
   auto next = spawn(user_add.epoch());
 
   // Update the ratchet tree
-  next._ratchet_tree.add(user_add.message.path);
+  auto path = user_add.message.path;
+  next._ratchet_tree.decrypt(user_add.signer_index, path);
+  next._ratchet_tree.merge(user_add.signer_index, path);
 
   // Add to symmetric state
   next.add_inner(user_add.identity_key, user_add);
@@ -180,7 +176,9 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   auto leaf_data = _add_priv.derive(init_key);
   auto leaf_key = DHPrivateKey::derive(leaf_data);
 
-  next._ratchet_tree.add(RatchetNode(leaf_key));
+  auto path = group_add.message.path;
+  next._ratchet_tree.decrypt(group_add.signer_index, path);
+  next._ratchet_tree.merge(group_add.signer_index, path);
 
   // Add to symmetric state
   next.add_inner(identity_key, group_add);
@@ -189,8 +187,7 @@ State::handle(const Handshake<GroupAdd>& group_add) const
 }
 
 State
-State::handle(const Handshake<Update>& update,
-              const DHPrivateKey& leaf_priv) const
+State::handle(const Handshake<Update>& update, const bytes& leaf_secret) const
 {
   if (!verify_now(update)) {
     throw InvalidParameterError("Update is not from a member of the group");
@@ -202,9 +199,8 @@ State::handle(const Handshake<Update>& update,
 
   auto next = spawn(update.epoch());
 
-  next.update_leaf(update.signer_index, update.message.path, update, leaf_priv);
-
-  next._leaf_priv = leaf_priv;
+  next.update_leaf(
+    update.signer_index, update.message.path, update, leaf_secret);
 
   return next;
 }
@@ -291,30 +287,6 @@ operator!=(const State& lhs, const State& rhs)
   return !(lhs == rhs);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const State& obj)
-{
-  return out << obj._index << obj._leaf_priv << obj._identity_priv
-             << obj._prior_epoch << obj._epoch << obj._group_id
-             << obj._identity_tree << obj._ratchet_tree
-             << obj._message_master_secret << obj._init_secret << obj._add_priv;
-}
-
-tls::istream&
-operator>>(tls::istream& in, State& obj)
-{
-  in >> obj._index >> obj._leaf_priv >> obj._identity_priv >>
-    obj._prior_epoch >> obj._epoch >> obj._group_id >> obj._identity_tree >>
-    obj._ratchet_tree >> obj._message_master_secret >> obj._init_secret >>
-    obj._add_priv;
-
-  // Reinstate the private keys in the ratchet tree
-  auto leaf = RatchetNode(obj._leaf_priv);
-  obj._ratchet_tree.update(obj._index, leaf);
-
-  return in;
-}
-
 State
 State::spawn(const epoch_t& epoch) const
 {
@@ -327,32 +299,35 @@ State::spawn(const epoch_t& epoch) const
 template<typename Message>
 void
 State::init_from_details(const SignaturePrivateKey& identity_priv,
-                         const DHPrivateKey& leaf_priv,
+                         const bytes& leaf_secret,
                          const GroupInitKey& group_init_key,
                          const Handshake<Message>& handshake)
 {
-  auto tree_size = group_init_key.group_size;
+  auto tree_size = group_init_key.ratchet_tree.size();
   _index = tree_size;
-  _leaf_priv = leaf_priv;
   _identity_priv = identity_priv;
 
   _identity_tree =
     Tree<MerkleNode>(tree_size, group_init_key.identity_frontier);
-  _ratchet_tree = Tree<RatchetNode>(tree_size, group_init_key.ratchet_frontier);
+  _ratchet_tree = group_init_key.ratchet_tree;
 
   auto identity_leaf = MerkleNode::leaf(_identity_priv.public_key().to_bytes());
   _identity_tree.add(identity_leaf);
 
-  auto ratchet_leaf = RatchetNode(_leaf_priv);
-  _ratchet_tree.add(ratchet_leaf);
+  // XXX(rlb@ipv.sx) This is clumsy, but might not be necessary
+  // after further modernization
+  auto index = _ratchet_tree.size();
+  auto temp_path = _ratchet_tree.encrypt(index, leaf_secret);
+  _ratchet_tree.decrypt(index, temp_path);
+  _ratchet_tree.merge(index, temp_path);
 
   _prior_epoch = group_init_key.epoch;
   _epoch = next_epoch(_prior_epoch, handshake.message);
 
   _group_id = group_init_key.group_id;
 
-  // XXX(rlb@ipv.sx) Verify that this is populated?
-  auto tree_priv = *(_ratchet_tree.root().private_key());
+  auto tree_secret = *(_ratchet_tree.root().secret());
+  auto tree_priv = DHPrivateKey::derive(tree_secret);
   auto update_secret = tree_priv.derive(group_init_key.add_key);
   derive_epoch_keys(true, update_secret, tls::marshal(handshake));
 }
@@ -374,18 +349,15 @@ State::add_inner(const SignaturePublicKey& identity_key,
 template<typename Message>
 void
 State::update_leaf(uint32_t index,
-                   const std::vector<RatchetNode>& path_in,
+                   const RatchetPath& path,
                    const Handshake<Message>& handshake,
-                   const optional<DHPrivateKey>& leaf_priv)
+                   const optional<bytes>& leaf_secret)
 {
-  std::vector<RatchetNode> path = path_in;
-  if (leaf_priv) {
-    path.back() = RatchetNode(*leaf_priv);
-  }
+  // XXX(rlb@ipv.sx) Probably need to fold in leaf_secret somehow
+  auto temp_path = path;
+  _ratchet_tree.decrypt(index, temp_path);
+  _ratchet_tree.merge(index, temp_path);
 
-  _ratchet_tree.update(index, path);
-
-  // XXX(rlb@ipv.sx) Verify that this is populated?
   auto update_secret = *(_ratchet_tree.root().secret());
   derive_epoch_keys(false, update_secret, tls::marshal(handshake));
 }
@@ -451,7 +423,7 @@ State::group_init_key() const
                        0x0000, // ciphersuite, ignored
                        _add_priv.public_key(),
                        _identity_tree.frontier(),
-                       _ratchet_tree.frontier() };
+                       _ratchet_tree };
 }
 
 } // namespace mls

@@ -109,13 +109,6 @@ TEST_CASE("Full life-cycle", "[session]")
     broadcast_and_check(sessions, update);
   }
 
-  // TLS marshal/unmarshal round trip
-  for (const auto& before : sessions) {
-    Session after;
-    tls::unmarshal(tls::marshal(before), after);
-    REQUIRE(before == after);
-  }
-
   // Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto remove = sessions[i - 1].remove(i);

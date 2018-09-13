@@ -37,8 +37,8 @@ public:
   epoch_t current_epoch() const { return _current_epoch; }
 
 private:
-  DHPrivateKey _next_leaf_priv;
-  DHPrivateKey _init_priv;
+  bytes _next_leaf_secret;
+  bytes _init_secret;
   tls::opaque<2> _user_init_key;
   tls::opaque<2> _group_init_key;
   SignaturePrivateKey _identity_priv;
@@ -49,9 +49,6 @@ private:
   void add_state(const State& state);
   State& current_state();
   const State& current_state() const;
-
-  friend tls::ostream& operator<<(tls::ostream& out, const Session& obj);
-  friend tls::istream& operator>>(tls::istream& in, Session& obj);
 };
 
 } // namespace mls
