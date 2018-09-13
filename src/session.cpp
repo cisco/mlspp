@@ -34,6 +34,8 @@ bool
 operator==(const Session& lhs, const Session& rhs)
 {
   if (lhs._current_epoch != rhs._current_epoch) {
+    std::cout << "epoch mismatch" << lhs._current_epoch << " "
+              << rhs._current_epoch << std::endl;
     return false;
   }
 
@@ -43,6 +45,7 @@ operator==(const Session& lhs, const Session& rhs)
     }
 
     if (rhs._state.at(pair.first) != pair.second) {
+      std::cout << "state mismatch for epoch " << pair.first << std::endl;
       return false;
     }
   }
@@ -69,7 +72,8 @@ Session::join(const bytes& group_init_key_bytes)
   _group_init_key = group_init_key_bytes;
   GroupInitKey group_init_key;
   tls::unmarshal(group_init_key_bytes, group_init_key);
-  auto user_add = State::join(_identity_priv, _init_secret, group_init_key);
+  auto user_add =
+    State::join(_identity_priv, _next_leaf_secret, group_init_key);
   return tls::marshal(user_add);
 }
 

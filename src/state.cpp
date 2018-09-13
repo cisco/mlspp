@@ -1,4 +1,5 @@
 #include "state.h"
+
 namespace mls {
 
 ///
@@ -176,9 +177,10 @@ State::handle(const Handshake<GroupAdd>& group_add) const
   auto leaf_data = _add_priv.derive(init_key);
   auto leaf_key = DHPrivateKey::derive(leaf_data);
 
+  auto tree_size = _ratchet_tree.size();
   auto path = group_add.message.path;
-  next._ratchet_tree.decrypt(group_add.signer_index, path);
-  next._ratchet_tree.merge(group_add.signer_index, path);
+  next._ratchet_tree.decrypt(tree_size, path);
+  next._ratchet_tree.merge(tree_size, path);
 
   // Add to symmetric state
   next.add_inner(identity_key, group_add);
@@ -240,8 +242,6 @@ State::handle(const Handshake<Remove>& remove) const
                    remove.message.path,
                    remove,
                    std::experimental::nullopt);
-
-  // TODO: Update identity tree and ratchet tree with blank nodes
 
   return next;
 }
@@ -353,10 +353,13 @@ State::update_leaf(uint32_t index,
                    const Handshake<Message>& handshake,
                    const optional<bytes>& leaf_secret)
 {
-  // XXX(rlb@ipv.sx) Probably need to fold in leaf_secret somehow
-  auto temp_path = path;
-  _ratchet_tree.decrypt(index, temp_path);
-  _ratchet_tree.merge(index, temp_path);
+  if (leaf_secret) {
+    _ratchet_tree.set_leaf(index, *leaf_secret);
+  } else {
+    auto temp_path = path;
+    _ratchet_tree.decrypt(index, temp_path);
+    _ratchet_tree.merge(index, temp_path);
+  }
 
   auto update_secret = *(_ratchet_tree.root().secret());
   derive_epoch_keys(false, update_secret, tls::marshal(handshake));

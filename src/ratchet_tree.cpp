@@ -380,6 +380,24 @@ RatchetTree::merge(uint32_t from, const RatchetPath& path)
   }
 }
 
+void
+RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
+{
+  const auto size = working_size(index);
+  const auto root = tree_math::root(size);
+
+  auto curr = 2 * index;
+  auto secret = leaf;
+  while (curr != root) {
+    nodes[curr] = RatchetNode{ secret };
+    secret = SHA256Digest(secret).digest();
+
+    curr = tree_math::parent(curr, size);
+  }
+
+  nodes[root] = RatchetNode{ secret };
+}
+
 uint32_t
 RatchetTree::size() const
 {
@@ -415,6 +433,15 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   return true;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const RatchetTree& obj)
+{
+  for (int i = 0; i < obj.nodes.size(); i += 1) {
+    out << obj.nodes[i].public_key() << " ";
+  }
+  return out;
 }
 
 tls::ostream&

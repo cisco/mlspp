@@ -81,6 +81,7 @@ public:
   RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
   bytes decrypt(uint32_t from, RatchetPath& path) const;
   void merge(uint32_t from, const RatchetPath& path);
+  void set_leaf(uint32_t index, const bytes& leaf);
 
   uint32_t size() const;
   RatchetNode root() const;
@@ -92,6 +93,7 @@ private:
   uint32_t working_size(uint32_t from) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
+  friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
