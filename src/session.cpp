@@ -10,7 +10,7 @@ Session::Session(const bytes& group_id,
   , _identity_priv(identity_priv)
 {
   State root(group_id, identity_priv);
-  add_state(root);
+  add_state(0, root);
   make_init_key();
 }
 
@@ -92,9 +92,10 @@ Session::handle(const bytes& handshake)
       tls::unmarshal(handshake, group_add);
 
       if (_state.size() == 0) {
-        add_state(State(_identity_priv, _init_secret, group_add));
+        add_state(group_add.prior_epoch,
+                  State(_identity_priv, _init_secret, group_add));
       } else {
-        add_state(current_state().handle(group_add));
+        add_state(group_add.prior_epoch, current_state().handle(group_add));
       }
     } break;
 
@@ -103,10 +104,11 @@ Session::handle(const bytes& handshake)
       tls::unmarshal(handshake, update);
 
       if (update.signer_index == current_state().index()) {
-        add_state(current_state().handle(update, _next_leaf_secret));
+        add_state(update.prior_epoch,
+                  current_state().handle(update, _next_leaf_secret));
         _next_leaf_secret = random_bytes(32);
       } else {
-        add_state(current_state().handle(update));
+        add_state(update.prior_epoch, current_state().handle(update));
       }
 
     } break;
@@ -114,7 +116,7 @@ Session::handle(const bytes& handshake)
     case HandshakeType::remove: {
       Handshake<Remove> remove;
       tls::unmarshal(handshake, remove);
-      add_state(current_state().handle(remove));
+      add_state(remove.prior_epoch, current_state().handle(remove));
     } break;
 
     default:
@@ -135,13 +137,13 @@ Session::make_init_key()
 }
 
 void
-Session::add_state(const State& state)
+Session::add_state(epoch_t prior_epoch, const State& state)
 {
   // XXX(rlb@ipv.sx) Assumes no epoch collisions
   _state.emplace(state.epoch(), state);
 
   // XXX(rlb@ipv.sx) First successor updates the head pointer
-  if (_current_epoch == state.prior_epoch() || _state.size() == 1) {
+  if (prior_epoch == _current_epoch || _state.size() == 1) {
     _current_epoch = state.epoch();
   }
 }

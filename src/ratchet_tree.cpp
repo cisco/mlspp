@@ -175,17 +175,17 @@ operator>>(tls::istream& in, RatchetPath& obj)
 ///
 
 RatchetTree::RatchetTree()
-  : nodes()
+  : _nodes()
 {}
 
 RatchetTree::RatchetTree(const bytes& secret)
-  : nodes(1)
+  : _nodes(1)
 {
-  nodes[0] = RatchetNode(secret);
+  _nodes[0] = RatchetNode(secret);
 }
 
 RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
-  : nodes(tree_math::node_width(secrets.size()))
+  : _nodes(tree_math::node_width(secrets.size()))
 {
   uint32_t size = secrets.size();
   std::queue<uint32_t> to_update;
@@ -196,7 +196,7 @@ RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
       to_update.push(parent);
     }
 
-    nodes[curr] = RatchetNode(secrets[i]);
+    _nodes[curr] = RatchetNode(secrets[i]);
   }
 
   while (to_update.size() > 0) {
@@ -208,16 +208,16 @@ RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
     }
 
     auto right = tree_math::right(curr, size);
-    auto child_secret = *(nodes[right].secret());
+    auto child_secret = *(_nodes[right].secret());
     auto secret = SHA256Digest(child_secret).digest();
-    nodes[curr] = RatchetNode(secret);
+    _nodes[curr] = RatchetNode(secret);
   }
 }
 
 uint32_t
 RatchetTree::working_size(uint32_t from) const
 {
-  uint32_t size = tree_math::size_from_width(nodes.size());
+  uint32_t size = tree_math::size_from_width(_nodes.size());
   if (2 * from > size) {
     size = from + 1;
   }
@@ -243,7 +243,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
     RatchetNode temp(secret);
     path.nodes.push_back(temp);
 
-    auto ciphertext = nodes[sibling].public_key().encrypt(secret);
+    auto ciphertext = _nodes[sibling].public_key().encrypt(secret);
     path.node_secrets.push_back(ciphertext);
 
     curr = tree_math::parent(curr, size);
@@ -268,7 +268,7 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
   bool have_secret = false;
   bytes secret;
   for (int i = 1; i < path.nodes.size(); i += 1) {
-    auto priv = nodes[sibling].private_key();
+    auto priv = _nodes[sibling].private_key();
     if (priv && !have_secret) {
       secret = priv->decrypt(path.node_secrets[i - 1]);
       have_secret = true;
@@ -302,11 +302,11 @@ RatchetTree::merge(uint32_t from, const RatchetPath& path)
 
   auto curr = 2 * from;
   for (auto& node : path.nodes) {
-    if (curr > nodes.size() - 1) {
-      nodes.resize(curr + 1);
+    if (curr > _nodes.size() - 1) {
+      _nodes.resize(curr + 1);
     }
 
-    nodes[curr].merge(node);
+    _nodes[curr].merge(node);
     curr = tree_math::parent(curr, size);
   }
 }
@@ -320,13 +320,17 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
   auto curr = 2 * index;
   auto secret = leaf;
   while (curr != root) {
-    nodes[curr] = RatchetNode{ secret };
+    if (curr > _nodes.size() - 1) {
+      _nodes.resize(curr + 1);
+    }
+
+    _nodes[curr] = RatchetNode{ secret };
     secret = SHA256Digest(secret).digest();
 
     curr = tree_math::parent(curr, size);
   }
 
-  nodes[root] = RatchetNode{ secret };
+  _nodes[root] = RatchetNode{ secret };
 }
 
 uint32_t
@@ -339,26 +343,26 @@ RatchetNode
 RatchetTree::root() const
 {
   auto root = tree_math::root(size());
-  return nodes[root];
+  return _nodes[root];
 }
 
 bytes
 RatchetTree::root_secret() const
 {
   auto root = tree_math::root(size());
-  auto val = nodes[root].secret();
+  auto val = _nodes[root].secret();
   return *val;
 }
 
 bool
 operator==(const RatchetTree& lhs, const RatchetTree& rhs)
 {
-  if (lhs.nodes.size() != rhs.nodes.size()) {
+  if (lhs._nodes.size() != rhs._nodes.size()) {
     return false;
   }
 
-  for (int i = 0; i < lhs.nodes.size(); i += 1) {
-    if (lhs.nodes[i].public_key() != rhs.nodes[i].public_key()) {
+  for (int i = 0; i < lhs._nodes.size(); i += 1) {
+    if (lhs._nodes[i].public_key() != rhs._nodes[i].public_key()) {
       return false;
     }
   }
@@ -369,8 +373,8 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
 std::ostream&
 operator<<(std::ostream& out, const RatchetTree& obj)
 {
-  for (int i = 0; i < obj.nodes.size(); i += 1) {
-    out << obj.nodes[i].public_key() << " ";
+  for (int i = 0; i < obj._nodes.size(); i += 1) {
+    out << obj._nodes[i].public_key() << " ";
   }
   return out;
 }
@@ -378,13 +382,13 @@ operator<<(std::ostream& out, const RatchetTree& obj)
 tls::ostream&
 operator<<(tls::ostream& out, const RatchetTree& obj)
 {
-  return out << obj.nodes;
+  return out << obj._nodes;
 }
 
 tls::istream&
 operator>>(tls::istream& in, RatchetTree& obj)
 {
-  return in >> obj.nodes;
+  return in >> obj._nodes;
 }
 
 } // namespace mls

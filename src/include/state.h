@@ -61,23 +61,33 @@ public:
   // Handle a Remove (for the remaining participants, obviously)
   State handle(const Handshake<Remove>& remove) const;
 
-  epoch_t prior_epoch() const { return _prior_epoch; }
   epoch_t epoch() const { return _epoch; }
   uint32_t index() const { return _index; }
 
 private:
-  uint32_t _index;
-  SignaturePrivateKey _identity_priv;
-
-  epoch_t _prior_epoch;
-  epoch_t _epoch;
+  // Shared confirmed state:
+  //
+  // struct {
+  //   opaque group_id<0..255>;
+  //   uint32 epoch;
+  //   Credential roster<1..2^24-1>;
+  //   PublicKey tree<1..2^24-1>;
+  //   opaque transcript_hash<0..255>;
+  // } GroupState;
   tls::opaque<2> _group_id;
+  epoch_t _epoch;
   Roster _roster;
   RatchetTree _ratchet_tree;
+  // TODO transcript_hash;
 
+  // Shared secret state
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
   DHPrivateKey _add_priv;
+
+  // Per-participant state
+  uint32_t _index;
+  SignaturePrivateKey _identity_priv;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);

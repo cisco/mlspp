@@ -11,7 +11,6 @@ static const epoch_t zero_epoch{ 0 };
 State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   : _index(0)
   , _identity_priv(identity_priv)
-  , _prior_epoch()
   , _epoch(zero_epoch)
   , _group_id(group_id)
   , _message_master_secret()
@@ -43,29 +42,25 @@ State::State(const SignaturePrivateKey& identity_priv,
     throw InvalidParameterError("Group add not targeted for this node");
   }
 
-  // TODO(rlb@ipv.sx) Clean this up
-  auto leaf_secret = init_priv.derive(group_add.message.add_key);
-
-  _roster = group_add.message.roster;
-  _ratchet_tree = group_add.message.ratchet_tree;
-
-  _index = _ratchet_tree.size();
+  // Initialize per-participant state
+  _index = group_add.message.ratchet_tree.size();
   _identity_priv = identity_priv;
 
+  // Initialize shared state
+  _group_id = group_add.message.group_id;
+  _epoch = group_add.epoch();
+
   RawKeyCredential cred{ _identity_priv.public_key() };
+  _roster = group_add.message.roster;
   _roster.add(cred);
 
-  // XXX(rlb@ipv.sx) This is clumsy, but might not be necessary
-  // after further modernization
+  _ratchet_tree = group_add.message.ratchet_tree;
+  auto leaf_secret = init_priv.derive(group_add.message.add_key);
   auto temp_path = _ratchet_tree.encrypt(_index, leaf_secret);
   _ratchet_tree.decrypt(_index, temp_path);
   _ratchet_tree.merge(_index, temp_path);
 
-  _prior_epoch = group_add.message.epoch;
-  _epoch = next_epoch(_prior_epoch, group_add.message);
-
-  _group_id = group_add.message.group_id;
-
+  // Initialize shared secret state
   auto tree_secret = *(_ratchet_tree.root().secret());
   auto tree_priv = DHPrivateKey::derive(tree_secret);
   auto update_secret = tree_priv.derive(group_add.message.add_key);
@@ -225,7 +220,6 @@ operator==(const State& lhs, const State& rhs)
   // Uncomment for debug info
   /*
   std::cout << "== == == == ==" << std::endl
-            << "_prior_epoch " << lhs._prior_epoch << " " << rhs._prior_epoch
             << std::endl
             << "_epoch " << epoch << " " << lhs._epoch << " " << rhs._epoch
             << std::endl
@@ -251,7 +245,6 @@ State
 State::spawn(const epoch_t& epoch) const
 {
   auto next = *this;
-  next._prior_epoch = _epoch;
   next._epoch = epoch;
   return next;
 }

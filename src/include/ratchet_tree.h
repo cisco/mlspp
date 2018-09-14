@@ -67,7 +67,7 @@ public:
 
 private:
   // TODO(rlb@ipv.sx) prefid with _
-  tls::vector<RatchetNode, 3> nodes;
+  tls::vector<RatchetNode, 3> _nodes;
 
   uint32_t working_size(uint32_t from) const;
 

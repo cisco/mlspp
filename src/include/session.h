@@ -43,7 +43,7 @@ private:
   epoch_t _current_epoch;
 
   void make_init_key();
-  void add_state(const State& state);
+  void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;
 };
