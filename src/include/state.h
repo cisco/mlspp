@@ -27,26 +27,9 @@ public:
         const bytes& init_secret,
         const Handshake<GroupAdd>& group_add);
 
-  // Initialize a state from a UserAdd (for user-initiated join)
-  State(const SignaturePrivateKey& identity_priv,
-        const bytes& leaf_secret,
-        const Handshake<UserAdd>& user_add,
-        const GroupInitKey& group_init_key);
-
   ///
   /// Message factories
   ///
-
-  // Generate a UserAdd (for user-initiated join)
-  // Note that this method is static.  Because this participant is
-  // not yet joined, it has no pre-existing state
-  //
-  // XXX(rlb@ipv.sx): We could represent the collection of
-  // pre-existing / cached keys (identity, leaf, init) as some sort
-  // of pre-join state.
-  static Handshake<UserAdd> join(const SignaturePrivateKey& identity_priv,
-                                 const bytes& init_secret,
-                                 const GroupInitKey& group_init_key);
 
   // Generate a GroupAdd message (for group-initiated join)
   Handshake<GroupAdd> add(const UserInitKey& user_init_key) const;
@@ -68,9 +51,6 @@ public:
   // rather than modifying the current one, given that we will
   // probably want to keep old states around.  That could also be
   // done a little more explicitly with a copy constructor.
-
-  // Handle a UserAdd (for existing participants only)
-  State handle(const Handshake<UserAdd>& user_add) const;
 
   // Handle a GroupAdd (for existing participants only)
   State handle(const Handshake<GroupAdd>& group_add) const;
@@ -102,11 +82,6 @@ private:
   tls::opaque<1> _init_secret;
   DHPrivateKey _add_priv;
 
-  // Used to construct an ephemeral state while creating a UserAdd
-  State(const SignaturePrivateKey& identity_priv,
-        const bytes& leaf_secret,
-        const GroupInitKey& group_init_key);
-
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
@@ -114,6 +89,7 @@ private:
   // Spawn a new state (with a fresh epoch) from this state
   State spawn(const epoch_t& epoch) const;
 
+  // XXX maybe delete
   // Inner logic for UserAdd and GroupInitKey constructors
   template<typename Message>
   void init_from_details(const SignaturePrivateKey& identity_priv,

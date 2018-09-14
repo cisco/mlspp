@@ -48,23 +48,6 @@ TEST_CASE("Group creation", "[state]")
     REQUIRE(states[0] == states[1]);
   }
 
-  SECTION("Two person, user-initiated")
-  {
-    // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
-
-    // Create a UserAdd for the new participant
-    auto group_init_key = states[0].group_init_key();
-    auto user_add =
-      State::join(identity_privs[1], init_secrets[1], group_init_key);
-
-    // Process the UserAdd
-    states[0] = states[0].handle(user_add);
-    states.emplace(
-      stp + 1, identity_privs[1], init_secrets[1], user_add, group_init_key);
-    REQUIRE(states[0] == states[1]);
-  }
-
   SECTION("Full size, group-initiated")
   {
     // Initialize the creator's state
@@ -87,31 +70,6 @@ TEST_CASE("Group creation", "[state]")
       }
     }
   }
-
-  SECTION("Full size, user-initiated")
-  {
-    // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
-
-    // Participants add themselves in order
-    for (size_t i = 1; i < group_size; i += 1) {
-      auto group_init_key = states[i - 1].group_init_key();
-      auto user_add =
-        State::join(identity_privs[i], init_secrets[i], group_init_key);
-
-      for (auto& state : states) {
-        state = state.handle(user_add);
-      }
-
-      states.emplace(
-        stp + i, identity_privs[i], init_secrets[i], user_add, group_init_key);
-
-      // Check that everyone ended up in the same place
-      for (const auto& state : states) {
-        REQUIRE(state == states[0]);
-      }
-    }
-  }
 }
 
 TEST_CASE("Operations on a running group", "[state]")
@@ -123,17 +81,20 @@ TEST_CASE("Operations on a running group", "[state]")
   states.emplace(stp, group_id, SignaturePrivateKey::generate());
 
   for (size_t i = 1; i < group_size; i += 1) {
+    auto init_secret = random_bytes(32);
+    auto init_priv = DHPrivateKey::derive(init_secret);
     auto identity_priv = SignaturePrivateKey::generate();
-    auto leaf_secret = random_bytes(32);
-    auto group_init_key = states[i - 1].group_init_key();
-    auto user_add = State::join(identity_priv, leaf_secret, group_init_key);
 
+    UserInitKey uik;
+    uik.init_keys = { init_priv.public_key() };
+    uik.sign(identity_priv);
+
+    auto group_add = states[0].add(uik);
     for (auto& state : states) {
-      state = state.handle(user_add);
+      state = state.handle(group_add);
     }
 
-    states.emplace(
-      stp + i, identity_priv, leaf_secret, user_add, group_init_key);
+    states.emplace(stp + i, identity_priv, init_secret, group_add);
   }
 
   for (const auto& state : states) {

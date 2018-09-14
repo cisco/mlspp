@@ -53,8 +53,6 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("None") { tls_round_trip(None{}); }
 
-  SECTION("UserAdd") { tls_round_trip(UserAdd{ identity_pub, ratchet_path }); }
-
   SECTION("GroupAdd")
   {
     tls_round_trip(GroupAdd{ ratchet_path, user_init_key, group_init_key });
@@ -102,17 +100,6 @@ TEST_CASE("Handshake serialization", "[messages]")
   SECTION("None")
   {
     Handshake<None> before{ {}, epoch_val, group_size, signer_index };
-
-    before.sign(identity_priv);
-    auto after = tls_round_trip(before);
-    REQUIRE(after.verify(roster));
-  }
-
-  SECTION("UserAdd")
-  {
-    Handshake<UserAdd> before{
-      { identity_pub, ratchet_path }, epoch_val, group_size, signer_index
-    };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);

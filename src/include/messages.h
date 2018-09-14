@@ -65,10 +65,9 @@ operator>>(tls::istream& in, GroupInitKey& obj);
 enum class HandshakeType : uint8_t
 {
   none = 0,
-  user_add = 1,
-  group_add = 2,
-  update = 3,
-  remove = 4,
+  group_add = 1,
+  update = 2,
+  remove = 3,
 };
 
 tls::ostream&
@@ -88,25 +87,6 @@ tls::ostream&
 operator<<(tls::ostream& out, const None& obj);
 tls::istream&
 operator>>(tls::istream& in, None& obj);
-
-// struct {
-//     DHPublicKey path<1..2^16-1>;
-// } UserAdd;
-struct UserAdd
-{
-public:
-  SignaturePublicKey identity_key;
-  RatchetPath path;
-
-  static const HandshakeType type;
-};
-
-bool
-operator==(const UserAdd& lhs, const UserAdd& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const UserAdd& obj);
-tls::istream&
-operator>>(tls::istream& in, UserAdd& obj);
 
 // struct {
 //     UserInitKey init_key;
@@ -172,7 +152,6 @@ operator>>(tls::istream& in, Remove& obj);
 //     select (Handshake.msg_type) {
 //         case none:      struct{};
 //         case init:      Init;
-//         case user_add:  UserAdd;
 //         case group_add: GroupAdd;
 //         case update:    Update;
 //         case remove:    Remove;

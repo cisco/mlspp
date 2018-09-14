@@ -114,28 +114,6 @@ operator>>(tls::istream& in, None& obj)
   return in;
 }
 
-// UserAdd
-
-const HandshakeType UserAdd::type = HandshakeType::user_add;
-
-bool
-operator==(const UserAdd& lhs, const UserAdd& rhs)
-{
-  return (lhs.path == rhs.path);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const UserAdd& obj)
-{
-  return out << obj.identity_key << obj.path;
-}
-
-tls::istream&
-operator>>(tls::istream& in, UserAdd& obj)
-{
-  return in >> obj.identity_key >> obj.path;
-}
-
 // GroupAdd
 
 const HandshakeType GroupAdd::type = HandshakeType::group_add;

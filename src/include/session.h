@@ -27,7 +27,6 @@ public:
   bytes user_init_key() const;
   bytes group_init_key() const;
 
-  bytes join(const bytes& group_init_key);
   bytes add(const bytes& user_init_key) const;
   bytes update() const;
   bytes remove(uint32_t index) const;

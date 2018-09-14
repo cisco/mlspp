@@ -49,43 +49,9 @@ State::State(const SignaturePrivateKey& identity_priv,
     identity_priv, leaf_data, group_add.message.group_init_key, group_add);
 }
 
-State::State(const SignaturePrivateKey& identity_priv,
-             const bytes& leaf_secret,
-             const Handshake<UserAdd>& user_add,
-             const GroupInitKey& group_init_key)
-  : _identity_priv(identity_priv)
-  , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
-{
-  init_from_details(identity_priv, leaf_secret, group_init_key, user_add);
-}
-
-State::State(const SignaturePrivateKey& identity_priv,
-             const bytes& leaf_secret,
-             const GroupInitKey& group_init_key)
-  : _identity_priv(identity_priv)
-  , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
-{
-  Handshake<None> dummy;
-  dummy.sign(identity_priv); // XXX(rlb@ipv.sx) To allow marshal
-  init_from_details(identity_priv, leaf_secret, group_init_key, dummy);
-}
-
 ///
 /// Message factories
 ///
-
-Handshake<UserAdd>
-State::join(const SignaturePrivateKey& identity_priv,
-            const bytes& init_secret,
-            const GroupInitKey& group_init_key)
-{
-  State temp_state(identity_priv, init_secret, group_init_key);
-  temp_state._epoch = group_init_key.epoch;
-
-  auto path = temp_state._ratchet_tree.encrypt(temp_state._index, init_secret);
-
-  return temp_state.sign(UserAdd{ identity_priv.public_key(), path });
-}
 
 Handshake<GroupAdd>
 State::add(const UserInitKey& user_init_key) const
@@ -118,35 +84,6 @@ State::remove(uint32_t index) const
 ///
 /// Message handlers
 ///
-
-State
-State::handle(const Handshake<UserAdd>& user_add) const
-{
-  // Verify that the user_add addresse this state
-  if (user_add.prior_epoch != _epoch) {
-    throw InvalidParameterError("Invalid epoch");
-  }
-
-  // Verify the incoming message against the **new** identity tree
-  // XXX: Removed, as a prelude to removing UserAdd
-
-  if (user_add.signer_index != _ratchet_tree.size()) {
-    throw InvalidParameterError("UserAdd is not from the new member");
-  }
-
-  // Create a copy of the current state
-  auto next = spawn(user_add.epoch());
-
-  // Update the ratchet tree
-  auto path = user_add.message.path;
-  next._ratchet_tree.decrypt(user_add.signer_index, path);
-  next._ratchet_tree.merge(user_add.signer_index, path);
-
-  // Add to symmetric state
-  next.add_inner(user_add.message.identity_key, user_add);
-
-  return next;
-}
 
 State
 State::handle(const Handshake<GroupAdd>& group_add) const

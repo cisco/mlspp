@@ -36,28 +36,12 @@ TEST_CASE("Session creation", "[session]")
     broadcast_and_check(sessions, group_add);
   }
 
-  SECTION("Two person, user-initiated")
-  {
-    sessions.push_back({});
-    auto user_add = sessions[1].join(sessions[0].group_init_key());
-    broadcast_and_check(sessions, user_add);
-  }
-
   SECTION("Full-size, group-initiated")
   {
     for (int i = 0; i < group_size - 1; i += 1) {
       sessions.push_back({});
       auto group_add = sessions[i].add(sessions[i + 1].user_init_key());
       broadcast_and_check(sessions, group_add);
-    }
-  }
-
-  SECTION("Full-size, user-initiated")
-  {
-    for (int i = 0; i < group_size - 1; i += 1) {
-      sessions.push_back({});
-      auto user_add = sessions[i + 1].join(sessions[i].group_init_key());
-      broadcast_and_check(sessions, user_add);
     }
   }
 }

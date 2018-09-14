@@ -67,17 +67,6 @@ Session::group_init_key() const
 }
 
 bytes
-Session::join(const bytes& group_init_key_bytes)
-{
-  _group_init_key = group_init_key_bytes;
-  GroupInitKey group_init_key;
-  tls::unmarshal(group_init_key_bytes, group_init_key);
-  auto user_add =
-    State::join(_identity_priv, _next_leaf_secret, group_init_key);
-  return tls::marshal(user_add);
-}
-
-bytes
 Session::add(const bytes& user_init_key_bytes) const
 {
   UserInitKey user_init_key;
@@ -105,21 +94,6 @@ Session::handle(const bytes& handshake)
 {
   auto type = HandshakeType(handshake[0]);
   switch (type) {
-    case HandshakeType::user_add: {
-      Handshake<UserAdd> user_add;
-      tls::unmarshal(handshake, user_add);
-
-      if (_state.size() == 0) {
-        // NB: Assumes that join() has been called previously
-        GroupInitKey group_init_key;
-        tls::unmarshal(_group_init_key, group_init_key);
-        add_state(
-          State(_identity_priv, _next_leaf_secret, user_add, group_init_key));
-      } else {
-        add_state(current_state().handle(user_add));
-      }
-    } break;
-
     case HandshakeType::group_add: {
       Handshake<GroupAdd> group_add;
       tls::unmarshal(handshake, group_add);
