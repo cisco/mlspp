@@ -25,7 +25,6 @@ public:
   friend bool operator==(const Session& lhs, const Session& rhs);
 
   bytes user_init_key() const;
-  bytes group_init_key() const;
 
   bytes add(const bytes& user_init_key) const;
   bytes update() const;
@@ -39,7 +38,6 @@ private:
   bytes _next_leaf_secret;
   bytes _init_secret;
   tls::opaque<2> _user_init_key;
-  tls::opaque<2> _group_init_key;
   SignaturePrivateKey _identity_priv;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;

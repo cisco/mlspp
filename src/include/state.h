@@ -40,9 +40,6 @@ public:
   // Generate a Remove message (to remove another participant)
   Handshake<Remove> remove(uint32_t index) const;
 
-  // Generate a group init key representing the current state
-  GroupInitKey group_init_key() const;
-
   ///
   /// Message handlers
   ///
@@ -88,14 +85,6 @@ private:
 
   // Spawn a new state (with a fresh epoch) from this state
   State spawn(const epoch_t& epoch) const;
-
-  // XXX maybe delete
-  // Inner logic for UserAdd and GroupInitKey constructors
-  template<typename Message>
-  void init_from_details(const SignaturePrivateKey& identity_priv,
-                         const bytes& leaf_secret,
-                         const GroupInitKey& group_init_key,
-                         const Handshake<Message>& message);
 
   // Inner logic shared by UserAdd and GroupAdd handlers
   template<typename Message>

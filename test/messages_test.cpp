@@ -36,10 +36,6 @@ TEST_CASE("Basic message serialization", "[messages]")
   };
   user_init_key.sign(identity_priv);
 
-  GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,      dh_pub, roster,
-                               ratchet_tree };
-
   SECTION("UserInitKey")
   {
     REQUIRE(user_init_key.verify());
@@ -47,15 +43,19 @@ TEST_CASE("Basic message serialization", "[messages]")
     REQUIRE(after.verify());
   }
 
-  SECTION("GroupInitKey") { tls_round_trip(group_init_key); }
-
   SECTION("HandshakeType") { tls_round_trip(HandshakeType::update); }
 
   SECTION("None") { tls_round_trip(None{}); }
 
   SECTION("GroupAdd")
   {
-    tls_round_trip(GroupAdd{ ratchet_path, user_init_key, group_init_key });
+    tls_round_trip(GroupAdd{ epoch_val,
+                             { 0x03, 0x03, 0x03, 0x03 },
+                             roster,
+                             ratchet_tree,
+                             dh_pub,
+                             ratchet_path,
+                             user_init_key });
   }
 
   SECTION("Update") { tls_round_trip(Update{ ratchet_path }); }
@@ -85,10 +85,6 @@ TEST_CASE("Handshake serialization", "[messages]")
   UserInitKey user_init_key{ {}, { DHPrivateKey::generate().public_key() } };
   user_init_key.sign(identity_priv);
 
-  GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,      dh_pub, roster,
-                               ratchet_tree };
-
   Handshake<None> initial{
     None{}, epoch_val, group_size, signer_index
     // signature omitted
@@ -108,7 +104,13 @@ TEST_CASE("Handshake serialization", "[messages]")
 
   SECTION("GroupAdd")
   {
-    Handshake<GroupAdd> before{ { ratchet_path, user_init_key, group_init_key },
+    Handshake<GroupAdd> before{ { epoch_val,
+                                  { 0x03, 0x03, 0x03, 0x03 },
+                                  roster,
+                                  ratchet_tree,
+                                  dh_pub,
+                                  ratchet_path,
+                                  user_init_key },
                                 epoch_val,
                                 group_size,
                                 signer_index };

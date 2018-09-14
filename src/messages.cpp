@@ -50,31 +50,6 @@ operator>>(tls::istream& in, UserInitKey& obj)
          obj.algorithm >> obj.signature;
 }
 
-// GroupInitKey
-
-bool
-operator==(const GroupInitKey& lhs, const GroupInitKey& rhs)
-{
-  return (lhs.epoch == rhs.epoch) && (lhs.group_size == rhs.group_size) &&
-         (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.group_id == rhs.group_id) && (lhs.add_key == rhs.add_key) &&
-         (lhs.roster == rhs.roster) && (lhs.ratchet_tree == rhs.ratchet_tree);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const GroupInitKey& obj)
-{
-  return out << obj.epoch << obj.group_size << obj.group_id << obj.cipher_suite
-             << obj.add_key << obj.roster << obj.ratchet_tree;
-}
-
-tls::istream&
-operator>>(tls::istream& in, GroupInitKey& obj)
-{
-  return in >> obj.epoch >> obj.group_size >> obj.group_id >>
-         obj.cipher_suite >> obj.add_key >> obj.roster >> obj.ratchet_tree;
-}
-
 // HandshakeType
 
 tls::ostream&
@@ -121,20 +96,24 @@ const HandshakeType GroupAdd::type = HandshakeType::group_add;
 bool
 operator==(const GroupAdd& lhs, const GroupAdd& rhs)
 {
-  return (lhs.path == rhs.path) && (lhs.user_init_key == rhs.user_init_key) &&
-         (lhs.group_init_key == rhs.group_init_key);
+  return (lhs.epoch == rhs.epoch) && (lhs.group_id == rhs.group_id) &&
+         (lhs.roster == rhs.roster) && (lhs.ratchet_tree == rhs.ratchet_tree) &&
+         (lhs.add_key == rhs.add_key) && (lhs.path == rhs.path) &&
+         (lhs.user_init_key == rhs.user_init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupAdd& obj)
 {
-  return out << obj.path << obj.user_init_key << obj.group_init_key;
+  return out << obj.epoch << obj.group_id << obj.roster << obj.ratchet_tree
+             << obj.add_key << obj.path << obj.user_init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupAdd& obj)
 {
-  return in >> obj.path >> obj.user_init_key >> obj.group_init_key;
+  return in >> obj.epoch >> obj.group_id >> obj.roster >> obj.ratchet_tree >>
+         obj.add_key >> obj.path >> obj.user_init_key;
 }
 
 // Update

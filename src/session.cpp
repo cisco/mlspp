@@ -60,13 +60,6 @@ Session::user_init_key() const
 }
 
 bytes
-Session::group_init_key() const
-{
-  auto group_init_key = current_state().group_init_key();
-  return tls::marshal(group_init_key);
-}
-
-bytes
 Session::add(const bytes& user_init_key_bytes) const
 {
   UserInitKey user_init_key;

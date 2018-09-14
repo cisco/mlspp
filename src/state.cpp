@@ -29,7 +29,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   : _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  if (!group_add.verify(group_add.message.group_init_key.roster)) {
+  if (!group_add.verify(group_add.message.roster)) {
     throw InvalidParameterError("Group add is not from a member of the group");
   }
 
@@ -43,10 +43,33 @@ State::State(const SignaturePrivateKey& identity_priv,
     throw InvalidParameterError("Group add not targeted for this node");
   }
 
-  auto leaf_data = init_priv.derive(group_add.message.group_init_key.add_key);
+  // TODO(rlb@ipv.sx) Clean this up
+  auto leaf_secret = init_priv.derive(group_add.message.add_key);
 
-  init_from_details(
-    identity_priv, leaf_data, group_add.message.group_init_key, group_add);
+  _roster = group_add.message.roster;
+  _ratchet_tree = group_add.message.ratchet_tree;
+
+  _index = _ratchet_tree.size();
+  _identity_priv = identity_priv;
+
+  RawKeyCredential cred{ _identity_priv.public_key() };
+  _roster.add(cred);
+
+  // XXX(rlb@ipv.sx) This is clumsy, but might not be necessary
+  // after further modernization
+  auto temp_path = _ratchet_tree.encrypt(_index, leaf_secret);
+  _ratchet_tree.decrypt(_index, temp_path);
+  _ratchet_tree.merge(_index, temp_path);
+
+  _prior_epoch = group_add.message.epoch;
+  _epoch = next_epoch(_prior_epoch, group_add.message);
+
+  _group_id = group_add.message.group_id;
+
+  auto tree_secret = *(_ratchet_tree.root().secret());
+  auto tree_priv = DHPrivateKey::derive(tree_secret);
+  auto update_secret = tree_priv.derive(group_add.message.add_key);
+  derive_epoch_keys(true, update_secret, tls::marshal(group_add));
 }
 
 ///
@@ -63,7 +86,13 @@ State::add(const UserInitKey& user_init_key) const
   auto leaf_secret = _add_priv.derive(user_init_key.init_keys[0]);
   auto path = _ratchet_tree.encrypt(_ratchet_tree.size(), leaf_secret);
 
-  return sign(GroupAdd{ path, user_init_key, group_init_key() });
+  return sign(GroupAdd{ _epoch,
+                        _group_id,
+                        _roster,
+                        _ratchet_tree,
+                        _add_priv.public_key(),
+                        path,
+                        user_init_key });
 }
 
 Handshake<Update>
@@ -229,40 +258,6 @@ State::spawn(const epoch_t& epoch) const
 
 template<typename Message>
 void
-State::init_from_details(const SignaturePrivateKey& identity_priv,
-                         const bytes& leaf_secret,
-                         const GroupInitKey& group_init_key,
-                         const Handshake<Message>& handshake)
-{
-  auto tree_size = group_init_key.ratchet_tree.size();
-  _index = tree_size;
-  _identity_priv = identity_priv;
-
-  _roster = group_init_key.roster;
-  _ratchet_tree = group_init_key.ratchet_tree;
-
-  RawKeyCredential cred{ _identity_priv.public_key() };
-  _roster.add(cred);
-
-  // XXX(rlb@ipv.sx) This is clumsy, but might not be necessary
-  // after further modernization
-  auto temp_path = _ratchet_tree.encrypt(_index, leaf_secret);
-  _ratchet_tree.decrypt(_index, temp_path);
-  _ratchet_tree.merge(_index, temp_path);
-
-  _prior_epoch = group_init_key.epoch;
-  _epoch = next_epoch(_prior_epoch, handshake.message);
-
-  _group_id = group_init_key.group_id;
-
-  auto tree_secret = *(_ratchet_tree.root().secret());
-  auto tree_priv = DHPrivateKey::derive(tree_secret);
-  auto update_secret = tree_priv.derive(group_init_key.add_key);
-  derive_epoch_keys(true, update_secret, tls::marshal(handshake));
-}
-
-template<typename Message>
-void
 State::add_inner(const SignaturePublicKey& identity_key,
                  const Handshake<Message>& handshake)
 {
@@ -341,18 +336,6 @@ State::verify_now(const Handshake<T>& message) const
   }
 
   return message.verify(_roster);
-}
-
-GroupInitKey
-State::group_init_key() const
-{
-  return GroupInitKey{ _epoch,
-                       uint32_t(_ratchet_tree.size()),
-                       _group_id,
-                       0x0000, // ciphersuite, ignored
-                       _add_priv.public_key(),
-                       _roster,
-                       _ratchet_tree };
 }
 
 } // namespace mls

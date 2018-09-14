@@ -35,33 +35,7 @@ operator<<(tls::ostream& out, const UserInitKey& obj);
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj);
 
-// struct {
-//     uint64 epoch;
-//     uint32 group_size;
-//     tls::opaque group_id<0..2^16-1>;
-//     CipherSuite cipher_suite;                // ignored
-//     DHPublicKey add_key;
-//     MerkleNode identity_frontier<0..2^16-1>; // XXX changed
-//     DHPublicKey ratchet_frontier<0..2^16-1>; // XXX changed
-// } GroupInitKey;
-struct GroupInitKey
-{
-  epoch_t epoch;
-  uint32_t group_size;
-  tls::opaque<2> group_id;
-  uint16_t cipher_suite;
-  DHPublicKey add_key;
-  Roster roster;
-  RatchetTree ratchet_tree;
-};
-
-bool
-operator==(const GroupInitKey& lhs, const GroupInitKey& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const GroupInitKey& obj);
-tls::istream&
-operator>>(tls::istream& in, GroupInitKey& obj);
-
+// enum { ... } HandshakeType;
 enum class HandshakeType : uint8_t
 {
   none = 0,
@@ -94,9 +68,16 @@ operator>>(tls::istream& in, None& obj);
 struct GroupAdd
 {
 public:
+  // For joiner
+  epoch_t epoch;
+  tls::opaque<2> group_id;
+  Roster roster;
+  RatchetTree ratchet_tree;
+  DHPublicKey add_key;
+
+  // For members
   RatchetPath path;
   UserInitKey user_init_key;
-  GroupInitKey group_init_key;
 
   static const HandshakeType type;
 };
