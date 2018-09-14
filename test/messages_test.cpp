@@ -20,11 +20,15 @@ TEST_CASE("Basic message serialization", "[messages]")
 {
   auto random = random_bytes(32);
   auto identity_priv = SignaturePrivateKey::generate();
-  auto merkle = MerkleNode::leaf(identity_priv.public_key().to_bytes());
+  auto identity_pub = identity_priv.public_key();
   auto dh_pub = DHPrivateKey::generate().public_key();
 
   RatchetTree ratchet_tree{ { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
+
+  RawKeyCredential cred{ identity_pub };
+  Roster roster;
+  roster.add(cred);
 
   UserInitKey user_init_key{
     {},                                       // No ciphersuites
@@ -33,7 +37,7 @@ TEST_CASE("Basic message serialization", "[messages]")
   user_init_key.sign(identity_priv);
 
   GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,      dh_pub, { merkle, merkle },
+                               0x0000,      dh_pub, roster,
                                ratchet_tree };
 
   SECTION("UserInitKey")
@@ -43,19 +47,13 @@ TEST_CASE("Basic message serialization", "[messages]")
     REQUIRE(after.verify());
   }
 
-  SECTION("GroupInitKey")
-  {
-    tls_round_trip(group_init_key);
-
-    auto root = (merkle + merkle).value();
-    REQUIRE(group_init_key.identity_root() == root);
-  }
+  SECTION("GroupInitKey") { tls_round_trip(group_init_key); }
 
   SECTION("HandshakeType") { tls_round_trip(HandshakeType::update); }
 
   SECTION("None") { tls_round_trip(None{}); }
 
-  SECTION("UserAdd") { tls_round_trip(UserAdd{ ratchet_path }); }
+  SECTION("UserAdd") { tls_round_trip(UserAdd{ identity_pub, ratchet_path }); }
 
   SECTION("GroupAdd")
   {
@@ -69,53 +67,56 @@ TEST_CASE("Basic message serialization", "[messages]")
 
 TEST_CASE("Handshake serialization", "[messages]")
 {
+  uint32_t group_size = 3;
+  uint32_t signer_index = 0;
   auto random = random_bytes(32);
-  SignaturePrivateKey identity_priv = SignaturePrivateKey::generate();
-  MerkleNode merkle = MerkleNode::leaf(identity_priv.public_key().to_bytes());
+  auto identity_priv = SignaturePrivateKey::generate();
+  auto identity_pub = identity_priv.public_key();
   auto dh_pub = DHPrivateKey::generate().public_key();
+
   RatchetTree ratchet_tree{ { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
 
-  // Simulate a 3-node Merkle tree with the signer in position 1
-  uint32_t group_size = 3;
-  uint32_t signer_index = 0;
-  std::vector<MerkleNode> copath = { merkle, merkle };
-  auto root = ((merkle + merkle) + merkle).value();
+  // Simulate a three-user group
+  RawKeyCredential cred{ identity_priv.public_key() };
+  Roster roster;
+  roster.add(cred);
+  roster.add(cred);
+  roster.add(cred);
 
   UserInitKey user_init_key{ {}, { DHPrivateKey::generate().public_key() } };
   user_init_key.sign(identity_priv);
 
   GroupInitKey group_init_key{ epoch_val,   3,      { 0x03, 0x03, 0x03, 0x03 },
-                               0x0000,      dh_pub, { merkle, merkle },
+                               0x0000,      dh_pub, roster,
                                ratchet_tree };
 
   Handshake<None> initial{
-    None{}, epoch_val, group_size, signer_index, copath
-    // identity_key omitted
+    None{}, epoch_val, group_size, signer_index
     // signature omitted
   };
 
   initial.sign(identity_priv);
-  REQUIRE(initial.verify(root));
+  REQUIRE(initial.verify(roster));
 
   SECTION("None")
   {
-    Handshake<None> before{ {}, epoch_val, group_size, signer_index, copath };
+    Handshake<None> before{ {}, epoch_val, group_size, signer_index };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
-    REQUIRE(after.verify(root));
+    REQUIRE(after.verify(roster));
   }
 
   SECTION("UserAdd")
   {
     Handshake<UserAdd> before{
-      { ratchet_path }, epoch_val, group_size, signer_index, copath
+      { identity_pub, ratchet_path }, epoch_val, group_size, signer_index
     };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
-    REQUIRE(after.verify(root));
+    REQUIRE(after.verify(roster));
   }
 
   SECTION("GroupAdd")
@@ -123,34 +124,33 @@ TEST_CASE("Handshake serialization", "[messages]")
     Handshake<GroupAdd> before{ { ratchet_path, user_init_key, group_init_key },
                                 epoch_val,
                                 group_size,
-                                signer_index,
-                                copath };
+                                signer_index };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
-    REQUIRE(after.verify(root));
+    REQUIRE(after.verify(roster));
   }
 
   SECTION("Update")
   {
     Handshake<Update> before{
-      { ratchet_path }, epoch_val, group_size, signer_index, copath
+      { ratchet_path }, epoch_val, group_size, signer_index
     };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
-    REQUIRE(after.verify(root));
+    REQUIRE(after.verify(roster));
   }
 
   SECTION("Remove")
   {
     Handshake<Remove> before{
-      { 0x42, ratchet_path }, epoch_val, group_size, signer_index, copath
+      { 0x42, ratchet_path }, epoch_val, group_size, signer_index
     };
 
     before.sign(identity_priv);
     auto after = tls_round_trip(before);
-    REQUIRE(after.verify(root));
+    REQUIRE(after.verify(roster));
   }
 }
 

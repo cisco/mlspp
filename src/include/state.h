@@ -3,7 +3,7 @@
 #include "crypto.h"
 #include "messages.h"
 #include "ratchet_tree.h"
-#include "tree.h"
+#include "roster.h"
 #include <vector>
 
 namespace mls {
@@ -95,7 +95,7 @@ private:
   epoch_t _prior_epoch;
   epoch_t _epoch;
   tls::opaque<2> _group_id;
-  Tree<MerkleNode> _identity_tree;
+  Roster _roster;
   RatchetTree _ratchet_tree;
 
   tls::opaque<1> _message_master_secret;

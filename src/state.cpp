@@ -19,8 +19,8 @@ State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   , _add_priv(DHPrivateKey::generate())
   , _ratchet_tree(random_bytes(32))
 {
-  auto identity_leaf = MerkleNode::leaf(_identity_priv.public_key().to_bytes());
-  _identity_tree.add(identity_leaf);
+  RawKeyCredential cred{ identity_priv.public_key() };
+  _roster.add(cred);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
@@ -29,8 +29,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   : _identity_priv(identity_priv)
   , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
 {
-  auto prior_root = group_add.message.group_init_key.identity_root();
-  if (!group_add.verify(prior_root)) {
+  if (!group_add.verify(group_add.message.group_init_key.roster)) {
     throw InvalidParameterError("Group add is not from a member of the group");
   }
 
@@ -85,7 +84,7 @@ State::join(const SignaturePrivateKey& identity_priv,
 
   auto path = temp_state._ratchet_tree.encrypt(temp_state._index, init_secret);
 
-  return temp_state.sign(UserAdd{ path });
+  return temp_state.sign(UserAdd{ identity_priv.public_key(), path });
 }
 
 Handshake<GroupAdd>
@@ -129,14 +128,9 @@ State::handle(const Handshake<UserAdd>& user_add) const
   }
 
   // Verify the incoming message against the **new** identity tree
-  auto temp_identity_tree = _identity_tree;
-  auto identity_leaf = MerkleNode::leaf(user_add.identity_key.to_bytes());
-  temp_identity_tree.add(identity_leaf);
-  if (!user_add.verify(temp_identity_tree.root().value())) {
-    throw InvalidParameterError("UserAdd is not from a member of the group");
-  }
+  // XXX: Removed, as a prelude to removing UserAdd
 
-  if (user_add.signer_index != _identity_tree.size()) {
+  if (user_add.signer_index != _ratchet_tree.size()) {
     throw InvalidParameterError("UserAdd is not from the new member");
   }
 
@@ -149,7 +143,7 @@ State::handle(const Handshake<UserAdd>& user_add) const
   next._ratchet_tree.merge(user_add.signer_index, path);
 
   // Add to symmetric state
-  next.add_inner(user_add.identity_key, user_add);
+  next.add_inner(user_add.message.identity_key, user_add);
 
   return next;
 }
@@ -255,7 +249,7 @@ operator==(const State& lhs, const State& rhs)
 {
   auto epoch = (lhs._epoch == rhs._epoch);
   auto group_id = (lhs._group_id == rhs._group_id);
-  auto identity_tree = (lhs._identity_tree == rhs._identity_tree);
+  auto roster = (lhs._roster == rhs._roster);
   auto ratchet_tree = (lhs._ratchet_tree == rhs._ratchet_tree);
   auto message_master_secret =
     (lhs._message_master_secret == rhs._message_master_secret);
@@ -270,15 +264,15 @@ operator==(const State& lhs, const State& rhs)
             << "_epoch " << epoch << " " << lhs._epoch << " " << rhs._epoch
             << std::endl
             << "_group_id " << group_id << std::endl
-            << "_identity_tree " << identity_tree << std::endl
+            << "_roster " << roster << std::endl
             << "_ratchet_tree " << ratchet_tree << std::endl
             << "_message_master_secret " << message_master_secret << std::endl
             << "_init_secret " << init_secret << std::endl
             << "_add_priv " << add_priv << std::endl;
   */
 
-  return epoch && group_id && identity_tree && ratchet_tree &&
-         message_master_secret && init_secret && add_priv;
+  return epoch && group_id && roster && ratchet_tree && message_master_secret &&
+         init_secret && add_priv;
 }
 
 bool
@@ -307,19 +301,17 @@ State::init_from_details(const SignaturePrivateKey& identity_priv,
   _index = tree_size;
   _identity_priv = identity_priv;
 
-  _identity_tree =
-    Tree<MerkleNode>(tree_size, group_init_key.identity_frontier);
+  _roster = group_init_key.roster;
   _ratchet_tree = group_init_key.ratchet_tree;
 
-  auto identity_leaf = MerkleNode::leaf(_identity_priv.public_key().to_bytes());
-  _identity_tree.add(identity_leaf);
+  RawKeyCredential cred{ _identity_priv.public_key() };
+  _roster.add(cred);
 
   // XXX(rlb@ipv.sx) This is clumsy, but might not be necessary
   // after further modernization
-  auto index = _ratchet_tree.size();
-  auto temp_path = _ratchet_tree.encrypt(index, leaf_secret);
-  _ratchet_tree.decrypt(index, temp_path);
-  _ratchet_tree.merge(index, temp_path);
+  auto temp_path = _ratchet_tree.encrypt(_index, leaf_secret);
+  _ratchet_tree.decrypt(_index, temp_path);
+  _ratchet_tree.merge(_index, temp_path);
 
   _prior_epoch = group_init_key.epoch;
   _epoch = next_epoch(_prior_epoch, handshake.message);
@@ -337,8 +329,8 @@ void
 State::add_inner(const SignaturePublicKey& identity_key,
                  const Handshake<Message>& handshake)
 {
-  auto identity_leaf = MerkleNode::leaf(identity_key.to_bytes());
-  _identity_tree.add(identity_leaf);
+  RawKeyCredential cred{ identity_key };
+  _roster.add(cred);
 
   // NB: complementary to init_from_details
   auto tree_key = _ratchet_tree.root().public_key();
@@ -395,10 +387,8 @@ template<typename Message>
 Handshake<Message>
 State::sign(const Message& body) const
 {
-  auto copath = _identity_tree.copath(_index);
-
   Handshake<Message> handshake{
-    body, _epoch, uint32_t(_identity_tree.size()), _index, copath
+    body, _epoch, uint32_t(_ratchet_tree.size()), _index
   };
 
   handshake.sign(_identity_priv);
@@ -413,19 +403,18 @@ State::verify_now(const Handshake<T>& message) const
     return false;
   }
 
-  auto root = _identity_tree.root().value();
-  return message.verify(root);
+  return message.verify(_roster);
 }
 
 GroupInitKey
 State::group_init_key() const
 {
   return GroupInitKey{ _epoch,
-                       uint32_t(_identity_tree.size()),
+                       uint32_t(_ratchet_tree.size()),
                        _group_id,
                        0x0000, // ciphersuite, ignored
                        _add_priv.public_key(),
-                       _identity_tree.frontier(),
+                       _roster,
                        _ratchet_tree };
 }
 

@@ -7,28 +7,6 @@
 
 namespace mls {
 
-// TODO delete
-class MerkleNode
-{
-public:
-  // Defaults for the "rule of 6" are OK
-
-  static MerkleNode leaf(const bytes& value);
-
-  bool public_equal(const MerkleNode& other) const;
-  const bytes& value() const;
-
-private:
-  bytes _value;
-
-  friend MerkleNode operator+(const MerkleNode& lhs, const MerkleNode& rhs);
-  friend bool operator==(const MerkleNode& lhs, const MerkleNode& rhs);
-  friend bool operator!=(const MerkleNode& lhs, const MerkleNode& rhs);
-  friend std::ostream& operator<<(std::ostream& out, const MerkleNode& node);
-  friend tls::ostream& operator<<(tls::ostream& out, const MerkleNode& obj);
-  friend tls::istream& operator>>(tls::istream& in, MerkleNode& obj);
-};
-
 class RatchetNode
 {
 public:
@@ -88,6 +66,7 @@ public:
   bytes root_secret() const;
 
 private:
+  // TODO(rlb@ipv.sx) prefid with _
   tls::vector<RatchetNode, 3> nodes;
 
   uint32_t working_size(uint32_t from) const;

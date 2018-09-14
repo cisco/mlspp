@@ -3,8 +3,8 @@
 #include "common.h"
 #include "crypto.h"
 #include "ratchet_tree.h"
+#include "roster.h"
 #include "tls_syntax.h"
-#include "tree.h"
 
 namespace mls {
 
@@ -41,7 +41,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //     tls::opaque group_id<0..2^16-1>;
 //     CipherSuite cipher_suite;                // ignored
 //     DHPublicKey add_key;
-//     MerkleNode identity_frontier<0..2^16-1>;
+//     MerkleNode identity_frontier<0..2^16-1>; // XXX changed
 //     DHPublicKey ratchet_frontier<0..2^16-1>; // XXX changed
 // } GroupInitKey;
 struct GroupInitKey
@@ -51,10 +51,8 @@ struct GroupInitKey
   tls::opaque<2> group_id;
   uint16_t cipher_suite;
   DHPublicKey add_key;
-  tls::vector<MerkleNode, 2> identity_frontier;
+  Roster roster;
   RatchetTree ratchet_tree;
-
-  bytes identity_root() const;
 };
 
 bool
@@ -97,6 +95,7 @@ operator>>(tls::istream& in, None& obj);
 struct UserAdd
 {
 public:
+  SignaturePublicKey identity_key;
   RatchetPath path;
 
   static const HandshakeType type;
@@ -184,8 +183,8 @@ operator>>(tls::istream& in, Remove& obj);
 //
 //     uint32 group_size;
 //     uint32 signer_index;
-//     MerkleNode identity_proof<1..2^16-1>;
-//     SignaturePublicKey identity_key;
+//     MerkleNode identity_proof<1..2^16-1>;  // XXX changed
+//     SignaturePublicKey identity_key;       // XXX changed
 //
 //     SignatureScheme algorithm;             // OMITTED
 //     tls::opaque signature<1..2^16-1>;
@@ -206,32 +205,21 @@ struct Handshake
 
   uint32_t group_size;
   uint32_t signer_index;
-  tls::vector<MerkleNode, 2> identity_proof;
-  SignaturePublicKey identity_key;
   tls::opaque<2, 1> signature;
 
   epoch_t epoch() const { return next_epoch(prior_epoch, message); }
 
   void sign(const SignaturePrivateKey& identity_priv)
   {
-    identity_key = identity_priv.public_key();
     auto tbs = to_be_signed();
     signature = identity_priv.sign(tbs);
   }
 
-  bool verify(const bytes& identity_root) const
+  bool verify(const Roster& roster) const
   {
+    auto identity_key = roster.get(signer_index).public_key();
     auto tbs = to_be_signed();
-    if (!identity_key.verify(tbs, signature)) {
-      return false;
-    }
-
-    Tree<MerkleNode> identity_tree(group_size, signer_index, identity_proof);
-
-    auto leaf = MerkleNode::leaf(identity_key.to_bytes());
-    identity_tree.update(signer_index, leaf);
-
-    return identity_tree.root().value() == identity_root;
+    return identity_key.verify(tbs, signature);
   }
 
   bytes to_be_signed() const
@@ -240,7 +228,7 @@ struct Handshake
 
     tls::ostream out;
     out << Message::type << message_data << prior_epoch << group_size
-        << signer_index << identity_proof << identity_key;
+        << signer_index;
     return out.bytes();
   }
 };
@@ -252,8 +240,6 @@ operator==(const Handshake<Message>& lhs, const Handshake<Message>& rhs)
   return (lhs.message == rhs.message) && (lhs.prior_epoch == rhs.prior_epoch) &&
          (lhs.group_size == rhs.group_size) &&
          (lhs.signer_index == rhs.signer_index) &&
-         (lhs.identity_proof == rhs.identity_proof) &&
-         (lhs.identity_key == rhs.identity_key) &&
          (lhs.signature == rhs.signature);
 }
 
@@ -281,8 +267,7 @@ operator>>(tls::istream& in, Handshake<Message>& obj)
   in >> message;
   tls::unmarshal(message, obj.message);
 
-  in >> obj.prior_epoch >> obj.group_size >> obj.signer_index >>
-    obj.identity_proof >> obj.identity_key >> obj.signature;
+  in >> obj.prior_epoch >> obj.group_size >> obj.signer_index >> obj.signature;
   return in;
 }
 

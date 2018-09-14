@@ -1,5 +1,4 @@
 #include "messages.h"
-#include "tree.h"
 
 namespace mls {
 
@@ -53,36 +52,27 @@ operator>>(tls::istream& in, UserInitKey& obj)
 
 // GroupInitKey
 
-bytes
-GroupInitKey::identity_root() const
-{
-  Tree<MerkleNode> identity_tree(group_size, identity_frontier);
-  return identity_tree.root().value();
-}
-
 bool
 operator==(const GroupInitKey& lhs, const GroupInitKey& rhs)
 {
   return (lhs.epoch == rhs.epoch) && (lhs.group_size == rhs.group_size) &&
          (lhs.cipher_suite == rhs.cipher_suite) &&
          (lhs.group_id == rhs.group_id) && (lhs.add_key == rhs.add_key) &&
-         (lhs.identity_frontier == rhs.identity_frontier) &&
-         (lhs.ratchet_tree == rhs.ratchet_tree);
+         (lhs.roster == rhs.roster) && (lhs.ratchet_tree == rhs.ratchet_tree);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupInitKey& obj)
 {
   return out << obj.epoch << obj.group_size << obj.group_id << obj.cipher_suite
-             << obj.add_key << obj.identity_frontier << obj.ratchet_tree;
+             << obj.add_key << obj.roster << obj.ratchet_tree;
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupInitKey& obj)
 {
   return in >> obj.epoch >> obj.group_size >> obj.group_id >>
-         obj.cipher_suite >> obj.add_key >> obj.identity_frontier >>
-         obj.ratchet_tree;
+         obj.cipher_suite >> obj.add_key >> obj.roster >> obj.ratchet_tree;
 }
 
 // HandshakeType
@@ -137,13 +127,13 @@ operator==(const UserAdd& lhs, const UserAdd& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserAdd& obj)
 {
-  return out << obj.path;
+  return out << obj.identity_key << obj.path;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserAdd& obj)
 {
-  return in >> obj.path;
+  return in >> obj.identity_key >> obj.path;
 }
 
 // GroupAdd
