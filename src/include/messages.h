@@ -35,59 +35,65 @@ operator<<(tls::ostream& out, const UserInitKey& obj);
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj);
 
-// enum { ... } HandshakeType;
-enum class HandshakeType : uint8_t
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   Credential roster<1..2^24-1>;
+//   PublicKey tree<1..2^24-1>;
+//   GroupOperation transcript<0..2^24-1>;
+//   opaque init_secret<0..255>;
+//   opaque leaf_secret<0..255>;
+// } Welcome;
+struct GroupOperation;
+struct Welcome
 {
-  none = 0,
-  group_add = 1,
+  tls::opaque<2> group_id;
+  epoch_t epoch;
+  Roster roster;
+  RatchetTree tree;
+  tls::vector<GroupOperation, 3> transcript;
+  DHPublicKey add_key; // XXX replace with init + leaf secret
+};
+
+bool
+operator==(const Welcome& lhs, const Welcome& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const Welcome& obj);
+tls::istream&
+operator>>(tls::istream& in, Welcome& obj);
+
+// enum { ... } GroupOperationType;
+enum class GroupOperationType : uint8_t
+{
+  add = 1,
   update = 2,
   remove = 3,
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const HandshakeType& obj);
+operator<<(tls::ostream& out, const GroupOperationType& obj);
 tls::istream&
-operator>>(tls::istream& in, HandshakeType& obj);
-
-// struct {} None;
-struct None
-{
-  static const HandshakeType type;
-};
-
-bool
-operator==(const None& lhs, const None& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const None& obj);
-tls::istream&
-operator>>(tls::istream& in, None& obj);
+operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
+//     DirectPath path<1..2^16-1>;
 //     UserInitKey init_key;
-// } GroupAdd;
-struct GroupAdd
+// } Add;
+struct Add
 {
 public:
-  // For joiner
-  epoch_t epoch;
-  tls::opaque<2> group_id;
-  Roster roster;
-  RatchetTree ratchet_tree;
-  DHPublicKey add_key;
-
-  // For members
   RatchetPath path;
-  UserInitKey user_init_key;
+  UserInitKey init_key;
 
-  static const HandshakeType type;
+  static const GroupOperationType type;
 };
 
 bool
-operator==(const GroupAdd& lhs, const GroupAdd& rhs);
+operator==(const Add& lhs, const Add& rhs);
 tls::ostream&
-operator<<(tls::ostream& out, const GroupAdd& obj);
+operator<<(tls::ostream& out, const Add& obj);
 tls::istream&
-operator>>(tls::istream& in, GroupAdd& obj);
+operator>>(tls::istream& in, Add& obj);
 
 // struct {
 //     DHPublicKey path<1..2^16-1>;
@@ -97,7 +103,7 @@ struct Update
 public:
   RatchetPath path;
 
-  static const HandshakeType type;
+  static const GroupOperationType type;
 };
 
 bool
@@ -117,7 +123,7 @@ public:
   uint32_t removed;
   RatchetPath path;
 
-  static const HandshakeType type;
+  static const GroupOperationType type;
 };
 
 bool
@@ -127,133 +133,112 @@ operator<<(tls::ostream& out, const Remove& obj);
 tls::istream&
 operator>>(tls::istream& in, Remove& obj);
 
+// Container class for all operations
+//
 // struct {
-//     HandshakeType msg_type;
-//     uint24 inner_length;
-//     select (Handshake.msg_type) {
-//         case none:      struct{};
+//     GroupOperationType msg_type;
+//     select (GroupOperation.msg_type) {
 //         case init:      Init;
-//         case group_add: GroupAdd;
+//         case add:       Add;
 //         case update:    Update;
 //         case remove:    Remove;
 //     };
+// } GroupOperation;
 //
-//     uint64 prior_epoch;
-//     uint64 current_epoch;
+// NB: This is a "pseudo-union" type, in that only one of the struct
+// members will be populated with a non-zero value.  This is a bit
+// wasteful of memory, but necessary to avoid the silliness of C++
+// union types over structs.
+struct GroupOperation
+{
+  GroupOperationType type;
+
+  Add add;
+  Update update;
+  Remove remove;
+
+  GroupOperation() {}
+
+  GroupOperation(const Add& add)
+    : type(add.type)
+    , add(add)
+  {}
+
+  GroupOperation(const Update& update)
+    : type(update.type)
+    , update(update)
+  {}
+
+  GroupOperation(const Remove& remove)
+    : type(remove.type)
+    , remove(remove)
+  {}
+
+  // XXX(rlb@ipv.sx): It doesn't seem like this special copy ctor
+  // should be necessary, but there seems to be a problem with
+  // copying an empty Add structure.  It somehow creates an NPE.
+  // This should probably be cleaned up with some checks that all
+  // the crypto functions are null-safe.
+  GroupOperation(const GroupOperation& other)
+    : type(other.type)
+  {
+    switch (type) {
+      case GroupOperationType::add:
+        add = other.add;
+        break;
+      case GroupOperationType::update:
+        update = other.update;
+        break;
+      case GroupOperationType::remove:
+        remove = other.remove;
+        break;
+    }
+  }
+};
+
+bool
+operator==(const GroupOperation& lhs, const GroupOperation& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const GroupOperation& obj);
+tls::istream&
+operator>>(tls::istream& in, GroupOperation& obj);
+
+// struct {
+//     uint32 prior_epoch;
+//     GroupOperation operation;
 //
-//     uint32 group_size;
 //     uint32 signer_index;
-//     MerkleNode identity_proof<1..2^16-1>;  // XXX changed
-//     SignaturePublicKey identity_key;       // XXX changed
-//
-//     SignatureScheme algorithm;             // OMITTED
-//     tls::opaque signature<1..2^16-1>;
+//     SignatureScheme algorithm;
+//     opaque signature<1..2^16-1>;
 // } Handshake;
-//
-// XXX(rlb@ipv.sx): Handling polymorphism at compile time via a
-// template will make it difficult to generically read a handshake
-// message from a stream.  There are basically two approaches: (1)
-// peeking at the message type before reading the stream, or (2)
-// reading the bytes into some generic struct, then convert it to a
-// specific struct.
-template<typename Message>
 struct Handshake
 {
-  Message message;
-
   epoch_t prior_epoch;
+  GroupOperation operation;
 
-  uint32_t group_size;
   uint32_t signer_index;
-  tls::opaque<2, 1> signature;
+  tls::opaque<2> signature;
 
-  epoch_t epoch() const { return next_epoch(prior_epoch, message); }
+  epoch_t epoch() const { return prior_epoch + 1; }
 
-  void sign(const SignaturePrivateKey& identity_priv)
-  {
-    auto tbs = to_be_signed();
-    signature = identity_priv.sign(tbs);
-  }
+  Handshake() {}
 
-  bool verify(const Roster& roster) const
-  {
-    auto identity_key = roster.get(signer_index).public_key();
-    auto tbs = to_be_signed();
-    return identity_key.verify(tbs, signature);
-  }
-
-  bytes to_be_signed() const
-  {
-    tls::opaque<3> message_data = tls::marshal(message);
-
-    tls::ostream out;
-    out << Message::type << message_data << prior_epoch << group_size
-        << signer_index;
-    return out.bytes();
-  }
+  Handshake(epoch_t prior_epoch,
+            const GroupOperation& operation,
+            uint32_t signer_index,
+            bytes signature)
+    : prior_epoch(prior_epoch)
+    , operation(operation)
+    , signer_index(signer_index)
+    , signature(signature)
+  {}
 };
 
-template<typename Message>
 bool
-operator==(const Handshake<Message>& lhs, const Handshake<Message>& rhs)
-{
-  return (lhs.message == rhs.message) && (lhs.prior_epoch == rhs.prior_epoch) &&
-         (lhs.group_size == rhs.group_size) &&
-         (lhs.signer_index == rhs.signer_index) &&
-         (lhs.signature == rhs.signature);
-}
-
-template<typename Message>
+operator==(const Handshake& lhs, const Handshake& rhs);
 tls::ostream&
-operator<<(tls::ostream& out, const Handshake<Message>& obj)
-{
-  auto tbs = obj.to_be_signed();
-  out.write_raw(tbs);
-  out << obj.signature;
-  return out;
-}
-
-template<typename Message>
+operator<<(tls::ostream& out, const Handshake& obj);
 tls::istream&
-operator>>(tls::istream& in, Handshake<Message>& obj)
-{
-  HandshakeType type;
-  in >> type;
-  if (type != Message::type) {
-    throw tls::ReadError("Improper content type for object type");
-  }
-
-  tls::opaque<3> message;
-  in >> message;
-  tls::unmarshal(message, obj.message);
-
-  in >> obj.prior_epoch >> obj.group_size >> obj.signer_index >> obj.signature;
-  return in;
-}
-
-// Epoch evolution
-//
-// struct {
-//    uint64 prior_epoch;
-//    HandshakeType msg_type;
-//    opaque message<0..2^24-1>;
-// } EpochInfo;
-struct EpochInfo
-{
-  epoch_t prior_epoch;
-  HandshakeType msg_type;
-  tls::opaque<3> message;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const EpochInfo& obj);
-
-template<typename Message>
-epoch_t
-next_epoch(const epoch_t& prior, const Message& message)
-{
-  // TODO Enable non-linear epoch updates
-  return prior + 1;
-}
+operator>>(tls::istream& in, Handshake& obj);
 
 } // namespace mls

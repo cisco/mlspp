@@ -32,35 +32,39 @@ TEST_CASE("Group creation", "[state]")
     init_secrets.emplace(inp + i, init_secret);
   }
 
-  SECTION("Two person, group-initiated")
+  SECTION("Two person")
   {
     // Initialize the creator's state
     states.emplace(stp, group_id, identity_privs[0]);
 
-    // Create a GroupAdd for the new participant
-    auto group_add = states[0].add(user_init_keys[1]);
+    // Create a Add for the new participant
+    auto welcome_add = states[0].add(user_init_keys[1]);
+    auto welcome = welcome_add.first;
+    auto add = welcome_add.second;
 
-    // Process the GroupAdd
-    states[0] = states[0].handle(group_add);
-    states.emplace(stp + 1, identity_privs[1], init_secrets[1], group_add);
+    // Process the Add
+    states[0] = states[0].handle(add);
+    states.emplace(stp + 1, identity_privs[1], init_secrets[1], welcome, add);
 
     REQUIRE(states[0] == states[1]);
   }
 
-  SECTION("Full size, group-initiated")
+  SECTION("Full size")
   {
     // Initialize the creator's state
     states.emplace(stp, group_id, identity_privs[0]);
 
     // Each participant invites the next
     for (size_t i = 1; i < group_size; i += 1) {
-      auto group_add = states[i - 1].add(user_init_keys[i]);
+      auto welcome_add = states[i - 1].add(user_init_keys[i]);
+      auto welcome = welcome_add.first;
+      auto add = welcome_add.second;
 
       for (auto& state : states) {
-        state = state.handle(group_add);
+        state = state.handle(add);
       }
 
-      states.emplace(stp + i, identity_privs[i], init_secrets[i], group_add);
+      states.emplace(stp + i, identity_privs[i], init_secrets[i], welcome, add);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -87,12 +91,16 @@ TEST_CASE("Operations on a running group", "[state]")
     uik.init_keys = { init_priv.public_key() };
     uik.sign(identity_priv);
 
-    auto group_add = states[0].add(uik);
+    auto welcome_add = states[0].add(uik);
     for (auto& state : states) {
-      state = state.handle(group_add);
+      state = state.handle(welcome_add.second);
     }
 
-    states.emplace(stp + i, identity_priv, init_secret, group_add);
+    states.emplace(stp + i,
+                   identity_priv,
+                   init_secret,
+                   welcome_add.first,
+                   welcome_add.second);
   }
 
   for (const auto& state : states) {
@@ -106,11 +114,7 @@ TEST_CASE("Operations on a running group", "[state]")
       auto update = states[i].update(new_leaf);
 
       for (size_t j = 0; j < group_size; j += 1) {
-        if (i == j) {
-          states[j] = states[j].handle(update, new_leaf);
-        } else {
-          states[j] = states[j].handle(update);
-        }
+        states[j] = states[j].handle(update);
       }
 
       for (const auto& state : states) {

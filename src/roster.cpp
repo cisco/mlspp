@@ -36,6 +36,16 @@ Roster::put(uint32_t index, const RawKeyCredential& cred)
   _credentials.emplace(_credentials.begin() + index, cred);
 }
 
+void
+Roster::copy(uint32_t dst, uint32_t src)
+{
+  if (dst > _credentials.size() - 1) {
+    _credentials.resize(dst + 1);
+  }
+
+  _credentials.emplace(_credentials.begin() + dst, _credentials[src]);
+}
+
 RawKeyCredential
 Roster::get(uint32_t index) const
 {

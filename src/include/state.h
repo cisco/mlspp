@@ -22,44 +22,46 @@ public:
   // Initialize an empty group
   State(const bytes& group_id, const SignaturePrivateKey& identity_priv);
 
-  // Initialize a group from a GroupAdd (for group-initiated join)
+  // Initialize a group from a Add (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
         const bytes& init_secret,
-        const Handshake<GroupAdd>& group_add);
+        const Welcome& welcome,
+        const Handshake& handshake);
 
   ///
   /// Message factories
   ///
 
-  // Generate a GroupAdd message (for group-initiated join)
-  Handshake<GroupAdd> add(const UserInitKey& user_init_key) const;
+  // Generate a Add message (for group-initiated join)
+  std::pair<Welcome, Handshake> add(const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  Handshake<Update> update(const bytes& leaf_secret) const;
+  Handshake update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake<Remove> remove(uint32_t index) const;
+  Handshake remove(uint32_t index) const;
 
   ///
-  /// Message handlers
+  /// Generic handshake message handler
   ///
 
-  // XXX(rlb@ipv.sx) We might want for these to produce a new state,
-  // rather than modifying the current one, given that we will
-  // probably want to keep old states around.  That could also be
-  // done a little more explicitly with a copy constructor.
+  // Handle a Handshake message
+  State handle(const Handshake& handshake) const;
 
-  // Handle a GroupAdd (for existing participants only)
-  State handle(const Handshake<GroupAdd>& group_add) const;
+  ///
+  /// Specific operation handlers
+  ///
+  /// XXX(rlb@ipv.sx) These can probably be private
+  ///
+
+  // Handle a Add (for existing participants only)
+  void handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
-  State handle(const Handshake<Update>& update, const bytes& leaf_secret) const;
-
-  // Handle an Update (for the other participants)
-  State handle(const Handshake<Update>& update) const;
+  void handle(uint32_t index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  State handle(const Handshake<Remove>& remove) const;
+  void handle(uint32_t index, const Remove& remove);
 
   epoch_t epoch() const { return _epoch; }
   uint32_t index() const { return _index; }
@@ -72,13 +74,13 @@ private:
   //   uint32 epoch;
   //   Credential roster<1..2^24-1>;
   //   PublicKey tree<1..2^24-1>;
-  //   opaque transcript_hash<0..255>;
+  //   GroupOperation transcript<0..2^24-1>;
   // } GroupState;
   tls::opaque<2> _group_id;
   epoch_t _epoch;
   Roster _roster;
-  RatchetTree _ratchet_tree;
-  // TODO transcript_hash;
+  RatchetTree _tree;
+  tls::vector<GroupOperation, 3> _transcript;
 
   // Shared secret state
   tls::opaque<1> _message_master_secret;
@@ -88,24 +90,17 @@ private:
   // Per-participant state
   uint32_t _index;
   SignaturePrivateKey _identity_priv;
+  bytes _cached_leaf_secret;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
-  // Spawn a new state (with a fresh epoch) from this state
-  State spawn(const epoch_t& epoch) const;
-
-  // Inner logic shared by UserAdd and GroupAdd handlers
-  template<typename Message>
-  void add_inner(const SignaturePublicKey& identity_key,
-                 const Handshake<Message>& message);
-
   // Inner logic shared by Update, self-Update, and Remove handlers
   template<typename Message>
   void update_leaf(uint32_t index,
                    const RatchetPath& path,
-                   const Handshake<Message>& message,
+                   const Message& message,
                    const optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
@@ -113,14 +108,11 @@ private:
                          const bytes& update_secret,
                          const bytes& message);
 
-  // Create a signed Handshake message, given a payload
-  template<typename T>
-  Handshake<T> sign(const T& body) const;
+  // Sign this state with the associated private key
+  Handshake sign(const GroupOperation& operation) const;
 
-  // Verify a signed Handshake message against the list of
-  // participants for the current epoch
-  template<typename T>
-  bool verify_now(const Handshake<T>& message) const;
+  // Verify this state with the indicated public key
+  bool verify(uint32_t signer_index, const bytes& signature) const;
 };
 
 } // namespace mls

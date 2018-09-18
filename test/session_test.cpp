@@ -7,14 +7,28 @@ const size_t group_size = 5;
 const bytes group_id{ 0, 1, 2, 3 };
 
 void
-broadcast_and_check(std::vector<Session>& sessions, const bytes& message)
+broadcast(std::vector<Session>& sessions, const bytes& message)
 {
-  auto initial_epoch = sessions[0].current_epoch();
-
   for (auto& session : sessions) {
     session.handle(message);
   }
+}
 
+void
+broadcast_add(std::vector<Session>& sessions)
+{
+  Session next;
+  auto last = sessions.size() - 1;
+  auto welcome_add = sessions[last].add(next.user_init_key());
+
+  next.join(welcome_add.first, welcome_add.second);
+  broadcast(sessions, welcome_add.second);
+  sessions.push_back(next);
+}
+
+void
+check(std::vector<Session> sessions, epoch_t initial_epoch)
+{
   // Verify that everyone ended up in consistent states
   for (const auto& session : sessions) {
     REQUIRE(session == sessions[0]);
@@ -29,19 +43,19 @@ TEST_CASE("Session creation", "[session]")
   std::vector<Session> sessions;
   sessions.push_back({ group_id, SignaturePrivateKey::generate() });
 
-  SECTION("Two person, group-initiated")
+  SECTION("Two person")
   {
-    sessions.push_back({});
-    auto group_add = sessions[0].add(sessions[1].user_init_key());
-    broadcast_and_check(sessions, group_add);
+    auto initial_epoch = sessions[0].current_epoch();
+    broadcast_add(sessions);
+    check(sessions, initial_epoch);
   }
 
-  SECTION("Full-size, group-initiated")
+  SECTION("Full-size")
   {
     for (int i = 0; i < group_size - 1; i += 1) {
-      sessions.push_back({});
-      auto group_add = sessions[i].add(sessions[i + 1].user_init_key());
-      broadcast_and_check(sessions, group_add);
+      auto initial_epoch = sessions[0].current_epoch();
+      broadcast_add(sessions);
+      check(sessions, initial_epoch);
     }
   }
 }
@@ -52,25 +66,29 @@ TEST_CASE("Session update and removal", "[session]")
   sessions.push_back({ group_id, SignaturePrivateKey::generate() });
 
   for (int i = 0; i < group_size - 1; i += 1) {
-    sessions.push_back({});
-    auto group_add = sessions[i].add(sessions[i + 1].user_init_key());
-    broadcast_and_check(sessions, group_add);
+    auto initial_epoch = sessions[0].current_epoch();
+    broadcast_add(sessions);
+    check(sessions, initial_epoch);
   }
 
   SECTION("Update")
   {
     for (int i = 0; i < group_size; i += 1) {
+      auto initial_epoch = sessions[0].current_epoch();
       auto update = sessions[i].update();
-      broadcast_and_check(sessions, update);
+      broadcast(sessions, update);
+      check(sessions, initial_epoch);
     }
   }
 
   SECTION("Removal")
   {
     for (int i = group_size - 1; i > 0; i -= 1) {
+      auto initial_epoch = sessions[0].current_epoch();
       auto remove = sessions[i - 1].remove(i);
       sessions.resize(i);
-      broadcast_and_check(sessions, remove);
+      broadcast(sessions, remove);
+      check(sessions, initial_epoch);
     }
   }
 }
@@ -82,21 +100,25 @@ TEST_CASE("Full life-cycle", "[session]")
 
   // Create the group
   for (int i = 0; i < group_size - 1; i += 1) {
-    sessions.push_back({});
-    auto group_add = sessions[i].add(sessions[i + 1].user_init_key());
-    broadcast_and_check(sessions, group_add);
+    auto initial_epoch = sessions[0].current_epoch();
+    broadcast_add(sessions);
+    check(sessions, initial_epoch);
   }
 
   // Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
+    auto initial_epoch = sessions[0].current_epoch();
     auto update = sessions[i].update();
-    broadcast_and_check(sessions, update);
+    broadcast(sessions, update);
+    check(sessions, initial_epoch);
   }
 
   // Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
+    auto initial_epoch = sessions[0].current_epoch();
     auto remove = sessions[i - 1].remove(i);
     sessions.resize(i);
-    broadcast_and_check(sessions, remove);
+    broadcast(sessions, remove);
+    check(sessions, initial_epoch);
   }
 }

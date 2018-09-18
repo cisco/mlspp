@@ -34,8 +34,6 @@ bool
 operator==(const Session& lhs, const Session& rhs)
 {
   if (lhs._current_epoch != rhs._current_epoch) {
-    std::cout << "epoch mismatch" << lhs._current_epoch << " "
-              << rhs._current_epoch << std::endl;
     return false;
   }
 
@@ -45,7 +43,6 @@ operator==(const Session& lhs, const Session& rhs)
     }
 
     if (rhs._state.at(pair.first) != pair.second) {
-      std::cout << "state mismatch for epoch " << pair.first << std::endl;
       return false;
     }
   }
@@ -59,17 +56,19 @@ Session::user_init_key() const
   return _user_init_key;
 }
 
-bytes
+std::pair<bytes, bytes>
 Session::add(const bytes& user_init_key_bytes) const
 {
   UserInitKey user_init_key;
   tls::unmarshal(user_init_key_bytes, user_init_key);
-  auto group_add = current_state().add(user_init_key);
-  return tls::marshal(group_add);
+  auto welcome_add = current_state().add(user_init_key);
+  auto welcome = tls::marshal(welcome_add.first);
+  auto add = tls::marshal(welcome_add.second);
+  return std::pair<bytes, bytes>(welcome, add);
 }
 
 bytes
-Session::update() const
+Session::update()
 {
   auto update = current_state().update(_next_leaf_secret);
   return tls::marshal(update);
@@ -83,45 +82,26 @@ Session::remove(uint32_t index) const
 }
 
 void
-Session::handle(const bytes& handshake)
+Session::join(const bytes& welcome_data, const bytes& add_data)
 {
-  auto type = HandshakeType(handshake[0]);
-  switch (type) {
-    case HandshakeType::group_add: {
-      Handshake<GroupAdd> group_add;
-      tls::unmarshal(handshake, group_add);
+  Welcome welcome;
+  tls::unmarshal(welcome_data, welcome);
 
-      if (_state.size() == 0) {
-        add_state(group_add.prior_epoch,
-                  State(_identity_priv, _init_secret, group_add));
-      } else {
-        add_state(group_add.prior_epoch, current_state().handle(group_add));
-      }
-    } break;
+  Handshake add;
+  tls::unmarshal(add_data, add);
 
-    case HandshakeType::update: {
-      Handshake<Update> update;
-      tls::unmarshal(handshake, update);
+  State next(_identity_priv, _init_secret, welcome, add);
+  add_state(add.prior_epoch, next);
+}
 
-      if (update.signer_index == current_state().index()) {
-        add_state(update.prior_epoch,
-                  current_state().handle(update, _next_leaf_secret));
-        _next_leaf_secret = random_bytes(32);
-      } else {
-        add_state(update.prior_epoch, current_state().handle(update));
-      }
+void
+Session::handle(const bytes& data)
+{
+  Handshake handshake;
+  tls::unmarshal(data, handshake);
 
-    } break;
-
-    case HandshakeType::remove: {
-      Handshake<Remove> remove;
-      tls::unmarshal(handshake, remove);
-      add_state(remove.prior_epoch, current_state().handle(remove));
-    } break;
-
-    default:
-      throw InvalidMessageTypeError("Unknown HandshakeType");
-  }
+  auto next = current_state().handle(handshake);
+  add_state(handshake.prior_epoch, next);
 }
 
 void

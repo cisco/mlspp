@@ -26,10 +26,11 @@ public:
 
   bytes user_init_key() const;
 
-  bytes add(const bytes& user_init_key) const;
-  bytes update() const;
+  std::pair<bytes, bytes> add(const bytes& user_init_key) const;
+  bytes update();
   bytes remove(uint32_t index) const;
 
+  void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake);
 
   epoch_t current_epoch() const { return _current_epoch; }
