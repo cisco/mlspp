@@ -53,6 +53,7 @@ public:
   ///
   /// XXX(rlb@ipv.sx) These can probably be private
   ///
+  State handle(uint32_t signer_index, const GroupOperation& operation) const;
 
   // Handle a Add (for existing participants only)
   void handle(const Add& add);
@@ -68,14 +69,6 @@ public:
 
 private:
   // Shared confirmed state:
-  //
-  // struct {
-  //   opaque group_id<0..255>;
-  //   uint32 epoch;
-  //   Credential roster<1..2^24-1>;
-  //   PublicKey tree<1..2^24-1>;
-  //   GroupOperation transcript<0..2^24-1>;
-  // } GroupState;
   tls::opaque<2> _group_id;
   epoch_t _epoch;
   Roster _roster;
@@ -85,7 +78,6 @@ private:
   // Shared secret state
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
-  DHPrivateKey _add_priv;
 
   // Per-participant state
   uint32_t _index;
@@ -96,17 +88,16 @@ private:
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
+  // Marshal the shared confirmed state
+  friend tls::ostream& operator<<(tls::ostream& out, const State& rhs);
+
   // Inner logic shared by Update, self-Update, and Remove handlers
-  template<typename Message>
   void update_leaf(uint32_t index,
                    const RatchetPath& path,
-                   const Message& message,
                    const optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
-  void derive_epoch_keys(bool add,
-                         const bytes& update_secret,
-                         const bytes& message);
+  void derive_epoch_keys(const bytes& update_secret);
 
   // Sign this state with the associated private key
   Handshake sign(const GroupOperation& operation) const;

@@ -14,8 +14,7 @@ State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
   , _epoch(zero_epoch)
   , _group_id(group_id)
   , _message_master_secret()
-  , _init_secret()
-  , _add_priv(DHPrivateKey::generate())
+  , _init_secret(zero_bytes(32))
   , _tree(random_bytes(32))
 {
   RawKeyCredential cred{ identity_priv.public_key() };
@@ -27,16 +26,21 @@ State::State(const SignaturePrivateKey& identity_priv,
              const Welcome& welcome,
              const Handshake& handshake)
   : _identity_priv(identity_priv)
-  , _add_priv(DHPrivateKey::generate()) // XXX(rlb@ipv.sx) dummy
+  , _group_id(welcome.group_id)
+  , _epoch(welcome.epoch + 1)
+  , _roster(welcome.roster)
+  , _tree(welcome.tree)
+  , _transcript(welcome.transcript)
+  , _index(welcome.tree.size())
+  , _init_secret(welcome.init_secret)
 {
   if (handshake.operation.type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  auto add = handshake.operation.add;
-
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
+  auto add = handshake.operation.add;
   auto init_priv = DHPrivateKey::derive(init_secret);
   auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
@@ -45,31 +49,14 @@ State::State(const SignaturePrivateKey& identity_priv,
     throw InvalidParameterError("Group add not targeted for this node");
   }
 
-  // Initialize per-participant state
-  _index = welcome.tree.size();
-  _identity_priv = identity_priv;
-
   // Initialize shared state
-  _group_id = welcome.group_id;
-  _epoch = welcome.epoch + 1;
-
   RawKeyCredential cred{ identity_key };
-  _roster = welcome.roster;
   _roster.add(cred);
+  update_leaf(_index, add.path, welcome.leaf_secret);
 
-  _tree = welcome.tree;
-  auto leaf_secret = init_priv.derive(welcome.add_key);
-  auto temp_path = _tree.encrypt(_index, leaf_secret);
-  _tree.decrypt(_index, temp_path);
-  _tree.merge(_index, temp_path);
-
-  // Initialize shared secret state
-  auto tree_secret = *(_tree.root().secret());
-  auto tree_priv = DHPrivateKey::derive(tree_secret);
-  auto update_secret = tree_priv.derive(welcome.add_key);
-  derive_epoch_keys(true, update_secret, tls::marshal(add));
-
-  // TODO verify the resulting state against the Add
+  if (!verify(handshake.signer_index, handshake.signature)) {
+    throw InvalidParameterError("Handshake signature failed to verify");
+  }
 }
 
 ///
@@ -83,11 +70,11 @@ State::add(const UserInitKey& user_init_key) const
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  auto leaf_secret = _add_priv.derive(user_init_key.init_keys[0]);
+  auto leaf_secret = random_bytes(32);
   auto path = _tree.encrypt(_tree.size(), leaf_secret);
 
-  Welcome welcome{ _group_id, _epoch,      _roster,
-                   _tree,     _transcript, _add_priv.public_key() };
+  Welcome welcome{ _group_id,   _epoch,       _roster,    _tree,
+                   _transcript, _init_secret, leaf_secret };
   auto add = sign(Add{ path, user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
@@ -119,23 +106,31 @@ State::handle(const Handshake& handshake) const
     throw InvalidParameterError("Epoch mismatch");
   }
 
-  auto next = *this;
-  next._epoch = _epoch + 1;
-
-  switch (handshake.operation.type) {
-    case GroupOperationType::add:
-      next.handle(handshake.operation.add);
-      break;
-    case GroupOperationType::update:
-      next.handle(handshake.signer_index, handshake.operation.update);
-      break;
-    case GroupOperationType::remove:
-      next.handle(handshake.signer_index, handshake.operation.remove);
-      break;
-  }
+  auto next = handle(handshake.signer_index, handshake.operation);
 
   if (!next.verify(handshake.signer_index, handshake.signature)) {
     throw InvalidParameterError("Invalid handshake message signature");
+  }
+
+  return next;
+}
+
+State
+State::handle(uint32_t signer_index, const GroupOperation& operation) const
+{
+  auto next = *this;
+  next._epoch = _epoch + 1;
+
+  switch (operation.type) {
+    case GroupOperationType::add:
+      next.handle(operation.add);
+      break;
+    case GroupOperationType::update:
+      next.handle(signer_index, operation.update);
+      break;
+    case GroupOperationType::remove:
+      next.handle(signer_index, operation.remove);
+      break;
   }
 
   return next;
@@ -154,9 +149,6 @@ State::handle(const Add& add)
   auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
 
-  auto leaf_data = _add_priv.derive(init_key);
-  auto leaf_key = DHPrivateKey::derive(leaf_data);
-
   auto tree_size = _tree.size();
   auto path = add.path;
   _tree.decrypt(tree_size, path);
@@ -167,9 +159,8 @@ State::handle(const Add& add)
   _roster.add(cred);
 
   // Update symmetric state
-  auto tree_key = _tree.root().public_key();
-  auto update_secret = _add_priv.derive(tree_key);
-  derive_epoch_keys(true, update_secret, tls::marshal(add));
+  auto update_secret = *(_tree.root().secret());
+  derive_epoch_keys(update_secret);
 }
 
 void
@@ -185,14 +176,14 @@ State::handle(uint32_t index, const Update& update)
     _cached_leaf_secret.resize(0);
   }
 
-  update_leaf(index, update.path, update, leaf_secret);
+  update_leaf(index, update.path, leaf_secret);
 }
 
 void
 State::handle(uint32_t index, const Remove& remove)
 {
   auto leaf_secret = std::experimental::nullopt;
-  update_leaf(remove.removed, remove.path, remove, leaf_secret);
+  update_leaf(remove.removed, remove.path, leaf_secret);
 
   _roster.copy(remove.removed, index);
 }
@@ -211,7 +202,6 @@ operator==(const State& lhs, const State& rhs)
   auto message_master_secret =
     (lhs._message_master_secret == rhs._message_master_secret);
   auto init_secret = (lhs._init_secret == rhs._init_secret);
-  auto add_priv = (lhs._add_priv == rhs._add_priv);
 
   // Uncomment for debug info
   /*
@@ -224,11 +214,10 @@ operator==(const State& lhs, const State& rhs)
             << "_tree " << ratchet_tree << std::endl
             << "_message_master_secret " << message_master_secret << std::endl
             << "_init_secret " << init_secret << std::endl
-            << "_add_priv " << add_priv << std::endl;
   */
 
   return epoch && group_id && roster && ratchet_tree && message_master_secret &&
-         init_secret && add_priv;
+         init_secret;
 }
 
 bool
@@ -237,11 +226,9 @@ operator!=(const State& lhs, const State& rhs)
   return !(lhs == rhs);
 }
 
-template<typename Message>
 void
 State::update_leaf(uint32_t index,
                    const RatchetPath& path,
-                   const Message& handshake,
                    const optional<bytes>& leaf_secret)
 {
   if (leaf_secret) {
@@ -253,46 +240,46 @@ State::update_leaf(uint32_t index,
   }
 
   auto update_secret = *(_tree.root().secret());
-  derive_epoch_keys(false, update_secret, tls::marshal(handshake));
+  derive_epoch_keys(update_secret);
 }
 
 void
-State::derive_epoch_keys(bool add,
-                         const bytes& update_secret,
-                         const bytes& message)
+State::derive_epoch_keys(const bytes& update_secret)
 {
-  auto init_secret = _init_secret;
-  if (add) {
-    // XXX(rlb@ipv.sx) Crypto agility; should be sized according to
-    // hash function in use.
-    init_secret = bytes(32, 0);
-  }
-
-  auto epoch_secret = hkdf_extract(init_secret, update_secret);
-
-  _message_master_secret =
-    derive_secret(epoch_secret, "msg", _group_id, _epoch, message);
-
-  _init_secret =
-    derive_secret(epoch_secret, "init", _group_id, _epoch, message);
-
-  auto add_secret =
-    derive_secret(epoch_secret, "add", _group_id, _epoch, message);
-
-  _add_priv = DHPrivateKey::derive(add_secret);
+  auto epoch_secret = hkdf_extract(_init_secret, update_secret);
+  _message_master_secret = derive_secret(epoch_secret, "msg", *this);
+  _init_secret = derive_secret(epoch_secret, "init", *this);
 }
 
 Handshake
 State::sign(const GroupOperation& operation) const
 {
-  return Handshake{ _epoch, operation, _index, bytes() };
+  auto next = handle(_index, operation);
+  auto tbs = tls::marshal(next);
+  auto sig = _identity_priv.sign(tbs);
+  return Handshake{ _epoch, operation, _index, sig };
 }
 
 bool
 State::verify(uint32_t signer_index, const bytes& signature) const
 {
-  // TODO
-  return true;
+  auto tbs = tls::marshal(*this);
+  auto pub = _roster.get(signer_index).public_key();
+  return pub.verify(tbs, signature);
+}
+
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   Credential roster<1..2^24-1>;
+//   PublicKey tree<1..2^24-1>;
+//   GroupOperation transcript<0..2^24-1>;
+// } GroupState;
+tls::ostream&
+operator<<(tls::ostream& out, const State& obj)
+{
+  return out << obj._group_id << obj._epoch << obj._roster << obj._tree
+             << obj._transcript;
 }
 
 } // namespace mls

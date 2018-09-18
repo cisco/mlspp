@@ -7,6 +7,7 @@
 #include "openssl/obj_mac.h"
 #include "openssl/rand.h"
 #include "openssl/sha.h"
+#include "state.h"
 
 #include <string>
 
@@ -163,25 +164,30 @@ hkdf_extract(const bytes& salt, const bytes& ikm)
 
 // struct {
 //     uint16 length = Length;
-//     opaque label<7..255> = "mls10 " + Label;
-//     opaque group_id<0..2^16-1> = ID;
-//     uint64 epoch = Epoch;
-//     opaque message<0..2^16-1> = Msg
+//     opaque label<6..255> = "mls10 " + Label;
+//     GroupState state = State;
 // } HkdfLabel;
 struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1, 7> label;
-  tls::opaque<2> group_id;
-  epoch_t epoch;
-  tls::opaque<2> message;
+  State group_state;
 };
 
 tls::ostream&
 operator<<(tls::ostream& out, const HKDFLabel& obj)
 {
-  return out << obj.length << obj.label << obj.group_id << obj.epoch
-             << obj.message;
+  return out << obj.length << obj.label << obj.group_state;
+}
+
+bytes
+zero_bytes(size_t size)
+{
+  bytes out(size);
+  for (auto& b : out) {
+    b = 0;
+  }
+  return out;
 }
 
 bytes
@@ -195,18 +201,12 @@ random_bytes(size_t size)
 }
 
 bytes
-derive_secret(const bytes& secret,
-              const std::string& label,
-              const bytes& group_id,
-              const epoch_t& epoch,
-              const bytes& message)
+derive_secret(const bytes& secret, const std::string& label, const State& state)
 {
   std::string mls_label = std::string("mls10 ") + label;
   bytes vec_label(mls_label.begin(), mls_label.end());
 
-  HKDFLabel label_str{
-    SHA256_DIGEST_LENGTH, vec_label, group_id, epoch, message
-  };
+  HKDFLabel label_str{ SHA256_DIGEST_LENGTH, vec_label, state };
 
   auto hkdf_label = tls::marshal(label_str);
 

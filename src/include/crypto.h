@@ -115,17 +115,20 @@ private:
 };
 
 bytes
+zero_bytes(size_t size);
+
+bytes
 random_bytes(size_t size);
 
 bytes
 hkdf_extract(const bytes& salt, const bytes& ikm);
 
+class State;
+
 bytes
 derive_secret(const bytes& secret,
               const std::string& label,
-              const bytes& group_id,
-              const epoch_t& epoch,
-              const bytes& message);
+              const State& state);
 
 class AESGCM
 {

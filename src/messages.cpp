@@ -57,21 +57,23 @@ operator==(const Welcome& lhs, const Welcome& rhs)
 {
   return (lhs.group_id == rhs.group_id) && (lhs.epoch == rhs.epoch) &&
          (lhs.roster == rhs.roster) && (lhs.tree == rhs.tree) &&
-         (lhs.transcript == rhs.transcript) && (lhs.add_key == rhs.add_key);
+         (lhs.transcript == rhs.transcript) &&
+         (lhs.init_secret == rhs.init_secret) &&
+         (lhs.leaf_secret == rhs.leaf_secret);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Welcome& obj)
 {
   return out << obj.group_id << obj.epoch << obj.roster << obj.tree
-             << obj.transcript << obj.add_key;
+             << obj.transcript << obj.init_secret << obj.leaf_secret;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Welcome& obj)
 {
   return in >> obj.group_id >> obj.epoch >> obj.roster >> obj.tree >>
-         obj.transcript >> obj.add_key;
+         obj.transcript >> obj.init_secret >> obj.leaf_secret;
 }
 
 // GroupOperationType

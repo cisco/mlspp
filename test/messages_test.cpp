@@ -45,7 +45,7 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("Welcome")
   {
-    Welcome welcome{ random, 0x42, roster, ratchet_tree, {}, dh_pub };
+    Welcome welcome{ random, 0x42, roster, ratchet_tree, {}, random, random };
     tls_round_trip(welcome);
   }
 

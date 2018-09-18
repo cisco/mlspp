@@ -52,7 +52,8 @@ struct Welcome
   Roster roster;
   RatchetTree tree;
   tls::vector<GroupOperation, 3> transcript;
-  DHPublicKey add_key; // XXX replace with init + leaf secret
+  tls::opaque<1> init_secret;
+  tls::opaque<1> leaf_secret;
 };
 
 bool
