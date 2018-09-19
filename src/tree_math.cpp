@@ -31,10 +31,16 @@ level(uint32_t x)
   return k;
 }
 
-static uint32_t
+uint32_t
 node_width(uint32_t n)
 {
   return 2 * (n - 1) + 1;
+}
+
+uint32_t
+size_from_width(uint32_t w)
+{
+  return (w >> 1) + 1;
 }
 
 uint32_t

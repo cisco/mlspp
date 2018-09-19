@@ -2,8 +2,8 @@
 
 #include "crypto.h"
 #include "messages.h"
-#include "nodes.h"
-#include "tree.h"
+#include "ratchet_tree.h"
+#include "roster.h"
 #include <vector>
 
 namespace mls {
@@ -22,135 +22,88 @@ public:
   // Initialize an empty group
   State(const bytes& group_id, const SignaturePrivateKey& identity_priv);
 
-  // Initialize a group from a GroupAdd (for group-initiated join)
+  // Initialize a group from a Add (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
-        const DHPrivateKey& init_priv,
-        const Handshake<GroupAdd>& group_add);
-
-  // Initialize a state from a UserAdd (for user-initiated join)
-  State(const SignaturePrivateKey& identity_priv,
-        const DHPrivateKey& leaf_priv,
-        const Handshake<UserAdd>& user_add,
-        const GroupInitKey& group_init_key);
+        const bytes& init_secret,
+        const Welcome& welcome,
+        const Handshake& handshake);
 
   ///
   /// Message factories
   ///
 
-  // Generate a UserAdd (for user-initiated join)
-  // Note that this method is static.  Because this participant is
-  // not yet joined, it has no pre-existing state
-  //
-  // XXX(rlb@ipv.sx): We could represent the collection of
-  // pre-existing / cached keys (identity, leaf, init) as some sort
-  // of pre-join state.
-  static Handshake<UserAdd> join(const SignaturePrivateKey& identity_priv,
-                                 const DHPrivateKey& leaf_priv,
-                                 const GroupInitKey& group_init_key);
-
-  // Generate a GroupAdd message (for group-initiated join)
-  Handshake<GroupAdd> add(const UserInitKey& user_init_key) const;
+  // Generate a Add message (for group-initiated join)
+  std::pair<Welcome, Handshake> add(const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  Handshake<Update> update(DHPrivateKey leaf_key) const;
+  Handshake update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake<Remove> remove(uint32_t index) const;
-
-  // Generate a group init key representing the current state
-  GroupInitKey group_init_key() const;
+  Handshake remove(uint32_t index) const;
 
   ///
-  /// Message handlers
+  /// Generic handshake message handler
   ///
 
-  // XXX(rlb@ipv.sx) We might want for these to produce a new state,
-  // rather than modifying the current one, given that we will
-  // probably want to keep old states around.  That could also be
-  // done a little more explicitly with a copy constructor.
+  // Handle a Handshake message
+  State handle(const Handshake& handshake) const;
 
-  // Handle a UserAdd (for existing participants only)
-  State handle(const Handshake<UserAdd>& user_add) const;
+  ///
+  /// Specific operation handlers
+  ///
+  /// XXX(rlb@ipv.sx) These can probably be private
+  ///
+  State handle(uint32_t signer_index, const GroupOperation& operation) const;
 
-  // Handle a GroupAdd (for existing participants only)
-  State handle(const Handshake<GroupAdd>& group_add) const;
+  // Handle a Add (for existing participants only)
+  void handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
-  State handle(const Handshake<Update>& update,
-               const DHPrivateKey& leaf_priv) const;
-
-  // Handle an Update (for the other participants)
-  State handle(const Handshake<Update>& update) const;
+  void handle(uint32_t index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  State handle(const Handshake<Remove>& remove) const;
+  void handle(uint32_t index, const Remove& remove);
 
-  epoch_t prior_epoch() const { return _prior_epoch; }
   epoch_t epoch() const { return _epoch; }
+  uint32_t index() const { return _index; }
 
 private:
-  uint32_t _index;
-  DHPrivateKey _leaf_priv;
-  SignaturePrivateKey _identity_priv;
-
-  epoch_t _prior_epoch;
-  epoch_t _epoch;
+  // Shared confirmed state:
   tls::opaque<2> _group_id;
-  Tree<MerkleNode> _identity_tree;
-  Tree<RatchetNode> _ratchet_tree;
+  epoch_t _epoch;
+  Roster _roster;
+  RatchetTree _tree;
+  tls::vector<GroupOperation, 3> _transcript;
 
+  // Shared secret state
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
-  DHPrivateKey _add_priv;
 
-  // Used to construct an ephemeral state while creating a UserAdd
-  State(const SignaturePrivateKey& identity_priv,
-        const DHPrivateKey& leaf_priv,
-        const GroupInitKey& group_init_key);
+  // Per-participant state
+  uint32_t _index;
+  SignaturePrivateKey _identity_priv;
+  bytes _cached_leaf_secret;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
-  // Serialize a state for storage
-  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
-  friend tls::istream& operator>>(tls::istream& in, State& obj);
-
-  // Spawn a new state (with a fresh epoch) from this state
-  State spawn(const epoch_t& epoch) const;
-
-  // Inner logic for UserAdd and GroupInitKey constructors
-  template<typename Message>
-  void init_from_details(const SignaturePrivateKey& identity_priv,
-                         const DHPrivateKey& leaf_priv,
-                         const GroupInitKey& group_init_key,
-                         const Handshake<Message>& message);
-
-  // Inner logic shared by UserAdd and GroupAdd handlers
-  template<typename Message>
-  void add_inner(const SignaturePublicKey& identity_key,
-                 const Handshake<Message>& message);
+  // Marshal the shared confirmed state
+  friend tls::ostream& operator<<(tls::ostream& out, const State& rhs);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
-  template<typename Message>
   void update_leaf(uint32_t index,
-                   const std::vector<RatchetNode>& path,
-                   const Handshake<Message>& message,
-                   const optional<DHPrivateKey>& leaf_priv);
+                   const RatchetPath& path,
+                   const optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
-  void derive_epoch_keys(bool add,
-                         const bytes& update_secret,
-                         const bytes& message);
+  void derive_epoch_keys(const bytes& update_secret);
 
-  // Create a signed Handshake message, given a payload
-  template<typename T>
-  Handshake<T> sign(const T& body) const;
+  // Sign this state with the associated private key
+  Handshake sign(const GroupOperation& operation) const;
 
-  // Verify a signed Handshake message against the list of
-  // participants for the current epoch
-  template<typename T>
-  bool verify_now(const Handshake<T>& message) const;
+  // Verify this state with the indicated public key
+  bool verify(uint32_t signer_index, const bytes& signature) const;
 };
 
 } // namespace mls

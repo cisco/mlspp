@@ -32,6 +32,13 @@ namespace mls {
 // Internal namespace to keep these generic names clean
 namespace tree_math {
 
+// Tree size properties
+uint32_t
+node_width(uint32_t n);
+
+uint32_t
+size_from_width(uint32_t w);
+
 // Node relationships
 uint32_t
 root(uint32_t n);

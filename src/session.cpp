@@ -5,26 +5,26 @@ namespace mls {
 
 Session::Session(const bytes& group_id,
                  const SignaturePrivateKey& identity_priv)
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
   State root(group_id, identity_priv);
-  add_state(root);
+  add_state(0, root);
   make_init_key();
 }
 
 Session::Session(const SignaturePrivateKey& identity_priv)
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
   make_init_key();
 }
 
 Session::Session()
-  : _init_priv(DHPrivateKey::generate())
-  , _next_leaf_priv(DHPrivateKey::generate())
+  : _init_secret(random_bytes(32))
+  , _next_leaf_secret(random_bytes(32))
   , _identity_priv(SignaturePrivateKey::generate())
 {
   make_init_key();
@@ -56,36 +56,21 @@ Session::user_init_key() const
   return _user_init_key;
 }
 
-bytes
-Session::group_init_key() const
-{
-  auto group_init_key = current_state().group_init_key();
-  return tls::marshal(group_init_key);
-}
-
-bytes
-Session::join(const bytes& group_init_key_bytes)
-{
-  _group_init_key = group_init_key_bytes;
-  GroupInitKey group_init_key;
-  tls::unmarshal(group_init_key_bytes, group_init_key);
-  auto user_add = State::join(_identity_priv, _init_priv, group_init_key);
-  return tls::marshal(user_add);
-}
-
-bytes
+std::pair<bytes, bytes>
 Session::add(const bytes& user_init_key_bytes) const
 {
   UserInitKey user_init_key;
   tls::unmarshal(user_init_key_bytes, user_init_key);
-  auto group_add = current_state().add(user_init_key);
-  return tls::marshal(group_add);
+  auto welcome_add = current_state().add(user_init_key);
+  auto welcome = tls::marshal(welcome_add.first);
+  auto add = tls::marshal(welcome_add.second);
+  return std::pair<bytes, bytes>(welcome, add);
 }
 
 bytes
-Session::update() const
+Session::update()
 {
-  auto update = current_state().update(_next_leaf_priv);
+  auto update = current_state().update(_next_leaf_secret);
   return tls::marshal(update);
 }
 
@@ -97,78 +82,48 @@ Session::remove(uint32_t index) const
 }
 
 void
-Session::handle(const bytes& handshake)
+Session::join(const bytes& welcome_data, const bytes& add_data)
 {
-  auto type = HandshakeType(handshake[0]);
-  switch (type) {
-    case HandshakeType::user_add: {
-      Handshake<UserAdd> user_add;
-      tls::unmarshal(handshake, user_add);
+  Welcome welcome;
+  tls::unmarshal(welcome_data, welcome);
 
-      if (_state.size() == 0) {
-        // NB: Assumes that join() has been called previously
-        GroupInitKey group_init_key;
-        tls::unmarshal(_group_init_key, group_init_key);
-        add_state(State(_identity_priv, _init_priv, user_add, group_init_key));
-      } else {
-        add_state(current_state().handle(user_add));
-      }
-    } break;
+  Handshake add;
+  tls::unmarshal(add_data, add);
 
-    case HandshakeType::group_add: {
-      Handshake<GroupAdd> group_add;
-      tls::unmarshal(handshake, group_add);
+  State next(_identity_priv, _init_secret, welcome, add);
+  add_state(add.prior_epoch, next);
+}
 
-      if (_state.size() == 0) {
-        add_state(State(_identity_priv, _init_priv, group_add));
-      } else {
-        add_state(current_state().handle(group_add));
-      }
-    } break;
+void
+Session::handle(const bytes& data)
+{
+  Handshake handshake;
+  tls::unmarshal(data, handshake);
 
-    case HandshakeType::update: {
-      Handshake<Update> update;
-      tls::unmarshal(handshake, update);
-
-      if (update.message.path.back() == _next_leaf_priv.public_key()) {
-        add_state(current_state().handle(update, _next_leaf_priv));
-        _next_leaf_priv = std::move(DHPrivateKey::generate());
-      } else {
-        add_state(current_state().handle(update));
-      }
-
-    } break;
-
-    case HandshakeType::remove: {
-      Handshake<Remove> remove;
-      tls::unmarshal(handshake, remove);
-      add_state(current_state().handle(remove));
-    } break;
-
-    default:
-      throw InvalidMessageTypeError("Unknown HandshakeType");
-  }
+  auto next = current_state().handle(handshake);
+  add_state(handshake.prior_epoch, next);
 }
 
 void
 Session::make_init_key()
 {
+  auto init_priv = DHPrivateKey::derive(_init_secret);
   auto user_init_key = UserInitKey{
-    {},                         // No cipher suites
-    { _init_priv.public_key() } // One init key
+    {},                        // No cipher suites
+    { init_priv.public_key() } // One init key
   };
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }
 
 void
-Session::add_state(const State& state)
+Session::add_state(epoch_t prior_epoch, const State& state)
 {
   // XXX(rlb@ipv.sx) Assumes no epoch collisions
   _state.emplace(state.epoch(), state);
 
   // XXX(rlb@ipv.sx) First successor updates the head pointer
-  if (_current_epoch == state.prior_epoch() || _state.size() == 1) {
+  if (prior_epoch == _current_epoch || _state.size() == 1) {
     _current_epoch = state.epoch();
   }
 }
@@ -191,20 +146,6 @@ Session::current_state()
   }
 
   return _state.at(_current_epoch);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Session& obj)
-{
-  return out << obj._next_leaf_priv << obj._init_priv << obj._user_init_key
-             << obj._identity_priv << obj._state << obj._current_epoch;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Session& obj)
-{
-  return in >> obj._next_leaf_priv >> obj._init_priv >> obj._user_init_key >>
-         obj._identity_priv >> obj._state >> obj._current_epoch;
 }
 
 } // namespace mls

@@ -10,100 +10,61 @@ TEST_CASE("Group creation", "[state]")
 {
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<UserInitKey> user_init_keys;
-  std::vector<DHPrivateKey> init_privs;
+  std::vector<bytes> init_secrets;
   std::vector<State> states;
 
   identity_privs.reserve(group_size);
   user_init_keys.reserve(group_size);
-  init_privs.reserve(group_size);
+  init_secrets.reserve(group_size);
   states.reserve(group_size);
 
   auto idp = identity_privs.begin();
   auto uik = user_init_keys.begin();
-  auto inp = init_privs.begin();
+  auto inp = init_secrets.begin();
   auto stp = states.begin();
   for (size_t i = 0; i < group_size; i += 1) {
     identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
-    auto init_priv = DHPrivateKey::generate();
+    auto init_secret = random_bytes(32);
+    auto init_priv = DHPrivateKey::derive(init_secret);
     user_init_keys.emplace(uik + i);
     user_init_keys[i].init_keys = { init_priv.public_key() };
     user_init_keys[i].sign(identity_privs[i]);
-    init_privs.emplace(inp + i, init_priv);
+    init_secrets.emplace(inp + i, init_secret);
   }
 
-  SECTION("Two person, group-initiated")
+  SECTION("Two person")
   {
     // Initialize the creator's state
     states.emplace(stp, group_id, identity_privs[0]);
 
-    // Create a GroupAdd for the new participant
-    auto group_add = states[0].add(user_init_keys[1]);
-    auto group_init_key = states[0].group_init_key();
+    // Create a Add for the new participant
+    auto welcome_add = states[0].add(user_init_keys[1]);
+    auto welcome = welcome_add.first;
+    auto add = welcome_add.second;
 
-    // Process the GroupAdd
-    states[0] = states[0].handle(group_add);
-    states.emplace(stp + 1, identity_privs[1], init_privs[1], group_add);
+    // Process the Add
+    states[0] = states[0].handle(add);
+    states.emplace(stp + 1, identity_privs[1], init_secrets[1], welcome, add);
 
     REQUIRE(states[0] == states[1]);
   }
 
-  SECTION("Two person, user-initiated")
-  {
-    // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
-
-    // Create a UserAdd for the new participant
-    auto group_init_key = states[0].group_init_key();
-    auto user_add =
-      State::join(identity_privs[1], init_privs[1], group_init_key);
-
-    // Process the UserAdd
-    states[0] = states[0].handle(user_add);
-    states.emplace(
-      stp + 1, identity_privs[1], init_privs[1], user_add, group_init_key);
-    REQUIRE(states[0] == states[1]);
-  }
-
-  SECTION("Full size, group-initiated")
+  SECTION("Full size")
   {
     // Initialize the creator's state
     states.emplace(stp, group_id, identity_privs[0]);
 
     // Each participant invites the next
     for (size_t i = 1; i < group_size; i += 1) {
-      auto group_add = states[i - 1].add(user_init_keys[i]);
-      auto group_init_key = states[i - 1].group_init_key();
+      auto welcome_add = states[i - 1].add(user_init_keys[i]);
+      auto welcome = welcome_add.first;
+      auto add = welcome_add.second;
 
       for (auto& state : states) {
-        state = state.handle(group_add);
+        state = state.handle(add);
       }
 
-      states.emplace(stp + i, identity_privs[i], init_privs[i], group_add);
-
-      // Check that everyone ended up in the same place
-      for (const auto& state : states) {
-        REQUIRE(state == states[0]);
-      }
-    }
-  }
-
-  SECTION("Full size, user-initiated")
-  {
-    // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
-
-    // Participants add themselves in order
-    for (size_t i = 1; i < group_size; i += 1) {
-      auto group_init_key = states[i - 1].group_init_key();
-      auto user_add =
-        State::join(identity_privs[i], init_privs[i], group_init_key);
-
-      for (auto& state : states) {
-        state = state.handle(user_add);
-      }
-
-      states.emplace(
-        stp + i, identity_privs[i], init_privs[i], user_add, group_init_key);
+      states.emplace(stp + i, identity_privs[i], init_secrets[i], welcome, add);
 
       // Check that everyone ended up in the same place
       for (const auto& state : states) {
@@ -122,60 +83,38 @@ TEST_CASE("Operations on a running group", "[state]")
   states.emplace(stp, group_id, SignaturePrivateKey::generate());
 
   for (size_t i = 1; i < group_size; i += 1) {
+    auto init_secret = random_bytes(32);
+    auto init_priv = DHPrivateKey::derive(init_secret);
     auto identity_priv = SignaturePrivateKey::generate();
-    auto leaf_priv = DHPrivateKey::generate();
-    auto group_init_key = states[i - 1].group_init_key();
-    auto user_add = State::join(identity_priv, leaf_priv, group_init_key);
 
+    UserInitKey uik;
+    uik.init_keys = { init_priv.public_key() };
+    uik.sign(identity_priv);
+
+    auto welcome_add = states[0].add(uik);
     for (auto& state : states) {
-      state = state.handle(user_add);
+      state = state.handle(welcome_add.second);
     }
 
-    states.emplace(stp + i, identity_priv, leaf_priv, user_add, group_init_key);
+    states.emplace(stp + i,
+                   identity_priv,
+                   init_secret,
+                   welcome_add.first,
+                   welcome_add.second);
   }
 
   for (const auto& state : states) {
     REQUIRE(state == states[0]);
   }
 
-  SECTION("TLS marshal / unmarshal round trip, followed by update")
-  {
-    for (auto& state : states) {
-      State temp;
-      tls::unmarshal(tls::marshal(state), temp);
-      state = temp;
-    }
-
-    for (size_t i = 0; i < group_size; i += 1) {
-      auto new_leaf = DHPrivateKey::generate();
-      auto update = states[i].update(new_leaf);
-
-      for (size_t j = 0; j < group_size; j += 1) {
-        if (i == j) {
-          states[j] = states[j].handle(update, new_leaf);
-        } else {
-          states[j] = states[j].handle(update);
-        }
-      }
-
-      for (const auto& state : states) {
-        REQUIRE(state == states[0]);
-      }
-    }
-  }
-
   SECTION("Each node can update its leaf key")
   {
     for (size_t i = 0; i < group_size; i += 1) {
-      auto new_leaf = DHPrivateKey::generate();
+      auto new_leaf = random_bytes(32);
       auto update = states[i].update(new_leaf);
 
       for (size_t j = 0; j < group_size; j += 1) {
-        if (i == j) {
-          states[j] = states[j].handle(update, new_leaf);
-        } else {
-          states[j] = states[j].handle(update);
-        }
+        states[j] = states[j].handle(update);
       }
 
       for (const auto& state : states) {
@@ -196,15 +135,6 @@ TEST_CASE("Operations on a running group", "[state]")
       for (size_t j = 0; j < i; j += 1) {
         REQUIRE(states[j] == states[0]);
       }
-    }
-  }
-
-  SECTION("Each node's state survives a TLS marshal/unmarshal")
-  {
-    for (const auto& before : states) {
-      State after;
-      tls::unmarshal(tls::marshal(before), after);
-      REQUIRE(after == before);
     }
   }
 }

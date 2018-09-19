@@ -5,7 +5,9 @@
 #include "openssl/err.h"
 #include "openssl/hmac.h"
 #include "openssl/obj_mac.h"
+#include "openssl/rand.h"
 #include "openssl/sha.h"
+#include "state.h"
 
 #include <string>
 
@@ -162,50 +164,182 @@ hkdf_extract(const bytes& salt, const bytes& ikm)
 
 // struct {
 //     uint16 length = Length;
-//     opaque label<7..255> = "mls10 " + Label;
-//     opaque group_id<0..2^16-1> = ID;
-//     uint64 epoch = Epoch;
-//     opaque message<0..2^16-1> = Msg
+//     opaque label<6..255> = "mls10 " + Label;
+//     GroupState state = State;
 // } HkdfLabel;
 struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1, 7> label;
-  tls::opaque<2> group_id;
-  epoch_t epoch;
-  tls::opaque<2> message;
+  State group_state;
 };
 
 tls::ostream&
 operator<<(tls::ostream& out, const HKDFLabel& obj)
 {
-  return out << obj.length << obj.label << obj.group_id << obj.epoch
-             << obj.message;
+  return out << obj.length << obj.label << obj.group_state;
+}
+
+bytes
+zero_bytes(size_t size)
+{
+  bytes out(size);
+  for (auto& b : out) {
+    b = 0;
+  }
+  return out;
+}
+
+bytes
+random_bytes(size_t size)
+{
+  bytes out(size);
+  if (!RAND_bytes(out.data(), out.size())) {
+    throw OpenSSLError::current();
+  }
+  return out;
+}
+
+// XXX: This method requires that size <= Hash.length, so that
+// HKDF-Expand(Secret, Label) reduces to:
+//
+//   HMAC(Secret, Label || 0x01)
+template<typename T>
+static bytes
+hkdf_expand(const bytes& secret, const T& info, size_t size)
+{
+  auto label = tls::marshal(info);
+  label.push_back(0x01);
+  auto mac = hmac_sha256(secret, label);
+  mac.resize(size);
+  return mac;
 }
 
 bytes
 derive_secret(const bytes& secret,
               const std::string& label,
-              const bytes& group_id,
-              const epoch_t& epoch,
-              const bytes& message)
+              const State& state,
+              size_t size)
 {
   std::string mls_label = std::string("mls10 ") + label;
   bytes vec_label(mls_label.begin(), mls_label.end());
 
-  HKDFLabel label_str{
-    SHA256_DIGEST_LENGTH, vec_label, group_id, epoch, message
-  };
+  HKDFLabel label_str{ uint16_t(size), vec_label, state };
+  return hkdf_expand(secret, label_str, size);
+}
 
-  auto hkdf_label = tls::marshal(label_str);
+///
+/// AESGCM
+///
 
-  // We always extract Hash.length octets of output, in which case,
-  // HKDF-Expand(Secret, Label) reduces to:
-  //
-  //   HMAC(secret, Label || 0x01)
-  //
-  hkdf_label.push_back(0x01);
-  return hmac_sha256(secret, hkdf_label);
+AESGCM::AESGCM(const bytes& key, const bytes& nonce)
+{
+  switch (key.size()) {
+    case key_size_128:
+      _cipher = EVP_aes_128_gcm();
+      break;
+    case key_size_192:
+      _cipher = EVP_aes_192_gcm();
+      break;
+    case key_size_256:
+      _cipher = EVP_aes_256_gcm();
+      break;
+    default:
+      throw InvalidParameterError("Invalid AES key size");
+  }
+
+  if (nonce.size() != nonce_size) {
+    throw InvalidParameterError("Invalid AES-GCM nonce size");
+  }
+
+  _key = key;
+  _nonce = nonce;
+}
+
+void
+AESGCM::set_aad(const bytes& aad)
+{
+  _aad = aad;
+}
+
+bytes
+AESGCM::encrypt(const bytes& pt) const
+{
+  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  if (ctx.get() == nullptr) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_EncryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+    throw OpenSSLError::current();
+  }
+
+  int outlen = pt.size() + tag_size;
+  bytes ct(pt.size() + tag_size);
+
+  if (_aad.size() > 0) {
+    if (!EVP_EncryptUpdate(
+          ctx.get(), nullptr, &outlen, _aad.data(), _aad.size())) {
+      throw OpenSSLError::current();
+    }
+  }
+
+  if (!EVP_EncryptUpdate(ctx.get(), ct.data(), &outlen, pt.data(), pt.size())) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_EncryptFinal(ctx.get(), ct.data() + pt.size(), &outlen)) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_CIPHER_CTX_ctrl(
+        ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, ct.data() + pt.size())) {
+    throw OpenSSLError::current();
+  }
+
+  return ct;
+}
+
+bytes
+AESGCM::decrypt(const bytes& ct) const
+{
+  if (ct.size() < tag_size) {
+    throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
+  }
+
+  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  if (ctx.get() == nullptr) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_DecryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+    throw OpenSSLError::current();
+  }
+
+  uint8_t* tag = const_cast<uint8_t*>(ct.data() + ct.size() - tag_size);
+  if (!EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag)) {
+    throw OpenSSLError::current();
+  }
+
+  int dummy;
+  if (_aad.size() > 0) {
+    if (!EVP_DecryptUpdate(
+          ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+      throw OpenSSLError::current();
+    }
+  }
+
+  bytes pt(ct.size() - tag_size);
+  if (!EVP_DecryptUpdate(
+        ctx.get(), pt.data(), &dummy, ct.data(), ct.size() - tag_size)) {
+    throw OpenSSLError::current();
+  }
+
+  if (!EVP_DecryptFinal(ctx.get(), pt.data() + ct.size() - tag_size, &dummy)) {
+    throw OpenSSLError::current();
+  }
+
+  return pt;
 }
 
 ///
@@ -246,6 +380,14 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
+  if (_key.get() == nullptr && other._key.get() == nullptr) {
+    return true;
+  } else if (_key.get() == nullptr) {
+    return false;
+  } else if (other._key.get() == nullptr) {
+    return false;
+  }
+
   // Raw pointers OK here because get0 methods return pointers to
   // memory managed by the EC_KEY.
   const EC_GROUP* group = EC_KEY_get0_group(_key.get());
@@ -294,6 +436,57 @@ DHPublicKey::reset(const bytes& data)
   }
 
   _key = key;
+}
+
+// key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
+// nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
+//
+// Where ECIESLabel is specified as:
+//
+// struct {
+//   uint16 length = Length;
+//   opaque label<12..255> = "mls10 ecies " + Label;
+// } ECIESLabel;
+struct ECIESLabel
+{
+  uint16_t length;
+  tls::opaque<1, 12> label;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const ECIESLabel& obj)
+{
+  return out << obj.length << obj.label;
+}
+
+static std::pair<bytes, bytes>
+derive_ecies_secrets(const bytes& shared_secret)
+{
+  std::string key_label_str{ "mls10 ecies key" };
+  bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
+  HKDFLabel key_label{ AESGCM::key_size_128, key_label_vec };
+  auto key = hkdf_expand(shared_secret, key_label, AESGCM::key_size_128);
+
+  std::string nonce_label_str{ "mls10 ecies nonce" };
+  bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
+  HKDFLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
+  auto nonce = hkdf_expand(shared_secret, nonce_label, AESGCM::nonce_size);
+
+  return std::pair<bytes, bytes>(key, nonce);
+}
+
+ECIESCiphertext
+DHPublicKey::encrypt(const bytes& plaintext) const
+{
+  auto ephemeral = DHPrivateKey::generate();
+  auto shared_secret = ephemeral.derive(*this);
+
+  bytes key, nonce;
+  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+
+  AESGCM gcm(key, nonce);
+  auto content = gcm.encrypt(plaintext);
+  return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
 DHPublicKey::DHPublicKey(const EC_POINT* pt)
@@ -408,7 +601,7 @@ DHPrivateKey::operator!=(const DHPrivateKey& other) const
 }
 
 bytes
-DHPrivateKey::derive(DHPublicKey pub) const
+DHPrivateKey::derive(const DHPublicKey& pub) const
 {
   bytes out(DH_OUTPUT_BYTES);
   // ECDH_compute_key shouldn't modify the private key, but it's
@@ -429,6 +622,18 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
   : _key(key)
   , _pub(EC_KEY_get0_public_key(key))
 {}
+
+bytes
+DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
+{
+  auto shared_secret = derive(ciphertext.ephemeral);
+
+  bytes key, nonce;
+  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+
+  AESGCM gcm(key, nonce);
+  return gcm.decrypt(ciphertext.content);
+}
 
 tls::ostream&
 operator<<(tls::ostream& out, const DHPrivateKey& obj)
@@ -465,6 +670,22 @@ operator>>(tls::istream& in, DHPrivateKey& obj)
 
   obj = DHPrivateKey(key.release());
   return in;
+}
+
+///
+/// ECIESCiphertext
+///
+
+tls::ostream&
+operator<<(tls::ostream& out, const ECIESCiphertext& obj)
+{
+  return out << obj.ephemeral << obj.content;
+}
+
+tls::istream&
+operator>>(tls::istream& in, ECIESCiphertext& obj)
+{
+  return in >> obj.ephemeral >> obj.content;
 }
 
 ///
