@@ -200,23 +200,32 @@ random_bytes(size_t size)
   return out;
 }
 
+// XXX: This method requires that size <= Hash.length, so that
+// HKDF-Expand(Secret, Label) reduces to:
+//
+//   HMAC(Secret, Label || 0x01)
+template<typename T>
+static bytes
+hkdf_expand(const bytes& secret, const T& info, size_t size)
+{
+  auto label = tls::marshal(info);
+  label.push_back(0x01);
+  auto mac = hmac_sha256(secret, label);
+  mac.resize(size);
+  return mac;
+}
+
 bytes
-derive_secret(const bytes& secret, const std::string& label, const State& state)
+derive_secret(const bytes& secret,
+              const std::string& label,
+              const State& state,
+              size_t size)
 {
   std::string mls_label = std::string("mls10 ") + label;
   bytes vec_label(mls_label.begin(), mls_label.end());
 
-  HKDFLabel label_str{ SHA256_DIGEST_LENGTH, vec_label, state };
-
-  auto hkdf_label = tls::marshal(label_str);
-
-  // We always extract Hash.length octets of output, in which case,
-  // HKDF-Expand(Secret, Label) reduces to:
-  //
-  //   HMAC(secret, Label || 0x01)
-  //
-  hkdf_label.push_back(0x01);
-  return hmac_sha256(secret, hkdf_label);
+  HKDFLabel label_str{ uint16_t(size), vec_label, state };
+  return hkdf_expand(secret, label_str, size);
 }
 
 ///
@@ -429,16 +438,51 @@ DHPublicKey::reset(const bytes& data)
   _key = key;
 }
 
+// key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
+// nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
+//
+// Where ECIESLabel is specified as:
+//
+// struct {
+//   uint16 length = Length;
+//   opaque label<12..255> = "mls10 ecies " + Label;
+// } ECIESLabel;
+struct ECIESLabel
+{
+  uint16_t length;
+  tls::opaque<1, 12> label;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const ECIESLabel& obj)
+{
+  return out << obj.length << obj.label;
+}
+
+static std::pair<bytes, bytes>
+derive_ecies_secrets(const bytes& shared_secret)
+{
+  std::string key_label_str{ "mls10 ecies key" };
+  bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
+  HKDFLabel key_label{ AESGCM::key_size_128, key_label_vec };
+  auto key = hkdf_expand(shared_secret, key_label, AESGCM::key_size_128);
+
+  std::string nonce_label_str{ "mls10 ecies nonce" };
+  bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
+  HKDFLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
+  auto nonce = hkdf_expand(shared_secret, nonce_label, AESGCM::nonce_size);
+
+  return std::pair<bytes, bytes>(key, nonce);
+}
+
 ECIESCiphertext
 DHPublicKey::encrypt(const bytes& plaintext) const
 {
   auto ephemeral = DHPrivateKey::generate();
-  auto zz = ephemeral.derive(*this);
+  auto shared_secret = ephemeral.derive(*this);
 
-  auto key = SHA256Digest(0x00).write(zz).digest();
-  key.resize(AESGCM::key_size_128);
-  auto nonce = SHA256Digest(0x01).write(zz).digest();
-  nonce.resize(AESGCM::nonce_size);
+  bytes key, nonce;
+  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
 
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
@@ -582,12 +626,10 @@ DHPrivateKey::DHPrivateKey(EC_KEY* key)
 bytes
 DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 {
-  auto zz = derive(ciphertext.ephemeral);
+  auto shared_secret = derive(ciphertext.ephemeral);
 
-  auto key = SHA256Digest(0x00).write(zz).digest();
-  key.resize(AESGCM::key_size_128);
-  auto nonce = SHA256Digest(0x01).write(zz).digest();
-  nonce.resize(AESGCM::nonce_size);
+  bytes key, nonce;
+  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);

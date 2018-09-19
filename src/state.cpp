@@ -247,8 +247,10 @@ void
 State::derive_epoch_keys(const bytes& update_secret)
 {
   auto epoch_secret = hkdf_extract(_init_secret, update_secret);
-  _message_master_secret = derive_secret(epoch_secret, "msg", *this);
-  _init_secret = derive_secret(epoch_secret, "init", *this);
+  _message_master_secret =
+    derive_secret(epoch_secret, "msg", *this, SHA256Digest::output_size);
+  _init_secret =
+    derive_secret(epoch_secret, "init", *this, SHA256Digest::output_size);
 }
 
 Handshake

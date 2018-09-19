@@ -110,6 +110,8 @@ public:
   SHA256Digest& write(const bytes& data);
   bytes digest();
 
+  static const size_t output_size = 32;
+
 private:
   SHA256_CTX _ctx;
 };
@@ -128,7 +130,8 @@ class State;
 bytes
 derive_secret(const bytes& secret,
               const std::string& label,
-              const State& state);
+              const State& state,
+              const size_t length);
 
 class AESGCM
 {
