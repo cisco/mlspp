@@ -3,6 +3,7 @@
 #include "openssl/ecdh.h"
 #include "openssl/ecdsa.h"
 #include "openssl/err.h"
+#include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/obj_mac.h"
 #include "openssl/rand.h"
@@ -22,6 +23,20 @@ OpenSSLError::current()
 {
   unsigned long code = ERR_get_error();
   return OpenSSLError(ERR_error_string(code, nullptr));
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
 }
 
 template<>
@@ -71,6 +86,29 @@ EC_GROUP*
 TypedDup(EC_GROUP* ptr)
 {
   return EC_GROUP_dup(ptr);
+}
+
+template<>
+EVP_PKEY*
+TypedDup(EVP_PKEY* ptr)
+{
+
+  size_t raw_len = 0;
+  if (1 == EVP_PKEY_get_raw_private_key(ptr, nullptr, &raw_len)) {
+    bytes raw(raw_len);
+    uint8_t* data_ptr = raw.data();
+    EVP_PKEY_get_raw_private_key(ptr, data_ptr, &raw_len);
+    return EVP_PKEY_new_raw_public_key(
+      EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
+  }
+
+  EVP_PKEY_get_raw_public_key(ptr, nullptr, &raw_len);
+
+  bytes raw(raw_len);
+  uint8_t* data_ptr = raw.data();
+  EVP_PKEY_get_raw_public_key(ptr, data_ptr, &raw_len);
+  return EVP_PKEY_new_raw_public_key(
+    EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
 }
 
 Scoped<EC_GROUP>
@@ -380,20 +418,8 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
-  if (_key.get() == nullptr && other._key.get() == nullptr) {
-    return true;
-  } else if (_key.get() == nullptr) {
-    return false;
-  } else if (other._key.get() == nullptr) {
-    return false;
-  }
-
-  // Raw pointers OK here because get0 methods return pointers to
-  // memory managed by the EC_KEY.
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-  const EC_POINT* lhs = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* rhs = EC_KEY_get0_public_key(other._key.get());
-  return (EC_POINT_cmp(group, lhs, rhs, nullptr) == 0);
+  int cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
+  return cmp == 1;
 }
 
 bool
@@ -405,37 +431,20 @@ DHPublicKey::operator!=(const DHPublicKey& other) const
 bytes
 DHPublicKey::to_bytes() const
 {
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2o_ECPublicKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
+  size_t raw_len;
+  EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len);
 
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2o_ECPublicKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
+  bytes raw(raw_len);
+  uint8_t* data_ptr = raw.data();
+  EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len);
+  return raw;
 }
 
 void
 DHPublicKey::reset(const bytes& data)
 {
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!o2i_ECPublicKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
+  _key = EVP_PKEY_new_raw_public_key(
+    EVP_PKEY_X25519, nullptr, data.data(), data.size());
 }
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
@@ -489,13 +498,9 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
-DHPublicKey::DHPublicKey(const EC_POINT* pt)
-  : _key(EC_KEY_new_by_curve_name(DH_CURVE))
-{
-  if (EC_KEY_set_public_key(_key.get(), pt) != 1) {
-    throw OpenSSLError::current();
-  }
-}
+DHPublicKey::DHPublicKey(EVP_PKEY* pkey)
+  : _key(pkey)
+{}
 
 tls::ostream&
 operator<<(tls::ostream& out, const DHPublicKey& obj)
@@ -520,14 +525,7 @@ operator>>(tls::istream& in, DHPublicKey& obj)
 DHPrivateKey
 DHPrivateKey::generate()
 {
-  // Raw pointer is OK here because DHPrivateKey takes over
-  // management of the memory referenced by key.
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (EC_KEY_generate_key(key) != 1) {
-    throw OpenSSLError::current();
-  }
-
-  return DHPrivateKey(key);
+  return derive(random_bytes(32));
 }
 
 DHPrivateKey
@@ -535,17 +533,10 @@ DHPrivateKey::derive(const bytes& seed)
 {
   bytes digest = SHA256Digest(dh_hash_prefix).write(seed).digest();
 
-  Scoped<BIGNUM> d = BN_bin2bn(digest.data(), digest.size(), nullptr);
-  Scoped<EC_GROUP> group = defaultECGroup();
-  Scoped<EC_POINT> pt = EC_POINT_new(group.get());
-  EC_POINT_mul(group.get(), pt.get(), d.get(), nullptr, nullptr, nullptr);
+  EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+    EVP_PKEY_X25519, nullptr, digest.data(), digest.size());
 
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY_set_group(key, group.get());
-  EC_KEY_set_private_key(key, d.get());
-  EC_KEY_set_public_key(key, pt.get());
-
-  return DHPrivateKey(key);
+  return DHPrivateKey(pkey);
 }
 
 DHPrivateKey::DHPrivateKey(const DHPrivateKey& other)
@@ -581,17 +572,7 @@ DHPrivateKey::operator=(DHPrivateKey&& other)
 bool
 DHPrivateKey::operator==(const DHPrivateKey& other) const
 {
-  // Raw pointers here are OK because "get0" methods return pointers
-  // to memory owned by _key.
-  const BIGNUM* d1 = EC_KEY_get0_private_key(_key.get());
-  const BIGNUM* d2 = EC_KEY_get0_private_key(other._key.get());
-  const EC_POINT* p1 = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-
-  auto out =
-    (BN_cmp(d1, d2) == 0) && (EC_POINT_cmp(group, p1, p2, nullptr) == 0);
-  return out;
+  return EVP_PKEY_cmp(_key.get(), other._key.get()) == 1;
 }
 
 bool
@@ -603,12 +584,33 @@ DHPrivateKey::operator!=(const DHPrivateKey& other) const
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
-  bytes out(DH_OUTPUT_BYTES);
-  // ECDH_compute_key shouldn't modify the private key, but it's
-  // missing the const modifier.
-  EC_KEY* priv_key = const_cast<EC_KEY*>(_key.get());
-  const EC_POINT* pub_key = EC_KEY_get0_public_key(pub._key.get());
-  ECDH_compute_key(out.data(), out.size(), pub_key, priv_key, nullptr);
+  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
+  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
+
+  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw OpenSSLError::current();
+  }
+
+  size_t out_len;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw OpenSSLError::current();
+  }
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw OpenSSLError::current();
+  }
+
   return out;
 }
 
@@ -618,9 +620,9 @@ DHPrivateKey::public_key() const
   return _pub;
 }
 
-DHPrivateKey::DHPrivateKey(EC_KEY* key)
+DHPrivateKey::DHPrivateKey(EVP_PKEY* key)
   : _key(key)
-  , _pub(EC_KEY_get0_public_key(key))
+  , _pub(TypedDup(key))
 {}
 
 bytes
@@ -633,43 +635,6 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const DHPrivateKey& obj)
-{
-  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
-  int len = BN_num_bytes(dN);
-
-  tls::opaque<1> d(len);
-  BN_bn2bin(dN, d.data());
-
-  tls::opaque<1> pub = obj._pub.to_bytes();
-
-  return out << d << pub;
-}
-
-tls::istream&
-operator>>(tls::istream& in, DHPrivateKey& obj)
-{
-  tls::opaque<1> d, pub;
-  in >> d >> pub;
-
-  const uint8_t* ptr = pub.data();
-  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY* temp = key.get();
-  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
-    throw OpenSSLError::current();
-  }
-
-  Scoped<EC_GROUP> group = defaultECGroup();
-  EC_KEY_set_group(key.get(), group.get());
-
-  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
-  EC_KEY_set_private_key(key.get(), dN.get());
-
-  obj = DHPrivateKey(key.release());
-  return in;
 }
 
 ///

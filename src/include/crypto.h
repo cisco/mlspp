@@ -185,9 +185,9 @@ public:
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
-  Scoped<EC_KEY> _key;
+  Scoped<EVP_PKEY> _key;
 
-  DHPublicKey(const EC_POINT* pt);
+  DHPublicKey(EVP_PKEY* pt);
   friend class DHPrivateKey;
 };
 
@@ -217,16 +217,10 @@ public:
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
 private:
-  Scoped<EC_KEY> _key;
+  Scoped<EVP_PKEY> _key;
   DHPublicKey _pub;
 
-  DHPrivateKey(EC_KEY* key);
-
-  // XXX(rlb@ipv.sx) The format for private keys here is
-  // non-standard, because OpenSSL's private key serialization
-  // routines are wonky.
-  friend tls::ostream& operator<<(tls::ostream& out, const DHPrivateKey& obj);
-  friend tls::istream& operator>>(tls::istream& in, DHPrivateKey& obj);
+  DHPrivateKey(EVP_PKEY* key);
 };
 
 struct ECIESCiphertext
