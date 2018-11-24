@@ -428,6 +428,17 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
+  // If one pointer is null and the other is not, then the two keys
+  // are not equal
+  if (!!_key.get() != !!other._key.get()) {
+    return false;
+  }
+
+  // If both pointers are null, then the two keys are equal.
+  if (!_key.get()) {
+    return true;
+  }
+
   return EVP_PKEY_cmp(_key.get(), other._key.get());
 }
 
@@ -584,6 +595,17 @@ DHPrivateKey::operator=(DHPrivateKey&& other)
 bool
 DHPrivateKey::operator==(const DHPrivateKey& other) const
 {
+  // If one pointer is null and the other is not, then the two keys
+  // are not equal
+  if (!!_key.get() != !!other._key.get()) {
+    return false;
+  }
+
+  // If both pointers are null, then the two keys are equal.
+  if (!_key.get()) {
+    return true;
+  }
+
   return EVP_PKEY_cmp(_key.get(), other._key.get()) == 1;
 }
 
