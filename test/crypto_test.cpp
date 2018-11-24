@@ -1,5 +1,6 @@
 #include "crypto.h"
 #include <catch.hpp>
+#include <iostream>
 #include <string>
 
 using namespace mls;

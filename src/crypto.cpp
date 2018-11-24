@@ -10,6 +10,7 @@
 #include "openssl/sha.h"
 #include "state.h"
 
+#include <iostream>
 #include <string>
 
 #define DH_CURVE NID_X9_62_prime256v1
@@ -92,21 +93,30 @@ template<>
 EVP_PKEY*
 TypedDup(EVP_PKEY* ptr)
 {
-
   size_t raw_len = 0;
-  if (1 == EVP_PKEY_get_raw_private_key(ptr, nullptr, &raw_len)) {
-    bytes raw(raw_len);
-    uint8_t* data_ptr = raw.data();
-    EVP_PKEY_get_raw_private_key(ptr, data_ptr, &raw_len);
-    return EVP_PKEY_new_raw_public_key(
+  if (1 != EVP_PKEY_get_raw_private_key(ptr, nullptr, &raw_len)) {
+    throw OpenSSLError::current();
+  }
+
+  // The actual key fetch will fail if `ptr` represents a public key
+  bytes raw(raw_len);
+  uint8_t* data_ptr = raw.data();
+  int rv = EVP_PKEY_get_raw_private_key(ptr, data_ptr, &raw_len);
+  if (rv == 1) {
+    return EVP_PKEY_new_raw_private_key(
       EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
   }
 
-  EVP_PKEY_get_raw_public_key(ptr, nullptr, &raw_len);
+  if (1 != EVP_PKEY_get_raw_public_key(ptr, nullptr, &raw_len)) {
+    throw OpenSSLError::current();
+  }
 
-  bytes raw(raw_len);
-  uint8_t* data_ptr = raw.data();
-  EVP_PKEY_get_raw_public_key(ptr, data_ptr, &raw_len);
+  raw.resize(raw_len);
+  data_ptr = raw.data();
+  if (1 != EVP_PKEY_get_raw_public_key(ptr, data_ptr, &raw_len)) {
+    throw OpenSSLError::current();
+  }
+
   return EVP_PKEY_new_raw_public_key(
     EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
 }
@@ -418,8 +428,7 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
-  int cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
-  return cmp == 1;
+  return EVP_PKEY_cmp(_key.get(), other._key.get());
 }
 
 bool
@@ -499,7 +508,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 }
 
 DHPublicKey::DHPublicKey(EVP_PKEY* pkey)
-  : _key(pkey)
+  : _key(TypedDup(pkey))
 {}
 
 tls::ostream&
@@ -535,6 +544,9 @@ DHPrivateKey::derive(const bytes& seed)
 
   EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
     EVP_PKEY_X25519, nullptr, digest.data(), digest.size());
+  if (!pkey) {
+    throw OpenSSLError::current();
+  }
 
   return DHPrivateKey(pkey);
 }
@@ -614,7 +626,7 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
   return out;
 }
 
-DHPublicKey
+const DHPublicKey&
 DHPrivateKey::public_key() const
 {
   return _pub;
@@ -622,7 +634,7 @@ DHPrivateKey::public_key() const
 
 DHPrivateKey::DHPrivateKey(EVP_PKEY* key)
   : _key(key)
-  , _pub(TypedDup(key))
+  , _pub(key)
 {}
 
 bytes

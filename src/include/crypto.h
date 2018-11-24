@@ -212,7 +212,7 @@ public:
   bool operator!=(const DHPrivateKey& other) const;
 
   bytes derive(const DHPublicKey& pub) const;
-  DHPublicKey public_key() const;
+  const DHPublicKey& public_key() const;
 
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
