@@ -116,17 +116,6 @@ public:
     return raw;
   }
 
-  virtual void set_private(const bytes& data)
-  {
-    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
-      EVP_PKEY_X25519, nullptr, data.data(), data.size());
-    if (!pkey) {
-      throw OpenSSLError::current();
-    }
-
-    _key.reset(pkey);
-  }
-
   virtual void set_public(const bytes& data)
   {
     EVP_PKEY* pkey = EVP_PKEY_new_raw_public_key(
@@ -196,6 +185,106 @@ public:
 
     return new X25519Key(pkey);
   }
+};
+
+struct P256Key : OpenSSLKey
+{
+public:
+  P256Key() = default;
+
+  P256Key(EVP_PKEY* pkey)
+    : OpenSSLKey(pkey)
+  {}
+
+  virtual size_t secret_size() const { return 32; }
+  virtual bool can_derive() const { return true; }
+
+  virtual bytes marshal() const
+  {
+    EC_KEY* pub = EVP_PKEY_get0_EC_KEY(_key.get());
+
+    int len = i2o_ECPublicKey(pub, nullptr);
+    if (len == 0) {
+      // Technically, this is not necessarily an error, but in
+      // practice it always will be.
+      throw OpenSSLError::current();
+    }
+
+    bytes out(len);
+    unsigned char* data = out.data();
+    if (i2o_ECPublicKey(pub, &data) == 0) {
+      throw OpenSSLError::current();
+    }
+
+    return out;
+  }
+
+  virtual void set_public(const bytes& data)
+  {
+    auto eckey = Scoped<EC_KEY>(new_ec_key());
+
+    auto eckey_ptr = eckey.get();
+    auto data_ptr = data.data();
+    if (!o2i_ECPublicKey(&eckey_ptr, &data_ptr, data.size())) {
+      throw OpenSSLError::current();
+    }
+
+    reset(eckey.release());
+  }
+
+  virtual void set_secret(const bytes& data)
+  {
+    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+
+    EC_KEY* eckey = new_ec_key();
+
+    auto group = EC_KEY_get0_group(eckey);
+    Scoped<BIGNUM> d = BN_bin2bn(digest.data(), digest.size(), nullptr);
+    Scoped<EC_POINT> pt = EC_POINT_new(group);
+    EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
+
+    EC_KEY_set_private_key(eckey, d.get());
+    EC_KEY_set_public_key(eckey, pt.get());
+
+    reset(eckey);
+  }
+
+  virtual OpenSSLKey* dup() const
+  {
+    auto eckey_out = EC_KEY_dup(my_ec_key());
+    return new P256Key(eckey_out);
+  }
+
+  virtual OpenSSLKey* dup_public() const
+  {
+    auto eckey = my_ec_key();
+    auto group = EC_KEY_get0_group(eckey);
+    auto point = EC_KEY_get0_public_key(eckey);
+
+    auto eckey_out = new_ec_key();
+    EC_KEY_set_public_key(eckey_out, point);
+    return new P256Key(eckey_out);
+  }
+
+private:
+  static const int _curve_nid = NID_X9_62_prime256v1;
+
+  P256Key(EC_KEY* eckey)
+    : OpenSSLKey()
+  {
+    reset(eckey);
+  }
+
+  void reset(EC_KEY* eckey)
+  {
+    auto pkey = EVP_PKEY_new();
+    EVP_PKEY_assign_EC_KEY(pkey, eckey);
+    _key.reset(pkey);
+  }
+
+  const EC_KEY* my_ec_key() const { return EVP_PKEY_get0_EC_KEY(_key.get()); }
+
+  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(_curve_nid); }
 };
 
 ///
