@@ -2,12 +2,46 @@
 
 #include "common.h"
 #include "openssl/ec.h"
+#include "openssl/evp.h"
 #include "openssl/sha.h"
 #include "tls_syntax.h"
 #include <stdexcept>
 #include <vector>
 
 namespace mls {
+
+// Interface cleanup wrapper for raw OpenSSL EVP keys
+struct PKEYDeleter
+{
+  void operator()(EVP_PKEY* p) { EVP_PKEY_free(p); }
+};
+
+struct OpenSSLKey
+{
+public:
+  OpenSSLKey() = default;
+
+  OpenSSLKey(EVP_PKEY* key)
+    : _key(key, PKEYDeleter{})
+  {}
+
+  virtual ~OpenSSLKey() = default;
+
+  virtual size_t secret_size() const = 0;
+  virtual bool can_derive() const = 0;
+
+  virtual bytes marshal() const = 0;
+  virtual void set_public(const bytes& data) = 0;
+  virtual void set_secret(const bytes& data) = 0;
+  virtual OpenSSLKey* dup() const = 0;
+  virtual OpenSSLKey* dup_public() const = 0;
+
+  friend bool operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs);
+
+  bytes derive(const OpenSSLKey& pub);
+
+  std::unique_ptr<EVP_PKEY, PKEYDeleter> _key;
+};
 
 // Wrapper for OpenSSL errors
 class OpenSSLError : public std::runtime_error
@@ -169,7 +203,7 @@ struct ECIESCiphertext;
 class DHPublicKey
 {
 public:
-  DHPublicKey() = default;
+  DHPublicKey();
   DHPublicKey(const DHPublicKey& other);
   DHPublicKey(DHPublicKey&& other);
   DHPublicKey(const bytes& data);
@@ -185,9 +219,8 @@ public:
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
-  Scoped<EVP_PKEY> _key;
+  std::unique_ptr<OpenSSLKey> _key;
 
-  DHPublicKey(EVP_PKEY* pt);
   friend class DHPrivateKey;
 };
 
@@ -217,10 +250,8 @@ public:
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
 private:
-  Scoped<EVP_PKEY> _key;
+  std::unique_ptr<OpenSSLKey> _key;
   DHPublicKey _pub;
-
-  DHPrivateKey(EVP_PKEY* key);
 };
 
 struct ECIESCiphertext

@@ -19,6 +19,189 @@
 
 namespace mls {
 
+// Things we need to do per-key-type:
+// * TypedDup
+// * to_bytes
+// * from_bytes
+// * construct from data
+
+///
+/// OpenSSLKey
+///
+/// This is used to encapsulate the operations required for
+/// different types of points, with a slightly cleaner interface
+/// than OpenSSL's EVP interface.
+///
+
+bool
+operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs)
+{
+  // If one pointer is null and the other is not, then the two keys
+  // are not equal
+  if (!!lhs._key.get() != !!rhs._key.get()) {
+    return false;
+  }
+
+  // If both pointers are null, then the two keys are equal.
+  if (!lhs._key.get()) {
+    return true;
+  }
+
+  auto cmp = EVP_PKEY_cmp(lhs._key.get(), rhs._key.get());
+  return cmp == 1;
+}
+
+bytes
+OpenSSLKey::derive(const OpenSSLKey& pub)
+{
+  if (!can_derive() || !pub.can_derive()) {
+    throw InvalidParameterError("Inappropriate key(s) for derive");
+  }
+
+  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
+  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
+
+  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw OpenSSLError::current();
+  }
+
+  size_t out_len;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw OpenSSLError::current();
+  }
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw OpenSSLError::current();
+  }
+
+  return out;
+}
+
+struct X25519Key : OpenSSLKey
+{
+public:
+  X25519Key() = default;
+
+  X25519Key(EVP_PKEY* pkey)
+    : OpenSSLKey(pkey)
+  {}
+
+  virtual size_t secret_size() const { return 32; }
+  virtual bool can_derive() const { return true; }
+
+  virtual bytes marshal() const
+  {
+    size_t raw_len;
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes raw(raw_len);
+    uint8_t* data_ptr = raw.data();
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    return raw;
+  }
+
+  virtual void set_private(const bytes& data)
+  {
+    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+      EVP_PKEY_X25519, nullptr, data.data(), data.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
+  virtual void set_public(const bytes& data)
+  {
+    EVP_PKEY* pkey = EVP_PKEY_new_raw_public_key(
+      EVP_PKEY_X25519, nullptr, data.data(), data.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
+  virtual void set_secret(const bytes& data)
+  {
+    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+
+    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+      EVP_PKEY_X25519, nullptr, digest.data(), digest.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
+  virtual OpenSSLKey* dup() const
+  {
+    size_t raw_len = 0;
+    if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    // The actual key fetch will fail if `_key` represents a public key
+    bytes raw(raw_len);
+    auto data_ptr = raw.data();
+    auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
+    if (rv == 1) {
+      auto pkey = EVP_PKEY_new_raw_private_key(
+        EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
+      if (!pkey) {
+        throw OpenSSLError::current();
+      }
+
+      return new X25519Key(pkey);
+    }
+
+    return dup_public();
+  }
+
+  virtual OpenSSLKey* dup_public() const
+  {
+    size_t raw_len = 0;
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes raw(raw_len);
+    auto data_ptr = raw.data();
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    auto pkey = EVP_PKEY_new_raw_public_key(
+      EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    return new X25519Key(pkey);
+  }
+};
+
+///
+/// OpenSSLError
+///
+
 OpenSSLError
 OpenSSLError::current()
 {
@@ -93,6 +276,8 @@ template<>
 EVP_PKEY*
 TypedDup(EVP_PKEY* ptr)
 {
+  // TODO fork on key type
+
   size_t raw_len = 0;
   if (1 != EVP_PKEY_get_raw_private_key(ptr, nullptr, &raw_len)) {
     throw OpenSSLError::current();
@@ -394,8 +579,12 @@ AESGCM::decrypt(const bytes& ct) const
 /// DHPublicKey
 ///
 
+DHPublicKey::DHPublicKey()
+  : _key(new X25519Key)
+{}
+
 DHPublicKey::DHPublicKey(const DHPublicKey& other)
-  : _key(other._key)
+  : _key(other._key->dup())
 {}
 
 DHPublicKey::DHPublicKey(DHPublicKey&& other)
@@ -403,6 +592,7 @@ DHPublicKey::DHPublicKey(DHPublicKey&& other)
 {}
 
 DHPublicKey::DHPublicKey(const bytes& data)
+  : _key(new X25519Key)
 {
   reset(data);
 }
@@ -411,7 +601,7 @@ DHPublicKey&
 DHPublicKey::operator=(const DHPublicKey& other)
 {
   if (&other != this) {
-    _key = other._key;
+    _key.reset(other._key->dup());
   }
   return *this;
 }
@@ -428,18 +618,7 @@ DHPublicKey::operator=(DHPublicKey&& other)
 bool
 DHPublicKey::operator==(const DHPublicKey& other) const
 {
-  // If one pointer is null and the other is not, then the two keys
-  // are not equal
-  if (!!_key.get() != !!other._key.get()) {
-    return false;
-  }
-
-  // If both pointers are null, then the two keys are equal.
-  if (!_key.get()) {
-    return true;
-  }
-
-  return EVP_PKEY_cmp(_key.get(), other._key.get());
+  return *_key == *other._key;
 }
 
 bool
@@ -451,20 +630,13 @@ DHPublicKey::operator!=(const DHPublicKey& other) const
 bytes
 DHPublicKey::to_bytes() const
 {
-  size_t raw_len;
-  EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len);
-
-  bytes raw(raw_len);
-  uint8_t* data_ptr = raw.data();
-  EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len);
-  return raw;
+  return _key->marshal();
 }
 
 void
 DHPublicKey::reset(const bytes& data)
 {
-  _key = EVP_PKEY_new_raw_public_key(
-    EVP_PKEY_X25519, nullptr, data.data(), data.size());
+  _key->set_public(data);
 }
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
@@ -518,10 +690,6 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
-DHPublicKey::DHPublicKey(EVP_PKEY* pkey)
-  : _key(TypedDup(pkey))
-{}
-
 tls::ostream&
 operator<<(tls::ostream& out, const DHPublicKey& obj)
 {
@@ -551,19 +719,15 @@ DHPrivateKey::generate()
 DHPrivateKey
 DHPrivateKey::derive(const bytes& seed)
 {
-  bytes digest = SHA256Digest(dh_hash_prefix).write(seed).digest();
-
-  EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
-    EVP_PKEY_X25519, nullptr, digest.data(), digest.size());
-  if (!pkey) {
-    throw OpenSSLError::current();
-  }
-
-  return DHPrivateKey(pkey);
+  DHPrivateKey key;
+  key._key.reset(new X25519Key);
+  key._key->set_secret(seed);
+  key._pub._key.reset(key._key->dup_public());
+  return key;
 }
 
 DHPrivateKey::DHPrivateKey(const DHPrivateKey& other)
-  : _key(other._key)
+  : _key(other._key->dup())
   , _pub(other._pub)
 {}
 
@@ -576,7 +740,7 @@ DHPrivateKey&
 DHPrivateKey::operator=(const DHPrivateKey& other)
 {
   if (this != &other) {
-    _key = other._key;
+    _key.reset(other._key->dup());
     _pub = other._pub;
   }
   return *this;
@@ -595,18 +759,7 @@ DHPrivateKey::operator=(DHPrivateKey&& other)
 bool
 DHPrivateKey::operator==(const DHPrivateKey& other) const
 {
-  // If one pointer is null and the other is not, then the two keys
-  // are not equal
-  if (!!_key.get() != !!other._key.get()) {
-    return false;
-  }
-
-  // If both pointers are null, then the two keys are equal.
-  if (!_key.get()) {
-    return true;
-  }
-
-  return EVP_PKEY_cmp(_key.get(), other._key.get()) == 1;
+  return _key == other._key;
 }
 
 bool
@@ -618,34 +771,7 @@ DHPrivateKey::operator!=(const DHPrivateKey& other) const
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
-  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
-  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
-
-  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-  if (!ctx.get()) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_init(ctx.get())) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
-    throw OpenSSLError::current();
-  }
-
-  size_t out_len;
-  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
-    throw OpenSSLError::current();
-  }
-
-  bytes out(out_len);
-  uint8_t* ptr = out.data();
-  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
+  return _key->derive(*pub._key);
 }
 
 const DHPublicKey&
@@ -653,11 +779,6 @@ DHPrivateKey::public_key() const
 {
   return _pub;
 }
-
-DHPrivateKey::DHPrivateKey(EVP_PKEY* key)
-  : _key(key)
-  , _pub(key)
-{}
 
 bytes
 DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
