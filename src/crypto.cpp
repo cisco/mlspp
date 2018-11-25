@@ -14,6 +14,7 @@
 #include <string>
 
 #define DH_KEY_TYPE OpenSSLKeyType::P256
+// #define DH_KEY_TYPE OpenSSLKeyType::X25519
 
 #define DH_CURVE NID_X9_62_prime256v1
 #define SIG_CURVE NID_X9_62_prime256v1
@@ -62,6 +63,8 @@ public:
 
     return raw;
   }
+
+  virtual void generate() { set_secret(random_bytes(secret_size())); }
 
   virtual void set_public(const bytes& data)
   {
@@ -148,9 +151,9 @@ public:
 
   virtual bytes marshal() const
   {
-    EC_KEY* pub = EVP_PKEY_get0_EC_KEY(_key.get());
+    auto pub = EVP_PKEY_get0_EC_KEY(_key.get());
 
-    int len = i2o_ECPublicKey(pub, nullptr);
+    auto len = i2o_ECPublicKey(pub, nullptr);
     if (len == 0) {
       // Technically, this is not necessarily an error, but in
       // practice it always will be.
@@ -158,12 +161,22 @@ public:
     }
 
     bytes out(len);
-    unsigned char* data = out.data();
+    auto data = out.data();
     if (i2o_ECPublicKey(pub, &data) == 0) {
       throw OpenSSLError::current();
     }
 
     return out;
+  }
+
+  virtual void generate()
+  {
+    Scoped<EC_KEY> eckey = new_ec_key();
+    if (1 != EC_KEY_generate_key(eckey.get())) {
+      throw OpenSSLError::current();
+    }
+
+    reset(eckey.release());
   }
 
   virtual void set_public(const bytes& data)
