@@ -16,6 +16,12 @@ struct PKEYDeleter
   void operator()(EVP_PKEY* p) { EVP_PKEY_free(p); }
 };
 
+enum class OpenSSLKeyType : uint8_t
+{
+  P256,
+  X25519
+};
+
 struct OpenSSLKey
 {
 public:
@@ -35,6 +41,8 @@ public:
   virtual void set_secret(const bytes& data) = 0;
   virtual OpenSSLKey* dup() const = 0;
   virtual OpenSSLKey* dup_public() const = 0;
+
+  static OpenSSLKey* create(OpenSSLKeyType suite);
 
   friend bool operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs);
 

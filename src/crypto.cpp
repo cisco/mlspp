@@ -13,6 +13,8 @@
 #include <iostream>
 #include <string>
 
+#define DH_KEY_TYPE OpenSSLKeyType::P256
+
 #define DH_CURVE NID_X9_62_prime256v1
 #define SIG_CURVE NID_X9_62_prime256v1
 #define DH_OUTPUT_BYTES SHA256_DIGEST_LENGTH
@@ -32,61 +34,6 @@ namespace mls {
 /// different types of points, with a slightly cleaner interface
 /// than OpenSSL's EVP interface.
 ///
-
-bool
-operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs)
-{
-  // If one pointer is null and the other is not, then the two keys
-  // are not equal
-  if (!!lhs._key.get() != !!rhs._key.get()) {
-    return false;
-  }
-
-  // If both pointers are null, then the two keys are equal.
-  if (!lhs._key.get()) {
-    return true;
-  }
-
-  auto cmp = EVP_PKEY_cmp(lhs._key.get(), rhs._key.get());
-  return cmp == 1;
-}
-
-bytes
-OpenSSLKey::derive(const OpenSSLKey& pub)
-{
-  if (!can_derive() || !pub.can_derive()) {
-    throw InvalidParameterError("Inappropriate key(s) for derive");
-  }
-
-  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
-  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
-
-  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-  if (!ctx.get()) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_init(ctx.get())) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
-    throw OpenSSLError::current();
-  }
-
-  size_t out_len;
-  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
-    throw OpenSSLError::current();
-  }
-
-  bytes out(out_len);
-  uint8_t* ptr = out.data();
-  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
-}
 
 struct X25519Key : OpenSSLKey
 {
@@ -286,6 +233,72 @@ private:
 
   EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(_curve_nid); }
 };
+
+bool
+operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs)
+{
+  // If one pointer is null and the other is not, then the two keys
+  // are not equal
+  if (!!lhs._key.get() != !!rhs._key.get()) {
+    return false;
+  }
+
+  // If both pointers are null, then the two keys are equal.
+  if (!lhs._key.get()) {
+    return true;
+  }
+
+  auto cmp = EVP_PKEY_cmp(lhs._key.get(), rhs._key.get());
+  return cmp == 1;
+}
+
+OpenSSLKey*
+OpenSSLKey::create(OpenSSLKeyType type)
+{
+  switch (type) {
+    case OpenSSLKeyType::X25519:
+      return new X25519Key;
+    case OpenSSLKeyType::P256:
+      return new P256Key;
+  }
+}
+
+bytes
+OpenSSLKey::derive(const OpenSSLKey& pub)
+{
+  if (!can_derive() || !pub.can_derive()) {
+    throw InvalidParameterError("Inappropriate key(s) for derive");
+  }
+
+  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
+  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
+
+  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw OpenSSLError::current();
+  }
+
+  size_t out_len;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw OpenSSLError::current();
+  }
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw OpenSSLError::current();
+  }
+
+  return out;
+}
 
 ///
 /// OpenSSLError
@@ -669,7 +682,7 @@ AESGCM::decrypt(const bytes& ct) const
 ///
 
 DHPublicKey::DHPublicKey()
-  : _key(new X25519Key)
+  : _key(OpenSSLKey::create(DH_KEY_TYPE))
 {}
 
 DHPublicKey::DHPublicKey(const DHPublicKey& other)
@@ -681,7 +694,7 @@ DHPublicKey::DHPublicKey(DHPublicKey&& other)
 {}
 
 DHPublicKey::DHPublicKey(const bytes& data)
-  : _key(new X25519Key)
+  : _key(OpenSSLKey::create(DH_KEY_TYPE))
 {
   reset(data);
 }
@@ -809,7 +822,7 @@ DHPrivateKey
 DHPrivateKey::derive(const bytes& seed)
 {
   DHPrivateKey key;
-  key._key.reset(new X25519Key);
+  key._key.reset(OpenSSLKey::create(DH_KEY_TYPE));
   key._key->set_secret(seed);
   key._pub._key.reset(key._key->dup_public());
   return key;
