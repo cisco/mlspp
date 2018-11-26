@@ -11,11 +11,6 @@
 namespace mls {
 
 // Interface cleanup wrapper for raw OpenSSL EVP keys
-struct PKEYDeleter
-{
-  void operator()(EVP_PKEY* p) { EVP_PKEY_free(p); }
-};
-
 enum class OpenSSLKeyType : uint8_t
 {
   P256,
@@ -23,38 +18,35 @@ enum class OpenSSLKeyType : uint8_t
   Ed25519
 };
 
-struct OpenSSLKey
+struct OpenSSLKey;
+
+// Adapt standard pointers so that they can be "typed" to handle
+// custom deleters more easily.
+template<typename T>
+void
+TypedDelete(T* ptr);
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr);
+
+template<>
+void
+TypedDelete(OpenSSLKey* ptr);
+
+template<typename T>
+using typed_unique_ptr_base = std::unique_ptr<T, decltype(&TypedDelete<T>)>;
+
+template<typename T>
+class typed_unique_ptr : public typed_unique_ptr_base<T>
 {
 public:
-  OpenSSLKey() = default;
+  typedef typed_unique_ptr_base<T> parent;
+  using parent::parent;
 
-  OpenSSLKey(EVP_PKEY* key)
-    : _key(key, PKEYDeleter{})
+  typed_unique_ptr(T* ptr)
+    : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
   {}
-
-  virtual ~OpenSSLKey() = default;
-
-  virtual size_t secret_size() const = 0;
-  virtual size_t sig_size() const = 0;
-  virtual bool can_derive() const = 0;
-  virtual bool can_sign() const = 0;
-
-  virtual bytes marshal() const = 0;
-  virtual void generate() = 0;
-  virtual void set_public(const bytes& data) = 0;
-  virtual void set_secret(const bytes& data) = 0;
-  virtual OpenSSLKey* dup() const = 0;
-  virtual OpenSSLKey* dup_public() const = 0;
-
-  static OpenSSLKey* create(OpenSSLKeyType suite);
-
-  bool operator==(const OpenSSLKey& other);
-
-  bytes derive(const OpenSSLKey& pub);
-  bytes sign(const bytes& message);
-  bool verify(const bytes& message, const bytes& signature);
-
-  std::unique_ptr<EVP_PKEY, PKEYDeleter> _key;
 };
 
 // Wrapper for OpenSSL errors
@@ -65,86 +57,6 @@ public:
   using parent::parent;
 
   static OpenSSLError current();
-};
-
-// Scoped pointers for OpenSSL types
-template<typename T>
-void
-TypedDelete(T* ptr);
-
-template<typename T>
-T*
-TypedDup(T* ptr);
-
-template<typename T>
-class Scoped
-{
-public:
-  Scoped()
-    : _raw(nullptr)
-  {}
-
-  Scoped(T* raw) { adopt(raw); }
-
-  Scoped(const Scoped& other) { adopt(TypedDup(other._raw)); }
-
-  Scoped(Scoped&& other)
-  {
-    _raw = other._raw;
-    other._raw = nullptr;
-  }
-
-  Scoped& operator=(const Scoped& other)
-  {
-    clear();
-    adopt(TypedDup(other._raw));
-    return *this;
-  }
-
-  Scoped& operator=(Scoped&& other)
-  {
-    _raw = other._raw;
-    other._raw = nullptr;
-    return *this;
-  }
-
-  ~Scoped() { clear(); }
-
-  void move(Scoped& other)
-  {
-    adopt(other._raw);
-    other._raw = nullptr;
-  }
-
-  void adopt(T* raw)
-  {
-    if (raw == nullptr) {
-      throw OpenSSLError::current();
-    }
-    _raw = raw;
-  }
-
-  T* release()
-  {
-    T* out = _raw;
-    _raw = nullptr;
-    return out;
-  }
-
-  void clear()
-  {
-    if (_raw != nullptr) {
-      TypedDelete(_raw);
-      _raw = nullptr;
-    }
-  }
-
-  const T* get() const { return _raw; }
-
-  T* get() { return _raw; }
-
-private:
-  T* _raw;
 };
 
 class SHA256Digest
@@ -233,7 +145,7 @@ public:
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
-  std::unique_ptr<OpenSSLKey> _key;
+  typed_unique_ptr<OpenSSLKey> _key;
 
   friend class DHPrivateKey;
 };
@@ -249,7 +161,7 @@ public:
   static DHPrivateKey generate();
   static DHPrivateKey derive(const bytes& secret);
 
-  DHPrivateKey() = default;
+  DHPrivateKey();
   DHPrivateKey(const DHPrivateKey& other);
   DHPrivateKey(DHPrivateKey&& other);
   DHPrivateKey& operator=(const DHPrivateKey& other);
@@ -264,7 +176,7 @@ public:
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
 private:
-  std::unique_ptr<OpenSSLKey> _key;
+  typed_unique_ptr<OpenSSLKey> _key;
   DHPublicKey _pub;
 };
 
@@ -285,11 +197,9 @@ operator>>(tls::istream& in, DHPrivateKey& obj);
 
 // XXX(rlb@ipv.sx): There is a *ton* of repeated code between DH and
 // Signature keys, both here and in the corresponding .cpp file.
-// While this is unfortunate, it's a temporary state of affairs.  In
-// the slightly longer run, we're going to want to refactor this to
-// add more crypto agility anyway.  That agility will probably
-// require a complete restructure of these classes, e.g., because
-// Ed25519 does not use EC_KEY / ECDSA_sign.
+// While this is unfortunate, it's hopefully a temporary state of
+// affairs.  We should look into whether these classes can be
+// cleaned up leveraging OpenSSLKey.
 
 class SignaturePublicKey
 {
@@ -310,7 +220,7 @@ public:
   void reset(const bytes& data);
 
 private:
-  std::unique_ptr<OpenSSLKey> _key;
+  typed_unique_ptr<OpenSSLKey> _key;
 
   friend class SignaturePrivateKey;
 };
@@ -325,7 +235,7 @@ class SignaturePrivateKey
 public:
   static SignaturePrivateKey generate();
 
-  SignaturePrivateKey() = default;
+  SignaturePrivateKey();
   SignaturePrivateKey(const SignaturePrivateKey& other);
   SignaturePrivateKey(SignaturePrivateKey&& other);
   SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
@@ -338,7 +248,7 @@ public:
   const SignaturePublicKey& public_key() const;
 
 private:
-  std::unique_ptr<OpenSSLKey> _key;
+  typed_unique_ptr<OpenSSLKey> _key;
   SignaturePublicKey _pub;
 };
 

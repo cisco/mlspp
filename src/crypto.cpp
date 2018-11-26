@@ -22,6 +22,127 @@
 namespace mls {
 
 ///
+/// OpenSSLError
+///
+
+OpenSSLError
+OpenSSLError::current()
+{
+  unsigned long code = ERR_get_error();
+  return OpenSSLError(ERR_error_string(code, nullptr));
+}
+
+///
+/// OpenSSLKey
+///
+/// Declaration here, implementation below
+///
+
+struct OpenSSLKey
+{
+public:
+  OpenSSLKey()
+    : _key(nullptr)
+  {}
+
+  OpenSSLKey(EVP_PKEY* key)
+    : _key(key)
+  {}
+
+  virtual ~OpenSSLKey() = default;
+
+  virtual size_t secret_size() const = 0;
+  virtual size_t sig_size() const = 0;
+  virtual bool can_derive() const = 0;
+  virtual bool can_sign() const = 0;
+
+  virtual bytes marshal() const = 0;
+  virtual void generate() = 0;
+  virtual void set_public(const bytes& data) = 0;
+  virtual void set_secret(const bytes& data) = 0;
+  virtual OpenSSLKey* dup() const = 0;
+  virtual OpenSSLKey* dup_public() const = 0;
+
+  static OpenSSLKey* create(OpenSSLKeyType suite);
+
+  bool operator==(const OpenSSLKey& other);
+
+  bytes derive(const OpenSSLKey& pub);
+  bytes sign(const bytes& message);
+  bool verify(const bytes& message, const bytes& signature);
+
+  typed_unique_ptr<EVP_PKEY> _key;
+};
+
+///
+/// Deleters and smart pointers for OpenSSL types
+///
+
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_KEY* ptr)
+{
+  EC_KEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_POINT* ptr)
+{
+  EC_POINT_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(OpenSSLKey* ptr)
+{
+  delete ptr;
+}
+
+// This shorthand just saves on explicit template arguments
+template<typename T>
+typed_unique_ptr<T>
+make_typed_unique(T* ptr)
+{
+  return typed_unique_ptr<T>(ptr);
+}
+
+///
 /// OpenSSLKey
 ///
 /// This is used to encapsulate the operations required for
@@ -180,7 +301,7 @@ public:
 
   virtual void generate()
   {
-    Scoped<EC_KEY> eckey = new_ec_key();
+    auto eckey = make_typed_unique(new_ec_key());
     if (1 != EC_KEY_generate_key(eckey.get())) {
       throw OpenSSLError::current();
     }
@@ -190,7 +311,7 @@ public:
 
   virtual void set_public(const bytes& data)
   {
-    auto eckey = Scoped<EC_KEY>(new_ec_key());
+    auto eckey = make_typed_unique(new_ec_key());
 
     auto eckey_ptr = eckey.get();
     auto data_ptr = data.data();
@@ -208,8 +329,9 @@ public:
     EC_KEY* eckey = new_ec_key();
 
     auto group = EC_KEY_get0_group(eckey);
-    Scoped<BIGNUM> d = BN_bin2bn(digest.data(), digest.size(), nullptr);
-    Scoped<EC_POINT> pt = EC_POINT_new(group);
+    auto d =
+      make_typed_unique(BN_bin2bn(digest.data(), digest.size(), nullptr));
+    auto pt = make_typed_unique(EC_POINT_new(group));
     EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
 
     EC_KEY_set_private_key(eckey, d.get());
@@ -297,7 +419,7 @@ OpenSSLKey::derive(const OpenSSLKey& pub)
   EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
   EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
 
-  Scoped<EVP_PKEY_CTX> ctx(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
   if (!ctx.get()) {
     throw OpenSSLError::current();
   }
@@ -331,7 +453,7 @@ OpenSSLKey::sign(const bytes& msg)
     throw InvalidParameterError("Inappropriate key for sign");
   }
 
-  Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
   if (!ctx.get()) {
     throw OpenSSLError::current();
   }
@@ -358,7 +480,7 @@ OpenSSLKey::verify(const bytes& msg, const bytes& sig)
     throw InvalidParameterError("Inappropriate key for verify");
   }
 
-  Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
   if (!ctx.get()) {
     throw OpenSSLError::current();
   }
@@ -371,121 +493,6 @@ OpenSSLKey::verify(const bytes& msg, const bytes& sig)
     EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
 
   return rv == 1;
-}
-
-///
-/// OpenSSLError
-///
-
-OpenSSLError
-OpenSSLError::current()
-{
-  unsigned long code = ERR_get_error();
-  return OpenSSLError(ERR_error_string(code, nullptr));
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr)
-{
-  EVP_PKEY_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY_CTX* ptr)
-{
-  EVP_PKEY_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_KEY* ptr)
-{
-  EC_KEY_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_GROUP* ptr)
-{
-  EC_GROUP_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_POINT* ptr)
-{
-  EC_POINT_free(ptr);
-}
-
-template<>
-void
-TypedDelete(BIGNUM* ptr)
-{
-  BN_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_CIPHER_CTX* ptr)
-{
-  EVP_CIPHER_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr)
-{
-  EVP_MD_CTX_free(ptr);
-}
-
-template<>
-EC_KEY*
-TypedDup(EC_KEY* ptr)
-{
-  return EC_KEY_dup(ptr);
-}
-
-template<>
-EC_GROUP*
-TypedDup(EC_GROUP* ptr)
-{
-  return EC_GROUP_dup(ptr);
-}
-
-template<>
-EVP_PKEY*
-TypedDup(EVP_PKEY* ptr)
-{
-  // TODO fork on key type
-
-  size_t raw_len = 0;
-  if (1 != EVP_PKEY_get_raw_private_key(ptr, nullptr, &raw_len)) {
-    throw OpenSSLError::current();
-  }
-
-  // The actual key fetch will fail if `ptr` represents a public key
-  bytes raw(raw_len);
-  uint8_t* data_ptr = raw.data();
-  int rv = EVP_PKEY_get_raw_private_key(ptr, data_ptr, &raw_len);
-  if (rv == 1) {
-    return EVP_PKEY_new_raw_private_key(
-      EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
-  }
-
-  if (1 != EVP_PKEY_get_raw_public_key(ptr, nullptr, &raw_len)) {
-    throw OpenSSLError::current();
-  }
-
-  raw.resize(raw_len);
-  data_ptr = raw.data();
-  if (1 != EVP_PKEY_get_raw_public_key(ptr, data_ptr, &raw_len)) {
-    throw OpenSSLError::current();
-  }
-
-  return EVP_PKEY_new_raw_public_key(
-    EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
 }
 
 ///
@@ -670,7 +677,7 @@ AESGCM::set_aad(const bytes& aad)
 bytes
 AESGCM::encrypt(const bytes& pt) const
 {
-  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
@@ -712,7 +719,7 @@ AESGCM::decrypt(const bytes& ct) const
     throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
   }
 
-  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
@@ -902,6 +909,10 @@ DHPrivateKey::derive(const bytes& seed)
   return key;
 }
 
+DHPrivateKey::DHPrivateKey()
+  : _key(nullptr)
+{}
+
 DHPrivateKey::DHPrivateKey(const DHPrivateKey& other)
   : _key(other._key->dup())
   , _pub(other._pub)
@@ -1083,6 +1094,10 @@ SignaturePrivateKey::generate()
   key._pub._key.reset(key._key->dup_public());
   return key;
 }
+
+SignaturePrivateKey::SignaturePrivateKey()
+  : _key(nullptr)
+{}
 
 SignaturePrivateKey::SignaturePrivateKey(const SignaturePrivateKey& other)
   : _key(other._key->dup())
