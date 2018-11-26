@@ -108,34 +108,16 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
   auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
   auto gX = x.public_key();
 
-  std::string raw =
-    "045e2808231accb273fcb6d6fc1d0954e72239628a8e2ba2e5c7cb9c299f98e74"
-    "7b185023591e72c2aaa7147a3c273140523675235bd1ba8549046fb39545d4e47";
-  std::string header = "0041";
-
-  /*
-  // Uncomment to test X25519 keys
-  std::string raw =
-    "4c7a59eba41ba032833e85f4827652905cc7e06cc1898dc9af45bb1efededd16";
-  std::string header = "0020";
-  */
-
   SECTION("Directly")
   {
-    auto data = gX.to_bytes();
-    REQUIRE(data == from_hex(raw));
-
-    DHPublicKey parsed(data);
+    DHPublicKey parsed(gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
   SECTION("Via TLS syntax")
   {
-    auto data = tls::marshal(gX);
-    REQUIRE(data == from_hex(header + raw));
-
     DHPublicKey gX2;
-    tls::unmarshal(data, gX2);
+    tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
 }

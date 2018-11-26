@@ -13,7 +13,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
-#find_package(OpenSSL REQUIRED)
 set(OPENSSL_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/third_party/openssl/include")
 set(OPENSSL_LIBRARIES "${PROJECT_SOURCE_DIR}/third_party/openssl/libcrypto.a")
 
