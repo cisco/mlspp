@@ -51,6 +51,7 @@ public:
 
   virtual ~OpenSSLKey() = default;
 
+  virtual OpenSSLKeyType type() const = 0;
   virtual size_t secret_size() const = 0;
   virtual size_t sig_size() const = 0;
   virtual bool can_derive() const = 0;
@@ -134,6 +135,13 @@ TypedDelete(OpenSSLKey* ptr)
   delete ptr;
 }
 
+template<>
+void
+TypedDelete(PublicKey* ptr)
+{
+  delete ptr;
+}
+
 // This shorthand just saves on explicit template arguments
 template<typename T>
 typed_unique_ptr<T>
@@ -168,6 +176,17 @@ public:
     , _type(type)
   {}
 
+  virtual OpenSSLKeyType type() const
+  {
+    switch (_type) {
+      case X25519:
+        return OpenSSLKeyType::X25519;
+      case Ed25519:
+        return OpenSSLKeyType::Ed25519;
+    }
+
+    throw MissingStateError("Unknown raw key type");
+  }
   virtual size_t secret_size() const { return 32; }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
@@ -274,6 +293,7 @@ public:
     : OpenSSLKey(pkey)
   {}
 
+  virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
   virtual size_t secret_size() const { return 32; }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
@@ -755,29 +775,33 @@ AESGCM::decrypt(const bytes& ct) const
 }
 
 ///
-/// DHPublicKey
+/// PublicKey
 ///
 
-DHPublicKey::DHPublicKey()
-  : _key(OpenSSLKey::create(DH_KEY_TYPE))
+PublicKey::PublicKey(OpenSSLKeyType type)
+  : _key(OpenSSLKey::create(type))
 {}
 
-DHPublicKey::DHPublicKey(const DHPublicKey& other)
+PublicKey::PublicKey(const PublicKey& other)
   : _key(other._key->dup())
 {}
 
-DHPublicKey::DHPublicKey(DHPublicKey&& other)
+PublicKey::PublicKey(PublicKey&& other)
   : _key(std::move(other._key))
 {}
 
-DHPublicKey::DHPublicKey(const bytes& data)
-  : _key(OpenSSLKey::create(DH_KEY_TYPE))
+PublicKey::PublicKey(OpenSSLKeyType type, const bytes& data)
+  : _key(OpenSSLKey::create(type))
 {
   reset(data);
 }
 
-DHPublicKey&
-DHPublicKey::operator=(const DHPublicKey& other)
+PublicKey::PublicKey(OpenSSLKey* key)
+  : _key(key)
+{}
+
+PublicKey&
+PublicKey::operator=(const PublicKey& other)
 {
   if (&other != this) {
     _key.reset(other._key->dup());
@@ -785,8 +809,8 @@ DHPublicKey::operator=(const DHPublicKey& other)
   return *this;
 }
 
-DHPublicKey&
-DHPublicKey::operator=(DHPublicKey&& other)
+PublicKey&
+PublicKey::operator=(PublicKey&& other)
 {
   if (&other != this) {
     _key = std::move(other._key);
@@ -795,28 +819,122 @@ DHPublicKey::operator=(DHPublicKey&& other)
 }
 
 bool
-DHPublicKey::operator==(const DHPublicKey& other) const
+PublicKey::operator==(const PublicKey& other) const
 {
   return *_key == *other._key;
 }
 
 bool
-DHPublicKey::operator!=(const DHPublicKey& other) const
+PublicKey::operator!=(const PublicKey& other) const
 {
   return !(*this == other);
 }
 
 bytes
-DHPublicKey::to_bytes() const
+PublicKey::to_bytes() const
 {
   return _key->marshal();
 }
 
 void
-DHPublicKey::reset(const bytes& data)
+PublicKey::reset(const bytes& data)
 {
   _key->set_public(data);
 }
+
+void
+PublicKey::reset(OpenSSLKey* key)
+{
+  _key.reset(key);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const PublicKey& obj)
+{
+  tls::vector<uint8_t, 2> data = obj.to_bytes();
+  return out << data;
+}
+
+tls::istream&
+operator>>(tls::istream& in, PublicKey& obj)
+{
+  tls::vector<uint8_t, 2> data;
+  in >> data;
+  obj.reset(data);
+  return in;
+}
+
+///
+/// PrivateKey
+///
+
+PrivateKey::PrivateKey()
+  : _key(nullptr)
+  , _pub(nullptr)
+{}
+
+PrivateKey::PrivateKey(const PrivateKey& other)
+  : _key(other._key->dup())
+  , _pub(new PublicKey(*other._pub))
+{}
+
+PrivateKey::PrivateKey(PrivateKey&& other)
+  : _key(std::move(other._key))
+  , _pub(std::move(other._pub))
+{}
+
+PrivateKey&
+PrivateKey::operator=(const PrivateKey& other)
+{
+  if (this != &other) {
+    _key.reset(other._key->dup());
+    _pub.reset(new PublicKey(*other._pub));
+  }
+  return *this;
+}
+
+PrivateKey&
+PrivateKey::operator=(PrivateKey&& other)
+{
+  if (this != &other) {
+    _key = std::move(other._key);
+    _pub = std::move(other._pub);
+  }
+  return *this;
+}
+
+bool
+PrivateKey::operator==(const PrivateKey& other) const
+{
+  return *_key == *other._key;
+}
+
+bool
+PrivateKey::operator!=(const PrivateKey& other) const
+{
+  return !(*this == other);
+}
+
+PrivateKey::PrivateKey(OpenSSLKey* key)
+  : _key(key)
+  , _pub(nullptr)
+{
+  auto base = OpenSSLKey::create(key->type());
+  auto pub = new PublicKey(base);
+  _pub.reset(pub);
+}
+
+///
+/// DHPublicKey and DHPrivateKey
+///
+
+DHPublicKey::DHPublicKey()
+  : PublicKey(DH_KEY_TYPE)
+{}
+
+DHPublicKey::DHPublicKey(const bytes& data)
+  : PublicKey(DH_KEY_TYPE, data)
+{}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
 // nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
@@ -869,90 +987,22 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const DHPublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
-}
-
-tls::istream&
-operator>>(tls::istream& in, DHPublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
-  return in;
-}
-
-///
-/// DHPrivateKey
-///
-
 DHPrivateKey
 DHPrivateKey::generate()
 {
-  DHPrivateKey key;
-  key._key.reset(OpenSSLKey::create(DH_KEY_TYPE));
+  DHPrivateKey key(OpenSSLKey::create(DH_KEY_TYPE));
   key._key->generate();
-  key._pub._key.reset(key._key->dup_public());
+  key._pub->reset(key._key->dup_public());
   return key;
 }
 
 DHPrivateKey
 DHPrivateKey::derive(const bytes& seed)
 {
-  DHPrivateKey key;
-  key._key.reset(OpenSSLKey::create(DH_KEY_TYPE));
+  DHPrivateKey key(OpenSSLKey::create(DH_KEY_TYPE));
   key._key->set_secret(seed);
-  key._pub._key.reset(key._key->dup_public());
+  key._pub->reset(key._key->dup_public());
   return key;
-}
-
-DHPrivateKey::DHPrivateKey()
-  : _key(nullptr)
-{}
-
-DHPrivateKey::DHPrivateKey(const DHPrivateKey& other)
-  : _key(other._key->dup())
-  , _pub(other._pub)
-{}
-
-DHPrivateKey::DHPrivateKey(DHPrivateKey&& other)
-  : _key(std::move(other._key))
-  , _pub(std::move(other._pub))
-{}
-
-DHPrivateKey&
-DHPrivateKey::operator=(const DHPrivateKey& other)
-{
-  if (this != &other) {
-    _key.reset(other._key->dup());
-    _pub = other._pub;
-  }
-  return *this;
-}
-
-DHPrivateKey&
-DHPrivateKey::operator=(DHPrivateKey&& other)
-{
-  if (this != &other) {
-    _key = std::move(other._key);
-    _pub = std::move(other._pub);
-  }
-  return *this;
-}
-
-bool
-DHPrivateKey::operator==(const DHPrivateKey& other) const
-{
-  return *_key == *other._key;
-}
-
-bool
-DHPrivateKey::operator!=(const DHPrivateKey& other) const
-{
-  return !(*this == other);
 }
 
 bytes
@@ -964,7 +1014,8 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
 const DHPublicKey&
 DHPrivateKey::public_key() const
 {
-  return _pub;
+  auto pub = static_cast<DHPublicKey*>(_pub.get());
+  return *pub;
 }
 
 bytes
@@ -977,6 +1028,46 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);
+}
+
+///
+/// SignaturePublicKey and SignaturePrivateKey
+///
+
+SignaturePublicKey::SignaturePublicKey()
+  : PublicKey(SIG_KEY_TYPE)
+{}
+
+SignaturePublicKey::SignaturePublicKey(const bytes& data)
+  : PublicKey(SIG_KEY_TYPE, data)
+{}
+
+bool
+SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
+{
+  return _key->verify(message, signature);
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::generate()
+{
+  SignaturePrivateKey key(OpenSSLKey::create(SIG_KEY_TYPE));
+  key._key->generate();
+  key._pub->reset(key._key->dup_public());
+  return key;
+}
+
+bytes
+SignaturePrivateKey::sign(const bytes& message) const
+{
+  return _key->sign(message);
+}
+
+const SignaturePublicKey&
+SignaturePrivateKey::public_key() const
+{
+  auto pub = static_cast<SignaturePublicKey*>(_pub.get());
+  return *pub;
 }
 
 ///
@@ -993,164 +1084,6 @@ tls::istream&
 operator>>(tls::istream& in, ECIESCiphertext& obj)
 {
   return in >> obj.ephemeral >> obj.content;
-}
-
-///
-/// SignaturePublicKey
-///
-
-SignaturePublicKey::SignaturePublicKey()
-  : _key(OpenSSLKey::create(SIG_KEY_TYPE))
-{}
-
-SignaturePublicKey::SignaturePublicKey(const SignaturePublicKey& other)
-  : _key(other._key->dup_public())
-{}
-
-SignaturePublicKey::SignaturePublicKey(SignaturePublicKey&& other)
-  : _key(std::move(other._key))
-{}
-
-SignaturePublicKey::SignaturePublicKey(const bytes& data)
-  : _key(OpenSSLKey::create(SIG_KEY_TYPE))
-{
-  reset(data);
-}
-
-SignaturePublicKey&
-SignaturePublicKey::operator=(const SignaturePublicKey& other)
-{
-  if (&other != this) {
-    _key.reset(other._key->dup_public());
-  }
-  return *this;
-}
-
-SignaturePublicKey&
-SignaturePublicKey::operator=(SignaturePublicKey&& other)
-{
-  if (&other != this) {
-    _key = std::move(other._key);
-  }
-  return *this;
-}
-
-bool
-SignaturePublicKey::operator==(const SignaturePublicKey& other) const
-{
-  return *_key == *other._key;
-}
-
-bool
-SignaturePublicKey::operator!=(const SignaturePublicKey& other) const
-{
-  return !(*this == other);
-}
-
-bool
-SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
-{
-  return _key->verify(message, signature);
-}
-
-bytes
-SignaturePublicKey::to_bytes() const
-{
-  return _key->marshal();
-}
-
-void
-SignaturePublicKey::reset(const bytes& data)
-{
-  _key->set_public(data);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignaturePublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
-  return in;
-}
-
-///
-/// SignaturePrivateKey
-///
-
-SignaturePrivateKey
-SignaturePrivateKey::generate()
-{
-  SignaturePrivateKey key;
-  key._key.reset(OpenSSLKey::create(SIG_KEY_TYPE));
-  key._key->generate();
-  key._pub._key.reset(key._key->dup_public());
-  return key;
-}
-
-SignaturePrivateKey::SignaturePrivateKey()
-  : _key(nullptr)
-{}
-
-SignaturePrivateKey::SignaturePrivateKey(const SignaturePrivateKey& other)
-  : _key(other._key->dup())
-  , _pub(other._pub)
-{}
-
-SignaturePrivateKey::SignaturePrivateKey(SignaturePrivateKey&& other)
-  : _key(std::move(other._key))
-  , _pub(std::move(other._pub))
-{}
-
-SignaturePrivateKey&
-SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
-{
-  if (this != &other) {
-    _key.reset(other._key->dup());
-    _pub = other._pub;
-  }
-  return *this;
-}
-
-SignaturePrivateKey&
-SignaturePrivateKey::operator=(SignaturePrivateKey&& other)
-{
-  if (this != &other) {
-    _key = std::move(other._key);
-    _pub = std::move(other._pub);
-  }
-  return *this;
-}
-
-bool
-SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
-{
-  return *_key == *other._key;
-}
-
-bool
-SignaturePrivateKey::operator!=(const SignaturePrivateKey& other) const
-{
-  return !(*this == other);
-}
-
-bytes
-SignaturePrivateKey::sign(const bytes& message) const
-{
-  return _key->sign(message);
-}
-
-const SignaturePublicKey&
-SignaturePrivateKey::public_key() const
-{
-  return _pub;
 }
 
 } // namespace mls

@@ -124,60 +124,105 @@ private:
   const EVP_CIPHER* _cipher;
 };
 
-struct ECIESCiphertext;
+// Generic PublicKey and PrivateKey structs, which are specialized
+// to DH and Signature below
 
-class DHPublicKey
+class PublicKey
 {
 public:
-  DHPublicKey();
-  DHPublicKey(const DHPublicKey& other);
-  DHPublicKey(DHPublicKey&& other);
-  DHPublicKey(const bytes& data);
-  DHPublicKey& operator=(const DHPublicKey& other);
-  DHPublicKey& operator=(DHPublicKey&& other);
+  PublicKey(OpenSSLKeyType type);
+  PublicKey(const PublicKey& other);
+  PublicKey(PublicKey&& other);
+  PublicKey(OpenSSLKeyType type, const bytes& data);
+  PublicKey(OpenSSLKey* key);
 
-  bool operator==(const DHPublicKey& other) const;
-  bool operator!=(const DHPublicKey& other) const;
+  PublicKey& operator=(const PublicKey& other);
+  PublicKey& operator=(PublicKey&& other);
+
+  bool operator==(const PublicKey& other) const;
+  bool operator!=(const PublicKey& other) const;
 
   bytes to_bytes() const;
   void reset(const bytes& data);
+  void reset(OpenSSLKey* key);
 
-  ECIESCiphertext encrypt(const bytes& plaintext) const;
-
-private:
+protected:
   typed_unique_ptr<OpenSSLKey> _key;
-
-  friend class DHPrivateKey;
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const DHPublicKey& obj);
+operator<<(tls::ostream& out, const PublicKey& obj);
 tls::istream&
-operator>>(tls::istream& in, DHPublicKey& obj);
+operator>>(tls::istream& in, PublicKey& obj);
 
-class DHPrivateKey
+class PrivateKey
 {
 public:
+  PrivateKey();
+  PrivateKey(const PrivateKey& other);
+  PrivateKey(PrivateKey&& other);
+  PrivateKey& operator=(const PrivateKey& other);
+  PrivateKey& operator=(PrivateKey&& other);
+
+  bool operator==(const PrivateKey& other) const;
+  bool operator!=(const PrivateKey& other) const;
+
+protected:
+  typed_unique_ptr<OpenSSLKey> _key;
+  typed_unique_ptr<PublicKey> _pub;
+
+  PrivateKey(OpenSSLKey* key);
+};
+
+// DH specialization
+struct ECIESCiphertext;
+
+class DHPublicKey : public PublicKey
+{
+public:
+  using PublicKey::PublicKey;
+  DHPublicKey();
+  DHPublicKey(const bytes& data);
+  ECIESCiphertext encrypt(const bytes& plaintext) const;
+  friend class DHPrivateKey;
+};
+
+class DHPrivateKey : public PrivateKey
+{
+public:
+  using PrivateKey::PrivateKey;
+
   static DHPrivateKey generate();
   static DHPrivateKey derive(const bytes& secret);
-
-  DHPrivateKey();
-  DHPrivateKey(const DHPrivateKey& other);
-  DHPrivateKey(DHPrivateKey&& other);
-  DHPrivateKey& operator=(const DHPrivateKey& other);
-  DHPrivateKey& operator=(DHPrivateKey&& other);
-
-  bool operator==(const DHPrivateKey& other) const;
-  bool operator!=(const DHPrivateKey& other) const;
-
-  bytes derive(const DHPublicKey& pub) const;
   const DHPublicKey& public_key() const;
 
+  bytes derive(const DHPublicKey& pub) const;
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
+};
 
-private:
-  typed_unique_ptr<OpenSSLKey> _key;
-  DHPublicKey _pub;
+// Signature specialization
+class SignaturePublicKey : public PublicKey
+{
+public:
+  using PublicKey::PublicKey;
+
+  // XXX(rlb@ipv.sx) These are needed until we get proper crypto
+  // agility going.
+  SignaturePublicKey();
+  SignaturePublicKey(const bytes& data);
+
+  bool verify(const bytes& message, const bytes& signature) const;
+};
+
+class SignaturePrivateKey : public PrivateKey
+{
+public:
+  using PrivateKey::PrivateKey;
+
+  static SignaturePrivateKey generate();
+
+  bytes sign(const bytes& message) const;
+  const SignaturePublicKey& public_key() const;
 };
 
 struct ECIESCiphertext
@@ -188,68 +233,6 @@ struct ECIESCiphertext
   friend tls::ostream& operator<<(tls::ostream& out,
                                   const ECIESCiphertext& obj);
   friend tls::istream& operator>>(tls::istream& in, ECIESCiphertext& obj);
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const DHPrivateKey& obj);
-tls::istream&
-operator>>(tls::istream& in, DHPrivateKey& obj);
-
-// XXX(rlb@ipv.sx): There is a *ton* of repeated code between DH and
-// Signature keys, both here and in the corresponding .cpp file.
-// While this is unfortunate, it's hopefully a temporary state of
-// affairs.  We should look into whether these classes can be
-// cleaned up leveraging OpenSSLKey.
-
-class SignaturePublicKey
-{
-public:
-  SignaturePublicKey();
-  SignaturePublicKey(const SignaturePublicKey& other);
-  SignaturePublicKey(SignaturePublicKey&& other);
-  SignaturePublicKey(const bytes& data);
-  SignaturePublicKey& operator=(const SignaturePublicKey& other);
-  SignaturePublicKey& operator=(SignaturePublicKey&& other);
-
-  bool operator==(const SignaturePublicKey& other) const;
-  bool operator!=(const SignaturePublicKey& other) const;
-
-  bool verify(const bytes& message, const bytes& signature) const;
-
-  bytes to_bytes() const;
-  void reset(const bytes& data);
-
-private:
-  typed_unique_ptr<OpenSSLKey> _key;
-
-  friend class SignaturePrivateKey;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePublicKey& obj);
-tls::istream&
-operator>>(tls::istream& in, SignaturePublicKey& obj);
-
-class SignaturePrivateKey
-{
-public:
-  static SignaturePrivateKey generate();
-
-  SignaturePrivateKey();
-  SignaturePrivateKey(const SignaturePrivateKey& other);
-  SignaturePrivateKey(SignaturePrivateKey&& other);
-  SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
-  SignaturePrivateKey& operator=(SignaturePrivateKey&& other);
-
-  bool operator==(const SignaturePrivateKey& other) const;
-  bool operator!=(const SignaturePrivateKey& other) const;
-
-  bytes sign(const bytes& message) const;
-  const SignaturePublicKey& public_key() const;
-
-private:
-  typed_unique_ptr<OpenSSLKey> _key;
-  SignaturePublicKey _pub;
 };
 
 } // namespace mls
