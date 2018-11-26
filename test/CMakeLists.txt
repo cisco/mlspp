@@ -15,7 +15,7 @@ file(GLOB TEST_SOURCE_FILES "${TEST_SRC_PATH}/*.cpp")
 set(TEST_SOURCE_FILES ${TEST_SOURCE_FILES} PARENT_SCOPE)
 
 add_executable(${TEST_APP_NAME} ${TEST_SOURCE_FILES})
-target_link_libraries(${TEST_APP_NAME} ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(${TEST_APP_NAME} ${OPENSSL_LIBRARIES})
 target_link_libraries(${TEST_APP_NAME} ${LIB_NAME})
 
 enable_testing()

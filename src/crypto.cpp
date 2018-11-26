@@ -3,25 +3,100 @@
 #include "openssl/ecdh.h"
 #include "openssl/ecdsa.h"
 #include "openssl/err.h"
+#include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/obj_mac.h"
 #include "openssl/rand.h"
 #include "openssl/sha.h"
 #include "state.h"
 
+#include <iostream>
 #include <string>
 
-#define DH_CURVE NID_X9_62_prime256v1
-#define SIG_CURVE NID_X9_62_prime256v1
-#define DH_OUTPUT_BYTES SHA256_DIGEST_LENGTH
+#define DH_KEY_TYPE OpenSSLKeyType::P256
+// #define DH_KEY_TYPE OpenSSLKeyType::X25519
+
+// #define SIG_KEY_TYPE OpenSSLKeyType::P256
+#define SIG_KEY_TYPE OpenSSLKeyType::Ed25519
 
 namespace mls {
+
+///
+/// OpenSSLError
+///
 
 OpenSSLError
 OpenSSLError::current()
 {
   unsigned long code = ERR_get_error();
   return OpenSSLError(ERR_error_string(code, nullptr));
+}
+
+///
+/// OpenSSLKey
+///
+/// Declaration here, implementation below
+///
+
+struct OpenSSLKey
+{
+public:
+  OpenSSLKey()
+    : _key(nullptr)
+  {}
+
+  OpenSSLKey(EVP_PKEY* key)
+    : _key(key)
+  {}
+
+  virtual ~OpenSSLKey() = default;
+
+  virtual OpenSSLKeyType type() const = 0;
+  virtual size_t secret_size() const = 0;
+  virtual size_t sig_size() const = 0;
+  virtual bool can_derive() const = 0;
+  virtual bool can_sign() const = 0;
+
+  virtual bytes marshal() const = 0;
+  virtual void generate() = 0;
+  virtual void set_public(const bytes& data) = 0;
+  virtual void set_secret(const bytes& data) = 0;
+  virtual OpenSSLKey* dup() const = 0;
+  virtual OpenSSLKey* dup_public() const = 0;
+
+  // Defined below to make it easier to refer to the more specific
+  // key types.
+  static OpenSSLKey* create(OpenSSLKeyType type);
+
+  bool operator==(const OpenSSLKey& other)
+  {
+    // If one pointer is null and the other is not, then the two keys
+    // are not equal
+    if (!!_key.get() != !!other._key.get()) {
+      return false;
+    }
+
+    // If both pointers are null, then the two keys are equal.
+    if (!_key.get()) {
+      return true;
+    }
+
+    auto cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
+    return cmp == 1;
+  }
+
+  typed_unique_ptr<EVP_PKEY> _key;
+};
+
+///
+/// Deleters and smart pointers for OpenSSL types
+///
+
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
 }
 
 template<>
@@ -33,23 +108,9 @@ TypedDelete(EC_KEY* ptr)
 
 template<>
 void
-TypedDelete(EC_GROUP* ptr)
-{
-  EC_GROUP_free(ptr);
-}
-
-template<>
-void
 TypedDelete(EC_POINT* ptr)
 {
   EC_POINT_free(ptr);
-}
-
-template<>
-void
-TypedDelete(BIGNUM* ptr)
-{
-  BN_free(ptr);
 }
 
 template<>
@@ -60,27 +121,307 @@ TypedDelete(EVP_CIPHER_CTX* ptr)
 }
 
 template<>
-EC_KEY*
-TypedDup(EC_KEY* ptr)
+void
+TypedDelete(EVP_MD_CTX* ptr)
 {
-  return EC_KEY_dup(ptr);
+  EVP_MD_CTX_free(ptr);
 }
 
 template<>
-EC_GROUP*
-TypedDup(EC_GROUP* ptr)
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
 {
-  return EC_GROUP_dup(ptr);
+  EVP_PKEY_CTX_free(ptr);
 }
 
-Scoped<EC_GROUP>
-defaultECGroup()
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
 {
-  Scoped<EC_GROUP> group = EC_GROUP_new_by_curve_name(DH_CURVE);
-  if (group.get() == nullptr) {
-    throw OpenSSLError::current();
+  EVP_PKEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(OpenSSLKey* ptr)
+{
+  delete ptr;
+}
+
+template<>
+void
+TypedDelete(PublicKey* ptr)
+{
+  delete ptr;
+}
+
+// This shorthand just saves on explicit template arguments
+template<typename T>
+typed_unique_ptr<T>
+make_typed_unique(T* ptr)
+{
+  return typed_unique_ptr<T>(ptr);
+}
+
+///
+/// OpenSSLKey
+///
+/// This is used to encapsulate the operations required for
+/// different types of points, with a slightly cleaner interface
+/// than OpenSSL's EVP interface.
+///
+
+enum RawKeyType : int
+{
+  X25519 = EVP_PKEY_X25519,
+  Ed25519 = EVP_PKEY_ED25519,
+};
+
+struct RawKey : OpenSSLKey
+{
+public:
+  RawKey(RawKeyType type)
+    : _type(type)
+  {}
+
+  RawKey(RawKeyType type, EVP_PKEY* pkey)
+    : OpenSSLKey(pkey)
+    , _type(type)
+  {}
+
+  virtual OpenSSLKeyType type() const
+  {
+    switch (_type) {
+      case X25519:
+        return OpenSSLKeyType::X25519;
+      case Ed25519:
+        return OpenSSLKeyType::Ed25519;
+    }
+
+    throw MissingStateError("Unknown raw key type");
   }
-  return group;
+  virtual size_t secret_size() const { return 32; }
+  virtual size_t sig_size() const { return 200; }
+  virtual bool can_derive() const { return true; }
+  virtual bool can_sign() const { return _type == RawKeyType::Ed25519; }
+
+  virtual bytes marshal() const
+  {
+    size_t raw_len;
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes raw(raw_len);
+    uint8_t* data_ptr = raw.data();
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    return raw;
+  }
+
+  virtual void generate() { set_secret(random_bytes(secret_size())); }
+
+  virtual void set_public(const bytes& data)
+  {
+    EVP_PKEY* pkey =
+      EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
+  virtual void set_secret(const bytes& data)
+  {
+    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+
+    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+      _type, nullptr, digest.data(), digest.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
+  virtual OpenSSLKey* dup() const
+  {
+    size_t raw_len = 0;
+    if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    // The actual key fetch will fail if `_key` represents a public key
+    bytes raw(raw_len);
+    auto data_ptr = raw.data();
+    auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
+    if (rv == 1) {
+      auto pkey =
+        EVP_PKEY_new_raw_private_key(_type, nullptr, raw.data(), raw.size());
+      if (!pkey) {
+        throw OpenSSLError::current();
+      }
+
+      return new RawKey(_type, pkey);
+    }
+
+    return dup_public();
+  }
+
+  virtual OpenSSLKey* dup_public() const
+  {
+    size_t raw_len = 0;
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes raw(raw_len);
+    auto data_ptr = raw.data();
+    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    auto pkey =
+      EVP_PKEY_new_raw_public_key(_type, nullptr, raw.data(), raw.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    return new RawKey(_type, pkey);
+  }
+
+private:
+  RawKeyType _type;
+};
+
+struct P256Key : OpenSSLKey
+{
+public:
+  P256Key() = default;
+
+  P256Key(EVP_PKEY* pkey)
+    : OpenSSLKey(pkey)
+  {}
+
+  virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
+  virtual size_t secret_size() const { return 32; }
+  virtual size_t sig_size() const { return 200; }
+  virtual bool can_derive() const { return true; }
+  virtual bool can_sign() const { return true; }
+
+  virtual bytes marshal() const
+  {
+    auto pub = EVP_PKEY_get0_EC_KEY(_key.get());
+
+    auto len = i2o_ECPublicKey(pub, nullptr);
+    if (len == 0) {
+      // Technically, this is not necessarily an error, but in
+      // practice it always will be.
+      throw OpenSSLError::current();
+    }
+
+    bytes out(len);
+    auto data = out.data();
+    if (i2o_ECPublicKey(pub, &data) == 0) {
+      throw OpenSSLError::current();
+    }
+
+    return out;
+  }
+
+  virtual void generate()
+  {
+    auto eckey = make_typed_unique(new_ec_key());
+    if (1 != EC_KEY_generate_key(eckey.get())) {
+      throw OpenSSLError::current();
+    }
+
+    reset(eckey.release());
+  }
+
+  virtual void set_public(const bytes& data)
+  {
+    auto eckey = make_typed_unique(new_ec_key());
+
+    auto eckey_ptr = eckey.get();
+    auto data_ptr = data.data();
+    if (!o2i_ECPublicKey(&eckey_ptr, &data_ptr, data.size())) {
+      throw OpenSSLError::current();
+    }
+
+    reset(eckey.release());
+  }
+
+  virtual void set_secret(const bytes& data)
+  {
+    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+
+    EC_KEY* eckey = new_ec_key();
+
+    auto group = EC_KEY_get0_group(eckey);
+    auto d =
+      make_typed_unique(BN_bin2bn(digest.data(), digest.size(), nullptr));
+    auto pt = make_typed_unique(EC_POINT_new(group));
+    EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
+
+    EC_KEY_set_private_key(eckey, d.get());
+    EC_KEY_set_public_key(eckey, pt.get());
+
+    reset(eckey);
+  }
+
+  virtual OpenSSLKey* dup() const
+  {
+    auto eckey_out = EC_KEY_dup(my_ec_key());
+    return new P256Key(eckey_out);
+  }
+
+  virtual OpenSSLKey* dup_public() const
+  {
+    auto eckey = my_ec_key();
+    auto group = EC_KEY_get0_group(eckey);
+    auto point = EC_KEY_get0_public_key(eckey);
+
+    auto eckey_out = new_ec_key();
+    EC_KEY_set_public_key(eckey_out, point);
+    return new P256Key(eckey_out);
+  }
+
+private:
+  static const int _curve_nid = NID_X9_62_prime256v1;
+
+  P256Key(EC_KEY* eckey)
+    : OpenSSLKey()
+  {
+    reset(eckey);
+  }
+
+  void reset(EC_KEY* eckey)
+  {
+    auto pkey = EVP_PKEY_new();
+    EVP_PKEY_assign_EC_KEY(pkey, eckey);
+    _key.reset(pkey);
+  }
+
+  const EC_KEY* my_ec_key() const { return EVP_PKEY_get0_EC_KEY(_key.get()); }
+
+  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(_curve_nid); }
+};
+
+OpenSSLKey*
+OpenSSLKey::create(OpenSSLKeyType type)
+{
+  switch (type) {
+    case OpenSSLKeyType::X25519:
+      return new RawKey(RawKeyType::X25519);
+    case OpenSSLKeyType::Ed25519:
+      return new RawKey(RawKeyType::Ed25519);
+    case OpenSSLKeyType::P256:
+      return new P256Key;
+  }
 }
 
 ///
@@ -265,7 +606,7 @@ AESGCM::set_aad(const bytes& aad)
 bytes
 AESGCM::encrypt(const bytes& pt) const
 {
-  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
@@ -307,7 +648,7 @@ AESGCM::decrypt(const bytes& ct) const
     throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
   }
 
-  Scoped<EVP_CIPHER_CTX> ctx = EVP_CIPHER_CTX_new();
+  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
@@ -343,33 +684,42 @@ AESGCM::decrypt(const bytes& ct) const
 }
 
 ///
-/// DHPublicKey
+/// PublicKey
 ///
 
-DHPublicKey::DHPublicKey(const DHPublicKey& other)
-  : _key(other._key)
+PublicKey::PublicKey(OpenSSLKeyType type)
+  : _key(OpenSSLKey::create(type))
 {}
 
-DHPublicKey::DHPublicKey(DHPublicKey&& other)
+PublicKey::PublicKey(const PublicKey& other)
+  : _key(other._key->dup())
+{}
+
+PublicKey::PublicKey(PublicKey&& other)
   : _key(std::move(other._key))
 {}
 
-DHPublicKey::DHPublicKey(const bytes& data)
+PublicKey::PublicKey(OpenSSLKeyType type, const bytes& data)
+  : _key(OpenSSLKey::create(type))
 {
   reset(data);
 }
 
-DHPublicKey&
-DHPublicKey::operator=(const DHPublicKey& other)
+PublicKey::PublicKey(OpenSSLKey* key)
+  : _key(key)
+{}
+
+PublicKey&
+PublicKey::operator=(const PublicKey& other)
 {
   if (&other != this) {
-    _key = other._key;
+    _key.reset(other._key->dup());
   }
   return *this;
 }
 
-DHPublicKey&
-DHPublicKey::operator=(DHPublicKey&& other)
+PublicKey&
+PublicKey::operator=(PublicKey&& other)
 {
   if (&other != this) {
     _key = std::move(other._key);
@@ -378,65 +728,122 @@ DHPublicKey::operator=(DHPublicKey&& other)
 }
 
 bool
-DHPublicKey::operator==(const DHPublicKey& other) const
+PublicKey::operator==(const PublicKey& other) const
 {
-  if (_key.get() == nullptr && other._key.get() == nullptr) {
-    return true;
-  } else if (_key.get() == nullptr) {
-    return false;
-  } else if (other._key.get() == nullptr) {
-    return false;
-  }
-
-  // Raw pointers OK here because get0 methods return pointers to
-  // memory managed by the EC_KEY.
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-  const EC_POINT* lhs = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* rhs = EC_KEY_get0_public_key(other._key.get());
-  return (EC_POINT_cmp(group, lhs, rhs, nullptr) == 0);
+  return *_key == *other._key;
 }
 
 bool
-DHPublicKey::operator!=(const DHPublicKey& other) const
+PublicKey::operator!=(const PublicKey& other) const
 {
   return !(*this == other);
 }
 
 bytes
-DHPublicKey::to_bytes() const
+PublicKey::to_bytes() const
 {
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2o_ECPublicKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
-
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2o_ECPublicKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
+  return _key->marshal();
 }
 
 void
-DHPublicKey::reset(const bytes& data)
+PublicKey::reset(const bytes& data)
 {
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!o2i_ECPublicKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
+  _key->set_public(data);
 }
+
+void
+PublicKey::reset(OpenSSLKey* key)
+{
+  _key.reset(key);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const PublicKey& obj)
+{
+  tls::vector<uint8_t, 2> data = obj.to_bytes();
+  return out << data;
+}
+
+tls::istream&
+operator>>(tls::istream& in, PublicKey& obj)
+{
+  tls::vector<uint8_t, 2> data;
+  in >> data;
+  obj.reset(data);
+  return in;
+}
+
+///
+/// PrivateKey
+///
+
+PrivateKey::PrivateKey()
+  : _key(nullptr)
+  , _pub(nullptr)
+{}
+
+PrivateKey::PrivateKey(const PrivateKey& other)
+  : _key(other._key->dup())
+  , _pub(new PublicKey(*other._pub))
+{}
+
+PrivateKey::PrivateKey(PrivateKey&& other)
+  : _key(std::move(other._key))
+  , _pub(std::move(other._pub))
+{}
+
+PrivateKey&
+PrivateKey::operator=(const PrivateKey& other)
+{
+  if (this != &other) {
+    _key.reset(other._key->dup());
+    _pub.reset(new PublicKey(*other._pub));
+  }
+  return *this;
+}
+
+PrivateKey&
+PrivateKey::operator=(PrivateKey&& other)
+{
+  if (this != &other) {
+    _key = std::move(other._key);
+    _pub = std::move(other._pub);
+  }
+  return *this;
+}
+
+bool
+PrivateKey::operator==(const PrivateKey& other) const
+{
+  return *_key == *other._key;
+}
+
+bool
+PrivateKey::operator!=(const PrivateKey& other) const
+{
+  return !(*this == other);
+}
+
+PrivateKey::PrivateKey(OpenSSLKey* key)
+  : _key(key)
+  , _pub(nullptr)
+{
+  auto base = OpenSSLKey::create(key->type());
+  auto pub = new PublicKey(base);
+  _pub.reset(pub);
+}
+
+///
+/// DHPublicKey and DHPrivateKey
+///
+
+DHPublicKey::DHPublicKey()
+  : PublicKey(DH_KEY_TYPE)
+{}
+
+DHPublicKey::DHPublicKey(const bytes& data)
+  : PublicKey(DH_KEY_TYPE, data)
+{}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
 // nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
@@ -489,139 +896,67 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
-DHPublicKey::DHPublicKey(const EC_POINT* pt)
-  : _key(EC_KEY_new_by_curve_name(DH_CURVE))
-{
-  if (EC_KEY_set_public_key(_key.get(), pt) != 1) {
-    throw OpenSSLError::current();
-  }
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const DHPublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
-}
-
-tls::istream&
-operator>>(tls::istream& in, DHPublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
-  return in;
-}
-
-///
-/// DHPrivateKey
-///
-
 DHPrivateKey
 DHPrivateKey::generate()
 {
-  // Raw pointer is OK here because DHPrivateKey takes over
-  // management of the memory referenced by key.
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (EC_KEY_generate_key(key) != 1) {
-    throw OpenSSLError::current();
-  }
-
-  return DHPrivateKey(key);
+  DHPrivateKey key(OpenSSLKey::create(DH_KEY_TYPE));
+  key._key->generate();
+  key._pub->reset(key._key->dup_public());
+  return key;
 }
 
 DHPrivateKey
 DHPrivateKey::derive(const bytes& seed)
 {
-  bytes digest = SHA256Digest(dh_hash_prefix).write(seed).digest();
-
-  Scoped<BIGNUM> d = BN_bin2bn(digest.data(), digest.size(), nullptr);
-  Scoped<EC_GROUP> group = defaultECGroup();
-  Scoped<EC_POINT> pt = EC_POINT_new(group.get());
-  EC_POINT_mul(group.get(), pt.get(), d.get(), nullptr, nullptr, nullptr);
-
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY_set_group(key, group.get());
-  EC_KEY_set_private_key(key, d.get());
-  EC_KEY_set_public_key(key, pt.get());
-
-  return DHPrivateKey(key);
-}
-
-DHPrivateKey::DHPrivateKey(const DHPrivateKey& other)
-  : _key(other._key)
-  , _pub(other._pub)
-{}
-
-DHPrivateKey::DHPrivateKey(DHPrivateKey&& other)
-  : _key(std::move(other._key))
-  , _pub(std::move(other._pub))
-{}
-
-DHPrivateKey&
-DHPrivateKey::operator=(const DHPrivateKey& other)
-{
-  if (this != &other) {
-    _key = other._key;
-    _pub = other._pub;
-  }
-  return *this;
-}
-
-DHPrivateKey&
-DHPrivateKey::operator=(DHPrivateKey&& other)
-{
-  if (this != &other) {
-    _key = std::move(other._key);
-    _pub = std::move(other._pub);
-  }
-  return *this;
-}
-
-bool
-DHPrivateKey::operator==(const DHPrivateKey& other) const
-{
-  // Raw pointers here are OK because "get0" methods return pointers
-  // to memory owned by _key.
-  const BIGNUM* d1 = EC_KEY_get0_private_key(_key.get());
-  const BIGNUM* d2 = EC_KEY_get0_private_key(other._key.get());
-  const EC_POINT* p1 = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-
-  auto out =
-    (BN_cmp(d1, d2) == 0) && (EC_POINT_cmp(group, p1, p2, nullptr) == 0);
-  return out;
-}
-
-bool
-DHPrivateKey::operator!=(const DHPrivateKey& other) const
-{
-  return !(*this == other);
+  DHPrivateKey key(OpenSSLKey::create(DH_KEY_TYPE));
+  key._key->set_secret(seed);
+  key._pub->reset(key._key->dup_public());
+  return key;
 }
 
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
-  bytes out(DH_OUTPUT_BYTES);
-  // ECDH_compute_key shouldn't modify the private key, but it's
-  // missing the const modifier.
-  EC_KEY* priv_key = const_cast<EC_KEY*>(_key.get());
-  const EC_POINT* pub_key = EC_KEY_get0_public_key(pub._key.get());
-  ECDH_compute_key(out.data(), out.size(), pub_key, priv_key, nullptr);
+  if (!_key->can_derive() || !pub._key->can_derive()) {
+    throw InvalidParameterError("Inappropriate key(s) for derive");
+  }
+
+  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key->_key.get());
+  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key->_key.get());
+
+  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw OpenSSLError::current();
+  }
+
+  size_t out_len;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw OpenSSLError::current();
+  }
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw OpenSSLError::current();
+  }
+
   return out;
 }
 
-DHPublicKey
+const DHPublicKey&
 DHPrivateKey::public_key() const
 {
-  return _pub;
+  auto pub = static_cast<DHPublicKey*>(_pub.get());
+  return *pub;
 }
-
-DHPrivateKey::DHPrivateKey(EC_KEY* key)
-  : _key(key)
-  , _pub(EC_KEY_get0_public_key(key))
-{}
 
 bytes
 DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
@@ -635,41 +970,82 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
   return gcm.decrypt(ciphertext.content);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const DHPrivateKey& obj)
+///
+/// SignaturePublicKey and SignaturePrivateKey
+///
+
+SignaturePublicKey::SignaturePublicKey()
+  : PublicKey(SIG_KEY_TYPE)
+{}
+
+SignaturePublicKey::SignaturePublicKey(const bytes& data)
+  : PublicKey(SIG_KEY_TYPE, data)
+{}
+
+bool
+SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
 {
-  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
-  int len = BN_num_bytes(dN);
+  if (!_key->can_sign()) {
+    throw InvalidParameterError("Inappropriate key for verify");
+  }
 
-  tls::opaque<1> d(len);
-  BN_bn2bin(dN, d.data());
-
-  tls::opaque<1> pub = obj._pub.to_bytes();
-
-  return out << d << pub;
-}
-
-tls::istream&
-operator>>(tls::istream& in, DHPrivateKey& obj)
-{
-  tls::opaque<1> d, pub;
-  in >> d >> pub;
-
-  const uint8_t* ptr = pub.data();
-  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY* temp = key.get();
-  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (!ctx.get()) {
     throw OpenSSLError::current();
   }
 
-  Scoped<EC_GROUP> group = defaultECGroup();
-  EC_KEY_set_group(key.get(), group.get());
+  if (1 !=
+      EVP_DigestVerifyInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+    throw OpenSSLError::current();
+  }
 
-  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
-  EC_KEY_set_private_key(key.get(), dN.get());
+  auto rv =
+    EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
 
-  obj = DHPrivateKey(key.release());
-  return in;
+  return rv == 1;
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::generate()
+{
+  SignaturePrivateKey key(OpenSSLKey::create(SIG_KEY_TYPE));
+  key._key->generate();
+  key._pub->reset(key._key->dup_public());
+  return key;
+}
+
+bytes
+SignaturePrivateKey::sign(const bytes& msg) const
+{
+  if (!_key->can_sign()) {
+    throw InvalidParameterError("Inappropriate key for sign");
+  }
+
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_DigestSignInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+    throw OpenSSLError::current();
+  }
+
+  auto siglen = _key->sig_size();
+  bytes sig(_key->sig_size());
+  if (1 !=
+      EVP_DigestSign(ctx.get(), sig.data(), &siglen, msg.data(), msg.size())) {
+    throw OpenSSLError::current();
+  }
+
+  sig.resize(siglen);
+  return sig;
+}
+
+const SignaturePublicKey&
+SignaturePrivateKey::public_key() const
+{
+  auto pub = static_cast<SignaturePublicKey*>(_pub.get());
+  return *pub;
 }
 
 ///
@@ -686,291 +1062,6 @@ tls::istream&
 operator>>(tls::istream& in, ECIESCiphertext& obj)
 {
   return in >> obj.ephemeral >> obj.content;
-}
-
-///
-/// SignaturePublicKey
-///
-
-SignaturePublicKey::SignaturePublicKey(const SignaturePublicKey& other)
-  : _key(other._key)
-{}
-
-SignaturePublicKey::SignaturePublicKey(SignaturePublicKey&& other)
-  : _key(std::move(other._key))
-{}
-
-SignaturePublicKey::SignaturePublicKey(const bytes& data)
-{
-  reset(data);
-}
-
-SignaturePublicKey&
-SignaturePublicKey::operator=(const SignaturePublicKey& other)
-{
-  if (&other != this) {
-    _key = other._key;
-  }
-  return *this;
-}
-
-SignaturePublicKey&
-SignaturePublicKey::operator=(SignaturePublicKey&& other)
-{
-  if (&other != this) {
-    _key = std::move(other._key);
-  }
-  return *this;
-}
-
-bool
-SignaturePublicKey::operator==(const SignaturePublicKey& other) const
-{
-  // Raw pointers OK here because get0 methods return pointers to
-  // memory managed by the EC_KEY.
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-  const EC_POINT* lhs = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* rhs = EC_KEY_get0_public_key(other._key.get());
-  return (EC_POINT_cmp(group, lhs, rhs, nullptr) == 0);
-}
-
-bool
-SignaturePublicKey::operator!=(const SignaturePublicKey& other) const
-{
-  return !(*this == other);
-}
-
-bool
-SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
-{
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  auto digest = SHA256Digest(message).digest();
-  int rv = ECDSA_verify(0,
-                        digest.data(),
-                        digest.size(),
-                        signature.data(),
-                        signature.size(),
-                        temp_key);
-  if (rv < 0) {
-    throw OpenSSLError::current();
-  }
-
-  return (rv == 1);
-}
-
-bytes
-SignaturePublicKey::to_bytes() const
-{
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2o_ECPublicKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
-
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2o_ECPublicKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
-}
-
-void
-SignaturePublicKey::reset(const bytes& data)
-{
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!o2i_ECPublicKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
-}
-
-SignaturePublicKey::SignaturePublicKey(const EC_POINT* pt)
-  : _key(EC_KEY_new_by_curve_name(SIG_CURVE))
-{
-  if (EC_KEY_set_public_key(_key.get(), pt) != 1) {
-    throw OpenSSLError::current();
-  }
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data = obj.to_bytes();
-  return out << data;
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignaturePublicKey& obj)
-{
-  tls::vector<uint8_t, 2> data;
-  in >> data;
-  obj.reset(data);
-  return in;
-}
-
-///
-/// SignaturePrivateKey
-///
-
-SignaturePrivateKey
-SignaturePrivateKey::generate()
-{
-  // Raw pointer is OK here because SignaturePrivateKey takes over
-  // management of the memory referenced by key.
-  EC_KEY* key = EC_KEY_new_by_curve_name(SIG_CURVE);
-  if (EC_KEY_generate_key(key) != 1) {
-    throw OpenSSLError::current();
-  }
-
-  return SignaturePrivateKey(key);
-}
-
-SignaturePrivateKey::SignaturePrivateKey(const SignaturePrivateKey& other)
-  : _key(other._key)
-  , _pub(other._pub)
-{}
-
-SignaturePrivateKey::SignaturePrivateKey(SignaturePrivateKey&& other)
-  : _key(std::move(other._key))
-  , _pub(std::move(other._pub))
-{}
-
-SignaturePrivateKey&
-SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
-{
-  if (this != &other) {
-    _key = other._key;
-    _pub = other._pub;
-  }
-  return *this;
-}
-
-SignaturePrivateKey&
-SignaturePrivateKey::operator=(SignaturePrivateKey&& other)
-{
-  if (this != &other) {
-    _key = std::move(other._key);
-    _pub = std::move(other._pub);
-  }
-  return *this;
-}
-
-bytes
-point_data(const EC_KEY* key)
-{
-  point_conversion_form_t form = POINT_CONVERSION_UNCOMPRESSED;
-  const EC_POINT* pt = EC_KEY_get0_public_key(key);
-  const EC_GROUP* group = EC_KEY_get0_group(key);
-
-  bytes data;
-  int len = 0;
-  len = EC_POINT_point2oct(group, pt, form, nullptr, len, nullptr);
-  data.resize(len);
-  EC_POINT_point2oct(group, pt, form, data.data(), len, nullptr);
-  return data;
-}
-
-bool
-SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
-{
-  // Raw pointers here are OK because "get0" methods return pointers
-  // to memory owned by _key.
-  const BIGNUM* d1 = EC_KEY_get0_private_key(_key.get());
-  const BIGNUM* d2 = EC_KEY_get0_private_key(other._key.get());
-  const EC_POINT* p1 = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-
-  auto deq = BN_cmp(d1, d2);
-  auto peq = EC_POINT_cmp(group, p1, p2, nullptr);
-  if (peq == -1) {
-    throw OpenSSLError::current();
-  }
-
-  auto out = (deq == 0) && (peq == 0) && (_pub == other._pub);
-  return out;
-}
-
-bool
-SignaturePrivateKey::operator!=(const SignaturePrivateKey& other) const
-{
-  return !(*this == other);
-}
-
-bytes
-SignaturePrivateKey::sign(const bytes& message) const
-{
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  bytes sig(ECDSA_size(_key.get()));
-  auto digest = SHA256Digest(message).digest();
-
-  unsigned int siglen = 0;
-  int rv =
-    ECDSA_sign(0, digest.data(), digest.size(), sig.data(), &siglen, temp_key);
-  if (rv != 1) {
-    throw OpenSSLError::current();
-  }
-
-  sig.resize(siglen);
-  return sig;
-}
-
-SignaturePublicKey
-SignaturePrivateKey::public_key() const
-{
-  return _pub;
-}
-
-SignaturePrivateKey::SignaturePrivateKey(EC_KEY* key)
-  : _key(key)
-  , _pub(EC_KEY_get0_public_key(key))
-{}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePrivateKey& obj)
-{
-  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
-  int len = BN_num_bytes(dN);
-
-  tls::opaque<1> d(len);
-  BN_bn2bin(dN, d.data());
-
-  tls::opaque<1> pub = obj._pub.to_bytes();
-
-  return out << d << pub;
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignaturePrivateKey& obj)
-{
-  tls::opaque<1> d, pub;
-  in >> d >> pub;
-
-  const uint8_t* ptr = pub.data();
-  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY* temp = key.get();
-  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
-    throw OpenSSLError::current();
-  }
-
-  Scoped<EC_GROUP> group = defaultECGroup();
-  EC_KEY_set_group(key.get(), group.get());
-
-  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
-  EC_KEY_set_private_key(key.get(), dN.get());
-
-  obj = SignaturePrivateKey(key.release());
-  return in;
 }
 
 } // namespace mls

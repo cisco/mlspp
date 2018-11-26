@@ -1,5 +1,6 @@
 #include "crypto.h"
 #include <catch.hpp>
+#include <iostream>
 #include <string>
 
 using namespace mls;
@@ -107,47 +108,18 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
   auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
   auto gX = x.public_key();
 
-  std::string raw =
-    "045e2808231accb273fcb6d6fc1d0954e72239628a8e2ba2e5c7cb9c299f98e74"
-    "7b185023591e72c2aaa7147a3c273140523675235bd1ba8549046fb39545d4e47";
-  std::string header = "0041";
-
   SECTION("Directly")
   {
-    auto data = gX.to_bytes();
-    REQUIRE(data == from_hex(raw));
-
-    DHPublicKey parsed(data);
+    DHPublicKey parsed(gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
   SECTION("Via TLS syntax")
   {
-    auto data = tls::marshal(gX);
-    REQUIRE(data == from_hex(header + raw));
-
     DHPublicKey gX2;
-    tls::unmarshal(data, gX2);
+    tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
-}
-
-TEST_CASE("Diffie-Hellman private keys serialize and deserialize", "[crypto]")
-{
-  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
-
-  std::string raw =
-    "200dd712c4747615f155efdd48a3f9e6c9f50de785d9bb1b9d4f99583ff248133f"
-    "4104"
-    "5e2808231accb273fcb6d6fc1d0954e72239628a8e2ba2e5c7cb9c299f98e747"
-    "b185023591e72c2aaa7147a3c273140523675235bd1ba8549046fb39545d4e47";
-
-  auto marshaled = tls::marshal(x);
-  REQUIRE(marshaled == from_hex(raw));
-
-  DHPrivateKey x2;
-  tls::unmarshal(marshaled, x2);
-  REQUIRE(x2 == x);
 }
 
 TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
@@ -198,13 +170,4 @@ TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
     tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
-}
-
-TEST_CASE("Signature private keys serialize and deserialize", "[crypto]")
-{
-  auto x = SignaturePrivateKey::generate();
-
-  SignaturePrivateKey x2;
-  tls::unmarshal(tls::marshal(x), x2);
-  REQUIRE(x2 == x);
 }
