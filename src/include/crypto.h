@@ -19,7 +19,8 @@ struct PKEYDeleter
 enum class OpenSSLKeyType : uint8_t
 {
   P256,
-  X25519
+  X25519,
+  Ed25519
 };
 
 struct OpenSSLKey
@@ -36,6 +37,7 @@ public:
   virtual size_t secret_size() const = 0;
   virtual size_t sig_size() const = 0;
   virtual bool can_derive() const = 0;
+  virtual bool can_sign() const = 0;
 
   virtual bytes marshal() const = 0;
   virtual void generate() = 0;

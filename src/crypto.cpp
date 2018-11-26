@@ -16,19 +16,10 @@
 #define DH_KEY_TYPE OpenSSLKeyType::P256
 // #define DH_KEY_TYPE OpenSSLKeyType::X25519
 
-#define SIG_KEY_TYPE OpenSSLKeyType::P256
-
-#define DH_CURVE NID_X9_62_prime256v1
-#define SIG_CURVE NID_X9_62_prime256v1
-#define DH_OUTPUT_BYTES SHA256_DIGEST_LENGTH
+// #define SIG_KEY_TYPE OpenSSLKeyType::P256
+#define SIG_KEY_TYPE OpenSSLKeyType::Ed25519
 
 namespace mls {
-
-// Things we need to do per-key-type:
-// * TypedDup
-// * to_bytes
-// * from_bytes
-// * construct from data
 
 ///
 /// OpenSSLKey
@@ -38,18 +29,28 @@ namespace mls {
 /// than OpenSSL's EVP interface.
 ///
 
-struct X25519Key : OpenSSLKey
+enum RawKeyType : int
+{
+  X25519 = EVP_PKEY_X25519,
+  Ed25519 = EVP_PKEY_ED25519,
+};
+
+struct RawKey : OpenSSLKey
 {
 public:
-  X25519Key() = default;
+  RawKey(RawKeyType type)
+    : _type(type)
+  {}
 
-  X25519Key(EVP_PKEY* pkey)
+  RawKey(RawKeyType type, EVP_PKEY* pkey)
     : OpenSSLKey(pkey)
+    , _type(type)
   {}
 
   virtual size_t secret_size() const { return 32; }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
+  virtual bool can_sign() const { return _type == RawKeyType::Ed25519; }
 
   virtual bytes marshal() const
   {
@@ -71,8 +72,8 @@ public:
 
   virtual void set_public(const bytes& data)
   {
-    EVP_PKEY* pkey = EVP_PKEY_new_raw_public_key(
-      EVP_PKEY_X25519, nullptr, data.data(), data.size());
+    EVP_PKEY* pkey =
+      EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
     if (!pkey) {
       throw OpenSSLError::current();
     }
@@ -85,7 +86,7 @@ public:
     bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
 
     EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
-      EVP_PKEY_X25519, nullptr, digest.data(), digest.size());
+      _type, nullptr, digest.data(), digest.size());
     if (!pkey) {
       throw OpenSSLError::current();
     }
@@ -105,13 +106,13 @@ public:
     auto data_ptr = raw.data();
     auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
     if (rv == 1) {
-      auto pkey = EVP_PKEY_new_raw_private_key(
-        EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
+      auto pkey =
+        EVP_PKEY_new_raw_private_key(_type, nullptr, raw.data(), raw.size());
       if (!pkey) {
         throw OpenSSLError::current();
       }
 
-      return new X25519Key(pkey);
+      return new RawKey(_type, pkey);
     }
 
     return dup_public();
@@ -130,14 +131,17 @@ public:
       throw OpenSSLError::current();
     }
 
-    auto pkey = EVP_PKEY_new_raw_public_key(
-      EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
+    auto pkey =
+      EVP_PKEY_new_raw_public_key(_type, nullptr, raw.data(), raw.size());
     if (!pkey) {
       throw OpenSSLError::current();
     }
 
-    return new X25519Key(pkey);
+    return new RawKey(_type, pkey);
   }
+
+private:
+  RawKeyType _type;
 };
 
 struct P256Key : OpenSSLKey
@@ -152,6 +156,7 @@ public:
   virtual size_t secret_size() const { return 32; }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
+  virtual bool can_sign() const { return true; }
 
   virtual bytes marshal() const
   {
@@ -274,7 +279,9 @@ OpenSSLKey::create(OpenSSLKeyType type)
 {
   switch (type) {
     case OpenSSLKeyType::X25519:
-      return new X25519Key;
+      return new RawKey(RawKeyType::X25519);
+    case OpenSSLKeyType::Ed25519:
+      return new RawKey(RawKeyType::Ed25519);
     case OpenSSLKeyType::P256:
       return new P256Key;
   }
@@ -320,6 +327,10 @@ OpenSSLKey::derive(const OpenSSLKey& pub)
 bytes
 OpenSSLKey::sign(const bytes& msg)
 {
+  if (!can_sign()) {
+    throw InvalidParameterError("Inappropriate key for sign");
+  }
+
   Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
   if (!ctx.get()) {
     throw OpenSSLError::current();
@@ -343,6 +354,10 @@ OpenSSLKey::sign(const bytes& msg)
 bool
 OpenSSLKey::verify(const bytes& msg, const bytes& sig)
 {
+  if (!can_sign()) {
+    throw InvalidParameterError("Inappropriate key for verify");
+  }
+
   Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
   if (!ctx.get()) {
     throw OpenSSLError::current();
@@ -471,16 +486,6 @@ TypedDup(EVP_PKEY* ptr)
 
   return EVP_PKEY_new_raw_public_key(
     EVP_PKEY_X25519, nullptr, raw.data(), raw.size());
-}
-
-Scoped<EC_GROUP>
-defaultECGroup()
-{
-  Scoped<EC_GROUP> group = EC_GROUP_new_by_curve_name(DH_CURVE);
-  if (group.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-  return group;
 }
 
 ///
