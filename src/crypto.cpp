@@ -64,13 +64,26 @@ public:
   virtual OpenSSLKey* dup() const = 0;
   virtual OpenSSLKey* dup_public() const = 0;
 
-  static OpenSSLKey* create(OpenSSLKeyType suite);
+  // Defined below to make it easier to refer to the more specific
+  // key types.
+  static OpenSSLKey* create(OpenSSLKeyType type);
 
-  bool operator==(const OpenSSLKey& other);
+  bool operator==(const OpenSSLKey& other)
+  {
+    // If one pointer is null and the other is not, then the two keys
+    // are not equal
+    if (!!_key.get() != !!other._key.get()) {
+      return false;
+    }
 
-  bytes derive(const OpenSSLKey& pub);
-  bytes sign(const bytes& message);
-  bool verify(const bytes& message, const bytes& signature);
+    // If both pointers are null, then the two keys are equal.
+    if (!_key.get()) {
+      return true;
+    }
+
+    auto cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
+    return cmp == 1;
+  }
 
   typed_unique_ptr<EVP_PKEY> _key;
 };
@@ -398,24 +411,6 @@ private:
   EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(_curve_nid); }
 };
 
-bool
-OpenSSLKey::operator==(const OpenSSLKey& other)
-{
-  // If one pointer is null and the other is not, then the two keys
-  // are not equal
-  if (!!_key.get() != !!other._key.get()) {
-    return false;
-  }
-
-  // If both pointers are null, then the two keys are equal.
-  if (!_key.get()) {
-    return true;
-  }
-
-  auto cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
-  return cmp == 1;
-}
-
 OpenSSLKey*
 OpenSSLKey::create(OpenSSLKeyType type)
 {
@@ -427,92 +422,6 @@ OpenSSLKey::create(OpenSSLKeyType type)
     case OpenSSLKeyType::P256:
       return new P256Key;
   }
-}
-
-bytes
-OpenSSLKey::derive(const OpenSSLKey& pub)
-{
-  if (!can_derive() || !pub.can_derive()) {
-    throw InvalidParameterError("Inappropriate key(s) for derive");
-  }
-
-  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
-  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key.get());
-
-  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-  if (!ctx.get()) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_init(ctx.get())) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
-    throw OpenSSLError::current();
-  }
-
-  size_t out_len;
-  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
-    throw OpenSSLError::current();
-  }
-
-  bytes out(out_len);
-  uint8_t* ptr = out.data();
-  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
-}
-
-bytes
-OpenSSLKey::sign(const bytes& msg)
-{
-  if (!can_sign()) {
-    throw InvalidParameterError("Inappropriate key for sign");
-  }
-
-  auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (!ctx.get()) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_DigestSignInit(ctx.get(), NULL, NULL, NULL, _key.get())) {
-    throw OpenSSLError::current();
-  }
-
-  size_t siglen = sig_size();
-  bytes sig(sig_size());
-  if (1 !=
-      EVP_DigestSign(ctx.get(), sig.data(), &siglen, msg.data(), msg.size())) {
-    throw OpenSSLError::current();
-  }
-
-  sig.resize(siglen);
-  return sig;
-}
-
-bool
-OpenSSLKey::verify(const bytes& msg, const bytes& sig)
-{
-  if (!can_sign()) {
-    throw InvalidParameterError("Inappropriate key for verify");
-  }
-
-  auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (!ctx.get()) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_DigestVerifyInit(ctx.get(), NULL, NULL, NULL, _key.get())) {
-    throw OpenSSLError::current();
-  }
-
-  auto rv =
-    EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
-
-  return rv == 1;
 }
 
 ///
@@ -1008,7 +917,38 @@ DHPrivateKey::derive(const bytes& seed)
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
-  return _key->derive(*pub._key);
+  if (!_key->can_derive() || !pub._key->can_derive()) {
+    throw InvalidParameterError("Inappropriate key(s) for derive");
+  }
+
+  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key->_key.get());
+  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key->_key.get());
+
+  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw OpenSSLError::current();
+  }
+
+  size_t out_len;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw OpenSSLError::current();
+  }
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw OpenSSLError::current();
+  }
+
+  return out;
 }
 
 const DHPublicKey&
@@ -1043,9 +983,26 @@ SignaturePublicKey::SignaturePublicKey(const bytes& data)
 {}
 
 bool
-SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
+SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
 {
-  return _key->verify(message, signature);
+  if (!_key->can_sign()) {
+    throw InvalidParameterError("Inappropriate key for verify");
+  }
+
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 !=
+      EVP_DigestVerifyInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+    throw OpenSSLError::current();
+  }
+
+  auto rv =
+    EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
+
+  return rv == 1;
 }
 
 SignaturePrivateKey
@@ -1058,9 +1015,30 @@ SignaturePrivateKey::generate()
 }
 
 bytes
-SignaturePrivateKey::sign(const bytes& message) const
+SignaturePrivateKey::sign(const bytes& msg) const
 {
-  return _key->sign(message);
+  if (!_key->can_sign()) {
+    throw InvalidParameterError("Inappropriate key for sign");
+  }
+
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_DigestSignInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+    throw OpenSSLError::current();
+  }
+
+  auto siglen = _key->sig_size();
+  bytes sig(_key->sig_size());
+  if (1 !=
+      EVP_DigestSign(ctx.get(), sig.data(), &siglen, msg.data(), msg.size())) {
+    throw OpenSSLError::current();
+  }
+
+  sig.resize(siglen);
+  return sig;
 }
 
 const SignaturePublicKey&
