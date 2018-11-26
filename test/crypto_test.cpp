@@ -114,6 +114,7 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
   std::string header = "0041";
 
   /*
+  // Uncomment to test X25519 keys
   std::string raw =
     "4c7a59eba41ba032833e85f4827652905cc7e06cc1898dc9af45bb1efededd16";
   std::string header = "0020";
@@ -187,13 +188,4 @@ TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
     tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
-}
-
-TEST_CASE("Signature private keys serialize and deserialize", "[crypto]")
-{
-  auto x = SignaturePrivateKey::generate();
-
-  SignaturePrivateKey x2;
-  tls::unmarshal(tls::marshal(x), x2);
-  REQUIRE(x2 == x);
 }

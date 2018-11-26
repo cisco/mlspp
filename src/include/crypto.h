@@ -34,9 +34,11 @@ public:
   virtual ~OpenSSLKey() = default;
 
   virtual size_t secret_size() const = 0;
+  virtual size_t sig_size() const = 0;
   virtual bool can_derive() const = 0;
 
   virtual bytes marshal() const = 0;
+  virtual void generate() = 0;
   virtual void set_public(const bytes& data) = 0;
   virtual void set_secret(const bytes& data) = 0;
   virtual OpenSSLKey* dup() const = 0;
@@ -44,9 +46,11 @@ public:
 
   static OpenSSLKey* create(OpenSSLKeyType suite);
 
-  friend bool operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs);
+  bool operator==(const OpenSSLKey& other);
 
   bytes derive(const OpenSSLKey& pub);
+  bytes sign(const bytes& message);
+  bool verify(const bytes& message, const bytes& signature);
 
   std::unique_ptr<EVP_PKEY, PKEYDeleter> _key;
 };
@@ -288,7 +292,7 @@ operator>>(tls::istream& in, DHPrivateKey& obj);
 class SignaturePublicKey
 {
 public:
-  SignaturePublicKey() = default;
+  SignaturePublicKey();
   SignaturePublicKey(const SignaturePublicKey& other);
   SignaturePublicKey(SignaturePublicKey&& other);
   SignaturePublicKey(const bytes& data);
@@ -304,9 +308,8 @@ public:
   void reset(const bytes& data);
 
 private:
-  Scoped<EC_KEY> _key;
+  std::unique_ptr<OpenSSLKey> _key;
 
-  SignaturePublicKey(const EC_POINT* pt);
   friend class SignaturePrivateKey;
 };
 
@@ -330,20 +333,11 @@ public:
   bool operator!=(const SignaturePrivateKey& other) const;
 
   bytes sign(const bytes& message) const;
-  SignaturePublicKey public_key() const;
+  const SignaturePublicKey& public_key() const;
 
 private:
-  Scoped<EC_KEY> _key;
+  std::unique_ptr<OpenSSLKey> _key;
   SignaturePublicKey _pub;
-
-  SignaturePrivateKey(EC_KEY* key);
-
-  // XXX(rlb@ipv.sx) The format for private keys here is
-  // non-standard, because OpenSSL's private key serialization
-  // routines are wonky.
-  friend tls::ostream& operator<<(tls::ostream& out,
-                                  const SignaturePrivateKey& obj);
-  friend tls::istream& operator>>(tls::istream& in, SignaturePrivateKey& obj);
 };
 
 } // namespace mls

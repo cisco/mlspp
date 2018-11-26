@@ -16,6 +16,8 @@
 #define DH_KEY_TYPE OpenSSLKeyType::P256
 // #define DH_KEY_TYPE OpenSSLKeyType::X25519
 
+#define SIG_KEY_TYPE OpenSSLKeyType::P256
+
 #define DH_CURVE NID_X9_62_prime256v1
 #define SIG_CURVE NID_X9_62_prime256v1
 #define DH_OUTPUT_BYTES SHA256_DIGEST_LENGTH
@@ -46,6 +48,7 @@ public:
   {}
 
   virtual size_t secret_size() const { return 32; }
+  virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
 
   virtual bytes marshal() const
@@ -147,6 +150,7 @@ public:
   {}
 
   virtual size_t secret_size() const { return 32; }
+  virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
 
   virtual bytes marshal() const
@@ -248,20 +252,20 @@ private:
 };
 
 bool
-operator==(const OpenSSLKey& lhs, const OpenSSLKey& rhs)
+OpenSSLKey::operator==(const OpenSSLKey& other)
 {
   // If one pointer is null and the other is not, then the two keys
   // are not equal
-  if (!!lhs._key.get() != !!rhs._key.get()) {
+  if (!!_key.get() != !!other._key.get()) {
     return false;
   }
 
   // If both pointers are null, then the two keys are equal.
-  if (!lhs._key.get()) {
+  if (!_key.get()) {
     return true;
   }
 
-  auto cmp = EVP_PKEY_cmp(lhs._key.get(), rhs._key.get());
+  auto cmp = EVP_PKEY_cmp(_key.get(), other._key.get());
   return cmp == 1;
 }
 
@@ -311,6 +315,47 @@ OpenSSLKey::derive(const OpenSSLKey& pub)
   }
 
   return out;
+}
+
+bytes
+OpenSSLKey::sign(const bytes& msg)
+{
+  Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_DigestSignInit(ctx.get(), NULL, NULL, NULL, _key.get())) {
+    throw OpenSSLError::current();
+  }
+
+  size_t siglen = sig_size();
+  bytes sig(sig_size());
+  if (1 !=
+      EVP_DigestSign(ctx.get(), sig.data(), &siglen, msg.data(), msg.size())) {
+    throw OpenSSLError::current();
+  }
+
+  sig.resize(siglen);
+  return sig;
+}
+
+bool
+OpenSSLKey::verify(const bytes& msg, const bytes& sig)
+{
+  Scoped<EVP_MD_CTX> ctx = EVP_MD_CTX_create();
+  if (!ctx.get()) {
+    throw OpenSSLError::current();
+  }
+
+  if (1 != EVP_DigestVerifyInit(ctx.get(), NULL, NULL, NULL, _key.get())) {
+    throw OpenSSLError::current();
+  }
+
+  auto rv =
+    EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
+
+  return rv == 1;
 }
 
 ///
@@ -371,6 +416,13 @@ void
 TypedDelete(EVP_CIPHER_CTX* ptr)
 {
   EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
 }
 
 template<>
@@ -828,7 +880,11 @@ operator>>(tls::istream& in, DHPublicKey& obj)
 DHPrivateKey
 DHPrivateKey::generate()
 {
-  return derive(random_bytes(32));
+  DHPrivateKey key;
+  key._key.reset(OpenSSLKey::create(DH_KEY_TYPE));
+  key._key->generate();
+  key._pub._key.reset(key._key->dup_public());
+  return key;
 }
 
 DHPrivateKey
@@ -874,7 +930,7 @@ DHPrivateKey::operator=(DHPrivateKey&& other)
 bool
 DHPrivateKey::operator==(const DHPrivateKey& other) const
 {
-  return _key == other._key;
+  return *_key == *other._key;
 }
 
 bool
@@ -927,8 +983,12 @@ operator>>(tls::istream& in, ECIESCiphertext& obj)
 /// SignaturePublicKey
 ///
 
+SignaturePublicKey::SignaturePublicKey()
+  : _key(OpenSSLKey::create(SIG_KEY_TYPE))
+{}
+
 SignaturePublicKey::SignaturePublicKey(const SignaturePublicKey& other)
-  : _key(other._key)
+  : _key(other._key->dup_public())
 {}
 
 SignaturePublicKey::SignaturePublicKey(SignaturePublicKey&& other)
@@ -936,6 +996,7 @@ SignaturePublicKey::SignaturePublicKey(SignaturePublicKey&& other)
 {}
 
 SignaturePublicKey::SignaturePublicKey(const bytes& data)
+  : _key(OpenSSLKey::create(SIG_KEY_TYPE))
 {
   reset(data);
 }
@@ -944,7 +1005,7 @@ SignaturePublicKey&
 SignaturePublicKey::operator=(const SignaturePublicKey& other)
 {
   if (&other != this) {
-    _key = other._key;
+    _key.reset(other._key->dup_public());
   }
   return *this;
 }
@@ -961,12 +1022,7 @@ SignaturePublicKey::operator=(SignaturePublicKey&& other)
 bool
 SignaturePublicKey::operator==(const SignaturePublicKey& other) const
 {
-  // Raw pointers OK here because get0 methods return pointers to
-  // memory managed by the EC_KEY.
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-  const EC_POINT* lhs = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* rhs = EC_KEY_get0_public_key(other._key.get());
-  return (EC_POINT_cmp(group, lhs, rhs, nullptr) == 0);
+  return *_key == *other._key;
 }
 
 bool
@@ -978,63 +1034,19 @@ SignaturePublicKey::operator!=(const SignaturePublicKey& other) const
 bool
 SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 {
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  auto digest = SHA256Digest(message).digest();
-  int rv = ECDSA_verify(0,
-                        digest.data(),
-                        digest.size(),
-                        signature.data(),
-                        signature.size(),
-                        temp_key);
-  if (rv < 0) {
-    throw OpenSSLError::current();
-  }
-
-  return (rv == 1);
+  return _key->verify(message, signature);
 }
 
 bytes
 SignaturePublicKey::to_bytes() const
 {
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  int len = i2o_ECPublicKey(temp_key, nullptr);
-  if (len == 0) {
-    // Technically, this is not necessarily an error, but in
-    // practice it always will be.
-    throw OpenSSLError::current();
-  }
-
-  bytes out(len);
-  unsigned char* data = out.data();
-  if (i2o_ECPublicKey(temp_key, &data) == 0) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
+  return _key->marshal();
 }
 
 void
 SignaturePublicKey::reset(const bytes& data)
 {
-  EC_KEY* key = EC_KEY_new_by_curve_name(DH_CURVE);
-  if (!key) {
-    throw OpenSSLError::current();
-  }
-
-  const uint8_t* ptr = data.data();
-  if (!o2i_ECPublicKey(&key, &ptr, data.size())) {
-    throw OpenSSLError::current();
-  }
-
-  _key = key;
-}
-
-SignaturePublicKey::SignaturePublicKey(const EC_POINT* pt)
-  : _key(EC_KEY_new_by_curve_name(SIG_CURVE))
-{
-  if (EC_KEY_set_public_key(_key.get(), pt) != 1) {
-    throw OpenSSLError::current();
-  }
+  _key->set_public(data);
 }
 
 tls::ostream&
@@ -1060,18 +1072,15 @@ operator>>(tls::istream& in, SignaturePublicKey& obj)
 SignaturePrivateKey
 SignaturePrivateKey::generate()
 {
-  // Raw pointer is OK here because SignaturePrivateKey takes over
-  // management of the memory referenced by key.
-  EC_KEY* key = EC_KEY_new_by_curve_name(SIG_CURVE);
-  if (EC_KEY_generate_key(key) != 1) {
-    throw OpenSSLError::current();
-  }
-
-  return SignaturePrivateKey(key);
+  SignaturePrivateKey key;
+  key._key.reset(OpenSSLKey::create(SIG_KEY_TYPE));
+  key._key->generate();
+  key._pub._key.reset(key._key->dup_public());
+  return key;
 }
 
 SignaturePrivateKey::SignaturePrivateKey(const SignaturePrivateKey& other)
-  : _key(other._key)
+  : _key(other._key->dup())
   , _pub(other._pub)
 {}
 
@@ -1084,7 +1093,7 @@ SignaturePrivateKey&
 SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
 {
   if (this != &other) {
-    _key = other._key;
+    _key.reset(other._key->dup());
     _pub = other._pub;
   }
   return *this;
@@ -1100,40 +1109,10 @@ SignaturePrivateKey::operator=(SignaturePrivateKey&& other)
   return *this;
 }
 
-bytes
-point_data(const EC_KEY* key)
-{
-  point_conversion_form_t form = POINT_CONVERSION_UNCOMPRESSED;
-  const EC_POINT* pt = EC_KEY_get0_public_key(key);
-  const EC_GROUP* group = EC_KEY_get0_group(key);
-
-  bytes data;
-  int len = 0;
-  len = EC_POINT_point2oct(group, pt, form, nullptr, len, nullptr);
-  data.resize(len);
-  EC_POINT_point2oct(group, pt, form, data.data(), len, nullptr);
-  return data;
-}
-
 bool
 SignaturePrivateKey::operator==(const SignaturePrivateKey& other) const
 {
-  // Raw pointers here are OK because "get0" methods return pointers
-  // to memory owned by _key.
-  const BIGNUM* d1 = EC_KEY_get0_private_key(_key.get());
-  const BIGNUM* d2 = EC_KEY_get0_private_key(other._key.get());
-  const EC_POINT* p1 = EC_KEY_get0_public_key(_key.get());
-  const EC_POINT* p2 = EC_KEY_get0_public_key(other._key.get());
-  const EC_GROUP* group = EC_KEY_get0_group(_key.get());
-
-  auto deq = BN_cmp(d1, d2);
-  auto peq = EC_POINT_cmp(group, p1, p2, nullptr);
-  if (peq == -1) {
-    throw OpenSSLError::current();
-  }
-
-  auto out = (deq == 0) && (peq == 0) && (_pub == other._pub);
-  return out;
+  return *_key == *other._key;
 }
 
 bool
@@ -1145,67 +1124,13 @@ SignaturePrivateKey::operator!=(const SignaturePrivateKey& other) const
 bytes
 SignaturePrivateKey::sign(const bytes& message) const
 {
-  EC_KEY* temp_key = const_cast<EC_KEY*>(_key.get());
-  bytes sig(ECDSA_size(_key.get()));
-  auto digest = SHA256Digest(message).digest();
-
-  unsigned int siglen = 0;
-  int rv =
-    ECDSA_sign(0, digest.data(), digest.size(), sig.data(), &siglen, temp_key);
-  if (rv != 1) {
-    throw OpenSSLError::current();
-  }
-
-  sig.resize(siglen);
-  return sig;
+  return _key->sign(message);
 }
 
-SignaturePublicKey
+const SignaturePublicKey&
 SignaturePrivateKey::public_key() const
 {
   return _pub;
-}
-
-SignaturePrivateKey::SignaturePrivateKey(EC_KEY* key)
-  : _key(key)
-  , _pub(EC_KEY_get0_public_key(key))
-{}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignaturePrivateKey& obj)
-{
-  const BIGNUM* dN = EC_KEY_get0_private_key(obj._key.get());
-  int len = BN_num_bytes(dN);
-
-  tls::opaque<1> d(len);
-  BN_bn2bin(dN, d.data());
-
-  tls::opaque<1> pub = obj._pub.to_bytes();
-
-  return out << d << pub;
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignaturePrivateKey& obj)
-{
-  tls::opaque<1> d, pub;
-  in >> d >> pub;
-
-  const uint8_t* ptr = pub.data();
-  Scoped<EC_KEY> key = EC_KEY_new_by_curve_name(DH_CURVE);
-  EC_KEY* temp = key.get();
-  if (!o2i_ECPublicKey(&temp, &ptr, pub.size())) {
-    throw OpenSSLError::current();
-  }
-
-  Scoped<EC_GROUP> group = defaultECGroup();
-  EC_KEY_set_group(key.get(), group.get());
-
-  Scoped<BIGNUM> dN = BN_bin2bn(d.data(), d.size(), nullptr);
-  EC_KEY_set_private_key(key.get(), dN.get());
-
-  obj = SignaturePrivateKey(key.release());
-  return in;
 }
 
 } // namespace mls
