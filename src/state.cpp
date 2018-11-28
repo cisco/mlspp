@@ -41,7 +41,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
-  auto init_priv = DHPrivateKey::derive(init_secret);
+  auto init_priv = DHPrivateKey::derive(DH_DEFAULT, init_secret);
   auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
   if ((identity_key != identity_priv.public_key()) ||

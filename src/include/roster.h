@@ -10,7 +10,9 @@ namespace mls {
 class RawKeyCredential
 {
 public:
-  RawKeyCredential() {}
+  RawKeyCredential()
+    : _key(SIG_DEFAULT) // XXX
+  {}
 
   RawKeyCredential(const SignaturePublicKey& key)
     : _key(key)

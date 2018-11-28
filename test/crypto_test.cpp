@@ -5,6 +5,9 @@
 
 using namespace mls;
 
+#define DH_TEST CipherSuite::P256_SHA256_AES128GCM
+#define SIG_TEST SignatureScheme::P256_SHA256
+
 TEST_CASE("SHA-256 hash produces correct values", "[crypto]")
 {
   uint8_t byte = 0x42;
@@ -85,8 +88,8 @@ TEST_CASE("AES-GCM encryption produces correct values", "[crypto]")
 
 TEST_CASE("Diffie-Hellman key pairs can be created and combined", "[crypto]")
 {
-  auto x = DHPrivateKey::generate();
-  auto y = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::generate(DH_TEST);
+  auto y = DHPrivateKey::derive(DH_TEST, { 0, 1, 2, 3 });
 
   REQUIRE(x == x);
   REQUIRE(y == y);
@@ -105,12 +108,12 @@ TEST_CASE("Diffie-Hellman key pairs can be created and combined", "[crypto]")
 
 TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
 {
-  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::derive(DH_TEST, { 0, 1, 2, 3 });
   auto gX = x.public_key();
 
   SECTION("Directly")
   {
-    DHPublicKey parsed(gX.to_bytes());
+    DHPublicKey parsed(DH_TEST, gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
@@ -124,7 +127,7 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
 
 TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
 {
-  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::derive(DH_TEST, { 0, 1, 2, 3 });
   auto gX = x.public_key();
 
   auto original = random_bytes(100);
@@ -136,8 +139,8 @@ TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
 
 TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
 {
-  auto a = SignaturePrivateKey::generate();
-  auto b = SignaturePrivateKey::generate();
+  auto a = SignaturePrivateKey::generate(SIG_TEST);
+  auto b = SignaturePrivateKey::generate(SIG_TEST);
 
   REQUIRE(a == a);
   REQUIRE(b == b);
@@ -155,12 +158,12 @@ TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
 
 TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
 {
-  auto x = SignaturePrivateKey::generate();
+  auto x = SignaturePrivateKey::generate(SIG_TEST);
   auto gX = x.public_key();
 
   SECTION("Directly")
   {
-    SignaturePublicKey parsed(gX.to_bytes());
+    SignaturePublicKey parsed(SIG_TEST, gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 

@@ -10,15 +10,34 @@
 
 namespace mls {
 
-// Interface cleanup wrapper for raw OpenSSL EVP keys
-enum class OpenSSLKeyType : uint8_t
+// Algorithm selectors
+enum struct CipherSuite : uint16_t
 {
-  P256,
-  X25519,
-  Ed25519
+  P256_SHA256_AES128GCM = 0x0000,
+  X25519_SHA256_AES128GCM = 0x0001
 };
 
-struct OpenSSLKey;
+// XXX
+#define DH_DEFAULT CipherSuite::P256_SHA256_AES128GCM
+
+tls::ostream&
+operator<<(tls::ostream& out, const CipherSuite& obj);
+tls::istream&
+operator>>(tls::istream& in, CipherSuite& obj);
+
+enum struct SignatureScheme : uint16_t
+{
+  P256_SHA256 = 0x0000,
+  Ed25519_SHA256 = 0x0001
+};
+
+// XXX
+#define SIG_DEFAULT SignatureScheme::P256_SHA256
+
+tls::ostream&
+operator<<(tls::ostream& out, const SignatureScheme& obj);
+tls::istream&
+operator>>(tls::istream& in, SignatureScheme& obj);
 
 // Adapt standard pointers so that they can be "typed" to handle
 // custom deleters more easily.
@@ -29,10 +48,6 @@ TypedDelete(T* ptr);
 template<>
 void
 TypedDelete(EVP_PKEY* ptr);
-
-template<>
-void
-TypedDelete(OpenSSLKey* ptr);
 
 template<typename T>
 using typed_unique_ptr_base = std::unique_ptr<T, decltype(&TypedDelete<T>)>;
@@ -48,6 +63,14 @@ public:
     : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
   {}
 };
+
+// Interface cleanup wrapper for raw OpenSSL EVP keys
+struct OpenSSLKey;
+enum struct OpenSSLKeyType;
+
+template<>
+void
+TypedDelete(OpenSSLKey* ptr);
 
 // Wrapper for OpenSSL errors
 class OpenSSLError : public std::runtime_error
@@ -130,14 +153,15 @@ private:
 class PublicKey
 {
 public:
-  PublicKey(OpenSSLKeyType type);
+  PublicKey();
   PublicKey(const PublicKey& other);
   PublicKey(PublicKey&& other);
-  PublicKey(OpenSSLKeyType type, const bytes& data);
-  PublicKey(OpenSSLKey* key);
-
   PublicKey& operator=(const PublicKey& other);
   PublicKey& operator=(PublicKey&& other);
+
+  PublicKey(OpenSSLKeyType type);
+  PublicKey(OpenSSLKeyType type, const bytes& data);
+  PublicKey(OpenSSLKey* key);
 
   bool operator==(const PublicKey& other) const;
   bool operator!=(const PublicKey& other) const;
@@ -146,19 +170,21 @@ public:
   void reset(const bytes& data);
   void reset(OpenSSLKey* key);
 
-protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-};
+  void activate_base(OpenSSLKeyType type);
 
-tls::ostream&
-operator<<(tls::ostream& out, const PublicKey& obj);
-tls::istream&
-operator>>(tls::istream& in, PublicKey& obj);
+protected:
+  OpenSSLKeyType _type;
+  bool _activated;
+  tls::opaque<2> _raw;
+  typed_unique_ptr<OpenSSLKey> _key;
+
+  friend tls::ostream& operator<<(tls::ostream& out, const PublicKey& obj);
+  friend tls::istream& operator>>(tls::istream& in, PublicKey& obj);
+};
 
 class PrivateKey
 {
 public:
-  PrivateKey();
   PrivateKey(const PrivateKey& other);
   PrivateKey(PrivateKey&& other);
   PrivateKey& operator=(const PrivateKey& other);
@@ -180,11 +206,16 @@ struct ECIESCiphertext;
 class DHPublicKey : public PublicKey
 {
 public:
-  using PublicKey::PublicKey;
-  DHPublicKey();
-  DHPublicKey(const bytes& data);
+  DHPublicKey() = default;
+  DHPublicKey(CipherSuite suite);
+  DHPublicKey(CipherSuite suite, const bytes& data);
+  void activate(CipherSuite suite);
+
   ECIESCiphertext encrypt(const bytes& plaintext) const;
   friend class DHPrivateKey;
+
+private:
+  CipherSuite _suite;
 };
 
 class DHPrivateKey : public PrivateKey
@@ -192,24 +223,22 @@ class DHPrivateKey : public PrivateKey
 public:
   using PrivateKey::PrivateKey;
 
-  static DHPrivateKey generate();
-  static DHPrivateKey derive(const bytes& secret);
-  const DHPublicKey& public_key() const;
+  static DHPrivateKey generate(CipherSuite suite);
+  static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
+  const DHPublicKey& public_key() const;
 };
 
 // Signature specialization
 class SignaturePublicKey : public PublicKey
 {
 public:
-  using PublicKey::PublicKey;
-
-  // XXX(rlb@ipv.sx) These are needed until we get proper crypto
-  // agility going.
-  SignaturePublicKey();
-  SignaturePublicKey(const bytes& data);
+  SignaturePublicKey() = default;
+  SignaturePublicKey(SignatureScheme scheme);
+  SignaturePublicKey(SignatureScheme scheme, const bytes& data);
+  void activate(SignatureScheme scheme);
 
   bool verify(const bytes& message, const bytes& signature) const;
 };
@@ -219,12 +248,13 @@ class SignaturePrivateKey : public PrivateKey
 public:
   using PrivateKey::PrivateKey;
 
-  static SignaturePrivateKey generate();
+  static SignaturePrivateKey generate(SignatureScheme scheme);
 
   bytes sign(const bytes& message) const;
   const SignaturePublicKey& public_key() const;
 };
 
+// A struct for ECIES-encrypted information
 struct ECIESCiphertext
 {
   DHPublicKey ephemeral;

@@ -14,7 +14,7 @@ public:
   RatchetNode(const RatchetNode& other);
   RatchetNode& operator=(const RatchetNode& other);
 
-  RatchetNode(const bytes& secret);
+  RatchetNode(CipherSuite suite, const bytes& secret);
   RatchetNode(const DHPrivateKey& priv);
   RatchetNode(const DHPublicKey& pub);
 
@@ -66,9 +66,10 @@ public:
   bytes root_secret() const;
 
 private:
-  // TODO(rlb@ipv.sx) prefid with _
   tls::vector<RatchetNode, 3> _nodes;
+  CipherSuite _suite;
 
+  RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);

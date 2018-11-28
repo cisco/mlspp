@@ -46,8 +46,10 @@ operator<<(tls::ostream& out, const UserInitKey& obj)
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  return in >> obj.cipher_suites >> obj.init_keys >> obj.identity_key >>
-         obj.algorithm >> obj.signature;
+  // XXX TODO decode init_keys and identity key according to algorithms
+  // return in >> obj.cipher_suites >> obj.init_keys >> obj.identity_key >>
+  //       obj.algorithm >> obj.signature;
+  return in;
 }
 
 // Welcome

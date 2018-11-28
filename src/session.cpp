@@ -25,7 +25,7 @@ Session::Session(const SignaturePrivateKey& identity_priv)
 Session::Session()
   : _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
-  , _identity_priv(SignaturePrivateKey::generate())
+  , _identity_priv(SignaturePrivateKey::generate(SIG_DEFAULT))
 {
   make_init_key();
 }
@@ -107,7 +107,7 @@ Session::handle(const bytes& data)
 void
 Session::make_init_key()
 {
-  auto init_priv = DHPrivateKey::derive(_init_secret);
+  auto init_priv = DHPrivateKey::derive(DH_DEFAULT, _init_secret);
   auto user_init_key = UserInitKey{
     {},                        // No cipher suites
     { init_priv.public_key() } // One init key

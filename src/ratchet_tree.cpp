@@ -1,7 +1,6 @@
 #include "ratchet_tree.h"
 #include "common.h"
 #include "tree_math.h"
-#include <iostream> // XXX
 #include <queue>
 
 namespace mls {
@@ -25,9 +24,10 @@ RatchetNode::operator=(const RatchetNode& other)
   return *this;
 }
 
-RatchetNode::RatchetNode(const bytes& secret)
+RatchetNode::RatchetNode(CipherSuite suite, const bytes& secret)
   : _secret(secret)
-  , _priv(DHPrivateKey::derive(secret))
+  , _priv(DHPrivateKey::derive(DH_DEFAULT, secret))
+  , _pub(suite)
 {
   _pub = _priv->public_key();
 }
@@ -82,18 +82,6 @@ RatchetNode::merge(const RatchetNode& other)
   if (other._secret && !_secret) {
     *_secret = *other._secret;
   }
-}
-
-RatchetNode
-operator+(const RatchetNode& lhs, const RatchetNode& rhs)
-{
-  if (lhs._priv) {
-    return RatchetNode(lhs._priv->derive(rhs._pub));
-  } else if (rhs._priv) {
-    return RatchetNode(rhs._priv->derive(lhs._pub));
-  }
-
-  throw IncompatibleNodesError("Neither ratchet node has a private key");
 }
 
 bool
@@ -181,7 +169,7 @@ RatchetTree::RatchetTree()
 RatchetTree::RatchetTree(const bytes& secret)
   : _nodes(1)
 {
-  _nodes[0] = RatchetNode(secret);
+  _nodes[0] = new_node(secret);
 }
 
 RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
@@ -196,7 +184,7 @@ RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
       to_update.push(parent);
     }
 
-    _nodes[curr] = RatchetNode(secrets[i]);
+    _nodes[curr] = new_node(secrets[i]);
   }
 
   while (to_update.size() > 0) {
@@ -210,8 +198,14 @@ RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
     auto right = tree_math::right(curr, size);
     auto child_secret = *(_nodes[right].secret());
     auto secret = SHA256Digest(child_secret).digest();
-    _nodes[curr] = RatchetNode(secret);
+    _nodes[curr] = new_node(secret);
   }
+}
+
+RatchetNode
+RatchetTree::new_node(const bytes& data) const
+{
+  return RatchetNode(_suite, data);
 }
 
 uint32_t
@@ -232,7 +226,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
   const auto size = working_size(from);
   const auto root = tree_math::root(size);
 
-  path.nodes.push_back(RatchetNode{ leaf_secret });
+  path.nodes.push_back(new_node(leaf_secret));
 
   auto curr = 2 * from;
   auto sibling = tree_math::sibling(curr, size);
@@ -240,7 +234,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
   while (curr != root) {
     secret = SHA256Digest(secret).digest();
 
-    RatchetNode temp(secret);
+    auto temp = new_node(secret);
     path.nodes.push_back(temp);
 
     auto ciphertext = _nodes[sibling].public_key().encrypt(secret);
@@ -277,12 +271,12 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
     }
 
     if (have_secret) {
-      RatchetNode temp(secret);
+      auto temp = new_node(secret);
       if (temp.public_key() != path.nodes[i].public_key()) {
         throw InvalidParameterError("Incorrect node public key");
       }
 
-      path.nodes[i] = RatchetNode(secret);
+      path.nodes[i] = new_node(secret);
     }
 
     curr = tree_math::parent(curr, size);
@@ -324,13 +318,13 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
       _nodes.resize(curr + 1);
     }
 
-    _nodes[curr] = RatchetNode{ secret };
+    _nodes[curr] = new_node(secret);
     secret = SHA256Digest(secret).digest();
 
     curr = tree_math::parent(curr, size);
   }
 
-  _nodes[root] = RatchetNode{ secret };
+  _nodes[root] = new_node(secret);
 }
 
 uint32_t

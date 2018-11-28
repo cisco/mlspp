@@ -3,6 +3,9 @@
 
 using namespace mls;
 
+#define DH_TEST CipherSuite::P256_SHA256_AES128GCM
+#define SIG_TEST SignatureScheme::P256_SHA256
+
 const size_t group_size = 5;
 const bytes group_id{ 0, 1, 2, 3 };
 
@@ -23,9 +26,9 @@ TEST_CASE("Group creation", "[state]")
   auto inp = init_secrets.begin();
   auto stp = states.begin();
   for (size_t i = 0; i < group_size; i += 1) {
-    identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
+    identity_privs.emplace(idp + i, SignaturePrivateKey::generate(SIG_TEST));
     auto init_secret = random_bytes(32);
-    auto init_priv = DHPrivateKey::derive(init_secret);
+    auto init_priv = DHPrivateKey::derive(DH_TEST, init_secret);
     user_init_keys.emplace(uik + i);
     user_init_keys[i].init_keys = { init_priv.public_key() };
     user_init_keys[i].sign(identity_privs[i]);
@@ -80,12 +83,12 @@ TEST_CASE("Operations on a running group", "[state]")
   states.reserve(group_size);
 
   auto stp = states.begin();
-  states.emplace(stp, group_id, SignaturePrivateKey::generate());
+  states.emplace(stp, group_id, SignaturePrivateKey::generate(SIG_TEST));
 
   for (size_t i = 1; i < group_size; i += 1) {
     auto init_secret = random_bytes(32);
-    auto init_priv = DHPrivateKey::derive(init_secret);
-    auto identity_priv = SignaturePrivateKey::generate();
+    auto init_priv = DHPrivateKey::derive(DH_TEST, init_secret);
+    auto identity_priv = SignaturePrivateKey::generate(SIG_TEST);
 
     UserInitKey uik;
     uik.init_keys = { init_priv.public_key() };

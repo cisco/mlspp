@@ -3,6 +3,8 @@
 
 using namespace mls;
 
+#define SIG_TEST SignatureScheme::P256_SHA256
+
 const size_t group_size = 5;
 const bytes group_id{ 0, 1, 2, 3 };
 
@@ -41,7 +43,7 @@ check(std::vector<Session> sessions, epoch_t initial_epoch)
 TEST_CASE("Session creation", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back({ group_id, SignaturePrivateKey::generate() });
+  sessions.push_back({ group_id, SignaturePrivateKey::generate(SIG_TEST) });
 
   SECTION("Two person")
   {
@@ -63,7 +65,7 @@ TEST_CASE("Session creation", "[session]")
 TEST_CASE("Session update and removal", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back({ group_id, SignaturePrivateKey::generate() });
+  sessions.push_back({ group_id, SignaturePrivateKey::generate(SIG_TEST) });
 
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
@@ -96,7 +98,7 @@ TEST_CASE("Session update and removal", "[session]")
 TEST_CASE("Full life-cycle", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back({ group_id, SignaturePrivateKey::generate() });
+  sessions.push_back({ group_id, SignaturePrivateKey::generate(SIG_TEST) });
 
   // Create the group
   for (int i = 0; i < group_size - 1; i += 1) {

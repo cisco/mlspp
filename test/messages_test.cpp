@@ -4,6 +4,9 @@
 
 using namespace mls;
 
+#define DH_TEST CipherSuite::P256_SHA256_AES128GCM
+#define SIG_TEST SignatureScheme::P256_SHA256
+
 template<typename T>
 T
 tls_round_trip(const T& before)
@@ -19,9 +22,9 @@ static const epoch_t epoch_val = 0x01020304;
 TEST_CASE("Basic message serialization", "[messages]")
 {
   auto random = random_bytes(32);
-  auto identity_priv = SignaturePrivateKey::generate();
+  auto identity_priv = SignaturePrivateKey::generate(SIG_TEST);
   auto identity_pub = identity_priv.public_key();
-  auto dh_pub = DHPrivateKey::generate().public_key();
+  auto dh_pub = DHPrivateKey::generate(DH_TEST).public_key();
 
   RatchetTree ratchet_tree{ { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
@@ -31,8 +34,8 @@ TEST_CASE("Basic message serialization", "[messages]")
   roster.add(cred);
 
   UserInitKey user_init_key{
-    {},                                       // No ciphersuites
-    { DHPrivateKey::generate().public_key() } // Only one init key
+    {},                                              // No ciphersuites
+    { DHPrivateKey::generate(DH_TEST).public_key() } // Only one init key
   };
   user_init_key.sign(identity_priv);
 
