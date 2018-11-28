@@ -11,7 +11,9 @@ class Session
 {
 public:
   // Create a session joined to an empty group
-  Session(const bytes& group_id, const SignaturePrivateKey& identity_priv);
+  Session(const bytes& group_id,
+          CipherSuite suite,
+          const SignaturePrivateKey& identity_priv);
 
   // Create an unjoined session
   Session(const SignaturePrivateKey& identity_priv);

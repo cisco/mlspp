@@ -12,16 +12,24 @@ namespace mls {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
 //     SignaturePublicKey identity_key;
-//     SignatureScheme algorithm;         // always 0
+//     SignatureScheme algorithm;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
   tls::vector<uint16_t, 1> cipher_suites;
-  tls::vector<DHPublicKey, 2> init_keys;
+  tls::variant_vector<DHPublicKey, CipherSuite, 2> init_keys;
   SignaturePublicKey identity_key;
-  uint16_t algorithm = 0;
+  SignatureScheme algorithm;
   tls::opaque<2> signature;
+
+  // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
+  // value here until it gets overwritten by reading from data.  The
+  // alternative is to have a default ctor for SignaturePublicKey,
+  // which seems worse.
+  UserInitKey()
+    : identity_key(SignatureScheme::P256_SHA256)
+  {}
 
   void sign(const SignaturePrivateKey& identity_priv);
   bool verify() const;
@@ -38,6 +46,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 // struct {
 //   opaque group_id<0..255>;
 //   uint32 epoch;
+//   CipherSuite cipher_suite;
 //   Credential roster<1..2^24-1>;
 //   PublicKey tree<1..2^24-1>;
 //   GroupOperation transcript<0..2^24-1>;
@@ -49,11 +58,38 @@ struct Welcome
 {
   tls::opaque<2> group_id;
   epoch_t epoch;
+  CipherSuite cipher_suite;
   Roster roster;
   RatchetTree tree;
   tls::vector<GroupOperation, 3> transcript;
   tls::opaque<1> init_secret;
   tls::opaque<1> leaf_secret;
+
+  // This ctor should only be used for serialization.  The tree is
+  // initialized to a dummy state.
+  //
+  // XXX: Need to update unmarshal to set the tree properly
+  Welcome()
+    : tree(CipherSuite::P256_SHA256_AES128GCM)
+  {}
+
+  Welcome(tls::opaque<2> group_id,
+          epoch_t epoch,
+          CipherSuite cipher_suite,
+          Roster roster,
+          RatchetTree tree,
+          tls::vector<GroupOperation, 3> transcript,
+          tls::opaque<1> init_secret,
+          tls::opaque<1> leaf_secret)
+    : group_id(group_id)
+    , epoch(epoch)
+    , cipher_suite(cipher_suite)
+    , roster(roster)
+    , tree(tree)
+    , transcript(transcript)
+    , init_secret(init_secret)
+    , leaf_secret(leaf_secret)
+  {}
 };
 
 bool

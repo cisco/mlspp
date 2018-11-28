@@ -9,8 +9,16 @@ namespace mls {
 /// RatchetNode
 ///
 
+RatchetNode::RatchetNode(CipherSuite suite)
+  : _suite(suite)
+  , _secret(std::experimental::nullopt)
+  , _priv(std::experimental::nullopt)
+  , _pub(suite)
+{}
+
 RatchetNode::RatchetNode(const RatchetNode& other)
-  : _secret(other._secret)
+  : _suite(other._suite)
+  , _secret(other._secret)
   , _priv(other._priv)
   , _pub(other._pub)
 {}
@@ -18,6 +26,7 @@ RatchetNode::RatchetNode(const RatchetNode& other)
 RatchetNode&
 RatchetNode::operator=(const RatchetNode& other)
 {
+  _suite = other._suite;
   _secret = other._secret;
   _priv = other._priv;
   _pub = other._pub;
@@ -25,21 +34,24 @@ RatchetNode::operator=(const RatchetNode& other)
 }
 
 RatchetNode::RatchetNode(CipherSuite suite, const bytes& secret)
-  : _secret(secret)
-  , _priv(DHPrivateKey::derive(DH_DEFAULT, secret))
+  : _suite(suite)
+  , _secret(secret)
+  , _priv(DHPrivateKey::derive(suite, secret))
   , _pub(suite)
 {
   _pub = _priv->public_key();
 }
 
 RatchetNode::RatchetNode(const DHPrivateKey& priv)
-  : _secret(std::experimental::nullopt)
+  : _suite(priv.cipher_suite())
+  , _secret(std::experimental::nullopt)
   , _priv(priv)
   , _pub(priv.public_key())
 {}
 
 RatchetNode::RatchetNode(const DHPublicKey& pub)
-  : _secret(std::experimental::nullopt)
+  : _suite(pub.cipher_suite())
+  , _secret(std::experimental::nullopt)
   , _priv(std::experimental::nullopt)
   , _pub(pub)
 {}
@@ -162,18 +174,21 @@ operator>>(tls::istream& in, RatchetPath& obj)
 /// RatchetTree
 ///
 
-RatchetTree::RatchetTree()
-  : _nodes()
+RatchetTree::RatchetTree(CipherSuite suite)
+  : _suite(suite)
+  , _nodes(suite)
 {}
 
-RatchetTree::RatchetTree(const bytes& secret)
-  : _nodes(1)
+RatchetTree::RatchetTree(CipherSuite suite, const bytes& secret)
+  : _suite(suite)
+  , _nodes(suite)
 {
-  _nodes[0] = new_node(secret);
+  _nodes.emplace_back(_suite, secret);
 }
 
-RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
-  : _nodes(tree_math::node_width(secrets.size()))
+RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
+  : _suite(suite)
+  , _nodes(suite)
 {
   uint32_t size = secrets.size();
   std::queue<uint32_t> to_update;
@@ -184,7 +199,10 @@ RatchetTree::RatchetTree(const std::vector<bytes>& secrets)
       to_update.push(parent);
     }
 
-    _nodes[curr] = new_node(secrets[i]);
+    _nodes.emplace_back(_suite, secrets[i]);
+    if (i < secrets.size() - 1) {
+      _nodes.emplace_back(_suite);
+    }
   }
 
   while (to_update.size() > 0) {
@@ -296,8 +314,8 @@ RatchetTree::merge(uint32_t from, const RatchetPath& path)
 
   auto curr = 2 * from;
   for (auto& node : path.nodes) {
-    if (curr > _nodes.size() - 1) {
-      _nodes.resize(curr + 1);
+    while (curr > _nodes.size() - 1) {
+      _nodes.emplace_back(_suite);
     }
 
     _nodes[curr].merge(node);
@@ -314,8 +332,8 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
   auto curr = 2 * index;
   auto secret = leaf;
   while (curr != root) {
-    if (curr > _nodes.size() - 1) {
-      _nodes.resize(curr + 1);
+    while (curr > _nodes.size() - 1) {
+      _nodes.emplace_back(_suite);
     }
 
     _nodes[curr] = new_node(secret);

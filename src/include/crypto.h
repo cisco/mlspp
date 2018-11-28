@@ -153,7 +153,6 @@ private:
 class PublicKey
 {
 public:
-  PublicKey();
   PublicKey(const PublicKey& other);
   PublicKey(PublicKey&& other);
   PublicKey& operator=(const PublicKey& other);
@@ -170,12 +169,7 @@ public:
   void reset(const bytes& data);
   void reset(OpenSSLKey* key);
 
-  void activate_base(OpenSSLKeyType type);
-
 protected:
-  OpenSSLKeyType _type;
-  bool _activated;
-  tls::opaque<2> _raw;
   typed_unique_ptr<OpenSSLKey> _key;
 
   friend tls::ostream& operator<<(tls::ostream& out, const PublicKey& obj);
@@ -206,16 +200,17 @@ struct ECIESCiphertext;
 class DHPublicKey : public PublicKey
 {
 public:
-  DHPublicKey() = default;
   DHPublicKey(CipherSuite suite);
   DHPublicKey(CipherSuite suite, const bytes& data);
-  void activate(CipherSuite suite);
 
   ECIESCiphertext encrypt(const bytes& plaintext) const;
-  friend class DHPrivateKey;
+  CipherSuite cipher_suite() const;
 
 private:
   CipherSuite _suite;
+
+  DHPublicKey(CipherSuite suite, OpenSSLKey* key);
+  friend class DHPrivateKey;
 };
 
 class DHPrivateKey : public PrivateKey
@@ -228,19 +223,32 @@ public:
 
   bytes derive(const DHPublicKey& pub) const;
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
+
   const DHPublicKey& public_key() const;
+  CipherSuite cipher_suite() const;
+
+private:
+  CipherSuite _suite;
+
+  DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 
 // Signature specialization
 class SignaturePublicKey : public PublicKey
 {
 public:
-  SignaturePublicKey() = default;
   SignaturePublicKey(SignatureScheme scheme);
   SignaturePublicKey(SignatureScheme scheme, const bytes& data);
-  void activate(SignatureScheme scheme);
 
   bool verify(const bytes& message, const bytes& signature) const;
+
+  SignatureScheme signature_scheme() const;
+
+private:
+  SignatureScheme _scheme;
+
+  SignaturePublicKey(SignatureScheme scheme, OpenSSLKey* key);
+  friend class SignaturePrivateKey;
 };
 
 class SignaturePrivateKey : public PrivateKey
@@ -252,6 +260,12 @@ public:
 
   bytes sign(const bytes& message) const;
   const SignaturePublicKey& public_key() const;
+  SignatureScheme signature_scheme() const;
+
+private:
+  SignatureScheme _scheme;
+
+  SignaturePrivateKey(SignatureScheme scheme, OpenSSLKey* key);
 };
 
 // A struct for ECIES-encrypted information

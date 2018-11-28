@@ -21,22 +21,21 @@ static const epoch_t epoch_val = 0x01020304;
 
 TEST_CASE("Basic message serialization", "[messages]")
 {
+  auto suite = DH_TEST;
   auto random = random_bytes(32);
   auto identity_priv = SignaturePrivateKey::generate(SIG_TEST);
   auto identity_pub = identity_priv.public_key();
   auto dh_pub = DHPrivateKey::generate(DH_TEST).public_key();
 
-  RatchetTree ratchet_tree{ { random, random } };
+  RatchetTree ratchet_tree{ DH_TEST, { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
 
   RawKeyCredential cred{ identity_pub };
   Roster roster;
   roster.add(cred);
 
-  UserInitKey user_init_key{
-    {},                                              // No ciphersuites
-    { DHPrivateKey::generate(DH_TEST).public_key() } // Only one init key
-  };
+  UserInitKey user_init_key;
+  user_init_key.init_keys.push_back(dh_pub);
   user_init_key.sign(identity_priv);
 
   SECTION("UserInitKey")
@@ -48,7 +47,8 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("Welcome")
   {
-    Welcome welcome{ random, 0x42, roster, ratchet_tree, {}, random, random };
+    Welcome welcome{ random,       0x42, suite,  roster,
+                     ratchet_tree, {},   random, random };
     tls_round_trip(welcome);
   }
 

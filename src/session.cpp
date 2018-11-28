@@ -4,12 +4,13 @@
 namespace mls {
 
 Session::Session(const bytes& group_id,
+                 CipherSuite suite,
                  const SignaturePrivateKey& identity_priv)
   : _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
-  State root(group_id, identity_priv);
+  State root(group_id, suite, identity_priv);
   add_state(0, root);
   make_init_key();
 }
@@ -108,10 +109,8 @@ void
 Session::make_init_key()
 {
   auto init_priv = DHPrivateKey::derive(DH_DEFAULT, _init_secret);
-  auto user_init_key = UserInitKey{
-    {},                        // No cipher suites
-    { init_priv.public_key() } // One init key
-  };
+  auto user_init_key = UserInitKey{};
+  user_init_key.init_keys.push_back(init_priv.public_key());
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }

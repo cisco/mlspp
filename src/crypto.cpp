@@ -122,6 +122,8 @@ public:
   // Defined below to make it easier to refer to the more specific
   // key types.
   static OpenSSLKey* create(OpenSSLKeyType type);
+  static OpenSSLKey* generate(OpenSSLKeyType type);
+  static OpenSSLKey* derive(OpenSSLKeyType type, const bytes& data);
 
   bool operator==(const OpenSSLKey& other)
   {
@@ -479,6 +481,22 @@ OpenSSLKey::create(OpenSSLKeyType type)
   }
 }
 
+OpenSSLKey*
+OpenSSLKey::generate(OpenSSLKeyType type)
+{
+  auto key = make_typed_unique(create(type));
+  key->generate();
+  return key.release();
+}
+
+OpenSSLKey*
+OpenSSLKey::derive(OpenSSLKeyType type, const bytes& data)
+{
+  auto key = make_typed_unique(create(type));
+  key->set_secret(data);
+  return key.release();
+}
+
 ///
 /// SHA256Digest
 ///
@@ -742,51 +760,33 @@ AESGCM::decrypt(const bytes& ct) const
 /// PublicKey
 ///
 
-PublicKey::PublicKey()
-  : _key(nullptr)
-{}
-
 PublicKey::PublicKey(OpenSSLKeyType type)
-  : _type(type)
-  , _activated(true)
-  , _key(OpenSSLKey::create(type))
+  : _key(OpenSSLKey::create(type))
 {}
 
 PublicKey::PublicKey(const PublicKey& other)
-  : _type(other._type)
-  , _activated(true)
-  , _key(other._key->dup())
+  : _key(other._key->dup())
 {}
 
 PublicKey::PublicKey(PublicKey&& other)
-  : _type(other._type)
-  , _activated(true)
-  , _key(std::move(other._key))
+  : _key(std::move(other._key))
 {}
 
 PublicKey::PublicKey(OpenSSLKeyType type, const bytes& data)
-  : _type(type)
-  , _activated(true)
-  , _key(OpenSSLKey::create(type))
+  : _key(OpenSSLKey::create(type))
 {
   reset(data);
 }
 
 PublicKey::PublicKey(OpenSSLKey* key)
-  : _type(key->type())
-  , _activated(true)
-  , _key(key)
+  : _key(key)
 {}
 
 PublicKey&
 PublicKey::operator=(const PublicKey& other)
 {
   if (&other != this) {
-    _type = other._type;
-    _activated = other._activated;
-    if (other._key) {
-      _key.reset(other._key->dup());
-    }
+    _key.reset(other._key->dup());
   }
   return *this;
 }
@@ -795,8 +795,6 @@ PublicKey&
 PublicKey::operator=(PublicKey&& other)
 {
   if (&other != this) {
-    _type = other._type;
-    _activated = other._activated;
     _key = std::move(other._key);
   }
   return *this;
@@ -805,10 +803,6 @@ PublicKey::operator=(PublicKey&& other)
 bool
 PublicKey::operator==(const PublicKey& other) const
 {
-  if (!_key || !other._key) {
-    return false;
-  }
-
   return *_key == *other._key;
 }
 
@@ -836,13 +830,6 @@ PublicKey::reset(OpenSSLKey* key)
   _key.reset(key);
 }
 
-void
-PublicKey::activate_base(OpenSSLKeyType type)
-{
-  _key.reset(OpenSSLKey::create(type));
-  reset(_raw);
-}
-
 tls::ostream&
 operator<<(tls::ostream& out, const PublicKey& obj)
 {
@@ -853,10 +840,9 @@ operator<<(tls::ostream& out, const PublicKey& obj)
 tls::istream&
 operator>>(tls::istream& in, PublicKey& obj)
 {
-  in >> obj._raw;
-  if (obj._activated) {
-    obj.reset(obj._raw);
-  }
+  tls::opaque<2> data;
+  in >> data;
+  obj.reset(data);
   return in;
 }
 
@@ -911,8 +897,6 @@ PrivateKey::PrivateKey(OpenSSLKey* key)
   , _pub(nullptr)
 {
   auto base = OpenSSLKey::create(key->type());
-  auto pub = new PublicKey(base);
-  _pub.reset(pub);
 }
 
 ///
@@ -929,11 +913,10 @@ DHPublicKey::DHPublicKey(CipherSuite suite, const bytes& data)
   , _suite(suite)
 {}
 
-void
-DHPublicKey::activate(CipherSuite suite)
-{
-  activate_base(ossl_key_type(suite));
-}
+DHPublicKey::DHPublicKey(CipherSuite suite, OpenSSLKey* key)
+  : PublicKey(key)
+  , _suite(suite)
+{}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
 // nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
@@ -986,24 +969,24 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return ECIESCiphertext{ ephemeral.public_key(), content };
 }
 
+CipherSuite
+DHPublicKey::cipher_suite() const
+{
+  return _suite;
+}
+
 DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
-  DHPrivateKey key(OpenSSLKey::create(type));
-  key._key->generate();
-  key._pub->reset(key._key->dup_public());
-  return key;
+  return DHPrivateKey(suite, OpenSSLKey::generate(type));
 }
 
 DHPrivateKey
-DHPrivateKey::derive(CipherSuite suite, const bytes& seed)
+DHPrivateKey::derive(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  DHPrivateKey key(OpenSSLKey::create(type));
-  key._key->set_secret(seed);
-  key._pub->reset(key._key->dup_public());
-  return key;
+  return DHPrivateKey(suite, OpenSSLKey::derive(type, data));
 }
 
 bytes
@@ -1043,13 +1026,6 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
   return out;
 }
 
-const DHPublicKey&
-DHPrivateKey::public_key() const
-{
-  auto pub = static_cast<DHPublicKey*>(_pub.get());
-  return *pub;
-}
-
 bytes
 DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 {
@@ -1060,6 +1036,26 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);
+}
+
+const DHPublicKey&
+DHPrivateKey::public_key() const
+{
+  auto pub = static_cast<DHPublicKey*>(_pub.get());
+  return *pub;
+}
+
+CipherSuite
+DHPrivateKey::cipher_suite() const
+{
+  return _suite;
+}
+
+DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
+  : PrivateKey(key)
+  , _suite(suite)
+{
+  _pub.reset(new DHPublicKey(suite, key->dup_public()));
 }
 
 ///
@@ -1074,12 +1070,6 @@ SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme,
                                        const bytes& data)
   : PublicKey(ossl_key_type(scheme), data)
 {}
-
-void
-SignaturePublicKey::activate(SignatureScheme scheme)
-{
-  activate_base(ossl_key_type(scheme));
-}
 
 bool
 SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
@@ -1104,14 +1094,22 @@ SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
   return rv == 1;
 }
 
+SignatureScheme
+SignaturePublicKey::signature_scheme() const
+{
+  return _scheme;
+}
+
+SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, OpenSSLKey* key)
+  : PublicKey(key)
+  , _scheme(scheme)
+{}
+
 SignaturePrivateKey
 SignaturePrivateKey::generate(SignatureScheme scheme)
 {
   auto type = ossl_key_type(scheme);
-  SignaturePrivateKey key(OpenSSLKey::create(type));
-  key._key->generate();
-  key._pub->reset(key._key->dup_public());
-  return key;
+  return SignaturePrivateKey(scheme, OpenSSLKey::generate(type));
 }
 
 bytes
@@ -1146,6 +1144,20 @@ SignaturePrivateKey::public_key() const
 {
   auto pub = static_cast<SignaturePublicKey*>(_pub.get());
   return *pub;
+}
+
+SignatureScheme
+SignaturePrivateKey::signature_scheme() const
+{
+  return _scheme;
+}
+
+SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
+                                         OpenSSLKey* key)
+  : PrivateKey(key)
+  , _scheme(scheme)
+{
+  _pub.reset(new SignaturePublicKey(scheme, key->dup_public()));
 }
 
 ///

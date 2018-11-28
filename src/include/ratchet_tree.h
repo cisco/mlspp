@@ -10,7 +10,7 @@ namespace mls {
 class RatchetNode
 {
 public:
-  RatchetNode() = default;
+  RatchetNode(CipherSuite suite);
   RatchetNode(const RatchetNode& other);
   RatchetNode& operator=(const RatchetNode& other);
 
@@ -26,6 +26,7 @@ public:
   void merge(const RatchetNode& other);
 
 private:
+  CipherSuite _suite;
   optional<bytes> _secret;
   optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
@@ -40,8 +41,8 @@ private:
 
 struct RatchetPath
 {
-  tls::vector<RatchetNode, 3> nodes;
-  tls::vector<ECIESCiphertext, 3> node_secrets;
+  tls::variant_vector<RatchetNode, CipherSuite, 3> nodes;
+  tls::variant_vector<ECIESCiphertext, CipherSuite, 3> node_secrets;
 
   friend bool operator==(const RatchetPath& lhs, const RatchetPath& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
@@ -52,9 +53,9 @@ struct RatchetPath
 class RatchetTree
 {
 public:
-  RatchetTree();
-  RatchetTree(const bytes& secret);
-  RatchetTree(const std::vector<bytes>& secrets);
+  RatchetTree(CipherSuite suite);
+  RatchetTree(CipherSuite suite, const bytes& secret);
+  RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets);
 
   RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
   bytes decrypt(uint32_t from, RatchetPath& path) const;
@@ -66,7 +67,7 @@ public:
   bytes root_secret() const;
 
 private:
-  tls::vector<RatchetNode, 3> _nodes;
+  tls::variant_vector<RatchetNode, CipherSuite, 3> _nodes;
   CipherSuite _suite;
 
   RatchetNode new_node(const bytes& data) const;

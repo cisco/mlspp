@@ -8,14 +8,16 @@ namespace mls {
 
 static const epoch_t zero_epoch{ 0 };
 
-State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
+State::State(const bytes& group_id,
+             CipherSuite suite,
+             const SignaturePrivateKey& identity_priv)
   : _index(0)
   , _identity_priv(identity_priv)
   , _epoch(zero_epoch)
   , _group_id(group_id)
   , _message_master_secret()
   , _init_secret(zero_bytes(32))
-  , _tree(random_bytes(32))
+  , _tree(suite, random_bytes(32))
 {
   RawKeyCredential cred{ identity_priv.public_key() };
   _roster.add(cred);
@@ -27,6 +29,7 @@ State::State(const SignaturePrivateKey& identity_priv,
              const Handshake& handshake)
   : _identity_priv(identity_priv)
   , _group_id(welcome.group_id)
+  , _suite(welcome.cipher_suite)
   , _epoch(welcome.epoch + 1)
   , _roster(welcome.roster)
   , _tree(welcome.tree)
@@ -73,8 +76,8 @@ State::add(const UserInitKey& user_init_key) const
   auto leaf_secret = random_bytes(32);
   auto path = _tree.encrypt(_tree.size(), leaf_secret);
 
-  Welcome welcome{ _group_id,   _epoch,       _roster,    _tree,
-                   _transcript, _init_secret, leaf_secret };
+  Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
+                   _tree,     _transcript, _init_secret, leaf_secret };
   auto add = sign(Add{ path, user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
