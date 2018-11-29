@@ -15,12 +15,10 @@ public:
   /// Constructors
   ///
 
-  // Default constructor does not have a useful semantic.  It should
-  // only be used for constructing blank states, e.g., for unmarshal
-  State() = default;
-
   // Initialize an empty group
-  State(const bytes& group_id, const SignaturePrivateKey& identity_priv);
+  State(const bytes& group_id,
+        CipherSuite suite,
+        const SignaturePrivateKey& identity_priv);
 
   // Initialize a group from a Add (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
@@ -66,10 +64,12 @@ public:
 
   epoch_t epoch() const { return _epoch; }
   uint32_t index() const { return _index; }
+  CipherSuite cipher_suite() const { return _suite; }
 
 private:
   // Shared confirmed state:
   tls::opaque<2> _group_id;
+  CipherSuite _suite;
   epoch_t _epoch;
   Roster _roster;
   RatchetTree _tree;

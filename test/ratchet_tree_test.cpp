@@ -4,6 +4,8 @@
 
 using namespace mls;
 
+#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+
 TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
 {
   bytes secretA = from_hex("00010203");
@@ -21,21 +23,21 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
 
   SECTION("With one member")
   {
-    RatchetTree tree{ secretA };
+    RatchetTree tree{ CIPHERSUITE, secretA };
     REQUIRE(tree.size() == 1);
     REQUIRE(tree.root_secret() == secretA);
   }
 
   SECTION("With multiple members")
   {
-    RatchetTree tree{ { secretA, secretB, secretC, secretD } };
+    RatchetTree tree{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
     REQUIRE(tree.size() == 4);
     REQUIRE(tree.root_secret() == secretABCD);
   }
 
   SECTION("By extension")
   {
-    RatchetTree tree{ secretA };
+    RatchetTree tree{ CIPHERSUITE, secretA };
 
     auto ctB = tree.encrypt(1, secretB);
     auto rootAB = tree.decrypt(1, ctB);
@@ -61,14 +63,14 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(tree.root_secret() == rootABCD);
     REQUIRE(tree.root_secret() == secretABCD);
 
-    RatchetTree direct{ { secretA, secretB, secretC, secretD } };
+    RatchetTree direct{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
     REQUIRE(tree == direct);
   }
 
   SECTION("Via serialization")
   {
-    RatchetTree before{ { secretA, secretB, secretC, secretD } };
-    RatchetTree after;
+    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
+    RatchetTree after{ CIPHERSUITE };
 
     tls::unmarshal(tls::marshal(before), after);
     REQUIRE(before == after);

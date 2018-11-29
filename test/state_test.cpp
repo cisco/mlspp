@@ -3,6 +3,9 @@
 
 using namespace mls;
 
+#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+#define SIG_SCHEME SignatureScheme::P256_SHA256
+
 const size_t group_size = 5;
 const bytes group_id{ 0, 1, 2, 3 };
 
@@ -23,11 +26,11 @@ TEST_CASE("Group creation", "[state]")
   auto inp = init_secrets.begin();
   auto stp = states.begin();
   for (size_t i = 0; i < group_size; i += 1) {
-    identity_privs.emplace(idp + i, SignaturePrivateKey::generate());
+    identity_privs.emplace(idp + i, SignaturePrivateKey::generate(SIG_SCHEME));
     auto init_secret = random_bytes(32);
-    auto init_priv = DHPrivateKey::derive(init_secret);
+    auto init_priv = DHPrivateKey::derive(CIPHERSUITE, init_secret);
     user_init_keys.emplace(uik + i);
-    user_init_keys[i].init_keys = { init_priv.public_key() };
+    user_init_keys[i].add_init_key(init_priv.public_key());
     user_init_keys[i].sign(identity_privs[i]);
     init_secrets.emplace(inp + i, init_secret);
   }
@@ -35,7 +38,7 @@ TEST_CASE("Group creation", "[state]")
   SECTION("Two person")
   {
     // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
+    states.emplace(stp, group_id, CIPHERSUITE, identity_privs[0]);
 
     // Create a Add for the new participant
     auto welcome_add = states[0].add(user_init_keys[1]);
@@ -52,7 +55,7 @@ TEST_CASE("Group creation", "[state]")
   SECTION("Full size")
   {
     // Initialize the creator's state
-    states.emplace(stp, group_id, identity_privs[0]);
+    states.emplace(stp, group_id, CIPHERSUITE, identity_privs[0]);
 
     // Each participant invites the next
     for (size_t i = 1; i < group_size; i += 1) {
@@ -80,15 +83,16 @@ TEST_CASE("Operations on a running group", "[state]")
   states.reserve(group_size);
 
   auto stp = states.begin();
-  states.emplace(stp, group_id, SignaturePrivateKey::generate());
+  states.emplace(
+    stp, group_id, CIPHERSUITE, SignaturePrivateKey::generate(SIG_SCHEME));
 
   for (size_t i = 1; i < group_size; i += 1) {
     auto init_secret = random_bytes(32);
-    auto init_priv = DHPrivateKey::derive(init_secret);
-    auto identity_priv = SignaturePrivateKey::generate();
+    auto init_priv = DHPrivateKey::derive(CIPHERSUITE, init_secret);
+    auto identity_priv = SignaturePrivateKey::generate(SIG_SCHEME);
 
     UserInitKey uik;
-    uik.init_keys = { init_priv.public_key() };
+    uik.add_init_key(init_priv.public_key());
     uik.sign(identity_priv);
 
     auto welcome_add = states[0].add(uik);

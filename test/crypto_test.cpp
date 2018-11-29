@@ -5,6 +5,9 @@
 
 using namespace mls;
 
+#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+#define SIG_SCHEME SignatureScheme::P256_SHA256
+
 TEST_CASE("SHA-256 hash produces correct values", "[crypto]")
 {
   uint8_t byte = 0x42;
@@ -85,8 +88,8 @@ TEST_CASE("AES-GCM encryption produces correct values", "[crypto]")
 
 TEST_CASE("Diffie-Hellman key pairs can be created and combined", "[crypto]")
 {
-  auto x = DHPrivateKey::generate();
-  auto y = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::generate(CIPHERSUITE);
+  auto y = DHPrivateKey::derive(CIPHERSUITE, { 0, 1, 2, 3 });
 
   REQUIRE(x == x);
   REQUIRE(y == y);
@@ -105,18 +108,18 @@ TEST_CASE("Diffie-Hellman key pairs can be created and combined", "[crypto]")
 
 TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
 {
-  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::derive(CIPHERSUITE, { 0, 1, 2, 3 });
   auto gX = x.public_key();
 
   SECTION("Directly")
   {
-    DHPublicKey parsed(gX.to_bytes());
+    DHPublicKey parsed(CIPHERSUITE, gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
   SECTION("Via TLS syntax")
   {
-    DHPublicKey gX2;
+    DHPublicKey gX2(CIPHERSUITE);
     tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }
@@ -124,7 +127,7 @@ TEST_CASE("Diffie-Hellman public keys serialize and deserialize", "[crypto]")
 
 TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
 {
-  auto x = DHPrivateKey::derive({ 0, 1, 2, 3 });
+  auto x = DHPrivateKey::derive(CIPHERSUITE, { 0, 1, 2, 3 });
   auto gX = x.public_key();
 
   auto original = random_bytes(100);
@@ -136,8 +139,8 @@ TEST_CASE("Diffie-Hellman key pairs encrypt and decrypt ECIES", "[crypto]")
 
 TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
 {
-  auto a = SignaturePrivateKey::generate();
-  auto b = SignaturePrivateKey::generate();
+  auto a = SignaturePrivateKey::generate(SIG_SCHEME);
+  auto b = SignaturePrivateKey::generate(SIG_SCHEME);
 
   REQUIRE(a == a);
   REQUIRE(b == b);
@@ -155,18 +158,18 @@ TEST_CASE("Signature key pairs can sign and verify", "[crypto]")
 
 TEST_CASE("Signature public keys serialize and deserialize", "[crypto]")
 {
-  auto x = SignaturePrivateKey::generate();
+  auto x = SignaturePrivateKey::generate(SIG_SCHEME);
   auto gX = x.public_key();
 
   SECTION("Directly")
   {
-    SignaturePublicKey parsed(gX.to_bytes());
+    SignaturePublicKey parsed(SIG_SCHEME, gX.to_bytes());
     REQUIRE(parsed == gX);
   }
 
   SECTION("Via TLS syntax")
   {
-    SignaturePublicKey gX2;
+    SignaturePublicKey gX2(SIG_SCHEME);
     tls::unmarshal(tls::marshal(gX), gX2);
     REQUIRE(gX2 == gX);
   }

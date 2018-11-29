@@ -3,13 +3,17 @@
 
 namespace mls {
 
+const CipherSuite default_cipher_suite = CipherSuite::P256_SHA256_AES128GCM;
+const SignatureScheme default_signature_scheme = SignatureScheme::P256_SHA256;
+
 Session::Session(const bytes& group_id,
+                 CipherSuite suite,
                  const SignaturePrivateKey& identity_priv)
   : _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
-  State root(group_id, identity_priv);
+  State root(group_id, suite, identity_priv);
   add_state(0, root);
   make_init_key();
 }
@@ -25,7 +29,7 @@ Session::Session(const SignaturePrivateKey& identity_priv)
 Session::Session()
   : _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
-  , _identity_priv(SignaturePrivateKey::generate())
+  , _identity_priv(SignaturePrivateKey::generate(default_signature_scheme))
 {
   make_init_key();
 }
@@ -87,7 +91,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   Welcome welcome;
   tls::unmarshal(welcome_data, welcome);
 
-  Handshake add;
+  Handshake add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
   State next(_identity_priv, _init_secret, welcome, add);
@@ -97,7 +101,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
 void
 Session::handle(const bytes& data)
 {
-  Handshake handshake;
+  Handshake handshake{ cipher_suite() };
   tls::unmarshal(data, handshake);
 
   auto next = current_state().handle(handshake);
@@ -107,11 +111,10 @@ Session::handle(const bytes& data)
 void
 Session::make_init_key()
 {
-  auto init_priv = DHPrivateKey::derive(_init_secret);
-  auto user_init_key = UserInitKey{
-    {},                        // No cipher suites
-    { init_priv.public_key() } // One init key
-  };
+  // TODO(rlb@ipv.sx): Include all supported algorithms
+  auto init_priv = DHPrivateKey::derive(default_cipher_suite, _init_secret);
+  auto user_init_key = UserInitKey{};
+  user_init_key.add_init_key(init_priv.public_key());
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }
@@ -146,6 +149,12 @@ Session::current_state()
   }
 
   return _state.at(_current_epoch);
+}
+
+CipherSuite
+Session::cipher_suite() const
+{
+  return current_state().cipher_suite();
 }
 
 } // namespace mls

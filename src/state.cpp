@@ -8,14 +8,17 @@ namespace mls {
 
 static const epoch_t zero_epoch{ 0 };
 
-State::State(const bytes& group_id, const SignaturePrivateKey& identity_priv)
+State::State(const bytes& group_id,
+             CipherSuite suite,
+             const SignaturePrivateKey& identity_priv)
   : _index(0)
   , _identity_priv(identity_priv)
   , _epoch(zero_epoch)
   , _group_id(group_id)
+  , _suite(suite)
   , _message_master_secret()
   , _init_secret(zero_bytes(32))
-  , _tree(random_bytes(32))
+  , _tree(suite, random_bytes(32))
 {
   RawKeyCredential cred{ identity_priv.public_key() };
   _roster.add(cred);
@@ -27,6 +30,7 @@ State::State(const SignaturePrivateKey& identity_priv,
              const Handshake& handshake)
   : _identity_priv(identity_priv)
   , _group_id(welcome.group_id)
+  , _suite(welcome.cipher_suite)
   , _epoch(welcome.epoch + 1)
   , _roster(welcome.roster)
   , _tree(welcome.tree)
@@ -41,7 +45,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
-  auto init_priv = DHPrivateKey::derive(init_secret);
+  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
   auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
   if ((identity_key != identity_priv.public_key()) ||
@@ -73,8 +77,10 @@ State::add(const UserInitKey& user_init_key) const
   auto leaf_secret = random_bytes(32);
   auto path = _tree.encrypt(_tree.size(), leaf_secret);
 
-  Welcome welcome{ _group_id,   _epoch,       _roster,    _tree,
-                   _transcript, _init_secret, leaf_secret };
+  // TODO(rlb@ipv.sx): Do proper algorithm negotiation here
+
+  Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
+                   _tree,     _transcript, _init_secret, leaf_secret };
   auto add = sign(Add{ path, user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }

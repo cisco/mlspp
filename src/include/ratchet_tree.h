@@ -7,14 +7,14 @@
 
 namespace mls {
 
-class RatchetNode
+class RatchetNode : public CipherAware
 {
 public:
-  RatchetNode() = default;
+  RatchetNode(CipherSuite suite);
   RatchetNode(const RatchetNode& other);
   RatchetNode& operator=(const RatchetNode& other);
 
-  RatchetNode(const bytes& secret);
+  RatchetNode(CipherSuite suite, const bytes& secret);
   RatchetNode(const DHPrivateKey& priv);
   RatchetNode(const DHPublicKey& pub);
 
@@ -38,10 +38,16 @@ private:
   friend tls::istream& operator>>(tls::istream& in, RatchetNode& obj);
 };
 
-struct RatchetPath
+struct RatchetPath : public CipherAware
 {
-  tls::vector<RatchetNode, 3> nodes;
-  tls::vector<ECIESCiphertext, 3> node_secrets;
+  tls::variant_vector<RatchetNode, CipherSuite, 3> nodes;
+  tls::variant_vector<ECIESCiphertext, CipherSuite, 3> node_secrets;
+
+  RatchetPath(CipherSuite suite)
+    : CipherAware(suite)
+    , nodes(suite)
+    , node_secrets(suite)
+  {}
 
   friend bool operator==(const RatchetPath& lhs, const RatchetPath& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
@@ -49,12 +55,12 @@ struct RatchetPath
   friend tls::istream& operator>>(tls::istream& in, RatchetPath& obj);
 };
 
-class RatchetTree
+class RatchetTree : public CipherAware
 {
 public:
-  RatchetTree();
-  RatchetTree(const bytes& secret);
-  RatchetTree(const std::vector<bytes>& secrets);
+  RatchetTree(CipherSuite suite);
+  RatchetTree(CipherSuite suite, const bytes& secret);
+  RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets);
 
   RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
   bytes decrypt(uint32_t from, RatchetPath& path) const;
@@ -66,9 +72,9 @@ public:
   bytes root_secret() const;
 
 private:
-  // TODO(rlb@ipv.sx) prefid with _
-  tls::vector<RatchetNode, 3> _nodes;
+  tls::variant_vector<RatchetNode, CipherSuite, 3> _nodes;
 
+  RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);

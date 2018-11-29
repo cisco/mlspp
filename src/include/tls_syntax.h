@@ -27,6 +27,27 @@ public:
   using parent::parent;
 };
 
+template<typename T, size_t head, size_t min = none, size_t max = none>
+class vector_base : public std::vector<T>
+{
+public:
+  // Explicitly import constructors
+  typedef std::vector<T> parent;
+  using parent::parent;
+
+  vector_base(const parent& other)
+    : parent(other)
+  {}
+  vector_base(parent&& other)
+    : parent(other)
+  {}
+  vector_base()
+    : parent()
+  {}
+
+  virtual T new_element() const = 0;
+};
+
 // A vector type that knows the length of its header and optionally
 // min and max lengths.  Otherwise identical to std::vector<T>.
 //
@@ -34,22 +55,40 @@ public:
 // encode/decode, with a simple API.  The cost is that new code gets
 // generated for every head/min/max combination.
 template<typename T, size_t head, size_t min = none, size_t max = none>
-class vector : public std::vector<T>
+class vector : public vector_base<T, head, min, max>
 {
 public:
-  typedef std::vector<T> parent;
-
   // Explicitly import constructors
+  typedef vector_base<T, head, min, max> parent;
   using parent::parent;
-  vector(const parent& other)
-    : parent(other)
+
+  virtual T new_element() const { return T{}; }
+};
+
+// An extension of the above vector type that can be used to handle
+// types with runtime variants.  This works the same as `vector`
+// except that it passes a single argument to the constructor for
+// new elements.
+template<typename T,
+         typename C,
+         size_t head,
+         size_t min = none,
+         size_t max = none>
+class variant_vector : public vector_base<T, head, min, max>
+{
+public:
+  // Explicitly import constructors
+  typedef vector_base<T, head, min, max> parent;
+  using parent::parent;
+
+  variant_vector(C ctor_arg)
+    : _ctor_arg(ctor_arg)
   {}
-  vector(parent&& other)
-    : parent(other)
-  {}
-  vector()
-    : parent()
-  {}
+
+  virtual T new_element() const { return T{ _ctor_arg }; }
+
+private:
+  C _ctor_arg;
 };
 
 template<size_t head, size_t min = tls::none, size_t max = tls::none>
@@ -78,7 +117,7 @@ private:
 
   template<typename T, size_t head, size_t min, size_t max>
   friend ostream& operator<<(ostream& out,
-                             const vector<T, head, min, max>& data);
+                             const vector_base<T, head, min, max>& data);
 };
 
 // Primitive writers defined in .cpp file
@@ -97,7 +136,7 @@ operator<<(ostream& out, const std::array<T, N>& data)
 // Vector writer
 template<typename T, size_t head, size_t min, size_t max>
 ostream&
-operator<<(ostream& out, const vector<T, head, min, max>& data)
+operator<<(ostream& out, const vector_base<T, head, min, max>& data)
 {
   uint64_t head_max = 0;
   switch (head) {
@@ -191,7 +230,7 @@ private:
   friend istream& operator>>(istream& in, std::array<T, N>& data);
 
   template<typename T, size_t head, size_t min, size_t max>
-  friend istream& operator>>(istream& in, vector<T, head, min, max>& data);
+  friend istream& operator>>(istream& in, vector_base<T, head, min, max>& data);
 };
 
 // Primitive type readers defined in .cpp file
@@ -210,7 +249,7 @@ operator>>(istream& in, std::array<T, N>& data)
 // Vector reader
 template<typename T, size_t head, size_t min, size_t max>
 istream&
-operator>>(istream& in, vector<T, head, min, max>& data)
+operator>>(istream& in, vector_base<T, head, min, max>& data)
 {
   switch (head) {
     case 1: // fallthrough
@@ -242,7 +281,7 @@ operator>>(istream& in, vector<T, head, min, max>& data)
   istream r;
   r._buffer = trunc;
   while (r._buffer.size() > 0) {
-    T temp;
+    auto temp = data.new_element();
     r >> temp;
     data.push_back(temp);
   }
