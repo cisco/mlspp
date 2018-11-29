@@ -10,7 +10,6 @@
 #include "openssl/sha.h"
 #include "state.h"
 
-#include <iostream>
 #include <string>
 
 namespace mls {
@@ -81,7 +80,6 @@ ossl_key_type(CipherSuite suite)
       return OpenSSLKeyType::X25519;
   }
 
-  printf("unknown ciphersuite: %04x\n", static_cast<uint16_t>(suite));
   throw InvalidParameterError("Unknown ciphersuite");
 }
 
@@ -851,9 +849,6 @@ operator>>(tls::istream& in, PublicKey& obj)
 {
   tls::opaque<2> data;
   in >> data;
-
-  std::cout << ">>public: " << data.size() << " " << data << std::endl;
-
   obj.reset(data);
   return in;
 }

@@ -31,9 +31,6 @@ protected:
   CipherSuite _suite;
 };
 
-// XXX
-#define DH_DEFAULT CipherSuite::P256_SHA256_AES128GCM
-
 tls::ostream&
 operator<<(tls::ostream& out, const CipherSuite& obj);
 tls::istream&
@@ -44,9 +41,6 @@ enum struct SignatureScheme : uint16_t
   P256_SHA256 = 0x0000,
   Ed25519_SHA256 = 0x0001
 };
-
-// XXX
-#define SIG_DEFAULT SignatureScheme::P256_SHA256
 
 tls::ostream&
 operator<<(tls::ostream& out, const SignatureScheme& obj);

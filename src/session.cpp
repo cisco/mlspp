@@ -3,6 +3,9 @@
 
 namespace mls {
 
+const CipherSuite default_cipher_suite = CipherSuite::P256_SHA256_AES128GCM;
+const SignatureScheme default_signature_scheme = SignatureScheme::P256_SHA256;
+
 Session::Session(const bytes& group_id,
                  CipherSuite suite,
                  const SignaturePrivateKey& identity_priv)
@@ -26,7 +29,7 @@ Session::Session(const SignaturePrivateKey& identity_priv)
 Session::Session()
   : _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
-  , _identity_priv(SignaturePrivateKey::generate(SIG_DEFAULT))
+  , _identity_priv(SignaturePrivateKey::generate(default_signature_scheme))
 {
   make_init_key();
 }
@@ -85,9 +88,6 @@ Session::remove(uint32_t index) const
 void
 Session::join(const bytes& welcome_data, const bytes& add_data)
 {
-  std::cout << "welcome: " << welcome_data << std::endl;
-  std::cout << "add: " << welcome_data << std::endl;
-
   Welcome welcome;
   tls::unmarshal(welcome_data, welcome);
 
@@ -111,7 +111,8 @@ Session::handle(const bytes& data)
 void
 Session::make_init_key()
 {
-  auto init_priv = DHPrivateKey::derive(DH_DEFAULT, _init_secret);
+  // TODO(rlb@ipv.sx): Include all supported algorithms
+  auto init_priv = DHPrivateKey::derive(default_cipher_suite, _init_secret);
   auto user_init_key = UserInitKey{};
   user_init_key.add_init_key(init_priv.public_key());
   user_init_key.sign(_identity_priv);

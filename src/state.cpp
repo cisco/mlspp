@@ -45,7 +45,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
-  auto init_priv = DHPrivateKey::derive(DH_DEFAULT, init_secret);
+  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
   auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
   if ((identity_key != identity_priv.public_key()) ||
@@ -76,6 +76,8 @@ State::add(const UserInitKey& user_init_key) const
 
   auto leaf_secret = random_bytes(32);
   auto path = _tree.encrypt(_tree.size(), leaf_secret);
+
+  // TODO(rlb@ipv.sx): Do proper algorithm negotiation here
 
   Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
                    _tree,     _transcript, _init_secret, leaf_secret };

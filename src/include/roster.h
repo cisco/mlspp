@@ -7,11 +7,13 @@
 
 namespace mls {
 
+#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
+
 class RawKeyCredential
 {
 public:
   RawKeyCredential()
-    : _key(SIG_DEFAULT) // XXX
+    : _key(DUMMY_SIG_SCHEME)
   {}
 
   RawKeyCredential(const SignaturePublicKey& key)
