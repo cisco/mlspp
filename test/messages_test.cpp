@@ -2,32 +2,32 @@
 #include "tls_syntax.h"
 #include <catch.hpp>
 
+#include <iostream>
+
 using namespace mls;
 
-#define DH_TEST CipherSuite::P256_SHA256_AES128GCM
+#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
 #define SIG_TEST SignatureScheme::P256_SHA256
 
 template<typename T>
-T
-tls_round_trip(const T& before)
+void
+tls_round_trip(const T& before, T& after)
 {
-  T after;
   tls::unmarshal(tls::marshal(before), after);
   REQUIRE(before == after);
-  return after;
 }
 
 static const epoch_t epoch_val = 0x01020304;
 
 TEST_CASE("Basic message serialization", "[messages]")
 {
-  auto suite = DH_TEST;
+  auto suite = CIPHERSUITE;
   auto random = random_bytes(32);
   auto identity_priv = SignaturePrivateKey::generate(SIG_TEST);
   auto identity_pub = identity_priv.public_key();
-  auto dh_pub = DHPrivateKey::generate(DH_TEST).public_key();
+  auto dh_pub = DHPrivateKey::generate(CIPHERSUITE).public_key();
 
-  RatchetTree ratchet_tree{ DH_TEST, { random, random } };
+  RatchetTree ratchet_tree{ CIPHERSUITE, { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
 
   RawKeyCredential cred{ identity_pub };
@@ -35,34 +35,61 @@ TEST_CASE("Basic message serialization", "[messages]")
   roster.add(cred);
 
   UserInitKey user_init_key;
-  user_init_key.init_keys.push_back(dh_pub);
+  user_init_key.add_init_key(dh_pub);
   user_init_key.sign(identity_priv);
+
+  auto uik = tls::marshal(user_init_key);
+  std::cout << uik << std::endl;
 
   SECTION("UserInitKey")
   {
     REQUIRE(user_init_key.verify());
-    auto after = tls_round_trip(user_init_key);
+    UserInitKey after;
+    tls_round_trip(user_init_key, after);
     REQUIRE(after.verify());
   }
 
   SECTION("Welcome")
   {
-    Welcome welcome{ random,       0x42, suite,  roster,
-                     ratchet_tree, {},   random, random };
-    tls_round_trip(welcome);
+    Welcome before{ random,       0x42, suite,  roster,
+                    ratchet_tree, {},   random, random };
+    Welcome after;
+    tls_round_trip(before, after);
   }
 
-  SECTION("GroupOperationType") { tls_round_trip(GroupOperationType::update); }
+  SECTION("GroupOperationType")
+  {
+    GroupOperationType before = GroupOperationType::update;
+    GroupOperationType after;
+    tls_round_trip(before, after);
+  }
 
-  SECTION("Add") { tls_round_trip(Add{ ratchet_path, user_init_key }); }
+  SECTION("Add")
+  {
+    auto before = Add{ ratchet_path, user_init_key };
+    auto after = Add{ CIPHERSUITE };
+    tls_round_trip(before, after);
+  }
 
-  SECTION("Update") { tls_round_trip(Update{ ratchet_path }); }
+  SECTION("Update")
+  {
+    auto before = Update{ ratchet_path };
+    auto after = Update{ CIPHERSUITE };
+    tls_round_trip(before, after);
+  }
 
-  SECTION("Remove") { tls_round_trip(Remove{ 0x42, ratchet_path }); }
+  SECTION("Remove")
+  {
+    auto before = Remove{ 0x42, ratchet_path };
+    auto after = Remove{ CIPHERSUITE };
+    tls_round_trip(before, after);
+  }
 
   SECTION("Handshake")
   {
-    Add add{ ratchet_path, user_init_key };
-    tls_round_trip(Handshake{ 0x42, add, 0x43, random });
+    auto add = Add{ ratchet_path, user_init_key };
+    auto before = Handshake{ 0x42, add, 0x43, random };
+    auto after = Handshake{ CIPHERSUITE };
+    tls_round_trip(before, after);
   }
 }

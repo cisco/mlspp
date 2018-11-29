@@ -11,16 +11,16 @@ namespace mls {
 // struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
-//     SignaturePublicKey identity_key;
 //     SignatureScheme algorithm;
+//     SignaturePublicKey identity_key;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
-  tls::vector<uint16_t, 1> cipher_suites;
+  tls::vector<CipherSuite, 1> cipher_suites;
   tls::variant_vector<DHPublicKey, CipherSuite, 2> init_keys;
-  SignaturePublicKey identity_key;
   SignatureScheme algorithm;
+  SignaturePublicKey identity_key;
   tls::opaque<2> signature;
 
   // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
@@ -31,6 +31,7 @@ struct UserInitKey
     : identity_key(SignatureScheme::P256_SHA256)
   {}
 
+  void add_init_key(const DHPublicKey& pub);
   void sign(const SignaturePrivateKey& identity_priv);
   bool verify() const;
   bytes to_be_signed() const;
@@ -116,11 +117,22 @@ operator>>(tls::istream& in, GroupOperationType& obj);
 //     DirectPath path<1..2^16-1>;
 //     UserInitKey init_key;
 // } Add;
-struct Add
+struct Add : public CipherAware
 {
 public:
   RatchetPath path;
   UserInitKey init_key;
+
+  Add(CipherSuite suite)
+    : CipherAware(suite)
+    , path(suite)
+  {}
+
+  Add(const RatchetPath& path, const UserInitKey& init_key)
+    : CipherAware(path)
+    , path(path)
+    , init_key(init_key)
+  {}
 
   static const GroupOperationType type;
 };
@@ -135,10 +147,20 @@ operator>>(tls::istream& in, Add& obj);
 // struct {
 //     DHPublicKey path<1..2^16-1>;
 // } Update;
-struct Update
+struct Update : public CipherAware
 {
 public:
   RatchetPath path;
+
+  Update(CipherSuite suite)
+    : CipherAware(suite)
+    , path(suite)
+  {}
+
+  Update(const RatchetPath& path)
+    : CipherAware(path)
+    , path(path)
+  {}
 
   static const GroupOperationType type;
 };
@@ -154,11 +176,22 @@ operator>>(tls::istream& in, Update& obj);
 //     uint32 removed;
 //     DHPublicKey path<1..2^16-1>;
 // } Remove;
-struct Remove
+struct Remove : public CipherAware
 {
 public:
   uint32_t removed;
   RatchetPath path;
+
+  Remove(CipherSuite suite)
+    : CipherAware(suite)
+    , path(suite)
+  {}
+
+  Remove(uint32_t removed, const RatchetPath& path)
+    : CipherAware(path)
+    , removed(removed)
+    , path(path)
+  {}
 
   static const GroupOperationType type;
 };
@@ -186,7 +219,7 @@ operator>>(tls::istream& in, Remove& obj);
 // members will be populated with a non-zero value.  This is a bit
 // wasteful of memory, but necessary to avoid the silliness of C++
 // union types over structs.
-struct GroupOperation
+struct GroupOperation : public CipherAware
 {
   GroupOperationType type;
 
@@ -194,43 +227,45 @@ struct GroupOperation
   Update update;
   Remove remove;
 
-  GroupOperation() {}
+  // XXX
+  GroupOperation()
+    : CipherAware(CipherSuite::P256_SHA256_AES128GCM)
+    , add(CipherSuite::P256_SHA256_AES128GCM)
+    , update(CipherSuite::P256_SHA256_AES128GCM)
+    , remove(CipherSuite::P256_SHA256_AES128GCM)
+  {}
+
+  GroupOperation(CipherSuite suite)
+    : CipherAware(suite)
+    , add(suite)
+    , update(suite)
+    , remove(suite)
+  {}
 
   GroupOperation(const Add& add)
-    : type(add.type)
+    : CipherAware(add)
+    , type(add.type)
     , add(add)
+    , update(add.cipher_suite())
+    , remove(add.cipher_suite())
   {}
 
   GroupOperation(const Update& update)
-    : type(update.type)
+    : CipherAware(update)
+    , type(update.type)
+    , add(update.cipher_suite())
     , update(update)
+    , remove(update.cipher_suite())
+
   {}
 
   GroupOperation(const Remove& remove)
-    : type(remove.type)
+    : CipherAware(remove)
+    , type(remove.type)
+    , add(remove.cipher_suite())
+    , update(remove.cipher_suite())
     , remove(remove)
   {}
-
-  // XXX(rlb@ipv.sx): It doesn't seem like this special copy ctor
-  // should be necessary, but there seems to be a problem with
-  // copying an empty Add structure.  It somehow creates an NPE.
-  // This should probably be cleaned up with some checks that all
-  // the crypto functions are null-safe.
-  GroupOperation(const GroupOperation& other)
-    : type(other.type)
-  {
-    switch (type) {
-      case GroupOperationType::add:
-        add = other.add;
-        break;
-      case GroupOperationType::update:
-        update = other.update;
-        break;
-      case GroupOperationType::remove:
-        remove = other.remove;
-        break;
-    }
-  }
 };
 
 bool
@@ -248,7 +283,7 @@ operator>>(tls::istream& in, GroupOperation& obj);
 //     SignatureScheme algorithm;
 //     opaque signature<1..2^16-1>;
 // } Handshake;
-struct Handshake
+struct Handshake : public CipherAware
 {
   epoch_t prior_epoch;
   GroupOperation operation;
@@ -258,13 +293,17 @@ struct Handshake
 
   epoch_t epoch() const { return prior_epoch + 1; }
 
-  Handshake() {}
+  Handshake(CipherSuite suite)
+    : CipherAware(suite)
+    , operation(suite)
+  {}
 
   Handshake(epoch_t prior_epoch,
             const GroupOperation& operation,
             uint32_t signer_index,
             bytes signature)
-    : prior_epoch(prior_epoch)
+    : CipherAware(operation)
+    , prior_epoch(prior_epoch)
     , operation(operation)
     , signer_index(signer_index)
     , signature(signature)

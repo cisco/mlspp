@@ -7,7 +7,7 @@
 
 namespace mls {
 
-class RatchetNode
+class RatchetNode : public CipherAware
 {
 public:
   RatchetNode(CipherSuite suite);
@@ -26,7 +26,6 @@ public:
   void merge(const RatchetNode& other);
 
 private:
-  CipherSuite _suite;
   optional<bytes> _secret;
   optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
@@ -39,10 +38,16 @@ private:
   friend tls::istream& operator>>(tls::istream& in, RatchetNode& obj);
 };
 
-struct RatchetPath
+struct RatchetPath : public CipherAware
 {
   tls::variant_vector<RatchetNode, CipherSuite, 3> nodes;
   tls::variant_vector<ECIESCiphertext, CipherSuite, 3> node_secrets;
+
+  RatchetPath(CipherSuite suite)
+    : CipherAware(suite)
+    , nodes(suite)
+    , node_secrets(suite)
+  {}
 
   friend bool operator==(const RatchetPath& lhs, const RatchetPath& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
@@ -50,7 +55,7 @@ struct RatchetPath
   friend tls::istream& operator>>(tls::istream& in, RatchetPath& obj);
 };
 
-class RatchetTree
+class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
@@ -68,7 +73,6 @@ public:
 
 private:
   tls::variant_vector<RatchetNode, CipherSuite, 3> _nodes;
-  CipherSuite _suite;
 
   RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;

@@ -17,6 +17,20 @@ enum struct CipherSuite : uint16_t
   X25519_SHA256_AES128GCM = 0x0001
 };
 
+// Utility class to avoid a bit of boilerplate
+class CipherAware
+{
+public:
+  CipherAware(CipherSuite suite)
+    : _suite(suite)
+  {}
+
+  CipherSuite cipher_suite() const { return _suite; }
+
+protected:
+  CipherSuite _suite;
+};
+
 // XXX
 #define DH_DEFAULT CipherSuite::P256_SHA256_AES128GCM
 
@@ -197,23 +211,24 @@ protected:
 // DH specialization
 struct ECIESCiphertext;
 
-class DHPublicKey : public PublicKey
+class DHPublicKey
+  : public PublicKey
+  , public CipherAware
 {
 public:
   DHPublicKey(CipherSuite suite);
   DHPublicKey(CipherSuite suite, const bytes& data);
 
   ECIESCiphertext encrypt(const bytes& plaintext) const;
-  CipherSuite cipher_suite() const;
 
 private:
-  CipherSuite _suite;
-
   DHPublicKey(CipherSuite suite, OpenSSLKey* key);
   friend class DHPrivateKey;
 };
 
-class DHPrivateKey : public PrivateKey
+class DHPrivateKey
+  : public PrivateKey
+  , public CipherAware
 {
 public:
   using PrivateKey::PrivateKey;
@@ -225,11 +240,8 @@ public:
   bytes decrypt(const ECIESCiphertext& ciphertext) const;
 
   const DHPublicKey& public_key() const;
-  CipherSuite cipher_suite() const;
 
 private:
-  CipherSuite _suite;
-
   DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 

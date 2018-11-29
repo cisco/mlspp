@@ -88,7 +88,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   Welcome welcome;
   tls::unmarshal(welcome_data, welcome);
 
-  Handshake add;
+  Handshake add{ cipher_suite() };
   tls::unmarshal(add_data, add);
 
   State next(_identity_priv, _init_secret, welcome, add);
@@ -98,7 +98,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
 void
 Session::handle(const bytes& data)
 {
-  Handshake handshake;
+  Handshake handshake{ cipher_suite() };
   tls::unmarshal(data, handshake);
 
   auto next = current_state().handle(handshake);
@@ -110,7 +110,7 @@ Session::make_init_key()
 {
   auto init_priv = DHPrivateKey::derive(DH_DEFAULT, _init_secret);
   auto user_init_key = UserInitKey{};
-  user_init_key.init_keys.push_back(init_priv.public_key());
+  user_init_key.add_init_key(init_priv.public_key());
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }
@@ -145,6 +145,12 @@ Session::current_state()
   }
 
   return _state.at(_current_epoch);
+}
+
+CipherSuite
+Session::cipher_suite() const
+{
+  return current_state().cipher_suite();
 }
 
 } // namespace mls

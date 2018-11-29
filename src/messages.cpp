@@ -5,9 +5,21 @@ namespace mls {
 // UserInitKey
 
 void
+UserInitKey::add_init_key(const DHPublicKey& pub)
+{
+  cipher_suites.push_back(pub.cipher_suite());
+  init_keys.push_back(pub);
+}
+
+void
 UserInitKey::sign(const SignaturePrivateKey& identity_priv)
 {
+  if (cipher_suites.size() != init_keys.size()) {
+    throw InvalidParameterError("Mal-formed UserInitKey");
+  }
+
   identity_key = identity_priv.public_key();
+  algorithm = identity_priv.signature_scheme();
   auto tbs = to_be_signed();
   signature = identity_priv.sign(tbs);
 }
@@ -23,7 +35,7 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << identity_key << algorithm;
+  out << cipher_suites << init_keys << algorithm << identity_key;
   return out.bytes();
 }
 
@@ -39,16 +51,33 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.identity_key
-             << obj.algorithm << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.algorithm
+             << obj.identity_key << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  // XXX TODO decode init_keys and identity key according to algorithms
-  // return in >> obj.cipher_suites >> obj.init_keys >> obj.identity_key >>
-  //       obj.algorithm >> obj.signature;
+  in >> obj.cipher_suites;
+
+  // The need to adapt the public key type per ciphersuite means we
+  // need to do a bit of manual decoding
+  tls::opaque<2> init_key_buffer;
+  in >> init_key_buffer;
+  tls::istream init_key_stream(init_key_buffer);
+
+  obj.init_keys.clear();
+  for (auto suite : obj.cipher_suites) {
+    DHPublicKey key(suite);
+    init_key_stream >> key;
+    obj.init_keys.push_back(key);
+  }
+
+  in >> obj.algorithm;
+  auto key = SignaturePublicKey(obj.algorithm); // XXX
+  obj.identity_key = key;
+  in >> obj.identity_key >> obj.signature;
+
   return in;
 }
 
@@ -67,15 +96,23 @@ operator==(const Welcome& lhs, const Welcome& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const Welcome& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.roster << obj.tree
-             << obj.transcript << obj.init_secret << obj.leaf_secret;
+  return out << obj.group_id << obj.epoch << obj.cipher_suite << obj.roster
+             << obj.tree << obj.transcript << obj.init_secret
+             << obj.leaf_secret;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Welcome& obj)
 {
-  return in >> obj.group_id >> obj.epoch >> obj.roster >> obj.tree >>
-         obj.transcript >> obj.init_secret >> obj.leaf_secret;
+  in >> obj.group_id >> obj.epoch >> obj.cipher_suite;
+
+  // Set the tree struct to use the correct ciphersuite for this
+  // group
+  obj.tree = RatchetTree(obj.cipher_suite);
+
+  in >> obj.roster >> obj.tree >> obj.transcript >> obj.init_secret >>
+    obj.leaf_secret;
+  return in;
 }
 
 // GroupOperationType

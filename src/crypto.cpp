@@ -80,6 +80,9 @@ ossl_key_type(CipherSuite suite)
     case CipherSuite::X25519_SHA256_AES128GCM:
       return OpenSSLKeyType::X25519;
   }
+
+  printf("unknown ciphersuite: %04x\n", static_cast<uint16_t>(suite));
+  throw InvalidParameterError("Unknown ciphersuite");
 }
 
 OpenSSLKeyType
@@ -91,6 +94,8 @@ ossl_key_type(SignatureScheme scheme)
     case SignatureScheme::Ed25519_SHA256:
       return OpenSSLKeyType::X25519;
   }
+
+  throw InvalidParameterError("Unknown signature scheme");
 }
 
 struct OpenSSLKey
@@ -432,6 +437,10 @@ public:
 
   virtual OpenSSLKey* dup() const
   {
+    if (!_key.get()) {
+      return new P256Key{};
+    }
+
     auto eckey_out = EC_KEY_dup(my_ec_key());
     return new P256Key(eckey_out);
   }
@@ -842,6 +851,9 @@ operator>>(tls::istream& in, PublicKey& obj)
 {
   tls::opaque<2> data;
   in >> data;
+
+  std::cout << ">>public: " << data.size() << " " << data << std::endl;
+
   obj.reset(data);
   return in;
 }
@@ -905,17 +917,17 @@ PrivateKey::PrivateKey(OpenSSLKey* key)
 
 DHPublicKey::DHPublicKey(CipherSuite suite)
   : PublicKey(ossl_key_type(suite))
-  , _suite(suite)
+  , CipherAware(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, const bytes& data)
   : PublicKey(ossl_key_type(suite), data)
-  , _suite(suite)
+  , CipherAware(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, OpenSSLKey* key)
   : PublicKey(key)
-  , _suite(suite)
+  , CipherAware(suite)
 {}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
@@ -967,12 +979,6 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
   return ECIESCiphertext{ ephemeral.public_key(), content };
-}
-
-CipherSuite
-DHPublicKey::cipher_suite() const
-{
-  return _suite;
 }
 
 DHPrivateKey
@@ -1045,15 +1051,9 @@ DHPrivateKey::public_key() const
   return *pub;
 }
 
-CipherSuite
-DHPrivateKey::cipher_suite() const
-{
-  return _suite;
-}
-
 DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
   : PrivateKey(key)
-  , _suite(suite)
+  , CipherAware(suite)
 {
   _pub.reset(new DHPublicKey(suite, key->dup_public()));
 }

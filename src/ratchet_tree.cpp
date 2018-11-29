@@ -10,14 +10,14 @@ namespace mls {
 ///
 
 RatchetNode::RatchetNode(CipherSuite suite)
-  : _suite(suite)
+  : CipherAware(suite)
   , _secret(std::experimental::nullopt)
   , _priv(std::experimental::nullopt)
   , _pub(suite)
 {}
 
 RatchetNode::RatchetNode(const RatchetNode& other)
-  : _suite(other._suite)
+  : CipherAware(other)
   , _secret(other._secret)
   , _priv(other._priv)
   , _pub(other._pub)
@@ -34,7 +34,7 @@ RatchetNode::operator=(const RatchetNode& other)
 }
 
 RatchetNode::RatchetNode(CipherSuite suite, const bytes& secret)
-  : _suite(suite)
+  : CipherAware(suite)
   , _secret(secret)
   , _priv(DHPrivateKey::derive(suite, secret))
   , _pub(suite)
@@ -43,14 +43,14 @@ RatchetNode::RatchetNode(CipherSuite suite, const bytes& secret)
 }
 
 RatchetNode::RatchetNode(const DHPrivateKey& priv)
-  : _suite(priv.cipher_suite())
+  : CipherAware(priv.cipher_suite())
   , _secret(std::experimental::nullopt)
   , _priv(priv)
   , _pub(priv.public_key())
 {}
 
 RatchetNode::RatchetNode(const DHPublicKey& pub)
-  : _suite(pub.cipher_suite())
+  : CipherAware(pub.cipher_suite())
   , _secret(std::experimental::nullopt)
   , _priv(std::experimental::nullopt)
   , _pub(pub)
@@ -175,19 +175,19 @@ operator>>(tls::istream& in, RatchetPath& obj)
 ///
 
 RatchetTree::RatchetTree(CipherSuite suite)
-  : _suite(suite)
+  : CipherAware(suite)
   , _nodes(suite)
 {}
 
 RatchetTree::RatchetTree(CipherSuite suite, const bytes& secret)
-  : _suite(suite)
+  : CipherAware(suite)
   , _nodes(suite)
 {
   _nodes.emplace_back(_suite, secret);
 }
 
 RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
-  : _suite(suite)
+  : CipherAware(suite)
   , _nodes(suite)
 {
   uint32_t size = secrets.size();
@@ -239,7 +239,7 @@ RatchetTree::working_size(uint32_t from) const
 RatchetPath
 RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
 {
-  RatchetPath path;
+  RatchetPath path(_suite);
 
   const auto size = working_size(from);
   const auto root = tree_math::root(size);

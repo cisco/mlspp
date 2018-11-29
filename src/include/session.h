@@ -49,6 +49,7 @@ private:
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;
+  CipherSuite cipher_suite() const;
 };
 
 } // namespace mls
