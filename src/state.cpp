@@ -15,6 +15,7 @@ State::State(const bytes& group_id,
   , _identity_priv(identity_priv)
   , _epoch(zero_epoch)
   , _group_id(group_id)
+  , _suite(suite)
   , _message_master_secret()
   , _init_secret(zero_bytes(32))
   , _tree(suite, random_bytes(32))

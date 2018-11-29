@@ -85,10 +85,13 @@ Session::remove(uint32_t index) const
 void
 Session::join(const bytes& welcome_data, const bytes& add_data)
 {
+  std::cout << "welcome: " << welcome_data << std::endl;
+  std::cout << "add: " << welcome_data << std::endl;
+
   Welcome welcome;
   tls::unmarshal(welcome_data, welcome);
 
-  Handshake add{ cipher_suite() };
+  Handshake add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
   State next(_identity_priv, _init_secret, welcome, add);

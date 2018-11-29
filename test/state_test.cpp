@@ -30,7 +30,7 @@ TEST_CASE("Group creation", "[state]")
     auto init_secret = random_bytes(32);
     auto init_priv = DHPrivateKey::derive(CIPHERSUITE, init_secret);
     user_init_keys.emplace(uik + i);
-    user_init_keys[i].init_keys = { init_priv.public_key() };
+    user_init_keys[i].add_init_key(init_priv.public_key());
     user_init_keys[i].sign(identity_privs[i]);
     init_secrets.emplace(inp + i, init_secret);
   }
@@ -92,7 +92,7 @@ TEST_CASE("Operations on a running group", "[state]")
     auto identity_priv = SignaturePrivateKey::generate(SIG_SCHEME);
 
     UserInitKey uik;
-    uik.init_keys = { init_priv.public_key() };
+    uik.add_init_key(init_priv.public_key());
     uik.sign(identity_priv);
 
     auto welcome_add = states[0].add(uik);
