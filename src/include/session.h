@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.h" // TODO(rlb@ipv.sx) Locally declare bytes
-#include "state.h"  // TODO(rlb@ipv.sx) Forward declare State
+#include "common.h"
+#include "state.h"
 #include "tls_syntax.h"
 #include <map>
 

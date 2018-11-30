@@ -74,10 +74,19 @@ State::add(const UserInitKey& user_init_key) const
     throw InvalidParameterError("bad signature on user init key");
   }
 
+  // XXX(rlb@ipv.sx): This is all the algorithm negotiation we need
+  // for the moment.  When we encrypt the Welcome, we will need to
+  // choose the proper DH key to use for the encryption.
+  bool cipher_supported = false;
+  for (auto suite : user_init_key.cipher_suites) {
+    cipher_supported = cipher_supported || (suite == _suite);
+  }
+  if (!cipher_supported) {
+    throw ProtocolError("New member does not support the groups ciphersuite");
+  }
+
   auto leaf_secret = random_bytes(32);
   auto path = _tree.encrypt(_tree.size(), leaf_secret);
-
-  // TODO(rlb@ipv.sx): Do proper algorithm negotiation here
 
   Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
                    _tree,     _transcript, _init_secret, leaf_secret };

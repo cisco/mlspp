@@ -1,9 +1,14 @@
 #include "session.h"
-#include "tls_syntax.h"
+#include "common.h"
+#include "state.h"
 
 namespace mls {
 
-const CipherSuite default_cipher_suite = CipherSuite::P256_SHA256_AES128GCM;
+const std::vector<CipherSuite> supported_cipher_suites{
+  CipherSuite::P256_SHA256_AES128GCM,
+  CipherSuite::X25519_SHA256_AES128GCM
+};
+
 const SignatureScheme default_signature_scheme = SignatureScheme::P256_SHA256;
 
 Session::Session(const bytes& group_id,
@@ -111,10 +116,16 @@ Session::handle(const bytes& data)
 void
 Session::make_init_key()
 {
-  // TODO(rlb@ipv.sx): Include all supported algorithms
-  auto init_priv = DHPrivateKey::derive(default_cipher_suite, _init_secret);
   auto user_init_key = UserInitKey{};
-  user_init_key.add_init_key(init_priv.public_key());
+
+  // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
+  // from the same secret.  Maybe we should include the ciphersuite
+  // in the key derivation...
+  for (auto suite : supported_cipher_suites) {
+    auto init_priv = DHPrivateKey::derive(suite, _init_secret);
+    user_init_key.add_init_key(init_priv.public_key());
+  }
+
   user_init_key.sign(_identity_priv);
   _user_init_key = tls::marshal(user_init_key);
 }

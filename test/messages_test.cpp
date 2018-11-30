@@ -4,7 +4,8 @@
 
 using namespace mls;
 
-#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+#define P256_SUITE CipherSuite::P256_SHA256_AES128GCM
+#define X25519_SUITE CipherSuite::X25519_SHA256_AES128GCM
 #define SIG_TEST SignatureScheme::P256_SHA256
 
 template<typename T>
@@ -19,13 +20,14 @@ static const epoch_t epoch_val = 0x01020304;
 
 TEST_CASE("Basic message serialization", "[messages]")
 {
-  auto suite = CIPHERSUITE;
+  auto suite = P256_SUITE;
   auto random = random_bytes(32);
   auto identity_priv = SignaturePrivateKey::generate(SIG_TEST);
   auto identity_pub = identity_priv.public_key();
-  auto dh_pub = DHPrivateKey::generate(CIPHERSUITE).public_key();
+  auto dh_pub_p256 = DHPrivateKey::generate(P256_SUITE).public_key();
+  auto dh_pub_x25519 = DHPrivateKey::generate(X25519_SUITE).public_key();
 
-  RatchetTree ratchet_tree{ CIPHERSUITE, { random, random } };
+  RatchetTree ratchet_tree{ P256_SUITE, { random, random } };
   auto ratchet_path = ratchet_tree.encrypt(0, random);
 
   RawKeyCredential cred{ identity_pub };
@@ -33,11 +35,14 @@ TEST_CASE("Basic message serialization", "[messages]")
   roster.add(cred);
 
   UserInitKey user_init_key;
-  user_init_key.add_init_key(dh_pub);
+  user_init_key.add_init_key(dh_pub_p256);
+  user_init_key.add_init_key(dh_pub_x25519);
   user_init_key.sign(identity_priv);
 
   SECTION("UserInitKey")
   {
+    std::cout << "uik: " << tls::marshal(user_init_key) << std::endl;
+
     REQUIRE(user_init_key.verify());
     UserInitKey after;
     tls_round_trip(user_init_key, after);
@@ -62,21 +67,21 @@ TEST_CASE("Basic message serialization", "[messages]")
   SECTION("Add")
   {
     auto before = Add{ ratchet_path, user_init_key };
-    auto after = Add{ CIPHERSUITE };
+    auto after = Add{ P256_SUITE };
     tls_round_trip(before, after);
   }
 
   SECTION("Update")
   {
     auto before = Update{ ratchet_path };
-    auto after = Update{ CIPHERSUITE };
+    auto after = Update{ P256_SUITE };
     tls_round_trip(before, after);
   }
 
   SECTION("Remove")
   {
     auto before = Remove{ 0x42, ratchet_path };
-    auto after = Remove{ CIPHERSUITE };
+    auto after = Remove{ P256_SUITE };
     tls_round_trip(before, after);
   }
 
@@ -84,7 +89,7 @@ TEST_CASE("Basic message serialization", "[messages]")
   {
     auto add = Add{ ratchet_path, user_init_key };
     auto before = Handshake{ 0x42, add, 0x43, random };
-    auto after = Handshake{ CIPHERSUITE };
+    auto after = Handshake{ P256_SUITE };
     tls_round_trip(before, after);
   }
 }
