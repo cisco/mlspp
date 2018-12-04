@@ -94,6 +94,7 @@ public:
   static OpenSSLError current();
 };
 
+// Digests
 class SHA256Digest
 {
 public:

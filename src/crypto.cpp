@@ -465,6 +465,12 @@ public:
 
   virtual OpenSSLKey* dup() const
   {
+    // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
+    // RatchetTree ctor tries to copy an empty key.
+    if (!_key.get()) {
+      return new ECKey(_curve_nid, static_cast<EVP_PKEY*>(nullptr));
+    }
+
     auto eckey_out = EC_KEY_dup(my_ec_key());
     return new ECKey(_curve_nid, eckey_out);
   }
