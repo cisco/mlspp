@@ -14,7 +14,9 @@ namespace mls {
 enum struct CipherSuite : uint16_t
 {
   P256_SHA256_AES128GCM = 0x0000,
-  X25519_SHA256_AES128GCM = 0x0001
+  P521_SHA512_AES256GCM = 0x0010,
+  X25519_SHA256_AES128GCM = 0x0001,
+  X448_SHA512_AES256GCM = 0x0011
 };
 
 // Utility class to avoid a bit of boilerplate
@@ -39,7 +41,9 @@ operator>>(tls::istream& in, CipherSuite& obj);
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0000,
-  Ed25519_SHA256 = 0x0001
+  P521_SHA512 = 0x0010,
+  Ed25519 = 0x0001,
+  Ed448 = 0x0011
 };
 
 tls::ostream&

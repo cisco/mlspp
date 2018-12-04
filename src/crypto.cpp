@@ -66,8 +66,11 @@ OpenSSLError::current()
 enum struct OpenSSLKeyType
 {
   P256,
+  P521,
   X25519,
-  Ed25519
+  X448,
+  Ed25519,
+  Ed448
 };
 
 OpenSSLKeyType
@@ -76,8 +79,12 @@ ossl_key_type(CipherSuite suite)
   switch (suite) {
     case CipherSuite::P256_SHA256_AES128GCM:
       return OpenSSLKeyType::P256;
+    case CipherSuite::P521_SHA512_AES256GCM:
+      return OpenSSLKeyType::P521;
     case CipherSuite::X25519_SHA256_AES128GCM:
       return OpenSSLKeyType::X25519;
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return OpenSSLKeyType::X448;
   }
 
   throw InvalidParameterError("Unknown ciphersuite");
@@ -89,8 +96,12 @@ ossl_key_type(SignatureScheme scheme)
   switch (scheme) {
     case SignatureScheme::P256_SHA256:
       return OpenSSLKeyType::P256;
-    case SignatureScheme::Ed25519_SHA256:
-      return OpenSSLKeyType::X25519;
+    case SignatureScheme::P521_SHA512:
+      return OpenSSLKeyType::P521;
+    case SignatureScheme::Ed25519:
+      return OpenSSLKeyType::Ed25519;
+    case SignatureScheme::Ed448:
+      return OpenSSLKeyType::Ed448;
   }
 
   throw InvalidParameterError("Unknown signature scheme");
@@ -231,31 +242,38 @@ make_typed_unique(T* ptr)
 /// than OpenSSL's EVP interface.
 ///
 
-enum RawKeyType : int
+enum struct RawKeyType : int
 {
   X25519 = EVP_PKEY_X25519,
+  X448 = EVP_PKEY_X448,
   Ed25519 = EVP_PKEY_ED25519,
+  Ed448 = EVP_PKEY_ED448
 };
 
 struct RawKey : OpenSSLKey
 {
 public:
   RawKey(RawKeyType type)
-    : _type(type)
+    : _type(static_cast<int>(type))
   {}
 
-  RawKey(RawKeyType type, EVP_PKEY* pkey)
+  RawKey(int type, EVP_PKEY* pkey)
     : OpenSSLKey(pkey)
     , _type(type)
   {}
 
   virtual OpenSSLKeyType type() const
   {
-    switch (_type) {
-      case X25519:
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
         return OpenSSLKeyType::X25519;
-      case Ed25519:
+      case RawKeyType::X448:
+        return OpenSSLKeyType::X448;
+      case RawKeyType::Ed25519:
         return OpenSSLKeyType::Ed25519;
+      case RawKeyType::Ed448:
+        return OpenSSLKeyType::Ed448;
     }
 
     throw MissingStateError("Unknown raw key type");
@@ -263,7 +281,10 @@ public:
   virtual size_t secret_size() const { return 32; }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
-  virtual bool can_sign() const { return _type == RawKeyType::Ed25519; }
+  virtual bool can_sign() const
+  {
+    return _type == static_cast<int>(RawKeyType::Ed25519);
+  }
 
   virtual bytes marshal() const
   {
@@ -285,7 +306,7 @@ public:
 
   virtual void set_public(const bytes& data)
   {
-    EVP_PKEY* pkey =
+    auto pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
     if (!pkey) {
       throw OpenSSLError::current();
@@ -298,7 +319,7 @@ public:
   {
     bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
 
-    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+    auto pkey = EVP_PKEY_new_raw_private_key(
       _type, nullptr, digest.data(), digest.size());
     if (!pkey) {
       throw OpenSSLError::current();
@@ -354,16 +375,25 @@ public:
   }
 
 private:
-  RawKeyType _type;
+  const int _type;
 };
 
-struct P256Key : OpenSSLKey
+enum struct ECKeyType : int
+{
+  P256 = NID_X9_62_prime256v1,
+  P521 = NID_secp521r1
+};
+
+struct ECKey : OpenSSLKey
 {
 public:
-  P256Key() = default;
+  ECKey(ECKeyType type)
+    : _curve_nid(static_cast<int>(type))
+  {}
 
-  P256Key(EVP_PKEY* pkey)
-    : OpenSSLKey(pkey)
+  ECKey(int curve_nid, EVP_PKEY* pkey)
+    : _curve_nid(curve_nid)
+    , OpenSSLKey(pkey)
   {}
 
   virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
@@ -435,12 +465,8 @@ public:
 
   virtual OpenSSLKey* dup() const
   {
-    if (!_key.get()) {
-      return new P256Key{};
-    }
-
     auto eckey_out = EC_KEY_dup(my_ec_key());
-    return new P256Key(eckey_out);
+    return new ECKey(_curve_nid, eckey_out);
   }
 
   virtual OpenSSLKey* dup_public() const
@@ -451,14 +477,15 @@ public:
 
     auto eckey_out = new_ec_key();
     EC_KEY_set_public_key(eckey_out, point);
-    return new P256Key(eckey_out);
+    return new ECKey(_curve_nid, eckey_out);
   }
 
 private:
-  static const int _curve_nid = NID_X9_62_prime256v1;
+  const int _curve_nid;
 
-  P256Key(EC_KEY* eckey)
+  ECKey(int curve_nid, EC_KEY* eckey)
     : OpenSSLKey()
+    , _curve_nid(curve_nid)
   {
     reset(eckey);
   }
@@ -481,10 +508,16 @@ OpenSSLKey::create(OpenSSLKeyType type)
   switch (type) {
     case OpenSSLKeyType::X25519:
       return new RawKey(RawKeyType::X25519);
+    case OpenSSLKeyType::X448:
+      return new RawKey(RawKeyType::X448);
     case OpenSSLKeyType::Ed25519:
       return new RawKey(RawKeyType::Ed25519);
+    case OpenSSLKeyType::Ed448:
+      return new RawKey(RawKeyType::Ed448);
     case OpenSSLKeyType::P256:
-      return new P256Key;
+      return new ECKey(ECKeyType::P256);
+    case OpenSSLKeyType::P521:
+      return new ECKey(ECKeyType::P521);
   }
 }
 
