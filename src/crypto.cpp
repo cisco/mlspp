@@ -654,11 +654,11 @@ Digest::output_size() const
 ///
 
 static bytes
-hmac_sha256(const bytes& key, const bytes& data)
+hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
   unsigned int size = 0;
   bytes md(SHA256_DIGEST_LENGTH);
-  if (!HMAC(EVP_sha256(),
+  if (!HMAC(ossl_digest_type(digest_type(suite)),
             key.data(),
             key.size(),
             data.data(),
@@ -672,9 +672,9 @@ hmac_sha256(const bytes& key, const bytes& data)
 }
 
 bytes
-hkdf_extract(const bytes& salt, const bytes& ikm)
+hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  return hmac_sha256(salt, ikm);
+  return hmac(suite, salt, ikm);
 }
 
 // struct {
@@ -721,17 +721,18 @@ random_bytes(size_t size)
 //   HMAC(Secret, Label || 0x01)
 template<typename T>
 static bytes
-hkdf_expand(const bytes& secret, const T& info, size_t size)
+hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
 {
   auto label = tls::marshal(info);
   label.push_back(0x01);
-  auto mac = hmac_sha256(secret, label);
+  auto mac = hmac(suite, secret, label);
   mac.resize(size);
   return mac;
 }
 
 bytes
-derive_secret(const bytes& secret,
+derive_secret(CipherSuite suite,
+              const bytes& secret,
               const std::string& label,
               const State& state,
               size_t size)
@@ -740,7 +741,7 @@ derive_secret(const bytes& secret,
   bytes vec_label(mls_label.begin(), mls_label.end());
 
   HKDFLabel label_str{ uint16_t(size), vec_label, state };
-  return hkdf_expand(secret, label_str, size);
+  return hkdf_expand(suite, secret, label_str, size);
 }
 
 ///
@@ -1007,16 +1008,19 @@ PrivateKey::PrivateKey(OpenSSLKey* key)
 DHPublicKey::DHPublicKey(CipherSuite suite)
   : PublicKey(ossl_key_type(suite))
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, const bytes& data)
   : PublicKey(ossl_key_type(suite), data)
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, OpenSSLKey* key)
   : PublicKey(key)
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
@@ -1041,17 +1045,18 @@ operator<<(tls::ostream& out, const ECIESLabel& obj)
 }
 
 static std::pair<bytes, bytes>
-derive_ecies_secrets(const bytes& shared_secret)
+derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
 {
   std::string key_label_str{ "mls10 ecies key" };
   bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
   ECIESLabel key_label{ AESGCM::key_size_128, key_label_vec };
-  auto key = hkdf_expand(shared_secret, key_label, AESGCM::key_size_128);
+  auto key = hkdf_expand(suite, shared_secret, key_label, AESGCM::key_size_128);
 
   std::string nonce_label_str{ "mls10 ecies nonce" };
   bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
   ECIESLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
-  auto nonce = hkdf_expand(shared_secret, nonce_label, AESGCM::nonce_size);
+  auto nonce =
+    hkdf_expand(suite, shared_secret, nonce_label, AESGCM::nonce_size);
 
   return std::pair<bytes, bytes>(key, nonce);
 }
@@ -1063,7 +1068,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   auto shared_secret = ephemeral.derive(*this);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
 
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
@@ -1074,14 +1079,18 @@ DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::generate(type));
+  auto key = DHPrivateKey(suite, OpenSSLKey::generate(type));
+  key._suite = suite;
+  return key;
 }
 
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::derive(type, data));
+  auto key = DHPrivateKey(suite, OpenSSLKey::derive(type, data));
+  key._suite = suite;
+  return key;
 }
 
 bytes
@@ -1127,7 +1136,7 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
   auto shared_secret = derive(ciphertext.ephemeral);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);

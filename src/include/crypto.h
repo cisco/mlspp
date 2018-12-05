@@ -124,12 +124,13 @@ bytes
 random_bytes(size_t size);
 
 bytes
-hkdf_extract(const bytes& salt, const bytes& ikm);
+hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
 class State;
 
 bytes
-derive_secret(const bytes& secret,
+derive_secret(CipherSuite suite,
+              const bytes& secret,
               const std::string& label,
               const State& state,
               const size_t length);
@@ -226,6 +227,8 @@ public:
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
+  CipherSuite _suite;
+
   DHPublicKey(CipherSuite suite, OpenSSLKey* key);
   friend class DHPrivateKey;
 };
@@ -246,6 +249,7 @@ public:
   const DHPublicKey& public_key() const;
 
 private:
+  CipherSuite _suite;
   DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 
