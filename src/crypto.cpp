@@ -858,6 +858,21 @@ AESGCM::decrypt(const bytes& ct) const
   return pt;
 }
 
+size_t
+AESGCM::key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return key_size_128;
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return key_size_256;
+  }
+
+  throw InvalidParameterError("Non-AESGCM ciphersuite");
+}
+
 ///
 /// PublicKey
 ///
@@ -1047,10 +1062,11 @@ operator<<(tls::ostream& out, const ECIESLabel& obj)
 static std::pair<bytes, bytes>
 derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
 {
+  uint16_t key_size = AESGCM::key_size(suite);
   std::string key_label_str{ "mls10 ecies key" };
   bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
-  ECIESLabel key_label{ AESGCM::key_size_128, key_label_vec };
-  auto key = hkdf_expand(suite, shared_secret, key_label, AESGCM::key_size_128);
+  ECIESLabel key_label{ key_size, key_label_vec };
+  auto key = hkdf_expand(suite, shared_secret, key_label, key_size);
 
   std::string nonce_label_str{ "mls10 ecies nonce" };
   bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };

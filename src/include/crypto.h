@@ -150,6 +150,8 @@ public:
   bytes encrypt(const bytes& plaintext) const;
   bytes decrypt(const bytes& ciphertext) const;
 
+  static size_t key_size(CipherSuite suite);
+
   static const size_t key_size_128 = 16;
   static const size_t key_size_192 = 24;
   static const size_t key_size_256 = 32;
