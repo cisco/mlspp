@@ -17,21 +17,24 @@ TEST_CASE("SHA-256 hash produces correct values", "[crypto]")
   {
     std::string answer =
       "df7e70e5021544f4834bbee64a9e3789febc4be81470df629cad6ddb03320a5c";
-    REQUIRE(SHA256Digest(byte).digest() == from_hex(answer));
+    REQUIRE(Digest(DigestType::SHA256).write(byte).digest() ==
+            from_hex(answer));
   }
 
   SECTION("For a byte string")
   {
     std::string answer =
       "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a";
-    REQUIRE(SHA256Digest(data).digest() == from_hex(answer));
+    REQUIRE(Digest(DigestType::SHA256).write(data).digest() ==
+            from_hex(answer));
   }
 
   SECTION("For input in multiple chunks")
   {
     std::string answer =
       "76a952f18b6c638b028860087e7840a9cc43ed1af489d62a51c71984266789d6";
-    REQUIRE(SHA256Digest(byte).write(data).digest() == from_hex(answer));
+    REQUIRE(Digest(DigestType::SHA256).write(byte).write(data).digest() ==
+            from_hex(answer));
   }
 }
 

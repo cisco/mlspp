@@ -95,21 +95,26 @@ public:
 };
 
 // Digests
-class SHA256Digest
+enum struct DigestType
+{
+  SHA256,
+  SHA512
+};
+
+class Digest
 {
 public:
-  SHA256Digest();
-  SHA256Digest(uint8_t byte);
-  SHA256Digest(const bytes& data);
-
-  SHA256Digest& write(uint8_t byte);
-  SHA256Digest& write(const bytes& data);
+  Digest(DigestType type);
+  Digest(CipherSuite suite);
+  Digest& write(uint8_t byte);
+  Digest& write(const bytes& data);
   bytes digest();
 
-  static const size_t output_size = 32;
+  const size_t output_size() const;
 
 private:
-  SHA256_CTX _ctx;
+  size_t _size;
+  typed_unique_ptr<EVP_MD_CTX> _ctx;
 };
 
 bytes

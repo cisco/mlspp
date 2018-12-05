@@ -317,7 +317,20 @@ public:
 
   virtual void set_secret(const bytes& data)
   {
-    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+    DigestType digest_type;
+    switch (static_cast<RawKeyType>(_type)) {
+      case RawKeyType::X25519:
+        digest_type = DigestType::SHA256;
+        break;
+      case RawKeyType::X448:
+        digest_type = DigestType::SHA512;
+        break;
+      default:
+        throw InvalidParameterError("set_secret not supported");
+    }
+
+    bytes digest =
+      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
 
     auto pkey = EVP_PKEY_new_raw_private_key(
       _type, nullptr, digest.data(), digest.size());
@@ -447,7 +460,20 @@ public:
 
   virtual void set_secret(const bytes& data)
   {
-    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+    DigestType digest_type;
+    switch (static_cast<ECKeyType>(_curve_nid)) {
+      case ECKeyType::P256:
+        digest_type = DigestType::SHA256;
+        break;
+      case ECKeyType::P521:
+        digest_type = DigestType::SHA512;
+        break;
+      default:
+        throw InvalidParameterError("set_secret not supported");
+    }
+
+    bytes digest =
+      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
 
     EC_KEY* eckey = new_ec_key();
 
@@ -544,54 +570,83 @@ OpenSSLKey::derive(OpenSSLKeyType type, const bytes& data)
 }
 
 ///
-/// SHA256Digest
+/// Digest
 ///
 
-SHA256Digest::SHA256Digest()
+DigestType
+digest_type(CipherSuite suite)
 {
-  if (SHA256_Init(&_ctx) != 1) {
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return DigestType::SHA256;
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return DigestType::SHA512;
+  }
+
+  throw InvalidParameterError("Unknown ciphersuite");
+}
+
+const EVP_MD*
+ossl_digest_type(DigestType type)
+{
+  switch (type) {
+    case DigestType::SHA256:
+      return EVP_sha256();
+    case DigestType::SHA512:
+      return EVP_sha512();
+  }
+}
+
+Digest::Digest(DigestType type)
+  : _ctx(EVP_MD_CTX_new())
+{
+  auto md = ossl_digest_type(type);
+  _size = EVP_MD_size(md);
+  if (EVP_DigestInit(_ctx.get(), md) != 1) {
     throw OpenSSLError::current();
   }
 }
 
-SHA256Digest::SHA256Digest(uint8_t byte)
-  : SHA256Digest()
-{
-  write(byte);
-}
+Digest::Digest(CipherSuite suite)
+  : Digest(digest_type(suite))
+{}
 
-SHA256Digest::SHA256Digest(const bytes& data)
-  : SHA256Digest()
+Digest&
+Digest::write(uint8_t byte)
 {
-  write(data);
-}
-
-SHA256Digest&
-SHA256Digest::write(uint8_t byte)
-{
-  if (SHA256_Update(&_ctx, &byte, 1) != 1) {
+  if (EVP_DigestUpdate(_ctx.get(), &byte, 1) != 1) {
     throw OpenSSLError::current();
   }
   return *this;
 }
 
-SHA256Digest&
-SHA256Digest::write(const bytes& data)
+Digest&
+Digest::write(const bytes& data)
 {
-  if (SHA256_Update(&_ctx, data.data(), data.size()) != 1) {
+  if (EVP_DigestUpdate(_ctx.get(), data.data(), data.size()) != 1) {
     throw OpenSSLError::current();
   }
   return *this;
 }
 
 bytes
-SHA256Digest::digest()
+Digest::digest()
 {
-  bytes out(SHA256_DIGEST_LENGTH);
-  if (SHA256_Final(out.data(), &_ctx) != 1) {
+  unsigned int outlen = output_size();
+  auto out = bytes(outlen);
+  auto ptr = out.data();
+  if (EVP_DigestFinal(_ctx.get(), ptr, &outlen) != 1) {
     throw OpenSSLError::current();
   }
   return out;
+}
+
+const size_t
+Digest::output_size() const
+{
+  return _size;
 }
 
 ///
