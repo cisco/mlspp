@@ -14,7 +14,9 @@ namespace mls {
 enum struct CipherSuite : uint16_t
 {
   P256_SHA256_AES128GCM = 0x0000,
-  X25519_SHA256_AES128GCM = 0x0001
+  P521_SHA512_AES256GCM = 0x0010,
+  X25519_SHA256_AES128GCM = 0x0001,
+  X448_SHA512_AES256GCM = 0x0011
 };
 
 // Utility class to avoid a bit of boilerplate
@@ -39,7 +41,9 @@ operator>>(tls::istream& in, CipherSuite& obj);
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0000,
-  Ed25519_SHA256 = 0x0001
+  P521_SHA512 = 0x0010,
+  Ed25519 = 0x0001,
+  Ed448 = 0x0011
 };
 
 tls::ostream&
@@ -90,21 +94,27 @@ public:
   static OpenSSLError current();
 };
 
-class SHA256Digest
+// Digests
+enum struct DigestType
+{
+  SHA256,
+  SHA512
+};
+
+class Digest
 {
 public:
-  SHA256Digest();
-  SHA256Digest(uint8_t byte);
-  SHA256Digest(const bytes& data);
-
-  SHA256Digest& write(uint8_t byte);
-  SHA256Digest& write(const bytes& data);
+  Digest(DigestType type);
+  Digest(CipherSuite suite);
+  Digest& write(uint8_t byte);
+  Digest& write(const bytes& data);
   bytes digest();
 
-  static const size_t output_size = 32;
+  const size_t output_size() const;
 
 private:
-  SHA256_CTX _ctx;
+  size_t _size;
+  typed_unique_ptr<EVP_MD_CTX> _ctx;
 };
 
 bytes
@@ -114,12 +124,13 @@ bytes
 random_bytes(size_t size);
 
 bytes
-hkdf_extract(const bytes& salt, const bytes& ikm);
+hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
 class State;
 
 bytes
-derive_secret(const bytes& secret,
+derive_secret(CipherSuite suite,
+              const bytes& secret,
               const std::string& label,
               const State& state,
               const size_t length);
@@ -138,6 +149,8 @@ public:
   void set_aad(const bytes& key);
   bytes encrypt(const bytes& plaintext) const;
   bytes decrypt(const bytes& ciphertext) const;
+
+  static size_t key_size(CipherSuite suite);
 
   static const size_t key_size_128 = 16;
   static const size_t key_size_192 = 24;
@@ -216,6 +229,8 @@ public:
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
+  CipherSuite _suite;
+
   DHPublicKey(CipherSuite suite, OpenSSLKey* key);
   friend class DHPrivateKey;
 };
@@ -236,6 +251,7 @@ public:
   const DHPublicKey& public_key() const;
 
 private:
+  CipherSuite _suite;
   DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 

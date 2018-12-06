@@ -66,8 +66,11 @@ OpenSSLError::current()
 enum struct OpenSSLKeyType
 {
   P256,
+  P521,
   X25519,
-  Ed25519
+  X448,
+  Ed25519,
+  Ed448
 };
 
 OpenSSLKeyType
@@ -76,8 +79,12 @@ ossl_key_type(CipherSuite suite)
   switch (suite) {
     case CipherSuite::P256_SHA256_AES128GCM:
       return OpenSSLKeyType::P256;
+    case CipherSuite::P521_SHA512_AES256GCM:
+      return OpenSSLKeyType::P521;
     case CipherSuite::X25519_SHA256_AES128GCM:
       return OpenSSLKeyType::X25519;
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return OpenSSLKeyType::X448;
   }
 
   throw InvalidParameterError("Unknown ciphersuite");
@@ -89,8 +96,12 @@ ossl_key_type(SignatureScheme scheme)
   switch (scheme) {
     case SignatureScheme::P256_SHA256:
       return OpenSSLKeyType::P256;
-    case SignatureScheme::Ed25519_SHA256:
-      return OpenSSLKeyType::X25519;
+    case SignatureScheme::P521_SHA512:
+      return OpenSSLKeyType::P521;
+    case SignatureScheme::Ed25519:
+      return OpenSSLKeyType::Ed25519;
+    case SignatureScheme::Ed448:
+      return OpenSSLKeyType::Ed448;
   }
 
   throw InvalidParameterError("Unknown signature scheme");
@@ -231,39 +242,75 @@ make_typed_unique(T* ptr)
 /// than OpenSSL's EVP interface.
 ///
 
-enum RawKeyType : int
+enum struct RawKeyType : int
 {
   X25519 = EVP_PKEY_X25519,
+  X448 = EVP_PKEY_X448,
   Ed25519 = EVP_PKEY_ED25519,
+  Ed448 = EVP_PKEY_ED448
 };
 
 struct RawKey : OpenSSLKey
 {
 public:
   RawKey(RawKeyType type)
-    : _type(type)
+    : _type(static_cast<int>(type))
   {}
 
-  RawKey(RawKeyType type, EVP_PKEY* pkey)
+  RawKey(int type, EVP_PKEY* pkey)
     : OpenSSLKey(pkey)
     , _type(type)
   {}
 
   virtual OpenSSLKeyType type() const
   {
-    switch (_type) {
-      case X25519:
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
         return OpenSSLKeyType::X25519;
-      case Ed25519:
+      case RawKeyType::X448:
+        return OpenSSLKeyType::X448;
+      case RawKeyType::Ed25519:
         return OpenSSLKeyType::Ed25519;
+      case RawKeyType::Ed448:
+        return OpenSSLKeyType::Ed448;
     }
 
     throw MissingStateError("Unknown raw key type");
   }
-  virtual size_t secret_size() const { return 32; }
+
+  virtual size_t secret_size() const
+  {
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+      case RawKeyType::Ed25519:
+        return 32;
+      case RawKeyType::X448:
+        return 56;
+      case RawKeyType::Ed448:
+        return 57;
+    }
+
+    throw MissingStateError("Unknown raw key type");
+  }
+
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
-  virtual bool can_sign() const { return _type == RawKeyType::Ed25519; }
+  virtual bool can_sign() const
+  {
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+      case RawKeyType::X448:
+        return false;
+      case RawKeyType::Ed25519:
+      case RawKeyType::Ed448:
+        return true;
+    }
+
+    return false;
+  }
 
   virtual bytes marshal() const
   {
@@ -285,7 +332,7 @@ public:
 
   virtual void set_public(const bytes& data)
   {
-    EVP_PKEY* pkey =
+    auto pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
     if (!pkey) {
       throw OpenSSLError::current();
@@ -296,9 +343,25 @@ public:
 
   virtual void set_secret(const bytes& data)
   {
-    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+    DigestType digest_type;
+    switch (static_cast<RawKeyType>(_type)) {
+      case RawKeyType::X25519:
+      case RawKeyType::Ed25519:
+        digest_type = DigestType::SHA256;
+        break;
+      case RawKeyType::X448:
+      case RawKeyType::Ed448:
+        digest_type = DigestType::SHA512;
+        break;
+      default:
+        throw InvalidParameterError("set_secret not supported");
+    }
 
-    EVP_PKEY* pkey = EVP_PKEY_new_raw_private_key(
+    bytes digest =
+      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
+    digest.resize(secret_size());
+
+    auto pkey = EVP_PKEY_new_raw_private_key(
       _type, nullptr, digest.data(), digest.size());
     if (!pkey) {
       throw OpenSSLError::current();
@@ -354,20 +417,40 @@ public:
   }
 
 private:
-  RawKeyType _type;
+  const int _type;
 };
 
-struct P256Key : OpenSSLKey
+enum struct ECKeyType : int
+{
+  P256 = NID_X9_62_prime256v1,
+  P521 = NID_secp521r1
+};
+
+struct ECKey : OpenSSLKey
 {
 public:
-  P256Key() = default;
+  ECKey(ECKeyType type)
+    : _curve_nid(static_cast<int>(type))
+  {}
 
-  P256Key(EVP_PKEY* pkey)
-    : OpenSSLKey(pkey)
+  ECKey(int curve_nid, EVP_PKEY* pkey)
+    : _curve_nid(curve_nid)
+    , OpenSSLKey(pkey)
   {}
 
   virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
-  virtual size_t secret_size() const { return 32; }
+  virtual size_t secret_size() const
+  {
+    auto enum_curve = static_cast<ECKeyType>(_curve_nid);
+    switch (enum_curve) {
+      case ECKeyType::P256:
+        return 32;
+      case ECKeyType::P521:
+        return 66;
+    }
+
+    throw InvalidParameterError("Unknown curve");
+  }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
   virtual bool can_sign() const { return true; }
@@ -417,7 +500,20 @@ public:
 
   virtual void set_secret(const bytes& data)
   {
-    bytes digest = SHA256Digest(dh_hash_prefix).write(data).digest();
+    DigestType digest_type;
+    switch (static_cast<ECKeyType>(_curve_nid)) {
+      case ECKeyType::P256:
+        digest_type = DigestType::SHA256;
+        break;
+      case ECKeyType::P521:
+        digest_type = DigestType::SHA512;
+        break;
+      default:
+        throw InvalidParameterError("set_secret not supported");
+    }
+
+    bytes digest =
+      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
 
     EC_KEY* eckey = new_ec_key();
 
@@ -435,12 +531,14 @@ public:
 
   virtual OpenSSLKey* dup() const
   {
+    // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
+    // RatchetTree ctor tries to copy an empty key.
     if (!_key.get()) {
-      return new P256Key{};
+      return new ECKey(_curve_nid, static_cast<EVP_PKEY*>(nullptr));
     }
 
     auto eckey_out = EC_KEY_dup(my_ec_key());
-    return new P256Key(eckey_out);
+    return new ECKey(_curve_nid, eckey_out);
   }
 
   virtual OpenSSLKey* dup_public() const
@@ -451,14 +549,15 @@ public:
 
     auto eckey_out = new_ec_key();
     EC_KEY_set_public_key(eckey_out, point);
-    return new P256Key(eckey_out);
+    return new ECKey(_curve_nid, eckey_out);
   }
 
 private:
-  static const int _curve_nid = NID_X9_62_prime256v1;
+  const int _curve_nid;
 
-  P256Key(EC_KEY* eckey)
+  ECKey(int curve_nid, EC_KEY* eckey)
     : OpenSSLKey()
+    , _curve_nid(curve_nid)
   {
     reset(eckey);
   }
@@ -481,10 +580,16 @@ OpenSSLKey::create(OpenSSLKeyType type)
   switch (type) {
     case OpenSSLKeyType::X25519:
       return new RawKey(RawKeyType::X25519);
+    case OpenSSLKeyType::X448:
+      return new RawKey(RawKeyType::X448);
     case OpenSSLKeyType::Ed25519:
       return new RawKey(RawKeyType::Ed25519);
+    case OpenSSLKeyType::Ed448:
+      return new RawKey(RawKeyType::Ed448);
     case OpenSSLKeyType::P256:
-      return new P256Key;
+      return new ECKey(ECKeyType::P256);
+    case OpenSSLKeyType::P521:
+      return new ECKey(ECKeyType::P521);
   }
 }
 
@@ -505,54 +610,83 @@ OpenSSLKey::derive(OpenSSLKeyType type, const bytes& data)
 }
 
 ///
-/// SHA256Digest
+/// Digest
 ///
 
-SHA256Digest::SHA256Digest()
+DigestType
+digest_type(CipherSuite suite)
 {
-  if (SHA256_Init(&_ctx) != 1) {
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return DigestType::SHA256;
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return DigestType::SHA512;
+  }
+
+  throw InvalidParameterError("Unknown ciphersuite");
+}
+
+const EVP_MD*
+ossl_digest_type(DigestType type)
+{
+  switch (type) {
+    case DigestType::SHA256:
+      return EVP_sha256();
+    case DigestType::SHA512:
+      return EVP_sha512();
+  }
+}
+
+Digest::Digest(DigestType type)
+  : _ctx(EVP_MD_CTX_new())
+{
+  auto md = ossl_digest_type(type);
+  _size = EVP_MD_size(md);
+  if (EVP_DigestInit(_ctx.get(), md) != 1) {
     throw OpenSSLError::current();
   }
 }
 
-SHA256Digest::SHA256Digest(uint8_t byte)
-  : SHA256Digest()
-{
-  write(byte);
-}
+Digest::Digest(CipherSuite suite)
+  : Digest(digest_type(suite))
+{}
 
-SHA256Digest::SHA256Digest(const bytes& data)
-  : SHA256Digest()
+Digest&
+Digest::write(uint8_t byte)
 {
-  write(data);
-}
-
-SHA256Digest&
-SHA256Digest::write(uint8_t byte)
-{
-  if (SHA256_Update(&_ctx, &byte, 1) != 1) {
+  if (EVP_DigestUpdate(_ctx.get(), &byte, 1) != 1) {
     throw OpenSSLError::current();
   }
   return *this;
 }
 
-SHA256Digest&
-SHA256Digest::write(const bytes& data)
+Digest&
+Digest::write(const bytes& data)
 {
-  if (SHA256_Update(&_ctx, data.data(), data.size()) != 1) {
+  if (EVP_DigestUpdate(_ctx.get(), data.data(), data.size()) != 1) {
     throw OpenSSLError::current();
   }
   return *this;
 }
 
 bytes
-SHA256Digest::digest()
+Digest::digest()
 {
-  bytes out(SHA256_DIGEST_LENGTH);
-  if (SHA256_Final(out.data(), &_ctx) != 1) {
+  unsigned int outlen = output_size();
+  auto out = bytes(outlen);
+  auto ptr = out.data();
+  if (EVP_DigestFinal(_ctx.get(), ptr, &outlen) != 1) {
     throw OpenSSLError::current();
   }
   return out;
+}
+
+const size_t
+Digest::output_size() const
+{
+  return _size;
 }
 
 ///
@@ -560,11 +694,11 @@ SHA256Digest::digest()
 ///
 
 static bytes
-hmac_sha256(const bytes& key, const bytes& data)
+hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
   unsigned int size = 0;
   bytes md(SHA256_DIGEST_LENGTH);
-  if (!HMAC(EVP_sha256(),
+  if (!HMAC(ossl_digest_type(digest_type(suite)),
             key.data(),
             key.size(),
             data.data(),
@@ -578,9 +712,9 @@ hmac_sha256(const bytes& key, const bytes& data)
 }
 
 bytes
-hkdf_extract(const bytes& salt, const bytes& ikm)
+hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  return hmac_sha256(salt, ikm);
+  return hmac(suite, salt, ikm);
 }
 
 // struct {
@@ -627,17 +761,18 @@ random_bytes(size_t size)
 //   HMAC(Secret, Label || 0x01)
 template<typename T>
 static bytes
-hkdf_expand(const bytes& secret, const T& info, size_t size)
+hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
 {
   auto label = tls::marshal(info);
   label.push_back(0x01);
-  auto mac = hmac_sha256(secret, label);
+  auto mac = hmac(suite, secret, label);
   mac.resize(size);
   return mac;
 }
 
 bytes
-derive_secret(const bytes& secret,
+derive_secret(CipherSuite suite,
+              const bytes& secret,
               const std::string& label,
               const State& state,
               size_t size)
@@ -646,7 +781,7 @@ derive_secret(const bytes& secret,
   bytes vec_label(mls_label.begin(), mls_label.end());
 
   HKDFLabel label_str{ uint16_t(size), vec_label, state };
-  return hkdf_expand(secret, label_str, size);
+  return hkdf_expand(suite, secret, label_str, size);
 }
 
 ///
@@ -761,6 +896,21 @@ AESGCM::decrypt(const bytes& ct) const
   }
 
   return pt;
+}
+
+size_t
+AESGCM::key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return key_size_128;
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return key_size_256;
+  }
+
+  throw InvalidParameterError("Non-AESGCM ciphersuite");
 }
 
 ///
@@ -913,16 +1063,19 @@ PrivateKey::PrivateKey(OpenSSLKey* key)
 DHPublicKey::DHPublicKey(CipherSuite suite)
   : PublicKey(ossl_key_type(suite))
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, const bytes& data)
   : PublicKey(ossl_key_type(suite), data)
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 DHPublicKey::DHPublicKey(CipherSuite suite, OpenSSLKey* key)
   : PublicKey(key)
   , CipherAware(suite)
+  , _suite(suite)
 {}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
@@ -947,17 +1100,19 @@ operator<<(tls::ostream& out, const ECIESLabel& obj)
 }
 
 static std::pair<bytes, bytes>
-derive_ecies_secrets(const bytes& shared_secret)
+derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
 {
+  uint16_t key_size = AESGCM::key_size(suite);
   std::string key_label_str{ "mls10 ecies key" };
   bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
-  ECIESLabel key_label{ AESGCM::key_size_128, key_label_vec };
-  auto key = hkdf_expand(shared_secret, key_label, AESGCM::key_size_128);
+  ECIESLabel key_label{ key_size, key_label_vec };
+  auto key = hkdf_expand(suite, shared_secret, key_label, key_size);
 
   std::string nonce_label_str{ "mls10 ecies nonce" };
   bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
   ECIESLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
-  auto nonce = hkdf_expand(shared_secret, nonce_label, AESGCM::nonce_size);
+  auto nonce =
+    hkdf_expand(suite, shared_secret, nonce_label, AESGCM::nonce_size);
 
   return std::pair<bytes, bytes>(key, nonce);
 }
@@ -969,7 +1124,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   auto shared_secret = ephemeral.derive(*this);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
 
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
@@ -980,14 +1135,18 @@ DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::generate(type));
+  auto key = DHPrivateKey(suite, OpenSSLKey::generate(type));
+  key._suite = suite;
+  return key;
 }
 
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::derive(type, data));
+  auto key = DHPrivateKey(suite, OpenSSLKey::derive(type, data));
+  key._suite = suite;
+  return key;
 }
 
 bytes
@@ -1033,7 +1192,7 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
   auto shared_secret = derive(ciphertext.ephemeral);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(shared_secret);
+  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);

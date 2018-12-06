@@ -215,7 +215,7 @@ RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
 
     auto right = tree_math::right(curr, size);
     auto child_secret = *(_nodes[right].secret());
-    auto secret = SHA256Digest(child_secret).digest();
+    auto secret = Digest(_suite).write(child_secret).digest();
     _nodes[curr] = new_node(secret);
   }
 }
@@ -250,7 +250,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
   auto sibling = tree_math::sibling(curr, size);
   auto secret = leaf_secret;
   while (curr != root) {
-    secret = SHA256Digest(secret).digest();
+    secret = Digest(_suite).write(secret).digest();
 
     auto temp = new_node(secret);
     path.nodes.push_back(temp);
@@ -285,7 +285,7 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
       secret = priv->decrypt(path.node_secrets[i - 1]);
       have_secret = true;
     } else if (have_secret) {
-      secret = SHA256Digest(secret).digest();
+      secret = Digest(_suite).write(secret).digest();
     }
 
     if (have_secret) {
@@ -337,7 +337,7 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
     }
 
     _nodes[curr] = new_node(secret);
-    secret = SHA256Digest(secret).digest();
+    secret = Digest(_suite).write(secret).digest();
 
     curr = tree_math::parent(curr, size);
   }
