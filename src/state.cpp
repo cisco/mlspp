@@ -45,12 +45,32 @@ State::State(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
-  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
-  auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
-  if ((identity_key != identity_priv.public_key()) ||
-      (init_key != init_priv.public_key())) {
+  if (identity_key != identity_priv.public_key()) {
     throw InvalidParameterError("Group add not targeted for this node");
+  }
+
+  // Make sure that the init key for the chosen ciphersuite is the
+  // one we sent
+  bool init_verified = false;
+  for (int i = 0; i < add.init_key.cipher_suites.size(); ++i) {
+    auto suite = add.init_key.cipher_suites[i];
+    if (suite != _suite) {
+      continue;
+    }
+
+    auto init_priv = DHPrivateKey::derive(_suite, init_secret);
+    auto init_uik = DHPublicKey(_suite, add.init_key.init_keys[i]);
+
+    if (init_uik != init_priv.public_key()) {
+      throw ProtocolError("Incorrect init key");
+    }
+
+    init_verified = true;
+    break;
+  }
+  if (!init_verified) {
+    throw ProtocolError("Selected cipher suite not supported");
   }
 
   // Initialize shared state
