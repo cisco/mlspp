@@ -35,7 +35,7 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << algorithm << identity_key;
+  out << cipher_suites << init_keys << identity_key << algorithm;
   return out.bytes();
 }
 
@@ -51,8 +51,8 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.algorithm
-             << obj.identity_key << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.identity_key
+             << obj.algorithm << obj.signature;
 }
 
 tls::istream&
@@ -73,11 +73,15 @@ operator>>(tls::istream& in, UserInitKey& obj)
     obj.init_keys.push_back(key);
   }
 
-  in >> obj.algorithm;
-  auto key = SignaturePublicKey(obj.algorithm); // XXX
-  obj.identity_key = key;
-  in >> obj.identity_key >> obj.signature;
+  // XXX(rlb@ipv.sx) Because the algorithm comes after the key, we
+  // have to read the key as opaque bytes, then populate it once we
+  // know the algorithm.  We could fix this by reversing the order
+  // of these fields in the struct.
+  auto key_data = tls::opaque<2>();
+  in >> key_data >> obj.algorithm;
+  obj.identity_key = SignaturePublicKey(obj.algorithm, key_data);
 
+  in >> obj.signature;
   return in;
 }
 

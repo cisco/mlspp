@@ -11,16 +11,16 @@ namespace mls {
 // struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
-//     SignatureScheme algorithm;
 //     SignaturePublicKey identity_key;
+//     SignatureScheme algorithm;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::variant_vector<DHPublicKey, CipherSuite, 2> init_keys;
-  SignatureScheme algorithm;
   SignaturePublicKey identity_key;
+  SignatureScheme algorithm;
   tls::opaque<2> signature;
 
   // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy

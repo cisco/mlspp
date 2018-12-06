@@ -76,6 +76,13 @@ public:
   using parent::parent;
 };
 
+class ProtocolError : public std::runtime_error
+{
+public:
+  typedef std::runtime_error parent;
+  using parent::parent;
+};
+
 class InvalidTLSSyntax : public std::invalid_argument
 {
 public:
