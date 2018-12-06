@@ -278,12 +278,38 @@ public:
 
     throw MissingStateError("Unknown raw key type");
   }
-  virtual size_t secret_size() const { return 32; }
+
+  virtual size_t secret_size() const
+  {
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+      case RawKeyType::Ed25519:
+        return 32;
+      case RawKeyType::X448:
+        return 56;
+      case RawKeyType::Ed448:
+        return 57;
+    }
+
+    throw MissingStateError("Unknown raw key type");
+  }
+
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
   virtual bool can_sign() const
   {
-    return _type == static_cast<int>(RawKeyType::Ed25519);
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+      case RawKeyType::X448:
+        return false;
+      case RawKeyType::Ed25519:
+      case RawKeyType::Ed448:
+        return true;
+    }
+
+    return false;
   }
 
   virtual bytes marshal() const
@@ -320,9 +346,11 @@ public:
     DigestType digest_type;
     switch (static_cast<RawKeyType>(_type)) {
       case RawKeyType::X25519:
+      case RawKeyType::Ed25519:
         digest_type = DigestType::SHA256;
         break;
       case RawKeyType::X448:
+      case RawKeyType::Ed448:
         digest_type = DigestType::SHA512;
         break;
       default:
@@ -331,6 +359,7 @@ public:
 
     bytes digest =
       Digest(digest_type).write(dh_hash_prefix).write(data).digest();
+    digest.resize(secret_size());
 
     auto pkey = EVP_PKEY_new_raw_private_key(
       _type, nullptr, digest.data(), digest.size());
@@ -410,7 +439,18 @@ public:
   {}
 
   virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
-  virtual size_t secret_size() const { return 32; }
+  virtual size_t secret_size() const
+  {
+    auto enum_curve = static_cast<ECKeyType>(_curve_nid);
+    switch (enum_curve) {
+      case ECKeyType::P256:
+        return 32;
+      case ECKeyType::P521:
+        return 66;
+    }
+
+    throw InvalidParameterError("Unknown curve");
+  }
   virtual size_t sig_size() const { return 200; }
   virtual bool can_derive() const { return true; }
   virtual bool can_sign() const { return true; }

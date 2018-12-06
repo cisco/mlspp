@@ -2,8 +2,6 @@
 #include "tls_syntax.h"
 #include <catch.hpp>
 
-#include <iostream>
-
 using namespace mls;
 
 #define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
@@ -37,9 +35,6 @@ TEST_CASE("Basic message serialization", "[messages]")
   UserInitKey user_init_key;
   user_init_key.add_init_key(dh_pub);
   user_init_key.sign(identity_priv);
-
-  auto uik = tls::marshal(user_init_key);
-  std::cout << uik << std::endl;
 
   SECTION("UserInitKey")
   {
