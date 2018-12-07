@@ -52,4 +52,7 @@ private:
   CipherSuite cipher_suite() const;
 };
 
+// TODO(rlb@ipv.sx): Enable a session to be initialized from the
+// counterparty's UIK
+
 } // namespace mls

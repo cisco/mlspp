@@ -141,4 +141,28 @@ TEST_CASE("Operations on a running group", "[state]")
       }
     }
   }
+
+  SECTION("Ciphersuite negotiation works")
+  {
+    // Alice supports P-256 and X25516
+    auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+    auto inkA1 = DHPrivateKey::generate(CipherSuite::P256_SHA256_AES128GCM);
+    auto inkA2 = DHPrivateKey::generate(CipherSuite::X25519_SHA256_AES128GCM);
+
+    auto uikA = UserInitKey{};
+    uikA.add_init_key(inkA1.public_key());
+    uikA.add_init_key(inkA2.public_key());
+    uikA.sign(idkA);
+
+    // Bob spuports P-256 and P-521
+    auto supported_ciphers =
+      std::vector<CipherSuite>{ CipherSuite::P256_SHA256_AES128GCM,
+                                CipherSuite::P521_SHA512_AES256GCM };
+    auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+    auto group_id = from_hex("0001020304");
+
+    // They should negotiate P-256
+    auto initial = create_group(group_id, supported_ciphers, idkB, uikA);
+    REQUIRE(initial.first.cipher_suite() == CipherSuite::P256_SHA256_AES128GCM);
+  }
 }

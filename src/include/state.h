@@ -106,4 +106,11 @@ private:
   bool verify(uint32_t signer_index, const bytes& signature) const;
 };
 
+typedef std::pair<State, std::pair<Welcome, Handshake>> InitialGroupInfo;
+InitialGroupInfo
+create_group(const bytes& group_id,
+             const std::vector<CipherSuite> supported_ciphersuites,
+             const SignaturePrivateKey& identity_priv,
+             const UserInitKey& user_init_key);
+
 } // namespace mls
