@@ -162,7 +162,7 @@ TEST_CASE("Operations on a running group", "[state]")
     auto group_id = from_hex("0001020304");
 
     // They should negotiate P-256
-    auto initial = create_group(group_id, supported_ciphers, idkB, uikA);
+    auto initial = State::negotiate(group_id, supported_ciphers, idkB, uikA);
     REQUIRE(initial.first.cipher_suite() == CipherSuite::P256_SHA256_AES128GCM);
   }
 }

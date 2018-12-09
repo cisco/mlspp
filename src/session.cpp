@@ -39,6 +39,28 @@ Session::Session()
   make_init_key();
 }
 
+Session::InitialInfo
+Session::negotiate(const bytes& group_id,
+                   const std::vector<CipherSuite> supported_ciphersuites,
+                   const SignaturePrivateKey& identity_priv,
+                   const bytes& user_init_key)
+{
+  UserInitKey uik;
+  tls::unmarshal(user_init_key, uik);
+
+  auto state_init =
+    State::negotiate(group_id, supported_ciphersuites, identity_priv, uik);
+  auto state = state_init.first;
+
+  auto session = Session(identity_priv);
+  session.add_state(state.epoch(), state);
+  session.make_init_key();
+
+  auto welcome = tls::marshal(state_init.second.first);
+  auto add = tls::marshal(state_init.second.second);
+  return InitialInfo{ session, { welcome, add } };
+}
+
 bool
 operator==(const Session& lhs, const Session& rhs)
 {

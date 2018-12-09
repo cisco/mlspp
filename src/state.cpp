@@ -83,6 +83,36 @@ State::State(const SignaturePrivateKey& identity_priv,
   }
 }
 
+State::InitialInfo
+State::negotiate(const bytes& group_id,
+                 const std::vector<CipherSuite> supported_ciphersuites,
+                 const SignaturePrivateKey& identity_priv,
+                 const UserInitKey& user_init_key)
+{
+  // Negotiate a ciphersuite with the other party
+  CipherSuite suite;
+  auto selected = false;
+  for (auto my_suite : supported_ciphersuites) {
+    for (auto other_suite : user_init_key.cipher_suites) {
+      if (my_suite == other_suite) {
+        selected = true;
+        suite = my_suite;
+        break;
+      }
+    }
+
+    if (selected) {
+      break;
+    }
+  }
+
+  auto state = State{ group_id, suite, identity_priv };
+  auto welcome_add = state.add(user_init_key);
+  state.handle(welcome_add.second);
+
+  return InitialInfo(state, welcome_add);
+}
+
 ///
 /// Message factories
 ///
@@ -317,36 +347,6 @@ operator<<(tls::ostream& out, const State& obj)
 {
   return out << obj._group_id << obj._epoch << obj._roster << obj._tree
              << obj._transcript;
-}
-
-InitialGroupInfo
-create_group(const bytes& group_id,
-             const std::vector<CipherSuite> supported_ciphersuites,
-             const SignaturePrivateKey& identity_priv,
-             const UserInitKey& user_init_key)
-{
-  // Negotiate a ciphersuite with the other party
-  CipherSuite suite;
-  auto selected = false;
-  for (auto my_suite : supported_ciphersuites) {
-    for (auto other_suite : user_init_key.cipher_suites) {
-      if (my_suite == other_suite) {
-        selected = true;
-        suite = my_suite;
-        break;
-      }
-    }
-
-    if (selected) {
-      break;
-    }
-  }
-
-  auto state = State{ group_id, suite, identity_priv };
-  auto welcome_add = state.add(user_init_key);
-  state.handle(welcome_add.second);
-
-  return InitialGroupInfo(state, welcome_add);
 }
 
 } // namespace mls

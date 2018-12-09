@@ -21,6 +21,15 @@ public:
   // Create an unjoined session (and auto-generate the identity key)
   Session();
 
+  // Negotiate a session with a second peer based on their
+  // UserInitKey
+  typedef std::pair<Session, std::pair<bytes, bytes>> InitialInfo;
+  static InitialInfo negotiate(
+    const bytes& group_id,
+    const std::vector<CipherSuite> supported_ciphersuites,
+    const SignaturePrivateKey& identity_priv,
+    const bytes& user_init_key);
+
   // Two sessions are considered equal if:
   // (1) they agree on the states they have in common
   // (2) they agree on the current epoch
@@ -51,8 +60,5 @@ private:
   const State& current_state() const;
   CipherSuite cipher_suite() const;
 };
-
-// TODO(rlb@ipv.sx): Enable a session to be initialized from the
-// counterparty's UIK
 
 } // namespace mls
