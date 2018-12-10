@@ -43,6 +43,7 @@ public:
   void add(const RawKeyCredential& public_key);
   void copy(uint32_t dst, uint32_t src);
   RawKeyCredential get(uint32_t index) const;
+  size_t size() const;
 
 private:
   tls::vector<RawKeyCredential, 4> _credentials;

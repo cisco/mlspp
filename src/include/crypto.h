@@ -19,6 +19,8 @@ enum struct CipherSuite : uint16_t
   X448_SHA512_AES256GCM = 0x0011
 };
 
+typedef std::vector<CipherSuite> CipherList;
+
 // Utility class to avoid a bit of boilerplate
 class CipherAware
 {
@@ -44,6 +46,19 @@ enum struct SignatureScheme : uint16_t
   P521_SHA512 = 0x0010,
   Ed25519 = 0x0001,
   Ed448 = 0x0011
+};
+
+class SignatureAware
+{
+public:
+  SignatureAware(SignatureScheme scheme)
+    : _scheme(scheme)
+  {}
+
+  SignatureScheme signature_scheme() const { return _scheme; }
+
+protected:
+  SignatureScheme _scheme;
 };
 
 tls::ostream&
@@ -172,16 +187,21 @@ private:
 // to DH and Signature below
 
 class PublicKey
+  : public CipherAware
+  , public SignatureAware
 {
 public:
   PublicKey(const PublicKey& other);
-  PublicKey(PublicKey&& other);
   PublicKey& operator=(const PublicKey& other);
   PublicKey& operator=(PublicKey&& other);
 
-  PublicKey(OpenSSLKeyType type);
-  PublicKey(OpenSSLKeyType type, const bytes& data);
-  PublicKey(OpenSSLKey* key);
+  PublicKey(CipherSuite suite);
+  PublicKey(CipherSuite suite, const bytes& data);
+  PublicKey(CipherSuite suite, OpenSSLKey* key);
+
+  PublicKey(SignatureScheme scheme);
+  PublicKey(SignatureScheme scheme, const bytes& data);
+  PublicKey(SignatureScheme scheme, OpenSSLKey* key);
 
   bool operator==(const PublicKey& other) const;
   bool operator!=(const PublicKey& other) const;
@@ -198,10 +218,11 @@ protected:
 };
 
 class PrivateKey
+  : public CipherAware
+  , public SignatureAware
 {
 public:
   PrivateKey(const PrivateKey& other);
-  PrivateKey(PrivateKey&& other);
   PrivateKey& operator=(const PrivateKey& other);
   PrivateKey& operator=(PrivateKey&& other);
 
@@ -212,32 +233,24 @@ protected:
   typed_unique_ptr<OpenSSLKey> _key;
   typed_unique_ptr<PublicKey> _pub;
 
-  PrivateKey(OpenSSLKey* key);
+  PrivateKey(CipherSuite suite, OpenSSLKey* key);
+  PrivateKey(SignatureScheme scheme, OpenSSLKey* key);
 };
 
 // DH specialization
 struct ECIESCiphertext;
 
-class DHPublicKey
-  : public PublicKey
-  , public CipherAware
+class DHPublicKey : public PublicKey
 {
 public:
-  DHPublicKey(CipherSuite suite);
-  DHPublicKey(CipherSuite suite, const bytes& data);
-
+  using PublicKey::PublicKey;
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
 private:
-  CipherSuite _suite;
-
-  DHPublicKey(CipherSuite suite, OpenSSLKey* key);
   friend class DHPrivateKey;
 };
 
-class DHPrivateKey
-  : public PrivateKey
-  , public CipherAware
+class DHPrivateKey : public PrivateKey
 {
 public:
   using PrivateKey::PrivateKey;
@@ -251,7 +264,6 @@ public:
   const DHPublicKey& public_key() const;
 
 private:
-  CipherSuite _suite;
   DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 
@@ -259,17 +271,10 @@ private:
 class SignaturePublicKey : public PublicKey
 {
 public:
-  SignaturePublicKey(SignatureScheme scheme);
-  SignaturePublicKey(SignatureScheme scheme, const bytes& data);
-
+  using PublicKey::PublicKey;
   bool verify(const bytes& message, const bytes& signature) const;
 
-  SignatureScheme signature_scheme() const;
-
 private:
-  SignatureScheme _scheme;
-
-  SignaturePublicKey(SignatureScheme scheme, OpenSSLKey* key);
   friend class SignaturePrivateKey;
 };
 
@@ -282,11 +287,8 @@ public:
 
   bytes sign(const bytes& message) const;
   const SignaturePublicKey& public_key() const;
-  SignatureScheme signature_scheme() const;
 
 private:
-  SignatureScheme _scheme;
-
   SignaturePrivateKey(SignatureScheme scheme, OpenSSLKey* key);
 };
 

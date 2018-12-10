@@ -11,13 +11,20 @@ operator==(const RawKeyCredential& lhs, const RawKeyCredential& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const RawKeyCredential& obj)
 {
-  return out << obj._key;
+  return out << obj._key.signature_scheme() << obj._key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, RawKeyCredential& obj)
 {
-  return in >> obj._key;
+  SignatureScheme scheme;
+  in >> scheme;
+
+  SignaturePublicKey key(scheme);
+  in >> key;
+
+  obj._key = key;
+  return in;
 }
 
 void
@@ -50,6 +57,12 @@ RawKeyCredential
 Roster::get(uint32_t index) const
 {
   return _credentials[index];
+}
+
+size_t
+Roster::size() const
+{
+  return _credentials.size();
 }
 
 bool

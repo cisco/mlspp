@@ -10,6 +10,7 @@
 #include "openssl/sha.h"
 #include "state.h"
 
+#include <iostream>
 #include <string>
 
 namespace mls {
@@ -17,6 +18,10 @@ namespace mls {
 ///
 /// CipherSuite and SignatureScheme
 ///
+
+static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
+static const SignatureScheme unknown_scheme =
+  static_cast<SignatureScheme>(0xFFFF);
 
 tls::ostream&
 operator<<(tls::ostream& out, const CipherSuite& obj)
@@ -104,6 +109,7 @@ ossl_key_type(SignatureScheme scheme)
       return OpenSSLKeyType::Ed448;
   }
 
+  std::cout << "Unknown signature scheme: " << uint16_t(scheme) << std::endl;
   throw InvalidParameterError("Unknown signature scheme");
 }
 
@@ -917,26 +923,50 @@ AESGCM::key_size(CipherSuite suite)
 /// PublicKey
 ///
 
-PublicKey::PublicKey(OpenSSLKeyType type)
-  : _key(OpenSSLKey::create(type))
+PublicKey::PublicKey(CipherSuite suite)
+  : _key(OpenSSLKey::create(ossl_key_type(suite)))
+  , CipherAware(suite)
+  , SignatureAware(unknown_scheme)
+{}
+
+PublicKey::PublicKey(SignatureScheme scheme)
+  : _key(OpenSSLKey::create(ossl_key_type(scheme)))
+  , CipherAware(unknown_suite)
+  , SignatureAware(scheme)
 {}
 
 PublicKey::PublicKey(const PublicKey& other)
   : _key(other._key->dup())
+  , CipherAware(other)
+  , SignatureAware(other)
 {}
 
-PublicKey::PublicKey(PublicKey&& other)
-  : _key(std::move(other._key))
-{}
-
-PublicKey::PublicKey(OpenSSLKeyType type, const bytes& data)
-  : _key(OpenSSLKey::create(type))
+PublicKey::PublicKey(CipherSuite suite, const bytes& data)
+  : _key(OpenSSLKey::create(ossl_key_type(suite)))
+  , CipherAware(suite)
+  , SignatureAware(unknown_scheme)
 {
   reset(data);
 }
 
-PublicKey::PublicKey(OpenSSLKey* key)
+PublicKey::PublicKey(SignatureScheme scheme, const bytes& data)
+  : _key(OpenSSLKey::create(ossl_key_type(scheme)))
+  , CipherAware(unknown_suite)
+  , SignatureAware(scheme)
+{
+  reset(data);
+}
+
+PublicKey::PublicKey(CipherSuite suite, OpenSSLKey* key)
   : _key(key)
+  , CipherAware(suite)
+  , SignatureAware(unknown_scheme)
+{}
+
+PublicKey::PublicKey(SignatureScheme scheme, OpenSSLKey* key)
+  : _key(key)
+  , CipherAware(unknown_suite)
+  , SignatureAware(scheme)
 {}
 
 PublicKey&
@@ -944,6 +974,8 @@ PublicKey::operator=(const PublicKey& other)
 {
   if (&other != this) {
     _key.reset(other._key->dup());
+    _suite = other._suite;
+    _scheme = other._scheme;
   }
   return *this;
 }
@@ -953,6 +985,8 @@ PublicKey::operator=(PublicKey&& other)
 {
   if (&other != this) {
     _key = std::move(other._key);
+    _suite = other._suite;
+    _scheme = other._scheme;
   }
   return *this;
 }
@@ -1010,11 +1044,8 @@ operator>>(tls::istream& in, PublicKey& obj)
 PrivateKey::PrivateKey(const PrivateKey& other)
   : _key(other._key->dup())
   , _pub(new PublicKey(*other._pub))
-{}
-
-PrivateKey::PrivateKey(PrivateKey&& other)
-  : _key(std::move(other._key))
-  , _pub(std::move(other._pub))
+  , CipherAware(other)
+  , SignatureAware(other)
 {}
 
 PrivateKey&
@@ -1023,6 +1054,8 @@ PrivateKey::operator=(const PrivateKey& other)
   if (this != &other) {
     _key.reset(other._key->dup());
     _pub.reset(new PublicKey(*other._pub));
+    _suite = other._suite;
+    _scheme = other._scheme;
   }
   return *this;
 }
@@ -1033,6 +1066,8 @@ PrivateKey::operator=(PrivateKey&& other)
   if (this != &other) {
     _key = std::move(other._key);
     _pub = std::move(other._pub);
+    _suite = other._suite;
+    _scheme = other._scheme;
   }
   return *this;
 }
@@ -1049,34 +1084,23 @@ PrivateKey::operator!=(const PrivateKey& other) const
   return !(*this == other);
 }
 
-PrivateKey::PrivateKey(OpenSSLKey* key)
+PrivateKey::PrivateKey(CipherSuite suite, OpenSSLKey* key)
   : _key(key)
   , _pub(nullptr)
-{
-  auto base = OpenSSLKey::create(key->type());
-}
+  , CipherAware(suite)
+  , SignatureAware(unknown_scheme)
+{}
+
+PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
+  : _key(key)
+  , _pub(nullptr)
+  , CipherAware(unknown_suite)
+  , SignatureAware(scheme)
+{}
 
 ///
 /// DHPublicKey and DHPrivateKey
 ///
-
-DHPublicKey::DHPublicKey(CipherSuite suite)
-  : PublicKey(ossl_key_type(suite))
-  , CipherAware(suite)
-  , _suite(suite)
-{}
-
-DHPublicKey::DHPublicKey(CipherSuite suite, const bytes& data)
-  : PublicKey(ossl_key_type(suite), data)
-  , CipherAware(suite)
-  , _suite(suite)
-{}
-
-DHPublicKey::DHPublicKey(CipherSuite suite, OpenSSLKey* key)
-  : PublicKey(key)
-  , CipherAware(suite)
-  , _suite(suite)
-{}
 
 // key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
 // nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
@@ -1135,18 +1159,14 @@ DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
-  auto key = DHPrivateKey(suite, OpenSSLKey::generate(type));
-  key._suite = suite;
-  return key;
+  return DHPrivateKey(suite, OpenSSLKey::generate(type));
 }
 
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  auto key = DHPrivateKey(suite, OpenSSLKey::derive(type, data));
-  key._suite = suite;
-  return key;
+  return DHPrivateKey(suite, OpenSSLKey::derive(type, data));
 }
 
 bytes
@@ -1206,8 +1226,7 @@ DHPrivateKey::public_key() const
 }
 
 DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
-  : PrivateKey(key)
-  , CipherAware(suite)
+  : PrivateKey(suite, key)
 {
   _pub.reset(new DHPublicKey(suite, key->dup_public()));
 }
@@ -1215,15 +1234,6 @@ DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
-
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme)
-  : PublicKey(ossl_key_type(scheme))
-{}
-
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme,
-                                       const bytes& data)
-  : PublicKey(ossl_key_type(scheme), data)
-{}
 
 bool
 SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
@@ -1247,17 +1257,6 @@ SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
 
   return rv == 1;
 }
-
-SignatureScheme
-SignaturePublicKey::signature_scheme() const
-{
-  return _scheme;
-}
-
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, OpenSSLKey* key)
-  : PublicKey(key)
-  , _scheme(scheme)
-{}
 
 SignaturePrivateKey
 SignaturePrivateKey::generate(SignatureScheme scheme)
@@ -1300,16 +1299,9 @@ SignaturePrivateKey::public_key() const
   return *pub;
 }
 
-SignatureScheme
-SignaturePrivateKey::signature_scheme() const
-{
-  return _scheme;
-}
-
 SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
                                          OpenSSLKey* key)
-  : PrivateKey(key)
-  , _scheme(scheme)
+  : PrivateKey(scheme, key)
 {
   _pub.reset(new SignaturePublicKey(scheme, key->dup_public()));
 }
