@@ -8,7 +8,7 @@ void
 UserInitKey::add_init_key(const DHPublicKey& pub)
 {
   cipher_suites.push_back(pub.cipher_suite());
-  init_keys.push_back(pub);
+  init_keys.push_back(pub.to_bytes());
 }
 
 void
@@ -35,7 +35,7 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << identity_key << algorithm;
+  out << cipher_suites << init_keys << algorithm << identity_key;
   return out.bytes();
 }
 
@@ -51,35 +51,18 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.identity_key
-             << obj.algorithm << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.algorithm
+             << obj.identity_key << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  in >> obj.cipher_suites;
+  in >> obj.cipher_suites >> obj.init_keys >> obj.algorithm;
 
-  // The need to adapt the public key type per ciphersuite means we
-  // need to do a bit of manual decoding
-  tls::opaque<2> init_key_buffer;
-  in >> init_key_buffer;
-  tls::istream init_key_stream(init_key_buffer);
-
-  obj.init_keys.clear();
-  for (auto suite : obj.cipher_suites) {
-    DHPublicKey key(suite);
-    init_key_stream >> key;
-    obj.init_keys.push_back(key);
-  }
-
-  // XXX(rlb@ipv.sx) Because the algorithm comes after the key, we
-  // have to read the key as opaque bytes, then populate it once we
-  // know the algorithm.  We could fix this by reversing the order
-  // of these fields in the struct.
-  auto key_data = tls::opaque<2>();
-  in >> key_data >> obj.algorithm;
-  obj.identity_key = SignaturePublicKey(obj.algorithm, key_data);
+  auto key = SignaturePublicKey(obj.algorithm);
+  in >> key;
+  obj.identity_key = key;
 
   in >> obj.signature;
   return in;
@@ -114,8 +97,11 @@ operator>>(tls::istream& in, Welcome& obj)
   // group
   obj.tree = RatchetTree(obj.cipher_suite);
 
-  in >> obj.roster >> obj.tree >> obj.transcript >> obj.init_secret >>
-    obj.leaf_secret;
+  in >> obj.roster;
+  in >> obj.tree;
+  in >> obj.transcript;
+  in >> obj.init_secret;
+  in >> obj.leaf_secret;
   return in;
 }
 

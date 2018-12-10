@@ -26,6 +26,15 @@ public:
         const Welcome& welcome,
         const Handshake& handshake);
 
+  // Negotiate an initial state with another peer based on their
+  // UserInitKey
+  typedef std::pair<State, std::pair<Welcome, Handshake>> InitialInfo;
+  static InitialInfo negotiate(
+    const bytes& group_id,
+    const std::vector<CipherSuite> supported_ciphersuites,
+    const SignaturePrivateKey& identity_priv,
+    const UserInitKey& user_init_key);
+
   ///
   /// Message factories
   ///

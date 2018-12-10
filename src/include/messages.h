@@ -11,16 +11,16 @@ namespace mls {
 // struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
-//     SignaturePublicKey identity_key;
 //     SignatureScheme algorithm;
+//     SignaturePublicKey identity_key;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
   tls::vector<CipherSuite, 1> cipher_suites;
-  tls::variant_vector<DHPublicKey, CipherSuite, 2> init_keys;
-  SignaturePublicKey identity_key;
+  tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
   SignatureScheme algorithm;
+  SignaturePublicKey identity_key;
   tls::opaque<2> signature;
 
   // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
@@ -48,21 +48,21 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   opaque group_id<0..255>;
 //   uint32 epoch;
 //   CipherSuite cipher_suite;
-//   Credential roster<1..2^24-1>;
-//   PublicKey tree<1..2^24-1>;
-//   GroupOperation transcript<0..2^24-1>;
+//   Credential roster<1..2^32-1>;
+//   PublicKey tree<1..2^32-1>;
+//   GroupOperation transcript<0..2^32-1>;
 //   opaque init_secret<0..255>;
 //   opaque leaf_secret<0..255>;
 // } Welcome;
 struct GroupOperation;
 struct Welcome
 {
-  tls::opaque<2> group_id;
+  tls::opaque<1> group_id;
   epoch_t epoch;
   CipherSuite cipher_suite;
   Roster roster;
   RatchetTree tree;
-  tls::vector<GroupOperation, 3> transcript;
+  tls::vector<GroupOperation, 4> transcript;
   tls::opaque<1> init_secret;
   tls::opaque<1> leaf_secret;
 

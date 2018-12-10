@@ -141,4 +141,37 @@ TEST_CASE("Operations on a running group", "[state]")
       }
     }
   }
+
+  SECTION("Ciphersuite negotiation works")
+  {
+    // Alice supports P-256 and X25519
+    auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+    auto insA = bytes{ 0, 1, 2, 3 };
+    auto inkA1 = DHPrivateKey::derive(CipherSuite::P256_SHA256_AES128GCM, insA);
+    auto inkA2 =
+      DHPrivateKey::derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
+
+    auto uikA = UserInitKey{};
+    uikA.add_init_key(inkA1.public_key());
+    uikA.add_init_key(inkA2.public_key());
+    uikA.sign(idkA);
+
+    // Bob spuports P-256 and P-521
+    auto supported_ciphers =
+      std::vector<CipherSuite>{ CipherSuite::P256_SHA256_AES128GCM,
+                                CipherSuite::P521_SHA512_AES256GCM };
+    auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+    auto group_id = from_hex("0001020304");
+
+    // Bob should choose P-256
+    auto initialB = State::negotiate(group_id, supported_ciphers, idkB, uikA);
+    auto stateB = initialB.first;
+    REQUIRE(stateB.cipher_suite() == CipherSuite::P256_SHA256_AES128GCM);
+
+    // Alice should also arrive at P-256 when initialized
+    auto welcome = initialB.second.first;
+    auto add = initialB.second.second;
+    auto stateA = State(idkA, insA, welcome, add);
+    REQUIRE(stateA == stateB);
+  }
 }

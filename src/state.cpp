@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -45,12 +47,32 @@ State::State(const SignaturePrivateKey& identity_priv,
   // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
   // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
-  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
-  auto init_key = add.init_key.init_keys[0];
   auto identity_key = add.init_key.identity_key;
-  if ((identity_key != identity_priv.public_key()) ||
-      (init_key != init_priv.public_key())) {
+  if (identity_key != identity_priv.public_key()) {
     throw InvalidParameterError("Group add not targeted for this node");
+  }
+
+  // Make sure that the init key for the chosen ciphersuite is the
+  // one we sent
+  bool init_verified = false;
+  for (int i = 0; i < add.init_key.cipher_suites.size(); ++i) {
+    auto suite = add.init_key.cipher_suites[i];
+    if (suite != _suite) {
+      continue;
+    }
+
+    auto init_priv = DHPrivateKey::derive(_suite, init_secret);
+    auto init_uik = DHPublicKey(_suite, add.init_key.init_keys[i]);
+
+    if (init_uik != init_priv.public_key()) {
+      throw ProtocolError("Incorrect init key");
+    }
+
+    init_verified = true;
+    break;
+  }
+  if (!init_verified) {
+    throw ProtocolError("Selected cipher suite not supported");
   }
 
   // Initialize shared state
@@ -61,6 +83,36 @@ State::State(const SignaturePrivateKey& identity_priv,
   if (!verify(handshake.signer_index, handshake.signature)) {
     throw InvalidParameterError("Handshake signature failed to verify");
   }
+}
+
+State::InitialInfo
+State::negotiate(const bytes& group_id,
+                 const std::vector<CipherSuite> supported_ciphersuites,
+                 const SignaturePrivateKey& identity_priv,
+                 const UserInitKey& user_init_key)
+{
+  // Negotiate a ciphersuite with the other party
+  CipherSuite suite;
+  auto selected = false;
+  for (auto my_suite : supported_ciphersuites) {
+    for (auto other_suite : user_init_key.cipher_suites) {
+      if (my_suite == other_suite) {
+        selected = true;
+        suite = my_suite;
+        break;
+      }
+    }
+
+    if (selected) {
+      break;
+    }
+  }
+
+  auto state = State{ group_id, suite, identity_priv };
+  auto welcome_add = state.add(user_init_key);
+  state = state.handle(welcome_add.second);
+
+  return InitialInfo(state, welcome_add);
 }
 
 ///
@@ -224,11 +276,14 @@ operator==(const State& lhs, const State& rhs)
             << std::endl
             << "_epoch " << epoch << " " << lhs._epoch << " " << rhs._epoch
             << std::endl
-            << "_group_id " << group_id << std::endl
-            << "_roster " << roster << std::endl
-            << "_tree " << ratchet_tree << std::endl
+            << "_group_id " << group_id << " " << lhs._group_id << " "
+            << rhs._group_id << std::endl
+            << "_roster " << roster << " " << lhs._roster.size() << " "
+            << rhs._roster.size() << std::endl
+            << "_tree " << ratchet_tree << " " << lhs._tree.size() << " "
+            << rhs._tree.size() << std::endl
             << "_message_master_secret " << message_master_secret << std::endl
-            << "_init_secret " << init_secret << std::endl
+            << "_init_secret " << init_secret << std::endl;
   */
 
   return epoch && group_id && roster && ratchet_tree && message_master_secret &&

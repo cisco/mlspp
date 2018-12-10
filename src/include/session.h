@@ -10,16 +10,8 @@ namespace mls {
 class Session
 {
 public:
-  // Create a session joined to an empty group
-  Session(const bytes& group_id,
-          CipherSuite suite,
+  Session(const CipherList& supported_ciphersuites,
           const SignaturePrivateKey& identity_priv);
-
-  // Create an unjoined session
-  Session(const SignaturePrivateKey& identity_priv);
-
-  // Create an unjoined session (and auto-generate the identity key)
-  Session();
 
   // Two sessions are considered equal if:
   // (1) they agree on the states they have in common
@@ -27,6 +19,9 @@ public:
   friend bool operator==(const Session& lhs, const Session& rhs);
 
   bytes user_init_key() const;
+
+  std::pair<bytes, bytes> start(const bytes& group_id,
+                                const bytes& user_init_key);
 
   std::pair<bytes, bytes> add(const bytes& user_init_key) const;
   bytes update();
@@ -38,6 +33,7 @@ public:
   epoch_t current_epoch() const { return _current_epoch; }
 
 private:
+  CipherList _supported_ciphersuites;
   bytes _next_leaf_secret;
   bytes _init_secret;
   tls::opaque<2> _user_init_key;

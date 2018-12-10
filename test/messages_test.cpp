@@ -41,8 +41,6 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("UserInitKey")
   {
-    std::cout << "uik: " << tls::marshal(user_init_key) << std::endl;
-
     REQUIRE(user_init_key.verify());
     UserInitKey after;
     tls_round_trip(user_init_key, after);
