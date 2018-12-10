@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -108,7 +110,7 @@ State::negotiate(const bytes& group_id,
 
   auto state = State{ group_id, suite, identity_priv };
   auto welcome_add = state.add(user_init_key);
-  state.handle(welcome_add.second);
+  state = state.handle(welcome_add.second);
 
   return InitialInfo(state, welcome_add);
 }
@@ -274,11 +276,14 @@ operator==(const State& lhs, const State& rhs)
             << std::endl
             << "_epoch " << epoch << " " << lhs._epoch << " " << rhs._epoch
             << std::endl
-            << "_group_id " << group_id << std::endl
-            << "_roster " << roster << std::endl
-            << "_tree " << ratchet_tree << std::endl
+            << "_group_id " << group_id << " " << lhs._group_id << " "
+            << rhs._group_id << std::endl
+            << "_roster " << roster << " " << lhs._roster.size() << " "
+            << rhs._roster.size() << std::endl
+            << "_tree " << ratchet_tree << " " << lhs._tree.size() << " "
+            << rhs._tree.size() << std::endl
             << "_message_master_secret " << message_master_secret << std::endl
-            << "_init_secret " << init_secret << std::endl
+            << "_init_secret " << init_secret << std::endl;
   */
 
   return epoch && group_id && roster && ratchet_tree && message_master_secret &&

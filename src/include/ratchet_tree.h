@@ -72,7 +72,7 @@ public:
   bytes root_secret() const;
 
 private:
-  tls::variant_vector<RatchetNode, CipherSuite, 3> _nodes;
+  tls::variant_vector<RatchetNode, CipherSuite, 4> _nodes;
 
   RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;

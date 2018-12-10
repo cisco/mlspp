@@ -4,61 +4,14 @@
 
 namespace mls {
 
-const std::vector<CipherSuite> supported_cipher_suites{
-  CipherSuite::P256_SHA256_AES128GCM,
-  CipherSuite::X25519_SHA256_AES128GCM
-};
-
-const SignatureScheme default_signature_scheme = SignatureScheme::P256_SHA256;
-
-Session::Session(const bytes& group_id,
-                 CipherSuite suite,
+Session::Session(const CipherList& supported_ciphersuites,
                  const SignaturePrivateKey& identity_priv)
-  : _init_secret(random_bytes(32))
-  , _next_leaf_secret(random_bytes(32))
-  , _identity_priv(identity_priv)
-{
-  State root(group_id, suite, identity_priv);
-  add_state(0, root);
-  make_init_key();
-}
-
-Session::Session(const SignaturePrivateKey& identity_priv)
-  : _init_secret(random_bytes(32))
+  : _supported_ciphersuites(supported_ciphersuites)
+  , _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
 {
   make_init_key();
-}
-
-Session::Session()
-  : _init_secret(random_bytes(32))
-  , _next_leaf_secret(random_bytes(32))
-  , _identity_priv(SignaturePrivateKey::generate(default_signature_scheme))
-{
-  make_init_key();
-}
-
-Session::InitialInfo
-Session::negotiate(const bytes& group_id,
-                   const std::vector<CipherSuite> supported_ciphersuites,
-                   const SignaturePrivateKey& identity_priv,
-                   const bytes& user_init_key)
-{
-  UserInitKey uik;
-  tls::unmarshal(user_init_key, uik);
-
-  auto state_init =
-    State::negotiate(group_id, supported_ciphersuites, identity_priv, uik);
-  auto state = state_init.first;
-
-  auto session = Session(identity_priv);
-  session.add_state(state.epoch(), state);
-  session.make_init_key();
-
-  auto welcome = tls::marshal(state_init.second.first);
-  auto add = tls::marshal(state_init.second.second);
-  return InitialInfo{ session, { welcome, add } };
 }
 
 bool
@@ -85,6 +38,28 @@ bytes
 Session::user_init_key() const
 {
   return _user_init_key;
+}
+
+std::pair<bytes, bytes>
+Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
+{
+  if (_state.size() > 0) {
+    throw InvalidParameterError("start called on an initialized session");
+  }
+
+  UserInitKey user_init_key;
+  tls::unmarshal(user_init_key_bytes, user_init_key);
+
+  auto init = State::negotiate(
+    group_id, _supported_ciphersuites, _identity_priv, user_init_key);
+
+  auto root = init.first;
+  add_state(0, root);
+
+  auto welcome_add = init.second;
+  auto welcome = tls::marshal(welcome_add.first);
+  auto add = tls::marshal(welcome_add.second);
+  return std::pair<bytes, bytes>(welcome, add);
 }
 
 std::pair<bytes, bytes>
@@ -143,7 +118,7 @@ Session::make_init_key()
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
   // from the same secret.  Maybe we should include the ciphersuite
   // in the key derivation...
-  for (auto suite : supported_cipher_suites) {
+  for (auto suite : _supported_ciphersuites) {
     auto init_priv = DHPrivateKey::derive(suite, _init_secret);
     user_init_key.add_init_key(init_priv.public_key());
   }

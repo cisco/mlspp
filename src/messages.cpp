@@ -61,9 +61,10 @@ operator>>(tls::istream& in, UserInitKey& obj)
   in >> obj.cipher_suites >> obj.init_keys >> obj.algorithm;
 
   auto key = SignaturePublicKey(obj.algorithm);
+  in >> key;
   obj.identity_key = key;
 
-  in >> obj.identity_key >> obj.signature;
+  in >> obj.signature;
   return in;
 }
 
@@ -96,8 +97,11 @@ operator>>(tls::istream& in, Welcome& obj)
   // group
   obj.tree = RatchetTree(obj.cipher_suite);
 
-  in >> obj.roster >> obj.tree >> obj.transcript >> obj.init_secret >>
-    obj.leaf_secret;
+  in >> obj.roster;
+  in >> obj.tree;
+  in >> obj.transcript;
+  in >> obj.init_secret;
+  in >> obj.leaf_secret;
   return in;
 }
 

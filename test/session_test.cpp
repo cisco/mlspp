@@ -1,10 +1,18 @@
 #include "session.h"
 #include <catch.hpp>
 
+#include <iostream>
+
 using namespace mls;
 
-#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
-#define SIG_TEST SignatureScheme::P256_SHA256
+const CipherList ciphersuites{ CipherSuite::P256_SHA256_AES128GCM,
+                               CipherSuite::X25519_SHA256_AES128GCM };
+
+SignaturePrivateKey
+new_identity_key()
+{
+  return SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+}
 
 const size_t group_size = 5;
 const bytes group_id{ 0, 1, 2, 3 };
@@ -20,10 +28,19 @@ broadcast(std::vector<Session>& sessions, const bytes& message)
 void
 broadcast_add(std::vector<Session>& sessions)
 {
-  Session next;
+  Session next{ ciphersuites, new_identity_key() };
   auto last = sessions.size() - 1;
-  auto welcome_add = sessions[last].add(next.user_init_key());
+  std::pair<bytes, bytes> welcome_add;
 
+  // Initial add is different
+  if (sessions.size() == 1) {
+    welcome_add = sessions[last].start(group_id, next.user_init_key());
+    next.join(welcome_add.first, welcome_add.second);
+    sessions.push_back(next);
+    return;
+  }
+
+  welcome_add = sessions[last].add(next.user_init_key());
   next.join(welcome_add.first, welcome_add.second);
   broadcast(sessions, welcome_add.second);
   sessions.push_back(next);
@@ -44,8 +61,7 @@ check(std::vector<Session> sessions, epoch_t initial_epoch)
 TEST_CASE("Session creation", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back(
-    { group_id, CIPHERSUITE, SignaturePrivateKey::generate(SIG_TEST) });
+  sessions.push_back({ ciphersuites, new_identity_key() });
 
   SECTION("Two person")
   {
@@ -62,13 +78,19 @@ TEST_CASE("Session creation", "[session]")
       check(sessions, initial_epoch);
     }
   }
+
+  SECTION("With Ciphersuite Negotiation")
+  {
+    // Alice supports P-256 and X25519
+    // Bob supports P-256 and P-521
+    // TODO continue...
+  }
 }
 
 TEST_CASE("Session update and removal", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back(
-    { group_id, CIPHERSUITE, SignaturePrivateKey::generate(SIG_TEST) });
+  sessions.push_back({ ciphersuites, new_identity_key() });
 
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
@@ -91,7 +113,7 @@ TEST_CASE("Session update and removal", "[session]")
     for (int i = group_size - 1; i > 0; i -= 1) {
       auto initial_epoch = sessions[0].current_epoch();
       auto remove = sessions[i - 1].remove(i);
-      sessions.resize(i);
+      sessions.pop_back();
       broadcast(sessions, remove);
       check(sessions, initial_epoch);
     }
@@ -101,8 +123,7 @@ TEST_CASE("Session update and removal", "[session]")
 TEST_CASE("Full life-cycle", "[session]")
 {
   std::vector<Session> sessions;
-  sessions.push_back(
-    { group_id, CIPHERSUITE, SignaturePrivateKey::generate(SIG_TEST) });
+  sessions.push_back({ ciphersuites, new_identity_key() });
 
   // Create the group
   for (int i = 0; i < group_size - 1; i += 1) {
@@ -123,7 +144,7 @@ TEST_CASE("Full life-cycle", "[session]")
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
     auto remove = sessions[i - 1].remove(i);
-    sessions.resize(i);
+    sessions.pop_back();
     broadcast(sessions, remove);
     check(sessions, initial_epoch);
   }
