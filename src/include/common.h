@@ -7,14 +7,60 @@
 #include <stdexcept>
 #include <vector>
 
+// Forward declarations to enable optional serialization below
+namespace tls {
+class ostream;
+class istream;
+
+ostream&
+operator<<(ostream& out, uint8_t data);
+
+istream&
+operator>>(istream& in, uint8_t& data);
+}
+
 namespace mls {
 
 ///
-/// Some abbreviations
+/// Optional and its serialization
 ///
 
 template<typename T>
 using optional = std::experimental::optional<T>;
+
+template<typename T>
+tls::ostream&
+operator<<(tls::ostream& out, const optional<T>& opt)
+{
+  if (!opt) {
+    return opt << uint8_t(0);
+  }
+
+  return opt << uint8_t(1) << *opt;
+}
+
+template<typename T>
+tls::istream&
+operator<<(tls::istream& in, const optional<T>& opt)
+{
+  uint8_t present = 0;
+  in >> present;
+
+  switch (present) {
+    case 0:
+      return in;
+
+    case 1:
+      return in >> *opt;
+
+    default:
+      throw std::invalid_argument("Malformed optional");
+  }
+}
+
+///
+/// Byte strings and serialization
+///
 
 typedef std::vector<uint8_t> bytes;
 
