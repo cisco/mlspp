@@ -38,6 +38,19 @@ private:
   friend tls::istream& operator>>(tls::istream& in, RatchetNode& obj);
 };
 
+struct OptionalRatchetNode : public optional<RatchetNode>
+{
+  typedef optional<RatchetNode> parent;
+
+  OptionalRatchetNode(CipherSuite suite)
+    : parent(RatchetNode(suite))
+  {}
+
+  OptionalRatchetNode(CipherSuite suite, const bytes& secret)
+    : parent(RatchetNode(suite, secret))
+  {}
+};
+
 struct RatchetPath : public CipherAware
 {
   tls::variant_vector<RatchetNode, CipherSuite, 3> nodes;
@@ -72,7 +85,7 @@ public:
   bytes root_secret() const;
 
 private:
-  tls::variant_vector<RatchetNode, CipherSuite, 4> _nodes;
+  tls::variant_vector<OptionalRatchetNode, CipherSuite, 4> _nodes;
 
   RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;

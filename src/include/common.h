@@ -33,15 +33,15 @@ tls::ostream&
 operator<<(tls::ostream& out, const optional<T>& opt)
 {
   if (!opt) {
-    return opt << uint8_t(0);
+    return out << uint8_t(0);
   }
 
-  return opt << uint8_t(1) << *opt;
+  return out << uint8_t(1) << *opt;
 }
 
 template<typename T>
 tls::istream&
-operator<<(tls::istream& in, const optional<T>& opt)
+operator>>(tls::istream& in, optional<T>& opt)
 {
   uint8_t present = 0;
   in >> present;

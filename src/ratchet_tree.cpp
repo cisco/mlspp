@@ -214,9 +214,9 @@ RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
     }
 
     auto right = tree_math::right(curr, size);
-    auto child_secret = *(_nodes[right].secret());
+    auto child_secret = *(_nodes[right]->secret());
     auto secret = Digest(_suite).write(child_secret).digest();
-    _nodes[curr] = new_node(secret);
+    *_nodes[curr] = new_node(secret);
   }
 }
 
@@ -255,7 +255,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
     auto temp = new_node(secret);
     path.nodes.push_back(temp);
 
-    auto ciphertext = _nodes[sibling].public_key().encrypt(secret);
+    auto ciphertext = _nodes[sibling]->public_key().encrypt(secret);
     path.node_secrets.push_back(ciphertext);
 
     curr = tree_math::parent(curr, size);
@@ -280,7 +280,7 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
   bool have_secret = false;
   bytes secret;
   for (int i = 1; i < path.nodes.size(); i += 1) {
-    auto priv = _nodes[sibling].private_key();
+    auto priv = _nodes[sibling]->private_key();
     if (priv && !have_secret) {
       secret = priv->decrypt(path.node_secrets[i - 1]);
       have_secret = true;
@@ -318,7 +318,7 @@ RatchetTree::merge(uint32_t from, const RatchetPath& path)
       _nodes.emplace_back(_suite);
     }
 
-    _nodes[curr].merge(node);
+    _nodes[curr]->merge(node);
     curr = tree_math::parent(curr, size);
   }
 }
@@ -336,13 +336,13 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
       _nodes.emplace_back(_suite);
     }
 
-    _nodes[curr] = new_node(secret);
+    *_nodes[curr] = new_node(secret);
     secret = Digest(_suite).write(secret).digest();
 
     curr = tree_math::parent(curr, size);
   }
 
-  _nodes[root] = new_node(secret);
+  *_nodes[root] = new_node(secret);
 }
 
 uint32_t
@@ -355,14 +355,14 @@ RatchetNode
 RatchetTree::root() const
 {
   auto root = tree_math::root(size());
-  return _nodes[root];
+  return *_nodes[root];
 }
 
 bytes
 RatchetTree::root_secret() const
 {
   auto root = tree_math::root(size());
-  auto val = _nodes[root].secret();
+  auto val = _nodes[root]->secret();
   return *val;
 }
 
@@ -374,7 +374,7 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   for (int i = 0; i < lhs._nodes.size(); i += 1) {
-    if (lhs._nodes[i].public_key() != rhs._nodes[i].public_key()) {
+    if (lhs._nodes[i]->public_key() != rhs._nodes[i]->public_key()) {
       return false;
     }
   }
@@ -386,7 +386,7 @@ std::ostream&
 operator<<(std::ostream& out, const RatchetTree& obj)
 {
   for (int i = 0; i < obj._nodes.size(); i += 1) {
-    out << obj._nodes[i].public_key() << " ";
+    out << obj._nodes[i]->public_key() << " ";
   }
   return out;
 }
