@@ -2,6 +2,8 @@
 #include "tls_syntax.h"
 #include <catch.hpp>
 
+#include <iostream>
+
 using namespace mls;
 
 #define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
@@ -73,24 +75,36 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(tree == direct);
   }
 
-  SECTION("By adding leaves")
+  SECTION("Via serialization")
   {
-    size_t size = 5;
-    size_t depth = 4;
+    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
+    RatchetTree after{ CIPHERSUITE };
 
-    bytes secretA = { 0, 1, 2, 3 };
-    bytes secretB = { 1, 2, 3, 4 };
-    RatchetTree tree{ CIPHERSUITE, secretA };
-    tree.add_leaf(secretB);
+    tls::unmarshal(tls::marshal(before), after);
+    REQUIRE(before == after);
+  }
+}
 
-    auto priv = DHPrivateKey::derive(CIPHERSUITE, { 2, 3, 4, 5 });
-    auto pub = priv.public_key();
-    for (uint8_t i = 2; i < size; ++i) {
-      tree.add_leaf(pub);
-    }
+TEST_CASE("Incomplete trees", "[ratchet-tree]")
+{
+  size_t size = 5;
+  size_t depth = 4;
 
-    REQUIRE(tree.size() == size);
+  bytes secretA = { 0, 1, 2, 3 };
+  bytes secretB = { 1, 2, 3, 4 };
+  RatchetTree tree{ CIPHERSUITE, secretA };
+  tree.add_leaf(secretB);
 
+  auto priv = DHPrivateKey::derive(CIPHERSUITE, { 2, 3, 4, 5 });
+  auto pub = priv.public_key();
+  for (uint8_t i = 2; i < size; ++i) {
+    tree.add_leaf(pub);
+  }
+
+  REQUIRE(tree.size() == size);
+
+  SECTION("... can encrypt and decrypt")
+  {
     bytes original{ 0, 1, 2, 3 };
     auto encrypted = tree.encrypt(0, original);
     REQUIRE(encrypted.nodes.size() == depth);
@@ -105,12 +119,14 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(decrypted == digest);
   }
 
-  SECTION("Via serialization")
+  SECTION("... can serialize and deserialize")
   {
-    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
     RatchetTree after{ CIPHERSUITE };
+    auto marshaled = tls::marshal(tree);
+    tls::unmarshal(marshaled, after);
+    REQUIRE(tree == after);
 
-    tls::unmarshal(tls::marshal(before), after);
-    REQUIRE(before == after);
+    auto marshaled2 = tls::marshal(after);
+    REQUIRE(marshaled2 == marshaled);
   }
 }

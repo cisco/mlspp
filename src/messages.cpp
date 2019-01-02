@@ -11,6 +11,18 @@ UserInitKey::add_init_key(const DHPublicKey& pub)
   init_keys.push_back(pub.to_bytes());
 }
 
+optional<DHPublicKey>
+UserInitKey::find_init_key(CipherSuite suite) const
+{
+  for (int i = 0; i < cipher_suites.size(); ++i) {
+    if (cipher_suites[i] == suite) {
+      return DHPublicKey{ suite, init_keys[i] };
+    }
+  }
+
+  return std::experimental::nullopt;
+}
+
 void
 UserInitKey::sign(const SignaturePrivateKey& identity_priv)
 {
@@ -129,19 +141,19 @@ const GroupOperationType Add::type = GroupOperationType::add;
 bool
 operator==(const Add& lhs, const Add& rhs)
 {
-  return (lhs.path == rhs.path) && (lhs.init_key == rhs.init_key);
+  return (lhs.init_key == rhs.init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Add& obj)
 {
-  return out << obj.path << obj.init_key;
+  return out << obj.init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Add& obj)
 {
-  return in >> obj.path >> obj.init_key;
+  return in >> obj.init_key;
 }
 
 // Update

@@ -64,8 +64,8 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("Add")
   {
-    auto before = Add{ ratchet_path, user_init_key };
-    auto after = Add{ P256_SUITE };
+    auto before = Add{ user_init_key };
+    auto after = Add{};
     tls_round_trip(before, after);
   }
 
@@ -85,7 +85,7 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("Handshake")
   {
-    auto add = Add{ ratchet_path, user_init_key };
+    auto add = Add{ user_init_key };
     auto before = Handshake{ 0x42, add, 0x43, random };
     auto after = Handshake{ P256_SUITE };
     tls_round_trip(before, after);

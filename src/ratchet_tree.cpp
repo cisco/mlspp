@@ -3,6 +3,8 @@
 #include "tree_math.h"
 #include <queue>
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -218,7 +220,7 @@ RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
     auto right = tree_math::right(curr, size);
     auto child_secret = *(_nodes[right]->secret());
     auto secret = Digest(_suite).write(child_secret).digest();
-    *_nodes[curr] = new_node(secret);
+    _nodes[curr] = new_node(secret);
   }
 }
 
@@ -328,7 +330,11 @@ RatchetTree::merge(uint32_t from, const RatchetPath& path)
       _nodes.emplace_back(_suite);
     }
 
-    _nodes[curr]->merge(node);
+    if (!_nodes[curr]) {
+      _nodes[curr] = node;
+    } else {
+      _nodes[curr]->merge(node);
+    }
     curr = tree_math::parent(curr, size);
   }
 }
@@ -346,13 +352,13 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
       _nodes.emplace_back(_suite);
     }
 
-    *_nodes[curr] = new_node(secret);
+    _nodes[curr] = new_node(secret);
     secret = Digest(_suite).write(secret).digest();
 
     curr = tree_math::parent(curr, size);
   }
 
-  *_nodes[root] = new_node(secret);
+  _nodes[root] = new_node(secret);
 }
 
 void
@@ -457,7 +463,14 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   for (int i = 0; i < lhs._nodes.size(); i += 1) {
-    if (lhs._nodes[i]->public_key() != rhs._nodes[i]->public_key()) {
+    // Presence state needs to be the same
+    if (bool(lhs._nodes[i]) != bool(rhs._nodes[i])) {
+      return false;
+    }
+
+    // If they're both present, they need to be equal
+    if (lhs._nodes[i] && rhs._nodes[i] &&
+        lhs._nodes[i]->public_key() != rhs._nodes[i]->public_key()) {
       return false;
     }
   }
@@ -468,13 +481,8 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
 std::ostream&
 operator<<(std::ostream& out, const RatchetTree& obj)
 {
-  for (int i = 0; i < obj._nodes.size(); i += 1) {
-    if (!obj._nodes[i]) {
-      out << "_ ";
-      continue;
-    }
-
-    out << obj._nodes[i]->public_key() << " ";
+  for (const auto& node : obj._nodes) {
+    out << node << " ";
   }
   return out;
 }

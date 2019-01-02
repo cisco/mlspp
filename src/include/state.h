@@ -93,6 +93,9 @@ private:
   SignaturePrivateKey _identity_priv;
   bytes _cached_leaf_secret;
 
+  // A zero vector, for convenience
+  bytes _zero;
+
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
@@ -113,6 +116,13 @@ private:
 
   // Verify this state with the indicated public key
   bool verify(uint32_t signer_index, const bytes& signature) const;
+
+  // XXX
+  friend bytes derive_secret(CipherSuite suite,
+                             const bytes& secret,
+                             const std::string& label,
+                             const State& state,
+                             size_t size);
 };
 
 } // namespace mls

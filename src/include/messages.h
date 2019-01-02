@@ -6,6 +6,8 @@
 #include "roster.h"
 #include "tls_syntax.h"
 
+#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+
 namespace mls {
 
 // struct {
@@ -32,6 +34,7 @@ struct UserInitKey
   {}
 
   void add_init_key(const DHPublicKey& pub);
+  optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   void sign(const SignaturePrivateKey& identity_priv);
   bool verify() const;
   bytes to_be_signed() const;
@@ -71,7 +74,7 @@ struct Welcome
   //
   // XXX: Need to update unmarshal to set the tree properly
   Welcome()
-    : tree(CipherSuite::P256_SHA256_AES128GCM)
+    : tree(DUMMY_CIPHERSUITE)
   {}
 
   Welcome(tls::opaque<2> group_id,
@@ -114,24 +117,20 @@ tls::istream&
 operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
-//     DirectPath path<1..2^16-1>;
 //     UserInitKey init_key;
 // } Add;
-struct Add : public CipherAware
+//
+// XXX(rlb@ipv.sx): This no longer actually needs CipherAware, but
+// let's keep it for symmetry with the other GroupOperations.
+struct Add
 {
 public:
-  RatchetPath path;
   UserInitKey init_key;
 
-  Add(CipherSuite suite)
-    : CipherAware(suite)
-    , path(suite)
-  {}
+  Add() {}
 
-  Add(const RatchetPath& path, const UserInitKey& init_key)
-    : CipherAware(path)
-    , path(path)
-    , init_key(init_key)
+  Add(const UserInitKey& init_key)
+    : init_key(init_key)
   {}
 
   static const GroupOperationType type;
@@ -227,33 +226,33 @@ struct GroupOperation : public CipherAware
   Update update;
   Remove remove;
 
-  // XXX
+  // XXX(rlb@ipv.sx): Can this be removed?
   GroupOperation()
-    : CipherAware(CipherSuite::P256_SHA256_AES128GCM)
-    , add(CipherSuite::P256_SHA256_AES128GCM)
-    , update(CipherSuite::P256_SHA256_AES128GCM)
-    , remove(CipherSuite::P256_SHA256_AES128GCM)
+    : CipherAware(DUMMY_CIPHERSUITE)
+    , add()
+    , update(DUMMY_CIPHERSUITE)
+    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(CipherSuite suite)
     : CipherAware(suite)
-    , add(suite)
+    , add()
     , update(suite)
     , remove(suite)
   {}
 
   GroupOperation(const Add& add)
-    : CipherAware(add)
+    : CipherAware(DUMMY_CIPHERSUITE)
     , type(add.type)
     , add(add)
-    , update(add.cipher_suite())
-    , remove(add.cipher_suite())
+    , update(DUMMY_CIPHERSUITE)
+    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(const Update& update)
     : CipherAware(update)
     , type(update.type)
-    , add(update.cipher_suite())
+    , add()
     , update(update)
     , remove(update.cipher_suite())
 
@@ -262,7 +261,7 @@ struct GroupOperation : public CipherAware
   GroupOperation(const Remove& remove)
     : CipherAware(remove)
     , type(remove.type)
-    , add(remove.cipher_suite())
+    , add()
     , update(remove.cipher_suite())
     , remove(remove)
   {}

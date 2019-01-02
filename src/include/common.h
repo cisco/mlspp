@@ -29,6 +29,17 @@ template<typename T>
 using optional = std::experimental::optional<T>;
 
 template<typename T>
+std::ostream&
+operator<<(std::ostream& out, const optional<T>& opt)
+{
+  if (!opt) {
+    return out << "_";
+  }
+
+  return out << *opt;
+}
+
+template<typename T>
 tls::ostream&
 operator<<(tls::ostream& out, const optional<T>& opt)
 {
@@ -48,6 +59,7 @@ operator>>(tls::istream& in, optional<T>& opt)
 
   switch (present) {
     case 0:
+      opt = std::experimental::nullopt;
       return in;
 
     case 1:
