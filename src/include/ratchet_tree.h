@@ -89,6 +89,9 @@ private:
 
   RatchetNode new_node(const bytes& data) const;
   uint32_t working_size(uint32_t from) const;
+  std::vector<uint32_t> resolve(uint32_t target) const;
+  std::vector<std::vector<uint32_t>> resolve_copath(uint32_t target,
+                                                    uint32_t size) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);

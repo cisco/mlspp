@@ -17,7 +17,7 @@ log2(uint32_t x)
   return k - 1;
 }
 
-static uint32_t
+uint32_t
 level(uint32_t x)
 {
   if ((x & 0x01) == 0) {

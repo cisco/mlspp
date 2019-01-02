@@ -124,6 +124,8 @@ operator<<(tls::ostream& out, const RatchetNode& obj)
 tls::istream&
 operator>>(tls::istream& in, RatchetNode& obj)
 {
+  obj._priv = std::experimental::nullopt;
+  obj._secret = std::experimental::nullopt;
   return in >> obj._pub;
 }
 
@@ -240,26 +242,20 @@ RatchetPath
 RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
 {
   RatchetPath path(_suite);
-
-  const auto size = working_size(from);
-  const auto root = tree_math::root(size);
-
   path.nodes.push_back(new_node(leaf_secret));
 
-  auto curr = 2 * from;
-  auto sibling = tree_math::sibling(curr, size);
+  const auto size = working_size(from);
+  const auto respath = resolve_copath(2 * from, size);
+
   auto secret = leaf_secret;
-  while (curr != root) {
+  for (const auto& res : respath) {
     secret = Digest(_suite).write(secret).digest();
+    path.nodes.push_back(new_node(secret));
 
-    auto temp = new_node(secret);
-    path.nodes.push_back(temp);
-
-    auto ciphertext = _nodes[sibling]->public_key().encrypt(secret);
-    path.node_secrets.push_back(ciphertext);
-
-    curr = tree_math::parent(curr, size);
-    sibling = tree_math::sibling(curr, size);
+    for (const auto& node : res) {
+      auto ciphertext = _nodes[node]->public_key().encrypt(secret);
+      path.node_secrets.push_back(ciphertext);
+    }
   }
 
   return path;
@@ -274,31 +270,40 @@ RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
 
   const auto size = working_size(from);
   const auto root = tree_math::root(size);
+  const auto respath = resolve_copath(2 * from, size);
+  if (path.node_secrets.size() != respath.size()) {
+    throw InvalidParameterError("Malformed RatchetPath");
+  }
 
   auto curr = 2 * from;
-  auto sibling = tree_math::sibling(curr, size);
+  size_t secret_index = 0;
   bool have_secret = false;
   bytes secret;
-  for (int i = 1; i < path.nodes.size(); i += 1) {
-    auto priv = _nodes[sibling]->private_key();
-    if (priv && !have_secret) {
-      secret = priv->decrypt(path.node_secrets[i - 1]);
-      have_secret = true;
-    } else if (have_secret) {
+  for (int i = 0; i < path.node_secrets.size(); i += 1) {
+    if (!have_secret) {
+      for (const auto& node : respath[i]) {
+        if (_nodes[node] && _nodes[node]->private_key()) {
+          auto encrypted_secret = path.node_secrets[secret_index];
+          secret = _nodes[node]->private_key()->decrypt(encrypted_secret);
+          have_secret = true;
+        }
+
+        secret_index += 1;
+      }
+    } else {
       secret = Digest(_suite).write(secret).digest();
     }
 
     if (have_secret) {
       auto temp = new_node(secret);
-      if (temp.public_key() != path.nodes[i].public_key()) {
+      if (temp.public_key() != path.nodes[i + 1].public_key()) {
         throw InvalidParameterError("Incorrect node public key");
       }
 
-      path.nodes[i] = new_node(secret);
+      path.nodes[i + 1] = temp;
     }
 
     curr = tree_math::parent(curr, size);
-    sibling = tree_math::sibling(curr, size);
   }
 
   if (curr != root) {
@@ -364,6 +369,44 @@ RatchetTree::root_secret() const
   auto root = tree_math::root(size());
   auto val = _nodes[root]->secret();
   return *val;
+}
+
+std::vector<uint32_t>
+RatchetTree::resolve(uint32_t node) const
+{
+  if (_nodes[node]) {
+    return { node };
+  }
+
+  if (tree_math::level(node) == 0) {
+    return {};
+  }
+
+  auto left = resolve(tree_math::left(node));
+  auto right = resolve(tree_math::right(node, size()));
+  left.insert(left.end(), right.begin(), right.end());
+  return left;
+}
+
+std::vector<std::vector<uint32_t>>
+RatchetTree::resolve_copath(uint32_t leaf, uint32_t size) const
+{
+  // XXX: We should be able to elimiate the `size` param once we
+  // switch to constant time add, i.e., explicit addition of leaves
+
+  const auto root = tree_math::root(size);
+  auto curr = leaf;
+
+  auto respath = std::vector<std::vector<uint32_t>>{};
+  while (curr != root) {
+    auto sib = tree_math::sibling(curr, size);
+    auto res = resolve(sib);
+    respath.push_back(res);
+
+    curr = tree_math::parent(curr, size);
+  }
+
+  return respath;
 }
 
 bool

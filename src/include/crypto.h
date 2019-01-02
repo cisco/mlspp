@@ -86,6 +86,10 @@ public:
   typedef typed_unique_ptr_base<T> parent;
   using parent::parent;
 
+  typed_unique_ptr()
+    : typed_unique_ptr_base<T>(nullptr, TypedDelete<T>)
+  {}
+
   typed_unique_ptr(T* ptr)
     : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
   {}

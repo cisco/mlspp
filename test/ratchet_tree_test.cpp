@@ -47,6 +47,9 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(tree.root_secret() == rootAB);
     REQUIRE(tree.root_secret() == secretAB);
 
+    RatchetTree directAB{ CIPHERSUITE, { secretA, secretB } };
+    REQUIRE(tree == directAB);
+
     auto ctC = tree.encrypt(2, secretC);
     auto rootABC = tree.decrypt(2, ctC);
     tree.merge(2, ctC);
@@ -54,6 +57,9 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(tree.size() == 3);
     REQUIRE(tree.root_secret() == rootABC);
     REQUIRE(tree.root_secret() == secretABC);
+
+    RatchetTree directABC{ CIPHERSUITE, { secretA, secretB, secretC } };
+    REQUIRE(tree == directABC);
 
     auto ctD = tree.encrypt(3, secretD);
     auto rootABCD = tree.decrypt(3, ctD);
