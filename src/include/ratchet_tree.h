@@ -41,6 +41,7 @@ private:
 struct OptionalRatchetNode : public optional<RatchetNode>
 {
   typedef optional<RatchetNode> parent;
+  using parent::parent;
 
   OptionalRatchetNode(CipherSuite suite)
     : parent(RatchetNode(suite))
@@ -78,7 +79,13 @@ public:
   RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
   bytes decrypt(uint32_t from, RatchetPath& path) const;
   void merge(uint32_t from, const RatchetPath& path);
+
+  // TODO: Rename to set_path
   void set_leaf(uint32_t index, const bytes& leaf);
+
+  void add_leaf(const DHPublicKey& pub);
+  void add_leaf(const bytes& leaf_secret);
+  void blank_path(uint32_t index);
 
   uint32_t size() const;
   RatchetNode root() const;

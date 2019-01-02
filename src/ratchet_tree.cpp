@@ -264,22 +264,27 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
 bytes
 RatchetTree::decrypt(uint32_t from, RatchetPath& path) const
 {
-  if (path.nodes.size() != path.node_secrets.size() + 1) {
-    throw InvalidParameterError("Malformed RatchetPath");
-  }
-
   const auto size = working_size(from);
   const auto root = tree_math::root(size);
   const auto respath = resolve_copath(2 * from, size);
-  if (path.node_secrets.size() != respath.size()) {
-    throw InvalidParameterError("Malformed RatchetPath");
+
+  if (path.nodes.size() != respath.size() + 1) {
+    throw InvalidParameterError("Malformed RatchetPath.nodes");
+  }
+
+  size_t total_res_size = 0;
+  for (const auto& res : respath) {
+    total_res_size += res.size();
+  }
+  if (path.node_secrets.size() != total_res_size) {
+    throw InvalidParameterError("Malformed RatchetPath.node_secrets");
   }
 
   auto curr = 2 * from;
   size_t secret_index = 0;
   bool have_secret = false;
   bytes secret;
-  for (int i = 0; i < path.node_secrets.size(); i += 1) {
+  for (int i = 0; i < path.nodes.size() - 1; i += 1) {
     if (!have_secret) {
       for (const auto& node : respath[i]) {
         if (_nodes[node] && _nodes[node]->private_key()) {
@@ -348,6 +353,41 @@ RatchetTree::set_leaf(uint32_t index, const bytes& leaf)
   }
 
   *_nodes[root] = new_node(secret);
+}
+
+void
+RatchetTree::add_leaf(const DHPublicKey& pub)
+{
+  if (_suite != pub.cipher_suite()) {
+    throw InvalidParameterError("Incorrect ciphersuite");
+  }
+
+  if (_nodes.size() > 0) {
+    _nodes.emplace_back(std::experimental::nullopt);
+  }
+  _nodes.emplace_back(RatchetNode(pub));
+}
+
+void
+RatchetTree::add_leaf(const bytes& leaf_secret)
+{
+  if (_nodes.size() > 0) {
+    _nodes.emplace_back(std::experimental::nullopt);
+  }
+  _nodes.emplace_back(new_node(leaf_secret));
+}
+
+void
+RatchetTree::blank_path(uint32_t index)
+{
+  const auto size = working_size(index);
+  const auto root = tree_math::root(size);
+
+  auto curr = 2 * index;
+  while (curr != root) {
+    _nodes[curr] = std::experimental::nullopt;
+    curr = tree_math::parent(curr, size);
+  }
 }
 
 uint32_t
@@ -429,6 +469,11 @@ std::ostream&
 operator<<(std::ostream& out, const RatchetTree& obj)
 {
   for (int i = 0; i < obj._nodes.size(); i += 1) {
+    if (!obj._nodes[i]) {
+      out << "_ ";
+      continue;
+    }
+
     out << obj._nodes[i]->public_key() << " ";
   }
   return out;

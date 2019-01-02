@@ -73,6 +73,38 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     REQUIRE(tree == direct);
   }
 
+  SECTION("By adding leaves")
+  {
+    size_t size = 5;
+    size_t depth = 4;
+
+    bytes secretA = { 0, 1, 2, 3 };
+    bytes secretB = { 1, 2, 3, 4 };
+    RatchetTree tree{ CIPHERSUITE, secretA };
+    tree.add_leaf(secretB);
+
+    auto priv = DHPrivateKey::derive(CIPHERSUITE, { 2, 3, 4, 5 });
+    auto pub = priv.public_key();
+    for (uint8_t i = 2; i < size; ++i) {
+      tree.add_leaf(pub);
+    }
+
+    REQUIRE(tree.size() == size);
+
+    bytes original{ 0, 1, 2, 3 };
+    auto encrypted = tree.encrypt(0, original);
+    REQUIRE(encrypted.nodes.size() == depth);
+    REQUIRE(encrypted.node_secrets.size() == size - 1);
+
+    auto decrypted = tree.decrypt(0, encrypted);
+
+    bytes digest = original;
+    for (size_t i = 1; i < depth; ++i) {
+      digest = Digest(CIPHERSUITE).write(digest).digest();
+    }
+    REQUIRE(decrypted == digest);
+  }
+
   SECTION("Via serialization")
   {
     RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
