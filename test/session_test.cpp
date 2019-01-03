@@ -82,8 +82,18 @@ TEST_CASE("Session creation", "[session]")
   SECTION("With Ciphersuite Negotiation")
   {
     // Alice supports P-256 and X25519
+    Session alice{ { CipherSuite::P256_SHA256_AES128GCM,
+                     CipherSuite::X25519_SHA256_AES128GCM },
+                   new_identity_key() };
+
     // Bob supports P-256 and P-521
-    // TODO continue...
+    Session bob{ { CipherSuite::P256_SHA256_AES128GCM,
+                   CipherSuite::X25519_SHA256_AES128GCM },
+                 new_identity_key() };
+
+    auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.user_init_key());
+    bob.join(welcome_add.first, welcome_add.second);
+    REQUIRE(alice == bob);
   }
 }
 
