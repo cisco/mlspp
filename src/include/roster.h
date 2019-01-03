@@ -34,19 +34,33 @@ private:
   friend tls::istream& operator>>(tls::istream& in, RawKeyCredential& roster);
 };
 
+// XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
+// ensure that credentials are populated with blank values on
+// unmarshal.  Otherwise, `*opt` will access uninitialized memory.
+class OptionalRawKeyCredential : public optional<RawKeyCredential>
+{
+public:
+  typedef optional<RawKeyCredential> parent;
+  using parent::parent;
+
+  OptionalRawKeyCredential()
+    : parent(RawKeyCredential())
+  {}
+};
+
 // TODO(rlb@ipv.sx): Figure out how to generalize to more types of
 // credential
 class Roster
 {
 public:
-  void put(uint32_t index, const RawKeyCredential& public_key);
   void add(const RawKeyCredential& public_key);
   void copy(uint32_t dst, uint32_t src);
+  void remove(uint32_t index);
   RawKeyCredential get(uint32_t index) const;
   size_t size() const;
 
 private:
-  tls::vector<RawKeyCredential, 4> _credentials;
+  tls::vector<OptionalRawKeyCredential, 4> _credentials;
 
   friend bool operator==(const Roster& lhs, const Roster& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const Roster& roster);

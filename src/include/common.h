@@ -28,6 +28,10 @@ namespace mls {
 template<typename T>
 using optional = std::experimental::optional<T>;
 
+using nullopt_t = std::experimental::nullopt_t;
+
+static const nullopt_t nullopt = std::experimental::nullopt;
+
 template<typename T>
 std::ostream&
 operator<<(std::ostream& out, const optional<T>& opt)
