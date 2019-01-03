@@ -63,7 +63,7 @@ operator>>(tls::istream& in, optional<T>& opt)
 
   switch (present) {
     case 0:
-      opt = std::experimental::nullopt;
+      opt = nullopt;
       return in;
 
     case 1:

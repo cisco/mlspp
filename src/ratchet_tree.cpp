@@ -13,8 +13,8 @@ namespace mls {
 
 RatchetNode::RatchetNode(CipherSuite suite)
   : CipherAware(suite)
-  , _secret(std::experimental::nullopt)
-  , _priv(std::experimental::nullopt)
+  , _secret(nullopt)
+  , _priv(nullopt)
   , _pub(suite)
 {}
 
@@ -46,15 +46,15 @@ RatchetNode::RatchetNode(CipherSuite suite, const bytes& secret)
 
 RatchetNode::RatchetNode(const DHPrivateKey& priv)
   : CipherAware(priv.cipher_suite())
-  , _secret(std::experimental::nullopt)
+  , _secret(nullopt)
   , _priv(priv)
   , _pub(priv.public_key())
 {}
 
 RatchetNode::RatchetNode(const DHPublicKey& pub)
   : CipherAware(pub.cipher_suite())
-  , _secret(std::experimental::nullopt)
-  , _priv(std::experimental::nullopt)
+  , _secret(nullopt)
+  , _priv(nullopt)
   , _pub(pub)
 {}
 
@@ -126,8 +126,8 @@ operator<<(tls::ostream& out, const RatchetNode& obj)
 tls::istream&
 operator>>(tls::istream& in, RatchetNode& obj)
 {
-  obj._priv = std::experimental::nullopt;
-  obj._secret = std::experimental::nullopt;
+  obj._priv = nullopt;
+  obj._secret = nullopt;
   return in >> obj._pub;
 }
 
@@ -369,7 +369,7 @@ RatchetTree::add_leaf(const DHPublicKey& pub)
   }
 
   if (_nodes.size() > 0) {
-    _nodes.emplace_back(std::experimental::nullopt);
+    _nodes.emplace_back(nullopt);
   }
   _nodes.emplace_back(RatchetNode(pub));
 }
@@ -378,7 +378,7 @@ void
 RatchetTree::add_leaf(const bytes& leaf_secret)
 {
   if (_nodes.size() > 0) {
-    _nodes.emplace_back(std::experimental::nullopt);
+    _nodes.emplace_back(nullopt);
   }
   _nodes.emplace_back(new_node(leaf_secret));
 }
@@ -391,7 +391,7 @@ RatchetTree::blank_path(uint32_t index)
 
   auto curr = 2 * index;
   while (curr != root) {
-    _nodes[curr] = std::experimental::nullopt;
+    _nodes[curr] = nullopt;
     curr = tree_math::parent(curr, size);
   }
 }

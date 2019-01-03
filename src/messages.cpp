@@ -20,7 +20,7 @@ UserInitKey::find_init_key(CipherSuite suite) const
     }
   }
 
-  return std::experimental::nullopt;
+  return nullopt;
 }
 
 void

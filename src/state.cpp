@@ -220,7 +220,7 @@ State::handle(const Add& add)
 void
 State::handle(uint32_t index, const Update& update)
 {
-  optional<bytes> leaf_secret = std::experimental::nullopt;
+  optional<bytes> leaf_secret = nullopt;
   if (index == _index) {
     if (_cached_leaf_secret.size() == 0) {
       throw InvalidParameterError("Got self-update without generating one");
@@ -236,7 +236,7 @@ State::handle(uint32_t index, const Update& update)
 void
 State::handle(uint32_t index, const Remove& remove)
 {
-  auto leaf_secret = std::experimental::nullopt;
+  auto leaf_secret = nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
 
   _roster.copy(remove.removed, index);
