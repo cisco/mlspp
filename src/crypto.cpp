@@ -10,7 +10,6 @@
 #include "openssl/sha.h"
 #include "state.h"
 
-#include <iostream>
 #include <string>
 
 namespace mls {
@@ -109,7 +108,6 @@ ossl_key_type(SignatureScheme scheme)
       return OpenSSLKeyType::Ed448;
   }
 
-  std::cout << "Unknown signature scheme: " << uint16_t(scheme) << std::endl;
   throw InvalidParameterError("Unknown signature scheme");
 }
 

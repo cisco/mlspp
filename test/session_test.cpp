@@ -1,8 +1,6 @@
 #include "session.h"
 #include <catch.hpp>
 
-#include <iostream>
-
 using namespace mls;
 
 const CipherList ciphersuites{ CipherSuite::P256_SHA256_AES128GCM,
