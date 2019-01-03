@@ -6,7 +6,59 @@
 #include "roster.h"
 #include "tls_syntax.h"
 
+#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+
 namespace mls {
+
+// struct {
+//    DHPublicKey public_key;
+//    ECIESCiphertext node_secrets<0..2^16-1>;
+// } RatchetNode
+struct RatchetNode : public CipherAware
+{
+  DHPublicKey public_key;
+  tls::variant_vector<ECIESCiphertext, CipherSuite, 2> node_secrets;
+
+  RatchetNode(CipherSuite suite)
+    : CipherAware(suite)
+    , public_key(suite)
+    , node_secrets(suite)
+  {}
+
+  RatchetNode(const DHPublicKey& public_key,
+              const std::vector<ECIESCiphertext>& node_secrets)
+    : CipherAware(public_key)
+    , public_key(public_key)
+    , node_secrets(node_secrets)
+  {}
+};
+
+bool
+operator==(const RatchetNode& lhs, const RatchetNode& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const RatchetNode& obj);
+tls::istream&
+operator>>(tls::istream& in, RatchetNode& obj);
+
+// struct {
+//    RatchetNode nodes<0..2^16-1>;
+// } DirectPath;
+struct DirectPath : public CipherAware
+{
+  tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
+
+  DirectPath(CipherSuite suite)
+    : CipherAware(suite)
+    , nodes(suite)
+  {}
+};
+
+bool
+operator==(const DirectPath& lhs, const DirectPath& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const DirectPath& obj);
+tls::istream&
+operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
@@ -32,6 +84,7 @@ struct UserInitKey
   {}
 
   void add_init_key(const DHPublicKey& pub);
+  optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   void sign(const SignaturePrivateKey& identity_priv);
   bool verify() const;
   bytes to_be_signed() const;
@@ -64,14 +117,13 @@ struct Welcome
   RatchetTree tree;
   tls::vector<GroupOperation, 4> transcript;
   tls::opaque<1> init_secret;
-  tls::opaque<1> leaf_secret;
 
   // This ctor should only be used for serialization.  The tree is
   // initialized to a dummy state.
   //
   // XXX: Need to update unmarshal to set the tree properly
   Welcome()
-    : tree(CipherSuite::P256_SHA256_AES128GCM)
+    : tree(DUMMY_CIPHERSUITE)
   {}
 
   Welcome(tls::opaque<2> group_id,
@@ -80,8 +132,7 @@ struct Welcome
           Roster roster,
           RatchetTree tree,
           tls::vector<GroupOperation, 3> transcript,
-          tls::opaque<1> init_secret,
-          tls::opaque<1> leaf_secret)
+          tls::opaque<1> init_secret)
     : group_id(group_id)
     , epoch(epoch)
     , cipher_suite(cipher_suite)
@@ -89,7 +140,6 @@ struct Welcome
     , tree(tree)
     , transcript(transcript)
     , init_secret(init_secret)
-    , leaf_secret(leaf_secret)
   {}
 };
 
@@ -114,24 +164,20 @@ tls::istream&
 operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
-//     DirectPath path<1..2^16-1>;
 //     UserInitKey init_key;
 // } Add;
-struct Add : public CipherAware
+//
+// XXX(rlb@ipv.sx): This no longer actually needs CipherAware, but
+// let's keep it for symmetry with the other GroupOperations.
+struct Add
 {
 public:
-  RatchetPath path;
   UserInitKey init_key;
 
-  Add(CipherSuite suite)
-    : CipherAware(suite)
-    , path(suite)
-  {}
+  Add() {}
 
-  Add(const RatchetPath& path, const UserInitKey& init_key)
-    : CipherAware(path)
-    , path(path)
-    , init_key(init_key)
+  Add(const UserInitKey& init_key)
+    : init_key(init_key)
   {}
 
   static const GroupOperationType type;
@@ -150,14 +196,14 @@ operator>>(tls::istream& in, Add& obj);
 struct Update : public CipherAware
 {
 public:
-  RatchetPath path;
+  DirectPath path;
 
   Update(CipherSuite suite)
     : CipherAware(suite)
     , path(suite)
   {}
 
-  Update(const RatchetPath& path)
+  Update(const DirectPath& path)
     : CipherAware(path)
     , path(path)
   {}
@@ -180,14 +226,14 @@ struct Remove : public CipherAware
 {
 public:
   uint32_t removed;
-  RatchetPath path;
+  DirectPath path;
 
   Remove(CipherSuite suite)
     : CipherAware(suite)
     , path(suite)
   {}
 
-  Remove(uint32_t removed, const RatchetPath& path)
+  Remove(uint32_t removed, const DirectPath& path)
     : CipherAware(path)
     , removed(removed)
     , path(path)
@@ -227,33 +273,33 @@ struct GroupOperation : public CipherAware
   Update update;
   Remove remove;
 
-  // XXX
+  // XXX(rlb@ipv.sx): Can this be removed?
   GroupOperation()
-    : CipherAware(CipherSuite::P256_SHA256_AES128GCM)
-    , add(CipherSuite::P256_SHA256_AES128GCM)
-    , update(CipherSuite::P256_SHA256_AES128GCM)
-    , remove(CipherSuite::P256_SHA256_AES128GCM)
+    : CipherAware(DUMMY_CIPHERSUITE)
+    , add()
+    , update(DUMMY_CIPHERSUITE)
+    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(CipherSuite suite)
     : CipherAware(suite)
-    , add(suite)
+    , add()
     , update(suite)
     , remove(suite)
   {}
 
   GroupOperation(const Add& add)
-    : CipherAware(add)
+    : CipherAware(DUMMY_CIPHERSUITE)
     , type(add.type)
     , add(add)
-    , update(add.cipher_suite())
-    , remove(add.cipher_suite())
+    , update(DUMMY_CIPHERSUITE)
+    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(const Update& update)
     : CipherAware(update)
     , type(update.type)
-    , add(update.cipher_suite())
+    , add()
     , update(update)
     , remove(update.cipher_suite())
 
@@ -262,7 +308,7 @@ struct GroupOperation : public CipherAware
   GroupOperation(const Remove& remove)
     : CipherAware(remove)
     , type(remove.type)
-    , add(remove.cipher_suite())
+    , add()
     , update(remove.cipher_suite())
     , remove(remove)
   {}

@@ -34,29 +34,23 @@ Roster::add(const RawKeyCredential& cred)
 }
 
 void
-Roster::put(uint32_t index, const RawKeyCredential& cred)
+Roster::remove(uint32_t index)
 {
-  if (index > _credentials.size() - 1) {
-    _credentials.resize(index + 1);
+  if (index > _credentials.size()) {
+    throw InvalidParameterError("Unknown credential index");
   }
 
-  _credentials.emplace(_credentials.begin() + index, cred);
-}
-
-void
-Roster::copy(uint32_t dst, uint32_t src)
-{
-  if (dst > _credentials.size() - 1) {
-    _credentials.resize(dst + 1);
-  }
-
-  _credentials.emplace(_credentials.begin() + dst, _credentials[src]);
+  _credentials[index] = nullopt;
 }
 
 RawKeyCredential
 Roster::get(uint32_t index) const
 {
-  return _credentials[index];
+  if (!_credentials[index]) {
+    throw InvalidParameterError("No credential available");
+  }
+
+  return *_credentials[index];
 }
 
 size_t

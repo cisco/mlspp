@@ -158,8 +158,10 @@ operator<<(ostream& out, const vector_base<T, head, min, max>& data)
 
   // Pre-encode contents
   ostream temp;
+  size_t i = 0;
   for (const auto& item : data) {
     temp << item;
+    i += 1;
   }
 
   // Check that the encoded length is OK

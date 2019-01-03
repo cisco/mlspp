@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -21,6 +19,7 @@ State::State(const bytes& group_id,
   , _message_master_secret()
   , _init_secret(zero_bytes(32))
   , _tree(suite, random_bytes(32))
+  , _zero(Digest(suite).output_size(), 0)
 {
   RawKeyCredential cred{ identity_priv.public_key() };
   _roster.add(cred);
@@ -39,50 +38,41 @@ State::State(const SignaturePrivateKey& identity_priv,
   , _transcript(welcome.transcript)
   , _index(welcome.tree.size())
   , _init_secret(welcome.init_secret)
+  , _zero(Digest(welcome.cipher_suite).output_size(), 0)
 {
   if (handshake.operation.type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  // XXX(rlb@ipv.sx): Assuming exactly one init key, of the same
-  // algorithm.  Should do algorithm negotiation.
   auto add = handshake.operation.add;
   auto identity_key = add.init_key.identity_key;
   if (identity_key != identity_priv.public_key()) {
-    throw InvalidParameterError("Group add not targeted for this node");
+    throw InvalidParameterError("Add not targeted for this node");
   }
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  bool init_verified = false;
-  for (int i = 0; i < add.init_key.cipher_suites.size(); ++i) {
-    auto suite = add.init_key.cipher_suites[i];
-    if (suite != _suite) {
-      continue;
-    }
-
-    auto init_priv = DHPrivateKey::derive(_suite, init_secret);
-    auto init_uik = DHPublicKey(_suite, add.init_key.init_keys[i]);
-
-    if (init_uik != init_priv.public_key()) {
-      throw ProtocolError("Incorrect init key");
-    }
-
-    init_verified = true;
-    break;
-  }
-  if (!init_verified) {
+  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
+  auto init_uik = add.init_key.find_init_key(_suite);
+  if (!init_uik) {
     throw ProtocolError("Selected cipher suite not supported");
+  } else if (*init_uik != init_priv.public_key()) {
+    throw ProtocolError("Incorrect init key");
   }
 
-  // Initialize shared state
+  // Add to the tree
+  _tree.add_leaf(init_secret);
+
+  // Add to the roster
   RawKeyCredential cred{ identity_key };
   _roster.add(cred);
-  update_leaf(_index, add.path, welcome.leaf_secret);
 
   if (!verify(handshake.signer_index, handshake.signature)) {
     throw InvalidParameterError("Handshake signature failed to verify");
   }
+
+  // Ratchet forward into shared state
+  derive_epoch_keys(_zero);
 }
 
 State::InitialInfo
@@ -137,12 +127,9 @@ State::add(const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the groups ciphersuite");
   }
 
-  auto leaf_secret = random_bytes(32);
-  auto path = _tree.encrypt(_tree.size(), leaf_secret);
-
-  Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
-                   _tree,     _transcript, _init_secret, leaf_secret };
-  auto add = sign(Add{ path, user_init_key });
+  Welcome welcome{ _group_id, _epoch,      _suite,      _roster,
+                   _tree,     _transcript, _init_secret };
+  auto add = sign(Add{ user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
 
@@ -211,29 +198,26 @@ State::handle(const Add& add)
     throw InvalidParameterError("Invalid signature on init key in group add");
   }
 
-  // Add the new leaf to the ratchet tree
-  // XXX(rlb@ipv.sx): Assumes only one initkey
-  auto init_key = add.init_key.init_keys[0];
-  auto identity_key = add.init_key.identity_key;
-
-  auto tree_size = _tree.size();
-  auto path = add.path;
-  _tree.decrypt(tree_size, path);
-  _tree.merge(tree_size, path);
+  // Add to the tree
+  auto init_key = add.init_key.find_init_key(_suite);
+  if (!init_key) {
+    throw ProtocolError("New node does not support group's cipher suite");
+  }
+  _tree.add_leaf(*init_key);
 
   // Add to the roster
+  auto identity_key = add.init_key.identity_key;
   RawKeyCredential cred{ identity_key };
   _roster.add(cred);
 
   // Update symmetric state
-  auto update_secret = *(_tree.root().secret());
-  derive_epoch_keys(update_secret);
+  derive_epoch_keys(_zero);
 }
 
 void
 State::handle(uint32_t index, const Update& update)
 {
-  optional<bytes> leaf_secret = std::experimental::nullopt;
+  optional<bytes> leaf_secret = nullopt;
   if (index == _index) {
     if (_cached_leaf_secret.size() == 0) {
       throw InvalidParameterError("Got self-update without generating one");
@@ -249,10 +233,10 @@ State::handle(uint32_t index, const Update& update)
 void
 State::handle(uint32_t index, const Remove& remove)
 {
-  auto leaf_secret = std::experimental::nullopt;
+  auto leaf_secret = nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
-
-  _roster.copy(remove.removed, index);
+  _tree.blank_path(remove.removed);
+  _roster.remove(remove.removed);
 }
 
 ///
@@ -298,19 +282,18 @@ operator!=(const State& lhs, const State& rhs)
 
 void
 State::update_leaf(uint32_t index,
-                   const RatchetPath& path,
+                   const DirectPath& path,
                    const optional<bytes>& leaf_secret)
 {
   if (leaf_secret) {
-    _tree.set_leaf(index, *leaf_secret);
+    _tree.set_path(index, *leaf_secret);
   } else {
     auto temp_path = path;
-    _tree.decrypt(index, temp_path);
-    _tree.merge(index, temp_path);
+    auto secrets = _tree.decrypt(index, temp_path);
+    _tree.merge_path(index, secrets);
   }
 
-  auto update_secret = *(_tree.root().secret());
-  derive_epoch_keys(update_secret);
+  derive_epoch_keys(_tree.root_secret());
 }
 
 void

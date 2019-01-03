@@ -2,6 +2,47 @@
 
 namespace mls {
 
+// RatchetNode
+
+bool
+operator==(const RatchetNode& lhs, const RatchetNode& rhs)
+{
+  return (lhs.public_key == rhs.public_key) &&
+         (lhs.node_secrets == rhs.node_secrets);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const RatchetNode& obj)
+{
+  return out << obj.public_key << obj.node_secrets;
+}
+
+tls::istream&
+operator>>(tls::istream& in, RatchetNode& obj)
+{
+  return in >> obj.public_key >> obj.node_secrets;
+}
+
+// DirectPath
+
+bool
+operator==(const DirectPath& lhs, const DirectPath& rhs)
+{
+  return (lhs.nodes == rhs.nodes);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const DirectPath& obj)
+{
+  return out << obj.nodes;
+}
+
+tls::istream&
+operator>>(tls::istream& in, DirectPath& obj)
+{
+  return in >> obj.nodes;
+}
+
 // UserInitKey
 
 void
@@ -9,6 +50,18 @@ UserInitKey::add_init_key(const DHPublicKey& pub)
 {
   cipher_suites.push_back(pub.cipher_suite());
   init_keys.push_back(pub.to_bytes());
+}
+
+optional<DHPublicKey>
+UserInitKey::find_init_key(CipherSuite suite) const
+{
+  for (int i = 0; i < cipher_suites.size(); ++i) {
+    if (cipher_suites[i] == suite) {
+      return DHPublicKey{ suite, init_keys[i] };
+    }
+  }
+
+  return nullopt;
 }
 
 void
@@ -76,16 +129,14 @@ operator==(const Welcome& lhs, const Welcome& rhs)
   return (lhs.group_id == rhs.group_id) && (lhs.epoch == rhs.epoch) &&
          (lhs.roster == rhs.roster) && (lhs.tree == rhs.tree) &&
          (lhs.transcript == rhs.transcript) &&
-         (lhs.init_secret == rhs.init_secret) &&
-         (lhs.leaf_secret == rhs.leaf_secret);
+         (lhs.init_secret == rhs.init_secret);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Welcome& obj)
 {
   return out << obj.group_id << obj.epoch << obj.cipher_suite << obj.roster
-             << obj.tree << obj.transcript << obj.init_secret
-             << obj.leaf_secret;
+             << obj.tree << obj.transcript << obj.init_secret;
 }
 
 tls::istream&
@@ -101,7 +152,6 @@ operator>>(tls::istream& in, Welcome& obj)
   in >> obj.tree;
   in >> obj.transcript;
   in >> obj.init_secret;
-  in >> obj.leaf_secret;
   return in;
 }
 
@@ -129,19 +179,19 @@ const GroupOperationType Add::type = GroupOperationType::add;
 bool
 operator==(const Add& lhs, const Add& rhs)
 {
-  return (lhs.path == rhs.path) && (lhs.init_key == rhs.init_key);
+  return (lhs.init_key == rhs.init_key);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Add& obj)
 {
-  return out << obj.path << obj.init_key;
+  return out << obj.init_key;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Add& obj)
 {
-  return in >> obj.path >> obj.init_key;
+  return in >> obj.init_key;
 }
 
 // Update

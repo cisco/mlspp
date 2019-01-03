@@ -1,6 +1,9 @@
+#include "messages.h"
 #include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include <catch.hpp>
+
+#include <iostream>
 
 using namespace mls;
 
@@ -39,28 +42,22 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
   {
     RatchetTree tree{ CIPHERSUITE, secretA };
 
-    auto ctB = tree.encrypt(1, secretB);
-    auto rootAB = tree.decrypt(1, ctB);
-    tree.merge(1, ctB);
+    tree.add_leaf(secretB);
+    tree.set_path(1, secretB);
 
     REQUIRE(tree.size() == 2);
-    REQUIRE(tree.root_secret() == rootAB);
     REQUIRE(tree.root_secret() == secretAB);
 
-    auto ctC = tree.encrypt(2, secretC);
-    auto rootABC = tree.decrypt(2, ctC);
-    tree.merge(2, ctC);
+    tree.add_leaf(secretC);
+    tree.set_path(2, secretC);
 
     REQUIRE(tree.size() == 3);
-    REQUIRE(tree.root_secret() == rootABC);
     REQUIRE(tree.root_secret() == secretABC);
 
-    auto ctD = tree.encrypt(3, secretD);
-    auto rootABCD = tree.decrypt(3, ctD);
-    tree.merge(3, ctD);
+    tree.add_leaf(secretD);
+    tree.set_path(3, secretD);
 
     REQUIRE(tree.size() == 4);
-    REQUIRE(tree.root_secret() == rootABCD);
     REQUIRE(tree.root_secret() == secretABCD);
 
     RatchetTree direct{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
@@ -74,5 +71,62 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
 
     tls::unmarshal(tls::marshal(before), after);
     REQUIRE(before == after);
+  }
+
+  SECTION("Via serialization, with blanks")
+  {
+    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
+    RatchetTree after{ CIPHERSUITE };
+
+    before.blank_path(1);
+    tls::unmarshal(tls::marshal(before), after);
+    REQUIRE(before == after);
+  }
+}
+
+TEST_CASE("Trees can encrypt and decrypt", "[ratchet-tree]")
+{
+  size_t size = 5;
+
+  // trees[i] represents a tree with a private key for only leaf i
+  std::vector<RatchetTree> trees(size, { CIPHERSUITE });
+  for (int i = 0; i < size; ++i) {
+    auto secret = random_bytes(32);
+    auto priv = DHPrivateKey::derive(CIPHERSUITE, secret);
+    auto pub = priv.public_key();
+
+    for (int j = 0; j < size; ++j) {
+      if (i == j) {
+        trees[j].add_leaf(secret);
+      } else {
+        trees[j].add_leaf(pub);
+      }
+    }
+  }
+
+  for (int i = 0; i < size; ++i) {
+    REQUIRE(trees[i].size() == size);
+    REQUIRE(trees[i].check_invariant(i));
+  }
+
+  // Verify that each member can encrypt and be decrypted by the
+  // other members
+  for (int i = 0; i < size; ++i) {
+    auto secret = random_bytes(32);
+    auto ct = trees[i].encrypt(i, secret);
+
+    for (int j = 0; j < size; ++j) {
+      if (i == j) {
+        trees[j].set_path(i, secret);
+      } else {
+        auto info = trees[j].decrypt(i, ct);
+        trees[j].merge_path(i, info);
+      }
+    }
+
+    for (int j = 0; j < size; ++j) {
+      REQUIRE(trees[j].check_invariant(j));
+      REQUIRE(trees[i] == trees[j]);
+    }
   }
 }

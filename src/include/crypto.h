@@ -86,6 +86,10 @@ public:
   typedef typed_unique_ptr_base<T> parent;
   using parent::parent;
 
+  typed_unique_ptr()
+    : typed_unique_ptr_base<T>(nullptr, TypedDelete<T>)
+  {}
+
   typed_unique_ptr(T* ptr)
     : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
   {}
@@ -298,6 +302,8 @@ struct ECIESCiphertext
   DHPublicKey ephemeral;
   tls::opaque<3> content;
 
+  friend bool operator==(const ECIESCiphertext& lhs,
+                         const ECIESCiphertext& rhs);
   friend tls::ostream& operator<<(tls::ostream& out,
                                   const ECIESCiphertext& obj);
   friend tls::istream& operator>>(tls::istream& in, ECIESCiphertext& obj);

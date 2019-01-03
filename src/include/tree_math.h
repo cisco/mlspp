@@ -32,6 +32,9 @@ namespace mls {
 // Internal namespace to keep these generic names clean
 namespace tree_math {
 
+uint32_t
+level(uint32_t x);
+
 // Tree size properties
 uint32_t
 node_width(uint32_t n);
@@ -54,6 +57,12 @@ parent(uint32_t x, uint32_t n);
 
 uint32_t
 sibling(uint32_t x, uint32_t n);
+
+std::vector<uint32_t>
+dirpath(uint32_t x, uint32_t n);
+
+std::vector<uint32_t>
+copath(uint32_t x, uint32_t n);
 
 } // namespace tree_math
 } // namespace mls

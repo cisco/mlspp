@@ -7,53 +7,67 @@
 
 namespace mls {
 
-class RatchetNode : public CipherAware
+class RatchetTreeNode : public CipherAware
 {
 public:
-  RatchetNode(CipherSuite suite);
-  RatchetNode(const RatchetNode& other);
-  RatchetNode& operator=(const RatchetNode& other);
+  RatchetTreeNode(CipherSuite suite);
+  RatchetTreeNode(const RatchetTreeNode& other);
+  RatchetTreeNode& operator=(const RatchetTreeNode& other);
 
-  RatchetNode(CipherSuite suite, const bytes& secret);
-  RatchetNode(const DHPrivateKey& priv);
-  RatchetNode(const DHPublicKey& pub);
+  RatchetTreeNode(CipherSuite suite, const bytes& secret);
+  RatchetTreeNode(const DHPrivateKey& priv);
+  RatchetTreeNode(const DHPublicKey& pub);
 
-  bool public_equal(const RatchetNode& other) const;
+  bool public_equal(const RatchetTreeNode& other) const;
   const optional<bytes>& secret() const;
   const optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
 
-  void merge(const RatchetNode& other);
+  void merge(const RatchetTreeNode& other);
 
 private:
   optional<bytes> _secret;
   optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
 
-  friend RatchetNode operator+(const RatchetNode& lhs, const RatchetNode& rhs);
-  friend bool operator==(const RatchetNode& lhs, const RatchetNode& rhs);
-  friend bool operator!=(const RatchetNode& lhs, const RatchetNode& rhs);
-  friend std::ostream& operator<<(std::ostream& out, const RatchetNode& node);
-  friend tls::ostream& operator<<(tls::ostream& out, const RatchetNode& obj);
-  friend tls::istream& operator>>(tls::istream& in, RatchetNode& obj);
+  friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,
+                                   const RatchetTreeNode& rhs);
+  friend bool operator==(const RatchetTreeNode& lhs,
+                         const RatchetTreeNode& rhs);
+  friend bool operator!=(const RatchetTreeNode& lhs,
+                         const RatchetTreeNode& rhs);
+  friend std::ostream& operator<<(std::ostream& out,
+                                  const RatchetTreeNode& node);
+  friend tls::ostream& operator<<(tls::ostream& out,
+                                  const RatchetTreeNode& obj);
+  friend tls::istream& operator>>(tls::istream& in, RatchetTreeNode& obj);
 };
 
-struct RatchetPath : public CipherAware
+struct OptionalRatchetTreeNode : public optional<RatchetTreeNode>
 {
-  tls::variant_vector<RatchetNode, CipherSuite, 3> nodes;
-  tls::variant_vector<ECIESCiphertext, CipherSuite, 3> node_secrets;
+  typedef optional<RatchetTreeNode> parent;
+  using parent::parent;
 
-  RatchetPath(CipherSuite suite)
-    : CipherAware(suite)
-    , nodes(suite)
-    , node_secrets(suite)
+  OptionalRatchetTreeNode(CipherSuite suite)
+    : parent(RatchetTreeNode(suite))
   {}
 
-  friend bool operator==(const RatchetPath& lhs, const RatchetPath& rhs);
-  friend std::ostream& operator<<(std::ostream& out, const RatchetPath& obj);
-  friend tls::ostream& operator<<(tls::ostream& out, const RatchetPath& obj);
-  friend tls::istream& operator>>(tls::istream& in, RatchetPath& obj);
+  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret)
+    : parent(RatchetTreeNode(suite, secret))
+  {}
+
+  void merge(const RatchetTreeNode& other)
+  {
+    if (!*this) {
+      *this = other;
+    } else {
+      (*this)->merge(other);
+    }
+  }
 };
+
+struct RatchetNode;
+struct DirectPath;
 
 class RatchetTree : public CipherAware
 {
@@ -62,20 +76,30 @@ public:
   RatchetTree(CipherSuite suite, const bytes& secret);
   RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets);
 
-  RatchetPath encrypt(uint32_t from, const bytes& leaf) const;
-  bytes decrypt(uint32_t from, RatchetPath& path) const;
-  void merge(uint32_t from, const RatchetPath& path);
-  void set_leaf(uint32_t index, const bytes& leaf);
+  struct MergeInfo
+  {
+    std::vector<DHPublicKey> public_keys;
+    std::vector<bytes> secrets;
+  };
+
+  DirectPath encrypt(uint32_t from, const bytes& leaf) const;
+  MergeInfo decrypt(uint32_t from, const DirectPath& path) const;
+  void merge_path(uint32_t from, const MergeInfo& path);
+
+  void add_leaf(const DHPublicKey& pub);
+  void add_leaf(const bytes& leaf_secret);
+  void blank_path(uint32_t index);
+  void set_path(uint32_t index, const bytes& leaf);
 
   uint32_t size() const;
-  RatchetNode root() const;
   bytes root_secret() const;
+  bool check_invariant(size_t from) const;
 
 private:
-  tls::variant_vector<RatchetNode, CipherSuite, 4> _nodes;
+  tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> _nodes;
 
-  RatchetNode new_node(const bytes& data) const;
-  uint32_t working_size(uint32_t from) const;
+  RatchetTreeNode new_node(const bytes& data) const;
+  std::vector<uint32_t> resolve(uint32_t target) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);

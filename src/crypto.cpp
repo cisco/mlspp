@@ -1310,6 +1310,12 @@ SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
 /// ECIESCiphertext
 ///
 
+bool
+operator==(const ECIESCiphertext& lhs, const ECIESCiphertext& rhs)
+{
+  return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
+}
+
 tls::ostream&
 operator<<(tls::ostream& out, const ECIESCiphertext& obj)
 {
