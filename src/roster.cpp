@@ -34,16 +34,6 @@ Roster::add(const RawKeyCredential& cred)
 }
 
 void
-Roster::copy(uint32_t dst, uint32_t src)
-{
-  if (dst > _credentials.size() - 1) {
-    _credentials.resize(dst + 1);
-  }
-
-  _credentials.emplace(_credentials.begin() + dst, _credentials[src]);
-}
-
-void
 Roster::remove(uint32_t index)
 {
   if (index > _credentials.size()) {

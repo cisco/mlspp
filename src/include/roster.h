@@ -54,7 +54,6 @@ class Roster
 {
 public:
   void add(const RawKeyCredential& public_key);
-  void copy(uint32_t dst, uint32_t src);
   void remove(uint32_t index);
   RawKeyCredential get(uint32_t index) const;
   size_t size() const;

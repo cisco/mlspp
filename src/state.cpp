@@ -238,8 +238,8 @@ State::handle(uint32_t index, const Remove& remove)
 {
   auto leaf_secret = nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
-
-  _roster.copy(remove.removed, index);
+  _tree.blank_path(remove.removed);
+  _roster.remove(remove.removed);
 }
 
 ///
