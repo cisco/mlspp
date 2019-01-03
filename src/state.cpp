@@ -19,6 +19,7 @@ State::State(const bytes& group_id,
   , _message_master_secret()
   , _init_secret(zero_bytes(32))
   , _tree(suite, random_bytes(32))
+  , _transcript_hash(Digest(suite).output_size(), 0)
   , _zero(Digest(suite).output_size(), 0)
 {
   RawKeyCredential cred{ identity_priv.public_key() };
@@ -35,7 +36,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   , _epoch(welcome.epoch + 1)
   , _roster(welcome.roster)
   , _tree(welcome.tree)
-  , _transcript(welcome.transcript)
+  , _transcript_hash(welcome.transcript_hash)
   , _index(welcome.tree.size())
   , _init_secret(welcome.init_secret)
   , _zero(Digest(welcome.cipher_suite).output_size(), 0)
@@ -59,6 +60,11 @@ State::State(const SignaturePrivateKey& identity_priv,
   } else if (*init_uik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
+
+  // Add to the transcript hash
+  auto operation_bytes = tls::marshal(handshake.operation);
+  _transcript_hash =
+    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
 
   // Add to the tree
   _tree.add_leaf(init_secret);
@@ -127,8 +133,8 @@ State::add(const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the groups ciphersuite");
   }
 
-  Welcome welcome{ _group_id, _epoch,      _suite,      _roster,
-                   _tree,     _transcript, _init_secret };
+  Welcome welcome{ _group_id, _epoch,           _suite,      _roster,
+                   _tree,     _transcript_hash, _init_secret };
   auto add = sign(Add{ user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
@@ -174,6 +180,10 @@ State::handle(uint32_t signer_index, const GroupOperation& operation) const
 {
   auto next = *this;
   next._epoch = _epoch + 1;
+
+  auto operation_bytes = tls::marshal(operation);
+  next._transcript_hash =
+    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
 
   switch (operation.type) {
     case GroupOperationType::add:
@@ -326,15 +336,15 @@ State::verify(uint32_t signer_index, const bytes& signature) const
 // struct {
 //   opaque group_id<0..255>;
 //   uint32 epoch;
-//   Credential roster<1..2^24-1>;
-//   PublicKey tree<1..2^24-1>;
-//   GroupOperation transcript<0..2^24-1>;
+//   optional<Credential> roster<1..2^32-1>;
+//   optional<PublicKey> tree<1..2^32-1>;
+//   opaque transcript_hash<0..255>;
 // } GroupState;
 tls::ostream&
 operator<<(tls::ostream& out, const State& obj)
 {
   return out << obj._group_id << obj._epoch << obj._roster << obj._tree
-             << obj._transcript;
+             << obj._transcript_hash;
 }
 
 } // namespace mls

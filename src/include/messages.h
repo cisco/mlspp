@@ -102,11 +102,10 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   opaque group_id<0..255>;
 //   uint32 epoch;
 //   CipherSuite cipher_suite;
-//   Credential roster<1..2^32-1>;
-//   PublicKey tree<1..2^32-1>;
-//   GroupOperation transcript<0..2^32-1>;
+//   optional<Credential> roster<1..2^32-1>;
+//   optional<PublicKey> tree<1..2^32-1>;
+//   opaque transcript_hash<0..255>;;
 //   opaque init_secret<0..255>;
-//   opaque leaf_secret<0..255>;
 // } Welcome;
 struct GroupOperation;
 struct Welcome
@@ -116,7 +115,7 @@ struct Welcome
   CipherSuite cipher_suite;
   Roster roster;
   RatchetTree tree;
-  tls::vector<GroupOperation, 4> transcript;
+  tls::opaque<1> transcript_hash;
   tls::opaque<1> init_secret;
 
   // This ctor should only be used for serialization.  The tree is
@@ -130,14 +129,14 @@ struct Welcome
           CipherSuite cipher_suite,
           Roster roster,
           RatchetTree tree,
-          tls::vector<GroupOperation, 3> transcript,
+          tls::opaque<1> transcript_hash,
           tls::opaque<1> init_secret)
     : group_id(group_id)
     , epoch(epoch)
     , cipher_suite(cipher_suite)
     , roster(roster)
     , tree(tree)
-    , transcript(transcript)
+    , transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
 };

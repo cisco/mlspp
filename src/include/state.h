@@ -64,7 +64,7 @@ private:
   epoch_t _epoch;
   Roster _roster;
   RatchetTree _tree;
-  tls::vector<GroupOperation, 3> _transcript;
+  tls::opaque<1> _transcript_hash;
 
   // Shared secret state
   tls::opaque<1> _message_master_secret;
