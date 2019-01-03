@@ -127,11 +127,8 @@ State::add(const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the groups ciphersuite");
   }
 
-  auto leaf_secret = random_bytes(32);
-  auto path = _tree.encrypt(_tree.size(), leaf_secret);
-
-  Welcome welcome{ _group_id, _epoch,      _suite,       _roster,
-                   _tree,     _transcript, _init_secret, leaf_secret };
+  Welcome welcome{ _group_id, _epoch,      _suite,      _roster,
+                   _tree,     _transcript, _init_secret };
   auto add = sign(Add{ user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
@@ -285,19 +282,18 @@ operator!=(const State& lhs, const State& rhs)
 
 void
 State::update_leaf(uint32_t index,
-                   const RatchetPath& path,
+                   const DirectPath& path,
                    const optional<bytes>& leaf_secret)
 {
   if (leaf_secret) {
-    _tree.set_leaf(index, *leaf_secret);
+    _tree.set_path(index, *leaf_secret);
   } else {
     auto temp_path = path;
-    _tree.decrypt(index, temp_path);
-    _tree.merge(index, temp_path);
+    auto secrets = _tree.decrypt(index, temp_path);
+    _tree.merge_path(index, secrets);
   }
 
-  auto update_secret = *(_tree.root().secret());
-  derive_epoch_keys(update_secret);
+  derive_epoch_keys(_tree.root_secret());
 }
 
 void

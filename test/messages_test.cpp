@@ -49,8 +49,7 @@ TEST_CASE("Basic message serialization", "[messages]")
 
   SECTION("Welcome")
   {
-    Welcome before{ random,       0x42, suite,  roster,
-                    ratchet_tree, {},   random, random };
+    Welcome before{ random, 0x42, suite, roster, ratchet_tree, {}, random };
     Welcome after;
     tls_round_trip(before, after);
   }

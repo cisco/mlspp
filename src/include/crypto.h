@@ -302,6 +302,8 @@ struct ECIESCiphertext
   DHPublicKey ephemeral;
   tls::opaque<3> content;
 
+  friend bool operator==(const ECIESCiphertext& lhs,
+                         const ECIESCiphertext& rhs);
   friend tls::ostream& operator<<(tls::ostream& out,
                                   const ECIESCiphertext& obj);
   friend tls::istream& operator>>(tls::istream& in, ECIESCiphertext& obj);

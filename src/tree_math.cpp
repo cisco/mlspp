@@ -1,5 +1,7 @@
 #include "tree_math.h"
 
+#include <algorithm>
+
 namespace mls {
 namespace tree_math {
 
@@ -110,17 +112,28 @@ sibling(uint32_t x, uint32_t n)
   return p;
 }
 
-static uint32_t
-subtree_size(uint32_t x, uint32_t n)
+std::vector<uint32_t>
+dirpath(uint32_t x, uint32_t n)
 {
-  auto w = node_width(n);
-  auto lr = (1 << level(x)) - 1;
-  auto rr = lr;
-  if (x + rr >= w) {
-    rr = w - x - 1;
+  std::vector<uint32_t> d;
+
+  auto r = root(n);
+  for (auto c = x; c != r; c = parent(c, n)) {
+    d.push_back(c);
   }
 
-  return (lr + rr) / 2 + 1;
+  return d;
+}
+
+std::vector<uint32_t>
+copath(uint32_t x, uint32_t n)
+{
+  auto d = dirpath(x, n);
+  std::vector<uint32_t> c(d.size());
+  for (int i = 0; i < d.size(); ++i) {
+    c[i] = sibling(d[i], n);
+  }
+  return c;
 }
 
 } // namespace tree_math

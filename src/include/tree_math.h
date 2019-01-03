@@ -58,5 +58,11 @@ parent(uint32_t x, uint32_t n);
 uint32_t
 sibling(uint32_t x, uint32_t n);
 
+std::vector<uint32_t>
+dirpath(uint32_t x, uint32_t n);
+
+std::vector<uint32_t>
+copath(uint32_t x, uint32_t n);
+
 } // namespace tree_math
 } // namespace mls

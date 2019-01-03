@@ -105,7 +105,7 @@ private:
 
   // Inner logic shared by Update, self-Update, and Remove handlers
   void update_leaf(uint32_t index,
-                   const RatchetPath& path,
+                   const DirectPath& path,
                    const optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy

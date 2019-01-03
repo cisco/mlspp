@@ -11,6 +11,56 @@
 namespace mls {
 
 // struct {
+//    DHPublicKey public_key;
+//    ECIESCiphertext node_secrets<0..2^16-1>;
+// } RatchetNode
+struct RatchetNode : public CipherAware
+{
+  DHPublicKey public_key;
+  tls::variant_vector<ECIESCiphertext, CipherSuite, 2> node_secrets;
+
+  RatchetNode(CipherSuite suite)
+    : CipherAware(suite)
+    , public_key(suite)
+    , node_secrets(suite)
+  {}
+
+  RatchetNode(const DHPublicKey& public_key,
+              const std::vector<ECIESCiphertext>& node_secrets)
+    : CipherAware(public_key)
+    , public_key(public_key)
+    , node_secrets(node_secrets)
+  {}
+};
+
+bool
+operator==(const RatchetNode& lhs, const RatchetNode& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const RatchetNode& obj);
+tls::istream&
+operator>>(tls::istream& in, RatchetNode& obj);
+
+// struct {
+//    RatchetNode nodes<0..2^16-1>;
+// } DirectPath;
+struct DirectPath : public CipherAware
+{
+  tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
+
+  DirectPath(CipherSuite suite)
+    : CipherAware(suite)
+    , nodes(suite)
+  {}
+};
+
+bool
+operator==(const DirectPath& lhs, const DirectPath& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const DirectPath& obj);
+tls::istream&
+operator>>(tls::istream& in, DirectPath& obj);
+
+// struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
 //     SignatureScheme algorithm;
@@ -67,7 +117,6 @@ struct Welcome
   RatchetTree tree;
   tls::vector<GroupOperation, 4> transcript;
   tls::opaque<1> init_secret;
-  tls::opaque<1> leaf_secret;
 
   // This ctor should only be used for serialization.  The tree is
   // initialized to a dummy state.
@@ -83,8 +132,7 @@ struct Welcome
           Roster roster,
           RatchetTree tree,
           tls::vector<GroupOperation, 3> transcript,
-          tls::opaque<1> init_secret,
-          tls::opaque<1> leaf_secret)
+          tls::opaque<1> init_secret)
     : group_id(group_id)
     , epoch(epoch)
     , cipher_suite(cipher_suite)
@@ -92,7 +140,6 @@ struct Welcome
     , tree(tree)
     , transcript(transcript)
     , init_secret(init_secret)
-    , leaf_secret(leaf_secret)
   {}
 };
 
@@ -149,14 +196,14 @@ operator>>(tls::istream& in, Add& obj);
 struct Update : public CipherAware
 {
 public:
-  RatchetPath path;
+  DirectPath path;
 
   Update(CipherSuite suite)
     : CipherAware(suite)
     , path(suite)
   {}
 
-  Update(const RatchetPath& path)
+  Update(const DirectPath& path)
     : CipherAware(path)
     , path(path)
   {}
@@ -179,14 +226,14 @@ struct Remove : public CipherAware
 {
 public:
   uint32_t removed;
-  RatchetPath path;
+  DirectPath path;
 
   Remove(CipherSuite suite)
     : CipherAware(suite)
     , path(suite)
   {}
 
-  Remove(uint32_t removed, const RatchetPath& path)
+  Remove(uint32_t removed, const DirectPath& path)
     : CipherAware(path)
     , removed(removed)
     , path(path)

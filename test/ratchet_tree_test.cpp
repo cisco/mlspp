@@ -1,3 +1,4 @@
+#include "messages.h"
 #include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include <catch.hpp>
@@ -41,34 +42,22 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
   {
     RatchetTree tree{ CIPHERSUITE, secretA };
 
-    auto ctB = tree.encrypt(1, secretB);
-    auto rootAB = tree.decrypt(1, ctB);
-    tree.merge(1, ctB);
+    tree.add_leaf(secretB);
+    tree.set_path(1, secretB);
 
     REQUIRE(tree.size() == 2);
-    REQUIRE(tree.root_secret() == rootAB);
     REQUIRE(tree.root_secret() == secretAB);
 
-    RatchetTree directAB{ CIPHERSUITE, { secretA, secretB } };
-    REQUIRE(tree == directAB);
-
-    auto ctC = tree.encrypt(2, secretC);
-    auto rootABC = tree.decrypt(2, ctC);
-    tree.merge(2, ctC);
+    tree.add_leaf(secretC);
+    tree.set_path(2, secretC);
 
     REQUIRE(tree.size() == 3);
-    REQUIRE(tree.root_secret() == rootABC);
     REQUIRE(tree.root_secret() == secretABC);
 
-    RatchetTree directABC{ CIPHERSUITE, { secretA, secretB, secretC } };
-    REQUIRE(tree == directABC);
-
-    auto ctD = tree.encrypt(3, secretD);
-    auto rootABCD = tree.decrypt(3, ctD);
-    tree.merge(3, ctD);
+    tree.add_leaf(secretD);
+    tree.set_path(3, secretD);
 
     REQUIRE(tree.size() == 4);
-    REQUIRE(tree.root_secret() == rootABCD);
     REQUIRE(tree.root_secret() == secretABCD);
 
     RatchetTree direct{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
@@ -83,50 +72,61 @@ TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
     tls::unmarshal(tls::marshal(before), after);
     REQUIRE(before == after);
   }
+
+  SECTION("Via serialization, with blanks")
+  {
+    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
+    RatchetTree after{ CIPHERSUITE };
+
+    before.blank_path(1);
+    tls::unmarshal(tls::marshal(before), after);
+    REQUIRE(before == after);
+  }
 }
 
-TEST_CASE("Incomplete trees", "[ratchet-tree]")
+TEST_CASE("Trees can encrypt and decrypt", "[ratchet-tree]")
 {
   size_t size = 5;
-  size_t depth = 4;
 
-  bytes secretA = { 0, 1, 2, 3 };
-  bytes secretB = { 1, 2, 3, 4 };
-  RatchetTree tree{ CIPHERSUITE, secretA };
-  tree.add_leaf(secretB);
+  // trees[i] represents a tree with a private key for only leaf i
+  std::vector<RatchetTree> trees(size, { CIPHERSUITE });
+  for (int i = 0; i < size; ++i) {
+    auto secret = random_bytes(32);
+    auto priv = DHPrivateKey::derive(CIPHERSUITE, secret);
+    auto pub = priv.public_key();
 
-  auto priv = DHPrivateKey::derive(CIPHERSUITE, { 2, 3, 4, 5 });
-  auto pub = priv.public_key();
-  for (uint8_t i = 2; i < size; ++i) {
-    tree.add_leaf(pub);
-  }
-
-  REQUIRE(tree.size() == size);
-
-  SECTION("... can encrypt and decrypt")
-  {
-    bytes original{ 0, 1, 2, 3 };
-    auto encrypted = tree.encrypt(0, original);
-    REQUIRE(encrypted.nodes.size() == depth);
-    REQUIRE(encrypted.node_secrets.size() == size - 1);
-
-    auto decrypted = tree.decrypt(0, encrypted);
-
-    bytes digest = original;
-    for (size_t i = 1; i < depth; ++i) {
-      digest = Digest(CIPHERSUITE).write(digest).digest();
+    for (int j = 0; j < size; ++j) {
+      if (i == j) {
+        trees[j].add_leaf(secret);
+      } else {
+        trees[j].add_leaf(pub);
+      }
     }
-    REQUIRE(decrypted == digest);
   }
 
-  SECTION("... can serialize and deserialize")
-  {
-    RatchetTree after{ CIPHERSUITE };
-    auto marshaled = tls::marshal(tree);
-    tls::unmarshal(marshaled, after);
-    REQUIRE(tree == after);
+  for (int i = 0; i < size; ++i) {
+    REQUIRE(trees[i].size() == size);
+    REQUIRE(trees[i].check_invariant(i));
+  }
 
-    auto marshaled2 = tls::marshal(after);
-    REQUIRE(marshaled2 == marshaled);
+  // Verify that each member can encrypt and be decrypted by the
+  // other members
+  for (int i = 0; i < size; ++i) {
+    auto secret = random_bytes(32);
+    auto ct = trees[i].encrypt(i, secret);
+
+    for (int j = 0; j < size; ++j) {
+      if (i == j) {
+        trees[j].set_path(i, secret);
+      } else {
+        auto info = trees[j].decrypt(i, ct);
+        trees[j].merge_path(i, info);
+      }
+    }
+
+    for (int j = 0; j < size; ++j) {
+      REQUIRE(trees[j].check_invariant(j));
+      REQUIRE(trees[i] == trees[j]);
+    }
   }
 }
