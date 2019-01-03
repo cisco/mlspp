@@ -7,6 +7,7 @@
 #include "tls_syntax.h"
 
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+#define DUMMY_SCHEME SignatureScheme::P256_SHA256
 
 namespace mls {
 
@@ -80,7 +81,7 @@ struct UserInitKey
   // alternative is to have a default ctor for SignaturePublicKey,
   // which seems worse.
   UserInitKey()
-    : identity_key(SignatureScheme::P256_SHA256)
+    : identity_key(DUMMY_SCHEME)
   {}
 
   void add_init_key(const DHPublicKey& pub);
@@ -120,8 +121,6 @@ struct Welcome
 
   // This ctor should only be used for serialization.  The tree is
   // initialized to a dummy state.
-  //
-  // XXX: Need to update unmarshal to set the tree properly
   Welcome()
     : tree(DUMMY_CIPHERSUITE)
   {}
@@ -166,9 +165,6 @@ operator>>(tls::istream& in, GroupOperationType& obj);
 // struct {
 //     UserInitKey init_key;
 // } Add;
-//
-// XXX(rlb@ipv.sx): This no longer actually needs CipherAware, but
-// let's keep it for symmetry with the other GroupOperations.
 struct Add
 {
 public:
@@ -273,7 +269,6 @@ struct GroupOperation : public CipherAware
   Update update;
   Remove remove;
 
-  // XXX(rlb@ipv.sx): Can this be removed?
   GroupOperation()
     : CipherAware(DUMMY_CIPHERSUITE)
     , add()

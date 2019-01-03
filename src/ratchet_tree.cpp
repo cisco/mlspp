@@ -3,8 +3,6 @@
 #include "messages.h"
 #include "tree_math.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -354,7 +352,6 @@ RatchetTree::check_invariant(size_t from) const
   for (const auto& node : dirpath) {
     in_dirpath[node] = true;
     if (_nodes[node] && !_nodes[node]->private_key()) {
-      std::cout << "Missing privkey: " << node << std::endl;
       return false;
     }
   }
@@ -366,7 +363,6 @@ RatchetTree::check_invariant(size_t from) const
     }
 
     if (_nodes[i] && _nodes[i]->private_key()) {
-      std::cout << "Inappropriate privkey: " << i << std::endl;
       return false;
     }
   }

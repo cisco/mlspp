@@ -3,8 +3,6 @@
 #include "tls_syntax.h"
 #include <catch.hpp>
 
-#include <iostream>
-
 using namespace mls;
 
 #define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM

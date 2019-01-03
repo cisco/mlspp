@@ -43,6 +43,9 @@ private:
   friend tls::istream& operator>>(tls::istream& in, RatchetTreeNode& obj);
 };
 
+// XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
+// ensure that nodes are populated with blank values on unmarshal.
+// Otherwise, `*opt` will access uninitialized memory.
 struct OptionalRatchetTreeNode : public optional<RatchetTreeNode>
 {
   typedef optional<RatchetTreeNode> parent;

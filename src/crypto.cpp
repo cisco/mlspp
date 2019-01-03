@@ -10,7 +10,6 @@
 #include "openssl/sha.h"
 #include "state.h"
 
-#include <iostream>
 #include <string>
 
 namespace mls {
@@ -109,7 +108,6 @@ ossl_key_type(SignatureScheme scheme)
       return OpenSSLKeyType::Ed448;
   }
 
-  std::cout << "Unknown signature scheme: " << uint16_t(scheme) << std::endl;
   throw InvalidParameterError("Unknown signature scheme");
 }
 
@@ -761,7 +759,7 @@ random_bytes(size_t size)
   return out;
 }
 
-// XXX: This method requires that size <= Hash.length, so that
+// For simplicity, we enforce that size <= Hash.length, so that
 // HKDF-Expand(Secret, Label) reduces to:
 //
 //   HMAC(Secret, Label || 0x01)
@@ -769,6 +767,11 @@ template<typename T>
 static bytes
 hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
 {
+  // Ensure that we need only one hash invocation
+  if (size > Digest(suite).output_size()) {
+    throw InvalidParameterError("Size too big for hkdf_expand");
+  }
+
   auto label = tls::marshal(info);
   label.push_back(0x01);
   auto mac = hmac(suite, secret, label);

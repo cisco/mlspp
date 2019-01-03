@@ -130,7 +130,8 @@ Session::make_init_key()
 void
 Session::add_state(epoch_t prior_epoch, const State& state)
 {
-  // XXX(rlb@ipv.sx) Assumes no epoch collisions
+  // XXX(rlb@ipv.sx) Assumes no epoch collisions, which is clearly
+  // not the case with the current linear updating.
   _state.emplace(state.epoch(), state);
 
   // XXX(rlb@ipv.sx) First successor updates the head pointer
