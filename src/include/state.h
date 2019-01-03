@@ -51,25 +51,7 @@ public:
   ///
   /// Generic handshake message handler
   ///
-
-  // Handle a Handshake message
   State handle(const Handshake& handshake) const;
-
-  ///
-  /// Specific operation handlers
-  ///
-  /// XXX(rlb@ipv.sx) These can probably be private
-  ///
-  State handle(uint32_t signer_index, const GroupOperation& operation) const;
-
-  // Handle a Add (for existing participants only)
-  void handle(const Add& add);
-
-  // Handle an Update (for the participant that sent the update)
-  void handle(uint32_t index, const Update& update);
-
-  // Handle a Remove (for the remaining participants, obviously)
-  void handle(uint32_t index, const Remove& remove);
 
   epoch_t epoch() const { return _epoch; }
   uint32_t index() const { return _index; }
@@ -96,6 +78,18 @@ private:
   // A zero vector, for convenience
   bytes _zero;
 
+  // Specific operation handlers
+  State handle(uint32_t signer_index, const GroupOperation& operation) const;
+
+  // Handle a Add (for existing participants only)
+  void handle(const Add& add);
+
+  // Handle an Update (for the participant that sent the update)
+  void handle(uint32_t index, const Update& update);
+
+  // Handle a Remove (for the remaining participants, obviously)
+  void handle(uint32_t index, const Remove& remove);
+
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
@@ -116,13 +110,6 @@ private:
 
   // Verify this state with the indicated public key
   bool verify(uint32_t signer_index, const bytes& signature) const;
-
-  // XXX
-  friend bytes derive_secret(CipherSuite suite,
-                             const bytes& secret,
-                             const std::string& label,
-                             const State& state,
-                             size_t size);
 };
 
 } // namespace mls
