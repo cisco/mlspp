@@ -11,15 +11,50 @@ using namespace mls;
 const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
 
 tls::istream&
-operator>>(tls::istream& str, TreeMathTestVectors& val)
+operator>>(tls::istream& str, TreeMathTestVectors& obj)
 {
-  return str >> val.root >> val.left >> val.right >> val.parent >> val.sibling;
+  return str >> obj.root >> obj.left >> obj.right >> obj.parent >> obj.sibling;
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const TreeMathTestVectors& val)
+operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 {
-  return str << val.root << val.left << val.right << val.parent << val.sibling;
+  return str << obj.root << obj.left << obj.right << obj.parent << obj.sibling;
+}
+
+///
+/// MessagesTestVectors
+///
+
+const std::string MessagesTestVectors::file_name = "./messages.bin";
+
+tls::istream&
+operator>>(tls::istream& str, MessagesTestVectors::CipherSuiteCase& obj)
+{
+  return str >> obj.cipher_suite >> obj.user_init_key >> obj.welcome >>
+         obj.add >> obj.update >> obj.remove;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const MessagesTestVectors::CipherSuiteCase& obj)
+{
+  return str << obj.cipher_suite << obj.user_init_key << obj.welcome << obj.add
+             << obj.update << obj.remove;
+}
+
+tls::istream&
+operator>>(tls::istream& str, MessagesTestVectors& obj)
+{
+  return str >> obj.user_init_key_all >> obj.case_p256_p256 >>
+         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const MessagesTestVectors& obj)
+{
+  return str << obj.user_init_key_all << obj.case_p256_p256
+             << obj.case_x25519_ed25519 << obj.case_p521_p521
+             << obj.case_x448_ed448;
 }
 
 ///
@@ -85,7 +120,8 @@ const TestVectors&
 TestVectors::get()
 {
   if (!_initialized) {
-    load_test(_vectors.tree);
+    load_test(_vectors.tree_math);
+    load_test(_vectors.messages);
   }
 
   return _vectors;
@@ -94,6 +130,6 @@ TestVectors::get()
 void
 TestVectors::dump()
 {
-  dump_test(tree);
+  dump_test(tree_math);
+  dump_test(messages);
 }
-
