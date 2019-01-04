@@ -13,11 +13,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
+# Find OpenSSL
 set(OPENSSL_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/third_party/openssl/include")
 set(OPENSSL_LIBRARIES "${PROJECT_SOURCE_DIR}/third_party/openssl/libcrypto.a")
 
 MESSAGE( STATUS "OPENSSL_INCLUDE_DIR: " ${OPENSSL_INCLUDE_DIR} )
 MESSAGE( STATUS "OPENSSL_LIBRARIES: " ${OPENSSL_LIBRARIES} )
+
+# Find GTest
+set(GTEST_DIR "${PROJECT_SOURCE_DIR}/third_party/googletest/googletest")
+set(GTEST_INCLUDE_DIR "${GTEST_DIR}/include")
+set(GTEST_LIBRARY "${GTEST_DIR}/make/libgtest.a")
+set(GTEST_MAIN_LIBRARY "${GTEST_DIR}/make/libgtest_main.a")
+
+MESSAGE( STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR} )
+MESSAGE( STATUS "GTEST_LIBRARY: " ${GTEST_LIBRARY} )
+MESSAGE( STATUS "GTEST_MAIN_LIBRARY: " ${GTEST_MAIN_LIBRARY} )
 
 ###
 ### Library Config

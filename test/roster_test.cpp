@@ -1,19 +1,26 @@
 #include "roster.h"
-#include <catch.hpp>
+#include <gtest/gtest.h>
 
 using namespace mls;
 
-#define SIG_TEST SignatureScheme::P256_SHA256
-
-TEST_CASE("Rosters can be created and accessed", "[roster]")
+TEST(RosterTest, Basic)
 {
-  auto priv = SignaturePrivateKey::generate(SIG_TEST);
+  auto scheme = SignatureScheme::P256_SHA256;
+  auto priv = SignaturePrivateKey::generate(scheme);
   auto pub = priv.public_key();
 
   RawKeyCredential cred{ pub };
-  REQUIRE(cred.public_key() == pub);
+  ASSERT_EQ(cred.public_key(), pub);
 
   Roster roster;
-  // roster.put(0, cred);
-  // REQUIRE(roster.get(0).public_key() == pub);
+  roster.add(cred);
+  roster.add(cred);
+  ASSERT_EQ(roster.size(), 2);
+  ASSERT_EQ(roster.get(0), cred);
+  ASSERT_EQ(roster.get(1), cred);
+
+  roster.remove(1);
+  ASSERT_EQ(roster.size(), 2);
+  ASSERT_EQ(roster.get(0), cred);
+  ASSERT_THROW(roster.get(1), InvalidParameterError);
 }
