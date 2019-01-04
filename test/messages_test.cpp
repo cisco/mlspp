@@ -1,4 +1,5 @@
 #include "messages.h"
+#include "test_vectors.h"
 #include "tls_syntax.h"
 #include <gtest/gtest.h>
 
@@ -12,92 +13,61 @@ tls_round_trip(const T& before, T& after)
   ASSERT_EQ(before, after);
 }
 
+void
+tls_round_trip_all(const MessagesTestVectors::CipherSuiteCase& test_case)
+{
+  UserInitKey user_init_key;
+  tls_round_trip(test_case.user_init_key, user_init_key);
+
+  Welcome welcome;
+  tls_round_trip(test_case.welcome, welcome);
+
+  Handshake add{ test_case.cipher_suite };
+  tls_round_trip(test_case.add, add);
+
+  Handshake update{ test_case.cipher_suite };
+  tls_round_trip(test_case.update, update);
+
+  Handshake remove{ test_case.cipher_suite };
+  tls_round_trip(test_case.remove, remove);
+}
+
 static const epoch_t epoch_val = 0x01020304;
 
 class MessagesTest : public ::testing::Test
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
-  const SignatureScheme scheme = SignatureScheme::P256_SHA256;
+  const TestVectors& tv;
 
-  bytes random;
-  UserInitKey user_init_key;
-  Roster roster;
-  RatchetTree ratchet_tree;
-  DirectPath direct_path;
-
+  // NB: Successful parsing of the test vectors is validated by the
+  // fact that this method doesn't throw.
   MessagesTest()
-    : random(random_bytes(32))
-    , ratchet_tree(suite)
-    , direct_path(suite)
-  {
-    auto identity_priv = SignaturePrivateKey::generate(scheme);
-    auto identity_pub = identity_priv.public_key();
-
-    auto p256 = CipherSuite::P256_SHA256_AES128GCM;
-    auto x25519 = CipherSuite::X25519_SHA256_AES128GCM;
-    auto dh_pub_p256 = DHPrivateKey::generate(p256).public_key();
-    auto dh_pub_x25519 = DHPrivateKey::generate(x25519).public_key();
-
-    ratchet_tree = RatchetTree{ suite, { random, random } };
-    direct_path = ratchet_tree.encrypt(0, random);
-
-    RawKeyCredential cred{ identity_pub };
-    roster.add(cred);
-
-    user_init_key.add_init_key(dh_pub_p256);
-    user_init_key.add_init_key(dh_pub_x25519);
-    user_init_key.sign(identity_priv);
-  }
+    : tv(TestVectors::get())
+  {}
 };
 
 TEST_F(MessagesTest, UserInitKey)
 {
-  ASSERT_TRUE(user_init_key.verify());
   UserInitKey after;
-  tls_round_trip(user_init_key, after);
-  ASSERT_TRUE(after.verify());
+  tls_round_trip(tv.messages.user_init_key_all, after);
 }
 
-TEST_F(MessagesTest, Welcome)
+TEST_F(MessagesTest, Suite_P256_P256)
 {
-  Welcome before{ random, 0x42, suite, roster, ratchet_tree, {}, random };
-  Welcome after;
-  tls_round_trip(before, after);
+  tls_round_trip_all(tv.messages.case_p256_p256);
 }
 
-TEST_F(MessagesTest, GroupOperationType)
+TEST_F(MessagesTest, Suite_X25519_Ed25519)
 {
-  GroupOperationType before = GroupOperationType::update;
-  GroupOperationType after;
-  tls_round_trip(before, after);
+  tls_round_trip_all(tv.messages.case_x25519_ed25519);
 }
 
-TEST_F(MessagesTest, Add)
+TEST_F(MessagesTest, Suite_P521_P521)
 {
-  auto before = Add{ user_init_key };
-  auto after = Add{};
-  tls_round_trip(before, after);
+  tls_round_trip_all(tv.messages.case_p521_p521);
 }
 
-TEST_F(MessagesTest, Update)
+TEST_F(MessagesTest, Suite_X448_Ed448)
 {
-  auto before = Update{ direct_path };
-  auto after = Update{ suite };
-  tls_round_trip(before, after);
-}
-
-TEST_F(MessagesTest, Remove)
-{
-  auto before = Remove{ 0x42, direct_path };
-  auto after = Remove{ suite };
-  tls_round_trip(before, after);
-}
-
-TEST_F(MessagesTest, Handshake)
-{
-  auto add = Add{ user_init_key };
-  auto before = Handshake{ 0x42, add, 0x43, random };
-  auto after = Handshake{ suite };
-  tls_round_trip(before, after);
+  tls_round_trip_all(tv.messages.case_x448_ed448);
 }
