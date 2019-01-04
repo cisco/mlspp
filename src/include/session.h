@@ -31,6 +31,7 @@ public:
   void handle(const bytes& handshake);
 
   epoch_t current_epoch() const { return _current_epoch; }
+  CipherSuite cipher_suite() const;
 
 private:
   CipherList _supported_ciphersuites;
@@ -45,7 +46,6 @@ private:
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;
-  CipherSuite cipher_suite() const;
 };
 
 } // namespace mls

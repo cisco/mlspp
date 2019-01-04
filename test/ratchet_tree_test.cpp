@@ -1,96 +1,96 @@
-#include "messages.h"
 #include "ratchet_tree.h"
+#include "messages.h"
 #include "tls_syntax.h"
-#include <catch.hpp>
+#include <gtest/gtest.h>
 
 using namespace mls;
 
-#define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+class RatchetTreeTest : public ::testing::Test {
+protected:
+  const CipherSuite ciphersuite = CipherSuite::P256_SHA256_AES128GCM;
 
-TEST_CASE("Trees can be created and extended", "[ratchet-tree]")
-{
-  bytes secretA = from_hex("00010203");
-  bytes secretB = from_hex("04050607");
-  bytes secretC = from_hex("08090a0b");
-  bytes secretD = from_hex("0c0d0e0f");
-  bytes secretAB = from_hex(
+  const bytes secretA = from_hex("00010203");
+  const bytes secretB = from_hex("04050607");
+  const bytes secretC = from_hex("08090a0b");
+  const bytes secretD = from_hex("0c0d0e0f");
+  const bytes secretAB = from_hex(
     "c6d44cf418f610e3fe9e1d9294ff43def81c6cdcad6cbb1820cff48d3aa4355d");
-  bytes secretCD = from_hex(
+  const bytes secretCD = from_hex(
     "71b92110bf135c85581c8a128f6a19c0f6aca752b0c6c91e3571899cf09b145d");
-  bytes secretABC = from_hex(
+  const bytes secretABC = from_hex(
     "e0e6e3c1c64422cc76229d0c35ba817a281f8fc4014faa3e9152428a08a73ab3");
-  bytes secretABCD = from_hex(
+  const bytes secretABCD = from_hex(
     "4e05f3b9649335c332f8a99cbaa56e637f3dc99a446f7f6af0f92ea7756717e0");
+};
 
-  SECTION("With one member")
-  {
-    RatchetTree tree{ CIPHERSUITE, secretA };
-    REQUIRE(tree.size() == 1);
-    REQUIRE(tree.root_secret() == secretA);
-  }
+TEST_F(RatchetTreeTest, OneMember)
+{
+  RatchetTree tree{ ciphersuite, secretA };
+  ASSERT_EQ(tree.size(), 1);
+  ASSERT_EQ(tree.root_secret(), secretA);
+}
 
-  SECTION("With multiple members")
-  {
-    RatchetTree tree{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
-    REQUIRE(tree.size() == 4);
-    REQUIRE(tree.root_secret() == secretABCD);
-  }
+TEST_F(RatchetTreeTest, MultipleMembers)
+{
+  RatchetTree tree{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  ASSERT_EQ(tree.size(), 4);
+  ASSERT_EQ(tree.root_secret(), secretABCD);
+}
 
-  SECTION("By extension")
-  {
-    RatchetTree tree{ CIPHERSUITE, secretA };
+TEST_F(RatchetTreeTest, ByExtension)
+{
+  RatchetTree tree{ ciphersuite, secretA };
 
     tree.add_leaf(secretB);
     tree.set_path(1, secretB);
 
-    REQUIRE(tree.size() == 2);
-    REQUIRE(tree.root_secret() == secretAB);
+    ASSERT_EQ(tree.size(), 2);
+    ASSERT_EQ(tree.root_secret(), secretAB);
 
     tree.add_leaf(secretC);
     tree.set_path(2, secretC);
 
-    REQUIRE(tree.size() == 3);
-    REQUIRE(tree.root_secret() == secretABC);
+    ASSERT_EQ(tree.size(), 3);
+    ASSERT_EQ(tree.root_secret(), secretABC);
 
     tree.add_leaf(secretD);
     tree.set_path(3, secretD);
 
-    REQUIRE(tree.size() == 4);
-    REQUIRE(tree.root_secret() == secretABCD);
+    ASSERT_EQ(tree.size(), 4);
+    ASSERT_EQ(tree.root_secret(), secretABCD);
 
-    RatchetTree direct{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
-    REQUIRE(tree == direct);
-  }
-
-  SECTION("Via serialization")
-  {
-    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
-    RatchetTree after{ CIPHERSUITE };
-
-    tls::unmarshal(tls::marshal(before), after);
-    REQUIRE(before == after);
-  }
-
-  SECTION("Via serialization, with blanks")
-  {
-    RatchetTree before{ CIPHERSUITE, { secretA, secretB, secretC, secretD } };
-    RatchetTree after{ CIPHERSUITE };
-
-    before.blank_path(1);
-    tls::unmarshal(tls::marshal(before), after);
-    REQUIRE(before == after);
-  }
+    RatchetTree direct{ ciphersuite, { secretA, secretB, secretC, secretD } };
+    ASSERT_EQ(tree, direct);
 }
 
-TEST_CASE("Trees can encrypt and decrypt", "[ratchet-tree]")
+TEST_F(RatchetTreeTest, BySerialization)
+{
+  RatchetTree before{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  RatchetTree after{ ciphersuite };
+
+  tls::unmarshal(tls::marshal(before), after);
+  ASSERT_EQ(before, after);
+}
+
+TEST_F(RatchetTreeTest, BySerializationWithBlanks)
+{
+  RatchetTree before{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  RatchetTree after{ ciphersuite };
+
+  before.blank_path(1);
+  tls::unmarshal(tls::marshal(before), after);
+  ASSERT_EQ(before, after);
+}
+
+TEST_F(RatchetTreeTest, EncryptDecrypt)
 {
   size_t size = 5;
 
   // trees[i] represents a tree with a private key for only leaf i
-  std::vector<RatchetTree> trees(size, { CIPHERSUITE });
+  std::vector<RatchetTree> trees(size, { ciphersuite });
   for (int i = 0; i < size; ++i) {
     auto secret = random_bytes(32);
-    auto priv = DHPrivateKey::derive(CIPHERSUITE, secret);
+    auto priv = DHPrivateKey::derive(ciphersuite, secret);
     auto pub = priv.public_key();
 
     for (int j = 0; j < size; ++j) {
@@ -103,8 +103,8 @@ TEST_CASE("Trees can encrypt and decrypt", "[ratchet-tree]")
   }
 
   for (int i = 0; i < size; ++i) {
-    REQUIRE(trees[i].size() == size);
-    REQUIRE(trees[i].check_invariant(i));
+    ASSERT_EQ(trees[i].size(), size);
+    ASSERT_TRUE(trees[i].check_invariant(i));
   }
 
   // Verify that each member can encrypt and be decrypted by the
@@ -123,8 +123,8 @@ TEST_CASE("Trees can encrypt and decrypt", "[ratchet-tree]")
     }
 
     for (int j = 0; j < size; ++j) {
-      REQUIRE(trees[j].check_invariant(j));
-      REQUIRE(trees[i] == trees[j]);
+      ASSERT_EQ(trees[i], trees[j]);
+      ASSERT_TRUE(trees[j].check_invariant(j));
     }
   }
 }

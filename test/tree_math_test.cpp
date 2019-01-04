@@ -1,8 +1,8 @@
 #include "tree_math.h"
-
 #include "common.h"
 #include "tls_syntax.h"
-#include <catch.hpp>
+
+#include <gtest/gtest.h>
 #include <vector>
 
 using namespace mls;
@@ -175,7 +175,7 @@ vector_test(F function, bytes answer_data)
   tls::vector<uint32_t, 4> vals;
   tls::unmarshal(answer_data, vals);
   for (uint32_t i = 0; i < vals.size(); ++i) {
-    REQUIRE(function(i) == vals[i]);
+    ASSERT_EQ(function(i), vals[i]);
   }
 }
 
@@ -186,31 +186,31 @@ size_scope(F function)
   return [=](uint32_t x) -> auto { return function(x, answers::size); };
 }
 
-TEST_CASE("Tree math functions match expected outputs", "[tree-math]")
+TEST(TreeMathTest, Root)
 {
-  SECTION("root")
-  {
-    tls::vector<uint32_t, 4> vals;
-    tls::unmarshal(answers::root_data, vals);
-    for (uint32_t n = 1; n < vals.size() - 1; n += 1) {
-      REQUIRE(tree_math::root(n) == vals[n - 1]);
-    }
+  tls::vector<uint32_t, 4> vals;
+  tls::unmarshal(answers::root_data, vals);
+  for (uint32_t n = 1; n < vals.size() - 1; n += 1) {
+    ASSERT_EQ(tree_math::root(n), vals[n - 1]);
   }
+}
 
-  SECTION("left") { vector_test(tree_math::left, answers::left_data); }
+TEST(TreeMathTest, Left)
+{
+  vector_test(tree_math::left, answers::left_data);
+}
 
-  SECTION("right")
-  {
-    vector_test(size_scope(tree_math::right), answers::right_data);
-  }
+TEST(TreeMathTest, Right)
+{
+  vector_test(size_scope(tree_math::right), answers::right_data);
+}
 
-  SECTION("parent")
-  {
-    vector_test(size_scope(tree_math::parent), answers::parent_data);
-  }
+TEST(TreeMathTest, Parent)
+{
+  vector_test(size_scope(tree_math::parent), answers::parent_data);
+}
 
-  SECTION("sibling")
-  {
-    vector_test(size_scope(tree_math::sibling), answers::sibling_data);
-  }
+TEST(TreeMathTest, Sibling)
+{
+  vector_test(size_scope(tree_math::sibling), answers::sibling_data);
 }
