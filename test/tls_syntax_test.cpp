@@ -1,5 +1,5 @@
-#include "tls_syntax.h"
 #include "common.h"
+#include "tls_syntax.h"
 #include <gtest/gtest.h>
 
 using namespace mls;
@@ -31,7 +31,8 @@ operator>>(tls::istream& in, ExampleStruct& data)
 }
 
 // Known-answer tests
-class TLSSyntaxTest : public ::testing::Test {
+class TLSSyntaxTest : public ::testing::Test
+{
 protected:
   const uint8_t val_uint8{ 0x11 };
   const bytes enc_uint8 = from_hex("11");
@@ -51,10 +52,13 @@ protected:
   const tls::vector<uint32_t, 3> val_vector{ 5, 6 };
   const bytes enc_vector = from_hex("0000080000000500000006");
 
-  const ExampleStruct val_struct{ 0x1111,
-                                { 0x22, 0x22 },
-                                { 0x33333333, 0x44444444, 0x55555555, 0x66666666 } };
-  const bytes enc_struct = from_hex("11110002222233333333444444445555555566666666");
+  const ExampleStruct val_struct{
+    0x1111,
+    { 0x22, 0x22 },
+    { 0x33333333, 0x44444444, 0x55555555, 0x66666666 }
+  };
+  const bytes enc_struct =
+    from_hex("11110002222233333333444444445555555566666666");
 };
 
 template<typename T>

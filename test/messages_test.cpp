@@ -14,7 +14,8 @@ tls_round_trip(const T& before, T& after)
 
 static const epoch_t epoch_val = 0x01020304;
 
-class MessagesTest : public ::testing::Test {
+class MessagesTest : public ::testing::Test
+{
 protected:
   const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
   const SignatureScheme scheme = SignatureScheme::P256_SHA256;
@@ -60,8 +61,7 @@ TEST_F(MessagesTest, UserInitKey)
 
 TEST_F(MessagesTest, Welcome)
 {
-  Welcome before{ random,       0x42, suite,  roster,
-                  ratchet_tree, {},   random };
+  Welcome before{ random, 0x42, suite, roster, ratchet_tree, {}, random };
   Welcome after;
   tls_round_trip(before, after);
 }

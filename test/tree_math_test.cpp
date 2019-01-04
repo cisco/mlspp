@@ -1,6 +1,6 @@
-#include "tree_math.h"
 #include "common.h"
 #include "tls_syntax.h"
+#include "tree_math.h"
 
 #include <gtest/gtest.h>
 #include <vector>

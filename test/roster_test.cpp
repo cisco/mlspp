@@ -13,7 +13,14 @@ TEST(RosterTest, Basic)
   ASSERT_EQ(cred.public_key(), pub);
 
   Roster roster;
-  // TODO(rlb@ipv.sx): Continue
-  // roster.put(0, cred);
-  // REQUIRE(roster.get(0).public_key() == pub);
+  roster.add(cred);
+  roster.add(cred);
+  ASSERT_EQ(roster.size(), 2);
+  ASSERT_EQ(roster.get(0), cred);
+  ASSERT_EQ(roster.get(1), cred);
+
+  roster.remove(1);
+  ASSERT_EQ(roster.size(), 2);
+  ASSERT_EQ(roster.get(0), cred);
+  ASSERT_THROW(roster.get(1), InvalidParameterError);
 }

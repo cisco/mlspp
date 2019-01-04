@@ -26,14 +26,18 @@ using namespace mls;
 //    * Ed25519     TODO https://tools.ietf.org/html/rfc8032#section-7.1
 //    * Ed448       TODO https://tools.ietf.org/html/rfc8032#section-7.4
 
-class CryptoTest : public ::testing::Test {
+class CryptoTest : public ::testing::Test
+{
 protected:
   // SHA-256 and SHA-512
-  const bytes sha2_in = from_hex("6162636462636465636465666465666765666768666768696768696a68696a6b6"
-                                "96a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071");
-  const bytes sha256_out = from_hex("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
-  const bytes sha512_out = from_hex("204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c3359"
-                                    "6fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445");
+  const bytes sha2_in =
+    from_hex("6162636462636465636465666465666765666768666768696768696a68696a6b6"
+             "96a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071");
+  const bytes sha256_out = from_hex(
+    "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+  const bytes sha512_out =
+    from_hex("204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c3359"
+             "6fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445");
 
   // AES-GCM
   // https://tools.ietf.org/html/draft-mcgrew-gcm-test-01#section-4
@@ -65,7 +69,6 @@ protected:
                                       "ef842d8eb335f4eecfdbf831824b4c49"
                                       "15956c96");
 };
-
 
 TEST_F(CryptoTest, SHA2)
 {

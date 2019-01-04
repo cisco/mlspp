@@ -1,7 +1,7 @@
 include(GoogleTest)
 
 set(GTEST_APP_NAME "${LIB_NAME}_gtest")
-set(GTEST_SRC_PATH "${PROJECT_SOURCE_DIR}/gtest")
+set(GTEST_SRC_PATH "${PROJECT_SOURCE_DIR}/test")
 set(GTEST_RUN_PATH "${PROJECT_SOURCE_DIR}/third_party/mls-implementations")
 
 include_directories(${LIBRARY_INCLUDE_PATH})

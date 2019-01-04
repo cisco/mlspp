@@ -53,7 +53,7 @@ public:
 class Roster
 {
 public:
-  void add(const RawKeyCredential& public_key);
+  void add(const RawKeyCredential& cred);
   void remove(uint32_t index);
   RawKeyCredential get(uint32_t index) const;
   size_t size() const;

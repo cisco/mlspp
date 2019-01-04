@@ -3,25 +3,26 @@
 
 using namespace mls;
 
-class SessionTest : public ::testing::Test {
+class SessionTest : public ::testing::Test
+{
 protected:
   const CipherList suites{ CipherSuite::P256_SHA256_AES128GCM,
                            CipherSuite::X25519_SHA256_AES128GCM };
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   const size_t group_size = 5;
-  const bytes group_id = {0, 1, 2, 3};
+  const bytes group_id = { 0, 1, 2, 3 };
 
   std::vector<Session> sessions;
 
-  SessionTest() {
-    sessions.push_back({ suites, new_identity_key() });
-  }
+  SessionTest() { sessions.push_back({ suites, new_identity_key() }); }
 
-  SignaturePrivateKey new_identity_key() {
+  SignaturePrivateKey new_identity_key()
+  {
     return SignaturePrivateKey::generate(scheme);
   }
 
-  void broadcast(const bytes& message) {
+  void broadcast(const bytes& message)
+  {
     auto initial_epoch = sessions[0].current_epoch();
     for (auto& session : sessions) {
       session.handle(message);
@@ -29,7 +30,8 @@ protected:
     check(initial_epoch);
   }
 
-  void broadcast_add() {
+  void broadcast_add()
+  {
     auto initial_epoch = sessions[0].current_epoch();
     Session next{ suites, new_identity_key() };
     auto last = sessions.size() - 1;
@@ -51,7 +53,8 @@ protected:
     check(initial_epoch);
   }
 
-  void check(epoch_t initial_epoch) const {
+  void check(epoch_t initial_epoch) const
+  {
     // Verify that everyone ended up in consistent states
     for (const auto& session : sessions) {
       ASSERT_EQ(session, sessions[0]);
@@ -92,7 +95,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
 
-class RunningSessionTest : public SessionTest {
+class RunningSessionTest : public SessionTest
+{
 protected:
   RunningSessionTest()
     : SessionTest()

@@ -55,4 +55,4 @@ target_link_libraries(mls ${OPENSSL_LIBRARIES})
 ###
 
 enable_testing()
-add_subdirectory(gtest)
+add_subdirectory(test)

@@ -3,23 +3,26 @@
 
 using namespace mls;
 
-class StateTest : public ::testing::Test {
+class StateTest : public ::testing::Test
+{
 protected:
   const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
   const SignatureScheme scheme = SignatureScheme::P256_SHA256;
 
   const size_t group_size = 5;
-  const bytes group_id = {0, 1, 2, 3};
+  const bytes group_id = { 0, 1, 2, 3 };
 };
 
-class GroupCreationTest : public StateTest {
+class GroupCreationTest : public StateTest
+{
 protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<UserInitKey> user_init_keys;
   std::vector<bytes> init_secrets;
   std::vector<State> states;
 
-  GroupCreationTest() {
+  GroupCreationTest()
+  {
     identity_privs.reserve(group_size);
     user_init_keys.reserve(group_size);
     init_secrets.reserve(group_size);
@@ -40,7 +43,8 @@ protected:
   }
 };
 
-TEST_F(GroupCreationTest, TwoPerson) {
+TEST_F(GroupCreationTest, TwoPerson)
+{
   // Initialize the creator's state
   auto stp = states.begin();
   states.emplace(stp, group_id, suite, identity_privs[0]);
@@ -82,16 +86,17 @@ TEST_F(GroupCreationTest, FullSize)
   }
 }
 
-class RunningGroupTest : public StateTest {
+class RunningGroupTest : public StateTest
+{
 protected:
   std::vector<State> states;
 
-  RunningGroupTest() {
+  RunningGroupTest()
+  {
     states.reserve(group_size);
 
     auto stp = states.begin();
-    states.emplace(
-      stp, group_id, suite, SignaturePrivateKey::generate(scheme));
+    states.emplace(stp, group_id, suite, SignaturePrivateKey::generate(scheme));
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
@@ -115,11 +120,10 @@ protected:
     }
   }
 
-  void SetUp() override {
-    check_consistency();
-  }
+  void SetUp() override { check_consistency(); }
 
-  void check_consistency() {
+  void check_consistency()
+  {
     for (const auto& state : states) {
       ASSERT_EQ(state, states[0]);
     }
@@ -160,8 +164,7 @@ TEST(OtherStateTest, CipherNegotiation)
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto insA = bytes{ 0, 1, 2, 3 };
   auto inkA1 = DHPrivateKey::derive(CipherSuite::P256_SHA256_AES128GCM, insA);
-  auto inkA2 =
-    DHPrivateKey::derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
+  auto inkA2 = DHPrivateKey::derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
 
   auto uikA = UserInitKey{};
   uikA.add_init_key(inkA1.public_key());

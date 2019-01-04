@@ -1,11 +1,12 @@
-#include "ratchet_tree.h"
 #include "messages.h"
+#include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include <gtest/gtest.h>
 
 using namespace mls;
 
-class RatchetTreeTest : public ::testing::Test {
+class RatchetTreeTest : public ::testing::Test
+{
 protected:
   const CipherSuite ciphersuite = CipherSuite::P256_SHA256_AES128GCM;
 
@@ -41,26 +42,26 @@ TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ ciphersuite, secretA };
 
-    tree.add_leaf(secretB);
-    tree.set_path(1, secretB);
+  tree.add_leaf(secretB);
+  tree.set_path(1, secretB);
 
-    ASSERT_EQ(tree.size(), 2);
-    ASSERT_EQ(tree.root_secret(), secretAB);
+  ASSERT_EQ(tree.size(), 2);
+  ASSERT_EQ(tree.root_secret(), secretAB);
 
-    tree.add_leaf(secretC);
-    tree.set_path(2, secretC);
+  tree.add_leaf(secretC);
+  tree.set_path(2, secretC);
 
-    ASSERT_EQ(tree.size(), 3);
-    ASSERT_EQ(tree.root_secret(), secretABC);
+  ASSERT_EQ(tree.size(), 3);
+  ASSERT_EQ(tree.root_secret(), secretABC);
 
-    tree.add_leaf(secretD);
-    tree.set_path(3, secretD);
+  tree.add_leaf(secretD);
+  tree.set_path(3, secretD);
 
-    ASSERT_EQ(tree.size(), 4);
-    ASSERT_EQ(tree.root_secret(), secretABCD);
+  ASSERT_EQ(tree.size(), 4);
+  ASSERT_EQ(tree.root_secret(), secretABCD);
 
-    RatchetTree direct{ ciphersuite, { secretA, secretB, secretC, secretD } };
-    ASSERT_EQ(tree, direct);
+  RatchetTree direct{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  ASSERT_EQ(tree, direct);
 }
 
 TEST_F(RatchetTreeTest, BySerialization)
