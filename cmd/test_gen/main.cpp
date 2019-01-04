@@ -56,7 +56,7 @@ generate_messages(TestVectors& vectors)
     auto priv = DHPrivateKey::generate(suite);
     uik_all.add_init_key(priv.public_key());
   }
-  auto identity_key = SignaturePrivateKey::generate(SignatureScheme::Ed448);
+  auto identity_key = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   uik_all.sign(identity_key);
 
   // Construct a test case for each suite
