@@ -51,8 +51,15 @@ add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES} ${LIB_HEADER_FILES})
 target_link_libraries(mls ${OPENSSL_LIBRARIES})
 
 ###
-### Test Config
+### Tests
 ###
 
 enable_testing()
 add_subdirectory(test)
+
+
+###
+### Applications
+###
+
+add_subdirectory(cmd)
