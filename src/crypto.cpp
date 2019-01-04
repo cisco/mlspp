@@ -376,6 +376,12 @@ public:
 
   virtual OpenSSLKey* dup() const
   {
+    // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
+    // RatchetTree ctor tries to copy an empty key.
+    if (!_key.get()) {
+      return new RawKey(_type, nullptr);
+    }
+
     size_t raw_len = 0;
     if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
       throw OpenSSLError::current();
@@ -701,8 +707,9 @@ static bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
   unsigned int size = 0;
-  bytes md(SHA256_DIGEST_LENGTH);
-  if (!HMAC(ossl_digest_type(digest_type(suite)),
+  auto type = ossl_digest_type(digest_type(suite));
+  bytes md(EVP_MAX_MD_SIZE);
+  if (!HMAC(type,
             key.data(),
             key.size(),
             data.data(),
@@ -712,6 +719,7 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
     throw OpenSSLError::current();
   }
 
+  md.resize(size);
   return md;
 }
 
