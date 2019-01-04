@@ -42,10 +42,10 @@ operator>>(tls::istream& in, CipherSuite& obj);
 
 enum struct SignatureScheme : uint16_t
 {
-  P256_SHA256 = 0x0000,
-  P521_SHA512 = 0x0010,
-  Ed25519 = 0x0001,
-  Ed448 = 0x0011
+  P256_SHA256 = 0x0403,
+  P521_SHA512 = 0x0603,
+  Ed25519 = 0x0807,
+  Ed448 = 0x0808
 };
 
 class SignatureAware
