@@ -71,8 +71,6 @@ UserInitKey::sign(const SignaturePrivateKey& identity_priv)
     throw InvalidParameterError("Mal-formed UserInitKey");
   }
 
-  identity_key = identity_priv.public_key();
-  algorithm = identity_priv.signature_scheme();
   auto tbs = to_be_signed();
   signature = identity_priv.sign(tbs);
 }
@@ -81,6 +79,7 @@ bool
 UserInitKey::verify() const
 {
   auto tbs = to_be_signed();
+  auto identity_key = credential.public_key();
   return identity_key.verify(tbs, signature);
 }
 
@@ -88,7 +87,7 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << algorithm << identity_key;
+  out << cipher_suites << init_keys << credential;
   return out.bytes();
 }
 
@@ -97,28 +96,21 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 {
   return (lhs.cipher_suites == rhs.cipher_suites) &&
          (lhs.init_keys == rhs.init_keys) &&
-         (lhs.identity_key == rhs.identity_key) &&
-         (lhs.signature == rhs.signature);
+         (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.algorithm
-             << obj.identity_key << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.credential
+             << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  in >> obj.cipher_suites >> obj.init_keys >> obj.algorithm;
-
-  auto key = SignaturePublicKey(obj.algorithm);
-  in >> key;
-  obj.identity_key = key;
-
-  in >> obj.signature;
-  return in;
+  return in >> obj.cipher_suites >> obj.init_keys >> obj.credential >>
+         obj.signature;
 }
 
 // Welcome

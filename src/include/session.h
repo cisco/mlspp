@@ -11,7 +11,8 @@ class Session
 {
 public:
   Session(const CipherList& supported_ciphersuites,
-          const SignaturePrivateKey& identity_priv);
+          const SignaturePrivateKey& identity_priv,
+          const Credential& credential);
 
   // Two sessions are considered equal if:
   // (1) they agree on the states they have in common
@@ -39,6 +40,7 @@ private:
   bytes _init_secret;
   tls::opaque<2> _user_init_key;
   SignaturePrivateKey _identity_priv;
+  Credential _credential;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;
 

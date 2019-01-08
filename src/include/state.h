@@ -18,10 +18,12 @@ public:
   // Initialize an empty group
   State(const bytes& group_id,
         CipherSuite suite,
-        const SignaturePrivateKey& identity_priv);
+        const SignaturePrivateKey& identity_priv,
+        const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
+        const Credential& credential,
         const bytes& init_secret,
         const Welcome& welcome,
         const Handshake& handshake);
@@ -33,6 +35,7 @@ public:
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
     const SignaturePrivateKey& identity_priv,
+    const Credential& credential,
     const UserInitKey& user_init_key);
 
   ///

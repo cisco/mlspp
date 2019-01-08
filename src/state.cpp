@@ -12,7 +12,8 @@ static const epoch_t zero_epoch{ 0 };
 
 State::State(const bytes& group_id,
              CipherSuite suite,
-             const SignaturePrivateKey& identity_priv)
+             const SignaturePrivateKey& identity_priv,
+             const Credential& credential)
   : _index(0)
   , _identity_priv(identity_priv)
   , _epoch(zero_epoch)
@@ -24,11 +25,11 @@ State::State(const bytes& group_id,
   , _transcript_hash(Digest(suite).output_size(), 0)
   , _zero(Digest(suite).output_size(), 0)
 {
-  RawKeyCredential cred{ identity_priv.public_key() };
-  _roster.add(cred);
+  _roster.add(credential);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
+             const Credential& credential,
              const bytes& init_secret,
              const Welcome& welcome,
              const Handshake& handshake)
@@ -48,8 +49,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   }
 
   auto add = handshake.operation.add;
-  auto identity_key = add.init_key.identity_key;
-  if (identity_key != identity_priv.public_key()) {
+  if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
 
@@ -72,8 +72,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   _tree.add_leaf(init_secret);
 
   // Add to the roster
-  RawKeyCredential cred{ identity_key };
-  _roster.add(cred);
+  _roster.add(credential);
 
   // Ratchet forward into shared state
   derive_epoch_keys(_zero);
@@ -87,6 +86,7 @@ State::InitialInfo
 State::negotiate(const bytes& group_id,
                  const std::vector<CipherSuite> supported_ciphersuites,
                  const SignaturePrivateKey& identity_priv,
+                 const Credential& credential,
                  const UserInitKey& user_init_key)
 {
   // Negotiate a ciphersuite with the other party
@@ -106,7 +106,7 @@ State::negotiate(const bytes& group_id,
     }
   }
 
-  auto state = State{ group_id, suite, identity_priv };
+  auto state = State{ group_id, suite, identity_priv, credential };
   auto welcome_add = state.add(user_init_key);
   state = state.handle(welcome_add.second);
 
@@ -218,9 +218,7 @@ State::handle(const Add& add)
   _tree.add_leaf(*init_key);
 
   // Add to the roster
-  auto identity_key = add.init_key.identity_key;
-  RawKeyCredential cred{ identity_key };
-  _roster.add(cred);
+  _roster.add(add.init_key.credential);
 
   // Update symmetric state
   derive_epoch_keys(_zero);

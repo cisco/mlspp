@@ -64,25 +64,24 @@ operator>>(tls::istream& in, DirectPath& obj);
 // struct {
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
-//     SignatureScheme algorithm;
-//     SignaturePublicKey identity_key;
+//     Credential credential;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
-  SignatureScheme algorithm;
-  SignaturePublicKey identity_key;
+  Credential credential;
   tls::opaque<2> signature;
 
+  /* TODO delete
   // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
   // value here until it gets overwritten by reading from data.  The
   // alternative is to have a default ctor for SignaturePublicKey,
   // which seems worse.
   UserInitKey()
-    : identity_key(DUMMY_SCHEME)
   {}
+  */
 
   void add_init_key(const DHPublicKey& pub);
   optional<DHPublicKey> find_init_key(CipherSuite suite) const;
