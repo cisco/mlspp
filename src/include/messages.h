@@ -322,6 +322,7 @@ operator>>(tls::istream& in, GroupOperation& obj);
 //     uint32 signer_index;
 //     SignatureScheme algorithm;
 //     opaque signature<1..2^16-1>;
+//     opaque confirmation<1..2^8-1>;
 // } Handshake;
 struct Handshake : public CipherAware
 {
@@ -330,6 +331,7 @@ struct Handshake : public CipherAware
 
   uint32_t signer_index;
   tls::opaque<2> signature;
+  tls::opaque<1> confirmation;
 
   epoch_t epoch() const { return prior_epoch + 1; }
 
@@ -341,12 +343,14 @@ struct Handshake : public CipherAware
   Handshake(epoch_t prior_epoch,
             const GroupOperation& operation,
             uint32_t signer_index,
-            bytes signature)
+            const bytes& signature,
+            const bytes& confirmation)
     : CipherAware(operation)
     , prior_epoch(prior_epoch)
     , operation(operation)
     , signer_index(signer_index)
     , signature(signature)
+    , confirmation(confirmation)
   {}
 };
 

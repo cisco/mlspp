@@ -69,6 +69,7 @@ private:
   // Shared secret state
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
+  tls::opaque<1> _confirmation_key;
 
   // Per-participant state
   uint32_t _index;
@@ -109,7 +110,7 @@ private:
   Handshake sign(const GroupOperation& operation) const;
 
   // Verify this state with the indicated public key
-  bool verify(uint32_t signer_index, const bytes& signature) const;
+  bool verify(const Handshake& handshake) const;
 };
 
 } // namespace mls

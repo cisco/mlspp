@@ -291,21 +291,22 @@ operator==(const Handshake& lhs, const Handshake& rhs)
   return (lhs.prior_epoch == rhs.prior_epoch) &&
          (lhs.operation == rhs.operation) &&
          (lhs.signer_index == rhs.signer_index) &&
-         (lhs.signature == rhs.signature);
+         (lhs.signature == rhs.signature) &&
+         (lhs.confirmation == rhs.confirmation);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Handshake& obj)
 {
   return out << obj.prior_epoch << obj.operation << obj.signer_index
-             << obj.signature;
+             << obj.signature << obj.confirmation;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Handshake& obj)
 {
   return in >> obj.prior_epoch >> obj.operation >> obj.signer_index >>
-         obj.signature;
+         obj.signature >> obj.confirmation;
 }
 
 } // namespace mls

@@ -703,7 +703,7 @@ Digest::output_size() const
 /// HKDF and DeriveSecret
 ///
 
-static bytes
+bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
   unsigned int size = 0;

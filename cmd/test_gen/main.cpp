@@ -98,9 +98,9 @@ generate_messages(TestVectors& vectors)
     auto add = Add{ test_case->user_init_key };
     auto update = Update{ direct_path };
     auto remove = Remove{ removed, direct_path };
-    test_case->add = { epoch, add, signer_index, random };
-    test_case->update = { epoch, update, signer_index, random };
-    test_case->remove = { epoch, remove, signer_index, random };
+    test_case->add = { epoch, add, signer_index, random, random };
+    test_case->update = { epoch, update, signer_index, random, random };
+    test_case->remove = { epoch, remove, signer_index, random, random };
   }
 }
 

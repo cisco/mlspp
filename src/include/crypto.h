@@ -3,7 +3,6 @@
 #include "common.h"
 #include "openssl/ec.h"
 #include "openssl/evp.h"
-#include "openssl/sha.h"
 #include "tls_syntax.h"
 #include <stdexcept>
 #include <vector>
@@ -141,6 +140,9 @@ zero_bytes(size_t size);
 
 bytes
 random_bytes(size_t size);
+
+bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
