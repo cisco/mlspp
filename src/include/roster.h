@@ -74,6 +74,7 @@ class Credential
 {
 public:
   Credential() = default;
+
   Credential(const Credential& other)
     : _type(other._type)
     , _cred(nullptr)
@@ -95,14 +96,14 @@ public:
     return *this;
   }
 
-  Credential(const BasicCredential& cred)
-    : _type(CredentialType::basic)
-    , _cred(new BasicCredential(cred))
-  {}
-
   bytes identity() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
+
+  static Credential basic(const bytes& identity,
+                          const SignaturePublicKey& public_key);
+  static Credential basic(const bytes& identity,
+                          const SignaturePrivateKey& private_key);
 
 private:
   CredentialType _type;

@@ -81,7 +81,7 @@ generate_messages(TestVectors& vectors)
     ratchet_tree.blank_path(2);
     auto direct_path = ratchet_tree.encrypt(0, random);
 
-    auto cred = RawKeyCredential{ sig_key };
+    auto cred = Credential::basic(random, sig_key);
     auto roster = Roster{};
     roster.add(cred);
 

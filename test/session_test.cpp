@@ -11,10 +11,16 @@ protected:
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
+  const bytes user_id = { 4, 5, 6, 7 };
 
   std::vector<Session> sessions;
 
-  SessionTest() { sessions.push_back({ suites, new_identity_key() }); }
+  SessionTest()
+  {
+    auto id_priv = new_identity_key();
+    auto cred = Credential::basic(user_id, id_priv);
+    sessions.push_back({ suites, id_priv, cred });
+  }
 
   SignaturePrivateKey new_identity_key()
   {
@@ -32,8 +38,11 @@ protected:
 
   void broadcast_add()
   {
+    auto id_priv = new_identity_key();
+    auto cred = Credential::basic(user_id, id_priv);
     auto initial_epoch = sessions[0].current_epoch();
-    Session next{ suites, new_identity_key() };
+
+    Session next{ suites, id_priv, cred };
     auto last = sessions.size() - 1;
     std::pair<bytes, bytes> welcome_add;
 
@@ -80,14 +89,20 @@ TEST_F(SessionTest, CreateFullSize)
 TEST_F(SessionTest, CiphersuiteNegotiation)
 {
   // Alice supports P-256 and X25519
+  auto idA = new_identity_key();
+  auto credA = Credential::basic(user_id, idA);
   Session alice{ { CipherSuite::P256_SHA256_AES128GCM,
                    CipherSuite::X25519_SHA256_AES128GCM },
-                 new_identity_key() };
+                 idA,
+                 credA };
 
   // Bob supports P-256 and P-521
+  auto idB = new_identity_key();
+  auto credB = Credential::basic(user_id, idB);
   Session bob{ { CipherSuite::P256_SHA256_AES128GCM,
                  CipherSuite::X25519_SHA256_AES128GCM },
-               new_identity_key() };
+               idB,
+               credB };
 
   auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.user_init_key());
   bob.join(welcome_add.first, welcome_add.second);

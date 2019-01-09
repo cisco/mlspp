@@ -89,6 +89,21 @@ Credential::valid_for(const SignaturePrivateKey& priv) const
   return priv.public_key() == public_key();
 }
 
+Credential
+Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
+{
+  auto cred = Credential{};
+  cred._type = CredentialType::basic;
+  cred._cred.reset(new BasicCredential(identity, public_key));
+  return cred;
+}
+
+Credential
+Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
+{
+  return basic(identity, private_key.public_key());
+}
+
 AbstractCredential*
 Credential::create(CredentialType type)
 {
