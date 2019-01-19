@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -330,10 +328,6 @@ State::sign(const GroupOperation& operation) const
   confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
 
-  std::cout << "sig: " << sig_data << std::endl
-            << "     " << next._confirmation_key << std::endl
-            << "     " << confirm_data << std::endl;
-
   return Handshake{ _epoch, operation, _index, sig, confirm };
 }
 
@@ -351,13 +345,6 @@ State::verify(const Handshake& handshake) const
 
   // TODO(rlb@ipv.sx): Verify MAC in constant time
   auto confirm_ver = (confirm == handshake.confirmation);
-
-  std::cout << "ver: " << sig_data << std::endl
-            << "     " << _confirmation_key << std::endl
-            << "     " << confirm_data << std::endl
-            << "     " << confirm << std::endl
-            << "     " << handshake.confirmation << std::endl
-            << "     " << sig_ver << " " << confirm_ver << std::endl;
 
   return sig_ver && confirm_ver;
 }
