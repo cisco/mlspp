@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -10,7 +12,8 @@ static const epoch_t zero_epoch{ 0 };
 
 State::State(const bytes& group_id,
              CipherSuite suite,
-             const SignaturePrivateKey& identity_priv)
+             const SignaturePrivateKey& identity_priv,
+             const Credential& credential)
   : _index(0)
   , _identity_priv(identity_priv)
   , _epoch(zero_epoch)
@@ -22,11 +25,11 @@ State::State(const bytes& group_id,
   , _transcript_hash(Digest(suite).output_size(), 0)
   , _zero(Digest(suite).output_size(), 0)
 {
-  RawKeyCredential cred{ identity_priv.public_key() };
-  _roster.add(cred);
+  _roster.add(credential);
 }
 
 State::State(const SignaturePrivateKey& identity_priv,
+             const Credential& credential,
              const bytes& init_secret,
              const Welcome& welcome,
              const Handshake& handshake)
@@ -46,8 +49,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   }
 
   auto add = handshake.operation.add;
-  auto identity_key = add.init_key.identity_key;
-  if (identity_key != identity_priv.public_key()) {
+  if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
 
@@ -70,21 +72,21 @@ State::State(const SignaturePrivateKey& identity_priv,
   _tree.add_leaf(init_secret);
 
   // Add to the roster
-  RawKeyCredential cred{ identity_key };
-  _roster.add(cred);
-
-  if (!verify(handshake.signer_index, handshake.signature)) {
-    throw InvalidParameterError("Handshake signature failed to verify");
-  }
+  _roster.add(credential);
 
   // Ratchet forward into shared state
   derive_epoch_keys(_zero);
+
+  if (!verify(handshake)) {
+    throw InvalidParameterError("Handshake signature failed to verify");
+  }
 }
 
 State::InitialInfo
 State::negotiate(const bytes& group_id,
                  const std::vector<CipherSuite> supported_ciphersuites,
                  const SignaturePrivateKey& identity_priv,
+                 const Credential& credential,
                  const UserInitKey& user_init_key)
 {
   // Negotiate a ciphersuite with the other party
@@ -104,7 +106,7 @@ State::negotiate(const bytes& group_id,
     }
   }
 
-  auto state = State{ group_id, suite, identity_priv };
+  auto state = State{ group_id, suite, identity_priv, credential };
   auto welcome_add = state.add(user_init_key);
   state = state.handle(welcome_add.second);
 
@@ -168,7 +170,7 @@ State::handle(const Handshake& handshake) const
 
   auto next = handle(handshake.signer_index, handshake.operation);
 
-  if (!next.verify(handshake.signer_index, handshake.signature)) {
+  if (!next.verify(handshake)) {
     throw InvalidParameterError("Invalid handshake message signature");
   }
 
@@ -216,9 +218,7 @@ State::handle(const Add& add)
   _tree.add_leaf(*init_key);
 
   // Add to the roster
-  auto identity_key = add.init_key.identity_key;
-  RawKeyCredential cred{ identity_key };
-  _roster.add(cred);
+  _roster.add(add.init_key.credential);
 
   // Update symmetric state
   derive_epoch_keys(_zero);
@@ -314,23 +314,52 @@ State::derive_epoch_keys(const bytes& update_secret)
     _suite, epoch_secret, "msg", *this, Digest(_suite).output_size());
   _init_secret = derive_secret(
     _suite, epoch_secret, "init", *this, Digest(_suite).output_size());
+  _confirmation_key = derive_secret(
+    _suite, epoch_secret, "confirm", *this, Digest(_suite).output_size());
 }
 
 Handshake
 State::sign(const GroupOperation& operation) const
 {
   auto next = handle(_index, operation);
-  auto tbs = tls::marshal(next);
-  auto sig = _identity_priv.sign(tbs);
-  return Handshake{ _epoch, operation, _index, sig };
+
+  auto sig_data = next._transcript_hash;
+  auto sig = _identity_priv.sign(sig_data);
+
+  auto confirm_data = sig_data;
+  confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
+  auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
+
+  std::cout << "sig: " << sig_data << std::endl
+            << "     " << next._confirmation_key << std::endl
+            << "     " << confirm_data << std::endl;
+
+  return Handshake{ _epoch, operation, _index, sig, confirm };
 }
 
 bool
-State::verify(uint32_t signer_index, const bytes& signature) const
+State::verify(const Handshake& handshake) const
 {
-  auto tbs = tls::marshal(*this);
-  auto pub = _roster.get(signer_index).public_key();
-  return pub.verify(tbs, signature);
+  auto pub = _roster.get(handshake.signer_index).public_key();
+  auto sig_data = _transcript_hash;
+  auto sig = handshake.signature;
+  auto sig_ver = pub.verify(sig_data, sig);
+
+  auto confirm_data = sig_data;
+  confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
+  auto confirm = hmac(_suite, _confirmation_key, confirm_data);
+
+  // TODO(rlb@ipv.sx): Verify MAC in constant time
+  auto confirm_ver = (confirm == handshake.confirmation);
+
+  std::cout << "ver: " << sig_data << std::endl
+            << "     " << _confirmation_key << std::endl
+            << "     " << confirm_data << std::endl
+            << "     " << confirm << std::endl
+            << "     " << handshake.confirmation << std::endl
+            << "     " << sig_ver << " " << confirm_ver << std::endl;
+
+  return sig_ver && confirm_ver;
 }
 
 // struct {

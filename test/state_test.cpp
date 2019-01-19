@@ -11,34 +11,34 @@ protected:
 
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
+  const bytes user_id = { 4, 5, 6, 7 };
 };
 
 class GroupCreationTest : public StateTest
 {
 protected:
   std::vector<SignaturePrivateKey> identity_privs;
-  std::vector<UserInitKey> user_init_keys;
+  std::vector<Credential> credentials;
   std::vector<bytes> init_secrets;
+  std::vector<UserInitKey> user_init_keys;
   std::vector<State> states;
 
   GroupCreationTest()
   {
-    identity_privs.reserve(group_size);
-    user_init_keys.reserve(group_size);
-    init_secrets.reserve(group_size);
-    states.reserve(group_size);
-
-    auto idp = identity_privs.begin();
-    auto uik = user_init_keys.begin();
-    auto inp = init_secrets.begin();
     for (size_t i = 0; i < group_size; i += 1) {
-      identity_privs.emplace(idp + i, SignaturePrivateKey::generate(scheme));
+      auto identity_priv = SignaturePrivateKey::generate(scheme);
+      auto credential = Credential::basic(user_id, identity_priv);
       auto init_secret = random_bytes(32);
       auto init_priv = DHPrivateKey::derive(suite, init_secret);
-      user_init_keys.emplace(uik + i);
-      user_init_keys[i].add_init_key(init_priv.public_key());
-      user_init_keys[i].sign(identity_privs[i]);
-      init_secrets.emplace(inp + i, init_secret);
+
+      auto user_init_key = UserInitKey{};
+      user_init_key.add_init_key(init_priv.public_key());
+      user_init_key.sign(identity_priv, credential);
+
+      identity_privs.push_back(identity_priv);
+      credentials.push_back(credential);
+      init_secrets.push_back(init_secret);
+      user_init_keys.push_back(user_init_key);
     }
   }
 };
@@ -46,26 +46,25 @@ protected:
 TEST_F(GroupCreationTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto stp = states.begin();
-  states.emplace(stp, group_id, suite, identity_privs[0]);
+  auto first = State{ group_id, suite, identity_privs[0], credentials[0] };
 
   // Create a Add for the new participant
-  auto welcome_add = states[0].add(user_init_keys[1]);
+  auto welcome_add = first.add(user_init_keys[1]);
   auto welcome = welcome_add.first;
   auto add = welcome_add.second;
 
   // Process the Add
-  states[0] = states[0].handle(add);
-  states.emplace(stp + 1, identity_privs[1], init_secrets[1], welcome, add);
+  first = first.handle(add);
+  auto second =
+    State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
-  ASSERT_EQ(states[0], states[1]);
+  ASSERT_EQ(first, second);
 }
 
 TEST_F(GroupCreationTest, FullSize)
 {
   // Initialize the creator's state
-  auto stp = states.begin();
-  states.emplace(stp, group_id, suite, identity_privs[0]);
+  states.emplace_back(group_id, suite, identity_privs[0], credentials[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -77,7 +76,8 @@ TEST_F(GroupCreationTest, FullSize)
       state = state.handle(add);
     }
 
-    states.emplace(stp + i, identity_privs[i], init_secrets[i], welcome, add);
+    states.emplace_back(
+      identity_privs[i], credentials[i], init_secrets[i], welcome, add);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -95,28 +95,30 @@ protected:
   {
     states.reserve(group_size);
 
-    auto stp = states.begin();
-    states.emplace(stp, group_id, suite, SignaturePrivateKey::generate(scheme));
+    auto identity_priv = SignaturePrivateKey::generate(scheme);
+    auto credential = Credential::basic(user_id, identity_priv);
+    states.emplace_back(group_id, suite, identity_priv, credential);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
       auto init_priv = DHPrivateKey::derive(suite, init_secret);
       auto identity_priv = SignaturePrivateKey::generate(scheme);
+      auto credential = Credential::basic(user_id, identity_priv);
 
       UserInitKey uik;
       uik.add_init_key(init_priv.public_key());
-      uik.sign(identity_priv);
+      uik.sign(identity_priv, credential);
 
       auto welcome_add = states[0].add(uik);
       for (auto& state : states) {
         state = state.handle(welcome_add.second);
       }
 
-      states.emplace(stp + i,
-                     identity_priv,
-                     init_secret,
-                     welcome_add.first,
-                     welcome_add.second);
+      states.emplace_back(identity_priv,
+                          credential,
+                          init_secret,
+                          welcome_add.first,
+                          welcome_add.second);
     }
   }
 
@@ -162,6 +164,7 @@ TEST(OtherStateTest, CipherNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
   auto insA = bytes{ 0, 1, 2, 3 };
   auto inkA1 = DHPrivateKey::derive(CipherSuite::P256_SHA256_AES128GCM, insA);
   auto inkA2 = DHPrivateKey::derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
@@ -169,23 +172,25 @@ TEST(OtherStateTest, CipherNegotiation)
   auto uikA = UserInitKey{};
   uikA.add_init_key(inkA1.public_key());
   uikA.add_init_key(inkA2.public_key());
-  uikA.sign(idkA);
+  uikA.sign(idkA, credA);
 
   // Bob spuports P-256 and P-521
   auto supported_ciphers =
     std::vector<CipherSuite>{ CipherSuite::P256_SHA256_AES128GCM,
                               CipherSuite::P521_SHA512_AES256GCM };
   auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
   auto group_id = from_hex("0001020304");
 
   // Bob should choose P-256
-  auto initialB = State::negotiate(group_id, supported_ciphers, idkB, uikA);
+  auto initialB =
+    State::negotiate(group_id, supported_ciphers, idkB, credB, uikA);
   auto stateB = initialB.first;
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
   auto welcome = initialB.second.first;
   auto add = initialB.second.second;
-  auto stateA = State(idkA, insA, welcome, add);
+  auto stateA = State(idkA, credA, insA, welcome, add);
   ASSERT_EQ(stateA, stateB);
 }

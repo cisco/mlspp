@@ -18,10 +18,12 @@ public:
   // Initialize an empty group
   State(const bytes& group_id,
         CipherSuite suite,
-        const SignaturePrivateKey& identity_priv);
+        const SignaturePrivateKey& identity_priv,
+        const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
   State(const SignaturePrivateKey& identity_priv,
+        const Credential& credential,
         const bytes& init_secret,
         const Welcome& welcome,
         const Handshake& handshake);
@@ -33,6 +35,7 @@ public:
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
     const SignaturePrivateKey& identity_priv,
+    const Credential& credential,
     const UserInitKey& user_init_key);
 
   ///
@@ -69,6 +72,7 @@ private:
   // Shared secret state
   tls::opaque<1> _message_master_secret;
   tls::opaque<1> _init_secret;
+  tls::opaque<1> _confirmation_key;
 
   // Per-participant state
   uint32_t _index;
@@ -109,7 +113,7 @@ private:
   Handshake sign(const GroupOperation& operation) const;
 
   // Verify this state with the indicated public key
-  bool verify(uint32_t signer_index, const bytes& signature) const;
+  bool verify(const Handshake& handshake) const;
 };
 
 } // namespace mls

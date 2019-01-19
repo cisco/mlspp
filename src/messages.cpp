@@ -65,14 +65,15 @@ UserInitKey::find_init_key(CipherSuite suite) const
 }
 
 void
-UserInitKey::sign(const SignaturePrivateKey& identity_priv)
+UserInitKey::sign(const SignaturePrivateKey& identity_priv,
+                  const Credential& credential_in)
 {
   if (cipher_suites.size() != init_keys.size()) {
     throw InvalidParameterError("Mal-formed UserInitKey");
   }
 
-  identity_key = identity_priv.public_key();
-  algorithm = identity_priv.signature_scheme();
+  credential = credential_in;
+
   auto tbs = to_be_signed();
   signature = identity_priv.sign(tbs);
 }
@@ -81,6 +82,7 @@ bool
 UserInitKey::verify() const
 {
   auto tbs = to_be_signed();
+  auto identity_key = credential.public_key();
   return identity_key.verify(tbs, signature);
 }
 
@@ -88,7 +90,7 @@ bytes
 UserInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << algorithm << identity_key;
+  out << cipher_suites << init_keys << credential;
   return out.bytes();
 }
 
@@ -97,28 +99,21 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 {
   return (lhs.cipher_suites == rhs.cipher_suites) &&
          (lhs.init_keys == rhs.init_keys) &&
-         (lhs.identity_key == rhs.identity_key) &&
-         (lhs.signature == rhs.signature);
+         (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.algorithm
-             << obj.identity_key << obj.signature;
+  return out << obj.cipher_suites << obj.init_keys << obj.credential
+             << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  in >> obj.cipher_suites >> obj.init_keys >> obj.algorithm;
-
-  auto key = SignaturePublicKey(obj.algorithm);
-  in >> key;
-  obj.identity_key = key;
-
-  in >> obj.signature;
-  return in;
+  return in >> obj.cipher_suites >> obj.init_keys >> obj.credential >>
+         obj.signature;
 }
 
 // Welcome
@@ -291,21 +286,22 @@ operator==(const Handshake& lhs, const Handshake& rhs)
   return (lhs.prior_epoch == rhs.prior_epoch) &&
          (lhs.operation == rhs.operation) &&
          (lhs.signer_index == rhs.signer_index) &&
-         (lhs.signature == rhs.signature);
+         (lhs.signature == rhs.signature) &&
+         (lhs.confirmation == rhs.confirmation);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Handshake& obj)
 {
   return out << obj.prior_epoch << obj.operation << obj.signer_index
-             << obj.signature;
+             << obj.signature << obj.confirmation;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Handshake& obj)
 {
   return in >> obj.prior_epoch >> obj.operation >> obj.signer_index >>
-         obj.signature;
+         obj.signature >> obj.confirmation;
 }
 
 } // namespace mls

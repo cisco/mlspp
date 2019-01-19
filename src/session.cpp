@@ -5,11 +5,13 @@
 namespace mls {
 
 Session::Session(const CipherList& supported_ciphersuites,
-                 const SignaturePrivateKey& identity_priv)
+                 const SignaturePrivateKey& identity_priv,
+                 const Credential& credential)
   : _supported_ciphersuites(supported_ciphersuites)
   , _init_secret(random_bytes(32))
   , _next_leaf_secret(random_bytes(32))
   , _identity_priv(identity_priv)
+  , _credential(credential)
 {
   make_init_key();
 }
@@ -50,8 +52,11 @@ Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
   UserInitKey user_init_key;
   tls::unmarshal(user_init_key_bytes, user_init_key);
 
-  auto init = State::negotiate(
-    group_id, _supported_ciphersuites, _identity_priv, user_init_key);
+  auto init = State::negotiate(group_id,
+                               _supported_ciphersuites,
+                               _identity_priv,
+                               _credential,
+                               user_init_key);
 
   auto root = init.first;
   add_state(0, root);
@@ -96,7 +101,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   Handshake add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
-  State next(_identity_priv, _init_secret, welcome, add);
+  State next(_identity_priv, _credential, _init_secret, welcome, add);
   add_state(add.prior_epoch, next);
 }
 
@@ -123,7 +128,7 @@ Session::make_init_key()
     user_init_key.add_init_key(init_priv.public_key());
   }
 
-  user_init_key.sign(_identity_priv);
+  user_init_key.sign(_identity_priv, _credential);
   _user_init_key = tls::marshal(user_init_key);
 }
 

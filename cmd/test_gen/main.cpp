@@ -56,8 +56,11 @@ generate_messages(TestVectors& vectors)
     auto priv = DHPrivateKey::generate(suite);
     uik_all.add_init_key(priv.public_key());
   }
-  auto identity_key = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
-  uik_all.sign(identity_key);
+
+  auto user_id = random_bytes(4);
+  auto identity_priv = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto credential_all = Credential::basic(user_id, identity_priv);
+  uik_all.sign(identity_priv, credential_all);
 
   // Construct a test case for each suite
   for (int i = 0; i < suites.size(); ++i) {
@@ -81,13 +84,13 @@ generate_messages(TestVectors& vectors)
     ratchet_tree.blank_path(2);
     auto direct_path = ratchet_tree.encrypt(0, random);
 
-    auto cred = RawKeyCredential{ sig_key };
+    auto cred = Credential::basic(user_id, sig_key);
     auto roster = Roster{};
     roster.add(cred);
 
     // Construct UIK
     test_case->user_init_key.add_init_key(dh_key);
-    test_case->user_init_key.sign(sig_priv);
+    test_case->user_init_key.sign(sig_priv, cred);
 
     // Construct Welcome
     test_case->welcome = {
@@ -98,9 +101,9 @@ generate_messages(TestVectors& vectors)
     auto add = Add{ test_case->user_init_key };
     auto update = Update{ direct_path };
     auto remove = Remove{ removed, direct_path };
-    test_case->add = { epoch, add, signer_index, random };
-    test_case->update = { epoch, update, signer_index, random };
-    test_case->remove = { epoch, remove, signer_index, random };
+    test_case->add = { epoch, add, signer_index, random, random };
+    test_case->update = { epoch, update, signer_index, random, random };
+    test_case->remove = { epoch, remove, signer_index, random, random };
   }
 }
 
