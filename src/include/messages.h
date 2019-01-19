@@ -76,15 +76,6 @@ struct UserInitKey
   Credential credential;
   tls::opaque<2> signature;
 
-  /* TODO delete
-  // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
-  // value here until it gets overwritten by reading from data.  The
-  // alternative is to have a default ctor for SignaturePublicKey,
-  // which seems worse.
-  UserInitKey()
-  {}
-  */
-
   void add_init_key(const DHPublicKey& pub);
   optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   void sign(const SignaturePrivateKey& identity_priv,
@@ -117,8 +108,6 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> transcript_hash;
   tls::opaque<1> init_secret;
 
-  // This ctor should only be used for serialization.  The tree is
-  // initialized to a dummy state.
   WelcomeInfo(CipherSuite suite)
     : CipherAware(suite)
     , tree(suite)
@@ -211,7 +200,7 @@ tls::istream&
 operator>>(tls::istream& in, Add& obj);
 
 // struct {
-//     DHPublicKey path<1..2^16-1>;
+//     DirectPath path;
 // } Update;
 struct Update : public CipherAware
 {
@@ -240,7 +229,7 @@ operator>>(tls::istream& in, Update& obj);
 
 // struct {
 //     uint32 removed;
-//     DHPublicKey path<1..2^16-1>;
+//     DirectPath path;
 // } Remove;
 struct Remove : public CipherAware
 {
