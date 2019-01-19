@@ -108,11 +108,10 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   opaque transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
-struct WelcomeInfo
+struct WelcomeInfo : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
-  CipherSuite cipher_suite;
   Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
@@ -120,20 +119,20 @@ struct WelcomeInfo
 
   // This ctor should only be used for serialization.  The tree is
   // initialized to a dummy state.
-  WelcomeInfo()
-    : tree(DUMMY_CIPHERSUITE)
+  WelcomeInfo(CipherSuite suite)
+    : CipherAware(suite)
+    , tree(suite)
   {}
 
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
-              CipherSuite cipher_suite,
               Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
               tls::opaque<1> init_secret)
-    : group_id(group_id)
+    : CipherAware(tree)
+    , group_id(group_id)
     , epoch(epoch)
-    , cipher_suite(cipher_suite)
     , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)

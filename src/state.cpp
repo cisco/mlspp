@@ -133,7 +133,7 @@ State::add(const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _group_id, _epoch,           _suite,      _roster,
+  WelcomeInfo welcome_info{ _group_id, _epoch,           _roster,
                             _tree,     _transcript_hash, _init_secret };
 
   Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };

@@ -130,18 +130,18 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.cipher_suite << obj.roster
-             << obj.tree << obj.transcript_hash << obj.init_secret;
+  return out << obj.group_id << obj.epoch << obj.roster << obj.tree
+             << obj.transcript_hash << obj.init_secret;
 }
 
 tls::istream&
 operator>>(tls::istream& in, WelcomeInfo& obj)
 {
-  in >> obj.group_id >> obj.epoch >> obj.cipher_suite;
+  in >> obj.group_id >> obj.epoch;
 
   // Set the tree struct to use the correct ciphersuite for this
   // group
-  obj.tree = RatchetTree(obj.cipher_suite);
+  obj.tree = RatchetTree(obj.cipher_suite());
 
   in >> obj.roster;
   in >> obj.tree;
@@ -164,7 +164,7 @@ WelcomeInfo
 Welcome::decrypt(const DHPrivateKey& priv) const
 {
   auto welcome_info_bytes = priv.decrypt(encrypted_welcome_info);
-  auto welcome_info = WelcomeInfo{};
+  auto welcome_info = WelcomeInfo{ priv.cipher_suite() };
   tls::unmarshal(welcome_info_bytes, welcome_info);
   return welcome_info;
 }

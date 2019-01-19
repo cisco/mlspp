@@ -19,7 +19,7 @@ tls_round_trip_all(const MessagesTestVectors::CipherSuiteCase& test_case)
   UserInitKey user_init_key;
   tls_round_trip(test_case.user_init_key, user_init_key);
 
-  WelcomeInfo welcome_info;
+  WelcomeInfo welcome_info{ test_case.cipher_suite };
   tls_round_trip(test_case.welcome_info, welcome_info);
 
   Welcome welcome;

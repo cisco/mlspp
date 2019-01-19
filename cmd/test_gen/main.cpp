@@ -97,7 +97,7 @@ generate_messages(TestVectors& vectors)
 
     // Construct WelcomeInfo and Welcome
     test_case->welcome_info = {
-      group_id, epoch, suite, roster, ratchet_tree, random, random,
+      group_id, epoch, roster, ratchet_tree, random, random,
     };
     test_case->welcome = { uik_id, dh_key, test_case->welcome_info };
 

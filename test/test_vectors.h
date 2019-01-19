@@ -42,6 +42,7 @@ struct MessagesTestVectors
     CipherSuiteCase(CipherSuite suite)
       : cipher_suite(suite)
       , user_init_key()
+      , welcome_info(suite)
       , welcome()
       , add(suite)
       , update(suite)
