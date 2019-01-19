@@ -58,9 +58,9 @@ generate_messages(TestVectors& vectors)
   }
 
   auto user_id = random_bytes(4);
-  auto identity_key = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
-  uik_all.credential = Credential::basic(user_id, identity_key);
-  uik_all.sign(identity_key);
+  auto identity_priv = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto credential_all = Credential::basic(user_id, identity_priv);
+  uik_all.sign(identity_priv, credential_all);
 
   // Construct a test case for each suite
   for (int i = 0; i < suites.size(); ++i) {
@@ -90,8 +90,7 @@ generate_messages(TestVectors& vectors)
 
     // Construct UIK
     test_case->user_init_key.add_init_key(dh_key);
-    test_case->user_init_key.credential = cred;
-    test_case->user_init_key.sign(sig_priv);
+    test_case->user_init_key.sign(sig_priv, cred);
 
     // Construct Welcome
     test_case->welcome = {

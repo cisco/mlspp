@@ -33,8 +33,7 @@ protected:
 
       auto user_init_key = UserInitKey{};
       user_init_key.add_init_key(init_priv.public_key());
-      user_init_key.credential = credential;
-      user_init_key.sign(identity_priv);
+      user_init_key.sign(identity_priv, credential);
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
@@ -108,8 +107,7 @@ protected:
 
       UserInitKey uik;
       uik.add_init_key(init_priv.public_key());
-      uik.credential = credential;
-      uik.sign(identity_priv);
+      uik.sign(identity_priv, credential);
 
       auto welcome_add = states[0].add(uik);
       for (auto& state : states) {
@@ -174,10 +172,7 @@ TEST(OtherStateTest, CipherNegotiation)
   auto uikA = UserInitKey{};
   uikA.add_init_key(inkA1.public_key());
   uikA.add_init_key(inkA2.public_key());
-  // TODO: Chance method signature to sign(priv, cred) so you can't
-  // forget to do set the credential
-  uikA.credential = credA;
-  uikA.sign(idkA);
+  uikA.sign(idkA, credA);
 
   // Bob spuports P-256 and P-521
   auto supported_ciphers =

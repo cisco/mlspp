@@ -85,7 +85,8 @@ struct UserInitKey
 
   void add_init_key(const DHPublicKey& pub);
   optional<DHPublicKey> find_init_key(CipherSuite suite) const;
-  void sign(const SignaturePrivateKey& identity_priv);
+  void sign(const SignaturePrivateKey& identity_priv,
+            const Credential& credential);
   bool verify() const;
   bytes to_be_signed() const;
 };

@@ -65,11 +65,14 @@ UserInitKey::find_init_key(CipherSuite suite) const
 }
 
 void
-UserInitKey::sign(const SignaturePrivateKey& identity_priv)
+UserInitKey::sign(const SignaturePrivateKey& identity_priv,
+                  const Credential& credential_in)
 {
   if (cipher_suites.size() != init_keys.size()) {
     throw InvalidParameterError("Mal-formed UserInitKey");
   }
+
+  credential = credential_in;
 
   auto tbs = to_be_signed();
   signature = identity_priv.sign(tbs);

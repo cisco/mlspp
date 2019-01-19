@@ -128,9 +128,7 @@ Session::make_init_key()
     user_init_key.add_init_key(init_priv.public_key());
   }
 
-  user_init_key.credential = _credential;
-
-  user_init_key.sign(_identity_priv);
+  user_init_key.sign(_identity_priv, _credential);
   _user_init_key = tls::marshal(user_init_key);
 }
 
