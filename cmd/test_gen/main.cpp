@@ -56,7 +56,10 @@ generate_messages(TestVectors& vectors)
     auto priv = DHPrivateKey::generate(suite);
     uik_all.add_init_key(priv.public_key());
   }
+
+  auto user_id = random_bytes(4);
   auto identity_key = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  uik_all.credential = Credential::basic(user_id, identity_key);
   uik_all.sign(identity_key);
 
   // Construct a test case for each suite
@@ -81,12 +84,13 @@ generate_messages(TestVectors& vectors)
     ratchet_tree.blank_path(2);
     auto direct_path = ratchet_tree.encrypt(0, random);
 
-    auto cred = Credential::basic(random, sig_key);
+    auto cred = Credential::basic(user_id, sig_key);
     auto roster = Roster{};
     roster.add(cred);
 
     // Construct UIK
     test_case->user_init_key.add_init_key(dh_key);
+    test_case->user_init_key.credential = cred;
     test_case->user_init_key.sign(sig_priv);
 
     // Construct Welcome

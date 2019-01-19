@@ -47,27 +47,25 @@ protected:
 TEST_F(GroupCreationTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto stp = states.begin();
-  states.emplace(stp, group_id, suite, identity_privs[0], credentials[0]);
+  auto first = State{ group_id, suite, identity_privs[0], credentials[0] };
 
   // Create a Add for the new participant
-  auto welcome_add = states[0].add(user_init_keys[1]);
+  auto welcome_add = first.add(user_init_keys[1]);
   auto welcome = welcome_add.first;
   auto add = welcome_add.second;
 
   // Process the Add
-  states[0] = states[0].handle(add);
-  states.emplace(
-    stp + 1, identity_privs[1], credentials[1], init_secrets[1], welcome, add);
+  first = first.handle(add);
+  auto second =
+    State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
-  ASSERT_EQ(states[0], states[1]);
+  ASSERT_EQ(first, second);
 }
 
 TEST_F(GroupCreationTest, FullSize)
 {
   // Initialize the creator's state
-  auto stp = states.begin();
-  states.emplace(stp, group_id, suite, identity_privs[0], credentials[0]);
+  states.emplace_back(group_id, suite, identity_privs[0], credentials[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -79,12 +77,8 @@ TEST_F(GroupCreationTest, FullSize)
       state = state.handle(add);
     }
 
-    states.emplace(stp + i,
-                   identity_privs[i],
-                   credentials[i],
-                   init_secrets[i],
-                   welcome,
-                   add);
+    states.emplace_back(
+      identity_privs[i], credentials[i], init_secrets[i], welcome, add);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -102,10 +96,9 @@ protected:
   {
     states.reserve(group_size);
 
-    auto stp = states.begin();
     auto identity_priv = SignaturePrivateKey::generate(scheme);
     auto credential = Credential::basic(user_id, identity_priv);
-    states.emplace(stp, group_id, suite, identity_priv, credential);
+    states.emplace_back(group_id, suite, identity_priv, credential);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
@@ -115,6 +108,7 @@ protected:
 
       UserInitKey uik;
       uik.add_init_key(init_priv.public_key());
+      uik.credential = credential;
       uik.sign(identity_priv);
 
       auto welcome_add = states[0].add(uik);
@@ -122,12 +116,11 @@ protected:
         state = state.handle(welcome_add.second);
       }
 
-      states.emplace(stp + i,
-                     identity_priv,
-                     credential,
-                     init_secret,
-                     welcome_add.first,
-                     welcome_add.second);
+      states.emplace_back(identity_priv,
+                          credential,
+                          init_secret,
+                          welcome_add.first,
+                          welcome_add.second);
     }
   }
 
