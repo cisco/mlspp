@@ -25,7 +25,7 @@ public:
   State(const SignaturePrivateKey& identity_priv,
         const Credential& credential,
         const bytes& init_secret,
-        const Welcome& welcome,
+        const Welcome& welcome_info,
         const Handshake& handshake);
 
   // Negotiate an initial state with another peer based on their

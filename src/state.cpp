@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -34,16 +32,23 @@ State::State(const SignaturePrivateKey& identity_priv,
              const Welcome& welcome,
              const Handshake& handshake)
   : _identity_priv(identity_priv)
-  , _group_id(welcome.group_id)
   , _suite(welcome.cipher_suite)
-  , _epoch(welcome.epoch + 1)
-  , _roster(welcome.roster)
-  , _tree(welcome.tree)
-  , _transcript_hash(welcome.transcript_hash)
-  , _index(welcome.tree.size())
-  , _init_secret(welcome.init_secret)
-  , _zero(Digest(welcome.cipher_suite).output_size(), 0)
+  , _tree(welcome.cipher_suite)
 {
+  // Decrypt and ingest the Welcome
+  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
+  auto welcome_info = welcome.decrypt(init_priv);
+
+  _group_id = welcome_info.group_id;
+  _epoch = welcome_info.epoch + 1;
+  _tree = welcome_info.tree;
+  _roster = welcome_info.roster;
+  _transcript_hash = welcome_info.transcript_hash;
+  _index = _tree.size();
+  _init_secret = welcome_info.init_secret;
+  _zero = bytes(Digest(_suite).output_size(), 0);
+
+  // Process the add
   if (handshake.operation.type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
@@ -55,7 +60,6 @@ State::State(const SignaturePrivateKey& identity_priv,
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
   auto init_uik = add.init_key.find_init_key(_suite);
   if (!init_uik) {
     throw ProtocolError("Selected cipher suite not supported");
@@ -124,19 +128,16 @@ State::add(const UserInitKey& user_init_key) const
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  // XXX(rlb@ipv.sx): This is all the algorithm negotiation we need
-  // for the moment.  When we encrypt the Welcome, we will need to
-  // choose the proper DH key to use for the encryption.
-  bool cipher_supported = false;
-  for (auto suite : user_init_key.cipher_suites) {
-    cipher_supported = cipher_supported || (suite == _suite);
-  }
-  if (!cipher_supported) {
-    throw ProtocolError("New member does not support the groups ciphersuite");
+  auto pub = user_init_key.find_init_key(_suite);
+  if (!pub) {
+    throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  Welcome welcome{ _group_id, _epoch,           _suite,      _roster,
-                   _tree,     _transcript_hash, _init_secret };
+  WelcomeInfo welcome_info{ _group_id, _epoch,           _roster,
+                            _tree,     _transcript_hash, _init_secret };
+
+  Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
+
   auto add = sign(Add{ user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
@@ -311,11 +312,11 @@ State::derive_epoch_keys(const bytes& update_secret)
 {
   auto epoch_secret = hkdf_extract(_suite, _init_secret, update_secret);
   _message_master_secret = derive_secret(
-    _suite, epoch_secret, "msg", *this, Digest(_suite).output_size());
-  _init_secret = derive_secret(
-    _suite, epoch_secret, "init", *this, Digest(_suite).output_size());
+    _suite, epoch_secret, "app", *this, Digest(_suite).output_size());
   _confirmation_key = derive_secret(
     _suite, epoch_secret, "confirm", *this, Digest(_suite).output_size());
+  _init_secret = derive_secret(
+    _suite, epoch_secret, "init", *this, Digest(_suite).output_size());
 }
 
 Handshake
@@ -329,10 +330,6 @@ State::sign(const GroupOperation& operation) const
   auto confirm_data = sig_data;
   confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
-
-  std::cout << "sig: " << sig_data << std::endl
-            << "     " << next._confirmation_key << std::endl
-            << "     " << confirm_data << std::endl;
 
   return Handshake{ _epoch, operation, _index, sig, confirm };
 }
@@ -351,13 +348,6 @@ State::verify(const Handshake& handshake) const
 
   // TODO(rlb@ipv.sx): Verify MAC in constant time
   auto confirm_ver = (confirm == handshake.confirmation);
-
-  std::cout << "ver: " << sig_data << std::endl
-            << "     " << _confirmation_key << std::endl
-            << "     " << confirm_data << std::endl
-            << "     " << confirm << std::endl
-            << "     " << handshake.confirmation << std::endl
-            << "     " << sig_ver << " " << confirm_ver << std::endl;
 
   return sig_ver && confirm_ver;
 }

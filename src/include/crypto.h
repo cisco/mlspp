@@ -299,10 +299,21 @@ private:
 };
 
 // A struct for ECIES-encrypted information
-struct ECIESCiphertext
+struct ECIESCiphertext : public CipherAware
 {
   DHPublicKey ephemeral;
   tls::opaque<3> content;
+
+  ECIESCiphertext(CipherSuite suite)
+    : CipherAware(suite)
+    , ephemeral(suite)
+  {}
+
+  ECIESCiphertext(const DHPublicKey& ephemeral, const bytes& content)
+    : CipherAware(ephemeral.cipher_suite())
+    , ephemeral(ephemeral)
+    , content(content)
+  {}
 
   friend bool operator==(const ECIESCiphertext& lhs,
                          const ECIESCiphertext& rhs);

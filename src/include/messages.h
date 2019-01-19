@@ -62,6 +62,7 @@ tls::istream&
 operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
+//     opaque user_init_key_id<0..255>;
 //     CipherSuite cipher_suites<0..255>; // ignored
 //     DHPublicKey init_keys<1..2^16-1>;  // only use first
 //     Credential credential;
@@ -69,19 +70,11 @@ operator>>(tls::istream& in, DirectPath& obj);
 // } UserInitKey;
 struct UserInitKey
 {
+  tls::opaque<1> user_init_key_id;
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
   Credential credential;
   tls::opaque<2> signature;
-
-  /* TODO delete
-  // XXX(rlb@ipv.sx): This is kind of inelegant, but we need a dummy
-  // value here until it gets overwritten by reading from data.  The
-  // alternative is to have a default ctor for SignaturePublicKey,
-  // which seems worse.
-  UserInitKey()
-  {}
-  */
 
   void add_init_key(const DHPublicKey& pub);
   optional<DHPublicKey> find_init_key(CipherSuite suite) const;
@@ -101,44 +94,65 @@ operator>>(tls::istream& in, UserInitKey& obj);
 // struct {
 //   opaque group_id<0..255>;
 //   uint32 epoch;
-//   CipherSuite cipher_suite;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<PublicKey> tree<1..2^32-1>;
-//   opaque transcript_hash<0..255>;;
+//   opaque transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
-// } Welcome;
-struct GroupOperation;
-struct Welcome
+// } WelcomeInfo;
+struct WelcomeInfo : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
-  CipherSuite cipher_suite;
   Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
   tls::opaque<1> init_secret;
 
-  // This ctor should only be used for serialization.  The tree is
-  // initialized to a dummy state.
-  Welcome()
-    : tree(DUMMY_CIPHERSUITE)
+  WelcomeInfo(CipherSuite suite)
+    : CipherAware(suite)
+    , tree(suite)
   {}
 
-  Welcome(tls::opaque<2> group_id,
-          epoch_t epoch,
-          CipherSuite cipher_suite,
-          Roster roster,
-          RatchetTree tree,
-          tls::opaque<1> transcript_hash,
-          tls::opaque<1> init_secret)
-    : group_id(group_id)
+  WelcomeInfo(tls::opaque<2> group_id,
+              epoch_t epoch,
+              Roster roster,
+              RatchetTree tree,
+              tls::opaque<1> transcript_hash,
+              tls::opaque<1> init_secret)
+    : CipherAware(tree)
+    , group_id(group_id)
     , epoch(epoch)
-    , cipher_suite(cipher_suite)
     , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
+};
+
+bool
+operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs);
+tls::ostream&
+operator<<(tls::ostream& out, const WelcomeInfo& obj);
+tls::istream&
+operator>>(tls::istream& in, WelcomeInfo& obj);
+
+// struct {
+//   opaque user_init_key_id<0..255>;
+//   CipherSuite cipher_suite;
+//   ECIESCiphertext encrypted_welcome_info;
+// } Welcome;
+struct Welcome
+{
+  tls::opaque<1> user_init_key_id;
+  CipherSuite cipher_suite;
+  ECIESCiphertext encrypted_welcome_info;
+
+  Welcome()
+    : encrypted_welcome_info(DUMMY_CIPHERSUITE)
+  {}
+
+  Welcome(const bytes& id, const DHPublicKey& pub, const WelcomeInfo& info);
+  WelcomeInfo decrypt(const DHPrivateKey& priv) const;
 };
 
 bool
@@ -186,7 +200,7 @@ tls::istream&
 operator>>(tls::istream& in, Add& obj);
 
 // struct {
-//     DHPublicKey path<1..2^16-1>;
+//     DirectPath path;
 // } Update;
 struct Update : public CipherAware
 {
@@ -215,7 +229,7 @@ operator>>(tls::istream& in, Update& obj);
 
 // struct {
 //     uint32 removed;
-//     DHPublicKey path<1..2^16-1>;
+//     DirectPath path;
 // } Remove;
 struct Remove : public CipherAware
 {

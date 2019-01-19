@@ -116,10 +116,10 @@ operator>>(tls::istream& in, UserInitKey& obj)
          obj.signature;
 }
 
-// Welcome
+// WelcomeInfo
 
 bool
-operator==(const Welcome& lhs, const Welcome& rhs)
+operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.group_id == rhs.group_id) && (lhs.epoch == rhs.epoch) &&
          (lhs.roster == rhs.roster) && (lhs.tree == rhs.tree) &&
@@ -128,25 +128,69 @@ operator==(const Welcome& lhs, const Welcome& rhs)
 }
 
 tls::ostream&
-operator<<(tls::ostream& out, const Welcome& obj)
+operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.cipher_suite << obj.roster
-             << obj.tree << obj.transcript_hash << obj.init_secret;
+  return out << obj.group_id << obj.epoch << obj.roster << obj.tree
+             << obj.transcript_hash << obj.init_secret;
 }
 
 tls::istream&
-operator>>(tls::istream& in, Welcome& obj)
+operator>>(tls::istream& in, WelcomeInfo& obj)
 {
-  in >> obj.group_id >> obj.epoch >> obj.cipher_suite;
+  in >> obj.group_id >> obj.epoch;
 
   // Set the tree struct to use the correct ciphersuite for this
   // group
-  obj.tree = RatchetTree(obj.cipher_suite);
+  obj.tree = RatchetTree(obj.cipher_suite());
 
   in >> obj.roster;
   in >> obj.tree;
   in >> obj.transcript_hash;
   in >> obj.init_secret;
+  return in;
+}
+
+// Welcome
+
+Welcome::Welcome(const bytes& id,
+                 const DHPublicKey& pub,
+                 const WelcomeInfo& info)
+  : user_init_key_id(id)
+  , cipher_suite(pub.cipher_suite())
+  , encrypted_welcome_info(pub.encrypt(tls::marshal(info)))
+{}
+
+WelcomeInfo
+Welcome::decrypt(const DHPrivateKey& priv) const
+{
+  auto welcome_info_bytes = priv.decrypt(encrypted_welcome_info);
+  auto welcome_info = WelcomeInfo{ priv.cipher_suite() };
+  tls::unmarshal(welcome_info_bytes, welcome_info);
+  return welcome_info;
+}
+
+bool
+operator==(const Welcome& lhs, const Welcome& rhs)
+{
+  return (lhs.user_init_key_id == rhs.user_init_key_id) &&
+         (lhs.cipher_suite == rhs.cipher_suite) &&
+         (lhs.encrypted_welcome_info == rhs.encrypted_welcome_info);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const Welcome& obj)
+{
+  return out << obj.user_init_key_id << obj.cipher_suite
+             << obj.encrypted_welcome_info;
+}
+
+tls::istream&
+operator>>(tls::istream& in, Welcome& obj)
+{
+  in >> obj.user_init_key_id >> obj.cipher_suite;
+
+  obj.encrypted_welcome_info = ECIESCiphertext{ obj.cipher_suite };
+  in >> obj.encrypted_welcome_info;
   return in;
 }
 

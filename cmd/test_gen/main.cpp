@@ -74,6 +74,8 @@ generate_messages(TestVectors& vectors)
     auto sig_key = sig_priv.public_key();
 
     auto group_id = random_bytes(4);
+    auto uik_id = random_bytes(4);
+
     auto epoch = epoch_t(0x42);
     auto signer_index = uint32_t(0);
     auto removed = uint32_t(1);
@@ -89,13 +91,15 @@ generate_messages(TestVectors& vectors)
     roster.add(cred);
 
     // Construct UIK
+    test_case->user_init_key.user_init_key_id = uik_id;
     test_case->user_init_key.add_init_key(dh_key);
     test_case->user_init_key.sign(sig_priv, cred);
 
-    // Construct Welcome
-    test_case->welcome = {
-      group_id, epoch, suite, roster, ratchet_tree, random, random,
+    // Construct WelcomeInfo and Welcome
+    test_case->welcome_info = {
+      group_id, epoch, roster, ratchet_tree, random, random,
     };
+    test_case->welcome = { uik_id, dh_key, test_case->welcome_info };
 
     // Construct Handshake messages
     auto add = Add{ test_case->user_init_key };

@@ -33,6 +33,7 @@ struct MessagesTestVectors
   {
     CipherSuite cipher_suite;
     UserInitKey user_init_key;
+    WelcomeInfo welcome_info;
     Welcome welcome;
     Handshake add;
     Handshake update;
@@ -41,6 +42,7 @@ struct MessagesTestVectors
     CipherSuiteCase(CipherSuite suite)
       : cipher_suite(suite)
       , user_init_key()
+      , welcome_info(suite)
       , welcome()
       , add(suite)
       , update(suite)
