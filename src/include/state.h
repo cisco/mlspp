@@ -8,6 +8,33 @@
 
 namespace mls {
 
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   optional<Credential> roster<1..2^32-1>;
+//   optional<PublicKey> tree<1..2^32-1>;
+//   opaque transcript_hash<0..255>;
+// } GroupState;
+struct GroupState
+{
+  tls::opaque<1> group_id;
+  uint32_t epoch;
+  Roster roster;
+  RatchetTree tree;
+  tls::opaque<1> transcript_hash;
+
+  GroupState(const bytes& group_id,
+             CipherSuite suite,
+             const Credential& credential);
+
+  GroupState(const WelcomeInfo& info);
+
+  GroupState(CipherSuite suite);
+
+  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
+  friend bool operator==(const GroupState& lhs, const GroupState& rhs);
+};
+
 class State
 {
 public:
@@ -56,18 +83,14 @@ public:
   ///
   State handle(const Handshake& handshake) const;
 
-  epoch_t epoch() const { return _epoch; }
+  epoch_t epoch() const { return _state.epoch; }
   uint32_t index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
 
 private:
   // Shared confirmed state:
-  tls::opaque<2> _group_id;
   CipherSuite _suite;
-  epoch_t _epoch;
-  Roster _roster;
-  RatchetTree _tree;
-  tls::opaque<1> _transcript_hash;
+  GroupState _state;
 
   // Shared secret state
   tls::opaque<1> _message_master_secret;
