@@ -32,6 +32,13 @@ operator<<(tls::ostream& out, const GroupState& obj)
              << obj.transcript_hash;
 }
 
+tls::istream&
+operator>>(tls::istream& out, GroupState& obj)
+{
+  return out >> obj.group_id >> obj.epoch >> obj.roster >> obj.tree >>
+         obj.transcript_hash;
+}
+
 bool
 operator==(const GroupState& lhs, const GroupState& rhs)
 {

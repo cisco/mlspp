@@ -43,7 +43,7 @@ generate_messages(TestVectors& vectors)
     SignatureScheme::Ed448,
   };
 
-  std::vector<MessagesTestVectors::CipherSuiteCase*> cases{
+  std::vector<MessagesTestVectors::TestCase*> cases{
     &vectors.messages.case_p256_p256,
     &vectors.messages.case_x25519_ed25519,
     &vectors.messages.case_p521_p521,

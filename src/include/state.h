@@ -31,7 +31,8 @@ struct GroupState
 
   GroupState(CipherSuite suite);
 
-  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
+  friend tls::ostream& operator<<(tls::ostream& out, const GroupState& obj);
+  friend tls::istream& operator>>(tls::istream& out, GroupState& obj);
   friend bool operator==(const GroupState& lhs, const GroupState& rhs);
 };
 

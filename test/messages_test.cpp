@@ -14,7 +14,7 @@ tls_round_trip(const T& before, T& after)
 }
 
 void
-tls_round_trip_all(const MessagesTestVectors::CipherSuiteCase& test_case)
+tls_round_trip_all(const MessagesTestVectors::TestCase& test_case)
 {
   UserInitKey user_init_key;
   tls_round_trip(test_case.user_init_key, user_init_key);

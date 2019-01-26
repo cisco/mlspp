@@ -23,20 +23,64 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 }
 
 ///
+/// CryptoTestVectors
+///
+
+const std::string CryptoTestVectors::file_name = "./crypto.bin";
+
+tls::istream&
+operator>>(tls::istream& str, CryptoTestVectors::TestCase& obj)
+{
+  return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
+         obj.hkdf_extract_out >> obj.derive_secret_secret >>
+         obj.derive_secret_label >> obj.derive_secret_state >>
+         obj.derive_secret_length >> obj.derive_secret_out >>
+         obj.derive_key_pair_seed >> obj.derive_key_pair_pub >>
+         obj.ecies_seed >> obj.ecies_plaintext >> obj.ecies_recipient_pub >>
+         obj.ecies_out;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const CryptoTestVectors::TestCase& obj)
+{
+  return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
+             << obj.hkdf_extract_out << obj.derive_secret_secret
+             << obj.derive_secret_label << obj.derive_secret_state
+             << obj.derive_secret_length << obj.derive_secret_out
+             << obj.derive_key_pair_seed << obj.derive_key_pair_pub
+             << obj.ecies_seed << obj.ecies_plaintext << obj.ecies_recipient_pub
+             << obj.ecies_out;
+}
+
+tls::istream&
+operator>>(tls::istream& str, CryptoTestVectors& obj)
+{
+  return str >> obj.case_p256 >> obj.case_x25519 >> obj.case_p521 >>
+         obj.case_x448;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const CryptoTestVectors& obj)
+{
+  return str << obj.case_p256 << obj.case_x25519 << obj.case_p521
+             << obj.case_x448;
+}
+
+///
 /// MessagesTestVectors
 ///
 
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 
 tls::istream&
-operator>>(tls::istream& str, MessagesTestVectors::CipherSuiteCase& obj)
+operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 {
   return str >> obj.cipher_suite >> obj.user_init_key >> obj.welcome >>
          obj.add >> obj.update >> obj.remove;
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const MessagesTestVectors::CipherSuiteCase& obj)
+operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& obj)
 {
   return str << obj.cipher_suite << obj.user_init_key << obj.welcome << obj.add
              << obj.update << obj.remove;
@@ -121,6 +165,7 @@ TestVectors::get()
 {
   if (!_initialized) {
     load_test(_vectors.tree_math);
+    load_test(_vectors.crypto);
     load_test(_vectors.messages);
   }
 
@@ -131,5 +176,6 @@ void
 TestVectors::dump()
 {
   dump_test(tree_math);
+  dump_test(crypto);
   dump_test(messages);
 }
