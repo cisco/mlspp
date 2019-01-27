@@ -738,7 +738,7 @@ struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1, 7> label;
-  State group_state;
+  GroupState group_state;
 };
 
 tls::ostream&
@@ -791,7 +791,7 @@ bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
-              const State& state,
+              const GroupState& state,
               size_t size)
 {
   std::string mls_label = std::string("mls10 ") + label;

@@ -31,39 +31,36 @@ const std::string CryptoTestVectors::file_name = "./crypto.bin";
 tls::istream&
 operator>>(tls::istream& str, CryptoTestVectors::TestCase& obj)
 {
-  return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
-         obj.hkdf_extract_out >> obj.derive_secret_secret >>
-         obj.derive_secret_label >> obj.derive_secret_state >>
-         obj.derive_secret_length >> obj.derive_secret_out >>
-         obj.derive_key_pair_seed >> obj.derive_key_pair_pub >>
-         obj.ecies_seed >> obj.ecies_plaintext >> obj.ecies_recipient_pub >>
-         obj.ecies_out;
+  return str >> obj.hkdf_extract_out >> obj.derive_secret_state >>
+         obj.derive_secret_out >> obj.derive_key_pair_pub >> obj.ecies_out;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const CryptoTestVectors::TestCase& obj)
 {
-  return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
-             << obj.hkdf_extract_out << obj.derive_secret_secret
-             << obj.derive_secret_label << obj.derive_secret_state
-             << obj.derive_secret_length << obj.derive_secret_out
-             << obj.derive_key_pair_seed << obj.derive_key_pair_pub
-             << obj.ecies_seed << obj.ecies_plaintext << obj.ecies_recipient_pub
+  return str << obj.hkdf_extract_out << obj.derive_secret_state
+             << obj.derive_secret_out << obj.derive_key_pair_pub
              << obj.ecies_out;
 }
 
 tls::istream&
 operator>>(tls::istream& str, CryptoTestVectors& obj)
 {
-  return str >> obj.case_p256 >> obj.case_x25519 >> obj.case_p521 >>
-         obj.case_x448;
+  return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
+         obj.derive_secret_secret >> obj.derive_secret_label >>
+         obj.derive_secret_length >> obj.derive_key_pair_seed >>
+         obj.ecies_seed >> obj.ecies_plaintext >> obj.case_p256 >>
+         obj.case_x25519 >> obj.case_p521 >> obj.case_x448;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const CryptoTestVectors& obj)
 {
-  return str << obj.case_p256 << obj.case_x25519 << obj.case_p521
-             << obj.case_x448;
+  return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
+             << obj.derive_secret_secret << obj.derive_secret_label
+             << obj.derive_secret_length << obj.derive_key_pair_seed
+             << obj.ecies_seed << obj.ecies_plaintext << obj.case_p256
+             << obj.case_x25519 << obj.case_p521 << obj.case_x448;
 }
 
 ///

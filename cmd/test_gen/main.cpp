@@ -1,3 +1,4 @@
+#include "crypto.h"
 #include "test_vectors.h"
 #include "tree_math.h"
 #include <iostream>
@@ -23,6 +24,69 @@ generate_tree_math(TestVectors& vectors)
 
     auto sibling = mls::tree_math::sibling(x, n);
     vectors.tree_math.sibling.push_back(sibling);
+  }
+}
+
+void
+generate_crypto(TestVectors& vectors)
+{
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+    CipherSuite::P521_SHA512_AES256GCM,
+    CipherSuite::X448_SHA512_AES256GCM,
+  };
+
+  std::vector<CryptoTestVectors::TestCase*> cases{
+    &vectors.crypto.case_p256,
+    &vectors.crypto.case_x25519,
+    &vectors.crypto.case_p521,
+    &vectors.crypto.case_x448,
+  };
+
+  std::string derive_secret_label_string = "test";
+  bytes derive_secret_label_bytes(derive_secret_label_string.begin(),
+                                  derive_secret_label_string.end());
+
+  vectors.crypto.hkdf_extract_salt = { 0, 1, 2, 3 };
+  vectors.crypto.hkdf_extract_ikm = { 4, 5, 6, 7 };
+
+  vectors.crypto.derive_secret_secret = bytes(32, 0xA0);
+  vectors.crypto.derive_secret_label = derive_secret_label_bytes;
+  vectors.crypto.derive_secret_length = 32;
+
+  vectors.crypto.derive_key_pair_seed = { 0, 1, 2, 3 };
+
+  vectors.crypto.ecies_seed = bytes(32, 0xB0);
+  vectors.crypto.ecies_plaintext = bytes(128, 0xB1);
+
+  // Construct a test case for each suite
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+
+    // HKDF-Extract
+    test_case->hkdf_extract_out = mls::hkdf_extract(
+      suite, vectors.crypto.hkdf_extract_salt, vectors.crypto.hkdf_extract_ikm);
+
+    // Derive-Secret
+    // TODO(rlb@ipv.sx): Populate some actual state
+    test_case->derive_secret_state = GroupState{ suite };
+    test_case->derive_secret_out =
+      mls::derive_secret(suite,
+                         vectors.crypto.derive_secret_secret,
+                         derive_secret_label_string,
+                         test_case->derive_secret_state,
+                         vectors.crypto.derive_secret_length);
+
+    // Derive-Key-Pair
+    auto priv =
+      DHPrivateKey::derive(suite, vectors.crypto.derive_key_pair_seed);
+    auto pub = priv.public_key();
+    test_case->derive_key_pair_pub = pub;
+
+    // ECIES
+    test_case->ecies_out = pub.encrypt(vectors.crypto.ecies_plaintext);
   }
 }
 
@@ -118,6 +182,7 @@ main()
 
   // Generate and write test vectors
   generate_tree_math(vectors);
+  generate_crypto(vectors);
   generate_messages(vectors);
   vectors.dump();
 

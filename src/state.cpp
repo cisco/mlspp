@@ -336,11 +336,11 @@ State::derive_epoch_keys(const bytes& update_secret)
 {
   auto epoch_secret = hkdf_extract(_suite, _init_secret, update_secret);
   _message_master_secret = derive_secret(
-    _suite, epoch_secret, "app", *this, Digest(_suite).output_size());
+    _suite, epoch_secret, "app", _state, Digest(_suite).output_size());
   _confirmation_key = derive_secret(
-    _suite, epoch_secret, "confirm", *this, Digest(_suite).output_size());
+    _suite, epoch_secret, "confirm", _state, Digest(_suite).output_size());
   _init_secret = derive_secret(
-    _suite, epoch_secret, "init", *this, Digest(_suite).output_size());
+    _suite, epoch_secret, "init", _state, Digest(_suite).output_size());
 }
 
 Handshake

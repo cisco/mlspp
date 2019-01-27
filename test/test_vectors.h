@@ -22,34 +22,36 @@ struct CryptoTestVectors
 {
   static const std::string file_name;
 
+  tls::opaque<1> hkdf_extract_salt;
+  tls::opaque<1> hkdf_extract_ikm;
+
+  tls::opaque<1> derive_secret_secret;
+  tls::opaque<1> derive_secret_label;
+  uint32_t derive_secret_length;
+
+  tls::opaque<1> derive_key_pair_seed;
+
+  tls::opaque<1> ecies_seed;
+  tls::opaque<1> ecies_plaintext;
+
   struct TestCase
   {
     // HKDF-Extract
-    tls::opaque<1> hkdf_extract_salt;
-    tls::opaque<1> hkdf_extract_ikm;
     tls::opaque<1> hkdf_extract_out;
 
     // Derive-Secret
-    tls::opaque<1> derive_secret_secret;
-    tls::opaque<1> derive_secret_label;
     GroupState derive_secret_state;
-    uint32_t derive_secret_length;
     tls::opaque<1> derive_secret_out;
 
     // Derive-Key-Pair
-    tls::opaque<1> derive_key_pair_seed;
     DHPublicKey derive_key_pair_pub;
 
     // ECIES
-    tls::opaque<1> ecies_seed;
-    tls::opaque<1> ecies_plaintext;
-    DHPublicKey ecies_recipient_pub;
     ECIESCiphertext ecies_out;
 
     TestCase(CipherSuite suite)
       : derive_secret_state(suite)
       , derive_key_pair_pub(suite)
-      , ecies_recipient_pub(suite)
       , ecies_out(suite)
     {}
   };

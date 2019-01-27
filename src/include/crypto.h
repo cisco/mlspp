@@ -147,13 +147,13 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data);
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
-class State;
+class GroupState;
 
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
-              const State& state,
+              const GroupState& state,
               const size_t length);
 
 class AESGCM
