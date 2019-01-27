@@ -1155,7 +1155,19 @@ derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
 ECIESCiphertext
 DHPublicKey::encrypt(const bytes& plaintext) const
 {
-  auto ephemeral = DHPrivateKey::generate(_suite);
+  return encrypt(DHPrivateKey::generate(_suite), plaintext);
+}
+
+ECIESCiphertext
+DHPublicKey::encrypt(const bytes& seed, const bytes& plaintext) const
+{
+  return encrypt(DHPrivateKey::derive(_suite, seed), plaintext);
+}
+
+ECIESCiphertext
+DHPublicKey::encrypt(const DHPrivateKey& ephemeral,
+                     const bytes& plaintext) const
+{
   auto shared_secret = ephemeral.derive(*this);
 
   bytes key, nonce;

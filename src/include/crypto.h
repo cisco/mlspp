@@ -245,6 +245,7 @@ protected:
 
 // DH specialization
 struct ECIESCiphertext;
+struct DHPrivateKey;
 
 class DHPublicKey : public PublicKey
 {
@@ -252,7 +253,14 @@ public:
   using PublicKey::PublicKey;
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
+  // NB: This variant should only be used for testing ECIES
+  // correctness.  It allows entropy to be provided explicitly.
+  ECIESCiphertext encrypt(const bytes& seed, const bytes& plaintext) const;
+
 private:
+  ECIESCiphertext encrypt(const DHPrivateKey& ephemeral,
+                          const bytes& plaintext) const;
+
   friend class DHPrivateKey;
 };
 

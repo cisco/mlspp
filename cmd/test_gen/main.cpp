@@ -86,8 +86,8 @@ generate_crypto(TestVectors& vectors)
     test_case->derive_key_pair_pub = pub;
 
     // ECIES
-    // TODO(rlb@ipv.sx): Make this deterministic
-    test_case->ecies_out = pub.encrypt(vectors.crypto.ecies_plaintext);
+    test_case->ecies_out =
+      pub.encrypt(vectors.crypto.ecies_seed, vectors.crypto.ecies_plaintext);
   }
 }
 
