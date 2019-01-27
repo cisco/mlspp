@@ -31,7 +31,6 @@ struct CryptoTestVectors
 
   tls::opaque<1> derive_key_pair_seed;
 
-  tls::opaque<1> ecies_seed;
   tls::opaque<1> ecies_plaintext;
 
   struct TestCase

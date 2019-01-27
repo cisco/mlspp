@@ -9,6 +9,27 @@
 
 namespace mls {
 
+namespace test {
+
+// DeterministicECIES enables RAII-based requests for ECIES to be
+// done deterministically.  The RAII pattern is used here to ensure
+// that the determinism always gets turned off.  To avoid conflicts
+// between multiple requests for determinism, determinism is turned
+// off when the last object in the stack is destroyed; it's
+// basically a ref-counted bool.
+class DeterministicECIES
+{
+public:
+  DeterministicECIES() { _refct += 1; }
+  ~DeterministicECIES() { _refct -= 1; }
+  static bool enabled() { return _refct > 0; }
+
+private:
+  static int _refct;
+};
+
+}
+
 // Algorithm selectors
 enum struct CipherSuite : uint16_t
 {
@@ -253,14 +274,7 @@ public:
   using PublicKey::PublicKey;
   ECIESCiphertext encrypt(const bytes& plaintext) const;
 
-  // NB: This variant should only be used for testing ECIES
-  // correctness.  It allows entropy to be provided explicitly.
-  ECIESCiphertext encrypt(const bytes& seed, const bytes& plaintext) const;
-
 private:
-  ECIESCiphertext encrypt(const DHPrivateKey& ephemeral,
-                          const bytes& plaintext) const;
-
   friend class DHPrivateKey;
 };
 

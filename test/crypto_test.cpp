@@ -95,8 +95,8 @@ protected:
     auto derive_key_pair_pub = derive_key_pair_priv.public_key();
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
-    auto ecies_out = derive_key_pair_pub.encrypt(tv.crypto.ecies_seed,
-                                                 tv.crypto.ecies_plaintext);
+    ::mls::test::DeterministicECIES lock;
+    auto ecies_out = derive_key_pair_pub.encrypt(tv.crypto.ecies_plaintext);
     ASSERT_EQ(ecies_out, test_case.ecies_out);
   }
 };

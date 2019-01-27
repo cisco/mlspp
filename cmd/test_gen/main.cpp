@@ -57,7 +57,6 @@ generate_crypto(TestVectors& vectors)
 
   vectors.crypto.derive_key_pair_seed = { 0, 1, 2, 3 };
 
-  vectors.crypto.ecies_seed = bytes(32, 0xB0);
   vectors.crypto.ecies_plaintext = bytes(128, 0xB1);
 
   // Construct a test case for each suite
@@ -86,8 +85,8 @@ generate_crypto(TestVectors& vectors)
     test_case->derive_key_pair_pub = pub;
 
     // ECIES
-    test_case->ecies_out =
-      pub.encrypt(vectors.crypto.ecies_seed, vectors.crypto.ecies_plaintext);
+    ::mls::test::DeterministicECIES lock;
+    test_case->ecies_out = pub.encrypt(vectors.crypto.ecies_plaintext);
   }
 }
 

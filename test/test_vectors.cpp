@@ -49,8 +49,8 @@ operator>>(tls::istream& str, CryptoTestVectors& obj)
   return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
          obj.derive_secret_secret >> obj.derive_secret_label >>
          obj.derive_secret_length >> obj.derive_key_pair_seed >>
-         obj.ecies_seed >> obj.ecies_plaintext >> obj.case_p256 >>
-         obj.case_x25519 >> obj.case_p521 >> obj.case_x448;
+         obj.ecies_plaintext >> obj.case_p256 >> obj.case_x25519 >>
+         obj.case_p521 >> obj.case_x448;
 }
 
 tls::ostream&
@@ -59,8 +59,8 @@ operator<<(tls::ostream& str, const CryptoTestVectors& obj)
   return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
              << obj.derive_secret_secret << obj.derive_secret_label
              << obj.derive_secret_length << obj.derive_key_pair_seed
-             << obj.ecies_seed << obj.ecies_plaintext << obj.case_p256
-             << obj.case_x25519 << obj.case_p521 << obj.case_x448;
+             << obj.ecies_plaintext << obj.case_p256 << obj.case_x25519
+             << obj.case_p521 << obj.case_x448;
 }
 
 ///
