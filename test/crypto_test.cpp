@@ -1,4 +1,5 @@
 #include "crypto.h"
+#include "test_vectors.h"
 #include <gtest/gtest.h>
 #include <string>
 
@@ -67,7 +68,46 @@ protected:
                                       "748a637985771d347f0545659f14e99d"
                                       "ef842d8eb335f4eecfdbf831824b4c49"
                                       "15956c96");
+  const TestVectors& tv;
+
+  CryptoTest()
+    : tv(TestVectors::get())
+  {}
+
+  void interop(CipherSuite suite, const CryptoTestVectors::TestCase& test_case)
+  {
+    auto hkdf_extract_out = hkdf_extract(
+      suite, tv.crypto.hkdf_extract_salt, tv.crypto.hkdf_extract_ikm);
+    ASSERT_EQ(hkdf_extract_out, test_case.hkdf_extract_out);
+
+    std::string derive_secret_label_string(
+      tv.crypto.derive_secret_label.begin(),
+      tv.crypto.derive_secret_label.end());
+    auto derive_secret_out = derive_secret(suite,
+                                           tv.crypto.derive_secret_secret,
+                                           derive_secret_label_string,
+                                           test_case.derive_secret_state,
+                                           tv.crypto.derive_secret_length);
+    ASSERT_EQ(derive_secret_out, test_case.derive_secret_out);
+
+    auto derive_key_pair_priv =
+      DHPrivateKey::derive(suite, tv.crypto.derive_key_pair_seed);
+    auto derive_key_pair_pub = derive_key_pair_priv.public_key();
+    ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
+
+    // TODO(rlb@ipv.sx): Re-enable this test
+    auto ecies_out = derive_key_pair_pub.encrypt(tv.crypto.ecies_plaintext);
+    // ASSERT_EQ(ecies_out, test_case.ecies_out);
+  }
 };
+
+TEST_F(CryptoTest, Interop)
+{
+  interop(CipherSuite::P256_SHA256_AES128GCM, tv.crypto.case_p256);
+  interop(CipherSuite::X25519_SHA256_AES128GCM, tv.crypto.case_x25519);
+  interop(CipherSuite::P521_SHA512_AES256GCM, tv.crypto.case_p521);
+  interop(CipherSuite::X448_SHA512_AES256GCM, tv.crypto.case_x448);
+}
 
 TEST_F(CryptoTest, SHA2)
 {
