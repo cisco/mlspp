@@ -108,7 +108,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
 void
 Session::handle(const bytes& data)
 {
-  Handshake handshake{ cipher_suite() };
+  Handshake handshake{ current_state().cipher_suite() };
   tls::unmarshal(data, handshake);
 
   auto next = current_state().handle(handshake);
@@ -165,10 +165,46 @@ Session::current_state()
   return _state.at(_current_epoch);
 }
 
+/////
+
+namespace test {
+
+epoch_t
+TestSession::current_epoch() const
+{
+  return _current_epoch;
+}
+
 CipherSuite
-Session::cipher_suite() const
+TestSession::cipher_suite() const
 {
   return current_state().cipher_suite();
 }
+
+bytes
+TestSession::current_epoch_secret() const
+{
+  return current_state().epoch_secret();
+}
+
+bytes
+TestSession::current_application_secret() const
+{
+  return current_state().application_secret();
+}
+
+bytes
+TestSession::current_confirmation_key() const
+{
+  return current_state().confirmation_key();
+}
+
+bytes
+TestSession::current_init_secret() const
+{
+  return current_state().init_secret();
+}
+
+} // namespace test
 
 } // namespace mls

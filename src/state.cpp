@@ -63,7 +63,7 @@ State::State(const bytes& group_id,
   , _identity_priv(identity_priv)
   , _suite(suite)
   , _state(group_id, suite, credential)
-  , _message_master_secret()
+  , _application_secret()
   , _init_secret(zero_bytes(32))
   , _zero(Digest(suite).output_size(), 0)
 {}
@@ -302,12 +302,14 @@ bool
 operator==(const State& lhs, const State& rhs)
 {
   auto state = (lhs._state == rhs._state);
-  auto message_master_secret =
-    (lhs._message_master_secret == rhs._message_master_secret);
-  auto init_secret = (lhs._init_secret == rhs._init_secret);
+  auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
+  auto application_secret =
+    (lhs._application_secret == rhs._application_secret);
   auto confirmation_key = (lhs._confirmation_key == rhs._confirmation_key);
+  auto init_secret = (lhs._init_secret == rhs._init_secret);
 
-  return state && message_master_secret && init_secret && confirmation_key;
+  return state && epoch_secret && application_secret && confirmation_key &&
+         init_secret;
 }
 
 bool
@@ -335,13 +337,13 @@ State::update_leaf(uint32_t index,
 void
 State::derive_epoch_keys(const bytes& update_secret)
 {
-  auto epoch_secret = hkdf_extract(_suite, _init_secret, update_secret);
-  _message_master_secret = derive_secret(
-    _suite, epoch_secret, "app", _state, Digest(_suite).output_size());
+  _epoch_secret = hkdf_extract(_suite, _init_secret, update_secret);
+  _application_secret = derive_secret(
+    _suite, _epoch_secret, "app", _state, Digest(_suite).output_size());
   _confirmation_key = derive_secret(
-    _suite, epoch_secret, "confirm", _state, Digest(_suite).output_size());
+    _suite, _epoch_secret, "confirm", _state, Digest(_suite).output_size());
   _init_secret = derive_secret(
-    _suite, epoch_secret, "init", _state, Digest(_suite).output_size());
+    _suite, _epoch_secret, "init", _state, Digest(_suite).output_size());
 }
 
 Handshake

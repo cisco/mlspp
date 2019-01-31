@@ -125,6 +125,45 @@ operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
 /////
 
+// Splitting the test data from the file definition here allows us
+// to have a consistent struct for different scenarios that live in
+// different files.
+struct SessionTestVectors
+{
+  struct Epoch
+  {
+    tls::opaque<4> welcome; // may be zero-size
+    tls::opaque<4> handshake;
+
+    epoch_t epoch;
+    tls::opaque<1> epoch_secret;
+    tls::opaque<1> application_secret;
+    tls::opaque<1> confirmation_key;
+    tls::opaque<1> init_secret;
+  };
+
+  struct TestCase
+  {
+    CipherSuite cipher_suite;
+    SignatureScheme sig_scheme;
+    tls::vector<Epoch, 4> transcript;
+  };
+
+  uint32_t group_size;
+
+  TestCase case_p256_p256;
+  TestCase case_x25519_ed25519;
+  TestCase case_p521_p521;
+  TestCase case_x448_ed448;
+};
+
+struct BasicSessionTestVectors : SessionTestVectors
+{
+  static const std::string file_name;
+};
+
+/////
+
 template<typename T>
 struct TestLoader
 {

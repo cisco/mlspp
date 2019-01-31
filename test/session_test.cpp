@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 using namespace mls;
+using namespace mls::test;
 
 class SessionTest : public ::testing::Test
 {
@@ -13,7 +14,7 @@ protected:
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
 
-  std::vector<Session> sessions;
+  std::vector<TestSession> sessions;
 
   SessionTest()
   {
@@ -42,7 +43,7 @@ protected:
     auto cred = Credential::basic(user_id, id_priv);
     auto initial_epoch = sessions[0].current_epoch();
 
-    Session next{ suites, id_priv, cred };
+    TestSession next{ suites, id_priv, cred };
     auto last = sessions.size() - 1;
     std::pair<bytes, bytes> welcome_add;
 
@@ -91,18 +92,18 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
   auto credA = Credential::basic(user_id, idA);
-  Session alice{ { CipherSuite::P256_SHA256_AES128GCM,
-                   CipherSuite::X25519_SHA256_AES128GCM },
-                 idA,
-                 credA };
+  TestSession alice{ { CipherSuite::P256_SHA256_AES128GCM,
+                       CipherSuite::X25519_SHA256_AES128GCM },
+                     idA,
+                     credA };
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
   auto credB = Credential::basic(user_id, idB);
-  Session bob{ { CipherSuite::P256_SHA256_AES128GCM,
-                 CipherSuite::X25519_SHA256_AES128GCM },
-               idB,
-               credB };
+  TestSession bob{ { CipherSuite::P256_SHA256_AES128GCM,
+                     CipherSuite::X25519_SHA256_AES128GCM },
+                   idB,
+                   credB };
 
   auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.user_init_key());
   bob.join(welcome_add.first, welcome_add.second);

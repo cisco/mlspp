@@ -84,9 +84,16 @@ public:
   ///
   State handle(const Handshake& handshake) const;
 
+  ///
+  /// Accessors
+  ///
   epoch_t epoch() const { return _state.epoch; }
   uint32_t index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
+  bytes epoch_secret() const { return _epoch_secret; }
+  bytes application_secret() const { return _application_secret; }
+  bytes confirmation_key() const { return _confirmation_key; }
+  bytes init_secret() const { return _init_secret; }
 
 private:
   // Shared confirmed state:
@@ -94,9 +101,10 @@ private:
   GroupState _state;
 
   // Shared secret state
-  tls::opaque<1> _message_master_secret;
-  tls::opaque<1> _init_secret;
+  tls::opaque<1> _epoch_secret;
+  tls::opaque<1> _application_secret;
   tls::opaque<1> _confirmation_key;
+  tls::opaque<1> _init_secret;
 
   // Per-participant state
   uint32_t _index;

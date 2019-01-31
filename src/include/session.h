@@ -31,10 +31,7 @@ public:
   void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake);
 
-  epoch_t current_epoch() const { return _current_epoch; }
-  CipherSuite cipher_suite() const;
-
-private:
+protected:
   CipherList _supported_ciphersuites;
   bytes _next_leaf_secret;
   bytes _init_secret;
@@ -49,5 +46,22 @@ private:
   State& current_state();
   const State& current_state() const;
 };
+
+namespace test {
+
+// Enable tests to ispect the internals of the session
+class TestSession : public Session
+{
+public:
+  using Session::Session;
+  epoch_t current_epoch() const;
+  CipherSuite cipher_suite() const;
+  bytes current_epoch_secret() const;
+  bytes current_application_secret() const;
+  bytes current_confirmation_key() const;
+  bytes current_init_secret() const;
+};
+
+}
 
 } // namespace mls

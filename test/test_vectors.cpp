@@ -105,6 +105,53 @@ operator<<(tls::ostream& str, const MessagesTestVectors& obj)
 }
 
 ///
+/// SessionTestVectors
+///
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors::Epoch& obj)
+{
+  return str >> obj.welcome >> obj.handshake >> obj.epoch >> obj.epoch_secret >>
+         obj.application_secret >> obj.confirmation_key >> obj.init_secret;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors::Epoch& obj)
+{
+  return str << obj.welcome << obj.handshake << obj.epoch << obj.epoch_secret
+             << obj.application_secret << obj.confirmation_key
+             << obj.init_secret;
+}
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors::TestCase& obj)
+{
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.transcript;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors::TestCase& obj)
+{
+  return str << obj.cipher_suite << obj.sig_scheme << obj.transcript;
+}
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors& obj)
+{
+  return str >> obj.group_size >> obj.case_p256_p256 >>
+         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors& obj)
+{
+  return str << obj.group_size << obj.case_p256_p256 << obj.case_x25519_ed25519
+             << obj.case_p521_p521 << obj.case_x448_ed448;
+}
+
+const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
+
+///
 /// File Handling
 ///
 
