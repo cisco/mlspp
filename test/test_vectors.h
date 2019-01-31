@@ -1,5 +1,6 @@
 #include "common.h"
 #include "messages.h"
+#include "session.h"
 #include "state.h"
 #include "tls_syntax.h"
 #include <string>
@@ -140,6 +141,20 @@ struct SessionTestVectors
     tls::opaque<1> application_secret;
     tls::opaque<1> confirmation_key;
     tls::opaque<1> init_secret;
+
+    Epoch() = default;
+
+    Epoch(const bytes& welcome,
+          const bytes& handshake,
+          const mls::test::TestSession& session)
+      : welcome(welcome)
+      , handshake(handshake)
+      , epoch(session.current_epoch())
+      , epoch_secret(session.current_epoch_secret())
+      , application_secret(session.current_application_secret())
+      , confirmation_key(session.current_confirmation_key())
+      , init_secret(session.current_init_secret())
+    {}
   };
 
   struct TestCase
@@ -150,12 +165,18 @@ struct SessionTestVectors
   };
 
   uint32_t group_size;
+  tls::opaque<1> group_id;
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
   TestCase case_p521_p521;
   TestCase case_x448_ed448;
 };
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors& tv);
 
 struct BasicSessionTestVectors : SessionTestVectors
 {

@@ -138,15 +138,16 @@ operator<<(tls::ostream& str, const SessionTestVectors::TestCase& obj)
 tls::istream&
 operator>>(tls::istream& str, SessionTestVectors& obj)
 {
-  return str >> obj.group_size >> obj.case_p256_p256 >>
+  return str >> obj.group_size >> obj.group_id >> obj.case_p256_p256 >>
          obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const SessionTestVectors& obj)
 {
-  return str << obj.group_size << obj.case_p256_p256 << obj.case_x25519_ed25519
-             << obj.case_p521_p521 << obj.case_x448_ed448;
+  return str << obj.group_size << obj.group_id << obj.case_p256_p256
+             << obj.case_x25519_ed25519 << obj.case_p521_p521
+             << obj.case_x448_ed448;
 }
 
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";

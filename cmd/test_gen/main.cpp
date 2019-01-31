@@ -1,4 +1,5 @@
 #include "crypto.h"
+#include "session.h"
 #include "test_vectors.h"
 #include "tree_math.h"
 #include <fstream>
@@ -210,6 +211,109 @@ generate_messages()
   return tv;
 }
 
+BasicSessionTestVectors
+generate_basic_session()
+{
+  BasicSessionTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+    CipherSuite::P521_SHA512_AES256GCM,
+    CipherSuite::X448_SHA512_AES256GCM,
+  };
+
+  std::vector<SignatureScheme> schemes{
+    SignatureScheme::P256_SHA256,
+    SignatureScheme::Ed25519,
+    SignatureScheme::P521_SHA512,
+    SignatureScheme::Ed448,
+  };
+
+  std::vector<SessionTestVectors::TestCase*> cases{
+    &tv.case_p256_p256,
+    &tv.case_x25519_ed25519,
+    &tv.case_p521_p521,
+    &tv.case_x448_ed448,
+  };
+
+  tv.group_size = 5;
+  tv.group_id = bytes(16, 0xA0);
+
+  mls::test::DeterministicECIES lock;
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto scheme = schemes[i];
+
+    std::vector<SessionTestVectors::Epoch> transcript;
+
+    // Initialize empty sessions
+    std::vector<mls::test::TestSession> sessions;
+    std::vector<bytes> seeds;
+    auto ciphersuites = CipherList{ suite };
+    for (int j = 0; j < tv.group_size; ++j) {
+      bytes seed = { uint8_t(i), 0 };
+      auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
+      auto cred = Credential::basic(seed, identity_priv);
+      seeds.push_back(seed);
+      sessions.emplace_back(ciphersuites, seed, identity_priv, cred);
+    }
+
+    // Add everyone
+    for (int j = 1; j < tv.group_size; ++j) {
+      auto uik = sessions[j].user_init_key();
+
+      std::pair<bytes, bytes> welcome_add;
+      if (j == 1) {
+        welcome_add = sessions[0].start(tv.group_id, uik);
+      } else {
+        welcome_add = sessions[j - 1].add(uik);
+        for (int k = 0; k < j; ++k) {
+          sessions[k].handle(welcome_add.second);
+        }
+      }
+
+      sessions[j].join(welcome_add.first, welcome_add.second);
+
+      transcript.emplace_back(
+        welcome_add.first, welcome_add.second, sessions[0]);
+    }
+
+    // Update everyone (L->R)
+    for (int j = 0; j < tv.group_size; ++j) {
+      seeds[j][1] += 1;
+      auto update = sessions[j].update(seeds[j]);
+      for (auto& session : sessions) {
+        session.handle(update);
+      }
+
+      transcript.emplace_back(bytes{}, update, sessions[0]);
+    }
+
+    // Remove everyone (R->L)
+    for (int j = tv.group_size - 2; j >= 0; --j) {
+      seeds[j][1] += 1;
+      auto remove = sessions[j].remove(seeds[j], j + 1);
+      for (int k = 0; k <= j; ++k) {
+        sessions[k].handle(remove);
+      }
+
+      for (int k = 0; k <= j; ++k) {
+        if (!(sessions[k] == sessions[0])) {
+          throw std::runtime_error("bad session during remove");
+        }
+      }
+
+      transcript.emplace_back(bytes{}, remove, sessions[0]);
+    }
+
+    // Construct the test case
+    *cases[i] = { suite, scheme, transcript };
+  }
+
+  return tv;
+}
+
 template<typename T>
 void
 write_test_vectors(const T& vectors)
@@ -237,6 +341,9 @@ main()
 
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
+
+  BasicSessionTestVectors basic_session = generate_basic_session();
+  write_test_vectors(basic_session);
 
   // Verify that the test vectors load
   try {
