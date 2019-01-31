@@ -179,6 +179,11 @@ struct SessionTestVectors
 };
 
 tls::istream&
+operator>>(tls::istream& str, SessionTestVectors::TestCase& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors::TestCase& tv);
+
+tls::istream&
 operator>>(tls::istream& str, SessionTestVectors& tv);
 tls::ostream&
 operator<<(tls::ostream& str, const SessionTestVectors& tv);

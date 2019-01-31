@@ -342,50 +342,33 @@ verify_equal_marshaled(const T& lhs, const T& rhs)
   }
 }
 
+template<typename F>
 void
-verify_tree_math_repro()
+verify_reproducible(const F& generator)
 {
-  auto v0 = generate_tree_math();
-  auto v1 = generate_tree_math();
+  auto v0 = generator();
+  auto v1 = generator();
   verify_equal_marshaled(v0, v1);
 }
 
+template<typename F>
 void
-verify_crypto_repro()
+verify_session_repro(const F& generator)
 {
-  auto v0 = generate_tree_math();
-  auto v1 = generate_tree_math();
-  verify_equal_marshaled(v0, v1);
-}
+  auto v0 = generator();
+  auto v1 = generator();
 
-void
-verify_messages_repro()
-{
-  auto v0 = generate_messages();
-  auto v1 = generate_messages();
-
-  // Inputs shouldn't have any variation
-  verify_equal_marshaled(v0.epoch, v1.epoch);
-  verify_equal_marshaled(v0.signer_index, v1.signer_index);
-  verify_equal_marshaled(v0.removed, v1.removed);
-  verify_equal_marshaled(v0.user_id, v1.user_id);
+  // Obviously, inputs should repro
+  verify_equal_marshaled(v0.group_size, v1.group_size);
   verify_equal_marshaled(v0.group_id, v1.group_id);
-  verify_equal_marshaled(v0.uik_id, v1.uik_id);
-  verify_equal_marshaled(v0.dh_seed, v1.dh_seed);
-  verify_equal_marshaled(v0.sig_seed, v1.sig_seed);
-  verify_equal_marshaled(v0.random, v1.random);
 
-  // EdDSA-based ciphersuites should be reproducible
+  // EdDSA-based cases should repro
   verify_equal_marshaled(v0.case_x25519_ed25519, v1.case_x25519_ed25519);
   verify_equal_marshaled(v0.case_x448_ed448, v1.case_x448_ed448);
 
-  // ECDSA-based ciphersuites should be reproducible except for the
-  // signature on the UIK
+  // TODO(rlb@ipv.sx): Verify that the parts of the non-EdDSA cases
+  // that should reproduce actually do.
 }
-
-void
-verify_session_repro()
-{}
 
 int
 main()
@@ -404,11 +387,11 @@ main()
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
-  if (true) {
-    verify_tree_math_repro();
-    verify_crypto_repro();
-    verify_messages_repro();
-    verify_session_repro();
+  if (false) {
+    verify_reproducible(generate_tree_math);
+    verify_reproducible(generate_crypto);
+    verify_reproducible(generate_messages);
+    verify_session_repro(generate_basic_session);
   }
 
   // Verify that the test vectors load
