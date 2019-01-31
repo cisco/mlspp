@@ -120,6 +120,11 @@ struct MessagesTestVectors
 };
 
 tls::istream&
+operator>>(tls::istream& str, MessagesTestVectors::TestCase& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& tc);
+
+tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors& tv);
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors& tv);

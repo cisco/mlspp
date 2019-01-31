@@ -57,7 +57,8 @@ protected:
     UserInitKey user_init_key_c;
     user_init_key_c.user_init_key_id = tv.uik_id;
     user_init_key_c.add_init_key(dh_key);
-    user_init_key_c.sign(sig_priv, cred);
+    user_init_key_c.credential = cred;
+    user_init_key_c.signature = tv.random;
 
     UserInitKey user_init_key;
     tls_round_trip(
@@ -117,8 +118,8 @@ TEST_F(MessagesTest, UserInitKey)
 
   auto identity_priv =
     SignaturePrivateKey::derive(tv.uik_all_scheme, tv.sig_seed);
-  auto credential_all = Credential::basic(tv.user_id, identity_priv);
-  constructed.sign(identity_priv, credential_all);
+  constructed.credential = Credential::basic(tv.user_id, identity_priv);
+  constructed.signature = tv.random;
 
   UserInitKey after;
   auto reproducible =

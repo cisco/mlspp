@@ -147,8 +147,8 @@ generate_messages()
 
   auto identity_priv =
     SignaturePrivateKey::derive(tv.uik_all_scheme, tv.sig_seed);
-  auto credential_all = Credential::basic(tv.user_id, identity_priv);
-  uik_all.sign(identity_priv, credential_all);
+  uik_all.credential = Credential::basic(tv.user_id, identity_priv);
+  uik_all.signature = tv.random;
 
   tv.user_init_key_all = tls::marshal(uik_all);
 
@@ -177,7 +177,8 @@ generate_messages()
     auto user_init_key = UserInitKey{};
     user_init_key.user_init_key_id = tv.uik_id;
     user_init_key.add_init_key(dh_key);
-    user_init_key.sign(sig_priv, cred);
+    user_init_key.credential = cred;
+    user_init_key.signature = tv.random;
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
@@ -330,6 +331,62 @@ write_test_vectors(const T& vectors)
   file.write(data, marshaled.size());
 }
 
+template<typename T>
+void
+verify_equal_marshaled(const T& lhs, const T& rhs)
+{
+  auto lhsb = tls::marshal(lhs);
+  auto rhsb = tls::marshal(rhs);
+  if (lhsb != rhsb) {
+    throw std::runtime_error("difference in marshaled values");
+  }
+}
+
+void
+verify_tree_math_repro()
+{
+  auto v0 = generate_tree_math();
+  auto v1 = generate_tree_math();
+  verify_equal_marshaled(v0, v1);
+}
+
+void
+verify_crypto_repro()
+{
+  auto v0 = generate_tree_math();
+  auto v1 = generate_tree_math();
+  verify_equal_marshaled(v0, v1);
+}
+
+void
+verify_messages_repro()
+{
+  auto v0 = generate_messages();
+  auto v1 = generate_messages();
+
+  // Inputs shouldn't have any variation
+  verify_equal_marshaled(v0.epoch, v1.epoch);
+  verify_equal_marshaled(v0.signer_index, v1.signer_index);
+  verify_equal_marshaled(v0.removed, v1.removed);
+  verify_equal_marshaled(v0.user_id, v1.user_id);
+  verify_equal_marshaled(v0.group_id, v1.group_id);
+  verify_equal_marshaled(v0.uik_id, v1.uik_id);
+  verify_equal_marshaled(v0.dh_seed, v1.dh_seed);
+  verify_equal_marshaled(v0.sig_seed, v1.sig_seed);
+  verify_equal_marshaled(v0.random, v1.random);
+
+  // EdDSA-based ciphersuites should be reproducible
+  verify_equal_marshaled(v0.case_x25519_ed25519, v1.case_x25519_ed25519);
+  verify_equal_marshaled(v0.case_x448_ed448, v1.case_x448_ed448);
+
+  // ECDSA-based ciphersuites should be reproducible except for the
+  // signature on the UIK
+}
+
+void
+verify_session_repro()
+{}
+
 int
 main()
 {
@@ -345,11 +402,21 @@ main()
   BasicSessionTestVectors basic_session = generate_basic_session();
   write_test_vectors(basic_session);
 
+  // Verify that the test vectors are reproducible (to the extent
+  // possible)
+  if (true) {
+    verify_tree_math_repro();
+    verify_crypto_repro();
+    verify_messages_repro();
+    verify_session_repro();
+  }
+
   // Verify that the test vectors load
   try {
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
+    TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }

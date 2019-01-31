@@ -103,7 +103,7 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 {
   return (lhs.cipher_suites == rhs.cipher_suites) &&
          (lhs.init_keys == rhs.init_keys) &&
-         (lhs.credential == rhs.credential) && lhs.verify() && rhs.verify();
+         (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
 }
 
 tls::ostream&

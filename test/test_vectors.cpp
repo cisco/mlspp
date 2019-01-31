@@ -224,3 +224,4 @@ TestLoader<T>::get()
 template class TestLoader<TreeMathTestVectors>;
 template class TestLoader<CryptoTestVectors>;
 template class TestLoader<MessagesTestVectors>;
+template class TestLoader<BasicSessionTestVectors>;
