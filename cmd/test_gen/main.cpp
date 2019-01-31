@@ -253,11 +253,16 @@ generate_basic_session()
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
     for (int j = 0; j < tv.group_size; ++j) {
-      bytes seed = { uint8_t(i), 0 };
+      bytes seed = { uint8_t(j), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       seeds.push_back(seed);
       sessions.emplace_back(ciphersuites, seed, identity_priv, cred);
+    }
+
+    std::vector<tls::opaque<4>> uiks;
+    for (const auto& session : sessions) {
+      uiks.push_back(session.user_init_key());
     }
 
     // Add everyone
@@ -309,7 +314,7 @@ generate_basic_session()
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, transcript };
+    *cases[i] = { suite, scheme, uiks, transcript };
   }
 
   return tv;

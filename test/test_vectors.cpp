@@ -126,13 +126,15 @@ operator<<(tls::ostream& str, const SessionTestVectors::Epoch& obj)
 tls::istream&
 operator>>(tls::istream& str, SessionTestVectors::TestCase& obj)
 {
-  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.transcript;
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_keys >>
+         obj.transcript;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const SessionTestVectors::TestCase& obj)
 {
-  return str << obj.cipher_suite << obj.sig_scheme << obj.transcript;
+  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_keys
+             << obj.transcript;
 }
 
 tls::istream&

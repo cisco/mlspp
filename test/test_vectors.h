@@ -166,6 +166,7 @@ struct SessionTestVectors
   {
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
+    tls::vector<tls::opaque<4>, 4> user_init_keys;
     tls::vector<Epoch, 4> transcript;
   };
 
