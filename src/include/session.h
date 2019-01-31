@@ -11,6 +11,7 @@ class Session
 {
 public:
   Session(const CipherList& supported_ciphersuites,
+          const bytes& init_secret,
           const SignaturePrivateKey& identity_priv,
           const Credential& credential);
 
@@ -25,15 +26,14 @@ public:
                                 const bytes& user_init_key);
 
   std::pair<bytes, bytes> add(const bytes& user_init_key) const;
-  bytes update();
-  bytes remove(uint32_t index) const;
+  bytes update(const bytes& init_secret);
+  bytes remove(const bytes& eviction_secret, uint32_t index) const;
 
   void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake);
 
 protected:
   CipherList _supported_ciphersuites;
-  bytes _next_leaf_secret;
   bytes _init_secret;
   tls::opaque<2> _user_init_key;
   SignaturePrivateKey _identity_priv;

@@ -5,11 +5,11 @@
 namespace mls {
 
 Session::Session(const CipherList& supported_ciphersuites,
+                 const bytes& init_secret,
                  const SignaturePrivateKey& identity_priv,
                  const Credential& credential)
   : _supported_ciphersuites(supported_ciphersuites)
-  , _init_secret(random_bytes(32))
-  , _next_leaf_secret(random_bytes(32))
+  , _init_secret(init_secret)
   , _identity_priv(identity_priv)
   , _credential(credential)
 {
@@ -54,6 +54,7 @@ Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
 
   auto init = State::negotiate(group_id,
                                _supported_ciphersuites,
+                               _init_secret,
                                _identity_priv,
                                _credential,
                                user_init_key);
@@ -79,16 +80,16 @@ Session::add(const bytes& user_init_key_bytes) const
 }
 
 bytes
-Session::update()
+Session::update(const bytes& leaf_secret)
 {
-  auto update = current_state().update(_next_leaf_secret);
+  auto update = current_state().update(leaf_secret);
   return tls::marshal(update);
 }
 
 bytes
-Session::remove(uint32_t index) const
+Session::remove(const bytes& evict_secret, uint32_t index) const
 {
-  auto update = current_state().remove(index);
+  auto update = current_state().remove(evict_secret, index);
   return tls::marshal(update);
 }
 

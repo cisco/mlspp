@@ -4,10 +4,11 @@ namespace mls {
 
 GroupState::GroupState(const bytes& group_id,
                        CipherSuite suite,
+                       const bytes& leaf_secret,
                        const Credential& credential)
   : group_id(group_id)
   , epoch(0)
-  , tree(suite, random_bytes(32))
+  , tree(suite, leaf_secret)
   , transcript_hash(Digest(suite).output_size(), 0)
 {
   roster.add(credential);
@@ -57,12 +58,13 @@ operator==(const GroupState& lhs, const GroupState& rhs)
 
 State::State(const bytes& group_id,
              CipherSuite suite,
+             const bytes& leaf_secret,
              const SignaturePrivateKey& identity_priv,
              const Credential& credential)
   : _index(0)
   , _identity_priv(identity_priv)
   , _suite(suite)
-  , _state(group_id, suite, credential)
+  , _state(group_id, suite, leaf_secret, credential)
   , _application_secret()
   , _init_secret(zero_bytes(32))
   , _zero(Digest(suite).output_size(), 0)
@@ -130,6 +132,7 @@ State::State(const SignaturePrivateKey& identity_priv,
 State::InitialInfo
 State::negotiate(const bytes& group_id,
                  const std::vector<CipherSuite> supported_ciphersuites,
+                 const bytes& leaf_secret,
                  const SignaturePrivateKey& identity_priv,
                  const Credential& credential,
                  const UserInitKey& user_init_key)
@@ -151,7 +154,7 @@ State::negotiate(const bytes& group_id,
     }
   }
 
-  auto state = State{ group_id, suite, identity_priv, credential };
+  auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
   auto welcome_add = state.add(user_init_key);
   state = state.handle(welcome_add.second);
 
@@ -193,9 +196,8 @@ State::update(const bytes& leaf_secret)
 }
 
 Handshake
-State::remove(uint32_t index) const
+State::remove(const bytes& evict_secret, uint32_t index) const
 {
-  auto evict_secret = random_bytes(32);
   auto path = _state.tree.encrypt(index, evict_secret);
   return sign(Remove{ index, path });
 }

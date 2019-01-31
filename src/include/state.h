@@ -25,6 +25,7 @@ struct GroupState
 
   GroupState(const bytes& group_id,
              CipherSuite suite,
+             const bytes& leaf_secret,
              const Credential& credential);
 
   GroupState(const WelcomeInfo& info);
@@ -46,6 +47,7 @@ public:
   // Initialize an empty group
   State(const bytes& group_id,
         CipherSuite suite,
+        const bytes& leaf_secret,
         const SignaturePrivateKey& identity_priv,
         const Credential& credential);
 
@@ -62,6 +64,7 @@ public:
   static InitialInfo negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
+    const bytes& leaf_secret,
     const SignaturePrivateKey& identity_priv,
     const Credential& credential,
     const UserInitKey& user_init_key);
@@ -77,7 +80,7 @@ public:
   Handshake update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake remove(uint32_t index) const;
+  Handshake remove(const bytes& evict_secret, uint32_t index) const;
 
   ///
   /// Generic handshake message handler

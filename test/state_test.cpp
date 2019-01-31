@@ -46,7 +46,9 @@ protected:
 TEST_F(GroupCreationTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto first = State{ group_id, suite, identity_privs[0], credentials[0] };
+  auto first = State{
+    group_id, suite, init_secrets[0], identity_privs[0], credentials[0]
+  };
 
   // Create a Add for the new participant
   auto welcome_add = first.add(user_init_keys[1]);
@@ -64,7 +66,8 @@ TEST_F(GroupCreationTest, TwoPerson)
 TEST_F(GroupCreationTest, FullSize)
 {
   // Initialize the creator's state
-  states.emplace_back(group_id, suite, identity_privs[0], credentials[0]);
+  states.emplace_back(
+    group_id, suite, init_secrets[0], identity_privs[0], credentials[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -95,9 +98,11 @@ protected:
   {
     states.reserve(group_size);
 
+    auto init_secret = random_bytes(32);
     auto identity_priv = SignaturePrivateKey::generate(scheme);
     auto credential = Credential::basic(user_id, identity_priv);
-    states.emplace_back(group_id, suite, identity_priv, credential);
+    states.emplace_back(
+      group_id, suite, init_secret, identity_priv, credential);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
@@ -149,7 +154,8 @@ TEST_F(RunningGroupTest, Update)
 TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
-    auto remove = states[i].remove(i + 1);
+    auto evict_secret = random_bytes(32);
+    auto remove = states[i].remove(evict_secret, i + 1);
     states.pop_back();
 
     for (auto& state : states) {
@@ -180,11 +186,12 @@ TEST(OtherStateTest, CipherNegotiation)
                               CipherSuite::P521_SHA512_AES256GCM };
   auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
-  auto group_id = from_hex("0001020304");
+  auto insB = bytes{ 4, 5, 6, 7 };
+  auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
 
   // Bob should choose P-256
   auto initialB =
-    State::negotiate(group_id, supported_ciphers, idkB, credB, uikA);
+    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, uikA);
   auto stateB = initialB.first;
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 

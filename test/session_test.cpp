@@ -11,6 +11,7 @@ protected:
                            CipherSuite::X25519_SHA256_AES128GCM };
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   const size_t group_size = 5;
+  const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
 
@@ -18,15 +19,18 @@ protected:
 
   SessionTest()
   {
+    auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto cred = Credential::basic(user_id, id_priv);
-    sessions.push_back({ suites, id_priv, cred });
+    sessions.push_back({ suites, init_secret, id_priv, cred });
   }
 
   SignaturePrivateKey new_identity_key()
   {
     return SignaturePrivateKey::generate(scheme);
   }
+
+  bytes fresh_secret() const { return random_bytes(secret_size); }
 
   void broadcast(const bytes& message)
   {
@@ -39,11 +43,12 @@ protected:
 
   void broadcast_add()
   {
+    auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto cred = Credential::basic(user_id, id_priv);
     auto initial_epoch = sessions[0].current_epoch();
 
-    TestSession next{ suites, id_priv, cred };
+    TestSession next{ suites, init_secret, id_priv, cred };
     auto last = sessions.size() - 1;
     std::pair<bytes, bytes> welcome_add;
 
@@ -91,17 +96,21 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
+  auto initA = fresh_secret();
   auto credA = Credential::basic(user_id, idA);
   TestSession alice{ { CipherSuite::P256_SHA256_AES128GCM,
                        CipherSuite::X25519_SHA256_AES128GCM },
+                     initA,
                      idA,
                      credA };
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
+  auto initB = fresh_secret();
   auto credB = Credential::basic(user_id, idB);
   TestSession bob{ { CipherSuite::P256_SHA256_AES128GCM,
                      CipherSuite::X25519_SHA256_AES128GCM },
+                   initB,
                    idB,
                    credB };
 
@@ -127,7 +136,8 @@ TEST_F(RunningSessionTest, Update)
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update = sessions[i].update();
+    auto update_secret = fresh_secret();
+    auto update = sessions[i].update(update_secret);
     broadcast(update);
     check(initial_epoch);
   }
@@ -137,7 +147,8 @@ TEST_F(RunningSessionTest, Remove)
 {
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto remove = sessions[i - 1].remove(i);
+    auto evict_secret = fresh_secret();
+    auto remove = sessions[i - 1].remove(evict_secret, i);
     sessions.pop_back();
     broadcast(remove);
     check(initial_epoch);
@@ -151,7 +162,8 @@ TEST_F(RunningSessionTest, FullLifeCycle)
   // 2. Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update = sessions[i].update();
+    auto update_secret = fresh_secret();
+    auto update = sessions[i].update(update_secret);
     broadcast(update);
     check(initial_epoch);
   }
@@ -159,7 +171,8 @@ TEST_F(RunningSessionTest, FullLifeCycle)
   // 3. Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto remove = sessions[i - 1].remove(i);
+    auto evict_secret = fresh_secret();
+    auto remove = sessions[i - 1].remove(evict_secret, i);
     sessions.pop_back();
     broadcast(remove);
     check(initial_epoch);
