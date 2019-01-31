@@ -22,7 +22,8 @@ GroupState::GroupState(const WelcomeInfo& info)
 {}
 
 GroupState::GroupState(CipherSuite suite)
-  : tree(suite)
+  : epoch(0)
+  , tree(suite)
 {}
 
 tls::ostream&

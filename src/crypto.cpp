@@ -22,6 +22,21 @@ namespace test {
 
 int DeterministicECIES::_refct = 0;
 
+bool
+deterministic_signature_scheme(SignatureScheme scheme)
+{
+  switch (scheme) {
+    case SignatureScheme::P256_SHA256:
+      return false;
+    case SignatureScheme::P521_SHA512:
+      return false;
+    case SignatureScheme::Ed25519:
+      return true;
+    case SignatureScheme::Ed448:
+      return true;
+  }
+}
+
 }
 
 ///
@@ -1290,6 +1305,13 @@ SignaturePrivateKey::generate(SignatureScheme scheme)
 {
   auto type = ossl_key_type(scheme);
   return SignaturePrivateKey(scheme, OpenSSLKey::generate(type));
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& data)
+{
+  auto type = ossl_key_type(scheme);
+  return SignaturePrivateKey(scheme, OpenSSLKey::derive(type, data));
 }
 
 bytes

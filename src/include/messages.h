@@ -63,8 +63,8 @@ operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
 //     opaque user_init_key_id<0..255>;
-//     CipherSuite cipher_suites<0..255>; // ignored
-//     DHPublicKey init_keys<1..2^16-1>;  // only use first
+//     CipherSuite cipher_suites<0..255>;
+//     DHPublicKey init_keys<1..2^16-1>;
 //     Credential credential;
 //     tls::opaque signature<0..2^16-1>;
 // } UserInitKey;
@@ -334,7 +334,6 @@ operator>>(tls::istream& in, GroupOperation& obj);
 //     GroupOperation operation;
 //
 //     uint32 signer_index;
-//     SignatureScheme algorithm;
 //     opaque signature<1..2^16-1>;
 //     opaque confirmation<1..2^8-1>;
 // } Handshake;

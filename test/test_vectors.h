@@ -18,6 +18,13 @@ struct TreeMathTestVectors
   tls::vector<uint32_t, 4> sibling;
 };
 
+tls::istream&
+operator>>(tls::istream& str, TreeMathTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const TreeMathTestVectors& tv);
+
+/////
+
 struct CryptoTestVectors
 {
   static const std::string file_name;
@@ -68,40 +75,42 @@ struct CryptoTestVectors
   TestCase case_x448;
 };
 
+tls::istream&
+operator>>(tls::istream& str, CryptoTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const CryptoTestVectors& tv);
+
+/////
+
 struct MessagesTestVectors
 {
   static const std::string file_name;
 
-  MessagesTestVectors()
-    : user_init_key_all()
-    , case_p256_p256(CipherSuite::P256_SHA256_AES128GCM)
-    , case_x25519_ed25519(CipherSuite::X25519_SHA256_AES128GCM)
-    , case_p521_p521(CipherSuite::P521_SHA512_AES256GCM)
-    , case_x448_ed448(CipherSuite::X448_SHA512_AES256GCM)
-  {}
-
   struct TestCase
   {
     CipherSuite cipher_suite;
-    UserInitKey user_init_key;
-    WelcomeInfo welcome_info;
-    Welcome welcome;
-    Handshake add;
-    Handshake update;
-    Handshake remove;
+    SignatureScheme sig_scheme;
 
-    TestCase(CipherSuite suite)
-      : cipher_suite(suite)
-      , user_init_key()
-      , welcome_info(suite)
-      , welcome()
-      , add(suite)
-      , update(suite)
-      , remove(suite)
-    {}
+    tls::opaque<4> user_init_key;
+    tls::opaque<4> welcome_info;
+    tls::opaque<4> welcome;
+    tls::opaque<4> add;
+    tls::opaque<4> update;
+    tls::opaque<4> remove;
   };
 
-  UserInitKey user_init_key_all;
+  uint32_t epoch;
+  uint32_t signer_index;
+  uint32_t removed;
+  tls::opaque<1> user_id;
+  tls::opaque<1> group_id;
+  tls::opaque<1> uik_id;
+  tls::opaque<1> dh_seed;
+  tls::opaque<1> sig_seed;
+  tls::opaque<1> random;
+
+  SignatureScheme uik_all_scheme;
+  tls::opaque<4> user_init_key_all;
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
@@ -109,16 +118,19 @@ struct MessagesTestVectors
   TestCase case_x448_ed448;
 };
 
-struct TestVectors
-{
-  TreeMathTestVectors tree_math;
-  CryptoTestVectors crypto;
-  MessagesTestVectors messages;
+tls::istream&
+operator>>(tls::istream& str, MessagesTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
-  static const TestVectors& get();
-  void dump();
+/////
+
+template<typename T>
+struct TestLoader
+{
+  static const T& get();
 
 private:
   static bool _initialized;
-  static TestVectors _vectors;
+  static T _vectors;
 };

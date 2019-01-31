@@ -72,35 +72,43 @@ const std::string MessagesTestVectors::file_name = "./messages.bin";
 tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 {
-  return str >> obj.cipher_suite >> obj.user_init_key >> obj.welcome >>
-         obj.add >> obj.update >> obj.remove;
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_key >>
+         obj.welcome_info >> obj.welcome >> obj.add >> obj.update >> obj.remove;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& obj)
 {
-  return str << obj.cipher_suite << obj.user_init_key << obj.welcome << obj.add
-             << obj.update << obj.remove;
+  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_key
+             << obj.welcome_info << obj.welcome << obj.add << obj.update
+             << obj.remove;
 }
 
 tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors& obj)
 {
-  return str >> obj.user_init_key_all >> obj.case_p256_p256 >>
-         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+  return str >> obj.epoch >> obj.signer_index >> obj.removed >> obj.user_id >>
+         obj.group_id >> obj.uik_id >> obj.dh_seed >> obj.sig_seed >>
+         obj.random >> obj.uik_all_scheme >> obj.user_init_key_all >>
+         obj.case_p256_p256 >> obj.case_x25519_ed25519 >> obj.case_p521_p521 >>
+         obj.case_x448_ed448;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors& obj)
 {
-  return str << obj.user_init_key_all << obj.case_p256_p256
-             << obj.case_x25519_ed25519 << obj.case_p521_p521
-             << obj.case_x448_ed448;
+  return str << obj.epoch << obj.signer_index << obj.removed << obj.user_id
+             << obj.group_id << obj.uik_id << obj.dh_seed << obj.sig_seed
+             << obj.random << obj.uik_all_scheme << obj.user_init_key_all
+             << obj.case_p256_p256 << obj.case_x25519_ed25519
+             << obj.case_p521_p521 << obj.case_x448_ed448;
 }
 
 ///
 /// File Handling
 ///
+
+const size_t max_file_size = 1 << 19; // 512KB
 
 bytes
 read_file(const std::string& filename)
@@ -123,6 +131,7 @@ read_file(const std::string& filename)
   return vec;
 }
 
+// TODO delete
 void
 write_file(const std::string& filename, const bytes& vec)
 {
@@ -142,37 +151,28 @@ load_test(T& val)
   tls::unmarshal(ser, val);
 }
 
+///
+/// TestLoader
+///
+
 template<typename T>
-void
-dump_test(const T& val)
-{
-  auto ser = tls::marshal(val);
-  write_file(T::file_name, ser);
-}
+bool TestLoader<T>::_initialized = false;
 
-///
-/// TestVectors
-///
+template<typename T>
+T TestLoader<T>::_vectors;
 
-bool TestVectors::_initialized = false;
-TestVectors TestVectors::_vectors = TestVectors();
-
-const TestVectors&
-TestVectors::get()
+template<typename T>
+const T&
+TestLoader<T>::get()
 {
   if (!_initialized) {
-    load_test(_vectors.tree_math);
-    load_test(_vectors.crypto);
-    load_test(_vectors.messages);
+    load_test(_vectors);
+    _initialized = true;
   }
 
   return _vectors;
 }
 
-void
-TestVectors::dump()
-{
-  dump_test(tree_math);
-  dump_test(crypto);
-  dump_test(messages);
-}
+template class TestLoader<TreeMathTestVectors>;
+template class TestLoader<CryptoTestVectors>;
+template class TestLoader<MessagesTestVectors>;
