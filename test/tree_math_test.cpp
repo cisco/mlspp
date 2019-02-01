@@ -33,36 +33,36 @@ vector_test(F function, A answers)
 class TreeMathTest : public ::testing::Test
 {
 protected:
-  const TestVectors& tv;
+  const TreeMathTestVectors& tv;
 
   TreeMathTest()
-    : tv(TestVectors::get())
+    : tv(TestLoader<TreeMathTestVectors>::get())
   {}
 };
 
 TEST_F(TreeMathTest, Root)
 {
   for (uint32_t n = 1; n <= TreeMathTestVectors::tree_size; ++n) {
-    ASSERT_EQ(tree_math::root(n), tv.tree_math.root[n - 1]);
+    ASSERT_EQ(tree_math::root(n), tv.root[n - 1]);
   }
 }
 
 TEST_F(TreeMathTest, Left)
 {
-  vector_test(tree_math::left, tv.tree_math.left);
+  vector_test(tree_math::left, tv.left);
 }
 
 TEST_F(TreeMathTest, Right)
 {
-  vector_test(size_scope(tree_math::right), tv.tree_math.right);
+  vector_test(size_scope(tree_math::right), tv.right);
 }
 
 TEST_F(TreeMathTest, Parent)
 {
-  vector_test(size_scope(tree_math::parent), tv.tree_math.parent);
+  vector_test(size_scope(tree_math::parent), tv.parent);
 }
 
 TEST_F(TreeMathTest, Sibling)
 {
-  vector_test(size_scope(tree_math::sibling), tv.tree_math.sibling);
+  vector_test(size_scope(tree_math::sibling), tv.sibling);
 }

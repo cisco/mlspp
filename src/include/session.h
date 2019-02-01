@@ -11,6 +11,7 @@ class Session
 {
 public:
   Session(const CipherList& supported_ciphersuites,
+          const bytes& init_secret,
           const SignaturePrivateKey& identity_priv,
           const Credential& credential);
 
@@ -25,18 +26,14 @@ public:
                                 const bytes& user_init_key);
 
   std::pair<bytes, bytes> add(const bytes& user_init_key) const;
-  bytes update();
-  bytes remove(uint32_t index) const;
+  bytes update(const bytes& init_secret);
+  bytes remove(const bytes& eviction_secret, uint32_t index) const;
 
   void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake);
 
-  epoch_t current_epoch() const { return _current_epoch; }
-  CipherSuite cipher_suite() const;
-
-private:
+protected:
   CipherList _supported_ciphersuites;
-  bytes _next_leaf_secret;
   bytes _init_secret;
   tls::opaque<2> _user_init_key;
   SignaturePrivateKey _identity_priv;
@@ -49,5 +46,22 @@ private:
   State& current_state();
   const State& current_state() const;
 };
+
+namespace test {
+
+// Enable tests to ispect the internals of the session
+class TestSession : public Session
+{
+public:
+  using Session::Session;
+  epoch_t current_epoch() const;
+  CipherSuite cipher_suite() const;
+  bytes current_epoch_secret() const;
+  bytes current_application_secret() const;
+  bytes current_confirmation_key() const;
+  bytes current_init_secret() const;
+};
+
+}
 
 } // namespace mls

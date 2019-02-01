@@ -15,6 +15,31 @@
 namespace mls {
 
 ///
+/// Test mode controls
+///
+
+namespace test {
+
+int DeterministicECIES::_refct = 0;
+
+bool
+deterministic_signature_scheme(SignatureScheme scheme)
+{
+  switch (scheme) {
+    case SignatureScheme::P256_SHA256:
+      return false;
+    case SignatureScheme::P521_SHA512:
+      return false;
+    case SignatureScheme::Ed25519:
+      return true;
+    case SignatureScheme::Ed448:
+      return true;
+  }
+}
+
+}
+
+///
 /// CipherSuite and SignatureScheme
 ///
 
@@ -738,7 +763,7 @@ struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1, 7> label;
-  State group_state;
+  GroupState group_state;
 };
 
 tls::ostream&
@@ -791,7 +816,7 @@ bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
-              const State& state,
+              const GroupState& state,
               size_t size)
 {
   std::string mls_label = std::string("mls10 ") + label;
@@ -1156,6 +1181,12 @@ ECIESCiphertext
 DHPublicKey::encrypt(const bytes& plaintext) const
 {
   auto ephemeral = DHPrivateKey::generate(_suite);
+  if (test::DeterministicECIES::enabled()) {
+    auto seed = to_bytes();
+    seed.insert(seed.end(), plaintext.begin(), plaintext.end());
+    ephemeral = DHPrivateKey::derive(_suite, seed);
+  }
+
   auto shared_secret = ephemeral.derive(*this);
 
   bytes key, nonce;
@@ -1274,6 +1305,13 @@ SignaturePrivateKey::generate(SignatureScheme scheme)
 {
   auto type = ossl_key_type(scheme);
   return SignaturePrivateKey(scheme, OpenSSLKey::generate(type));
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& data)
+{
+  auto type = ossl_key_type(scheme);
+  return SignaturePrivateKey(scheme, OpenSSLKey::derive(type, data));
 }
 
 bytes

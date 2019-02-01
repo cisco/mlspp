@@ -94,6 +94,10 @@ UserInitKey::to_be_signed() const
   return out.bytes();
 }
 
+// XXX(rlb@ipv.sx): Don't compare signature, since some signature
+// algorithms are non-deterministic.  Instead, we just verify that
+// the public keys are the same and both signatures are valid over
+// the same contents.
 bool
 operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 {
@@ -105,15 +109,15 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.cipher_suites << obj.init_keys << obj.credential
-             << obj.signature;
+  return out << obj.user_init_key_id << obj.cipher_suites << obj.init_keys
+             << obj.credential << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  return in >> obj.cipher_suites >> obj.init_keys >> obj.credential >>
-         obj.signature;
+  return in >> obj.user_init_key_id >> obj.cipher_suites >> obj.init_keys >>
+         obj.credential >> obj.signature;
 }
 
 // WelcomeInfo

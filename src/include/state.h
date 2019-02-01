@@ -8,6 +8,35 @@
 
 namespace mls {
 
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   optional<Credential> roster<1..2^32-1>;
+//   optional<PublicKey> tree<1..2^32-1>;
+//   opaque transcript_hash<0..255>;
+// } GroupState;
+struct GroupState
+{
+  tls::opaque<1> group_id;
+  uint32_t epoch;
+  Roster roster;
+  RatchetTree tree;
+  tls::opaque<1> transcript_hash;
+
+  GroupState(const bytes& group_id,
+             CipherSuite suite,
+             const bytes& leaf_secret,
+             const Credential& credential);
+
+  GroupState(const WelcomeInfo& info);
+
+  GroupState(CipherSuite suite);
+
+  friend tls::ostream& operator<<(tls::ostream& out, const GroupState& obj);
+  friend tls::istream& operator>>(tls::istream& out, GroupState& obj);
+  friend bool operator==(const GroupState& lhs, const GroupState& rhs);
+};
+
 class State
 {
 public:
@@ -18,6 +47,7 @@ public:
   // Initialize an empty group
   State(const bytes& group_id,
         CipherSuite suite,
+        const bytes& leaf_secret,
         const SignaturePrivateKey& identity_priv,
         const Credential& credential);
 
@@ -34,6 +64,7 @@ public:
   static InitialInfo negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
+    const bytes& leaf_secret,
     const SignaturePrivateKey& identity_priv,
     const Credential& credential,
     const UserInitKey& user_init_key);
@@ -49,30 +80,34 @@ public:
   Handshake update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake remove(uint32_t index) const;
+  Handshake remove(const bytes& evict_secret, uint32_t index) const;
 
   ///
   /// Generic handshake message handler
   ///
   State handle(const Handshake& handshake) const;
 
-  epoch_t epoch() const { return _epoch; }
+  ///
+  /// Accessors
+  ///
+  epoch_t epoch() const { return _state.epoch; }
   uint32_t index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
+  bytes epoch_secret() const { return _epoch_secret; }
+  bytes application_secret() const { return _application_secret; }
+  bytes confirmation_key() const { return _confirmation_key; }
+  bytes init_secret() const { return _init_secret; }
 
 private:
   // Shared confirmed state:
-  tls::opaque<2> _group_id;
   CipherSuite _suite;
-  epoch_t _epoch;
-  Roster _roster;
-  RatchetTree _tree;
-  tls::opaque<1> _transcript_hash;
+  GroupState _state;
 
   // Shared secret state
-  tls::opaque<1> _message_master_secret;
-  tls::opaque<1> _init_secret;
+  tls::opaque<1> _epoch_secret;
+  tls::opaque<1> _application_secret;
   tls::opaque<1> _confirmation_key;
+  tls::opaque<1> _init_secret;
 
   // Per-participant state
   uint32_t _index;

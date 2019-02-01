@@ -65,6 +65,31 @@ operator<<(tls::ostream& out, const SignatureScheme& obj);
 tls::istream&
 operator>>(tls::istream& in, SignatureScheme& obj);
 
+// Methods to help with testing
+namespace test {
+
+// DeterministicECIES enables RAII-based requests for ECIES to be
+// done deterministically.  The RAII pattern is used here to ensure
+// that the determinism always gets turned off.  To avoid conflicts
+// between multiple requests for determinism, determinism is turned
+// off when the last object in the stack is destroyed; it's
+// basically a ref-counted bool.
+class DeterministicECIES
+{
+public:
+  DeterministicECIES() { _refct += 1; }
+  ~DeterministicECIES() { _refct -= 1; }
+  static bool enabled() { return _refct > 0; }
+
+private:
+  static int _refct;
+};
+
+bool
+deterministic_signature_scheme(SignatureScheme scheme);
+
+}
+
 // Adapt standard pointers so that they can be "typed" to handle
 // custom deleters more easily.
 template<typename T>
@@ -147,13 +172,13 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data);
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
-class State;
+class GroupState;
 
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
-              const State& state,
+              const GroupState& state,
               const size_t length);
 
 class AESGCM
@@ -245,6 +270,7 @@ protected:
 
 // DH specialization
 struct ECIESCiphertext;
+struct DHPrivateKey;
 
 class DHPublicKey : public PublicKey
 {
@@ -290,6 +316,8 @@ public:
   using PrivateKey::PrivateKey;
 
   static SignaturePrivateKey generate(SignatureScheme scheme);
+  static SignaturePrivateKey derive(SignatureScheme scheme,
+                                    const bytes& secret);
 
   bytes sign(const bytes& message) const;
   const SignaturePublicKey& public_key() const;

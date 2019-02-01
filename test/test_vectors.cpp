@@ -23,43 +23,142 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 }
 
 ///
+/// CryptoTestVectors
+///
+
+const std::string CryptoTestVectors::file_name = "./crypto.bin";
+
+tls::istream&
+operator>>(tls::istream& str, CryptoTestVectors::TestCase& obj)
+{
+  return str >> obj.hkdf_extract_out >> obj.derive_secret_state >>
+         obj.derive_secret_out >> obj.derive_key_pair_pub >> obj.ecies_out;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const CryptoTestVectors::TestCase& obj)
+{
+  return str << obj.hkdf_extract_out << obj.derive_secret_state
+             << obj.derive_secret_out << obj.derive_key_pair_pub
+             << obj.ecies_out;
+}
+
+tls::istream&
+operator>>(tls::istream& str, CryptoTestVectors& obj)
+{
+  return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
+         obj.derive_secret_secret >> obj.derive_secret_label >>
+         obj.derive_secret_length >> obj.derive_key_pair_seed >>
+         obj.ecies_plaintext >> obj.case_p256 >> obj.case_x25519 >>
+         obj.case_p521 >> obj.case_x448;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const CryptoTestVectors& obj)
+{
+  return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
+             << obj.derive_secret_secret << obj.derive_secret_label
+             << obj.derive_secret_length << obj.derive_key_pair_seed
+             << obj.ecies_plaintext << obj.case_p256 << obj.case_x25519
+             << obj.case_p521 << obj.case_x448;
+}
+
+///
 /// MessagesTestVectors
 ///
 
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 
 tls::istream&
-operator>>(tls::istream& str, MessagesTestVectors::CipherSuiteCase& obj)
+operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 {
-  return str >> obj.cipher_suite >> obj.user_init_key >> obj.welcome >>
-         obj.add >> obj.update >> obj.remove;
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_key >>
+         obj.welcome_info >> obj.welcome >> obj.add >> obj.update >> obj.remove;
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const MessagesTestVectors::CipherSuiteCase& obj)
+operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& obj)
 {
-  return str << obj.cipher_suite << obj.user_init_key << obj.welcome << obj.add
-             << obj.update << obj.remove;
+  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_key
+             << obj.welcome_info << obj.welcome << obj.add << obj.update
+             << obj.remove;
 }
 
 tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors& obj)
 {
-  return str >> obj.user_init_key_all >> obj.case_p256_p256 >>
-         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+  return str >> obj.epoch >> obj.signer_index >> obj.removed >> obj.user_id >>
+         obj.group_id >> obj.uik_id >> obj.dh_seed >> obj.sig_seed >>
+         obj.random >> obj.uik_all_scheme >> obj.user_init_key_all >>
+         obj.case_p256_p256 >> obj.case_x25519_ed25519 >> obj.case_p521_p521 >>
+         obj.case_x448_ed448;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors& obj)
 {
-  return str << obj.user_init_key_all << obj.case_p256_p256
+  return str << obj.epoch << obj.signer_index << obj.removed << obj.user_id
+             << obj.group_id << obj.uik_id << obj.dh_seed << obj.sig_seed
+             << obj.random << obj.uik_all_scheme << obj.user_init_key_all
+             << obj.case_p256_p256 << obj.case_x25519_ed25519
+             << obj.case_p521_p521 << obj.case_x448_ed448;
+}
+
+///
+/// SessionTestVectors
+///
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors::Epoch& obj)
+{
+  return str >> obj.welcome >> obj.handshake >> obj.epoch >> obj.epoch_secret >>
+         obj.application_secret >> obj.confirmation_key >> obj.init_secret;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors::Epoch& obj)
+{
+  return str << obj.welcome << obj.handshake << obj.epoch << obj.epoch_secret
+             << obj.application_secret << obj.confirmation_key
+             << obj.init_secret;
+}
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors::TestCase& obj)
+{
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_keys >>
+         obj.transcript;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors::TestCase& obj)
+{
+  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_keys
+             << obj.transcript;
+}
+
+tls::istream&
+operator>>(tls::istream& str, SessionTestVectors& obj)
+{
+  return str >> obj.group_size >> obj.group_id >> obj.case_p256_p256 >>
+         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const SessionTestVectors& obj)
+{
+  return str << obj.group_size << obj.group_id << obj.case_p256_p256
              << obj.case_x25519_ed25519 << obj.case_p521_p521
              << obj.case_x448_ed448;
 }
 
+const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
+
 ///
 /// File Handling
 ///
+
+const size_t max_file_size = 1 << 19; // 512KB
 
 bytes
 read_file(const std::string& filename)
@@ -82,6 +181,7 @@ read_file(const std::string& filename)
   return vec;
 }
 
+// TODO delete
 void
 write_file(const std::string& filename, const bytes& vec)
 {
@@ -101,35 +201,29 @@ load_test(T& val)
   tls::unmarshal(ser, val);
 }
 
+///
+/// TestLoader
+///
+
 template<typename T>
-void
-dump_test(const T& val)
-{
-  auto ser = tls::marshal(val);
-  write_file(T::file_name, ser);
-}
+bool TestLoader<T>::_initialized = false;
 
-///
-/// TestVectors
-///
+template<typename T>
+T TestLoader<T>::_vectors;
 
-bool TestVectors::_initialized = false;
-TestVectors TestVectors::_vectors = TestVectors();
-
-const TestVectors&
-TestVectors::get()
+template<typename T>
+const T&
+TestLoader<T>::get()
 {
   if (!_initialized) {
-    load_test(_vectors.tree_math);
-    load_test(_vectors.messages);
+    load_test(_vectors);
+    _initialized = true;
   }
 
   return _vectors;
 }
 
-void
-TestVectors::dump()
-{
-  dump_test(tree_math);
-  dump_test(messages);
-}
+template class TestLoader<TreeMathTestVectors>;
+template class TestLoader<CryptoTestVectors>;
+template class TestLoader<MessagesTestVectors>;
+template class TestLoader<BasicSessionTestVectors>;
