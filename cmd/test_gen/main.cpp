@@ -9,14 +9,15 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
+  tv.n_leaves = 255;
 
-  for (int n = 1; n <= TreeMathTestVectors::tree_size; ++n) {
+  for (int n = 1; n <= tv.n_leaves; ++n) {
     auto val = mls::tree_math::root(n);
     tv.root.push_back(val);
   }
 
-  auto n = TreeMathTestVectors::tree_size;
-  for (int x = 0; x < TreeMathTestVectors::tree_size; ++x) {
+  auto n = tv.n_leaves;
+  for (int x = 0; x < tree_math::node_width(tv.n_leaves); ++x) {
     auto left = mls::tree_math::left(x);
     tv.left.push_back(left);
 
@@ -28,6 +29,29 @@ generate_tree_math()
 
     auto sibling = mls::tree_math::sibling(x, n);
     tv.sibling.push_back(sibling);
+  }
+
+  return tv;
+}
+
+ResolutionTestVectors
+generate_resolution()
+{
+  ResolutionTestVectors tv;
+  tv.n_leaves = 7;
+
+  auto width = tree_math::node_width(tv.n_leaves);
+  auto n_cases = (1 << width);
+
+  tv.cases.resize(n_cases);
+  for (uint32_t t = 0; t < n_cases; ++t) {
+    tv.cases[t].resize(width);
+
+    auto nodes = ResolutionTestVectors::make_tree(t, width);
+    for (uint32_t i = 0; i < width; ++i) {
+      auto res = tree_math::resolve(nodes, i);
+      tv.cases[t][i] = ResolutionTestVectors::compact(res);
+    }
   }
 
   return tv;
@@ -381,6 +405,9 @@ main()
   TreeMathTestVectors tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
+  ResolutionTestVectors resolution = generate_resolution();
+  write_test_vectors(resolution);
+
   CryptoTestVectors crypto = generate_crypto();
   write_test_vectors(crypto);
 
@@ -392,16 +419,16 @@ main()
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
-  if (false) {
-    verify_reproducible(generate_tree_math);
-    verify_reproducible(generate_crypto);
-    verify_reproducible(generate_messages);
-    verify_session_repro(generate_basic_session);
-  }
+  verify_reproducible(generate_tree_math);
+  verify_reproducible(generate_resolution);
+  verify_reproducible(generate_crypto);
+  verify_reproducible(generate_messages);
+  verify_session_repro(generate_basic_session);
 
   // Verify that the test vectors load
   try {
     TestLoader<TreeMathTestVectors>::get();
+    TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();

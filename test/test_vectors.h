@@ -10,8 +10,8 @@ using namespace mls;
 struct TreeMathTestVectors
 {
   static const std::string file_name;
-  static const size_t tree_size = 255;
 
+  uint32_t n_leaves = 255;
   tls::vector<uint32_t, 4> root;
   tls::vector<uint32_t, 4> left;
   tls::vector<uint32_t, 4> right;
@@ -29,11 +29,14 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& tv);
 struct ResolutionTestVectors
 {
   static const std::string file_name;
-  static const size_t tree_size = 7;
 
   typedef tls::vector<uint8_t, 1> Resolution;
-  typedef tls::vector<Resolution, 1> TreeCase;
+  typedef tls::vector<Resolution, 2> TreeCase;
 
+  static std::vector<bool> make_tree(uint32_t t, uint32_t n);
+  static std::vector<uint8_t> compact(const std::vector<uint32_t>& res);
+
+  uint32_t n_leaves;
   tls::vector<TreeCase, 4> cases;
 };
 
