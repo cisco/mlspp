@@ -65,7 +65,7 @@ TEST_F(TreeMathTest, Sibling)
   vector_test(size_scope(tree_math::sibling), tv.sibling);
 }
 
-TEST_F(ResolutionTest, Interop)
+TEST(ResolutionTest, Interop)
 {
   auto tv = TestLoader<ResolutionTestVectors>::get();
 

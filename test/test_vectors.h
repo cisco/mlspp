@@ -31,13 +31,13 @@ struct ResolutionTestVectors
   static const std::string file_name;
 
   typedef tls::vector<uint8_t, 1> Resolution;
-  typedef tls::vector<Resolution, 2> TreeCase;
+  typedef tls::vector<Resolution, 2> ResolutionCase;
 
   static std::vector<bool> make_tree(uint32_t t, uint32_t n);
   static std::vector<uint8_t> compact(const std::vector<uint32_t>& res);
 
   uint32_t n_leaves;
-  tls::vector<TreeCase, 4> cases;
+  tls::vector<ResolutionCase, 4> cases;
 };
 
 tls::istream&
