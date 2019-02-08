@@ -104,6 +104,37 @@ operator<<(tls::ostream& str, const CryptoTestVectors& tv);
 
 /////
 
+struct KeyScheduleTestVectors
+{
+  static const std::string file_name;
+
+  struct Epoch
+  {
+    tls::opaque<1> update_secret;
+    tls::opaque<2> group_state;
+
+    tls::opaque<1> application_secret;
+    tls::opaque<1> confirmation_key;
+    tls::opaque<1> init_secret;
+  };
+
+  struct TestCase
+  {
+    CipherSuite suite;
+    tls::vector<Epoch, 2> epochs;
+  };
+
+  TestCase case_p256;
+  TestCase case_x25519;
+};
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors& tv);
+
+/////
+
 struct MessagesTestVectors
 {
   static const std::string file_name;

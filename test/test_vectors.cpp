@@ -106,6 +106,48 @@ operator<<(tls::ostream& str, const CryptoTestVectors& obj)
 }
 
 ///
+/// KeyScheduleTestVectors
+///
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors::Epoch& obj)
+{
+  return str >> obj.update_secret >> obj.group_state >>
+         obj.application_secret >> obj.confirmation_key >> obj.init_secret;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors::Epoch& obj)
+{
+  return str << obj.update_secret << obj.group_state << obj.application_secret
+             << obj.confirmation_key << obj.init_secret;
+}
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors::TestCase& obj)
+{
+  return str >> obj.suite >> obj.epochs;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors::TestCase& obj)
+{
+  return str << obj.suite << obj.epochs;
+}
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors& obj)
+{
+  return str >> obj.case_p256 >> obj.case_x25519;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors& obj)
+{
+  return str << obj.case_p256 << obj.case_x25519;
+}
+
+///
 /// MessagesTestVectors
 ///
 
