@@ -23,6 +23,24 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 }
 
 ///
+/// ResolutionTestVectors
+///
+
+const std::string ResolutionTestVectors::file_name = "./resolution.bin";
+
+tls::istream&
+operator>>(tls::istream& str, ResolutionTestVectors& tv)
+{
+  return str >> tv.cases;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const ResolutionTestVectors& tv)
+{
+  return str << tv.cases;
+}
+
+///
 /// CryptoTestVectors
 ///
 

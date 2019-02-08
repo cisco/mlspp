@@ -26,6 +26,24 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& tv);
 
 /////
 
+struct ResolutionTestVectors
+{
+  static const std::string file_name;
+  static const size_t tree_size = 7;
+
+  typedef tls::vector<uint8_t, 1> Resolution;
+  typedef tls::vector<Resolution, 1> TreeCase;
+
+  tls::vector<TreeCase, 4> cases;
+};
+
+tls::istream&
+operator>>(tls::istream& str, ResolutionTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const ResolutionTestVectors& tv);
+
+/////
+
 struct CryptoTestVectors
 {
   static const std::string file_name;
