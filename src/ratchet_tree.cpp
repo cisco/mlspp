@@ -171,7 +171,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
     RatchetNode path_node{ _suite };
     path_node.public_key = new_node(secret).public_key();
 
-    for (const auto& node : resolve(node)) {
+    for (const auto& node : tree_math::resolve(_nodes, node)) {
       auto ciphertext = _nodes[node]->public_key().encrypt(secret);
       path_node.node_secrets.push_back(ciphertext);
     }
@@ -206,7 +206,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
     const auto& path_node = path.nodes[i + 1];
 
     if (!have_secret) {
-      auto res = resolve(curr);
+      auto res = tree_math::resolve(_nodes, curr);
       if (path_node.node_secrets.size() != res.size()) {
         throw ProtocolError("Malformed RatchetNode");
       }
@@ -374,23 +374,6 @@ RatchetTreeNode
 RatchetTree::new_node(const bytes& data) const
 {
   return RatchetTreeNode(_suite, data);
-}
-
-std::vector<uint32_t>
-RatchetTree::resolve(uint32_t node) const
-{
-  if (_nodes[node]) {
-    return { node };
-  }
-
-  if (tree_math::level(node) == 0) {
-    return {};
-  }
-
-  auto left = resolve(tree_math::left(node));
-  auto right = resolve(tree_math::right(node, size()));
-  left.insert(left.end(), right.begin(), right.end());
-  return left;
 }
 
 bool
