@@ -13,13 +13,55 @@ const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
 tls::istream&
 operator>>(tls::istream& str, TreeMathTestVectors& obj)
 {
-  return str >> obj.root >> obj.left >> obj.right >> obj.parent >> obj.sibling;
+  return str >> obj.n_leaves >> obj.root >> obj.left >> obj.right >>
+         obj.parent >> obj.sibling;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 {
-  return str << obj.root << obj.left << obj.right << obj.parent << obj.sibling;
+  return str << obj.n_leaves << obj.root << obj.left << obj.right << obj.parent
+             << obj.sibling;
+}
+
+///
+/// ResolutionTestVectors
+///
+
+const std::string ResolutionTestVectors::file_name = "./resolution.bin";
+
+std::vector<bool>
+ResolutionTestVectors::make_tree(uint32_t t, uint32_t n)
+{
+  auto vec = std::vector<bool>(n);
+  for (int i = 0; i < vec.size(); ++i) {
+    vec[i] = t & 1;
+    t >>= 1;
+  }
+  return vec;
+}
+
+std::vector<uint8_t>
+ResolutionTestVectors::compact(const std::vector<uint32_t>& res)
+{
+  std::vector<uint8_t> out(res.size());
+  std::transform(res.begin(),
+                 res.end(),
+                 out.begin(),
+                 [](uint32_t c) -> uint8_t { return c; });
+  return out;
+}
+
+tls::istream&
+operator>>(tls::istream& str, ResolutionTestVectors& tv)
+{
+  return str >> tv.n_leaves >> tv.cases;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const ResolutionTestVectors& tv)
+{
+  return str << tv.n_leaves << tv.cases;
 }
 
 ///
@@ -224,6 +266,7 @@ TestLoader<T>::get()
 }
 
 template class TestLoader<TreeMathTestVectors>;
+template class TestLoader<ResolutionTestVectors>;
 template class TestLoader<CryptoTestVectors>;
 template class TestLoader<MessagesTestVectors>;
 template class TestLoader<BasicSessionTestVectors>;
