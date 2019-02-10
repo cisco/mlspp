@@ -1,4 +1,5 @@
 #include "state.h"
+#include "test_vectors.h"
 #include <gtest/gtest.h>
 
 using namespace mls;
@@ -200,4 +201,42 @@ TEST(OtherStateTest, CipherNegotiation)
   auto add = initialB.second.second;
   auto stateA = State(idkA, credA, insA, welcome, add);
   ASSERT_EQ(stateA, stateB);
+}
+
+class KeyScheduleTest : public ::testing::Test
+{
+protected:
+  const KeyScheduleTestVectors& tv;
+
+  KeyScheduleTest()
+    : tv(TestLoader<KeyScheduleTestVectors>::get())
+  {}
+
+  void interop(const KeyScheduleTestVectors::TestCase& test_case)
+  {
+    auto suite = test_case.suite;
+    auto secret_size = Digest(suite).output_size();
+    bytes init_secret(secret_size, 0);
+
+    GroupState group_state(suite);
+    tls::unmarshal(tv.base_group_state, group_state);
+
+    for (const auto& epoch : test_case.epochs) {
+      auto secrets = State::derive_epoch_secrets(
+        suite, init_secret, epoch.update_secret, group_state);
+      ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
+      ASSERT_EQ(epoch.application_secret, secrets.application_secret);
+      ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);
+      ASSERT_EQ(epoch.init_secret, secrets.init_secret);
+
+      group_state.epoch += 1;
+      init_secret = secrets.init_secret;
+    }
+  }
+};
+
+TEST_F(KeyScheduleTest, Interop)
+{
+  interop(tv.case_p256);
+  interop(tv.case_x25519);
 }
