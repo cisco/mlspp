@@ -122,7 +122,7 @@ State::State(const SignaturePrivateKey& identity_priv,
   _state.roster.add(credential);
 
   // Ratchet forward into shared state
-  derive_epoch_keys(_zero);
+  update_epoch_secrets(_zero);
 
   if (!verify(handshake)) {
     throw InvalidParameterError("Handshake signature failed to verify");
@@ -268,7 +268,7 @@ State::handle(const Add& add)
   _state.roster.add(add.init_key.credential);
 
   // Update symmetric state
-  derive_epoch_keys(_zero);
+  update_epoch_secrets(_zero);
 }
 
 void
@@ -294,6 +294,22 @@ State::handle(uint32_t index, const Remove& remove)
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
   _state.roster.remove(remove.removed);
+}
+
+State::EpochSecrets
+State::derive_epoch_secrets(CipherSuite suite,
+                            const bytes& init_secret,
+                            const bytes& update_secret,
+                            const GroupState& state)
+{
+  auto secret_size = Digest(suite).output_size();
+  auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
+  return {
+    epoch_secret,
+    derive_secret(suite, epoch_secret, "app", state, secret_size),
+    derive_secret(suite, epoch_secret, "confirm", state, secret_size),
+    derive_secret(suite, epoch_secret, "init", state, secret_size),
+  };
 }
 
 ///
@@ -333,19 +349,18 @@ State::update_leaf(uint32_t index,
     _state.tree.merge_path(index, secrets);
   }
 
-  derive_epoch_keys(_state.tree.root_secret());
+  update_epoch_secrets(_state.tree.root_secret());
 }
 
 void
-State::derive_epoch_keys(const bytes& update_secret)
+State::update_epoch_secrets(const bytes& update_secret)
 {
-  _epoch_secret = hkdf_extract(_suite, _init_secret, update_secret);
-  _application_secret = derive_secret(
-    _suite, _epoch_secret, "app", _state, Digest(_suite).output_size());
-  _confirmation_key = derive_secret(
-    _suite, _epoch_secret, "confirm", _state, Digest(_suite).output_size());
-  _init_secret = derive_secret(
-    _suite, _epoch_secret, "init", _state, Digest(_suite).output_size());
+  auto secrets =
+    derive_epoch_secrets(_suite, _init_secret, update_secret, _state);
+  _epoch_secret = secrets.epoch_secret;
+  _application_secret = secrets.application_secret;
+  _confirmation_key = secrets.confirmation_key;
+  _init_secret = secrets.init_secret;
 }
 
 Handshake
