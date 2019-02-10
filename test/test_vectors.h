@@ -111,8 +111,8 @@ struct KeyScheduleTestVectors
   struct Epoch
   {
     tls::opaque<1> update_secret;
-    tls::opaque<2> group_state;
 
+    tls::opaque<1> epoch_secret;
     tls::opaque<1> application_secret;
     tls::opaque<1> confirmation_key;
     tls::opaque<1> init_secret;
@@ -123,6 +123,9 @@ struct KeyScheduleTestVectors
     CipherSuite suite;
     tls::vector<Epoch, 2> epochs;
   };
+
+  uint32_t n_epochs;
+  tls::opaque<4> base_group_state;
 
   TestCase case_p256;
   TestCase case_x25519;

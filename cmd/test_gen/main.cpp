@@ -57,6 +57,62 @@ generate_resolution()
   return tv;
 }
 
+KeyScheduleTestVectors
+generate_key_schedule()
+{
+  KeyScheduleTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<KeyScheduleTestVectors::TestCase*> cases{
+    &tv.case_p256,
+    &tv.case_x25519,
+  };
+
+  GroupState base_group_state(CipherSuite::P256_SHA256_AES128GCM);
+  base_group_state.group_id = { 0xA0, 0xA0, 0xA0, 0xA0 };
+
+  tv.n_epochs = 100;
+  tv.base_group_state = tls::marshal(base_group_state);
+
+  // Construct a test case for each suite
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+    auto secret_size = Digest(suite).output_size();
+
+    test_case->suite = suite;
+
+    GroupState group_state = base_group_state;
+    bytes init_secret(secret_size, 0);
+    bytes update_secret(secret_size, 0);
+
+    for (int j = 0; j < tv.n_epochs; ++j) {
+      auto secrets = State::derive_epoch_secrets(
+        suite, init_secret, update_secret, group_state);
+
+      test_case->epochs.push_back({
+        update_secret,
+        secrets.epoch_secret,
+        secrets.application_secret,
+        secrets.confirmation_key,
+        secrets.init_secret,
+      });
+
+      init_secret = secrets.init_secret;
+      for (auto& val : update_secret) {
+        val += 1;
+      }
+      group_state.epoch += 1;
+    }
+  }
+
+  return tv;
+}
+
 CryptoTestVectors
 generate_crypto()
 {
@@ -411,6 +467,9 @@ main()
   CryptoTestVectors crypto = generate_crypto();
   write_test_vectors(crypto);
 
+  KeyScheduleTestVectors key_schedule = generate_key_schedule();
+  write_test_vectors(key_schedule);
+
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
 
@@ -422,6 +481,7 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
+  verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
 
@@ -430,6 +490,7 @@ main()
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
+    TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {
