@@ -98,6 +98,21 @@ public:
   bytes confirmation_key() const { return _confirmation_key; }
   bytes init_secret() const { return _init_secret; }
 
+  ///
+  /// Static access to the key schedule
+  ///
+  struct EpochSecrets
+  {
+    bytes epoch_secret;
+    bytes application_secret;
+    bytes confirmation_key;
+    bytes init_secret;
+  };
+  static EpochSecrets derive_epoch_secrets(CipherSuite suite,
+                                           const bytes& init_secret,
+                                           const bytes& update_secret,
+                                           const GroupState& state);
+
 private:
   // Shared confirmed state:
   CipherSuite _suite;
@@ -142,7 +157,7 @@ private:
                    const optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
-  void derive_epoch_keys(const bytes& update_secret);
+  void update_epoch_secrets(const bytes& update_secret);
 
   // Sign this state with the associated private key
   Handshake sign(const GroupOperation& operation) const;

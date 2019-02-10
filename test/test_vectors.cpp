@@ -106,6 +106,52 @@ operator<<(tls::ostream& str, const CryptoTestVectors& obj)
 }
 
 ///
+/// KeyScheduleTestVectors
+///
+
+const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors::Epoch& obj)
+{
+  return str >> obj.update_secret >> obj.epoch_secret >>
+         obj.application_secret >> obj.confirmation_key >> obj.init_secret;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors::Epoch& obj)
+{
+  return str << obj.update_secret << obj.epoch_secret << obj.application_secret
+             << obj.confirmation_key << obj.init_secret;
+}
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors::TestCase& obj)
+{
+  return str >> obj.suite >> obj.epochs;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors::TestCase& obj)
+{
+  return str << obj.suite << obj.epochs;
+}
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors& obj)
+{
+  return str >> obj.n_epochs >> obj.base_group_state >> obj.case_p256 >>
+         obj.case_x25519;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors& obj)
+{
+  return str << obj.n_epochs << obj.base_group_state << obj.case_p256
+             << obj.case_x25519;
+}
+
+///
 /// MessagesTestVectors
 ///
 
@@ -268,5 +314,6 @@ TestLoader<T>::get()
 template class TestLoader<TreeMathTestVectors>;
 template class TestLoader<ResolutionTestVectors>;
 template class TestLoader<CryptoTestVectors>;
+template class TestLoader<KeyScheduleTestVectors>;
 template class TestLoader<MessagesTestVectors>;
 template class TestLoader<BasicSessionTestVectors>;
