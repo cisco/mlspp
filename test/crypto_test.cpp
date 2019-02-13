@@ -18,8 +18,8 @@ using namespace mls;
 // * DH
 //    * ECDH P-256  TODO
 //    * ECDH P-521  TODO
-//    * X25519      TODO https://tools.ietf.org/html/rfc7748#section-6.1
-//    * X448        TODO https://tools.ietf.org/html/rfc7748#section-6.2
+//    * X25519      DONE
+//    * X448        DONE
 // * Signature
 //    * ECDSA P-256 TODO
 //    * ECDSA P-521 TODO
@@ -68,6 +68,43 @@ protected:
                                       "748a637985771d347f0545659f14e99d"
                                       "ef842d8eb335f4eecfdbf831824b4c49"
                                       "15956c96");
+
+  // DH with X25519
+  // https://tools.ietf.org/html/rfc7748#section-6.1
+  const bytes x25519_skA = from_hex("77076d0a7318a57d3c16c17251b26645"
+                                    "df4c2f87ebc0992ab177fba51db92c2a");
+  const bytes x25519_pkA = from_hex("8520f0098930a754748b7ddcb43ef75a"
+                                    "0dbf3a0d26381af4eba4a98eaa9b4e6a");
+  const bytes x25519_skB = from_hex("5dab087e624a8a4b79e17f8b83800ee6"
+                                    "6f3bb1292618b6fd1c2f8b27ff88e0eb");
+  const bytes x25519_pkB = from_hex("de9edb7d7b7dc1b4d35b61c2ece43537"
+                                    "3f8343c85b78674dadfc7e146f882b4f");
+  const bytes x25519_K = from_hex("4a5d9d5ba4ce2de1728e3bf480350f25"
+                                  "e07e21c947d19e3376f09b3c1e161742");
+
+  // DH with X448
+  // https://tools.ietf.org/html/rfc7748#section-6.2
+  const bytes x448_skA = from_hex("9a8f4925d1519f5775cf46b04b58"
+                                  "00d4ee9ee8bae8bc5565d498c28d"
+                                  "d9c9baf574a94197448973910063"
+                                  "82a6f127ab1d9ac2d8c0a598726b");
+  const bytes x448_pkA = from_hex("9b08f7cc31b7e3e67d22d5aea121"
+                                  "074a273bd2b83de09c63faa73d2c"
+                                  "22c5d9bbc836647241d953d40c5b"
+                                  "12da88120d53177f80e532c41fa0");
+  const bytes x448_skB = from_hex("1c306a7ac2a0e2e0990b294470cb"
+                                  "a339e6453772b075811d8fad0d1d"
+                                  "6927c120bb5ee8972b0d3e21374c"
+                                  "9c921b09d1b0366f10b65173992d");
+  const bytes x448_pkB = from_hex("3eb7a829b0cd20f5bcfc0b599b6f"
+                                  "eccf6da4627107bdb0d4f345b430"
+                                  "27d8b972fc3e34fb4232a13ca706"
+                                  "dcb57aec3dae07bdc1c67bf33609");
+  const bytes x448_K = from_hex("07fff4181ac6cc95ec1c16a94a0f"
+                                "74d12da232ce40a77552281d282b"
+                                "b60c0b56fd2464c335543936521c"
+                                "24403085d59a449a5037514a879d");
+
   const CryptoTestVectors& tv;
 
   CryptoTest()
@@ -203,6 +240,40 @@ TEST_F(CryptoTest, DHSerialize)
     tls::unmarshal(tls::marshal(gX), gX2);
     ASSERT_EQ(gX2, gX);
   }
+}
+
+TEST_F(CryptoTest, X25519)
+{
+  auto suite = CipherSuite::X25519_SHA256_AES128GCM;
+  auto skA = DHPrivateKey::parse(suite, x25519_skA);
+  auto skB = DHPrivateKey::parse(suite, x25519_skB);
+
+  auto pkA = DHPublicKey(suite, x25519_pkA);
+  auto pkB = DHPublicKey(suite, x25519_pkB);
+  ASSERT_EQ(pkA, skA.public_key());
+  ASSERT_EQ(pkB, skB.public_key());
+
+  auto kAB = skA.derive(pkB);
+  auto kBA = skB.derive(pkA);
+  ASSERT_EQ(kAB, x25519_K);
+  ASSERT_EQ(kBA, x25519_K);
+}
+
+TEST_F(CryptoTest, X448)
+{
+  auto suite = CipherSuite::X448_SHA512_AES256GCM;
+  auto skA = DHPrivateKey::parse(suite, x448_skA);
+  auto skB = DHPrivateKey::parse(suite, x448_skB);
+
+  auto pkA = DHPublicKey(suite, x448_pkA);
+  auto pkB = DHPublicKey(suite, x448_pkB);
+  ASSERT_EQ(pkA, skA.public_key());
+  ASSERT_EQ(pkB, skB.public_key());
+
+  auto kAB = skA.derive(pkB);
+  auto kBA = skB.derive(pkA);
+  ASSERT_EQ(kAB, x448_K);
+  ASSERT_EQ(kBA, x448_K);
 }
 
 TEST_F(CryptoTest, ECIES)

@@ -288,6 +288,7 @@ public:
   using PrivateKey::PrivateKey;
 
   static DHPrivateKey generate(CipherSuite suite);
+  static DHPrivateKey parse(CipherSuite suite, const bytes& data);
   static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;

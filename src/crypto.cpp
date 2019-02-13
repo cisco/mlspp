@@ -138,7 +138,6 @@ ossl_key_type(SignatureScheme scheme)
 
 struct OpenSSLKey
 {
-public:
   OpenSSLKey()
     : _key(nullptr)
   {}
@@ -158,6 +157,7 @@ public:
   virtual bytes marshal() const = 0;
   virtual void generate() = 0;
   virtual void set_public(const bytes& data) = 0;
+  virtual void set_private(const bytes& data) = 0;
   virtual void set_secret(const bytes& data) = 0;
   virtual OpenSSLKey* dup() const = 0;
   virtual OpenSSLKey* dup_public() const = 0;
@@ -166,6 +166,7 @@ public:
   // key types.
   static OpenSSLKey* create(OpenSSLKeyType type);
   static OpenSSLKey* generate(OpenSSLKeyType type);
+  static OpenSSLKey* parse_private(OpenSSLKeyType type, const bytes& data);
   static OpenSSLKey* derive(OpenSSLKeyType type, const bytes& data);
 
   bool operator==(const OpenSSLKey& other)
@@ -370,6 +371,17 @@ public:
     _key.reset(pkey);
   }
 
+  virtual void set_private(const bytes& data)
+  {
+    auto pkey =
+      EVP_PKEY_new_raw_private_key(_type, nullptr, data.data(), data.size());
+    if (!pkey) {
+      throw OpenSSLError::current();
+    }
+
+    _key.reset(pkey);
+  }
+
   virtual void set_secret(const bytes& data)
   {
     DigestType digest_type;
@@ -389,14 +401,7 @@ public:
     bytes digest =
       Digest(digest_type).write(dh_hash_prefix).write(data).digest();
     digest.resize(secret_size());
-
-    auto pkey = EVP_PKEY_new_raw_private_key(
-      _type, nullptr, digest.data(), digest.size());
-    if (!pkey) {
-      throw OpenSSLError::current();
-    }
-
-    _key.reset(pkey);
+    set_private(digest);
   }
 
   virtual OpenSSLKey* dup() const
@@ -533,6 +538,21 @@ public:
     reset(eckey.release());
   }
 
+  virtual void set_private(const bytes& data)
+  {
+    auto eckey = make_typed_unique(new_ec_key());
+
+    auto group = EC_KEY_get0_group(eckey.get());
+    auto d = make_typed_unique(BN_bin2bn(data.data(), data.size(), nullptr));
+    auto pt = make_typed_unique(EC_POINT_new(group));
+    EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
+
+    EC_KEY_set_private_key(eckey.get(), d.get());
+    EC_KEY_set_public_key(eckey.get(), pt.get());
+
+    reset(eckey.release());
+  }
+
   virtual void set_secret(const bytes& data)
   {
     DigestType digest_type;
@@ -549,19 +569,7 @@ public:
 
     bytes digest =
       Digest(digest_type).write(dh_hash_prefix).write(data).digest();
-
-    EC_KEY* eckey = new_ec_key();
-
-    auto group = EC_KEY_get0_group(eckey);
-    auto d =
-      make_typed_unique(BN_bin2bn(digest.data(), digest.size(), nullptr));
-    auto pt = make_typed_unique(EC_POINT_new(group));
-    EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
-
-    EC_KEY_set_private_key(eckey, d.get());
-    EC_KEY_set_public_key(eckey, pt.get());
-
-    reset(eckey);
+    set_private(digest);
   }
 
   virtual OpenSSLKey* dup() const
@@ -633,6 +641,14 @@ OpenSSLKey::generate(OpenSSLKeyType type)
 {
   auto key = make_typed_unique(create(type));
   key->generate();
+  return key.release();
+}
+
+OpenSSLKey*
+OpenSSLKey::parse_private(OpenSSLKeyType type, const bytes& data)
+{
+  auto key = make_typed_unique(create(type));
+  key->set_private(data);
   return key.release();
 }
 
@@ -1202,6 +1218,13 @@ DHPrivateKey::generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::generate(type));
+}
+
+DHPrivateKey
+DHPrivateKey::parse(CipherSuite suite, const bytes& data)
+{
+  auto type = ossl_key_type(suite);
+  return DHPrivateKey(suite, OpenSSLKey::parse_private(type, data));
 }
 
 DHPrivateKey
