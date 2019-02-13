@@ -8,27 +8,17 @@ using namespace mls;
 #define CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
 #define SIG_SCHEME SignatureScheme::P256_SHA256
 
-// TODO Known-answer tests of all individual primitives:
-// * Digest
-//    * SHA256      DONE
-//    * SHA512      DONE
-// * Encryption
-//    * AES-128-GCM DONE
-//    * AES-256-GCM DONE
-// * DH
-//    * ECDH P-256  TODO
-//    * ECDH P-521  TODO
-//    * X25519      DONE
-//    * X448        DONE
-// * Signature
-//    * ECDSA P-256 TODO
-//    * ECDSA P-521 TODO
-//    * Ed25519     TODO https://tools.ietf.org/html/rfc8032#section-7.1
-//    * Ed448       TODO https://tools.ietf.org/html/rfc8032#section-7.4
-
 class CryptoTest : public ::testing::Test
 {
 protected:
+  // Known-answer tests of almost individual primitives (except for
+  // EDCSA variants, which are non-deterministic):
+  //
+  // * Digest: SHA256, SHA512
+  // * Encryption: AES-128-GCM, AES-256-GCM
+  // * DH: P-256, P-521, X25519, X448
+  // * Signature: Ed25519, Ed448
+
   // SHA-256 and SHA-512
   const bytes sha2_in =
     from_hex("6162636462636465636465666465666765666768666768696768696a68696a6b6"
@@ -69,6 +59,24 @@ protected:
                                       "ef842d8eb335f4eecfdbf831824b4c49"
                                       "15956c96");
 
+  // DH with P-256
+  // KASValidityTest_ECCEphemeralUnified_NOKC_ZZOnly_init.fax [EC]
+  // http://csrc.nist.gov/groups/STM/cavp/documents/keymgmt/kastestvectors.zip
+  const bytes p256dh_skA = from_hex("aaafcb133789a51d3428ce4342f2f630"
+                                    "db4971b8b429c1957283c81cd9f09b60");
+  const bytes p256dh_pkA = from_hex("04"
+                                    "14dc091c0f85c274b1e6d297155fe22c"
+                                    "de34f206ca507455d3a5a7425cd374de"
+                                    "8acf695806a778ae1177199d2dfb2ae4"
+                                    "8c22cc39944b6c3c3864bdf6c2a6dde9");
+  const bytes p256dh_pkB = from_hex("04"
+                                    "5ce7b86e3b32660403e63712ef0998de"
+                                    "ae1027faec3c1be9f76f934dfeb58e98"
+                                    "f4cf075b39405dd1f1adeb090107edcf"
+                                    "b2b4963739d87679e3056cb0557d0adf");
+  const bytes p256dh_K = from_hex("35669cd5c244ba6c1ea89b8802c3d1db"
+                                  "815cd769979072e6556eb98548c65f7d");
+
   // DH with X25519
   // https://tools.ietf.org/html/rfc7748#section-6.1
   const bytes x25519_skA = from_hex("77076d0a7318a57d3c16c17251b26645"
@@ -81,6 +89,42 @@ protected:
                                     "3f8343c85b78674dadfc7e146f882b4f");
   const bytes x25519_K = from_hex("4a5d9d5ba4ce2de1728e3bf480350f25"
                                   "e07e21c947d19e3376f09b3c1e161742");
+
+  // DH with P-521
+  // KASValidityTest_ECCEphemeralUnified_NOKC_ZZOnly_init.fax [EE]
+  // http://csrc.nist.gov/groups/STM/cavp/documents/keymgmt/kastestvectors.zip
+  const bytes p521dh_skA = from_hex("001b6c7e40c615aad053891bededa03e"
+                                    "ccc60934fc18b0da6896c541e9c565c7"
+                                    "b7aa9fdd874a996ab5c728167e05589c"
+                                    "35e216e5293aeb552835fc32912be687"
+                                    "bed2");
+  const bytes p521dh_pkA = from_hex("04"
+                                    "01c0ffe846f803ef1075433bd1ce85d1"
+                                    "6b6137592f5787e8852f101dba1de81e"
+                                    "32d590d4e78990b8247edc8063715d5c"
+                                    "a21d7cbb16f2527e6ccccb8282365488"
+                                    "3d32"
+                                    "014dd62897dfced9210107ad05768bbd"
+                                    "44881daf3b1cc9fcbd9141d389568a91"
+                                    "fe4abb2b02eff837eea26a6d0e0f8109"
+                                    "d2438c1fc88487bcae8af68ab054739b"
+                                    "6fa6");
+  const bytes p521dh_pkB = from_hex("04"
+                                    "01e08b81167e04fa9f86ae23b78d3df8"
+                                    "4dba5475b9976f6aef87076c86d0892f"
+                                    "fe19ca9da3ed3cee31dd3d7524b06a6b"
+                                    "372a7f45c4d977de2dde9797cd0ce240"
+                                    "8aa8"
+                                    "019200a7c4159d4f6104e90b49cbf477"
+                                    "2e78d2e1ad0561e45a3e031a1f84c61e"
+                                    "22599d04f98052f3e1d5c76781fa77c6"
+                                    "006132e3e0737e914595f89d392d5383"
+                                    "bec9");
+  const bytes p521dh_K = from_hex("00561eb17d856552c21b8cbe7d3d60d1"
+                                  "ea0db738b77d4050fa2dbd0773edc395"
+                                  "09854d9e30e843964ed3fd303339e338"
+                                  "f31289120a38f94e9dc9ff7d4b3ea8f2"
+                                  "5e01");
 
   // DH with X448
   // https://tools.ietf.org/html/rfc7748#section-6.2
@@ -278,6 +322,30 @@ TEST_F(CryptoTest, DHSerialize)
     tls::unmarshal(tls::marshal(gX), gX2);
     ASSERT_EQ(gX2, gX);
   }
+}
+
+TEST_F(CryptoTest, P256DH)
+{
+  auto suite = CipherSuite::P256_SHA256_AES128GCM;
+  auto skA = DHPrivateKey::parse(suite, p256dh_skA);
+  auto pkA = DHPublicKey(suite, p256dh_pkA);
+  ASSERT_EQ(pkA, skA.public_key());
+
+  auto pkB = DHPublicKey(suite, p256dh_pkB);
+  auto kAB = skA.derive(pkB);
+  ASSERT_EQ(kAB, p256dh_K);
+}
+
+TEST_F(CryptoTest, P521DH)
+{
+  auto suite = CipherSuite::P521_SHA512_AES256GCM;
+  auto skA = DHPrivateKey::parse(suite, p521dh_skA);
+  auto pkA = DHPublicKey(suite, p521dh_pkA);
+  ASSERT_EQ(pkA, skA.public_key());
+
+  auto pkB = DHPublicKey(suite, p521dh_pkB);
+  auto kAB = skA.derive(pkB);
+  ASSERT_EQ(kAB, p521dh_K);
 }
 
 TEST_F(CryptoTest, X25519)
