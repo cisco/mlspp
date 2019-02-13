@@ -317,6 +317,7 @@ public:
   using PrivateKey::PrivateKey;
 
   static SignaturePrivateKey generate(SignatureScheme scheme);
+  static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
   static SignaturePrivateKey derive(SignatureScheme scheme,
                                     const bytes& secret);
 

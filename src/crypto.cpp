@@ -1331,6 +1331,13 @@ SignaturePrivateKey::generate(SignatureScheme scheme)
 }
 
 SignaturePrivateKey
+SignaturePrivateKey::parse(SignatureScheme scheme, const bytes& data)
+{
+  auto type = ossl_key_type(scheme);
+  return SignaturePrivateKey(scheme, OpenSSLKey::parse_private(type, data));
+}
+
+SignaturePrivateKey
 SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& data)
 {
   auto type = ossl_key_type(scheme);

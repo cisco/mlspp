@@ -105,6 +105,44 @@ protected:
                                 "b60c0b56fd2464c335543936521c"
                                 "24403085d59a449a5037514a879d");
 
+  // Signature with Ed25519
+  // https://tools.ietf.org/html/rfc8032#section-7.1
+  const bytes ed25519_sk = from_hex("833fe62409237b9d62ec77587520911e"
+                                    "9a759cec1d19755b7da901b96dca3d42");
+  const bytes ed25519_pk = from_hex("ec172b93ad5e563bf4932c70e1245034"
+                                    "c35467ef2efd4d64ebf819683467e2bf");
+  const bytes ed25519_msg = from_hex("ddaf35a193617abacc417349ae204131"
+                                     "12e6fa4e89a97ea20a9eeee64b55d39a"
+                                     "2192992a274fc1a836ba3c23a3feebbd"
+                                     "454d4423643ce80e2a9ac94fa54ca49f");
+  const bytes ed25519_sig = from_hex("dc2a4459e7369633a52b1bf277839a00"
+                                     "201009a3efbf3ecb69bea2186c26b589"
+                                     "09351fc9ac90b3ecfdfbc7c66431e030"
+                                     "3dca179c138ac17ad9bef1177331a704");
+
+  // Signature with Ed448
+  // https://tools.ietf.org/html/rfc8032#section-7.2
+  const bytes ed448_sk = from_hex("d65df341ad13e008567688baedda8e9d"
+                                  "cdc17dc024974ea5b4227b6530e339bf"
+                                  "f21f99e68ca6968f3cca6dfe0fb9f4fa"
+                                  "b4fa135d5542ea3f01");
+  const bytes ed448_pk = from_hex("df9705f58edbab802c7f8363cfe5560a"
+                                  "b1c6132c20a9f1dd163483a26f8ac53a"
+                                  "39d6808bf4a1dfbd261b099bb03b3fb5"
+                                  "0906cb28bd8a081f00");
+  const bytes ed448_msg = from_hex("bd0f6a3747cd561bdddf4640a332461a"
+                                   "4a30a12a434cd0bf40d766d9c6d458e5"
+                                   "512204a30c17d1f50b5079631f64eb31"
+                                   "12182da3005835461113718d1a5ef944");
+  const bytes ed448_sig = from_hex("554bc2480860b49eab8532d2a533b7d5"
+                                   "78ef473eeb58c98bb2d0e1ce488a98b1"
+                                   "8dfde9b9b90775e67f47d4a1c3482058"
+                                   "efc9f40d2ca033a0801b63d45b3b722e"
+                                   "f552bad3b4ccb667da350192b61c508c"
+                                   "f7b6b5adadc2c8d9a446ef003fb05cba"
+                                   "5f30e88e36ec2703b349ca229c267083"
+                                   "3900");
+
   const CryptoTestVectors& tv;
 
   CryptoTest()
@@ -341,4 +379,28 @@ TEST_F(CryptoTest, SignatureSerialize)
     tls::unmarshal(tls::marshal(gX), gX2);
     ASSERT_EQ(gX2, gX);
   }
+}
+
+TEST_F(CryptoTest, Ed25519)
+{
+  auto scheme = SignatureScheme::Ed25519;
+  auto sk = SignaturePrivateKey::parse(scheme, ed25519_sk);
+  auto pk = SignaturePublicKey(scheme, ed25519_pk);
+  ASSERT_EQ(pk, sk.public_key());
+
+  auto sig = sk.sign(ed25519_msg);
+  ASSERT_EQ(sig, ed25519_sig);
+  ASSERT_TRUE(pk.verify(ed25519_msg, sig));
+}
+
+TEST_F(CryptoTest, Ed448)
+{
+  auto scheme = SignatureScheme::Ed448;
+  auto sk = SignaturePrivateKey::parse(scheme, ed448_sk);
+  auto pk = SignaturePublicKey(scheme, ed448_pk);
+  ASSERT_EQ(pk, sk.public_key());
+
+  auto sig = sk.sign(ed448_msg);
+  ASSERT_EQ(sig, ed448_sig);
+  ASSERT_TRUE(pk.verify(ed448_msg, sig));
 }
