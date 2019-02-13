@@ -764,6 +764,17 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
   return md;
 }
 
+bool
+constant_time_eq(const bytes& lhs, const bytes& rhs)
+{
+  uint8_t diff;
+  size_t size = (lhs.size() < rhs.size()) ? lhs.size() : rhs.size();
+  for (int i = 0; i < size; ++i) {
+    diff |= (lhs[i] ^ rhs[i]);
+  }
+  return (diff == 0);
+}
+
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {

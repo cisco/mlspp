@@ -169,6 +169,9 @@ random_bytes(size_t size);
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
+bool
+constant_time_eq(const bytes& lhs, const bytes& rhs);
+
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
