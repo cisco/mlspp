@@ -105,8 +105,6 @@ TEST_F(MessagesTest, UserInitKey)
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
-    CipherSuite::P521_SHA512_AES256GCM,
-    CipherSuite::X448_SHA512_AES256GCM,
   };
 
   UserInitKey constructed;
@@ -135,14 +133,4 @@ TEST_F(MessagesTest, Suite_P256_P256)
 TEST_F(MessagesTest, Suite_X25519_Ed25519)
 {
   tls_round_trip_all(tv.case_x25519_ed25519, true);
-}
-
-TEST_F(MessagesTest, Suite_P521_P521)
-{
-  tls_round_trip_all(tv.case_p521_p521, false);
-}
-
-TEST_F(MessagesTest, Suite_X448_Ed448)
-{
-  tls_round_trip_all(tv.case_x448_ed448, true);
 }

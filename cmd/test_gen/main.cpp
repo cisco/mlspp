@@ -121,15 +121,11 @@ generate_crypto()
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
-    CipherSuite::P521_SHA512_AES256GCM,
-    CipherSuite::X448_SHA512_AES256GCM,
   };
 
   std::vector<CryptoTestVectors::TestCase*> cases{
     &tv.case_p256,
     &tv.case_x25519,
-    &tv.case_p521,
-    &tv.case_x448,
   };
 
   std::string derive_secret_label_string = "test";
@@ -187,22 +183,16 @@ generate_messages()
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
-    CipherSuite::P521_SHA512_AES256GCM,
-    CipherSuite::X448_SHA512_AES256GCM,
   };
 
   std::vector<SignatureScheme> schemes{
     SignatureScheme::P256_SHA256,
     SignatureScheme::Ed25519,
-    SignatureScheme::P521_SHA512,
-    SignatureScheme::Ed448,
   };
 
   std::vector<MessagesTestVectors::TestCase*> cases{
     &tv.case_p256_p256,
     &tv.case_x25519_ed25519,
-    &tv.case_p521_p521,
-    &tv.case_x448_ed448,
   };
 
   // Set the inputs
@@ -300,22 +290,16 @@ generate_basic_session()
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
-    CipherSuite::P521_SHA512_AES256GCM,
-    CipherSuite::X448_SHA512_AES256GCM,
   };
 
   std::vector<SignatureScheme> schemes{
     SignatureScheme::P256_SHA256,
     SignatureScheme::Ed25519,
-    SignatureScheme::P521_SHA512,
-    SignatureScheme::Ed448,
   };
 
   std::vector<SessionTestVectors::TestCase*> cases{
     &tv.case_p256_p256,
     &tv.case_x25519_ed25519,
-    &tv.case_p521_p521,
-    &tv.case_x448_ed448,
   };
 
   tv.group_size = 5;
@@ -449,7 +433,6 @@ verify_session_repro(const F& generator)
 
   // EdDSA-based cases should repro
   verify_equal_marshaled(v0.case_x25519_ed25519, v1.case_x25519_ed25519);
-  verify_equal_marshaled(v0.case_x448_ed448, v1.case_x448_ed448);
 
   // TODO(rlb@ipv.sx): Verify that the parts of the non-EdDSA cases
   // that should reproduce actually do.

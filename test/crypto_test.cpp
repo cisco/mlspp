@@ -104,8 +104,6 @@ TEST_F(CryptoTest, Interop)
 {
   interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
   interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
-  interop(CipherSuite::P521_SHA512_AES256GCM, tv.case_p521);
-  interop(CipherSuite::X448_SHA512_AES256GCM, tv.case_x448);
 }
 
 TEST_F(CryptoTest, SHA2)

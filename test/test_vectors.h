@@ -87,14 +87,10 @@ struct CryptoTestVectors
   CryptoTestVectors()
     : case_p256(CipherSuite::P256_SHA256_AES128GCM)
     , case_x25519(CipherSuite::X25519_SHA256_AES128GCM)
-    , case_p521(CipherSuite::P521_SHA512_AES256GCM)
-    , case_x448(CipherSuite::X448_SHA512_AES256GCM)
   {}
 
   TestCase case_p256;
   TestCase case_x25519;
-  TestCase case_p521;
-  TestCase case_x448;
 };
 
 tls::istream&
@@ -170,8 +166,6 @@ struct MessagesTestVectors
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
-  TestCase case_p521_p521;
-  TestCase case_x448_ed448;
 };
 
 tls::istream&
@@ -230,8 +224,6 @@ struct SessionTestVectors
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
-  TestCase case_p521_p521;
-  TestCase case_x448_ed448;
 };
 
 tls::istream&
