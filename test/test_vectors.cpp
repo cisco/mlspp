@@ -91,8 +91,7 @@ operator>>(tls::istream& str, CryptoTestVectors& obj)
   return str >> obj.hkdf_extract_salt >> obj.hkdf_extract_ikm >>
          obj.derive_secret_secret >> obj.derive_secret_label >>
          obj.derive_secret_length >> obj.derive_key_pair_seed >>
-         obj.ecies_plaintext >> obj.case_p256 >> obj.case_x25519 >>
-         obj.case_p521 >> obj.case_x448;
+         obj.ecies_plaintext >> obj.case_p256 >> obj.case_x25519;
 }
 
 tls::ostream&
@@ -101,8 +100,7 @@ operator<<(tls::ostream& str, const CryptoTestVectors& obj)
   return str << obj.hkdf_extract_salt << obj.hkdf_extract_ikm
              << obj.derive_secret_secret << obj.derive_secret_label
              << obj.derive_secret_length << obj.derive_key_pair_seed
-             << obj.ecies_plaintext << obj.case_p256 << obj.case_x25519
-             << obj.case_p521 << obj.case_x448;
+             << obj.ecies_plaintext << obj.case_p256 << obj.case_x25519;
 }
 
 ///
@@ -178,8 +176,7 @@ operator>>(tls::istream& str, MessagesTestVectors& obj)
   return str >> obj.epoch >> obj.signer_index >> obj.removed >> obj.user_id >>
          obj.group_id >> obj.uik_id >> obj.dh_seed >> obj.sig_seed >>
          obj.random >> obj.uik_all_scheme >> obj.user_init_key_all >>
-         obj.case_p256_p256 >> obj.case_x25519_ed25519 >> obj.case_p521_p521 >>
-         obj.case_x448_ed448;
+         obj.case_p256_p256 >> obj.case_x25519_ed25519;
 }
 
 tls::ostream&
@@ -188,8 +185,7 @@ operator<<(tls::ostream& str, const MessagesTestVectors& obj)
   return str << obj.epoch << obj.signer_index << obj.removed << obj.user_id
              << obj.group_id << obj.uik_id << obj.dh_seed << obj.sig_seed
              << obj.random << obj.uik_all_scheme << obj.user_init_key_all
-             << obj.case_p256_p256 << obj.case_x25519_ed25519
-             << obj.case_p521_p521 << obj.case_x448_ed448;
+             << obj.case_p256_p256 << obj.case_x25519_ed25519;
 }
 
 ///
@@ -229,15 +225,14 @@ tls::istream&
 operator>>(tls::istream& str, SessionTestVectors& obj)
 {
   return str >> obj.group_size >> obj.group_id >> obj.case_p256_p256 >>
-         obj.case_x25519_ed25519 >> obj.case_p521_p521 >> obj.case_x448_ed448;
+         obj.case_x25519_ed25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const SessionTestVectors& obj)
 {
   return str << obj.group_size << obj.group_id << obj.case_p256_p256
-             << obj.case_x25519_ed25519 << obj.case_p521_p521
-             << obj.case_x448_ed448;
+             << obj.case_x25519_ed25519;
 }
 
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";

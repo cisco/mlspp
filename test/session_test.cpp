@@ -276,17 +276,3 @@ TEST_F(SessionInteropTest, BasicX25519)
              SignatureScheme::Ed25519,
              basic_tv.case_x25519_ed25519);
 }
-
-TEST_F(SessionInteropTest, BasicP521)
-{
-  follow_all(CipherSuite::P521_SHA512_AES256GCM,
-             SignatureScheme::P521_SHA512,
-             basic_tv.case_p521_p521);
-}
-
-TEST_F(SessionInteropTest, BasicX448)
-{
-  follow_all(CipherSuite::X448_SHA512_AES256GCM,
-             SignatureScheme::Ed448,
-             basic_tv.case_x448_ed448);
-}
