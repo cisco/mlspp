@@ -264,18 +264,6 @@ read_file(const std::string& filename)
   return vec;
 }
 
-// TODO delete
-void
-write_file(const std::string& filename, const bytes& vec)
-{
-  std::ofstream file(filename, std::ios::out | std::ios::binary);
-  if (!file) {
-    throw std::invalid_argument("Could not create ofstream for: " + filename);
-  }
-
-  file.write(reinterpret_cast<const char*>(vec.data()), vec.size());
-}
-
 template<typename T>
 void
 load_test(T& val)

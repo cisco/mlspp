@@ -389,9 +389,7 @@ State::verify(const Handshake& handshake) const
   auto confirm_data = sig_data;
   confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
   auto confirm = hmac(_suite, _confirmation_key, confirm_data);
-
-  // TODO(rlb@ipv.sx): Verify MAC in constant time
-  auto confirm_ver = (confirm == handshake.confirmation);
+  auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
 
   return sig_ver && confirm_ver;
 }

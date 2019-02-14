@@ -169,6 +169,9 @@ random_bytes(size_t size);
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
+bool
+constant_time_eq(const bytes& lhs, const bytes& rhs);
+
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
@@ -288,6 +291,7 @@ public:
   using PrivateKey::PrivateKey;
 
   static DHPrivateKey generate(CipherSuite suite);
+  static DHPrivateKey parse(CipherSuite suite, const bytes& data);
   static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;
@@ -316,6 +320,7 @@ public:
   using PrivateKey::PrivateKey;
 
   static SignaturePrivateKey generate(SignatureScheme scheme);
+  static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
   static SignaturePrivateKey derive(SignatureScheme scheme,
                                     const bytes& secret);
 
