@@ -28,6 +28,19 @@ MESSAGE( STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR} )
 MESSAGE( STATUS "GTEST_LIBRARY: " ${GTEST_LIBRARY} )
 MESSAGE( STATUS "GTEST_MAIN_LIBRARY: " ${GTEST_MAIN_LIBRARY} )
 
+# Find clang-tidy
+find_program(
+  CLANG_TIDY_EXE
+  NAMES "clang-tidy"
+  DOC "Path to clang-tidy executable"
+  )
+if(NOT CLANG_TIDY_EXE)
+  message(STATUS "clang-tidy not found.")
+else()
+  message(STATUS "clang-tidy: ${CLANG_TIDY_EXE}")
+  set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator")
+endif()
+
 # Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
 set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")
 set(SANITIZERS "-fno-sanitize-recover=all -fsanitize=undefined -fsanitize=address") 
@@ -52,7 +65,14 @@ file(GLOB LIB_HEADER_FILES "${LIBRARY_INCLUDE_PATH}/*.h")
 file(GLOB LIB_SOURCE_FILES "${LIBRARY_SRC_PATH}/*.cpp")
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES} ${LIB_HEADER_FILES})
-target_link_libraries(mls ${OPENSSL_LIBRARIES})
+target_link_libraries(${LIB_NAME} ${OPENSSL_LIBRARIES})
+
+if(CLANG_TIDY_EXE)
+  set_target_properties(
+    ${LIB_NAME} PROPERTIES
+    CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
+  )
+endif()
 
 ###
 ### Tests

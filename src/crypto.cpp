@@ -37,7 +37,7 @@ deterministic_signature_scheme(SignatureScheme scheme)
   }
 }
 
-}
+} // namespace test
 
 ///
 /// CipherSuite and SignatureScheme
@@ -84,7 +84,7 @@ operator>>(tls::istream& in, SignatureScheme& obj)
 OpenSSLError
 OpenSSLError::current()
 {
-  unsigned long code = ERR_get_error();
+  uint64_t code = ERR_get_error();
   return OpenSSLError(ERR_error_string(code, nullptr));
 }
 
@@ -138,13 +138,16 @@ ossl_key_type(SignatureScheme scheme)
 
 struct OpenSSLKey
 {
-  OpenSSLKey()
-    : _key(nullptr)
-  {}
+  OpenSSLKey() { _key.reset(nullptr) }
 
-  OpenSSLKey(EVP_PKEY* key)
+  explicit OpenSSLKey(EVP_PKEY* key)
     : _key(key)
   {}
+
+  OpenSSLKey(const OpenSSLKey& other) = delete;
+  OpenSSLKey(OpenSSLKey&& other) = delete;
+  OpenSSLKey& operator=(const OpenSSLKey& other) = delete;
+  OpenSSLKey& operator=(const OpenSSLKey&& other) = delete;
 
   virtual ~OpenSSLKey() = default;
 
@@ -242,20 +245,6 @@ TypedDelete(EVP_PKEY* ptr)
   EVP_PKEY_free(ptr);
 }
 
-template<>
-void
-TypedDelete(OpenSSLKey* ptr)
-{
-  delete ptr;
-}
-
-template<>
-void
-TypedDelete(PublicKey* ptr)
-{
-  delete ptr;
-}
-
 // This shorthand just saves on explicit template arguments
 template<typename T>
 typed_unique_ptr<T>
@@ -283,7 +272,7 @@ enum struct RawKeyType : int
 struct RawKey : OpenSSLKey
 {
 public:
-  RawKey(RawKeyType type)
+  explicit RawKey(RawKeyType type)
     : _type(static_cast<int>(type))
   {}
 
@@ -292,7 +281,7 @@ public:
     , _type(type)
   {}
 
-  virtual OpenSSLKeyType type() const
+  override OpenSSLKeyType type() const
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -309,7 +298,7 @@ public:
     throw MissingStateError("Unknown raw key type");
   }
 
-  virtual size_t secret_size() const
+  override size_t secret_size() const
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -325,9 +314,9 @@ public:
     throw MissingStateError("Unknown raw key type");
   }
 
-  virtual size_t sig_size() const { return 200; }
-  virtual bool can_derive() const { return true; }
-  virtual bool can_sign() const
+  override size_t sig_size() const { return 200; }
+  override bool can_derive() const { return true; }
+  override bool can_sign() const
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -342,7 +331,7 @@ public:
     return false;
   }
 
-  virtual bytes marshal() const
+  override bytes marshal() const
   {
     size_t raw_len;
     if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
@@ -358,9 +347,9 @@ public:
     return raw;
   }
 
-  virtual void generate() { set_secret(random_bytes(secret_size())); }
+  override void generate() { set_secret(random_bytes(secret_size())); }
 
-  virtual void set_public(const bytes& data)
+  override void set_public(const bytes& data)
   {
     auto pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
@@ -371,7 +360,7 @@ public:
     _key.reset(pkey);
   }
 
-  virtual void set_private(const bytes& data)
+  override void set_private(const bytes& data)
   {
     auto pkey =
       EVP_PKEY_new_raw_private_key(_type, nullptr, data.data(), data.size());
@@ -382,7 +371,7 @@ public:
     _key.reset(pkey);
   }
 
-  virtual void set_secret(const bytes& data)
+  override void set_secret(const bytes& data)
   {
     DigestType digest_type;
     switch (static_cast<RawKeyType>(_type)) {
@@ -404,7 +393,7 @@ public:
     set_private(digest);
   }
 
-  virtual OpenSSLKey* dup() const
+  override OpenSSLKey* dup() const
   {
     // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
     // RatchetTree ctor tries to copy an empty key.
@@ -434,7 +423,7 @@ public:
     return dup_public();
   }
 
-  virtual OpenSSLKey* dup_public() const
+  override OpenSSLKey* dup_public() const
   {
     size_t raw_len = 0;
     if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
@@ -469,7 +458,7 @@ enum struct ECKeyType : int
 struct ECKey : OpenSSLKey
 {
 public:
-  ECKey(ECKeyType type)
+  explicit ECKey(ECKeyType type)
     : _curve_nid(static_cast<int>(type))
   {}
 
@@ -478,8 +467,8 @@ public:
     , OpenSSLKey(pkey)
   {}
 
-  virtual OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
-  virtual size_t secret_size() const
+  override OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
+  override size_t secret_size() const
   {
     auto enum_curve = static_cast<ECKeyType>(_curve_nid);
     switch (enum_curve) {
@@ -491,11 +480,11 @@ public:
 
     throw InvalidParameterError("Unknown curve");
   }
-  virtual size_t sig_size() const { return 200; }
-  virtual bool can_derive() const { return true; }
-  virtual bool can_sign() const { return true; }
+  override size_t sig_size() const { return 200; }
+  override bool can_derive() const { return true; }
+  override bool can_sign() const { return true; }
 
-  virtual bytes marshal() const
+  override bytes marshal() const
   {
     auto pub = EVP_PKEY_get0_EC_KEY(_key.get());
 
@@ -515,7 +504,7 @@ public:
     return out;
   }
 
-  virtual void generate()
+  override void generate()
   {
     auto eckey = make_typed_unique(new_ec_key());
     if (1 != EC_KEY_generate_key(eckey.get())) {
@@ -525,7 +514,7 @@ public:
     reset(eckey.release());
   }
 
-  virtual void set_public(const bytes& data)
+  override void set_public(const bytes& data)
   {
     auto eckey = make_typed_unique(new_ec_key());
 
@@ -538,7 +527,7 @@ public:
     reset(eckey.release());
   }
 
-  virtual void set_private(const bytes& data)
+  override void set_private(const bytes& data)
   {
     auto eckey = make_typed_unique(new_ec_key());
 
@@ -553,7 +542,7 @@ public:
     reset(eckey.release());
   }
 
-  virtual void set_secret(const bytes& data)
+  override void set_secret(const bytes& data)
   {
     DigestType digest_type;
     switch (static_cast<ECKeyType>(_curve_nid)) {
@@ -572,7 +561,7 @@ public:
     set_private(digest);
   }
 
-  virtual OpenSSLKey* dup() const
+  override OpenSSLKey* dup() const
   {
     // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
     // RatchetTree ctor tries to copy an empty key.
@@ -584,7 +573,7 @@ public:
     return new ECKey(_curve_nid, eckey_out);
   }
 
-  virtual OpenSSLKey* dup_public() const
+  override OpenSSLKey* dup_public() const
   {
     auto eckey = my_ec_key();
     auto group = EC_KEY_get0_group(eckey);
@@ -599,8 +588,7 @@ private:
   const int _curve_nid;
 
   ECKey(int curve_nid, EC_KEY* eckey)
-    : OpenSSLKey()
-    , _curve_nid(curve_nid)
+    : _curve_nid(curve_nid)
   {
     reset(eckey);
   }

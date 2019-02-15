@@ -245,7 +245,7 @@ public:
   void reset(OpenSSLKey* key);
 
 protected:
-  typed_unique_ptr<OpenSSLKey> _key;
+  unique_ptr<OpenSSLKey> _key;
 
   friend tls::ostream& operator<<(tls::ostream& out, const PublicKey& obj);
   friend tls::istream& operator>>(tls::istream& in, PublicKey& obj);
@@ -264,8 +264,8 @@ public:
   bool operator!=(const PrivateKey& other) const;
 
 protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-  typed_unique_ptr<PublicKey> _pub;
+  unique_ptr<OpenSSLKey> _key;
+  unique_ptr<PublicKey> _pub;
 
   PrivateKey(CipherSuite suite, OpenSSLKey* key);
   PrivateKey(SignatureScheme scheme, OpenSSLKey* key);
