@@ -28,6 +28,12 @@ MESSAGE( STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR} )
 MESSAGE( STATUS "GTEST_LIBRARY: " ${GTEST_LIBRARY} )
 MESSAGE( STATUS "GTEST_MAIN_LIBRARY: " ${GTEST_MAIN_LIBRARY} )
 
+# Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
+set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")
+set(SANITIZERS "-fno-sanitize-recover=all -fsanitize=undefined -fsanitize=address") 
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
+
 ###
 ### Library Config
 ###
