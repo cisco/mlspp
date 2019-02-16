@@ -138,7 +138,10 @@ ossl_key_type(SignatureScheme scheme)
 
 struct OpenSSLKey
 {
-  OpenSSLKey() { _key.reset(nullptr) }
+  // XXX(rlb@ipv.sx): Deleted ctor that explicitly initialized to
+  // nullptr.  Might have to replace some (!ptr.get()) instances
+  // with (!ptr) instances.
+  OpenSSLKey() = default;
 
   explicit OpenSSLKey(EVP_PKEY* key)
     : _key(key)
@@ -176,12 +179,14 @@ struct OpenSSLKey
   {
     // If one pointer is null and the other is not, then the two keys
     // are not equal
-    if (!!_key.get() != !!other._key.get()) {
+    auto lhs_present = (_key && (_key.get() != nullptr));
+    auto rhs_present = (other._key && (other._key.get() != nullptr));
+    if (lhs_present != rhs_present) {
       return false;
     }
 
     // If both pointers are null, then the two keys are equal.
-    if (!_key.get()) {
+    if (!lhs_present) {
       return true;
     }
 
@@ -245,6 +250,19 @@ TypedDelete(EVP_PKEY* ptr)
   EVP_PKEY_free(ptr);
 }
 
+template<>
+void
+TypedDelete(OpenSSLKey* ptr)
+{
+  // XXX(rlb@ipv.sx): We need to use this custom deleter because
+  // unique_ptr can't be used with forward-declared types, and I
+  // don't want to pull OpenSSLKey up into the header file.
+  //
+  // We are using a smart pointer here, just in a special way.
+  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+  delete ptr;
+}
+
 // This shorthand just saves on explicit template arguments
 template<typename T>
 typed_unique_ptr<T>
@@ -281,7 +299,7 @@ public:
     , _type(type)
   {}
 
-  override OpenSSLKeyType type() const
+  OpenSSLKeyType type() const override
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -298,7 +316,7 @@ public:
     throw MissingStateError("Unknown raw key type");
   }
 
-  override size_t secret_size() const
+  size_t secret_size() const override
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -314,9 +332,9 @@ public:
     throw MissingStateError("Unknown raw key type");
   }
 
-  override size_t sig_size() const { return 200; }
-  override bool can_derive() const { return true; }
-  override bool can_sign() const
+  size_t sig_size() const override { return 200; }
+  bool can_derive() const override { return true; }
+  bool can_sign() const override
   {
     auto enum_type = static_cast<RawKeyType>(_type);
     switch (enum_type) {
@@ -331,7 +349,7 @@ public:
     return false;
   }
 
-  override bytes marshal() const
+  bytes marshal() const override
   {
     size_t raw_len;
     if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
@@ -347,31 +365,31 @@ public:
     return raw;
   }
 
-  override void generate() { set_secret(random_bytes(secret_size())); }
+  void generate() override { set_secret(random_bytes(secret_size())); }
 
-  override void set_public(const bytes& data)
+  void set_public(const bytes& data) override
   {
     auto pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
-    if (!pkey) {
+    if (pkey == nullptr) {
       throw OpenSSLError::current();
     }
 
     _key.reset(pkey);
   }
 
-  override void set_private(const bytes& data)
+  void set_private(const bytes& data) override
   {
     auto pkey =
       EVP_PKEY_new_raw_private_key(_type, nullptr, data.data(), data.size());
-    if (!pkey) {
+    if (pkey == nullptr) {
       throw OpenSSLError::current();
     }
 
     _key.reset(pkey);
   }
 
-  override void set_secret(const bytes& data)
+  void set_secret(const bytes& data) override
   {
     DigestType digest_type;
     switch (static_cast<RawKeyType>(_type)) {
@@ -387,17 +405,14 @@ public:
         throw InvalidParameterError("set_secret not supported");
     }
 
-    bytes digest =
-      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
+    bytes digest = Digest(digest_type).write(data).digest();
     digest.resize(secret_size());
     set_private(digest);
   }
 
-  override OpenSSLKey* dup() const
+  OpenSSLKey* dup() const override
   {
-    // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
-    // RatchetTree ctor tries to copy an empty key.
-    if (!_key.get()) {
+    if (!_key || (_key.get() == nullptr)) {
       return new RawKey(_type, nullptr);
     }
 
@@ -413,7 +428,7 @@ public:
     if (rv == 1) {
       auto pkey =
         EVP_PKEY_new_raw_private_key(_type, nullptr, raw.data(), raw.size());
-      if (!pkey) {
+      if (pkey == nullptr) {
         throw OpenSSLError::current();
       }
 
@@ -423,7 +438,7 @@ public:
     return dup_public();
   }
 
-  override OpenSSLKey* dup_public() const
+  OpenSSLKey* dup_public() const override
   {
     size_t raw_len = 0;
     if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
@@ -438,7 +453,7 @@ public:
 
     auto pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, raw.data(), raw.size());
-    if (!pkey) {
+    if (pkey == nullptr) {
       throw OpenSSLError::current();
     }
 
@@ -463,12 +478,13 @@ public:
   {}
 
   ECKey(int curve_nid, EVP_PKEY* pkey)
-    : _curve_nid(curve_nid)
-    , OpenSSLKey(pkey)
+    : OpenSSLKey(pkey)
+    , _curve_nid(curve_nid)
   {}
 
-  override OpenSSLKeyType type() const { return OpenSSLKeyType::P256; }
-  override size_t secret_size() const
+  OpenSSLKeyType type() const override { return OpenSSLKeyType::P256; }
+
+  size_t secret_size() const override
   {
     auto enum_curve = static_cast<ECKeyType>(_curve_nid);
     switch (enum_curve) {
@@ -480,11 +496,12 @@ public:
 
     throw InvalidParameterError("Unknown curve");
   }
-  override size_t sig_size() const { return 200; }
-  override bool can_derive() const { return true; }
-  override bool can_sign() const { return true; }
 
-  override bytes marshal() const
+  size_t sig_size() const override { return 200; }
+  bool can_derive() const override { return true; }
+  bool can_sign() const override { return true; }
+
+  bytes marshal() const override
   {
     auto pub = EVP_PKEY_get0_EC_KEY(_key.get());
 
@@ -504,7 +521,7 @@ public:
     return out;
   }
 
-  override void generate()
+  void generate() override
   {
     auto eckey = make_typed_unique(new_ec_key());
     if (1 != EC_KEY_generate_key(eckey.get())) {
@@ -514,20 +531,20 @@ public:
     reset(eckey.release());
   }
 
-  override void set_public(const bytes& data)
+  void set_public(const bytes& data) override
   {
     auto eckey = make_typed_unique(new_ec_key());
 
     auto eckey_ptr = eckey.get();
     auto data_ptr = data.data();
-    if (!o2i_ECPublicKey(&eckey_ptr, &data_ptr, data.size())) {
+    if (nullptr == o2i_ECPublicKey(&eckey_ptr, &data_ptr, data.size())) {
       throw OpenSSLError::current();
     }
 
     reset(eckey.release());
   }
 
-  override void set_private(const bytes& data)
+  void set_private(const bytes& data) override
   {
     auto eckey = make_typed_unique(new_ec_key());
 
@@ -542,7 +559,7 @@ public:
     reset(eckey.release());
   }
 
-  override void set_secret(const bytes& data)
+  void set_secret(const bytes& data) override
   {
     DigestType digest_type;
     switch (static_cast<ECKeyType>(_curve_nid)) {
@@ -556,16 +573,13 @@ public:
         throw InvalidParameterError("set_secret not supported");
     }
 
-    bytes digest =
-      Digest(digest_type).write(dh_hash_prefix).write(data).digest();
+    bytes digest = Digest(digest_type).write(data).digest();
     set_private(digest);
   }
 
-  override OpenSSLKey* dup() const
+  OpenSSLKey* dup() const override
   {
-    // XXX(rlb@ipv.sx): This shouldn't be necessary, but somehow the
-    // RatchetTree ctor tries to copy an empty key.
-    if (!_key.get()) {
+    if (!_key || (_key.get() == nullptr)) {
       return new ECKey(_curve_nid, static_cast<EVP_PKEY*>(nullptr));
     }
 
@@ -573,10 +587,9 @@ public:
     return new ECKey(_curve_nid, eckey_out);
   }
 
-  override OpenSSLKey* dup_public() const
+  OpenSSLKey* dup_public() const override
   {
     auto eckey = my_ec_key();
-    auto group = EC_KEY_get0_group(eckey);
     auto point = EC_KEY_get0_public_key(eckey);
 
     auto eckey_out = new_ec_key();
@@ -596,7 +609,11 @@ private:
   void reset(EC_KEY* eckey)
   {
     auto pkey = EVP_PKEY_new();
+
+    // Can't be accountable for OpenSSL's internal casting
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     EVP_PKEY_assign_EC_KEY(pkey, eckey);
+
     _key.reset(pkey);
   }
 
@@ -738,13 +755,13 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
   unsigned int size = 0;
   auto type = ossl_digest_type(digest_type(suite));
   bytes md(EVP_MAX_MD_SIZE);
-  if (!HMAC(type,
-            key.data(),
-            key.size(),
-            data.data(),
-            data.size(),
-            md.data(),
-            &size)) {
+  if (nullptr == HMAC(type,
+                      key.data(),
+                      key.size(),
+                      data.data(),
+                      data.size(),
+                      md.data(),
+                      &size)) {
     throw OpenSSLError::current();
   }
 
@@ -755,9 +772,15 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs)
 {
-  uint8_t diff;
-  size_t size = (lhs.size() < rhs.size()) ? lhs.size() : rhs.size();
-  for (int i = 0; i < size; ++i) {
+  size_t size = lhs.size();
+  if (rhs.size() > size) {
+    size = rhs.size();
+  }
+
+  unsigned char diff = 0;
+  for (size_t i = 0; i < size; ++i) {
+    // Not sure why the linter thinks `diff` is signed
+    // NOLINTNEXTLINE(hicpp-signed-bitwise)
     diff |= (lhs[i] ^ rhs[i]);
   }
   return (diff == 0);
@@ -801,7 +824,7 @@ bytes
 random_bytes(size_t size)
 {
   bytes out(size);
-  if (!RAND_bytes(out.data(), out.size())) {
+  if (1 != RAND_bytes(out.data(), out.size())) {
     throw OpenSSLError::current();
   }
   return out;
@@ -876,47 +899,53 @@ AESGCM::set_aad(const bytes& aad)
 }
 
 bytes
-AESGCM::encrypt(const bytes& pt) const
+AESGCM::encrypt(const bytes& plaintext) const
 {
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
 
-  if (!EVP_EncryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+  if (1 != EVP_EncryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
     throw OpenSSLError::current();
   }
 
-  int outlen = pt.size() + tag_size;
-  bytes ct(pt.size() + tag_size);
-
-  if (_aad.size() > 0) {
-    if (!EVP_EncryptUpdate(
-          ctx.get(), nullptr, &outlen, _aad.data(), _aad.size())) {
+  int outlen = 0;
+  if (!_aad.empty()) {
+    if (1 != EVP_EncryptUpdate(
+               ctx.get(), nullptr, &outlen, _aad.data(), _aad.size())) {
       throw OpenSSLError::current();
     }
   }
 
-  if (!EVP_EncryptUpdate(ctx.get(), ct.data(), &outlen, pt.data(), pt.size())) {
+  bytes ciphertext(plaintext.size());
+  if (1 != EVP_EncryptUpdate(ctx.get(),
+                             ciphertext.data(),
+                             &outlen,
+                             plaintext.data(),
+                             plaintext.size())) {
     throw OpenSSLError::current();
   }
 
-  if (!EVP_EncryptFinal(ctx.get(), ct.data() + pt.size(), &outlen)) {
+  // Providing nullptr as an argument is safe here because this
+  // function never writes with GCM; it only computes the tag
+  if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
     throw OpenSSLError::current();
   }
 
-  if (!EVP_CIPHER_CTX_ctrl(
-        ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, ct.data() + pt.size())) {
+  bytes tag(tag_size);
+  if (1 != EVP_CIPHER_CTX_ctrl(
+             ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, tag.data())) {
     throw OpenSSLError::current();
   }
 
-  return ct;
+  return ciphertext + tag;
 }
 
 bytes
-AESGCM::decrypt(const bytes& ct) const
+AESGCM::decrypt(const bytes& ciphertext) const
 {
-  if (ct.size() < tag_size) {
+  if (ciphertext.size() < tag_size) {
     throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
   }
 
@@ -925,34 +954,40 @@ AESGCM::decrypt(const bytes& ct) const
     throw OpenSSLError::current();
   }
 
-  if (!EVP_DecryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
+  if (1 != EVP_DecryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
     throw OpenSSLError::current();
   }
 
-  uint8_t* tag = const_cast<uint8_t*>(ct.data() + ct.size() - tag_size);
-  if (!EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag)) {
+  bytes tag(ciphertext.end() - tag_size, ciphertext.end());
+  if (1 != EVP_CIPHER_CTX_ctrl(
+             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag.data())) {
     throw OpenSSLError::current();
   }
 
-  int dummy;
-  if (_aad.size() > 0) {
-    if (!EVP_DecryptUpdate(
-          ctx.get(), nullptr, &dummy, _aad.data(), _aad.size())) {
+  int out_size;
+  if (!_aad.empty()) {
+    if (1 != EVP_DecryptUpdate(
+               ctx.get(), nullptr, &out_size, _aad.data(), _aad.size())) {
       throw OpenSSLError::current();
     }
   }
 
-  bytes pt(ct.size() - tag_size);
-  if (!EVP_DecryptUpdate(
-        ctx.get(), pt.data(), &dummy, ct.data(), ct.size() - tag_size)) {
+  bytes plaintext(ciphertext.size() - tag_size);
+  if (1 != EVP_DecryptUpdate(ctx.get(),
+                             plaintext.data(),
+                             &out_size,
+                             ciphertext.data(),
+                             ciphertext.size() - tag_size)) {
     throw OpenSSLError::current();
   }
 
-  if (!EVP_DecryptFinal(ctx.get(), pt.data() + ct.size() - tag_size, &dummy)) {
+  // Providing nullptr as an argument is safe here because this
+  // function never writes with GCM; it only verifies the tag
+  if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
     throw OpenSSLError::current();
   }
 
-  return pt;
+  return plaintext;
 }
 
 size_t
@@ -975,49 +1010,49 @@ AESGCM::key_size(CipherSuite suite)
 ///
 
 PublicKey::PublicKey(CipherSuite suite)
-  : _key(OpenSSLKey::create(ossl_key_type(suite)))
-  , CipherAware(suite)
+  : CipherAware(suite)
   , SignatureAware(unknown_scheme)
+  , _key(OpenSSLKey::create(ossl_key_type(suite)))
 {}
 
 PublicKey::PublicKey(SignatureScheme scheme)
-  : _key(OpenSSLKey::create(ossl_key_type(scheme)))
-  , CipherAware(unknown_suite)
+  : CipherAware(unknown_suite)
   , SignatureAware(scheme)
+  , _key(OpenSSLKey::create(ossl_key_type(scheme)))
 {}
 
 PublicKey::PublicKey(const PublicKey& other)
-  : _key(other._key->dup())
-  , CipherAware(other)
+  : CipherAware(other)
   , SignatureAware(other)
+  , _key(other._key->dup())
 {}
 
 PublicKey::PublicKey(CipherSuite suite, const bytes& data)
-  : _key(OpenSSLKey::create(ossl_key_type(suite)))
-  , CipherAware(suite)
+  : CipherAware(suite)
   , SignatureAware(unknown_scheme)
+  , _key(OpenSSLKey::create(ossl_key_type(suite)))
 {
   reset(data);
 }
 
 PublicKey::PublicKey(SignatureScheme scheme, const bytes& data)
-  : _key(OpenSSLKey::create(ossl_key_type(scheme)))
-  , CipherAware(unknown_suite)
+  : CipherAware(unknown_suite)
   , SignatureAware(scheme)
+  , _key(OpenSSLKey::create(ossl_key_type(scheme)))
 {
   reset(data);
 }
 
 PublicKey::PublicKey(CipherSuite suite, OpenSSLKey* key)
-  : _key(key)
-  , CipherAware(suite)
+  : CipherAware(suite)
   , SignatureAware(unknown_scheme)
+  , _key(key)
 {}
 
 PublicKey::PublicKey(SignatureScheme scheme, OpenSSLKey* key)
-  : _key(key)
-  , CipherAware(unknown_suite)
+  : CipherAware(unknown_suite)
   , SignatureAware(scheme)
+  , _key(key)
 {}
 
 PublicKey&
@@ -1032,7 +1067,7 @@ PublicKey::operator=(const PublicKey& other)
 }
 
 PublicKey&
-PublicKey::operator=(PublicKey&& other)
+PublicKey::operator=(PublicKey&& other) noexcept
 {
   if (&other != this) {
     _key = std::move(other._key);
@@ -1093,10 +1128,10 @@ operator>>(tls::istream& in, PublicKey& obj)
 ///
 
 PrivateKey::PrivateKey(const PrivateKey& other)
-  : _key(other._key->dup())
-  , _pub(new PublicKey(*other._pub))
-  , CipherAware(other)
+  : CipherAware(other)
   , SignatureAware(other)
+  , _key(other._key->dup())
+  , _pub(type_preserving_dup(other._pub.get()))
 {}
 
 PrivateKey&
@@ -1104,7 +1139,7 @@ PrivateKey::operator=(const PrivateKey& other)
 {
   if (this != &other) {
     _key.reset(other._key->dup());
-    _pub.reset(new PublicKey(*other._pub));
+    _pub = type_preserving_dup(other._pub.get());
     _suite = other._suite;
     _scheme = other._scheme;
   }
@@ -1112,7 +1147,7 @@ PrivateKey::operator=(const PrivateKey& other)
 }
 
 PrivateKey&
-PrivateKey::operator=(PrivateKey&& other)
+PrivateKey::operator=(PrivateKey&& other) noexcept
 {
   if (this != &other) {
     _key = std::move(other._key);
@@ -1135,19 +1170,40 @@ PrivateKey::operator!=(const PrivateKey& other) const
   return !(*this == other);
 }
 
+std::unique_ptr<PublicKey>
+PrivateKey::type_preserving_dup(const PublicKey* pub) const
+{
+  auto dh = dynamic_cast<const DHPublicKey*>(pub);
+  auto sig = dynamic_cast<const SignaturePublicKey*>(pub);
+
+  if (dh != nullptr) {
+    return std::make_unique<DHPublicKey>(*dh);
+  }
+
+  if (sig != nullptr) {
+    return std::make_unique<SignaturePublicKey>(*sig);
+  }
+
+  throw InvalidParameterError("Unknown public key type");
+}
+
 PrivateKey::PrivateKey(CipherSuite suite, OpenSSLKey* key)
-  : _key(key)
-  , _pub(nullptr)
-  , CipherAware(suite)
+  : CipherAware(suite)
   , SignatureAware(unknown_scheme)
-{}
+  , _key(key)
+  , _pub(nullptr)
+{
+  _pub = std::make_unique<DHPublicKey>(suite, _key->dup_public());
+}
 
 PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
-  : _key(key)
-  , _pub(nullptr)
-  , CipherAware(unknown_suite)
+  : CipherAware(unknown_suite)
   , SignatureAware(scheme)
-{}
+  , _key(key)
+  , _pub(nullptr)
+{
+  _pub = std::make_unique<SignaturePublicKey>(scheme, _key->dup_public());
+}
 
 ///
 /// DHPublicKey and DHPrivateKey
@@ -1197,8 +1253,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 {
   auto ephemeral = DHPrivateKey::generate(_suite);
   if (test::DeterministicECIES::enabled()) {
-    auto seed = to_bytes();
-    seed.insert(seed.end(), plaintext.begin(), plaintext.end());
+    auto seed = to_bytes() + plaintext;
     ephemeral = DHPrivateKey::derive(_suite, seed);
   }
 
@@ -1227,10 +1282,10 @@ DHPrivateKey::parse(CipherSuite suite, const bytes& data)
 }
 
 DHPrivateKey
-DHPrivateKey::derive(CipherSuite suite, const bytes& data)
+DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::derive(type, data));
+  return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
 }
 
 bytes
@@ -1240,11 +1295,17 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
     throw InvalidParameterError("Inappropriate key(s) for derive");
   }
 
-  EVP_PKEY* priv_pkey = const_cast<EVP_PKEY*>(_key->_key.get());
-  EVP_PKEY* pub_pkey = const_cast<EVP_PKEY*>(pub._key->_key.get());
+  // This and the next line are acceptable because the OpenSSL
+  // functions fail to mark the required EVP_PKEYs as const, even
+  // though they are not modified.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+  auto priv_pkey = const_cast<EVP_PKEY*>(_key->_key.get());
+
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+  auto pub_pkey = const_cast<EVP_PKEY*>(pub._key->_key.get());
 
   auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-  if (!ctx.get()) {
+  if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
 
@@ -1285,14 +1346,17 @@ DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
 const DHPublicKey&
 DHPrivateKey::public_key() const
 {
-  auto pub = static_cast<DHPublicKey*>(_pub.get());
-  return *pub;
+  if (_pub == nullptr) {
+    throw InvalidParameterError("No public key available");
+  }
+
+  return dynamic_cast<const DHPublicKey&>(*_pub);
 }
 
 DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
   : PrivateKey(suite, key)
 {
-  _pub.reset(new DHPublicKey(suite, key->dup_public()));
+  _pub = std::make_unique<DHPublicKey>(suite, key->dup_public());
 }
 
 ///
@@ -1300,24 +1364,27 @@ DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
 ///
 
 bool
-SignaturePublicKey::verify(const bytes& msg, const bytes& sig) const
+SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 {
   if (!_key->can_sign()) {
     throw InvalidParameterError("Inappropriate key for verify");
   }
 
   auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (!ctx.get()) {
+  if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
 
-  if (1 !=
-      EVP_DigestVerifyInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+  if (1 != EVP_DigestVerifyInit(
+             ctx.get(), nullptr, nullptr, nullptr, _key->_key.get())) {
     throw OpenSSLError::current();
   }
 
-  auto rv =
-    EVP_DigestVerify(ctx.get(), sig.data(), sig.size(), msg.data(), msg.size());
+  auto rv = EVP_DigestVerify(ctx.get(),
+                             signature.data(),
+                             signature.size(),
+                             message.data(),
+                             message.size());
 
   return rv == 1;
 }
@@ -1337,32 +1404,33 @@ SignaturePrivateKey::parse(SignatureScheme scheme, const bytes& data)
 }
 
 SignaturePrivateKey
-SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& data)
+SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& secret)
 {
   auto type = ossl_key_type(scheme);
-  return SignaturePrivateKey(scheme, OpenSSLKey::derive(type, data));
+  return SignaturePrivateKey(scheme, OpenSSLKey::derive(type, secret));
 }
 
 bytes
-SignaturePrivateKey::sign(const bytes& msg) const
+SignaturePrivateKey::sign(const bytes& message) const
 {
   if (!_key->can_sign()) {
     throw InvalidParameterError("Inappropriate key for sign");
   }
 
   auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (!ctx.get()) {
+  if (ctx.get() == nullptr) {
     throw OpenSSLError::current();
   }
 
-  if (1 != EVP_DigestSignInit(ctx.get(), NULL, NULL, NULL, _key->_key.get())) {
+  if (1 != EVP_DigestSignInit(
+             ctx.get(), nullptr, nullptr, nullptr, _key->_key.get())) {
     throw OpenSSLError::current();
   }
 
   auto siglen = _key->sig_size();
   bytes sig(_key->sig_size());
-  if (1 !=
-      EVP_DigestSign(ctx.get(), sig.data(), &siglen, msg.data(), msg.size())) {
+  if (1 != EVP_DigestSign(
+             ctx.get(), sig.data(), &siglen, message.data(), message.size())) {
     throw OpenSSLError::current();
   }
 
@@ -1373,15 +1441,18 @@ SignaturePrivateKey::sign(const bytes& msg) const
 const SignaturePublicKey&
 SignaturePrivateKey::public_key() const
 {
-  auto pub = static_cast<SignaturePublicKey*>(_pub.get());
-  return *pub;
+  if (_pub == nullptr) {
+    throw InvalidParameterError("No public key available");
+  }
+
+  return dynamic_cast<const SignaturePublicKey&>(*_pub);
 }
 
 SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
                                          OpenSSLKey* key)
   : PrivateKey(scheme, key)
 {
-  _pub.reset(new SignaturePublicKey(scheme, key->dup_public()));
+  _pub = std::make_unique<SignaturePublicKey>(scheme, key->dup_public());
 }
 
 ///

@@ -59,25 +59,24 @@ operator==(const GroupState& lhs, const GroupState& rhs)
 State::State(const bytes& group_id,
              CipherSuite suite,
              const bytes& leaf_secret,
-             const SignaturePrivateKey& identity_priv,
+             SignaturePrivateKey identity_priv,
              const Credential& credential)
-  : _index(0)
-  , _identity_priv(identity_priv)
-  , _suite(suite)
+  : _suite(suite)
   , _state(group_id, suite, leaf_secret, credential)
-  , _application_secret()
   , _init_secret(zero_bytes(32))
+  , _index(0)
+  , _identity_priv(std::move(identity_priv))
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(const SignaturePrivateKey& identity_priv,
+State::State(SignaturePrivateKey identity_priv,
              const Credential& credential,
              const bytes& init_secret,
              const Welcome& welcome,
              const Handshake& handshake)
-  : _identity_priv(identity_priv)
-  , _suite(welcome.cipher_suite)
+  : _suite(welcome.cipher_suite)
   , _state(welcome.cipher_suite)
+  , _identity_priv(std::move(identity_priv))
 {
   // Decrypt and ingest the Welcome
   auto init_priv = DHPrivateKey::derive(_suite, init_secret);
@@ -104,7 +103,8 @@ State::State(const SignaturePrivateKey& identity_priv,
   auto init_uik = add.init_key.find_init_key(_suite);
   if (!init_uik) {
     throw ProtocolError("Selected cipher suite not supported");
-  } else if (*init_uik != init_priv.public_key()) {
+  }
+  if (*init_uik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
 
@@ -154,6 +154,12 @@ State::negotiate(const bytes& group_id,
     }
   }
 
+  if (!selected) {
+    throw ProtocolError("Negotiation failure");
+  }
+
+  // We have manually guaranteed that `suite` is always initialized
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
   auto welcome_add = state.add(user_init_key);
   state = state.handle(welcome_add.second);
@@ -242,7 +248,7 @@ State::handle(uint32_t signer_index, const GroupOperation& operation) const
       next.handle(signer_index, operation.update);
       break;
     case GroupOperationType::remove:
-      next.handle(signer_index, operation.remove);
+      next.handle(operation.remove);
       break;
   }
 
@@ -276,7 +282,7 @@ State::handle(uint32_t index, const Update& update)
 {
   optional<bytes> leaf_secret = nullopt;
   if (index == _index) {
-    if (_cached_leaf_secret.size() == 0) {
+    if (_cached_leaf_secret.empty()) {
       throw InvalidParameterError("Got self-update without generating one");
     }
 
@@ -288,7 +294,7 @@ State::handle(uint32_t index, const Update& update)
 }
 
 void
-State::handle(uint32_t index, const Remove& remove)
+State::handle(const Remove& remove)
 {
   auto leaf_secret = nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
@@ -344,8 +350,7 @@ State::update_leaf(uint32_t index,
   if (leaf_secret) {
     _state.tree.set_path(index, *leaf_secret);
   } else {
-    auto temp_path = path;
-    auto secrets = _state.tree.decrypt(index, temp_path);
+    auto secrets = _state.tree.decrypt(index, path);
     _state.tree.merge_path(index, secrets);
   }
 
@@ -371,8 +376,7 @@ State::sign(const GroupOperation& operation) const
   auto sig_data = next._state.transcript_hash;
   auto sig = _identity_priv.sign(sig_data);
 
-  auto confirm_data = sig_data;
-  confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
+  auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
 
   return Handshake{ _state.epoch, operation, _index, sig, confirm };
@@ -386,8 +390,7 @@ State::verify(const Handshake& handshake) const
   auto sig = handshake.signature;
   auto sig_ver = pub.verify(sig_data, sig);
 
-  auto confirm_data = sig_data;
-  confirm_data.insert(confirm_data.end(), sig.begin(), sig.end());
+  auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, _confirmation_key, confirm_data);
   auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
 

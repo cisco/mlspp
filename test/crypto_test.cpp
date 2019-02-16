@@ -388,7 +388,7 @@ TEST_F(CryptoTest, ECIES)
                                    CipherSuite::X448_SHA512_AES256GCM };
 
   for (auto suite : suites) {
-    auto x = DHPrivateKey::derive(CIPHERSUITE, { 0, 1, 2, 3 });
+    auto x = DHPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
     auto original = random_bytes(100);

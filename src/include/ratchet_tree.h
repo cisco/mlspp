@@ -11,7 +11,7 @@ class RatchetTreeNode : public CipherAware
 {
 public:
   RatchetTreeNode(CipherSuite suite);
-  RatchetTreeNode(const RatchetTreeNode& other);
+  RatchetTreeNode(const RatchetTreeNode& other) = default;
   RatchetTreeNode& operator=(const RatchetTreeNode& other);
 
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
@@ -87,7 +87,7 @@ public:
 
   DirectPath encrypt(uint32_t from, const bytes& leaf) const;
   MergeInfo decrypt(uint32_t from, const DirectPath& path) const;
-  void merge_path(uint32_t from, const MergeInfo& path);
+  void merge_path(uint32_t from, const MergeInfo& info);
 
   void add_leaf(const DHPublicKey& pub);
   void add_leaf(const bytes& leaf_secret);

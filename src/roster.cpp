@@ -25,10 +25,10 @@ operator>>(tls::istream& in, CredentialType& type)
 /// BasicCredential
 ///
 
-AbstractCredential*
+std::unique_ptr<AbstractCredential>
 BasicCredential::dup() const
 {
-  return new BasicCredential(_identity, _public_key);
+  return std::make_unique<BasicCredential>(_identity, _public_key);
 }
 
 bytes
@@ -94,13 +94,16 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 {
   auto cred = Credential{};
   cred._type = CredentialType::basic;
-  cred._cred.reset(new BasicCredential(identity, public_key));
+  cred._cred = std::make_unique<BasicCredential>(identity, public_key);
   return cred;
 }
 
 Credential
 Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
 {
+  // XXX(rlb@ipv.sx): This might merit invesetigation, but for now,
+  // just disabling the check.  It seems like this is just a
+  // pass-through, so how could it leak?
   return basic(identity, private_key.public_key());
 }
 
@@ -146,6 +149,24 @@ operator>>(tls::istream& in, Credential& obj)
   obj._cred.reset(Credential::create(obj._type));
   obj._cred->read(in);
   return in;
+}
+
+///
+/// OptionalCredential
+///
+
+bool
+operator==(const OptionalCredential& lhs, const OptionalCredential& rhs)
+{
+  if (!!lhs != !!rhs) {
+    return false;
+  }
+
+  if (!lhs) {
+    return true;
+  }
+
+  return (*lhs == *rhs);
 }
 
 ///

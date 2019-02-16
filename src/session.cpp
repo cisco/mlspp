@@ -4,14 +4,15 @@
 
 namespace mls {
 
-Session::Session(const CipherList& supported_ciphersuites,
-                 const bytes& init_secret,
-                 const SignaturePrivateKey& identity_priv,
-                 const Credential& credential)
-  : _supported_ciphersuites(supported_ciphersuites)
-  , _init_secret(init_secret)
-  , _identity_priv(identity_priv)
-  , _credential(credential)
+Session::Session(CipherList supported_ciphersuites,
+                 bytes init_secret,
+                 SignaturePrivateKey identity_priv,
+                 Credential credential)
+  : _supported_ciphersuites(std::move(supported_ciphersuites))
+  , _init_secret(std::move(init_secret))
+  , _identity_priv(std::move(identity_priv))
+  , _credential(std::move(credential))
+  , _current_epoch(0)
 {
   make_init_key();
 }
@@ -45,7 +46,7 @@ Session::user_init_key() const
 std::pair<bytes, bytes>
 Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
 {
-  if (_state.size() > 0) {
+  if (!_state.empty()) {
     throw InvalidParameterError("start called on an initialized session");
   }
 
@@ -107,10 +108,10 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
 }
 
 void
-Session::handle(const bytes& data)
+Session::handle(const bytes& handshake_data)
 {
   Handshake handshake{ current_state().cipher_suite() };
-  tls::unmarshal(data, handshake);
+  tls::unmarshal(handshake_data, handshake);
 
   auto next = current_state().handle(handshake);
   add_state(handshake.prior_epoch, next);

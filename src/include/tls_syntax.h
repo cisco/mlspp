@@ -61,6 +61,7 @@ public:
   // Explicitly import constructors
   typedef vector_base<T, head, min, max> parent;
   using parent::parent;
+  virtual ~vector() = default;
 
   virtual T new_element() const { return T{}; }
 };

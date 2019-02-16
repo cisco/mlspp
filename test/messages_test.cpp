@@ -22,8 +22,6 @@ tls_round_trip(const bytes& vector,
   ASSERT_EQ(tls::marshal(unmarshaled), vector);
 }
 
-static const epoch_t epoch_val = 0x01020304;
-
 class MessagesTest : public ::testing::Test
 {
 protected:

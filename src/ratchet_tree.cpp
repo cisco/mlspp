@@ -16,13 +16,6 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite)
   , _pub(suite)
 {}
 
-RatchetTreeNode::RatchetTreeNode(const RatchetTreeNode& other)
-  : CipherAware(other)
-  , _secret(other._secret)
-  , _priv(other._priv)
-  , _pub(other._pub)
-{}
-
 RatchetTreeNode&
 RatchetTreeNode::operator=(const RatchetTreeNode& other)
 {
@@ -193,7 +186,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
   }
 
   // Handle the leaf node
-  if (path.nodes[0].node_secrets.size() != 0) {
+  if (!path.nodes[0].node_secrets.empty()) {
     throw ProtocolError("Malformed initial node");
   }
   info.public_keys.push_back(path.nodes[0].public_key);
@@ -276,7 +269,7 @@ RatchetTree::add_leaf(const DHPublicKey& pub)
     throw InvalidParameterError("Incorrect ciphersuite");
   }
 
-  if (_nodes.size() > 0) {
+  if (!_nodes.empty()) {
     _nodes.emplace_back(nullopt);
   }
   _nodes.emplace_back(RatchetTreeNode(pub));
@@ -285,7 +278,7 @@ RatchetTree::add_leaf(const DHPublicKey& pub)
 void
 RatchetTree::add_leaf(const bytes& leaf_secret)
 {
-  if (_nodes.size() > 0) {
+  if (!_nodes.empty()) {
     _nodes.emplace_back(nullopt);
   }
   _nodes.emplace_back(new_node(leaf_secret));

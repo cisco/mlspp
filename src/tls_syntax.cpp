@@ -5,6 +5,8 @@ namespace tls {
 void
 ostream::write_raw(const std::vector<uint8_t>& bytes)
 {
+  // Not sure what the default argument is here
+  // NOLINTNEXTLINE(fuchsia-default-arguments)
   _buffer.insert(_buffer.end(), bytes.begin(), bytes.end());
 }
 
@@ -13,7 +15,7 @@ ostream&
 ostream::write_uint(uint64_t value, int length)
 {
   for (int i = length - 1; i >= 0; i -= 1) {
-    _buffer.push_back(value >> (8 * i));
+    _buffer.push_back(value >> unsigned(8 * i));
   }
   return *this;
 }
@@ -46,7 +48,7 @@ operator<<(ostream& out, uint64_t data)
 uint8_t
 istream::next()
 {
-  if (_buffer.size() == 0) {
+  if (_buffer.empty()) {
     throw ReadError("Attempt to read from empty buffer");
   }
 
@@ -62,7 +64,7 @@ istream::read_uint(T& data, int length)
 {
   uint64_t value = 0;
   for (int i = 0; i < length; i += 1) {
-    value = (value << 8) + next();
+    value = (value << unsigned(8)) + next();
   }
   data = value;
   return *this;

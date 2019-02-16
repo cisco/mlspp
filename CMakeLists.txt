@@ -8,7 +8,7 @@ project(mls)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find OpenSSL
@@ -40,6 +40,9 @@ else()
   message(STATUS "clang-tidy: ${CLANG_TIDY_EXE}")
   set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator")
 endif()
+
+# Enable pedantic mode
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror")
 
 # Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
 set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")

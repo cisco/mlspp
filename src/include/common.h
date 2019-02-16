@@ -1,8 +1,8 @@
 #pragma once
 
 #include <array>
-#include <experimental/optional>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -14,7 +14,6 @@ class istream;
 
 ostream&
 operator<<(ostream& out, uint8_t data);
-
 istream&
 operator>>(istream& in, uint8_t& data);
 }
@@ -26,11 +25,11 @@ namespace mls {
 ///
 
 template<typename T>
-using optional = std::experimental::optional<T>;
+using optional = std::optional<T>;
 
-using nullopt_t = std::experimental::nullopt_t;
+using nullopt_t = std::nullopt_t;
 
-static const nullopt_t nullopt = std::experimental::nullopt;
+static const nullopt_t nullopt = std::nullopt;
 
 template<typename T>
 std::ostream&
@@ -80,49 +79,22 @@ operator>>(tls::istream& in, optional<T>& opt)
 
 typedef std::vector<uint8_t> bytes;
 
-static std::string
-to_hex(const bytes& data)
-{
-  std::stringstream hex;
-  hex.flags(std::ios::hex);
-  for (const auto& byte : data) {
-    hex << std::setw(2) << std::setfill('0') << int(byte);
-  }
-  return hex.str();
-}
+std::string
+to_hex(const bytes& data);
 
-static bytes
-from_hex(const std::string& hex)
-{
-  if (hex.length() % 2 == 1) {
-    throw std::invalid_argument("Odd-length hex string");
-  }
+bytes
+from_hex(const std::string& hex);
 
-  int len = hex.length() / 2;
-  bytes out(len);
-  for (int i = 0; i < len; i += 1) {
-    std::string byte = hex.substr(2 * i, 2);
-    out[i] = strtol(byte.c_str(), nullptr, 16);
-  }
+bytes&
+operator+=(bytes& lhs, const bytes& rhs);
 
-  return out;
-}
+bytes
+operator+(const bytes& lhs, const bytes& rhs);
 
-static std::ostream&
-operator<<(std::ostream& out, const bytes& data)
-{
-  return out << to_hex(data);
-}
+std::ostream&
+operator<<(std::ostream& out, const bytes& data);
 
 typedef uint32_t epoch_t;
-
-///
-/// Hash prefixes
-///
-
-static const uint8_t leaf_hash_prefix = 0x01;
-static const uint8_t pair_hash_prefix = 0x02;
-static const uint8_t dh_hash_prefix = 0x03;
 
 ///
 /// Error types
