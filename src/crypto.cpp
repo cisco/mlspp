@@ -739,7 +739,7 @@ Digest::digest()
   return out;
 }
 
-const size_t
+size_t
 Digest::output_size() const
 {
   return _size;

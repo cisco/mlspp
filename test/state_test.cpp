@@ -99,11 +99,11 @@ protected:
   {
     states.reserve(group_size);
 
-    auto init_secret = random_bytes(32);
-    auto identity_priv = SignaturePrivateKey::generate(scheme);
-    auto credential = Credential::basic(user_id, identity_priv);
+    auto init_secret_0 = random_bytes(32);
+    auto identity_priv_0 = SignaturePrivateKey::generate(scheme);
+    auto credential_0 = Credential::basic(user_id, identity_priv_0);
     states.emplace_back(
-      group_id, suite, init_secret, identity_priv, credential);
+      group_id, suite, init_secret_0, identity_priv_0, credential_0);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);

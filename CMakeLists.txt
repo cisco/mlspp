@@ -42,7 +42,11 @@ else()
 endif()
 
 # Enable pedantic mode
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror")
+# XXX(rlb@ipv.sx): I would include -Wextra here, but it fails on
+# gtest.  The right answer is probably just to apply -Werror to the
+# library and not to the tests, since the library is where these
+# things matter most.
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wshadow -pedantic-errors")
 
 # Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
 set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")

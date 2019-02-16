@@ -82,7 +82,6 @@ static uint32_t
 parent_step(uint32_t x)
 {
   auto k = level(x);
-  uint32_t one = 1;
   return (x | (one << k)) & ~(one << (k + 1));
 }
 
@@ -134,7 +133,7 @@ copath(uint32_t x, uint32_t n)
 {
   auto d = dirpath(x, n);
   std::vector<uint32_t> c(d.size());
-  for (int i = 0; i < d.size(); ++i) {
+  for (size_t i = 0; i < d.size(); ++i) {
     c[i] = sibling(d[i], n);
   }
   return c;

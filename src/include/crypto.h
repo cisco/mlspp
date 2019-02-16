@@ -153,7 +153,7 @@ public:
   Digest& write(const bytes& data);
   bytes digest();
 
-  const size_t output_size() const;
+  size_t output_size() const;
 
 private:
   size_t _size;

@@ -164,8 +164,8 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
     RatchetNode path_node{ _suite };
     path_node.public_key = new_node(secret).public_key();
 
-    for (const auto& node : tree_math::resolve(_nodes, node)) {
-      auto ciphertext = _nodes[node]->public_key().encrypt(secret);
+    for (const auto& res_node : tree_math::resolve(_nodes, node)) {
+      auto ciphertext = _nodes[res_node]->public_key().encrypt(secret);
       path_node.node_secrets.push_back(ciphertext);
     }
 
@@ -194,7 +194,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
   // Handle the remainder of the path
   bytes secret;
   bool have_secret = false;
-  for (int i = 0; i < copath.size(); ++i) {
+  for (size_t i = 0; i < copath.size(); ++i) {
     const auto curr = copath[i];
     const auto& path_node = path.nodes[i + 1];
 
@@ -204,7 +204,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
         throw ProtocolError("Malformed RatchetNode");
       }
 
-      for (int j = 0; j < res.size(); ++j) {
+      for (size_t j = 0; j < res.size(); ++j) {
         auto tree_node = _nodes[res[j]];
         if (!tree_node || !tree_node->private_key()) {
           continue;
@@ -242,7 +242,7 @@ RatchetTree::merge_path(uint32_t from, const RatchetTree::MergeInfo& info)
   }
 
   auto key_list_size = info.public_keys.size();
-  for (int i = 0; i < dirpath.size(); ++i) {
+  for (size_t i = 0; i < dirpath.size(); ++i) {
     auto curr = dirpath[i];
     while (curr > _nodes.size() - 1) {
       _nodes.emplace_back(_suite);
@@ -350,7 +350,7 @@ RatchetTree::check_invariant(size_t from) const
   }
 
   // ... and nothing else
-  for (int i = 0; i < _nodes.size(); ++i) {
+  for (size_t i = 0; i < _nodes.size(); ++i) {
     if (in_dirpath[i]) {
       continue;
     }
@@ -376,7 +376,7 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
     return false;
   }
 
-  for (int i = 0; i < lhs._nodes.size(); i += 1) {
+  for (size_t i = 0; i < lhs._nodes.size(); i += 1) {
     // Presence state needs to be the same
     if (bool(lhs._nodes[i]) != bool(rhs._nodes[i])) {
       return false;
