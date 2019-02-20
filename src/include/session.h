@@ -10,10 +10,10 @@ namespace mls {
 class Session
 {
 public:
-  Session(const CipherList& supported_ciphersuites,
-          const bytes& init_secret,
-          const SignaturePrivateKey& identity_priv,
-          const Credential& credential);
+  Session(CipherList supported_ciphersuites,
+          bytes init_secret,
+          SignaturePrivateKey identity_priv,
+          Credential credential);
 
   // Two sessions are considered equal if:
   // (1) they agree on the states they have in common
@@ -26,11 +26,11 @@ public:
                                 const bytes& user_init_key);
 
   std::pair<bytes, bytes> add(const bytes& user_init_key) const;
-  bytes update(const bytes& init_secret);
-  bytes remove(const bytes& eviction_secret, uint32_t index) const;
+  bytes update(const bytes& leaf_secret);
+  bytes remove(const bytes& evict_secret, uint32_t index) const;
 
   void join(const bytes& welcome, const bytes& add);
-  void handle(const bytes& handshake);
+  void handle(const bytes& handshake_data);
 
 protected:
   CipherList _supported_ciphersuites;

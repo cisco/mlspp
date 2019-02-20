@@ -55,7 +55,7 @@ UserInitKey::add_init_key(const DHPublicKey& pub)
 optional<DHPublicKey>
 UserInitKey::find_init_key(CipherSuite suite) const
 {
-  for (int i = 0; i < cipher_suites.size(); ++i) {
+  for (size_t i = 0; i < cipher_suites.size(); ++i) {
     if (cipher_suites[i] == suite) {
       return DHPublicKey{ suite, init_keys[i] };
     }

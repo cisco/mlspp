@@ -23,7 +23,7 @@ enum struct CredentialType : uint8_t
 struct AbstractCredential
 {
   virtual ~AbstractCredential() {}
-  virtual AbstractCredential* dup() const = 0;
+  virtual std::unique_ptr<AbstractCredential> dup() const = 0;
   virtual bytes identity() const = 0;
   virtual SignaturePublicKey public_key() const = 0;
   virtual void read(tls::istream& in) = 0;
@@ -48,7 +48,7 @@ public:
     , _public_key(public_key)
   {}
 
-  virtual AbstractCredential* dup() const;
+  virtual std::unique_ptr<AbstractCredential> dup() const;
   virtual bytes identity() const;
   virtual SignaturePublicKey public_key() const;
   virtual void read(tls::istream& in);
@@ -80,7 +80,16 @@ public:
     , _cred(nullptr)
   {
     if (other._cred) {
-      _cred.reset(other._cred->dup());
+      _cred = other._cred->dup();
+    }
+  }
+
+  Credential(Credential&& other)
+    : _type(other._type)
+    , _cred(nullptr)
+  {
+    if (other._cred) {
+      _cred.reset(other._cred.release());
     }
   }
 
@@ -90,7 +99,7 @@ public:
       _type = other._type;
       _cred.reset(nullptr);
       if (other._cred) {
-        _cred.reset(other._cred->dup());
+        _cred = other._cred->dup();
       }
     }
     return *this;
@@ -131,6 +140,9 @@ public:
   {}
 };
 
+bool
+operator==(const OptionalCredential& lhs, const OptionalCredential& rhs);
+
 class Roster
 {
 public:
@@ -143,8 +155,8 @@ private:
   tls::vector<OptionalCredential, 4> _credentials;
 
   friend bool operator==(const Roster& lhs, const Roster& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const Roster& roster);
-  friend tls::istream& operator>>(tls::istream& in, Roster& roster);
+  friend tls::ostream& operator<<(tls::ostream& out, const Roster& obj);
+  friend tls::istream& operator>>(tls::istream& in, Roster& obj);
 };
 
 } // namespace mls

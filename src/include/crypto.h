@@ -153,7 +153,7 @@ public:
   Digest& write(const bytes& data);
   bytes digest();
 
-  const size_t output_size() const;
+  size_t output_size() const;
 
 private:
   size_t _size;
@@ -175,14 +175,14 @@ constant_time_eq(const bytes& lhs, const bytes& rhs);
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
-class GroupState;
+struct GroupState;
 
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
               const GroupState& state,
-              const size_t length);
+              const size_t size);
 
 class AESGCM
 {
@@ -195,7 +195,7 @@ public:
 
   AESGCM(const bytes& key, const bytes& nonce);
 
-  void set_aad(const bytes& key);
+  void set_aad(const bytes& aad);
   bytes encrypt(const bytes& plaintext) const;
   bytes decrypt(const bytes& ciphertext) const;
 
@@ -227,13 +227,14 @@ class PublicKey
 public:
   PublicKey(const PublicKey& other);
   PublicKey& operator=(const PublicKey& other);
-  PublicKey& operator=(PublicKey&& other);
+  PublicKey& operator=(PublicKey&& other) noexcept;
+  virtual ~PublicKey() = default;
 
-  PublicKey(CipherSuite suite);
+  explicit PublicKey(CipherSuite suite);
   PublicKey(CipherSuite suite, const bytes& data);
   PublicKey(CipherSuite suite, OpenSSLKey* key);
 
-  PublicKey(SignatureScheme scheme);
+  explicit PublicKey(SignatureScheme scheme);
   PublicKey(SignatureScheme scheme, const bytes& data);
   PublicKey(SignatureScheme scheme, OpenSSLKey* key);
 
@@ -258,14 +259,17 @@ class PrivateKey
 public:
   PrivateKey(const PrivateKey& other);
   PrivateKey& operator=(const PrivateKey& other);
-  PrivateKey& operator=(PrivateKey&& other);
+  PrivateKey& operator=(PrivateKey&& other) noexcept;
+  virtual ~PrivateKey() = default;
 
   bool operator==(const PrivateKey& other) const;
   bool operator!=(const PrivateKey& other) const;
 
 protected:
   typed_unique_ptr<OpenSSLKey> _key;
-  typed_unique_ptr<PublicKey> _pub;
+  std::unique_ptr<PublicKey> _pub;
+
+  std::unique_ptr<PublicKey> type_preserving_dup(const PublicKey* pub) const;
 
   PrivateKey(CipherSuite suite, OpenSSLKey* key);
   PrivateKey(SignatureScheme scheme, OpenSSLKey* key);
@@ -273,7 +277,6 @@ protected:
 
 // DH specialization
 struct ECIESCiphertext;
-struct DHPrivateKey;
 
 class DHPublicKey : public PublicKey
 {

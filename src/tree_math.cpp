@@ -5,6 +5,8 @@
 namespace mls {
 namespace tree_math {
 
+static uint32_t one = 0x01;
+
 static uint32_t
 log2(uint32_t x)
 {
@@ -22,12 +24,12 @@ log2(uint32_t x)
 uint32_t
 level(uint32_t x)
 {
-  if ((x & 0x01) == 0) {
+  if ((x & one) == 0) {
     return 0;
   }
 
   uint32_t k = 0;
-  while (((x >> k) & 0x01) == 1) {
+  while (((x >> k) & one) == 1) {
     k += 1;
   }
   return k;
@@ -42,14 +44,14 @@ node_width(uint32_t n)
 uint32_t
 size_from_width(uint32_t w)
 {
-  return (w >> 1) + 1;
+  return (w >> one) + 1;
 }
 
 uint32_t
 root(uint32_t n)
 {
   uint32_t w = node_width(n);
-  return (1 << log2(w)) - 1;
+  return (one << log2(w)) - 1;
 }
 
 uint32_t
@@ -59,7 +61,7 @@ left(uint32_t x)
     return x;
   }
 
-  return x ^ (0x01 << (level(x) - 1));
+  return x ^ (one << (level(x) - 1));
 }
 
 uint32_t
@@ -69,7 +71,7 @@ right(uint32_t x, uint32_t n)
     return x;
   }
 
-  uint32_t r = x ^ (0x03 << (level(x) - 1));
+  uint32_t r = x ^ (uint32_t(0x03) << (level(x) - 1));
   while (r >= node_width(n)) {
     r = left(r);
   }
@@ -80,7 +82,6 @@ static uint32_t
 parent_step(uint32_t x)
 {
   auto k = level(x);
-  uint32_t one = 1;
   return (x | (one << k)) & ~(one << (k + 1));
 }
 
@@ -104,7 +105,9 @@ sibling(uint32_t x, uint32_t n)
   auto p = parent(x, n);
   if (x < p) {
     return right(p, n);
-  } else if (x > p) {
+  }
+
+  if (x > p) {
     return left(p);
   }
 
@@ -130,7 +133,7 @@ copath(uint32_t x, uint32_t n)
 {
   auto d = dirpath(x, n);
   std::vector<uint32_t> c(d.size());
-  for (int i = 0; i < d.size(); ++i) {
+  for (size_t i = 0; i < d.size(); ++i) {
     c[i] = sibling(d[i], n);
   }
   return c;

@@ -48,11 +48,11 @@ public:
   State(const bytes& group_id,
         CipherSuite suite,
         const bytes& leaf_secret,
-        const SignaturePrivateKey& identity_priv,
+        SignaturePrivateKey identity_priv,
         const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
-  State(const SignaturePrivateKey& identity_priv,
+  State(SignaturePrivateKey identity_priv,
         const Credential& credential,
         const bytes& init_secret,
         const Welcome& welcome_info,
@@ -142,14 +142,14 @@ private:
   void handle(uint32_t index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  void handle(uint32_t index, const Remove& remove);
+  void handle(const Remove& remove);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
   // Marshal the shared confirmed state
-  friend tls::ostream& operator<<(tls::ostream& out, const State& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
   void update_leaf(uint32_t index,

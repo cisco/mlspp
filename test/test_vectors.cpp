@@ -241,8 +241,6 @@ const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
 /// File Handling
 ///
 
-const size_t max_file_size = 1 << 19; // 512KB
-
 bytes
 read_file(const std::string& filename)
 {
@@ -294,9 +292,9 @@ TestLoader<T>::get()
   return _vectors;
 }
 
-template class TestLoader<TreeMathTestVectors>;
-template class TestLoader<ResolutionTestVectors>;
-template class TestLoader<CryptoTestVectors>;
-template class TestLoader<KeyScheduleTestVectors>;
-template class TestLoader<MessagesTestVectors>;
-template class TestLoader<BasicSessionTestVectors>;
+template struct TestLoader<TreeMathTestVectors>;
+template struct TestLoader<ResolutionTestVectors>;
+template struct TestLoader<CryptoTestVectors>;
+template struct TestLoader<KeyScheduleTestVectors>;
+template struct TestLoader<MessagesTestVectors>;
+template struct TestLoader<BasicSessionTestVectors>;
