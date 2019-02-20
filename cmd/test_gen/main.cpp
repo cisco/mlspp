@@ -57,62 +57,6 @@ generate_resolution()
   return tv;
 }
 
-KeyScheduleTestVectors
-generate_key_schedule()
-{
-  KeyScheduleTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    CipherSuite::P256_SHA256_AES128GCM,
-    CipherSuite::X25519_SHA256_AES128GCM,
-  };
-
-  std::vector<KeyScheduleTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
-  };
-
-  GroupState base_group_state(CipherSuite::P256_SHA256_AES128GCM);
-  base_group_state.group_id = { 0xA0, 0xA0, 0xA0, 0xA0 };
-
-  tv.n_epochs = 100;
-  tv.base_group_state = tls::marshal(base_group_state);
-
-  // Construct a test case for each suite
-  for (int i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto test_case = cases[i];
-    auto secret_size = Digest(suite).output_size();
-
-    test_case->suite = suite;
-
-    GroupState group_state = base_group_state;
-    bytes init_secret(secret_size, 0);
-    bytes update_secret(secret_size, 0);
-
-    for (int j = 0; j < tv.n_epochs; ++j) {
-      auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, update_secret, group_state);
-
-      test_case->epochs.push_back({
-        update_secret,
-        secrets.epoch_secret,
-        secrets.application_secret,
-        secrets.confirmation_key,
-        secrets.init_secret,
-      });
-
-      init_secret = secrets.init_secret;
-      for (auto& val : update_secret) {
-        val += 1;
-      }
-      group_state.epoch += 1;
-    }
-  }
-
-  return tv;
-}
-
 CryptoTestVectors
 generate_crypto()
 {
@@ -154,7 +98,9 @@ generate_crypto()
 
     // Derive-Secret
     // TODO(rlb@ipv.sx): Populate some actual state
+    auto zero = bytes(Digest(suite).output_size(), 0x00);
     test_case->derive_secret_state = GroupState{ suite };
+    test_case->derive_secret_state.transcript_hash = zero;
     test_case->derive_secret_out =
       mls::derive_secret(suite,
                          tv.derive_secret_secret,
@@ -170,6 +116,66 @@ generate_crypto()
     // ECIES
     mls::test::DeterministicECIES lock;
     test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
+  }
+
+  return tv;
+}
+
+KeyScheduleTestVectors
+generate_key_schedule()
+{
+  KeyScheduleTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<KeyScheduleTestVectors::TestCase*> cases{
+    &tv.case_p256,
+    &tv.case_x25519,
+  };
+
+  auto base_suite = CipherSuite::P256_SHA256_AES128GCM;
+  auto zero = bytes(Digest(base_suite).output_size(), 0x00);
+  GroupState base_group_state(base_suite);
+  base_group_state.group_id = { 0xA0, 0xA0, 0xA0, 0xA0 };
+  base_group_state.transcript_hash = zero;
+
+  tv.n_epochs = 100;
+  tv.base_group_state = tls::marshal(base_group_state);
+
+  // Construct a test case for each suite
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+    auto secret_size = Digest(suite).output_size();
+
+    test_case->suite = suite;
+
+    auto group_state = base_group_state;
+    group_state.transcript_hash = zero;
+    bytes init_secret(secret_size, 0);
+    bytes update_secret(secret_size, 0);
+
+    for (int j = 0; j < tv.n_epochs; ++j) {
+      auto secrets = State::derive_epoch_secrets(
+        suite, init_secret, update_secret, group_state);
+
+      test_case->epochs.push_back({
+        update_secret,
+        secrets.epoch_secret,
+        secrets.application_secret,
+        secrets.confirmation_key,
+        secrets.init_secret,
+      });
+
+      init_secret = secrets.init_secret;
+      for (auto& val : update_secret) {
+        val += 1;
+      }
+      group_state.epoch += 1;
+    }
   }
 
   return tv;
