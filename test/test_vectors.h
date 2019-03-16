@@ -134,6 +134,35 @@ operator<<(tls::ostream& str, const KeyScheduleTestVectors& tv);
 
 /////
 
+struct AppKeyScheduleTestVectors
+{
+  static const std::string file_name;
+
+  struct Step
+  {
+    tls::opaque<1> secret;
+    tls::opaque<1> key;
+    tls::opaque<1> iv;
+  };
+
+  typedef tls::vector<Step, 4> KeySequence;
+  typedef tls::vector<KeySequence, 4> TestCase;
+
+  uint32_t n_participants;
+  uint32_t n_messages;
+  tls::opaque<1> app_secret;
+
+  TestCase case_p256;
+  TestCase case_x25519;
+};
+
+tls::istream&
+operator>>(tls::istream& str, KeyScheduleTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const KeyScheduleTestVectors& tv);
+
+/////
+
 struct MessagesTestVectors
 {
   static const std::string file_name;

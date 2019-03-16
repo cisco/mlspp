@@ -150,6 +150,39 @@ operator<<(tls::ostream& str, const KeyScheduleTestVectors& obj)
 }
 
 ///
+/// AppKeyScheduleTestVectors
+///
+
+const std::string AppKeyScheduleTestVectors::file_name =
+  "./app_key_schedule.bin";
+
+tls::istream&
+operator>>(tls::istream& str, AppKeyScheduleTestVectors::Step& obj)
+{
+  return str >> obj.secret >> obj.key >> obj.iv;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const AppKeyScheduleTestVectors::Step& obj)
+{
+  return str << obj.secret << obj.key << obj.iv;
+}
+
+tls::istream&
+operator>>(tls::istream& str, AppKeyScheduleTestVectors& obj)
+{
+  return str >> obj.n_participants >> obj.n_messages >> obj.case_p256 >>
+         obj.case_x25519;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& obj)
+{
+  return str << obj.n_participants << obj.n_messages << obj.case_p256
+             << obj.case_x25519;
+}
+
+///
 /// MessagesTestVectors
 ///
 
@@ -296,5 +329,6 @@ template struct TestLoader<TreeMathTestVectors>;
 template struct TestLoader<ResolutionTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
+template struct TestLoader<AppKeyScheduleTestVectors>;
 template struct TestLoader<MessagesTestVectors>;
 template struct TestLoader<BasicSessionTestVectors>;
