@@ -196,19 +196,19 @@ generate_app_key_schedule()
     &tv.case_x25519,
   };
 
-  tv.n_participants = 16;
-  tv.n_messages = 16;
-  tv.app_secret = bytes(32, 0xA0);
+  tv.n_members = 16;
+  tv.n_generations = 16;
+  tv.application_secret = bytes(32, 0xA0);
 
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto test_case = cases[i];
 
-    for (uint32_t j = 0; j < tv.n_participants; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.app_secret);
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      ApplicationKeyChain chain(suite, j, tv.application_secret);
       test_case->emplace_back();
 
-      for (uint32_t k = 0; k < tv.n_messages; ++k) {
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto kn = chain.get(k);
         test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
       }

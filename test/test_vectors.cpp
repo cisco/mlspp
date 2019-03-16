@@ -171,14 +171,14 @@ operator<<(tls::ostream& str, const AppKeyScheduleTestVectors::Step& obj)
 tls::istream&
 operator>>(tls::istream& str, AppKeyScheduleTestVectors& obj)
 {
-  return str >> obj.n_participants >> obj.n_messages >> obj.app_secret >>
+  return str >> obj.n_members >> obj.n_generations >> obj.application_secret >>
          obj.case_p256 >> obj.case_x25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& obj)
 {
-  return str << obj.n_participants << obj.n_messages << obj.app_secret
+  return str << obj.n_members << obj.n_generations << obj.application_secret
              << obj.case_p256 << obj.case_x25519;
 }
 

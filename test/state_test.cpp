@@ -15,15 +15,12 @@ protected:
 
   void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
   {
-    ASSERT_EQ(tc.size(), tv.n_participants);
-    for (uint32_t j = 0; j < tv.n_participants; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.app_secret);
-      std::cout << "app_secret: " << tv.app_secret << std::endl;
+    ASSERT_EQ(tc.size(), tv.n_members);
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      ApplicationKeyChain chain(suite, j, tv.application_secret);
 
-      ASSERT_EQ(tc[j].size(), tv.n_messages);
-      for (uint32_t k = 0; k < tv.n_participants; ++k) {
-        std::cout << "step " << j << " " << k << std::endl;
-
+      ASSERT_EQ(tc[j].size(), tv.n_generations);
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto kn = chain.get(k);
         ASSERT_EQ(tc[j][k].secret, kn.secret);
         ASSERT_EQ(tc[j][k].key, kn.key);

@@ -148,9 +148,9 @@ struct AppKeyScheduleTestVectors
   typedef tls::vector<Step, 4> KeySequence;
   typedef tls::vector<KeySequence, 4> TestCase;
 
-  uint32_t n_participants;
-  uint32_t n_messages;
-  tls::opaque<1> app_secret;
+  uint32_t n_members;
+  uint32_t n_generations;
+  tls::opaque<1> application_secret;
 
   TestCase case_p256;
   TestCase case_x25519;
