@@ -159,13 +159,13 @@ const std::string AppKeyScheduleTestVectors::file_name =
 tls::istream&
 operator>>(tls::istream& str, AppKeyScheduleTestVectors::Step& obj)
 {
-  return str >> obj.secret >> obj.key >> obj.iv;
+  return str >> obj.secret >> obj.key >> obj.nonce;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const AppKeyScheduleTestVectors::Step& obj)
 {
-  return str << obj.secret << obj.key << obj.iv;
+  return str << obj.secret << obj.key << obj.nonce;
 }
 
 tls::istream&

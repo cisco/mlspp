@@ -142,7 +142,7 @@ struct AppKeyScheduleTestVectors
   {
     tls::opaque<1> secret;
     tls::opaque<1> key;
-    tls::opaque<1> iv;
+    tls::opaque<1> nonce;
   };
 
   typedef tls::vector<Step, 4> KeySequence;
@@ -157,9 +157,9 @@ struct AppKeyScheduleTestVectors
 };
 
 tls::istream&
-operator>>(tls::istream& str, KeyScheduleTestVectors& tv);
+operator>>(tls::istream& str, AppKeyScheduleTestVectors& tv);
 tls::ostream&
-operator<<(tls::ostream& str, const KeyScheduleTestVectors& tv);
+operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& tv);
 
 /////
 
