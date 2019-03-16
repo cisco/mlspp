@@ -175,6 +175,13 @@ constant_time_eq(const bytes& lhs, const bytes& rhs);
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
 
+bytes
+hkdf_expand_label(CipherSuite suite,
+                  const bytes& secret,
+                  const std::string& label,
+                  const bytes& context,
+                  const size_t length);
+
 struct GroupState;
 
 bytes

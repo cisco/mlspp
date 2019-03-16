@@ -37,6 +37,55 @@ struct GroupState
   friend bool operator==(const GroupState& lhs, const GroupState& rhs);
 };
 
+// XXX(rlb@ipv.sx): This is implemented in "const mode", where we
+// never ratchet forward the base secret.  This allows for maximal
+// out-of-order delivery, but provides no forward secrecy within an
+// epoch.
+class ApplicationKeyChain
+{
+public:
+  ApplicationKeyChain(CipherSuite suite,
+                      uint32_t sender,
+                      const bytes& app_secret)
+    : _suite(suite)
+    , _sender(tls::marshal(sender))
+    , _secret_size(Digest(suite).output_size())
+    , _key_size(AESGCM::key_size(suite))
+    , _nonce_size(AESGCM::nonce_size)
+  {
+    _base_secret = derive(app_secret, _secret_label, _secret_size);
+  }
+
+  struct KeyAndNonce
+  {
+    bytes secret;
+    bytes key;
+    bytes nonce;
+  };
+
+  KeyAndNonce get(uint32_t generation) const;
+
+private:
+  CipherSuite _suite;
+  bytes _sender;
+  bytes _base_secret;
+
+  size_t _secret_size;
+  size_t _key_size;
+  size_t _nonce_size;
+
+  // XXX(rlb@ipv.sx) Using char* here instead of std::string because
+  // the linter complains about static objects and objects with
+  // global scope.
+  static const char* _secret_label;
+  static const char* _nonce_label;
+  static const char* _key_label;
+
+  bytes derive(const bytes& secret,
+               const std::string& label,
+               const size_t size) const;
+};
+
 class State
 {
 public:
