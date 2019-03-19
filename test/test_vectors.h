@@ -56,7 +56,7 @@ struct CryptoTestVectors
 
   tls::opaque<1> derive_secret_secret;
   tls::opaque<1> derive_secret_label;
-  uint32_t derive_secret_length;
+  tls::opaque<1> derive_secret_context;
 
   tls::opaque<1> derive_key_pair_seed;
 
@@ -68,7 +68,6 @@ struct CryptoTestVectors
     tls::opaque<1> hkdf_extract_out;
 
     // Derive-Secret
-    GroupState derive_secret_state;
     tls::opaque<1> derive_secret_out;
 
     // Derive-Key-Pair
@@ -78,8 +77,7 @@ struct CryptoTestVectors
     ECIESCiphertext ecies_out;
 
     TestCase(CipherSuite suite)
-      : derive_secret_state(suite)
-      , derive_key_pair_pub(suite)
+      : derive_key_pair_pub(suite)
       , ecies_out(suite)
     {}
   };

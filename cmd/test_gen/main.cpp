@@ -72,16 +72,14 @@ generate_crypto()
     &tv.case_x25519,
   };
 
-  std::string derive_secret_label_string = "test";
-  bytes derive_secret_label_bytes(derive_secret_label_string.begin(),
-                                  derive_secret_label_string.end());
-
   tv.hkdf_extract_salt = { 0, 1, 2, 3 };
   tv.hkdf_extract_ikm = { 4, 5, 6, 7 };
 
+  std::string derive_secret_label_string = "test";
   tv.derive_secret_secret = bytes(32, 0xA0);
-  tv.derive_secret_label = derive_secret_label_bytes;
-  tv.derive_secret_length = 32;
+  tv.derive_secret_label =
+    bytes(derive_secret_label_string.begin(), derive_secret_label_string.end());
+  tv.derive_secret_context = bytes(32, 0xB0);
 
   tv.derive_key_pair_seed = { 0, 1, 2, 3 };
 
@@ -97,17 +95,11 @@ generate_crypto()
       mls::hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
 
     // Derive-Secret
-    // TODO(rlb@ipv.sx): Populate some actual state
-    auto zero = bytes(Digest(suite).output_size(), 0x00);
-    test_case->derive_secret_state = GroupState{ suite };
-    test_case->derive_secret_state.transcript_hash = zero;
-    auto derive_secret_state_bytes =
-      tls::marshal(test_case->derive_secret_state);
     test_case->derive_secret_out =
       mls::derive_secret(suite,
                          tv.derive_secret_secret,
                          derive_secret_label_string,
-                         derive_secret_state_bytes);
+                         tv.derive_secret_context);
 
     // Derive-Key-Pair
     auto priv = DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
