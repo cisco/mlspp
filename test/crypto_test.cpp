@@ -201,11 +201,12 @@ protected:
 
     std::string derive_secret_label_string(tv.derive_secret_label.begin(),
                                            tv.derive_secret_label.end());
+    auto derive_secret_state_bytes =
+      tls::marshal(test_case.derive_secret_state);
     auto derive_secret_out = derive_secret(suite,
                                            tv.derive_secret_secret,
                                            derive_secret_label_string,
-                                           test_case.derive_secret_state,
-                                           tv.derive_secret_length);
+                                           derive_secret_state_bytes);
     ASSERT_EQ(derive_secret_out, test_case.derive_secret_out);
 
     auto derive_key_pair_priv =

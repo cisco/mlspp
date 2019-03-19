@@ -342,13 +342,13 @@ State::derive_epoch_secrets(CipherSuite suite,
                             const bytes& update_secret,
                             const GroupState& state)
 {
-  auto secret_size = Digest(suite).output_size();
+  auto state_bytes = tls::marshal(state);
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
   return {
     epoch_secret,
-    derive_secret(suite, epoch_secret, "app", state, secret_size),
-    derive_secret(suite, epoch_secret, "confirm", state, secret_size),
-    derive_secret(suite, epoch_secret, "init", state, secret_size),
+    derive_secret(suite, epoch_secret, "app", state_bytes),
+    derive_secret(suite, epoch_secret, "confirm", state_bytes),
+    derive_secret(suite, epoch_secret, "init", state_bytes),
   };
 }
 

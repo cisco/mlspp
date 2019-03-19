@@ -832,7 +832,7 @@ hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
   return mac;
 }
 
-struct HKDFLabel04
+struct HKDFLabel
 {
   uint16_t length;
   tls::opaque<1> label;
@@ -840,7 +840,7 @@ struct HKDFLabel04
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const HKDFLabel04& obj)
+operator<<(tls::ostream& out, const HKDFLabel& obj)
 {
   return out << obj.length << obj.label << obj.context;
 }
@@ -856,35 +856,19 @@ hkdf_expand_label(CipherSuite suite,
   auto vec_label = bytes(mls_label.begin(), mls_label.end());
 
   auto length16 = static_cast<uint16_t>(length);
-  HKDFLabel04 str_label{ length16, vec_label, context };
+  HKDFLabel str_label{ length16, vec_label, context };
   return hkdf_expand(suite, secret, str_label, length);
-}
-
-struct HKDFLabel03
-{
-  uint16_t length;
-  tls::opaque<1, 7> label;
-  GroupState group_state;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const HKDFLabel03& obj)
-{
-  return out << obj.length << obj.label << obj.group_state;
 }
 
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
               const std::string& label,
-              const GroupState& state,
-              size_t size)
+              const bytes& context)
 {
-  std::string mls_label = std::string("mls10 ") + label;
-  bytes vec_label(mls_label.begin(), mls_label.end());
-
-  HKDFLabel03 label_str{ uint16_t(size), vec_label, state };
-  return hkdf_expand(suite, secret, label_str, size);
+  auto context_hash = Digest(suite).write(context).digest();
+  auto size = Digest(suite).output_size();
+  return hkdf_expand_label(suite, secret, label, context_hash, size);
 }
 
 ///

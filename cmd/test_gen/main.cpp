@@ -101,12 +101,13 @@ generate_crypto()
     auto zero = bytes(Digest(suite).output_size(), 0x00);
     test_case->derive_secret_state = GroupState{ suite };
     test_case->derive_secret_state.transcript_hash = zero;
+    auto derive_secret_state_bytes =
+      tls::marshal(test_case->derive_secret_state);
     test_case->derive_secret_out =
       mls::derive_secret(suite,
                          tv.derive_secret_secret,
                          derive_secret_label_string,
-                         test_case->derive_secret_state,
-                         tv.derive_secret_length);
+                         derive_secret_state_bytes);
 
     // Derive-Key-Pair
     auto priv = DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
