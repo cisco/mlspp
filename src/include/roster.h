@@ -150,6 +150,7 @@ public:
   void remove(uint32_t index);
   Credential get(uint32_t index) const;
   size_t size() const;
+  void truncate(uint32_t size);
 
 private:
   tls::vector<OptionalCredential, 4> _credentials;

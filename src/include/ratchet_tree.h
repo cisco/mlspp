@@ -94,6 +94,9 @@ public:
   void blank_path(uint32_t index);
   void set_path(uint32_t index, const bytes& leaf);
 
+  uint32_t leaf_span() const;
+  void truncate(uint32_t leaves);
+
   uint32_t size() const;
   bytes root_secret() const;
   bool check_invariant(size_t from) const;

@@ -205,6 +205,12 @@ Roster::size() const
   return _credentials.size();
 }
 
+void
+Roster::truncate(uint32_t size)
+{
+  _credentials.resize(size);
+}
+
 bool
 operator==(const Roster& lhs, const Roster& rhs)
 {

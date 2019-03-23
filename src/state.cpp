@@ -238,6 +238,10 @@ State::update(const bytes& leaf_secret)
 Handshake
 State::remove(const bytes& evict_secret, uint32_t index) const
 {
+  if (index >= _state.tree.size()) {
+    throw InvalidParameterError("Index too large for tree");
+  }
+
   auto path = _state.tree.encrypt(index, evict_secret);
   return sign(Remove{ index, path });
 }
@@ -334,6 +338,10 @@ State::handle(const Remove& remove)
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
   _state.roster.remove(remove.removed);
+
+  auto cut = _state.tree.leaf_span();
+  _state.tree.truncate(cut);
+  _state.roster.truncate(cut);
 }
 
 State::EpochSecrets

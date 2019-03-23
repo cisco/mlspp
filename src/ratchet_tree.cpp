@@ -320,6 +320,22 @@ RatchetTree::set_path(uint32_t index, const bytes& leaf)
 }
 
 uint32_t
+RatchetTree::leaf_span() const
+{
+  uint32_t max = size() - 1;
+  while (max != 0 && !_nodes[2 * max]) {
+    max -= 1;
+  }
+  return max + 1;
+}
+
+void
+RatchetTree::truncate(uint32_t leaves)
+{
+  _nodes.resize(tree_math::node_width(leaves));
+}
+
+uint32_t
 RatchetTree::size() const
 {
   return tree_math::size_from_width(_nodes.size());
