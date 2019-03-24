@@ -143,7 +143,7 @@ RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
   , _nodes(suite)
 {
   for (uint32_t i = 0; i < secrets.size(); i += 1) {
-    add_leaf(secrets[i]);
+    add_leaf(i, secrets[i]);
     set_path(i, secrets[i]);
   }
 }
@@ -263,25 +263,35 @@ RatchetTree::merge_path(uint32_t from, const RatchetTree::MergeInfo& info)
 }
 
 void
-RatchetTree::add_leaf(const DHPublicKey& pub)
+RatchetTree::add_leaf(uint32_t index, const DHPublicKey& pub)
 {
   if (_suite != pub.cipher_suite()) {
     throw InvalidParameterError("Incorrect ciphersuite");
   }
 
-  if (!_nodes.empty()) {
-    _nodes.emplace_back(nullopt);
+  if (index == size()) {
+    if (!_nodes.empty()) {
+      _nodes.emplace_back(nullopt);
+    }
+
+    _nodes.emplace_back(RatchetTreeNode(pub));
+  } else {
+    _nodes[index] = RatchetTreeNode(pub);
   }
-  _nodes.emplace_back(RatchetTreeNode(pub));
 }
 
 void
-RatchetTree::add_leaf(const bytes& leaf_secret)
+RatchetTree::add_leaf(uint32_t index, const bytes& leaf_secret)
 {
-  if (!_nodes.empty()) {
-    _nodes.emplace_back(nullopt);
+  if (index == size()) {
+    if (!_nodes.empty()) {
+      _nodes.emplace_back(nullopt);
+    }
+
+    _nodes.emplace_back(new_node(leaf_secret));
+  } else {
+    _nodes[index] = new_node(leaf_secret);
   }
-  _nodes.emplace_back(new_node(leaf_secret));
 }
 
 void
@@ -339,6 +349,12 @@ uint32_t
 RatchetTree::size() const
 {
   return tree_math::size_from_width(_nodes.size());
+}
+
+bool
+RatchetTree::occupied(uint32_t index) const
+{
+  return bool(_nodes[index]);
 }
 
 bytes

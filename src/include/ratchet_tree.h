@@ -89,8 +89,8 @@ public:
   MergeInfo decrypt(uint32_t from, const DirectPath& path) const;
   void merge_path(uint32_t from, const MergeInfo& info);
 
-  void add_leaf(const DHPublicKey& pub);
-  void add_leaf(const bytes& leaf_secret);
+  void add_leaf(uint32_t index, const DHPublicKey& pub);
+  void add_leaf(uint32_t index, const bytes& leaf_secret);
   void blank_path(uint32_t index);
   void set_path(uint32_t index, const bytes& leaf);
 
@@ -98,6 +98,7 @@ public:
   void truncate(uint32_t leaves);
 
   uint32_t size() const;
+  bool occupied(uint32_t index) const;
   bytes root_secret() const;
   bool check_invariant(size_t from) const;
 

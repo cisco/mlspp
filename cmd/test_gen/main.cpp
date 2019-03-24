@@ -277,7 +277,7 @@ generate_messages()
 
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};
-    roster.add(cred);
+    roster.add(0, cred);
 
     // Construct UIK
     auto user_init_key = UserInitKey{};
@@ -288,12 +288,13 @@ generate_messages()
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
-      tv.group_id, tv.epoch, roster, ratchet_tree, tv.random, tv.random,
+      tv.group_id,  tv.epoch,  tv.removed, roster,
+      ratchet_tree, tv.random, tv.random,
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
     // Construct Handshake messages
-    auto add_op = Add{ user_init_key };
+    auto add_op = Add{ tv.removed, user_init_key };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
     auto add =

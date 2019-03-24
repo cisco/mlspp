@@ -146,7 +146,7 @@ operator==(const OptionalCredential& lhs, const OptionalCredential& rhs);
 class Roster
 {
 public:
-  void add(const Credential& cred);
+  void add(uint32_t index, const Credential& cred);
   void remove(uint32_t index);
   Credential get(uint32_t index) const;
   size_t size() const;
