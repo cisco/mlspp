@@ -204,8 +204,7 @@ protected:
     auto derive_secret_out = derive_secret(suite,
                                            tv.derive_secret_secret,
                                            derive_secret_label_string,
-                                           test_case.derive_secret_state,
-                                           tv.derive_secret_length);
+                                           tv.derive_secret_context);
     ASSERT_EQ(derive_secret_out, test_case.derive_secret_out);
 
     auto derive_key_pair_priv =
