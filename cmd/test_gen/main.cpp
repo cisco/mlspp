@@ -181,6 +181,43 @@ generate_key_schedule()
   return tv;
 }
 
+AppKeyScheduleTestVectors
+generate_app_key_schedule()
+{
+  AppKeyScheduleTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<AppKeyScheduleTestVectors::TestCase*> cases{
+    &tv.case_p256,
+    &tv.case_x25519,
+  };
+
+  tv.n_members = 16;
+  tv.n_generations = 16;
+  tv.application_secret = bytes(32, 0xA0);
+
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      ApplicationKeyChain chain(suite, j, tv.application_secret);
+      test_case->emplace_back();
+
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
+        auto kn = chain.get(k);
+        test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
+      }
+    }
+  }
+
+  return tv;
+}
+
 MessagesTestVectors
 generate_messages()
 {
@@ -459,6 +496,9 @@ main()
   KeyScheduleTestVectors key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
+  AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
+  write_test_vectors(app_key_schedule);
+
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
 
@@ -471,6 +511,7 @@ main()
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
   verify_reproducible(generate_key_schedule);
+  verify_reproducible(generate_app_key_schedule);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
 
@@ -480,6 +521,7 @@ main()
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
+    TestLoader<AppKeyScheduleTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {

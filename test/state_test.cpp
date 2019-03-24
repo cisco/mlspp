@@ -4,6 +4,38 @@
 
 using namespace mls;
 
+class AppKeyScheduleTest : public ::testing::Test
+{
+protected:
+  const AppKeyScheduleTestVectors& tv;
+
+  AppKeyScheduleTest()
+    : tv(TestLoader<AppKeyScheduleTestVectors>::get())
+  {}
+
+  void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
+  {
+    ASSERT_EQ(tc.size(), tv.n_members);
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      ApplicationKeyChain chain(suite, j, tv.application_secret);
+
+      ASSERT_EQ(tc[j].size(), tv.n_generations);
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
+        auto kn = chain.get(k);
+        ASSERT_EQ(tc[j][k].secret, kn.secret);
+        ASSERT_EQ(tc[j][k].key, kn.key);
+        ASSERT_EQ(tc[j][k].nonce, kn.nonce);
+      }
+    }
+  }
+};
+
+TEST_F(AppKeyScheduleTest, Interop)
+{
+  interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
+  interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
+}
+
 class StateTest : public ::testing::Test
 {
 protected:

@@ -792,24 +792,6 @@ hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
   return hmac(suite, salt, ikm);
 }
 
-// struct {
-//     uint16 length = Length;
-//     opaque label<6..255> = "mls10 " + Label;
-//     GroupState state = State;
-// } HkdfLabel;
-struct HKDFLabel
-{
-  uint16_t length;
-  tls::opaque<1, 7> label;
-  GroupState group_state;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const HKDFLabel& obj)
-{
-  return out << obj.length << obj.label << obj.group_state;
-}
-
 bytes
 zero_bytes(size_t size)
 {
@@ -850,6 +832,47 @@ hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
   return mac;
 }
 
+struct HKDFLabel04
+{
+  uint16_t length;
+  tls::opaque<1> label;
+  tls::opaque<4> context;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const HKDFLabel04& obj)
+{
+  return out << obj.length << obj.label << obj.context;
+}
+
+bytes
+hkdf_expand_label(CipherSuite suite,
+                  const bytes& secret,
+                  const std::string& label,
+                  const bytes& context,
+                  const size_t length)
+{
+  auto mls_label = std::string("mls10 ") + label;
+  auto vec_label = bytes(mls_label.begin(), mls_label.end());
+
+  auto length16 = static_cast<uint16_t>(length);
+  HKDFLabel04 str_label{ length16, vec_label, context };
+  return hkdf_expand(suite, secret, str_label, length);
+}
+
+struct HKDFLabel03
+{
+  uint16_t length;
+  tls::opaque<1, 7> label;
+  GroupState group_state;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const HKDFLabel03& obj)
+{
+  return out << obj.length << obj.label << obj.group_state;
+}
+
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
@@ -860,7 +883,7 @@ derive_secret(CipherSuite suite,
   std::string mls_label = std::string("mls10 ") + label;
   bytes vec_label(mls_label.begin(), mls_label.end());
 
-  HKDFLabel label_str{ uint16_t(size), vec_label, state };
+  HKDFLabel03 label_str{ uint16_t(size), vec_label, state };
   return hkdf_expand(suite, secret, label_str, size);
 }
 

@@ -2,6 +2,10 @@
 
 namespace mls {
 
+///
+/// GroupState
+///
+
 GroupState::GroupState(const bytes& group_id,
                        CipherSuite suite,
                        const bytes& leaf_secret,
@@ -50,6 +54,36 @@ operator==(const GroupState& lhs, const GroupState& rhs)
   auto tree = (lhs.tree == rhs.tree);
   auto transcript_hash = (lhs.transcript_hash == rhs.transcript_hash);
   return group_id && epoch && roster && tree && transcript_hash;
+}
+
+///
+/// ApplicationKeyChain
+///
+
+const char* ApplicationKeyChain::_secret_label = "app sender";
+const char* ApplicationKeyChain::_nonce_label = "nonce";
+const char* ApplicationKeyChain::_key_label = "key";
+
+ApplicationKeyChain::KeyAndNonce
+ApplicationKeyChain::get(uint32_t generation) const
+{
+  auto secret = _base_secret;
+  for (uint32_t i = 0; i < generation; ++i) {
+    secret = derive(secret, _secret_label, _secret_size);
+  }
+
+  auto key = derive(secret, _key_label, _key_size);
+  auto nonce = derive(secret, _nonce_label, _nonce_size);
+
+  return KeyAndNonce{ secret, key, nonce };
+}
+
+bytes
+ApplicationKeyChain::derive(const bytes& secret,
+                            const std::string& label,
+                            const size_t size) const
+{
+  return hkdf_expand_label(_suite, secret, label, _sender, size);
 }
 
 ///
