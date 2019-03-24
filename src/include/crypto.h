@@ -344,7 +344,7 @@ private:
 struct ECIESCiphertext : public CipherAware
 {
   DHPublicKey ephemeral;
-  tls::opaque<3> content;
+  tls::opaque<4> content;
 
   ECIESCiphertext(CipherSuite suite)
     : CipherAware(suite)
