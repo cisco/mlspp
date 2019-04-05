@@ -171,6 +171,12 @@ Session::current_state()
 
 namespace test {
 
+uint32_t
+TestSession::index() const
+{
+  return current_state().index();
+}
+
 epoch_t
 TestSession::current_epoch() const
 {

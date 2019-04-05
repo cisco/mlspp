@@ -49,7 +49,7 @@ protected:
 
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};
-    roster.add(cred);
+    roster.add(0, cred);
 
     // UserInitKey
     UserInitKey user_init_key_c;
@@ -64,7 +64,8 @@ protected:
 
     // WelcomeInfo and Welcome
     WelcomeInfo welcome_info_c{
-      tv.group_id, tv.epoch, roster, ratchet_tree, tv.random, tv.random,
+      tv.group_id,  tv.epoch,  tv.removed, roster,
+      ratchet_tree, tv.random, tv.random,
     };
     Welcome welcome_c{ tv.uik_id, dh_key, welcome_info_c };
 
@@ -75,7 +76,7 @@ protected:
     tls_round_trip(tc.welcome, welcome_c, welcome, true);
 
     // Handshake messages
-    Add add_op{ user_init_key_c };
+    Add add_op{ tv.removed, user_init_key_c };
     Update update_op{ direct_path };
     Remove remove_op{ tv.removed, direct_path };
 

@@ -174,9 +174,13 @@ operator==(const OptionalCredential& lhs, const OptionalCredential& rhs)
 ///
 
 void
-Roster::add(const Credential& cred)
+Roster::add(uint32_t index, const Credential& cred)
 {
-  _credentials.push_back(cred);
+  if (index == _credentials.size()) {
+    _credentials.push_back(cred);
+  } else {
+    _credentials[index] = cred;
+  }
 }
 
 void
@@ -203,6 +207,12 @@ size_t
 Roster::size() const
 {
   return _credentials.size();
+}
+
+void
+Roster::truncate(uint32_t size)
+{
+  _credentials.resize(size);
 }
 
 bool

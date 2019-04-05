@@ -94,15 +94,20 @@ operator>>(tls::istream& in, UserInitKey& obj);
 // struct {
 //   opaque group_id<0..255>;
 //   uint32 epoch;
+//   uint32 index; // XXX see below
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<PublicKey> tree<1..2^32-1>;
 //   opaque transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
+//
+// XXX-SPEC(rlb@ipv.sx): To support add-in-place, the WelcomeInfo
+// struct needs to have an index field.
 struct WelcomeInfo : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
+  uint32_t index;
   Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
@@ -115,6 +120,7 @@ struct WelcomeInfo : public CipherAware
 
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
+              uint32_t index,
               Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
@@ -122,6 +128,7 @@ struct WelcomeInfo : public CipherAware
     : CipherAware(tree)
     , group_id(group_id)
     , epoch(epoch)
+    , index(index)
     , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)
@@ -181,12 +188,14 @@ operator>>(tls::istream& in, GroupOperationType& obj);
 struct Add
 {
 public:
+  uint32_t index;
   UserInitKey init_key;
 
   Add() {}
 
-  Add(const UserInitKey& init_key)
-    : init_key(init_key)
+  Add(uint32_t index, const UserInitKey& init_key)
+    : index(index)
+    , init_key(init_key)
   {}
 
   static const GroupOperationType type;

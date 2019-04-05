@@ -15,7 +15,7 @@ GroupState::GroupState(const bytes& group_id,
   , tree(suite, leaf_secret)
   , transcript_hash(Digest(suite).output_size(), 0)
 {
-  roster.add(credential);
+  roster.add(0, credential);
 }
 
 GroupState::GroupState(const WelcomeInfo& info)
@@ -118,7 +118,7 @@ State::State(SignaturePrivateKey identity_priv,
 
   _state = GroupState{ welcome_info };
 
-  _index = _state.tree.size();
+  _index = welcome_info.index;
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
 
@@ -150,10 +150,10 @@ State::State(SignaturePrivateKey identity_priv,
                              .digest();
 
   // Add to the tree
-  _state.tree.add_leaf(init_secret);
+  _state.tree.add_leaf(_index, init_secret);
 
   // Add to the roster
-  _state.roster.add(credential);
+  _state.roster.add(_index, credential);
 
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
@@ -208,6 +208,12 @@ State::negotiate(const bytes& group_id,
 std::pair<Welcome, Handshake>
 State::add(const UserInitKey& user_init_key) const
 {
+  return add(_state.tree.size(), user_init_key);
+}
+
+std::pair<Welcome, Handshake>
+State::add(uint32_t index, const UserInitKey& user_init_key) const
+{
   if (!user_init_key.verify()) {
     throw InvalidParameterError("bad signature on user init key");
   }
@@ -217,13 +223,14 @@ State::add(const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _state.group_id,        _state.epoch,
-                            _state.roster,          _state.tree,
-                            _state.transcript_hash, _init_secret };
+  WelcomeInfo welcome_info{ _state.group_id, _state.epoch,
+                            index,           _state.roster,
+                            _state.tree,     _state.transcript_hash,
+                            _init_secret };
 
   Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
 
-  auto add = sign(Add{ user_init_key });
+  auto add = sign(Add{ index, user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
 
@@ -238,6 +245,10 @@ State::update(const bytes& leaf_secret)
 Handshake
 State::remove(const bytes& evict_secret, uint32_t index) const
 {
+  if (index >= _state.tree.size()) {
+    throw InvalidParameterError("Index too large for tree");
+  }
+
   auto path = _state.tree.encrypt(index, evict_secret);
   return sign(Remove{ index, path });
 }
@@ -297,15 +308,23 @@ State::handle(const Add& add)
     throw InvalidParameterError("Invalid signature on init key in group add");
   }
 
+  // Verify the index in the Add message
+  if (add.index > _state.tree.size()) {
+    throw InvalidParameterError("Invalid leaf index");
+  }
+  if (add.index < _state.tree.size() && _state.tree.occupied(add.index)) {
+    throw InvalidParameterError("Leaf is not available for add");
+  }
+
   // Add to the tree
   auto init_key = add.init_key.find_init_key(_suite);
   if (!init_key) {
     throw ProtocolError("New node does not support group's cipher suite");
   }
-  _state.tree.add_leaf(*init_key);
+  _state.tree.add_leaf(add.index, *init_key);
 
   // Add to the roster
-  _state.roster.add(add.init_key.credential);
+  _state.roster.add(add.index, add.init_key.credential);
 
   // Update symmetric state
   update_epoch_secrets(_zero);
@@ -334,6 +353,10 @@ State::handle(const Remove& remove)
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
   _state.roster.remove(remove.removed);
+
+  auto cut = _state.tree.leaf_span();
+  _state.tree.truncate(cut);
+  _state.roster.truncate(cut);
 }
 
 State::EpochSecrets

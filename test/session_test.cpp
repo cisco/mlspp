@@ -16,6 +16,8 @@ protected:
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
 
+  static const uint32_t no_except = 0xffffffff;
+
   std::vector<TestSession> sessions;
 
   SessionTest()
@@ -33,16 +35,28 @@ protected:
 
   bytes fresh_secret() const { return random_bytes(secret_size); }
 
-  void broadcast(const bytes& message)
+  void broadcast(const bytes& message) { broadcast(message, no_except); }
+
+  void broadcast(const bytes& message, const uint32_t except)
   {
     auto initial_epoch = sessions[0].current_epoch();
     for (auto& session : sessions) {
+      if (except != no_except && session.index() == except) {
+        continue;
+      }
+
       session.handle(message);
     }
-    check(initial_epoch);
+    check(initial_epoch, except);
   }
 
   void broadcast_add()
+  {
+    auto size = sessions.size();
+    broadcast_add(size - 1, size);
+  }
+
+  void broadcast_add(uint32_t from, uint32_t index)
   {
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
@@ -50,34 +64,52 @@ protected:
     auto initial_epoch = sessions[0].current_epoch();
 
     TestSession next{ suites, init_secret, id_priv, cred };
-    auto last = sessions.size() - 1;
-    std::pair<bytes, bytes> welcome_add;
 
     // Initial add is different
     if (sessions.size() == 1) {
-      welcome_add = sessions[last].start(group_id, next.user_init_key());
+      auto welcome_add = sessions[0].start(group_id, next.user_init_key());
       next.join(welcome_add.first, welcome_add.second);
       sessions.push_back(next);
       // NB: Don't check epoch change, because it doesn't
       return;
     }
 
-    welcome_add = sessions[last].add(next.user_init_key());
+    auto welcome_add = sessions[from].add(next.user_init_key());
     next.join(welcome_add.first, welcome_add.second);
-    broadcast(welcome_add.second);
-    sessions.push_back(next);
+    broadcast(welcome_add.second, index);
+
+    // Add-in-place vs. add-at-edge
+    if (index == sessions.size()) {
+      sessions.push_back(next);
+    } else if (index < sessions.size()) {
+      sessions[index] = next;
+    } else {
+      throw InvalidParameterError("Index too large for group");
+    }
+
     check(initial_epoch);
   }
 
-  void check(epoch_t initial_epoch) const
+  void check(epoch_t initial_epoch) const { check(initial_epoch, no_except); }
+
+  void check(epoch_t initial_epoch, uint32_t except) const
   {
+    uint32_t ref = 0;
+    if (except == 0 && sessions.size() > 1) {
+      ref = 1;
+    }
+
     // Verify that everyone ended up in consistent states
     for (const auto& session : sessions) {
-      ASSERT_EQ(session, sessions[0]);
+      if (except != no_except && session.index() == except) {
+        continue;
+      }
+
+      ASSERT_EQ(session, sessions[ref]);
     }
 
     // Verify that the epoch got updated
-    ASSERT_NE(sessions[0].current_epoch(), initial_epoch);
+    ASSERT_NE(sessions[ref].current_epoch(), initial_epoch);
   }
 };
 
@@ -153,6 +185,28 @@ TEST_F(RunningSessionTest, Remove)
     sessions.pop_back();
     broadcast(remove);
     check(initial_epoch);
+  }
+}
+
+TEST_F(RunningSessionTest, Replace)
+{
+  for (int i = 0; i < group_size; ++i) {
+    auto target = (i + 1) % group_size;
+
+    std::cout << "sessions: " << i << " " << target << " " << sessions.size()
+              << " " << group_size << std::endl;
+    std::cout << "---" << std::endl;
+
+    // Remove target
+    auto initial_epoch = sessions[i].current_epoch();
+    auto evict_secret = fresh_secret();
+    auto remove = sessions[i].remove(evict_secret, target);
+    broadcast(remove, target);
+    check(initial_epoch, target);
+
+    // Re-add at target
+    initial_epoch = sessions[i].current_epoch();
+    broadcast_add(i, target);
   }
 }
 

@@ -16,8 +16,8 @@ TEST(RosterTest, Basic)
   ASSERT_EQ(cred.public_key(), pub);
 
   Roster roster;
-  roster.add(cred);
-  roster.add(cred);
+  roster.add(0, cred);
+  roster.add(1, cred);
   ASSERT_EQ(roster.size(), 2);
   ASSERT_EQ(roster.get(0), cred);
   ASSERT_EQ(roster.get(1), cred);

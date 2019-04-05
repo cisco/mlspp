@@ -54,6 +54,7 @@ class TestSession : public Session
 {
 public:
   using Session::Session;
+  uint32_t index() const;
   epoch_t current_epoch() const;
   CipherSuite cipher_suite() const;
   bytes current_epoch_secret() const;

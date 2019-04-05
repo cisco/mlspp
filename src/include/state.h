@@ -122,8 +122,12 @@ public:
   /// Message factories
   ///
 
-  // Generate a Add message (for group-initiated join)
+  // Generate a Add message
   std::pair<Welcome, Handshake> add(const UserInitKey& user_init_key) const;
+
+  // Generate an Add message at a specific location
+  std::pair<Welcome, Handshake> add(uint32_t index,
+                                    const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   Handshake update(const bytes& leaf_secret);

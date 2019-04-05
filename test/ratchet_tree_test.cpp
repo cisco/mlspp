@@ -42,19 +42,19 @@ TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ ciphersuite, secretA };
 
-  tree.add_leaf(secretB);
+  tree.add_leaf(1, secretB);
   tree.set_path(1, secretB);
 
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(tree.root_secret(), secretAB);
 
-  tree.add_leaf(secretC);
+  tree.add_leaf(2, secretC);
   tree.set_path(2, secretC);
 
   ASSERT_EQ(tree.size(), 3);
   ASSERT_EQ(tree.root_secret(), secretABC);
 
-  tree.add_leaf(secretD);
+  tree.add_leaf(3, secretD);
   tree.set_path(3, secretD);
 
   ASSERT_EQ(tree.size(), 4);
@@ -96,9 +96,9 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
 
     for (int j = 0; j < size; ++j) {
       if (i == j) {
-        trees[j].add_leaf(secret);
+        trees[j].add_leaf(i, secret);
       } else {
-        trees[j].add_leaf(pub);
+        trees[j].add_leaf(i, pub);
       }
     }
   }

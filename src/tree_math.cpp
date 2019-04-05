@@ -44,6 +44,10 @@ node_width(uint32_t n)
 uint32_t
 size_from_width(uint32_t w)
 {
+  if (w == 0) {
+    return 0;
+  }
+
   return (w >> one) + 1;
 }
 

@@ -146,10 +146,11 @@ operator==(const OptionalCredential& lhs, const OptionalCredential& rhs);
 class Roster
 {
 public:
-  void add(const Credential& cred);
+  void add(uint32_t index, const Credential& cred);
   void remove(uint32_t index);
   Credential get(uint32_t index) const;
   size_t size() const;
+  void truncate(uint32_t size);
 
 private:
   tls::vector<OptionalCredential, 4> _credentials;
