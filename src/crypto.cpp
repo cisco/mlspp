@@ -20,7 +20,7 @@ namespace mls {
 
 namespace test {
 
-int DeterministicECIES::_refct = 0;
+int DeterministicHPKE::_refct = 0;
 
 bool
 deterministic_signature_scheme(SignatureScheme scheme)
@@ -816,16 +816,18 @@ random_bytes(size_t size)
 // HKDF-Expand(Secret, Label) reduces to:
 //
 //   HMAC(Secret, Label || 0x01)
-template<typename T>
 static bytes
-hkdf_expand(CipherSuite suite, const bytes& secret, const T& info, size_t size)
+hkdf_expand(CipherSuite suite,
+            const bytes& secret,
+            const bytes& info,
+            size_t size)
 {
   // Ensure that we need only one hash invocation
   if (size > Digest(suite).output_size()) {
     throw InvalidParameterError("Size too big for hkdf_expand");
   }
 
-  auto label = tls::marshal(info);
+  auto label = info;
   label.push_back(0x01);
   auto mac = hmac(suite, secret, label);
   mac.resize(size);
@@ -852,12 +854,11 @@ hkdf_expand_label(CipherSuite suite,
                   const bytes& context,
                   const size_t length)
 {
-  auto mls_label = std::string("mls10 ") + label;
-  auto vec_label = bytes(mls_label.begin(), mls_label.end());
-
+  auto mls_label = to_bytes(std::string("mls10 ") + label);
   auto length16 = static_cast<uint16_t>(length);
-  HKDFLabel str_label{ length16, vec_label, context };
-  return hkdf_expand(suite, secret, str_label, length);
+  HKDFLabel label_str{ length16, mls_label, context };
+  auto label_bytes = tls::marshal(label_str);
+  return hkdf_expand(suite, secret, label_bytes, length);
 }
 
 bytes
@@ -1216,23 +1217,24 @@ PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
 /// DHPublicKey and DHPrivateKey
 ///
 
-// key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
-// nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
+/*
+// key = HKDF-Expand(Secret, HPKELabel("key"), Length)
+// nonce = HKDF-Expand(Secret, HPKELabel("nonce"), Length)
 //
-// Where ECIESLabel is specified as:
+// Where HPKELabel is specified as:
 //
 // struct {
 //   uint16 length = Length;
 //   opaque label<12..255> = "mls10 ecies " + Label;
-// } ECIESLabel;
-struct ECIESLabel
+// } HPKELabel;
+struct HPKELabel
 {
   uint16_t length;
   tls::opaque<1, 12> label;
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const ECIESLabel& obj)
+operator<<(tls::ostream& out, const HPKELabel& obj)
 {
   return out << obj.length << obj.label;
 }
@@ -1241,37 +1243,127 @@ static std::pair<bytes, bytes>
 derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
 {
   uint16_t key_size = AESGCM::key_size(suite);
-  std::string key_label_str{ "mls10 ecies key" };
-  bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
-  ECIESLabel key_label{ key_size, key_label_vec };
+  HPKELabel key_label_str{ key_size, to_bytes("mls10 ecies key") };
+  auto key_label = tls::marshal(key_label_str);
   auto key = hkdf_expand(suite, shared_secret, key_label, key_size);
 
-  std::string nonce_label_str{ "mls10 ecies nonce" };
-  bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
-  ECIESLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
+  HPKELabel nonce_label_str{ AESGCM::nonce_size,
+                             to_bytes("mls10 ecies nonce") };
+  auto nonce_label = tls::marshal(nonce_label_str);
   auto nonce =
     hkdf_expand(suite, shared_secret, nonce_label, AESGCM::nonce_size);
 
   return std::pair<bytes, bytes>(key, nonce);
 }
+*/
 
-ECIESCiphertext
+enum struct HPKEMode : uint8_t
+{
+  base = 0x00,
+  psk = 0x01,
+  auth = 0x02,
+};
+
+enum struct HPKECipherSuite : uint16_t
+{
+  P256_SHA256_AES128GCM = 0x0001,
+  P521_SHA512_AES256GCM = 0x0002,
+  X25519_SHA256_AES128GCM = 0x003,
+  X448_SHA512_AES256GCM = 0x0004,
+};
+
+static HPKECipherSuite
+to_hpke(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+      return HPKECipherSuite::P256_SHA256_AES128GCM;
+    case CipherSuite::P521_SHA512_AES256GCM:
+      return HPKECipherSuite::P521_SHA512_AES256GCM;
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return HPKECipherSuite::X25519_SHA256_AES128GCM;
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return HPKECipherSuite::X448_SHA512_AES256GCM;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite for HPKE");
+  }
+}
+
+struct HPKEContext
+{
+  uint16_t ciphersuite;
+  uint8_t mode;
+  tls::opaque<2> kem_context;
+  tls::opaque<2> info;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const HPKEContext& obj)
+{
+  return out << obj.ciphersuite << obj.mode << obj.kem_context << obj.info;
+}
+
+static std::pair<bytes, bytes>
+setup_core(CipherSuite suite,
+           HPKEMode mode,
+           const bytes& secret,
+           const bytes& kem_context,
+           const bytes& info)
+{
+  auto hpke_suite = to_hpke(suite);
+  auto context_str = HPKEContext{ static_cast<uint16_t>(hpke_suite),
+                                  static_cast<uint8_t>(mode),
+                                  kem_context,
+                                  info };
+  auto context = tls::marshal(context_str);
+
+  auto Nk = AESGCM::key_size(suite);
+  auto key_label = to_bytes("hpke key") + context;
+  auto key = hkdf_expand(suite, secret, key_label, Nk);
+
+  auto Nn = AESGCM::nonce_size;
+  auto nonce_label = to_bytes("hpke nonce") + context;
+  auto nonce = hkdf_expand(suite, secret, nonce_label, Nn);
+
+  return std::pair<bytes, bytes>(key, nonce);
+}
+
+static std::pair<bytes, bytes>
+setup_base(CipherSuite suite,
+           const DHPublicKey& pkR,
+           const bytes& zz,
+           const bytes& enc,
+           const bytes& info)
+{
+  auto Nh = Digest(suite).output_size();
+  bytes zero(Nh, 0);
+  auto secret = hkdf_extract(suite, zero, zz);
+  auto kem_context = enc + pkR.to_bytes();
+  return setup_core(suite, HPKEMode::base, secret, kem_context, info);
+}
+
+HPKECiphertext
 DHPublicKey::encrypt(const bytes& plaintext) const
 {
+  // SetupBaseI
   auto ephemeral = DHPrivateKey::generate(_suite);
-  if (test::DeterministicECIES::enabled()) {
+  if (test::DeterministicHPKE::enabled()) {
     auto seed = to_bytes() + plaintext;
     ephemeral = DHPrivateKey::derive(_suite, seed);
   }
 
-  auto shared_secret = ephemeral.derive(*this);
+  auto enc = ephemeral.public_key().to_bytes();
+  auto zz = ephemeral.derive(*this);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
+  bytes info;
+  std::tie(key, nonce) = setup_base(_suite, *this, zz, enc, info);
 
+  // Context.Encrypt
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
-  return ECIESCiphertext{ ephemeral.public_key(), content };
+  return HPKECiphertext{ ephemeral.public_key(), content };
 }
 
 DHPrivateKey
@@ -1339,12 +1431,15 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
 }
 
 bytes
-DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
+DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
 {
-  auto shared_secret = derive(ciphertext.ephemeral);
+  // SetupBaseR
+  auto enc = ciphertext.ephemeral.to_bytes();
+  auto zz = derive(ciphertext.ephemeral);
 
   bytes key, nonce;
-  std::tie(key, nonce) = derive_ecies_secrets(_suite, shared_secret);
+  bytes info;
+  std::tie(key, nonce) = setup_base(_suite, public_key(), zz, enc, info);
 
   AESGCM gcm(key, nonce);
   return gcm.decrypt(ciphertext.content);
@@ -1463,23 +1558,23 @@ SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
 }
 
 ///
-/// ECIESCiphertext
+/// HPKECiphertext
 ///
 
 bool
-operator==(const ECIESCiphertext& lhs, const ECIESCiphertext& rhs)
+operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs)
 {
   return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
 }
 
 tls::ostream&
-operator<<(tls::ostream& out, const ECIESCiphertext& obj)
+operator<<(tls::ostream& out, const HPKECiphertext& obj)
 {
   return out << obj.ephemeral << obj.content;
 }
 
 tls::istream&
-operator>>(tls::istream& in, ECIESCiphertext& obj)
+operator>>(tls::istream& in, HPKECiphertext& obj)
 {
   return in >> obj.ephemeral >> obj.content;
 }

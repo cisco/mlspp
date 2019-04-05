@@ -68,17 +68,17 @@ operator>>(tls::istream& in, SignatureScheme& obj);
 // Methods to help with testing
 namespace test {
 
-// DeterministicECIES enables RAII-based requests for ECIES to be
+// DeterministicHPKE enables RAII-based requests for HPKE to be
 // done deterministically.  The RAII pattern is used here to ensure
 // that the determinism always gets turned off.  To avoid conflicts
 // between multiple requests for determinism, determinism is turned
 // off when the last object in the stack is destroyed; it's
 // basically a ref-counted bool.
-class DeterministicECIES
+class DeterministicHPKE
 {
 public:
-  DeterministicECIES() { _refct += 1; }
-  ~DeterministicECIES() { _refct -= 1; }
+  DeterministicHPKE() { _refct += 1; }
+  ~DeterministicHPKE() { _refct -= 1; }
   static bool enabled() { return _refct > 0; }
 
 private:
@@ -282,13 +282,13 @@ protected:
 };
 
 // DH specialization
-struct ECIESCiphertext;
+struct HPKECiphertext;
 
 class DHPublicKey : public PublicKey
 {
 public:
   using PublicKey::PublicKey;
-  ECIESCiphertext encrypt(const bytes& plaintext) const;
+  HPKECiphertext encrypt(const bytes& plaintext) const;
 
 private:
   friend class DHPrivateKey;
@@ -304,7 +304,7 @@ public:
   static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;
-  bytes decrypt(const ECIESCiphertext& ciphertext) const;
+  bytes decrypt(const HPKECiphertext& ciphertext) const;
 
   const DHPublicKey& public_key() const;
 
@@ -340,28 +340,26 @@ private:
   SignaturePrivateKey(SignatureScheme scheme, OpenSSLKey* key);
 };
 
-// A struct for ECIES-encrypted information
-struct ECIESCiphertext : public CipherAware
+// A struct for HPKE-encrypted information
+struct HPKECiphertext : public CipherAware
 {
   DHPublicKey ephemeral;
   tls::opaque<4> content;
 
-  ECIESCiphertext(CipherSuite suite)
+  HPKECiphertext(CipherSuite suite)
     : CipherAware(suite)
     , ephemeral(suite)
   {}
 
-  ECIESCiphertext(const DHPublicKey& ephemeral, const bytes& content)
+  HPKECiphertext(const DHPublicKey& ephemeral, const bytes& content)
     : CipherAware(ephemeral.cipher_suite())
     , ephemeral(ephemeral)
     , content(content)
   {}
 
-  friend bool operator==(const ECIESCiphertext& lhs,
-                         const ECIESCiphertext& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out,
-                                  const ECIESCiphertext& obj);
-  friend tls::istream& operator>>(tls::istream& in, ECIESCiphertext& obj);
+  friend bool operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const HPKECiphertext& obj);
+  friend tls::istream& operator>>(tls::istream& in, HPKECiphertext& obj);
 };
 
 } // namespace mls

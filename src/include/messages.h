@@ -13,12 +13,12 @@ namespace mls {
 
 // struct {
 //    DHPublicKey public_key;
-//    ECIESCiphertext node_secrets<0..2^16-1>;
+//    HPKECiphertext node_secrets<0..2^16-1>;
 // } RatchetNode
 struct RatchetNode : public CipherAware
 {
   DHPublicKey public_key;
-  tls::variant_vector<ECIESCiphertext, CipherSuite, 2> node_secrets;
+  tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
 
   RatchetNode(CipherSuite suite)
     : CipherAware(suite)
@@ -27,7 +27,7 @@ struct RatchetNode : public CipherAware
   {}
 
   RatchetNode(const DHPublicKey& public_key,
-              const std::vector<ECIESCiphertext>& node_secrets)
+              const std::vector<HPKECiphertext>& node_secrets)
     : CipherAware(public_key)
     , public_key(public_key)
     , node_secrets(node_secrets)
@@ -146,13 +146,13 @@ operator>>(tls::istream& in, WelcomeInfo& obj);
 // struct {
 //   opaque user_init_key_id<0..255>;
 //   CipherSuite cipher_suite;
-//   ECIESCiphertext encrypted_welcome_info;
+//   HPKECiphertext encrypted_welcome_info;
 // } Welcome;
 struct Welcome
 {
   tls::opaque<1> user_init_key_id;
   CipherSuite cipher_suite;
-  ECIESCiphertext encrypted_welcome_info;
+  HPKECiphertext encrypted_welcome_info;
 
   Welcome()
     : encrypted_welcome_info(DUMMY_CIPHERSUITE)

@@ -4,6 +4,12 @@
 
 namespace mls {
 
+bytes
+to_bytes(const std::string& ascii)
+{
+  return bytes(ascii.begin(), ascii.end());
+}
+
 std::string
 to_hex(const bytes& data)
 {

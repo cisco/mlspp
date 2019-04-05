@@ -40,7 +40,7 @@ protected:
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
 
-    mls::test::DeterministicECIES lock;
+    mls::test::DeterministicHPKE lock;
     auto ratchet_tree =
       RatchetTree{ tc.cipher_suite,
                    { tv.random, tv.random, tv.random, tv.random } };

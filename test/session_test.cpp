@@ -193,10 +193,6 @@ TEST_F(RunningSessionTest, Replace)
   for (int i = 0; i < group_size; ++i) {
     auto target = (i + 1) % group_size;
 
-    std::cout << "sessions: " << i << " " << target << " " << sessions.size()
-              << " " << group_size << std::endl;
-    std::cout << "---" << std::endl;
-
     // Remove target
     auto initial_epoch = sessions[i].current_epoch();
     auto evict_secret = fresh_secret();
