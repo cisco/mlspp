@@ -73,8 +73,8 @@ struct CryptoTestVectors
     // Derive-Key-Pair
     DHPublicKey derive_key_pair_pub;
 
-    // ECIES
-    ECIESCiphertext ecies_out;
+    // HPKE
+    HPKECiphertext ecies_out;
 
     TestCase(CipherSuite suite)
       : derive_key_pair_pub(suite)

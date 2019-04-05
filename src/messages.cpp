@@ -194,7 +194,7 @@ operator>>(tls::istream& in, Welcome& obj)
 {
   in >> obj.user_init_key_id >> obj.cipher_suite;
 
-  obj.encrypted_welcome_info = ECIESCiphertext{ obj.cipher_suite };
+  obj.encrypted_welcome_info = HPKECiphertext{ obj.cipher_suite };
   in >> obj.encrypted_welcome_info;
   return in;
 }

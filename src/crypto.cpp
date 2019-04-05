@@ -20,7 +20,7 @@ namespace mls {
 
 namespace test {
 
-int DeterministicECIES::_refct = 0;
+int DeterministicHPKE::_refct = 0;
 
 bool
 deterministic_signature_scheme(SignatureScheme scheme)
@@ -1216,23 +1216,23 @@ PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
 /// DHPublicKey and DHPrivateKey
 ///
 
-// key = HKDF-Expand(Secret, ECIESLabel("key"), Length)
-// nonce = HKDF-Expand(Secret, ECIESLabel("nonce"), Length)
+// key = HKDF-Expand(Secret, HPKELabel("key"), Length)
+// nonce = HKDF-Expand(Secret, HPKELabel("nonce"), Length)
 //
-// Where ECIESLabel is specified as:
+// Where HPKELabel is specified as:
 //
 // struct {
 //   uint16 length = Length;
 //   opaque label<12..255> = "mls10 ecies " + Label;
-// } ECIESLabel;
-struct ECIESLabel
+// } HPKELabel;
+struct HPKELabel
 {
   uint16_t length;
   tls::opaque<1, 12> label;
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const ECIESLabel& obj)
+operator<<(tls::ostream& out, const HPKELabel& obj)
 {
   return out << obj.length << obj.label;
 }
@@ -1243,23 +1243,23 @@ derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
   uint16_t key_size = AESGCM::key_size(suite);
   std::string key_label_str{ "mls10 ecies key" };
   bytes key_label_vec{ key_label_str.begin(), key_label_str.end() };
-  ECIESLabel key_label{ key_size, key_label_vec };
+  HPKELabel key_label{ key_size, key_label_vec };
   auto key = hkdf_expand(suite, shared_secret, key_label, key_size);
 
   std::string nonce_label_str{ "mls10 ecies nonce" };
   bytes nonce_label_vec{ nonce_label_str.begin(), nonce_label_str.end() };
-  ECIESLabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
+  HPKELabel nonce_label{ AESGCM::nonce_size, nonce_label_vec };
   auto nonce =
     hkdf_expand(suite, shared_secret, nonce_label, AESGCM::nonce_size);
 
   return std::pair<bytes, bytes>(key, nonce);
 }
 
-ECIESCiphertext
+HPKECiphertext
 DHPublicKey::encrypt(const bytes& plaintext) const
 {
   auto ephemeral = DHPrivateKey::generate(_suite);
-  if (test::DeterministicECIES::enabled()) {
+  if (test::DeterministicHPKE::enabled()) {
     auto seed = to_bytes() + plaintext;
     ephemeral = DHPrivateKey::derive(_suite, seed);
   }
@@ -1271,7 +1271,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
-  return ECIESCiphertext{ ephemeral.public_key(), content };
+  return HPKECiphertext{ ephemeral.public_key(), content };
 }
 
 DHPrivateKey
@@ -1339,7 +1339,7 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
 }
 
 bytes
-DHPrivateKey::decrypt(const ECIESCiphertext& ciphertext) const
+DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
 {
   auto shared_secret = derive(ciphertext.ephemeral);
 
@@ -1463,23 +1463,23 @@ SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
 }
 
 ///
-/// ECIESCiphertext
+/// HPKECiphertext
 ///
 
 bool
-operator==(const ECIESCiphertext& lhs, const ECIESCiphertext& rhs)
+operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs)
 {
   return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
 }
 
 tls::ostream&
-operator<<(tls::ostream& out, const ECIESCiphertext& obj)
+operator<<(tls::ostream& out, const HPKECiphertext& obj)
 {
   return out << obj.ephemeral << obj.content;
 }
 
 tls::istream&
-operator>>(tls::istream& in, ECIESCiphertext& obj)
+operator>>(tls::istream& in, HPKECiphertext& obj)
 {
   return in >> obj.ephemeral >> obj.content;
 }

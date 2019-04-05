@@ -106,8 +106,8 @@ generate_crypto()
     auto pub = priv.public_key();
     test_case->derive_key_pair_pub = pub;
 
-    // ECIES
-    mls::test::DeterministicECIES lock;
+    // HPKE
+    mls::test::DeterministicHPKE lock;
     test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
   }
 
@@ -259,7 +259,7 @@ generate_messages()
   tv.user_init_key_all = tls::marshal(uik_all);
 
   // Construct a test case for each suite
-  mls::test::DeterministicECIES lock;
+  mls::test::DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -342,7 +342,7 @@ generate_basic_session()
   tv.group_size = 5;
   tv.group_id = bytes(16, 0xA0);
 
-  mls::test::DeterministicECIES lock;
+  mls::test::DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];

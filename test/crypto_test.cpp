@@ -212,7 +212,7 @@ protected:
     auto derive_key_pair_pub = derive_key_pair_priv.public_key();
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
-    ::mls::test::DeterministicECIES lock;
+    ::mls::test::DeterministicHPKE lock;
     auto ecies_out = derive_key_pair_pub.encrypt(tv.ecies_plaintext);
     ASSERT_EQ(ecies_out, test_case.ecies_out);
   }
@@ -379,7 +379,7 @@ TEST_F(CryptoTest, X448)
   ASSERT_EQ(kBA, x448_K);
 }
 
-TEST_F(CryptoTest, ECIES)
+TEST_F(CryptoTest, HPKE)
 {
   std::vector<CipherSuite> suites{ CipherSuite::P256_SHA256_AES128GCM,
                                    CipherSuite::P521_SHA512_AES256GCM,
