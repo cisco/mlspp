@@ -47,7 +47,7 @@ protected:
 
       session.handle(message);
     }
-    check(initial_epoch);
+    check(initial_epoch, except);
   }
 
   void broadcast_add()
@@ -76,7 +76,7 @@ protected:
 
     auto welcome_add = sessions[from].add(next.user_init_key());
     next.join(welcome_add.first, welcome_add.second);
-    broadcast(welcome_add.second);
+    broadcast(welcome_add.second, index);
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
@@ -105,7 +105,6 @@ protected:
         continue;
       }
 
-      std::cout << "eq:" <<
       ASSERT_EQ(session, sessions[ref]);
     }
 
