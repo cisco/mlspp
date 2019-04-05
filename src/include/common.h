@@ -79,6 +79,9 @@ operator>>(tls::istream& in, optional<T>& opt)
 
 typedef std::vector<uint8_t> bytes;
 
+bytes
+to_bytes(const std::string& ascii);
+
 std::string
 to_hex(const bytes& data);
 
