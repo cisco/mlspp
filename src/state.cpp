@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -131,7 +129,6 @@ State::State(SignaturePrivateKey identity_priv,
     throw ProtocolError("Selected cipher suite not supported");
   }
 
-  std::cout << "***2> node_derive from " << init_secret << std::endl;
   auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
   if (*init_uik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
@@ -371,13 +368,6 @@ State::derive_epoch_secrets(CipherSuite suite,
 {
   auto state_bytes = tls::marshal(state);
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
-
-  std::cout << "=== derive ===" << std::endl;
-  std::cout << "  init:   " << init_secret << std::endl;
-  std::cout << "  update: " << update_secret << std::endl;
-  std::cout << "  epoch:  " << epoch_secret << std::endl;
-  std::cout << "  state:  " << state_bytes << std::endl;
-
   return {
     epoch_secret,
     derive_secret(suite, epoch_secret, "app", state_bytes),
@@ -447,14 +437,6 @@ State::sign(const GroupOperation& operation) const
   auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
 
-  std::cout << "=== sign ===" << std::endl;
-  std::cout << "  hash: " << next._state.transcript_hash << std::endl;
-  std::cout << "  key: " << _identity_priv.public_key().to_bytes() << std::endl;
-  std::cout << "  sig: " << sig << std::endl;
-  std::cout << "    key:  " << next._confirmation_key << std::endl;
-  std::cout << "    data: " << confirm_data << std::endl;
-  std::cout << "  conf: " << confirm << std::endl;
-
   return Handshake{ _state.epoch, operation, _index, sig, confirm };
 }
 
@@ -469,14 +451,6 @@ State::verify(const Handshake& handshake) const
   auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, _confirmation_key, confirm_data);
   auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
-
-  std::cout << "=== verify ===" << std::endl;
-  std::cout << "  hash: " << _state.transcript_hash << std::endl;
-  std::cout << "  key:  " << pub.to_bytes() << std::endl;
-  std::cout << "  sig:  " << sig << std::endl;
-  std::cout << "    key:  " << _confirmation_key << std::endl;
-  std::cout << "    data: " << confirm_data << std::endl;
-  std::cout << "  conf: " << confirm << std::endl;
 
   return sig_ver && confirm_ver;
 }

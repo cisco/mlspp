@@ -3,8 +3,6 @@
 #include "tls_syntax.h"
 #include <gtest/gtest.h>
 
-#include <iostream>
-
 using namespace mls;
 
 class RatchetTreeTest : public ::testing::Test
@@ -17,42 +15,16 @@ protected:
   const bytes secretC = from_hex("08090a0b");
   const bytes secretD = from_hex("0c0d0e0f");
 
-  bytes secretAn;
-  bytes secretAB;
-  bytes secretCD;
-  bytes secretABC;
-  bytes secretABCD;
-
-  RatchetTreeTest()
-  {
-    auto secretA0n = hkdf_expand_label(suite, secretA, "node", {}, 32);
-    secretAn = secretA0n;
-
-    auto secretB1p = hkdf_expand_label(suite, secretB, "path", {}, 32);
-    auto secretB1n = hkdf_expand_label(suite, secretB1p, "node", {}, 32);
-    secretAB = secretB1n;
-
-    auto secretD1p = hkdf_expand_label(suite, secretD, "path", {}, 32);
-    auto secretD1n = hkdf_expand_label(suite, secretD1p, "node", {}, 32);
-    secretCD = secretD1n;
-
-    auto secretC1p = hkdf_expand_label(suite, secretC, "path", {}, 32);
-    auto secretC1n = hkdf_expand_label(suite, secretC1p, "node", {}, 32);
-    secretABC = secretC1n;
-
-    auto secretD2p = hkdf_expand_label(suite, secretD1p, "path", {}, 32);
-    auto secretD2n = hkdf_expand_label(suite, secretD2p, "node", {}, 32);
-    secretABCD = secretD2n;
-
-    std::cout << "B1p: " << secretB1p << std::endl;
-    std::cout << "B1n: " << secretB1n << std::endl;
-    std::cout << "C1p: " << secretC1p << std::endl;
-    std::cout << "C1n: " << secretC1n << std::endl;
-    std::cout << "D1p: " << secretD1p << std::endl;
-    std::cout << "D1n: " << secretD1n << std::endl;
-    std::cout << "D2p: " << secretD2p << std::endl;
-    std::cout << "D2n: " << secretD2n << std::endl;
-  }
+  const bytes secretAn = from_hex(
+    "6454ab64c6af8091859b13da01f6154820fef5f1b17d7c2b8b242d03b7bd5fc3");
+  const bytes secretAB = from_hex(
+    "2ccbf0bd1209c2f7b4095726897aa8487b723492f19b7f6c3e4a415df79d00d0");
+  const bytes secretCD = from_hex(
+    "293926d4d12149366ff84fabeb3d699558e39f333a116baf6a60a2588e1c601a");
+  const bytes secretABC = from_hex(
+    "31ce14ca8317bf564b12706367b8423ed69a520fad6c0acd2608da65d0bb2916");
+  const bytes secretABCD = from_hex(
+    "43793000dbf64b8606bfcd75c23b57f3096053eafdf182357fd013fbf8b9834a");
 };
 
 TEST_F(RatchetTreeTest, OneMember)
@@ -76,7 +48,6 @@ TEST_F(RatchetTreeTest, ByExtension)
   tree.add_leaf(1, secretB);
   tree.set_path(1, secretB);
 
-  std::cout << "rootAB: " << tree.root_secret() << std::endl;
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(tree.root_secret(), secretAB);
   RatchetTree directAB{ suite, { secretA, secretB } };
@@ -85,14 +56,12 @@ TEST_F(RatchetTreeTest, ByExtension)
   tree.add_leaf(2, secretC);
   tree.set_path(2, secretC);
 
-  std::cout << "rootABC: " << tree.root_secret() << std::endl;
   ASSERT_EQ(tree.size(), 3);
   ASSERT_EQ(tree.root_secret(), secretABC);
 
   tree.add_leaf(3, secretD);
   tree.set_path(3, secretD);
 
-  std::cout << "rootABCD: " << tree.root_secret() << std::endl;
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.root_secret(), secretABCD);
 
@@ -127,8 +96,7 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   std::vector<RatchetTree> trees(size, { suite });
   for (int i = 0; i < size; ++i) {
     auto secret = random_bytes(32);
-    auto node_secret = hkdf_expand_label(suite, secret, "node", {}, 32);
-    auto priv = DHPrivateKey::derive(suite, node_secret);
+    auto priv = DHPrivateKey::node_derive(suite, secret);
     auto pub = priv.public_key();
 
     for (int j = 0; j < size; ++j) {
@@ -151,13 +119,11 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   for (int i = 0; i < size; ++i) {
     auto secret = random_bytes(32);
     auto ct = trees[i].encrypt(i, secret);
-    std::cout << "src: " << trees[i] << std::endl;
 
     for (int j = 0; j < size; ++j) {
       if (i == j) {
         trees[j].set_path(i, secret);
       } else {
-        std::cout << "dst: " << trees[j] << std::endl;
         auto info = trees[j].decrypt(i, ct);
         trees[j].merge_path(i, info);
       }

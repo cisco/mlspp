@@ -131,8 +131,6 @@ protected:
   {
     states.reserve(group_size);
 
-    std::cout << "~~~ RUN RUN RUN ~~~" << std::endl;
-
     auto init_secret_0 = random_bytes(32);
     auto identity_priv_0 = SignaturePrivateKey::generate(scheme);
     auto credential_0 = Credential::basic(user_id, identity_priv_0);
@@ -141,7 +139,6 @@ protected:
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
-      std::cout << "***1> node_derive from " << init_secret << std::endl;
       auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);

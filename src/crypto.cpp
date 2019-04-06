@@ -12,8 +12,6 @@
 
 #include <string>
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -1342,7 +1340,6 @@ setup_base(CipherSuite suite,
   bytes zero(Nh, 0);
   auto secret = hkdf_extract(suite, zero, zz);
   auto kem_context = enc + pkR.to_bytes();
-
   return setup_core(suite, HPKEMode::base, secret, kem_context, info);
 }
 
@@ -1358,11 +1355,6 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 
   auto enc = ephemeral.public_key().to_bytes();
   auto zz = ephemeral.derive(*this);
-
-  std::cout << "=== SetupBaseI ===" << std::endl;
-  std::cout << "  enc: " << enc << std::endl;
-  std::cout << "  zz:  " << zz << std::endl;
-  std::cout << "  pkR: " << to_bytes() << std::endl;
 
   bytes key, nonce;
   bytes info;
@@ -1453,11 +1445,6 @@ DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
   // SetupBaseR
   auto enc = ciphertext.ephemeral.to_bytes();
   auto zz = derive(ciphertext.ephemeral);
-
-  std::cout << "=== SetupBaseR ===" << std::endl;
-  std::cout << "  enc: " << enc << std::endl;
-  std::cout << "  zz:  " << zz << std::endl;
-  std::cout << "  pkR: " << public_key().to_bytes() << std::endl;
 
   bytes key, nonce;
   bytes info;
