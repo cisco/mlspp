@@ -58,7 +58,13 @@ operator+(const bytes& lhs, const bytes& rhs)
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
-  return out << to_hex(data);
+  auto threshold = 0xffff;
+  if (data.size() < threshold) {
+    return out << to_hex(data);
+  }
+
+  bytes abbrev(data.begin(), data.begin() + threshold);
+  return out << to_hex(abbrev) << "...";
 }
 
 } // namespace mls

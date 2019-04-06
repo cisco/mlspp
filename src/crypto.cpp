@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -992,7 +994,7 @@ AESGCM::decrypt(const bytes& ciphertext) const
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw OpenSSLError::current();
+    throw InvalidParameterError("AES-GCM authentication failure");
   }
 
   return plaintext;
@@ -1340,6 +1342,7 @@ setup_base(CipherSuite suite,
   bytes zero(Nh, 0);
   auto secret = hkdf_extract(suite, zero, zz);
   auto kem_context = enc + pkR.to_bytes();
+
   return setup_core(suite, HPKEMode::base, secret, kem_context, info);
 }
 
@@ -1355,6 +1358,11 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 
   auto enc = ephemeral.public_key().to_bytes();
   auto zz = ephemeral.derive(*this);
+
+  std::cout << "=== SetupBaseI ===" << std::endl;
+  std::cout << "  enc: " << enc << std::endl;
+  std::cout << "  zz:  " << zz << std::endl;
+  std::cout << "  pkR: " << to_bytes() << std::endl;
 
   bytes key, nonce;
   bytes info;
@@ -1385,6 +1393,15 @@ DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
+}
+
+DHPrivateKey
+DHPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
+{
+  auto secret_size = Digest(suite).output_size();
+  auto node_secret =
+    hkdf_expand_label(suite, path_secret, "node", {}, secret_size);
+  return DHPrivateKey::derive(suite, node_secret);
 }
 
 bytes
@@ -1436,6 +1453,11 @@ DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
   // SetupBaseR
   auto enc = ciphertext.ephemeral.to_bytes();
   auto zz = derive(ciphertext.ephemeral);
+
+  std::cout << "=== SetupBaseR ===" << std::endl;
+  std::cout << "  enc: " << enc << std::endl;
+  std::cout << "  zz:  " << zz << std::endl;
+  std::cout << "  pkR: " << public_key().to_bytes() << std::endl;
 
   bytes key, nonce;
   bytes info;

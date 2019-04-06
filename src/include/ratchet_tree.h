@@ -104,8 +104,11 @@ public:
 
 private:
   tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> _nodes;
+  size_t _secret_size;
 
-  RatchetTreeNode new_node(const bytes& data) const;
+  RatchetTreeNode new_node(const bytes& path_secret) const;
+  bytes path_step(const bytes& path_secret) const;
+  bytes node_step(const bytes& path_secret) const;
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);

@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -112,17 +114,7 @@ State::State(SignaturePrivateKey identity_priv,
   , _state(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
-  // Decrypt and ingest the Welcome
-  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
-  auto welcome_info = welcome.decrypt(init_priv);
-
-  _state = GroupState{ welcome_info };
-
-  _index = welcome_info.index;
-  _init_secret = welcome_info.init_secret;
-  _zero = bytes(Digest(_suite).output_size(), 0);
-
-  // Process the add
+  // Verify that we have an add and it is for us
   if (handshake.operation.type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
@@ -138,9 +130,21 @@ State::State(SignaturePrivateKey identity_priv,
   if (!init_uik) {
     throw ProtocolError("Selected cipher suite not supported");
   }
+
+  std::cout << "***2> node_derive from " << init_secret << std::endl;
+  auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
   if (*init_uik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
+
+  // Decrypt and ingest the Welcome
+  auto welcome_info = welcome.decrypt(init_priv);
+
+  _state = GroupState{ welcome_info };
+
+  _index = welcome_info.index;
+  _init_secret = welcome_info.init_secret;
+  _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
   auto operation_bytes = tls::marshal(handshake.operation);
@@ -367,6 +371,13 @@ State::derive_epoch_secrets(CipherSuite suite,
 {
   auto state_bytes = tls::marshal(state);
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
+
+  std::cout << "=== derive ===" << std::endl;
+  std::cout << "  init:   " << init_secret << std::endl;
+  std::cout << "  update: " << update_secret << std::endl;
+  std::cout << "  epoch:  " << epoch_secret << std::endl;
+  std::cout << "  state:  " << state_bytes << std::endl;
+
   return {
     epoch_secret,
     derive_secret(suite, epoch_secret, "app", state_bytes),
@@ -436,6 +447,14 @@ State::sign(const GroupOperation& operation) const
   auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
 
+  std::cout << "=== sign ===" << std::endl;
+  std::cout << "  hash: " << next._state.transcript_hash << std::endl;
+  std::cout << "  key: " << _identity_priv.public_key().to_bytes() << std::endl;
+  std::cout << "  sig: " << sig << std::endl;
+  std::cout << "    key:  " << next._confirmation_key << std::endl;
+  std::cout << "    data: " << confirm_data << std::endl;
+  std::cout << "  conf: " << confirm << std::endl;
+
   return Handshake{ _state.epoch, operation, _index, sig, confirm };
 }
 
@@ -450,6 +469,14 @@ State::verify(const Handshake& handshake) const
   auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, _confirmation_key, confirm_data);
   auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
+
+  std::cout << "=== verify ===" << std::endl;
+  std::cout << "  hash: " << _state.transcript_hash << std::endl;
+  std::cout << "  key:  " << pub.to_bytes() << std::endl;
+  std::cout << "  sig:  " << sig << std::endl;
+  std::cout << "    key:  " << _confirmation_key << std::endl;
+  std::cout << "    data: " << confirm_data << std::endl;
+  std::cout << "  conf: " << confirm << std::endl;
 
   return sig_ver && confirm_ver;
 }
