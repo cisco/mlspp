@@ -109,15 +109,16 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const UserInitKey& obj)
 {
-  return out << obj.user_init_key_id << obj.cipher_suites << obj.init_keys
-             << obj.credential << obj.signature;
+  return out << obj.user_init_key_id << obj.supported_versions
+             << obj.cipher_suites << obj.init_keys << obj.credential
+             << obj.signature;
 }
 
 tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj)
 {
-  return in >> obj.user_init_key_id >> obj.cipher_suites >> obj.init_keys >>
-         obj.credential >> obj.signature;
+  return in >> obj.user_init_key_id >> obj.supported_versions >>
+         obj.cipher_suites >> obj.init_keys >> obj.credential >> obj.signature;
 }
 
 // WelcomeInfo
