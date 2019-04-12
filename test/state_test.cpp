@@ -62,7 +62,7 @@ protected:
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_secret = random_bytes(32);
-      auto init_priv = DHPrivateKey::derive(suite, init_secret);
+      auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
 
       auto user_init_key = UserInitKey{};
       user_init_key.add_init_key(init_priv.public_key());
@@ -139,7 +139,7 @@ protected:
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
-      auto init_priv = DHPrivateKey::derive(suite, init_secret);
+      auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
 
@@ -205,8 +205,10 @@ TEST(OtherStateTest, CipherNegotiation)
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
   auto insA = bytes{ 0, 1, 2, 3 };
-  auto inkA1 = DHPrivateKey::derive(CipherSuite::P256_SHA256_AES128GCM, insA);
-  auto inkA2 = DHPrivateKey::derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
+  auto inkA1 =
+    DHPrivateKey::node_derive(CipherSuite::P256_SHA256_AES128GCM, insA);
+  auto inkA2 =
+    DHPrivateKey::node_derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
 
   auto uikA = UserInitKey{};
   uikA.add_init_key(inkA1.public_key());

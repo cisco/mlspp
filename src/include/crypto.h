@@ -302,6 +302,7 @@ public:
   static DHPrivateKey generate(CipherSuite suite);
   static DHPrivateKey parse(CipherSuite suite, const bytes& data);
   static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
+  static DHPrivateKey node_derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;
   bytes decrypt(const HPKECiphertext& ciphertext) const;

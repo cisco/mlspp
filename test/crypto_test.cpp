@@ -282,6 +282,7 @@ TEST_F(CryptoTest, BasicDH)
                                    CipherSuite::X448_SHA512_AES256GCM };
 
   for (auto suite : suites) {
+    auto s = bytes{ 0, 1, 2, 3 };
     auto x = DHPrivateKey::generate(suite);
     auto y = DHPrivateKey::derive(suite, { 0, 1, 2, 3 });
 
@@ -298,6 +299,12 @@ TEST_F(CryptoTest, BasicDH)
     auto gXY = x.derive(gY);
     auto gYX = y.derive(gX);
     ASSERT_EQ(gXY, gYX);
+
+    auto nh = Digest(suite).output_size();
+    auto ns = hkdf_expand_label(suite, s, "node", {}, nh);
+    auto ny = DHPrivateKey::derive(suite, ns);
+    auto nz = DHPrivateKey::node_derive(suite, s);
+    ASSERT_EQ(ny, nz);
   }
 }
 

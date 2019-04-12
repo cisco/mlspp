@@ -8,45 +8,50 @@ using namespace mls;
 class RatchetTreeTest : public ::testing::Test
 {
 protected:
-  const CipherSuite ciphersuite = CipherSuite::P256_SHA256_AES128GCM;
+  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
 
   const bytes secretA = from_hex("00010203");
   const bytes secretB = from_hex("04050607");
   const bytes secretC = from_hex("08090a0b");
   const bytes secretD = from_hex("0c0d0e0f");
+
+  const bytes secretAn = from_hex(
+    "6454ab64c6af8091859b13da01f6154820fef5f1b17d7c2b8b242d03b7bd5fc3");
   const bytes secretAB = from_hex(
-    "c6d44cf418f610e3fe9e1d9294ff43def81c6cdcad6cbb1820cff48d3aa4355d");
+    "2ccbf0bd1209c2f7b4095726897aa8487b723492f19b7f6c3e4a415df79d00d0");
   const bytes secretCD = from_hex(
-    "71b92110bf135c85581c8a128f6a19c0f6aca752b0c6c91e3571899cf09b145d");
+    "293926d4d12149366ff84fabeb3d699558e39f333a116baf6a60a2588e1c601a");
   const bytes secretABC = from_hex(
-    "e0e6e3c1c64422cc76229d0c35ba817a281f8fc4014faa3e9152428a08a73ab3");
+    "31ce14ca8317bf564b12706367b8423ed69a520fad6c0acd2608da65d0bb2916");
   const bytes secretABCD = from_hex(
-    "4e05f3b9649335c332f8a99cbaa56e637f3dc99a446f7f6af0f92ea7756717e0");
+    "43793000dbf64b8606bfcd75c23b57f3096053eafdf182357fd013fbf8b9834a");
 };
 
 TEST_F(RatchetTreeTest, OneMember)
 {
-  RatchetTree tree{ ciphersuite, secretA };
+  RatchetTree tree{ suite, secretA };
   ASSERT_EQ(tree.size(), 1);
-  ASSERT_EQ(tree.root_secret(), secretA);
+  ASSERT_EQ(tree.root_secret(), secretAn);
 }
 
 TEST_F(RatchetTreeTest, MultipleMembers)
 {
-  RatchetTree tree{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  RatchetTree tree{ suite, { secretA, secretB, secretC, secretD } };
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.root_secret(), secretABCD);
 }
 
 TEST_F(RatchetTreeTest, ByExtension)
 {
-  RatchetTree tree{ ciphersuite, secretA };
+  RatchetTree tree{ suite, secretA };
 
   tree.add_leaf(1, secretB);
   tree.set_path(1, secretB);
 
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(tree.root_secret(), secretAB);
+  RatchetTree directAB{ suite, { secretA, secretB } };
+  ASSERT_EQ(tree, directAB);
 
   tree.add_leaf(2, secretC);
   tree.set_path(2, secretC);
@@ -60,14 +65,14 @@ TEST_F(RatchetTreeTest, ByExtension)
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.root_secret(), secretABCD);
 
-  RatchetTree direct{ ciphersuite, { secretA, secretB, secretC, secretD } };
+  RatchetTree direct{ suite, { secretA, secretB, secretC, secretD } };
   ASSERT_EQ(tree, direct);
 }
 
 TEST_F(RatchetTreeTest, BySerialization)
 {
-  RatchetTree before{ ciphersuite, { secretA, secretB, secretC, secretD } };
-  RatchetTree after{ ciphersuite };
+  RatchetTree before{ suite, { secretA, secretB, secretC, secretD } };
+  RatchetTree after{ suite };
 
   tls::unmarshal(tls::marshal(before), after);
   ASSERT_EQ(before, after);
@@ -75,8 +80,8 @@ TEST_F(RatchetTreeTest, BySerialization)
 
 TEST_F(RatchetTreeTest, BySerializationWithBlanks)
 {
-  RatchetTree before{ ciphersuite, { secretA, secretB, secretC, secretD } };
-  RatchetTree after{ ciphersuite };
+  RatchetTree before{ suite, { secretA, secretB, secretC, secretD } };
+  RatchetTree after{ suite };
 
   before.blank_path(1);
   tls::unmarshal(tls::marshal(before), after);
@@ -88,10 +93,10 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   size_t size = 5;
 
   // trees[i] represents a tree with a private key for only leaf i
-  std::vector<RatchetTree> trees(size, { ciphersuite });
+  std::vector<RatchetTree> trees(size, { suite });
   for (int i = 0; i < size; ++i) {
     auto secret = random_bytes(32);
-    auto priv = DHPrivateKey::derive(ciphersuite, secret);
+    auto priv = DHPrivateKey::node_derive(suite, secret);
     auto pub = priv.public_key();
 
     for (int j = 0; j < size; ++j) {
@@ -104,6 +109,7 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   }
 
   for (int i = 0; i < size; ++i) {
+    EXPECT_EQ(trees[i], trees[0]);
     ASSERT_EQ(trees[i].size(), size);
     ASSERT_TRUE(trees[i].check_invariant(i));
   }

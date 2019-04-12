@@ -126,7 +126,7 @@ Session::make_init_key()
   // from the same secret.  Maybe we should include the ciphersuite
   // in the key derivation...
   for (auto suite : _supported_ciphersuites) {
-    auto init_priv = DHPrivateKey::derive(suite, _init_secret);
+    auto init_priv = DHPrivateKey::node_derive(suite, _init_secret);
     user_init_key.add_init_key(init_priv.public_key());
   }
 

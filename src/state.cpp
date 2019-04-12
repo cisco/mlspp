@@ -112,17 +112,7 @@ State::State(SignaturePrivateKey identity_priv,
   , _state(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
-  // Decrypt and ingest the Welcome
-  auto init_priv = DHPrivateKey::derive(_suite, init_secret);
-  auto welcome_info = welcome.decrypt(init_priv);
-
-  _state = GroupState{ welcome_info };
-
-  _index = welcome_info.index;
-  _init_secret = welcome_info.init_secret;
-  _zero = bytes(Digest(_suite).output_size(), 0);
-
-  // Process the add
+  // Verify that we have an add and it is for us
   if (handshake.operation.type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
@@ -138,9 +128,20 @@ State::State(SignaturePrivateKey identity_priv,
   if (!init_uik) {
     throw ProtocolError("Selected cipher suite not supported");
   }
+
+  auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
   if (*init_uik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
+
+  // Decrypt and ingest the Welcome
+  auto welcome_info = welcome.decrypt(init_priv);
+
+  _state = GroupState{ welcome_info };
+
+  _index = welcome_info.index;
+  _init_secret = welcome_info.init_secret;
+  _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
   auto operation_bytes = tls::marshal(handshake.operation);

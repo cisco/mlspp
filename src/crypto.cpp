@@ -992,7 +992,7 @@ AESGCM::decrypt(const bytes& ciphertext) const
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw OpenSSLError::current();
+    throw InvalidParameterError("AES-GCM authentication failure");
   }
 
   return plaintext;
@@ -1385,6 +1385,15 @@ DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
+}
+
+DHPrivateKey
+DHPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
+{
+  auto secret_size = Digest(suite).output_size();
+  auto node_secret =
+    hkdf_expand_label(suite, path_secret, "node", {}, secret_size);
+  return DHPrivateKey::derive(suite, node_secret);
 }
 
 bytes
