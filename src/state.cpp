@@ -341,7 +341,7 @@ State::handle(uint32_t index, const Update& update)
     }
 
     leaf_secret = _cached_leaf_secret;
-    _cached_leaf_secret.resize(0);
+    _cached_leaf_secret.clear();
   }
 
   update_leaf(index, update.path, leaf_secret);
