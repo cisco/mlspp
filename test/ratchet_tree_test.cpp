@@ -44,6 +44,7 @@ TEST_F(RatchetTreeTest, MultipleMembers)
 TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ suite, secretA };
+  ASSERT_NE(tree.root_hash().size(), 0);
 
   tree.add_leaf(LeafIndex{ 1 }, secretB);
   tree.set_path(LeafIndex{ 1 }, secretB);

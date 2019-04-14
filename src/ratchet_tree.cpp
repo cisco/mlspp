@@ -3,6 +3,8 @@
 #include "messages.h"
 #include "tree_math.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -120,6 +122,98 @@ operator>>(tls::istream& in, RatchetTreeNode& obj)
   obj._priv = nullopt;
   obj._secret = nullopt;
   return in >> obj._pub;
+}
+
+///
+/// OptionalRatchetTreeNode
+///
+
+bool
+OptionalRatchetTreeNode::blank() const
+{
+  return !*this;
+}
+
+const bytes&
+OptionalRatchetTreeNode::hash() const
+{
+  return _hash;
+}
+
+void
+OptionalRatchetTreeNode::merge(const RatchetTreeNode& other)
+{
+  if (blank()) {
+    *this = other;
+  } else {
+    (*this)->merge(other);
+  }
+}
+
+struct LeafNodeInfo
+{
+  DHPublicKey public_key;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const LeafNodeInfo& obj)
+{
+  return out << obj.public_key;
+}
+
+struct LeafNodeHashInput
+{
+  const uint8_t hash_type = 0;
+  optional<LeafNodeInfo> info;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const LeafNodeHashInput& obj)
+{
+  return out << obj.hash_type << obj.info;
+}
+
+void
+OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
+{
+  auto hash_input_str = LeafNodeHashInput{};
+  if (!blank()) {
+    hash_input_str.info = { (*this)->public_key() };
+  }
+
+  auto hash_input = tls::marshal(hash_input_str);
+  _hash = Digest(suite).write(hash_input).digest();
+}
+
+struct ParentNodeHashInput
+{
+  const uint8_t hash_type = 1;
+  optional<DHPublicKey> public_key;
+  tls::opaque<1> left_hash;
+  tls::opaque<1> right_hash;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const ParentNodeHashInput& obj)
+{
+  return out << obj.hash_type << obj.public_key << obj.left_hash
+             << obj.right_hash;
+}
+
+void
+OptionalRatchetTreeNode::set_hash(CipherSuite suite,
+                                  const OptionalRatchetTreeNode& left,
+                                  const OptionalRatchetTreeNode& right)
+{
+  auto hash_input_str = ParentNodeHashInput{};
+  if (!blank()) {
+    hash_input_str.public_key = (*this)->public_key();
+  }
+  hash_input_str.left_hash = left._hash;
+  hash_input_str.right_hash = right._hash;
+
+  auto hash_input = tls::marshal(hash_input_str);
+  _hash = Digest(suite).write(hash_input).digest();
 }
 
 ///
@@ -272,15 +366,18 @@ RatchetTree::merge_path(LeafIndex from, const RatchetTree::MergeInfo& info)
     if (i < info.public_keys.size()) {
       auto node = RatchetTreeNode(info.public_keys[i]);
       _nodes[curr].merge(node);
+      set_hash(curr);
     } else {
       auto node = new_node(info.secrets[i - key_list_size]);
       _nodes[curr].merge(node);
+      set_hash(curr);
     }
   }
 
   auto root = tree_math::root(node_size());
   auto node = new_node(info.secrets.back());
   _nodes[root].merge(node);
+  set_hash(root);
 }
 
 void
@@ -300,6 +397,7 @@ RatchetTree::add_leaf(LeafIndex index, const DHPublicKey& pub)
     auto node = NodeIndex{ index };
     _nodes[node] = RatchetTreeNode(pub);
   }
+  set_hash(index);
 }
 
 void
@@ -315,6 +413,7 @@ RatchetTree::add_leaf(LeafIndex index, const bytes& leaf_secret)
     auto node = NodeIndex{ index };
     _nodes[node] = new_node(leaf_secret);
   }
+  set_hash(index);
 }
 
 void
@@ -326,8 +425,12 @@ RatchetTree::blank_path(LeafIndex index)
   auto curr = NodeIndex{ index };
   while (curr != root) {
     _nodes[curr] = nullopt;
+    set_hash(curr);
     curr = tree_math::parent(curr, node_count);
   }
+
+  _nodes[root] = nullopt;
+  set_hash(root);
 }
 
 void
@@ -344,12 +447,13 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
     }
 
     _nodes[curr] = new_node(path_secret);
-    path_secret = path_step(path_secret);
 
+    path_secret = path_step(path_secret);
     curr = tree_math::parent(curr, node_count);
   }
 
   _nodes[root] = new_node(path_secret);
+  set_hash_path(index);
 }
 
 LeafCount
@@ -379,7 +483,7 @@ bool
 RatchetTree::occupied(LeafIndex index) const
 {
   NodeIndex node_index{ index };
-  return bool(_nodes[node_index]);
+  return !_nodes[node_index].blank();
 }
 
 bytes
@@ -388,6 +492,13 @@ RatchetTree::root_secret() const
   auto root = tree_math::root(node_size());
   auto val = _nodes[root]->secret();
   return *val;
+}
+
+bytes
+RatchetTree::root_hash() const
+{
+  auto root = tree_math::root(size());
+  return _nodes[root].hash();
 }
 
 bool
@@ -445,6 +556,54 @@ RatchetTree::node_step(const bytes& path_secret) const
   return hkdf_expand_label(_suite, path_secret, "node", {}, _secret_size);
 }
 
+void
+RatchetTree::set_hash(uint32_t index)
+{
+  if (tree_math::level(index) == 0) {
+    _nodes[index].set_leaf_hash(_suite);
+  }
+
+  auto size_ = size();
+  auto left = tree_math::left(index);
+  auto right = tree_math::right(index, size_);
+  _nodes[index].set_hash(_suite, _nodes[left], _nodes[right]);
+}
+
+void
+RatchetTree::set_hash_path(uint32_t index)
+{
+  set_hash(index);
+  auto size_ = size();
+  auto curr = tree_math::parent(index, size_);
+  do {
+    set_hash(curr);
+    curr = tree_math::parent(index, size_)
+  } while (curr != root);
+}
+
+void
+RatchetTree::set_hash_all()
+{
+  auto root = tree_math::root(size());
+  set_hash_all(root);
+}
+
+void
+RatchetTree::set_hash_all(uint32_t index)
+{
+  if (tree_math::level(index) == 0) {
+    set_hash(index);
+    return;
+  }
+
+  auto size_ = size();
+  auto left = tree_math::left(index);
+  auto right = tree_math::right(index, size_);
+  set_hash_all(left);
+  set_hash_all(right);
+  set_hash(index);
+}
+
 bool
 operator==(const RatchetTree& lhs, const RatchetTree& rhs)
 {
@@ -461,6 +620,13 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
     // If they're both present, they need to be equal
     if (lhs._nodes[i] && rhs._nodes[i] &&
         lhs._nodes[i]->public_key() != rhs._nodes[i]->public_key()) {
+      return false;
+    }
+
+    // Hashes need to be the same
+    if (lhs._nodes[i].hash() != rhs._nodes[i].hash()) {
+      std::cout << "hash mismatch at " << i << "  [" << lhs._nodes[i].hash()
+                << "]  [" << rhs._nodes[i].hash() << "]" << std::endl;
       return false;
     }
   }
@@ -486,7 +652,9 @@ operator<<(tls::ostream& out, const RatchetTree& obj)
 tls::istream&
 operator>>(tls::istream& in, RatchetTree& obj)
 {
-  return in >> obj._nodes;
+  in >> obj._nodes;
+  obj.set_hash_all();
+  return in;
 }
 
 } // namespace mls

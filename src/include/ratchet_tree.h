@@ -60,14 +60,17 @@ struct OptionalRatchetTreeNode : public optional<RatchetTreeNode>
     : parent(RatchetTreeNode(suite, secret))
   {}
 
-  void merge(const RatchetTreeNode& other)
-  {
-    if (!*this) {
-      *this = other;
-    } else {
-      (*this)->merge(other);
-    }
-  }
+  bool blank() const;
+  const bytes& hash() const;
+
+  void merge(const RatchetTreeNode& other);
+  void set_leaf_hash(CipherSuite suite);
+  void set_hash(CipherSuite suite,
+                const OptionalRatchetTreeNode& left,
+                const OptionalRatchetTreeNode& right);
+
+private:
+  bytes _hash;
 };
 
 struct RatchetTreeNodeVector
@@ -112,6 +115,7 @@ public:
   uint32_t size() const;
   bool occupied(LeafIndex index) const;
   bytes root_secret() const;
+  bytes root_hash() const;
   bool check_invariant(LeafIndex from) const;
 
 private:
@@ -122,6 +126,10 @@ private:
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
+  void set_hash(uint32_t index);
+  void set_hash_path(uint32_t index);
+  void set_hash_all();
+  void set_hash_all(uint32_t index);
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
