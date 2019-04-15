@@ -126,10 +126,11 @@ private:
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
-  void set_hash(uint32_t index);
-  void set_hash_path(uint32_t index);
-  void set_hash_all();
-  void set_hash_all(uint32_t index);
+
+  void add_leaf_inner(LeafIndex index, const RatchetTreeNode& node_val);
+  void set_hash(NodeIndex index);
+  void set_hash_path(LeafIndex index);
+  void set_hash_all(NodeIndex index);
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
