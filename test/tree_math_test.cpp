@@ -20,7 +20,7 @@ protected:
   TreeMathTest()
     : tv(TestLoader<TreeMathTestVectors>::get())
   {
-    width = tree_math::node_width(LeafCount{ tv.n_leaves });
+    width = NodeCount{ tv.n_leaves };
   }
 
   template<typename F>
@@ -41,7 +41,7 @@ protected:
 TEST_F(TreeMathTest, Root)
 {
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
-    const auto w = tree_math::node_width(LeafCount{ n });
+    const auto w = NodeCount{ LeafCount{ n } };
     ASSERT_EQ(tree_math::root(w), tv.root[n - 1]);
   }
 }
@@ -70,7 +70,7 @@ TEST(ResolutionTest, Interop)
 {
   auto tv = TestLoader<ResolutionTestVectors>::get();
 
-  auto width = tree_math::node_width(LeafCount{ tv.n_leaves });
+  auto width = NodeCount{ tv.n_leaves };
   auto n_cases = (1 << width.val);
 
   for (uint32_t t = 0; t < n_cases; ++t) {

@@ -54,14 +54,18 @@ operator>>(tls::istream& in, UInt32& obj);
 tls::ostream&
 operator<<(tls::ostream& out, const UInt32& obj);
 
+struct NodeCount;
+
 struct LeafCount : public UInt32
 {
   using UInt32::UInt32;
+  explicit LeafCount(const NodeCount w);
 };
 
 struct NodeCount : public UInt32
 {
   using UInt32::UInt32;
+  explicit NodeCount(const LeafCount n);
 };
 
 struct LeafIndex : public UInt32
@@ -75,7 +79,7 @@ struct LeafIndex : public UInt32
 struct NodeIndex : public UInt32
 {
   using UInt32::UInt32;
-  explicit NodeIndex(LeafIndex x)
+  explicit NodeIndex(const LeafIndex x)
     : UInt32(2 * x.val)
   {}
 
@@ -88,13 +92,6 @@ namespace tree_math {
 
 uint32_t
 level(NodeIndex x);
-
-// Tree size properties
-NodeCount
-node_width(LeafCount n);
-
-LeafCount
-size_from_width(NodeCount w);
 
 // Node relationships
 NodeIndex

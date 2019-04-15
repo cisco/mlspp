@@ -345,14 +345,14 @@ RatchetTree::leaf_span() const
 void
 RatchetTree::truncate(LeafCount leaves)
 {
-  auto w = tree_math::node_width(LeafCount{ leaves });
+  auto w = NodeCount{ leaves };
   _nodes.resize(w.val);
 }
 
 uint32_t
 RatchetTree::size() const
 {
-  return leaf_size().val;
+  return LeafCount{ node_size() }.val;
 }
 
 bool
@@ -404,12 +404,6 @@ NodeCount
 RatchetTree::node_size() const
 {
   return NodeCount{ uint32_t(_nodes.size()) };
-}
-
-LeafCount
-RatchetTree::leaf_size() const
-{
-  return tree_math::size_from_width(node_size());
 }
 
 RatchetTreeNode

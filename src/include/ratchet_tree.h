@@ -108,7 +108,6 @@ private:
   size_t _secret_size;
 
   NodeCount node_size() const;
-  LeafCount leaf_size() const;
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;

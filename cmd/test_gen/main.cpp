@@ -12,12 +12,12 @@ generate_tree_math()
   tv.n_leaves = LeafCount{ 255 };
 
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
-    auto w = tree_math::node_width(LeafCount{ n });
+    auto w = NodeCount{ LeafCount{ n } };
     auto val = tree_math::root(w);
     tv.root.push_back(val);
   }
 
-  auto w = tree_math::node_width(tv.n_leaves);
+  auto w = NodeCount{ tv.n_leaves };
   for (uint32_t x = 0; x < w.val; ++x) {
     auto left = tree_math::left(NodeIndex{ x });
     tv.left.push_back(left);
@@ -41,7 +41,7 @@ generate_resolution()
   ResolutionTestVectors tv;
   tv.n_leaves = LeafCount{ 7 };
 
-  auto width = tree_math::node_width(tv.n_leaves);
+  auto width = NodeCount{ tv.n_leaves };
   auto n_cases = (1 << width.val);
 
   tv.cases.resize(n_cases);

@@ -1,9 +1,30 @@
 #include "tree_math.h"
+#include "common.h"
 #include "tls_syntax.h"
 
 #include <algorithm>
 
+static uint32_t one = 0x01;
+
 namespace mls {
+
+LeafCount::LeafCount(const NodeCount w)
+{
+  if (w.val == 0) {
+    val = 0;
+    return;
+  }
+
+  if ((w.val & one) == 0) {
+    throw InvalidParameterError("Only odd node counts describe trees");
+  }
+
+  val = (w.val >> one) + 1;
+}
+
+NodeCount::NodeCount(const LeafCount n)
+  : UInt32(2 * (n.val - 1) + 1)
+{}
 
 tls::istream&
 operator>>(tls::istream& in, UInt32& obj)
@@ -18,8 +39,6 @@ operator<<(tls::ostream& out, const UInt32& obj)
 }
 
 namespace tree_math {
-
-static uint32_t one = 0x01;
 
 static uint32_t
 log2(uint32_t x)
@@ -47,22 +66,6 @@ level(NodeIndex x)
     k += 1;
   }
   return k;
-}
-
-NodeCount
-node_width(LeafCount n)
-{
-  return NodeCount{ 2 * (n.val - 1) + 1 };
-}
-
-LeafCount
-size_from_width(NodeCount w)
-{
-  if (w.val == 0) {
-    return LeafCount{ 0 };
-  }
-
-  return LeafCount{ (w.val >> one) + 1 };
 }
 
 NodeIndex
