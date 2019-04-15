@@ -86,22 +86,22 @@ public:
     std::vector<bytes> secrets;
   };
 
-  DirectPath encrypt(uint32_t from, const bytes& leaf) const;
-  MergeInfo decrypt(uint32_t from, const DirectPath& path) const;
-  void merge_path(uint32_t from, const MergeInfo& info);
+  DirectPath encrypt(LeafIndex from, const bytes& leaf) const;
+  MergeInfo decrypt(LeafIndex from, const DirectPath& path) const;
+  void merge_path(LeafIndex from, const MergeInfo& info);
 
-  void add_leaf(uint32_t index, const DHPublicKey& pub);
-  void add_leaf(uint32_t index, const bytes& leaf_secret);
-  void blank_path(uint32_t index);
-  void set_path(uint32_t index, const bytes& leaf);
+  void add_leaf(LeafIndex index, const DHPublicKey& pub);
+  void add_leaf(LeafIndex index, const bytes& leaf_secret);
+  void blank_path(LeafIndex index);
+  void set_path(LeafIndex index, const bytes& leaf);
 
-  uint32_t leaf_span() const;
-  void truncate(uint32_t leaves);
+  LeafCount leaf_span() const;
+  void truncate(LeafCount leaves);
 
   uint32_t size() const;
-  bool occupied(uint32_t index) const;
+  bool occupied(LeafIndex index) const;
   bytes root_secret() const;
-  bool check_invariant(size_t from) const;
+  bool check_invariant(LeafIndex from) const;
 
 private:
   tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> _nodes;

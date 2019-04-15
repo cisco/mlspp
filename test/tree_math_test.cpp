@@ -26,7 +26,7 @@ protected:
   template<typename F>
   auto size_scope(F function)
   {
-    return [=](uint32_t x) -> auto { return function(x, width); };
+    return [=](NodeIndex x) -> auto { return function(x, width); };
   }
 
   template<typename F, typename A>
@@ -76,7 +76,7 @@ TEST(ResolutionTest, Interop)
   for (uint32_t t = 0; t < n_cases; ++t) {
     auto nodes = ResolutionTestVectors::make_tree(t, width);
     for (uint32_t i = 0; i < width.val; ++i) {
-      auto res = tree_math::resolve(nodes, i);
+      auto res = tree_math::resolve(nodes, NodeIndex{ i });
       auto compact = ResolutionTestVectors::compact(res);
       ASSERT_EQ(compact, tv.cases[t][i]);
     }

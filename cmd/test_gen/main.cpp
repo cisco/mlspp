@@ -50,7 +50,7 @@ generate_resolution()
 
     auto nodes = ResolutionTestVectors::make_tree(t, width);
     for (uint32_t i = 0; i < width.val; ++i) {
-      auto res = tree_math::resolve(nodes, i);
+      auto res = tree_math::resolve(nodes, NodeIndex{ i });
       tv.cases[t][i] = ResolutionTestVectors::compact(res);
     }
   }
@@ -233,8 +233,8 @@ generate_messages()
 
   // Set the inputs
   tv.epoch = 0xA0A1A2A3;
-  tv.signer_index = 0xB0B1B2B3;
-  tv.removed = 0xC0C1C2C3;
+  tv.signer_index = LeafIndex{ 0xB0B1B2B3 };
+  tv.removed = LeafIndex{ 0xC0C1C2C3 };
   tv.user_id = bytes(16, 0xD1);
   tv.group_id = bytes(16, 0xD2);
   tv.uik_id = bytes(16, 0xD3);
@@ -272,8 +272,8 @@ generate_messages()
 
     auto ratchet_tree =
       RatchetTree{ suite, { tv.random, tv.random, tv.random, tv.random } };
-    ratchet_tree.blank_path(2);
-    auto direct_path = ratchet_tree.encrypt(0, tv.random);
+    ratchet_tree.blank_path(LeafIndex{ 2 });
+    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};

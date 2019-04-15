@@ -38,12 +38,12 @@ log2(uint32_t x)
 uint32_t
 level(NodeIndex x)
 {
-  if ((x & one) == 0) {
+  if ((x.val & one) == 0) {
     return 0;
   }
 
   uint32_t k = 0;
-  while (((x >> k) & one) == 1) {
+  while (((x.val >> k) & one) == 1) {
     k += 1;
   }
   return k;
@@ -68,7 +68,7 @@ size_from_width(NodeCount w)
 NodeIndex
 root(NodeCount w)
 {
-  return (one << log2(w.val)) - 1;
+  return NodeIndex{ (one << log2(w.val)) - 1 };
 }
 
 NodeIndex
@@ -78,7 +78,7 @@ left(NodeIndex x)
     return x;
   }
 
-  return x ^ (one << (level(x) - 1));
+  return NodeIndex{ x.val ^ (one << (level(x) - 1)) };
 }
 
 NodeIndex
@@ -88,8 +88,8 @@ right(NodeIndex x, NodeCount w)
     return x;
   }
 
-  uint32_t r = x ^ (uint32_t(0x03) << (level(x) - 1));
-  while (r >= w.val) {
+  NodeIndex r{ x.val ^ (uint32_t(0x03) << (level(x) - 1)) };
+  while (r.val >= w.val) {
     r = left(r);
   }
   return r;
@@ -99,7 +99,7 @@ static NodeIndex
 parent_step(NodeIndex x)
 {
   auto k = level(x);
-  return (x | (one << k)) & ~(one << (k + 1));
+  return NodeIndex{ (x.val | (one << k)) & ~(one << (k + 1)) };
 }
 
 NodeIndex
@@ -110,7 +110,7 @@ parent(NodeIndex x, NodeCount w)
   }
 
   auto p = parent_step(x);
-  while (p >= w.val) {
+  while (p.val >= w.val) {
     p = parent_step(p);
   }
   return p;
@@ -120,11 +120,11 @@ NodeIndex
 sibling(NodeIndex x, NodeCount w)
 {
   auto p = parent(x, w);
-  if (x < p) {
+  if (x.val < p.val) {
     return right(p, w);
   }
 
-  if (x > p) {
+  if (x.val > p.val) {
     return left(p);
   }
 
@@ -138,7 +138,7 @@ dirpath(NodeIndex x, NodeCount w)
   std::vector<NodeIndex> d;
 
   auto r = root(w);
-  for (auto c = x; c != r; c = parent(c, w)) {
+  for (auto c = x; c.val != r.val; c = parent(c, w)) {
     d.push_back(c);
   }
 
@@ -149,7 +149,7 @@ std::vector<NodeIndex>
 copath(NodeIndex x, NodeCount w)
 {
   auto d = dirpath(x, w);
-  std::vector<uint32_t> c(d.size());
+  std::vector<NodeIndex> c(d.size());
   for (size_t i = 0; i < d.size(); ++i) {
     c[i] = sibling(d[i], w);
   }

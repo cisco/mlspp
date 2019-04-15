@@ -107,7 +107,7 @@ struct WelcomeInfo : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
-  uint32_t index;
+  LeafIndex index;
   Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
@@ -120,7 +120,7 @@ struct WelcomeInfo : public CipherAware
 
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
-              uint32_t index,
+              LeafIndex index,
               Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
@@ -188,12 +188,12 @@ operator>>(tls::istream& in, GroupOperationType& obj);
 struct Add
 {
 public:
-  uint32_t index;
+  LeafIndex index;
   UserInitKey init_key;
 
   Add() {}
 
-  Add(uint32_t index, const UserInitKey& init_key)
+  Add(LeafIndex index, const UserInitKey& init_key)
     : index(index)
     , init_key(init_key)
   {}
@@ -243,7 +243,7 @@ operator>>(tls::istream& in, Update& obj);
 struct Remove : public CipherAware
 {
 public:
-  uint32_t removed;
+  LeafIndex removed;
   DirectPath path;
 
   Remove(CipherSuite suite)
@@ -251,7 +251,7 @@ public:
     , path(suite)
   {}
 
-  Remove(uint32_t removed, const DirectPath& path)
+  Remove(LeafIndex removed, const DirectPath& path)
     : CipherAware(path)
     , removed(removed)
     , path(path)
@@ -351,7 +351,7 @@ struct Handshake : public CipherAware
   epoch_t prior_epoch;
   GroupOperation operation;
 
-  uint32_t signer_index;
+  LeafIndex signer_index;
   tls::opaque<2> signature;
   tls::opaque<1> confirmation;
 
@@ -364,7 +364,7 @@ struct Handshake : public CipherAware
 
   Handshake(epoch_t prior_epoch,
             const GroupOperation& operation,
-            uint32_t signer_index,
+            LeafIndex signer_index,
             const bytes& signature,
             const bytes& confirmation)
     : CipherAware(operation)

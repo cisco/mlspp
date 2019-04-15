@@ -48,7 +48,7 @@ ResolutionTestVectors::compact(const std::vector<NodeIndex>& res)
   std::transform(res.begin(),
                  res.end(),
                  out.begin(),
-                 [](NodeIndex c) -> uint8_t { return c; });
+                 [](NodeIndex c) -> uint8_t { return c.val; });
   return out;
 }
 

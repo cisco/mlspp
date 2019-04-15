@@ -64,8 +64,24 @@ struct NodeCount : public UInt32
   using UInt32::UInt32;
 };
 
-typedef uint32_t LeafIndex;
-typedef uint32_t NodeIndex;
+struct LeafIndex : public UInt32
+{
+  using UInt32::UInt32;
+
+  bool operator==(const LeafIndex other) const { return val == other.val; }
+  bool operator!=(const LeafIndex other) const { return val != other.val; }
+};
+
+struct NodeIndex : public UInt32
+{
+  using UInt32::UInt32;
+  explicit NodeIndex(LeafIndex x)
+    : UInt32(2 * x.val)
+  {}
+
+  bool operator==(const NodeIndex other) const { return val == other.val; }
+  bool operator!=(const NodeIndex other) const { return val != other.val; }
+};
 
 // Internal namespace to keep these generic names clean
 namespace tree_math {
@@ -85,31 +101,31 @@ NodeIndex
 root(NodeCount w);
 
 NodeIndex
-left(LeafIndex x);
+left(NodeIndex x);
 
 NodeIndex
-right(LeafIndex x, NodeCount w);
+right(NodeIndex x, NodeCount w);
 
 NodeIndex
-parent(LeafIndex x, NodeCount w);
+parent(NodeIndex x, NodeCount w);
 
 NodeIndex
-sibling(LeafIndex x, NodeCount w);
+sibling(NodeIndex x, NodeCount w);
 
 std::vector<NodeIndex>
-dirpath(LeafIndex x, NodeCount w);
+dirpath(NodeIndex x, NodeCount w);
 
 std::vector<NodeIndex>
-copath(LeafIndex x, NodeCount w);
+copath(NodeIndex x, NodeCount w);
 
 // XXX(rlb@ipv.sx): The templating here is looser than I would like.
 // Really it should be something like vector<optional<T>>
 template<typename T>
-std::vector<uint32_t>
-resolve(const T& nodes, LeafIndex target)
+std::vector<NodeIndex>
+resolve(const T& nodes, NodeIndex target)
 {
   // Resolution of a populated node is the node itself
-  if (nodes[target]) {
+  if (nodes[target.val]) {
     return { target };
   }
 

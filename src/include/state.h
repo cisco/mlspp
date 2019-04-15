@@ -144,7 +144,7 @@ public:
   /// Accessors
   ///
   epoch_t epoch() const { return _state.epoch; }
-  uint32_t index() const { return _index; }
+  LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   bytes epoch_secret() const { return _epoch_secret; }
   bytes application_secret() const { return _application_secret; }
@@ -178,7 +178,7 @@ private:
   tls::opaque<1> _init_secret;
 
   // Per-participant state
-  uint32_t _index;
+  LeafIndex _index;
   SignaturePrivateKey _identity_priv;
   bytes _cached_leaf_secret;
 
@@ -186,13 +186,13 @@ private:
   bytes _zero;
 
   // Specific operation handlers
-  State handle(uint32_t signer_index, const GroupOperation& operation) const;
+  State handle(LeafIndex signer_index, const GroupOperation& operation) const;
 
   // Handle a Add (for existing participants only)
   void handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
-  void handle(uint32_t index, const Update& update);
+  void handle(LeafIndex index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
   void handle(const Remove& remove);
@@ -205,7 +205,7 @@ private:
   friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
-  void update_leaf(uint32_t index,
+  void update_leaf(LeafIndex index,
                    const DirectPath& path,
                    const optional<bytes>& leaf_secret);
 

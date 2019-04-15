@@ -179,9 +179,9 @@ struct MessagesTestVectors
     tls::opaque<4> remove;
   };
 
-  uint32_t epoch;
-  uint32_t signer_index;
-  uint32_t removed;
+  epoch_t epoch;
+  LeafIndex signer_index;
+  LeafIndex removed;
   tls::opaque<1> user_id;
   tls::opaque<1> group_id;
   tls::opaque<1> uik_id;
