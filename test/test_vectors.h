@@ -3,6 +3,7 @@
 #include "session.h"
 #include "state.h"
 #include "tls_syntax.h"
+#include "tree_math.h"
 #include <string>
 
 using namespace mls;
@@ -11,12 +12,12 @@ struct TreeMathTestVectors
 {
   static const std::string file_name;
 
-  uint32_t n_leaves = 255;
-  tls::vector<uint32_t, 4> root;
-  tls::vector<uint32_t, 4> left;
-  tls::vector<uint32_t, 4> right;
-  tls::vector<uint32_t, 4> parent;
-  tls::vector<uint32_t, 4> sibling;
+  LeafCount n_leaves{ 255 };
+  tls::vector<NodeIndex, 4> root;
+  tls::vector<NodeIndex, 4> left;
+  tls::vector<NodeIndex, 4> right;
+  tls::vector<NodeIndex, 4> parent;
+  tls::vector<NodeIndex, 4> sibling;
 };
 
 tls::istream&
@@ -33,10 +34,10 @@ struct ResolutionTestVectors
   typedef tls::vector<uint8_t, 1> Resolution;
   typedef tls::vector<Resolution, 2> ResolutionCase;
 
-  static std::vector<bool> make_tree(uint32_t t, uint32_t n);
-  static std::vector<uint8_t> compact(const std::vector<uint32_t>& res);
+  static std::vector<bool> make_tree(uint32_t t, NodeCount w);
+  static std::vector<uint8_t> compact(const std::vector<NodeIndex>& res);
 
-  uint32_t n_leaves;
+  LeafCount n_leaves;
   tls::vector<ResolutionCase, 4> cases;
 };
 

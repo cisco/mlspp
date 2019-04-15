@@ -160,7 +160,7 @@ RatchetTree::encrypt(uint32_t from, const bytes& leaf_secret) const
   path.nodes.push_back({ leaf_node.public_key(), {} });
 
   auto path_secret = leaf_secret;
-  auto copath = tree_math::copath(2 * from, size());
+  auto copath = tree_math::copath(2 * from, node_size());
   for (const auto& node : copath) {
     path_secret = path_step(path_secret);
 
@@ -183,7 +183,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
 {
   MergeInfo info;
 
-  auto copath = tree_math::copath(2 * from, size());
+  auto copath = tree_math::copath(2 * from, node_size());
   if (path.nodes.size() != copath.size() + 1) {
     throw ProtocolError("Malformed DirectPath");
   }
@@ -239,7 +239,7 @@ RatchetTree::decrypt(uint32_t from, const DirectPath& path) const
 void
 RatchetTree::merge_path(uint32_t from, const RatchetTree::MergeInfo& info)
 {
-  const auto dirpath = tree_math::dirpath(2 * from, size());
+  const auto dirpath = tree_math::dirpath(2 * from, node_size());
   if (dirpath.size() + 1 != info.public_keys.size() + info.secrets.size()) {
     throw InvalidParameterError("Malformed MergeInfo");
   }
@@ -260,7 +260,7 @@ RatchetTree::merge_path(uint32_t from, const RatchetTree::MergeInfo& info)
     }
   }
 
-  auto root = tree_math::root(size());
+  auto root = tree_math::root(node_size());
   auto node = new_node(info.secrets.back());
   _nodes[root].merge(node);
 }
@@ -300,21 +300,21 @@ RatchetTree::add_leaf(uint32_t index, const bytes& leaf_secret)
 void
 RatchetTree::blank_path(uint32_t index)
 {
-  const auto size_ = size();
-  const auto root = tree_math::root(size_);
+  const auto node_count = node_size();
+  const auto root = tree_math::root(node_count);
 
   auto curr = 2 * index;
   while (curr != root) {
     _nodes[curr] = nullopt;
-    curr = tree_math::parent(curr, size_);
+    curr = tree_math::parent(curr, node_count);
   }
 }
 
 void
 RatchetTree::set_path(uint32_t index, const bytes& leaf)
 {
-  const auto size_ = size();
-  const auto root = tree_math::root(size_);
+  const auto node_count = node_size();
+  const auto root = tree_math::root(node_count);
 
   auto curr = 2 * index;
   auto path_secret = leaf;
@@ -326,7 +326,7 @@ RatchetTree::set_path(uint32_t index, const bytes& leaf)
     _nodes[curr] = new_node(path_secret);
     path_secret = path_step(path_secret);
 
-    curr = tree_math::parent(curr, size_);
+    curr = tree_math::parent(curr, node_count);
   }
 
   _nodes[root] = new_node(path_secret);
@@ -345,13 +345,14 @@ RatchetTree::leaf_span() const
 void
 RatchetTree::truncate(uint32_t leaves)
 {
-  _nodes.resize(tree_math::node_width(leaves));
+  auto w = tree_math::node_width(LeafCount{ leaves });
+  _nodes.resize(w.val);
 }
 
 uint32_t
 RatchetTree::size() const
 {
-  return tree_math::size_from_width(_nodes.size());
+  return leaf_size().val;
 }
 
 bool
@@ -363,7 +364,7 @@ RatchetTree::occupied(uint32_t index) const
 bytes
 RatchetTree::root_secret() const
 {
-  auto root = tree_math::root(size());
+  auto root = tree_math::root(node_size());
   auto val = _nodes[root]->secret();
   return *val;
 }
@@ -375,8 +376,8 @@ RatchetTree::check_invariant(size_t from) const
 
   // Ensure that we have private keys for everything in the direct
   // path...
-  auto dirpath = tree_math::dirpath(2 * from, size());
-  dirpath.push_back(tree_math::root(size()));
+  auto dirpath = tree_math::dirpath(2 * from, node_size());
+  dirpath.push_back(tree_math::root(node_size()));
   for (const auto& node : dirpath) {
     in_dirpath[node] = true;
     if (_nodes[node] && !_nodes[node]->private_key()) {
@@ -396,6 +397,18 @@ RatchetTree::check_invariant(size_t from) const
   }
 
   return true;
+}
+
+NodeCount
+RatchetTree::node_size() const
+{
+  return NodeCount{ uint32_t(_nodes.size()) };
+}
+
+LeafCount
+RatchetTree::leaf_size() const
+{
+  return tree_math::size_from_width(node_size());
 }
 
 RatchetTreeNode

@@ -3,6 +3,7 @@
 #include "common.h"
 #include "crypto.h"
 #include "tls_syntax.h"
+#include "tree_math.h"
 #include <iosfwd>
 
 namespace mls {
@@ -106,6 +107,8 @@ private:
   tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> _nodes;
   size_t _secret_size;
 
+  NodeCount node_size() const;
+  LeafCount leaf_size() const;
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
