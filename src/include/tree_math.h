@@ -27,51 +27,102 @@
 //
 //    01x = <00x, 10x>
 
+// Fordward declaration of TLS streams
+namespace tls {
+class istream;
+class ostream;
+}
+
 namespace mls {
+
+// Index types go in the overall namespace
+struct UInt32
+{
+  uint32_t val;
+
+  UInt32()
+    : val(0)
+  {}
+
+  explicit UInt32(uint32_t val)
+    : val(val)
+  {}
+};
+
+tls::istream&
+operator>>(tls::istream& in, UInt32& obj);
+tls::ostream&
+operator<<(tls::ostream& out, const UInt32& obj);
+
+struct NodeCount;
+
+struct LeafCount : public UInt32
+{
+  using UInt32::UInt32;
+  explicit LeafCount(const NodeCount w);
+};
+
+struct NodeCount : public UInt32
+{
+  using UInt32::UInt32;
+  explicit NodeCount(const LeafCount n);
+};
+
+struct LeafIndex : public UInt32
+{
+  using UInt32::UInt32;
+
+  bool operator==(const LeafIndex other) const { return val == other.val; }
+  bool operator!=(const LeafIndex other) const { return val != other.val; }
+};
+
+struct NodeIndex : public UInt32
+{
+  using UInt32::UInt32;
+  explicit NodeIndex(const LeafIndex x)
+    : UInt32(2 * x.val)
+  {}
+
+  bool operator==(const NodeIndex other) const { return val == other.val; }
+  bool operator!=(const NodeIndex other) const { return val != other.val; }
+};
 
 // Internal namespace to keep these generic names clean
 namespace tree_math {
 
 uint32_t
-level(uint32_t x);
-
-// Tree size properties
-uint32_t
-node_width(uint32_t n);
-
-uint32_t
-size_from_width(uint32_t w);
+level(NodeIndex x);
 
 // Node relationships
-uint32_t
-root(uint32_t n);
+NodeIndex
+root(NodeCount w);
 
-uint32_t
-left(uint32_t x);
+NodeIndex
+left(NodeIndex x);
 
-uint32_t
-right(uint32_t x, uint32_t n);
+NodeIndex
+right(NodeIndex x, NodeCount w);
 
-uint32_t
-parent(uint32_t x, uint32_t n);
+NodeIndex
+parent(NodeIndex x, NodeCount w);
 
-uint32_t
-sibling(uint32_t x, uint32_t n);
+NodeIndex
+sibling(NodeIndex x, NodeCount w);
 
-std::vector<uint32_t>
-dirpath(uint32_t x, uint32_t n);
+std::vector<NodeIndex>
+dirpath(NodeIndex x, NodeCount w);
 
-std::vector<uint32_t>
-copath(uint32_t x, uint32_t n);
+std::vector<NodeIndex>
+copath(NodeIndex x, NodeCount w);
 
 // XXX(rlb@ipv.sx): The templating here is looser than I would like.
 // Really it should be something like vector<optional<T>>
 template<typename T>
-std::vector<uint32_t>
-resolve(const T& nodes, uint32_t target)
+std::vector<NodeIndex>
+resolve(const T& nodes, NodeIndex target)
 {
   // Resolution of a populated node is the node itself
-  if (nodes[target]) {
+  if (nodes[target.val]) {
     return { target };
   }
 
@@ -80,7 +131,7 @@ resolve(const T& nodes, uint32_t target)
     return {};
   }
 
-  auto n = size_from_width(nodes.size());
+  auto n = NodeCount{ uint32_t(nodes.size()) };
   auto l = resolve(nodes, left(target));
   auto r = resolve(nodes, right(target, n));
   l.insert(l.end(), r.begin(), r.end());

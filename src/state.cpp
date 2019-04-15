@@ -154,7 +154,7 @@ State::State(SignaturePrivateKey identity_priv,
   _state.tree.add_leaf(_index, init_secret);
 
   // Add to the roster
-  _state.roster.add(_index, credential);
+  _state.roster.add(_index.val, credential);
 
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
@@ -224,14 +224,14 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _state.group_id, _state.epoch,
-                            index,           _state.roster,
-                            _state.tree,     _state.transcript_hash,
+  WelcomeInfo welcome_info{ _state.group_id,    _state.epoch,
+                            LeafIndex{ index }, _state.roster,
+                            _state.tree,        _state.transcript_hash,
                             _init_secret };
 
   Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
 
-  auto add = sign(Add{ index, user_init_key });
+  auto add = sign(Add{ LeafIndex{ index }, user_init_key });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
 
@@ -250,8 +250,8 @@ State::remove(const bytes& evict_secret, uint32_t index) const
     throw InvalidParameterError("Index too large for tree");
   }
 
-  auto path = _state.tree.encrypt(index, evict_secret);
-  return sign(Remove{ index, path });
+  auto path = _state.tree.encrypt(LeafIndex{ index }, evict_secret);
+  return sign(Remove{ LeafIndex{ index }, path });
 }
 
 ///
@@ -275,7 +275,7 @@ State::handle(const Handshake& handshake) const
 }
 
 State
-State::handle(uint32_t signer_index, const GroupOperation& operation) const
+State::handle(LeafIndex signer_index, const GroupOperation& operation) const
 {
   auto next = *this;
   next._state.epoch = _state.epoch + 1;
@@ -310,10 +310,10 @@ State::handle(const Add& add)
   }
 
   // Verify the index in the Add message
-  if (add.index > _state.tree.size()) {
+  if (add.index.val > _state.tree.size()) {
     throw InvalidParameterError("Invalid leaf index");
   }
-  if (add.index < _state.tree.size() && _state.tree.occupied(add.index)) {
+  if (add.index.val < _state.tree.size() && _state.tree.occupied(add.index)) {
     throw InvalidParameterError("Leaf is not available for add");
   }
 
@@ -325,14 +325,14 @@ State::handle(const Add& add)
   _state.tree.add_leaf(add.index, *init_key);
 
   // Add to the roster
-  _state.roster.add(add.index, add.init_key.credential);
+  _state.roster.add(add.index.val, add.init_key.credential);
 
   // Update symmetric state
   update_epoch_secrets(_zero);
 }
 
 void
-State::handle(uint32_t index, const Update& update)
+State::handle(LeafIndex index, const Update& update)
 {
   optional<bytes> leaf_secret = nullopt;
   if (index == _index) {
@@ -353,11 +353,11 @@ State::handle(const Remove& remove)
   auto leaf_secret = nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
-  _state.roster.remove(remove.removed);
+  _state.roster.remove(remove.removed.val);
 
   auto cut = _state.tree.leaf_span();
   _state.tree.truncate(cut);
-  _state.roster.truncate(cut);
+  _state.roster.truncate(cut.val);
 }
 
 State::EpochSecrets
@@ -401,7 +401,7 @@ operator!=(const State& lhs, const State& rhs)
 }
 
 void
-State::update_leaf(uint32_t index,
+State::update_leaf(LeafIndex index,
                    const DirectPath& path,
                    const optional<bytes>& leaf_secret)
 {
@@ -443,7 +443,7 @@ State::sign(const GroupOperation& operation) const
 bool
 State::verify(const Handshake& handshake) const
 {
-  auto pub = _state.roster.get(handshake.signer_index).public_key();
+  auto pub = _state.roster.get(handshake.signer_index.val).public_key();
   auto sig_data = _state.transcript_hash;
   auto sig = handshake.signature;
   auto sig_ver = pub.verify(sig_data, sig);

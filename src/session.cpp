@@ -174,7 +174,7 @@ namespace test {
 uint32_t
 TestSession::index() const
 {
-  return current_state().index();
+  return current_state().index().val;
 }
 
 epoch_t

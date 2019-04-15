@@ -9,25 +9,26 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
-  tv.n_leaves = 255;
+  tv.n_leaves = LeafCount{ 255 };
 
-  for (int n = 1; n <= tv.n_leaves; ++n) {
-    auto val = mls::tree_math::root(n);
+  for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
+    auto w = NodeCount{ LeafCount{ n } };
+    auto val = tree_math::root(w);
     tv.root.push_back(val);
   }
 
-  auto n = tv.n_leaves;
-  for (int x = 0; x < tree_math::node_width(tv.n_leaves); ++x) {
-    auto left = mls::tree_math::left(x);
+  auto w = NodeCount{ tv.n_leaves };
+  for (uint32_t x = 0; x < w.val; ++x) {
+    auto left = tree_math::left(NodeIndex{ x });
     tv.left.push_back(left);
 
-    auto right = mls::tree_math::right(x, n);
+    auto right = tree_math::right(NodeIndex{ x }, w);
     tv.right.push_back(right);
 
-    auto parent = mls::tree_math::parent(x, n);
+    auto parent = tree_math::parent(NodeIndex{ x }, w);
     tv.parent.push_back(parent);
 
-    auto sibling = mls::tree_math::sibling(x, n);
+    auto sibling = tree_math::sibling(NodeIndex{ x }, w);
     tv.sibling.push_back(sibling);
   }
 
@@ -38,18 +39,18 @@ ResolutionTestVectors
 generate_resolution()
 {
   ResolutionTestVectors tv;
-  tv.n_leaves = 7;
+  tv.n_leaves = LeafCount{ 7 };
 
-  auto width = tree_math::node_width(tv.n_leaves);
-  auto n_cases = (1 << width);
+  auto width = NodeCount{ tv.n_leaves };
+  auto n_cases = (1 << width.val);
 
   tv.cases.resize(n_cases);
   for (uint32_t t = 0; t < n_cases; ++t) {
-    tv.cases[t].resize(width);
+    tv.cases[t].resize(width.val);
 
     auto nodes = ResolutionTestVectors::make_tree(t, width);
-    for (uint32_t i = 0; i < width; ++i) {
-      auto res = tree_math::resolve(nodes, i);
+    for (uint32_t i = 0; i < width.val; ++i) {
+      auto res = tree_math::resolve(nodes, NodeIndex{ i });
       tv.cases[t][i] = ResolutionTestVectors::compact(res);
     }
   }
@@ -92,14 +93,13 @@ generate_crypto()
 
     // HKDF-Extract
     test_case->hkdf_extract_out =
-      mls::hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
+      hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
 
     // Derive-Secret
-    test_case->derive_secret_out =
-      mls::derive_secret(suite,
-                         tv.derive_secret_secret,
-                         derive_secret_label_string,
-                         tv.derive_secret_context);
+    test_case->derive_secret_out = derive_secret(suite,
+                                                 tv.derive_secret_secret,
+                                                 derive_secret_label_string,
+                                                 tv.derive_secret_context);
 
     // Derive-Key-Pair
     auto priv = DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
@@ -107,7 +107,7 @@ generate_crypto()
     test_case->derive_key_pair_pub = pub;
 
     // HPKE
-    mls::test::DeterministicHPKE lock;
+    test::DeterministicHPKE lock;
     test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
   }
 
@@ -233,8 +233,8 @@ generate_messages()
 
   // Set the inputs
   tv.epoch = 0xA0A1A2A3;
-  tv.signer_index = 0xB0B1B2B3;
-  tv.removed = 0xC0C1C2C3;
+  tv.signer_index = LeafIndex{ 0xB0B1B2B3 };
+  tv.removed = LeafIndex{ 0xC0C1C2C3 };
   tv.user_id = bytes(16, 0xD1);
   tv.group_id = bytes(16, 0xD2);
   tv.uik_id = bytes(16, 0xD3);
@@ -259,7 +259,7 @@ generate_messages()
   tv.user_init_key_all = tls::marshal(uik_all);
 
   // Construct a test case for each suite
-  mls::test::DeterministicHPKE lock;
+  test::DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -272,8 +272,8 @@ generate_messages()
 
     auto ratchet_tree =
       RatchetTree{ suite, { tv.random, tv.random, tv.random, tv.random } };
-    ratchet_tree.blank_path(2);
-    auto direct_path = ratchet_tree.encrypt(0, tv.random);
+    ratchet_tree.blank_path(LeafIndex{ 2 });
+    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};
@@ -342,7 +342,7 @@ generate_basic_session()
   tv.group_size = 5;
   tv.group_id = bytes(16, 0xA0);
 
-  mls::test::DeterministicHPKE lock;
+  test::DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -350,7 +350,7 @@ generate_basic_session()
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
-    std::vector<mls::test::TestSession> sessions;
+    std::vector<test::TestSession> sessions;
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
     for (int j = 0; j < tv.group_size; ++j) {

@@ -44,8 +44,8 @@ protected:
     auto ratchet_tree =
       RatchetTree{ tc.cipher_suite,
                    { tv.random, tv.random, tv.random, tv.random } };
-    ratchet_tree.blank_path(2);
-    auto direct_path = ratchet_tree.encrypt(0, tv.random);
+    ratchet_tree.blank_path(LeafIndex{ 2 });
+    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};

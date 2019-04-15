@@ -1,11 +1,44 @@
 #include "tree_math.h"
+#include "common.h"
+#include "tls_syntax.h"
 
 #include <algorithm>
 
-namespace mls {
-namespace tree_math {
-
 static uint32_t one = 0x01;
+
+namespace mls {
+
+LeafCount::LeafCount(const NodeCount w)
+{
+  if (w.val == 0) {
+    val = 0;
+    return;
+  }
+
+  if ((w.val & one) == 0) {
+    throw InvalidParameterError("Only odd node counts describe trees");
+  }
+
+  val = (w.val >> one) + 1;
+}
+
+NodeCount::NodeCount(const LeafCount n)
+  : UInt32(2 * (n.val - 1) + 1)
+{}
+
+tls::istream&
+operator>>(tls::istream& in, UInt32& obj)
+{
+  return in >> obj.val;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const UInt32& obj)
+{
+  return out << obj.val;
+}
+
+namespace tree_math {
 
 static uint32_t
 log2(uint32_t x)
@@ -22,96 +55,79 @@ log2(uint32_t x)
 }
 
 uint32_t
-level(uint32_t x)
+level(NodeIndex x)
 {
-  if ((x & one) == 0) {
+  if ((x.val & one) == 0) {
     return 0;
   }
 
   uint32_t k = 0;
-  while (((x >> k) & one) == 1) {
+  while (((x.val >> k) & one) == 1) {
     k += 1;
   }
   return k;
 }
 
-uint32_t
-node_width(uint32_t n)
+NodeIndex
+root(NodeCount w)
 {
-  return 2 * (n - 1) + 1;
+  return NodeIndex{ (one << log2(w.val)) - 1 };
 }
 
-uint32_t
-size_from_width(uint32_t w)
-{
-  if (w == 0) {
-    return 0;
-  }
-
-  return (w >> one) + 1;
-}
-
-uint32_t
-root(uint32_t n)
-{
-  uint32_t w = node_width(n);
-  return (one << log2(w)) - 1;
-}
-
-uint32_t
-left(uint32_t x)
+NodeIndex
+left(NodeIndex x)
 {
   if (level(x) == 0) {
     return x;
   }
 
-  return x ^ (one << (level(x) - 1));
+  return NodeIndex{ x.val ^ (one << (level(x) - 1)) };
 }
 
-uint32_t
-right(uint32_t x, uint32_t n)
+NodeIndex
+right(NodeIndex x, NodeCount w)
 {
   if (level(x) == 0) {
     return x;
   }
 
-  uint32_t r = x ^ (uint32_t(0x03) << (level(x) - 1));
-  while (r >= node_width(n)) {
+  NodeIndex r{ x.val ^ (uint32_t(0x03) << (level(x) - 1)) };
+  while (r.val >= w.val) {
     r = left(r);
   }
   return r;
 }
 
-static uint32_t
-parent_step(uint32_t x)
+static NodeIndex
+parent_step(NodeIndex x)
 {
   auto k = level(x);
-  return (x | (one << k)) & ~(one << (k + 1));
+  return NodeIndex{ (x.val | (one << k)) & ~(one << (k + 1)) };
 }
 
-uint32_t
-parent(uint32_t x, uint32_t n)
+NodeIndex
+parent(NodeIndex x, NodeCount w)
 {
-  if (x == root(n)) {
+  if (x == root(w)) {
     return x;
   }
 
   auto p = parent_step(x);
-  while (p >= node_width(n)) {
+  while (p.val >= w.val) {
     p = parent_step(p);
   }
   return p;
 }
 
-uint32_t
-sibling(uint32_t x, uint32_t n)
+NodeIndex
+sibling(NodeIndex x, NodeCount w)
 {
-  auto p = parent(x, n);
-  if (x < p) {
-    return right(p, n);
+  auto p = parent(x, w);
+  if (x.val < p.val) {
+    return right(p, w);
   }
 
-  if (x > p) {
+  if (x.val > p.val) {
     return left(p);
   }
 
@@ -119,26 +135,26 @@ sibling(uint32_t x, uint32_t n)
   return p;
 }
 
-std::vector<uint32_t>
-dirpath(uint32_t x, uint32_t n)
+std::vector<NodeIndex>
+dirpath(NodeIndex x, NodeCount w)
 {
-  std::vector<uint32_t> d;
+  std::vector<NodeIndex> d;
 
-  auto r = root(n);
-  for (auto c = x; c != r; c = parent(c, n)) {
+  auto r = root(w);
+  for (auto c = x; c.val != r.val; c = parent(c, w)) {
     d.push_back(c);
   }
 
   return d;
 }
 
-std::vector<uint32_t>
-copath(uint32_t x, uint32_t n)
+std::vector<NodeIndex>
+copath(NodeIndex x, NodeCount w)
 {
-  auto d = dirpath(x, n);
-  std::vector<uint32_t> c(d.size());
+  auto d = dirpath(x, w);
+  std::vector<NodeIndex> c(d.size());
   for (size_t i = 0; i < d.size(); ++i) {
-    c[i] = sibling(d[i], n);
+    c[i] = sibling(d[i], w);
   }
   return c;
 }

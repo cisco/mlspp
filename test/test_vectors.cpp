@@ -31,9 +31,9 @@ operator<<(tls::ostream& str, const TreeMathTestVectors& obj)
 const std::string ResolutionTestVectors::file_name = "./resolution.bin";
 
 std::vector<bool>
-ResolutionTestVectors::make_tree(uint32_t t, uint32_t n)
+ResolutionTestVectors::make_tree(uint32_t t, NodeCount w)
 {
-  auto vec = std::vector<bool>(n);
+  auto vec = std::vector<bool>(w.val);
   for (int i = 0; i < vec.size(); ++i) {
     vec[i] = t & 1;
     t >>= 1;
@@ -42,13 +42,13 @@ ResolutionTestVectors::make_tree(uint32_t t, uint32_t n)
 }
 
 std::vector<uint8_t>
-ResolutionTestVectors::compact(const std::vector<uint32_t>& res)
+ResolutionTestVectors::compact(const std::vector<NodeIndex>& res)
 {
   std::vector<uint8_t> out(res.size());
   std::transform(res.begin(),
                  res.end(),
                  out.begin(),
-                 [](uint32_t c) -> uint8_t { return c; });
+                 [](NodeIndex c) -> uint8_t { return c.val; });
   return out;
 }
 

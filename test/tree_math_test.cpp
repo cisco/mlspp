@@ -15,33 +15,34 @@ class TreeMathTest : public ::testing::Test
 {
 protected:
   const TreeMathTestVectors& tv;
-  uint32_t width;
+  NodeCount width;
 
   TreeMathTest()
     : tv(TestLoader<TreeMathTestVectors>::get())
   {
-    width = tree_math::node_width(tv.n_leaves);
+    width = NodeCount{ tv.n_leaves };
   }
 
   template<typename F>
   auto size_scope(F function)
   {
-    return [=](uint32_t x) -> auto { return function(x, tv.n_leaves); };
+    return [=](NodeIndex x) -> auto { return function(x, width); };
   }
 
   template<typename F, typename A>
   void vector_test(F function, A answers)
   {
-    for (uint32_t i = 0; i < width; ++i) {
-      ASSERT_EQ(function(i), answers[i]);
+    for (uint32_t i = 0; i < width.val; ++i) {
+      ASSERT_EQ(function(NodeIndex{ i }), answers[i]);
     }
   }
 };
 
 TEST_F(TreeMathTest, Root)
 {
-  for (uint32_t n = 1; n <= tv.n_leaves; ++n) {
-    ASSERT_EQ(tree_math::root(n), tv.root[n - 1]);
+  for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
+    const auto w = NodeCount{ LeafCount{ n } };
+    ASSERT_EQ(tree_math::root(w), tv.root[n - 1]);
   }
 }
 
@@ -69,13 +70,13 @@ TEST(ResolutionTest, Interop)
 {
   auto tv = TestLoader<ResolutionTestVectors>::get();
 
-  auto width = tree_math::node_width(tv.n_leaves);
-  auto n_cases = (1 << width);
+  auto width = NodeCount{ tv.n_leaves };
+  auto n_cases = (1 << width.val);
 
   for (uint32_t t = 0; t < n_cases; ++t) {
     auto nodes = ResolutionTestVectors::make_tree(t, width);
-    for (uint32_t i = 0; i < width; ++i) {
-      auto res = tree_math::resolve(nodes, i);
+    for (uint32_t i = 0; i < width.val; ++i) {
+      auto res = tree_math::resolve(nodes, NodeIndex{ i });
       auto compact = ResolutionTestVectors::compact(res);
       ASSERT_EQ(compact, tv.cases[t][i]);
     }
