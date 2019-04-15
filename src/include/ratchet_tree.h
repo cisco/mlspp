@@ -70,6 +70,17 @@ struct OptionalRatchetTreeNode : public optional<RatchetTreeNode>
   }
 };
 
+struct RatchetTreeNodeVector
+  : public tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>
+{
+  typedef tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> parent;
+  using parent::parent;
+  using parent::operator[];
+
+  OptionalRatchetTreeNode& operator[](const NodeIndex index);
+  const OptionalRatchetTreeNode& operator[](const NodeIndex index) const;
+};
+
 struct RatchetNode;
 struct DirectPath;
 
@@ -104,7 +115,7 @@ public:
   bool check_invariant(LeafIndex from) const;
 
 private:
-  tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> _nodes;
+  RatchetTreeNodeVector _nodes;
   size_t _secret_size;
 
   NodeCount node_size() const;

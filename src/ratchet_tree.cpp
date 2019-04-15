@@ -123,6 +123,24 @@ operator>>(tls::istream& in, RatchetTreeNode& obj)
 }
 
 ///
+/// RatchetTreeNodeVector
+///
+
+OptionalRatchetTreeNode& RatchetTreeNodeVector::operator[](
+  const NodeIndex index)
+{
+  auto vec = static_cast<parent*>(this);
+  return (*vec)[index.val];
+}
+
+const OptionalRatchetTreeNode& RatchetTreeNodeVector::operator[](
+  const NodeIndex index) const
+{
+  auto vec = static_cast<const parent*>(this);
+  return (*vec)[index.val];
+}
+
+///
 /// RatchetTree
 ///
 
@@ -168,7 +186,7 @@ RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret) const
     path_node.public_key = new_node(path_secret).public_key();
 
     for (const auto& res_node : tree_math::resolve(_nodes, node)) {
-      auto ciphertext = _nodes[res_node.val]->public_key().encrypt(path_secret);
+      auto ciphertext = _nodes[res_node]->public_key().encrypt(path_secret);
       path_node.node_secrets.push_back(ciphertext);
     }
 
@@ -208,7 +226,7 @@ RatchetTree::decrypt(LeafIndex from, const DirectPath& path) const
       }
 
       for (size_t j = 0; j < res.size(); ++j) {
-        auto tree_node = _nodes[res[j].val];
+        auto tree_node = _nodes[res[j]];
         if (!tree_node || !tree_node->private_key()) {
           continue;
         }
@@ -253,16 +271,16 @@ RatchetTree::merge_path(LeafIndex from, const RatchetTree::MergeInfo& info)
 
     if (i < info.public_keys.size()) {
       auto node = RatchetTreeNode(info.public_keys[i]);
-      _nodes[curr.val].merge(node);
+      _nodes[curr].merge(node);
     } else {
       auto node = new_node(info.secrets[i - key_list_size]);
-      _nodes[curr.val].merge(node);
+      _nodes[curr].merge(node);
     }
   }
 
   auto root = tree_math::root(node_size());
   auto node = new_node(info.secrets.back());
-  _nodes[root.val].merge(node);
+  _nodes[root].merge(node);
 }
 
 void
@@ -279,7 +297,8 @@ RatchetTree::add_leaf(LeafIndex index, const DHPublicKey& pub)
 
     _nodes.emplace_back(RatchetTreeNode(pub));
   } else {
-    _nodes[index.val] = RatchetTreeNode(pub);
+    auto node = NodeIndex{ index };
+    _nodes[node] = RatchetTreeNode(pub);
   }
 }
 
@@ -293,7 +312,8 @@ RatchetTree::add_leaf(LeafIndex index, const bytes& leaf_secret)
 
     _nodes.emplace_back(new_node(leaf_secret));
   } else {
-    _nodes[index.val] = new_node(leaf_secret);
+    auto node = NodeIndex{ index };
+    _nodes[node] = new_node(leaf_secret);
   }
 }
 
@@ -305,7 +325,7 @@ RatchetTree::blank_path(LeafIndex index)
 
   auto curr = NodeIndex{ index };
   while (curr != root) {
-    _nodes[curr.val] = nullopt;
+    _nodes[curr] = nullopt;
     curr = tree_math::parent(curr, node_count);
   }
 }
@@ -323,13 +343,13 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
       _nodes.emplace_back(_suite);
     }
 
-    _nodes[curr.val] = new_node(path_secret);
+    _nodes[curr] = new_node(path_secret);
     path_secret = path_step(path_secret);
 
     curr = tree_math::parent(curr, node_count);
   }
 
-  _nodes[root.val] = new_node(path_secret);
+  _nodes[root] = new_node(path_secret);
 }
 
 LeafCount
@@ -359,14 +379,14 @@ bool
 RatchetTree::occupied(LeafIndex index) const
 {
   NodeIndex node_index{ index };
-  return bool(_nodes[node_index.val]);
+  return bool(_nodes[node_index]);
 }
 
 bytes
 RatchetTree::root_secret() const
 {
   auto root = tree_math::root(node_size());
-  auto val = _nodes[root.val]->secret();
+  auto val = _nodes[root]->secret();
   return *val;
 }
 
@@ -381,7 +401,7 @@ RatchetTree::check_invariant(LeafIndex from) const
   dirpath.push_back(tree_math::root(node_size()));
   for (const auto& node : dirpath) {
     in_dirpath[node.val] = true;
-    if (_nodes[node.val] && !_nodes[node.val]->private_key()) {
+    if (_nodes[node] && !_nodes[node]->private_key()) {
       return false;
     }
   }
