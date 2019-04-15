@@ -63,18 +63,24 @@ operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
 //     opaque user_init_key_id<0..255>;
+//     ProtocolVersion supported_versions<0..255>;
 //     CipherSuite cipher_suites<0..255>;
-//     DHPublicKey init_keys<1..2^16-1>;
+//     HPKEPublicKey init_keys<1..2^16-1>;
 //     Credential credential;
-//     tls::opaque signature<0..2^16-1>;
+//     opaque signature<0..2^16-1>;
 // } UserInitKey;
 struct UserInitKey
 {
   tls::opaque<1> user_init_key_id;
+  tls::vector<ProtocolVersion, 1, 2> supported_versions;
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
   Credential credential;
   tls::opaque<2> signature;
+
+  UserInitKey()
+    : supported_versions(1, mls10Version)
+  {}
 
   void add_init_key(const DHPublicKey& pub);
   optional<DHPublicKey> find_init_key(CipherSuite suite) const;

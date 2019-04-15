@@ -253,6 +253,9 @@ operator>>(istream& in, vector_base<T, head, min, max>& data)
     throw ReadError("Data too small for declared min");
   }
 
+  // Truncate the data buffer
+  data.clear();
+
   // Truncate the buffer to the declared length and wrap it in a
   // new reader, then read items from it
   // NB: Remember that we store the vector in reverse order
