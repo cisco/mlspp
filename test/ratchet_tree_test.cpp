@@ -51,6 +51,22 @@ protected:
     : tv(TestLoader<TreeTestVectors>::get())
   {}
 
+  void assert_tree_eq(const TreeTestVectors::TreeCase& vec,
+                      const test::TestRatchetTree& tree)
+  {
+    auto nodes = tree.nodes();
+    ASSERT_EQ(vec.size(), nodes.size());
+
+    for (int j = 0; j < vec.size(); ++j) {
+      ASSERT_EQ(vec[j].hash, nodes[j].hash());
+      ASSERT_EQ(vec[j].secret.has_value(), nodes[j].has_value());
+      if (!nodes[j].blank()) {
+        ASSERT_EQ(vec[j].secret.value(), nodes[j]->secret().value());
+        ASSERT_EQ(vec[j].public_key.value(), nodes[j]->public_key().to_bytes());
+      }
+    }
+  }
+
   void interop(const TreeTestVectors::TestCase& tc, CipherSuite test_suite)
   {
     test::TestRatchetTree tree{ test_suite };
@@ -60,20 +76,13 @@ protected:
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
       tree.add_leaf(LeafIndex{ i }, tv.leaf_secrets[i]);
       tree.set_path(LeafIndex{ i }, tv.leaf_secrets[i]);
+      assert_tree_eq(tc[tci], tree);
+    }
 
-      auto vec = tc[tci];
-      auto nodes = tree.nodes();
-      ASSERT_EQ(vec.size(), nodes.size());
-
-      for (int j = 0; j < vec.size(); ++j) {
-        ASSERT_EQ(vec[j].hash, nodes[j].hash());
-        ASSERT_EQ(!!vec[j].secret, !nodes[j].blank());
-        if (!nodes[j].blank()) {
-          ASSERT_EQ(vec[j].secret.value(), nodes[j]->secret().value());
-          ASSERT_EQ(vec[j].public_key.value(),
-                    nodes[j]->public_key().to_bytes());
-        }
-      }
+    // Blank even-numbered leaves
+    for (uint32_t j = 0; j < tv.leaf_secrets.size(); j += 2, ++tci) {
+      tree.blank_path(LeafIndex{ j });
+      assert_tree_eq(tc[tci], tree);
     }
   }
 };

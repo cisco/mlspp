@@ -1217,46 +1217,6 @@ PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
 /// DHPublicKey and DHPrivateKey
 ///
 
-/*
-// key = HKDF-Expand(Secret, HPKELabel("key"), Length)
-// nonce = HKDF-Expand(Secret, HPKELabel("nonce"), Length)
-//
-// Where HPKELabel is specified as:
-//
-// struct {
-//   uint16 length = Length;
-//   opaque label<12..255> = "mls10 ecies " + Label;
-// } HPKELabel;
-struct HPKELabel
-{
-  uint16_t length;
-  tls::opaque<1, 12> label;
-};
-
-tls::ostream&
-operator<<(tls::ostream& out, const HPKELabel& obj)
-{
-  return out << obj.length << obj.label;
-}
-
-static std::pair<bytes, bytes>
-derive_ecies_secrets(CipherSuite suite, const bytes& shared_secret)
-{
-  uint16_t key_size = AESGCM::key_size(suite);
-  HPKELabel key_label_str{ key_size, to_bytes("mls10 ecies key") };
-  auto key_label = tls::marshal(key_label_str);
-  auto key = hkdf_expand(suite, shared_secret, key_label, key_size);
-
-  HPKELabel nonce_label_str{ AESGCM::nonce_size,
-                             to_bytes("mls10 ecies nonce") };
-  auto nonce_label = tls::marshal(nonce_label_str);
-  auto nonce =
-    hkdf_expand(suite, shared_secret, nonce_label, AESGCM::nonce_size);
-
-  return std::pair<bytes, bytes>(key, nonce);
-}
-*/
-
 enum struct HPKEMode : uint8_t
 {
   base = 0x00,

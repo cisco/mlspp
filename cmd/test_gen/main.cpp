@@ -241,7 +241,7 @@ generate_tree()
     &tv.case_x25519,
   };
 
-  int n_leaves = 2;
+  int n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
   for (int i = 0; i < n_leaves; ++i) {
     tv.leaf_secrets[i] = { uint8_t(i) };
@@ -537,7 +537,6 @@ verify_session_repro(const F& generator)
 int
 main()
 {
-  /*
   TreeMathTestVectors tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
@@ -552,48 +551,37 @@ main()
 
   AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
   write_test_vectors(app_key_schedule);
-  */
 
   TreeTestVectors tree = generate_tree();
   write_test_vectors(tree);
 
-  /*
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
 
   BasicSessionTestVectors basic_session = generate_basic_session();
   write_test_vectors(basic_session);
-  */
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
-  /*
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
   verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_app_key_schedule);
-  */
   verify_reproducible(generate_tree);
-  /*
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
-  */
 
   // Verify that the test vectors load
   try {
-    /*
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<AppKeyScheduleTestVectors>::get();
-    */
     TestLoader<TreeTestVectors>::get();
-    /*
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
-    */
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }

@@ -162,7 +162,7 @@ operator<<(tls::ostream& out, const LeafNodeInfo& obj)
 struct LeafNodeHashInput
 {
   const uint8_t hash_type = 0;
-  optional<LeafNodeInfo> info;
+  tls::optional<LeafNodeInfo> info;
 };
 
 tls::ostream&
@@ -176,7 +176,7 @@ OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
 {
   auto hash_input_str = LeafNodeHashInput{};
   if (!blank()) {
-    hash_input_str.info = { (*this)->public_key() };
+    hash_input_str.info = LeafNodeInfo{ (*this)->public_key() };
   }
 
   auto hash_input = tls::marshal(hash_input_str);
@@ -186,7 +186,7 @@ OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
 struct ParentNodeHashInput
 {
   const uint8_t hash_type = 1;
-  optional<DHPublicKey> public_key;
+  tls::optional<DHPublicKey> public_key;
   tls::opaque<1> left_hash;
   tls::opaque<1> right_hash;
 };
@@ -212,6 +212,16 @@ OptionalRatchetTreeNode::set_hash(CipherSuite suite,
 
   auto hash_input = tls::marshal(hash_input_str);
   _hash = Digest(suite).write(hash_input).digest();
+}
+
+std::ostream&
+operator<<(std::ostream& out, const OptionalRatchetTreeNode& opt)
+{
+  if (!opt.has_value()) {
+    return out << "_";
+  }
+
+  return out << opt.value();
 }
 
 ///
@@ -399,7 +409,7 @@ RatchetTree::add_leaf_inner(LeafIndex index, const RatchetTreeNode& node_val)
     if (!_nodes.empty()) {
       _nodes.emplace_back(std::nullopt);
     }
-    _nodes.emplace_back(nullopt);
+    _nodes.emplace_back(std::nullopt);
   }
 
   blank_path(index);
@@ -426,7 +436,7 @@ RatchetTree::blank_path(LeafIndex index)
     curr = tree_math::parent(curr, node_count);
   }
 
-  _nodes[root] = nullopt;
+  _nodes[root] = std::nullopt;
   set_hash_path(index);
 }
 

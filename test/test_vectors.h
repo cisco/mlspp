@@ -168,8 +168,8 @@ struct TreeTestVectors
 
   struct TreeNode
   {
-    optional<tls::opaque<1>> secret;
-    optional<tls::opaque<1>> public_key;
+    tls::optional<tls::opaque<1>> secret;
+    tls::optional<tls::opaque<1>> public_key;
     tls::opaque<1> hash;
   };
 
