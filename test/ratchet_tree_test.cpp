@@ -25,6 +25,29 @@ protected:
     "31ce14ca8317bf564b12706367b8423ed69a520fad6c0acd2608da65d0bb2916");
   const bytes secretABCD = from_hex(
     "43793000dbf64b8606bfcd75c23b57f3096053eafdf182357fd013fbf8b9834a");
+
+  // def LeafNodeHashInput(pubkey):
+  //  "0001" + pubkey
+  // ParentNodeHashInput = "0101" + pubkey + "20" + lHash + "20" + rHash
+  //
+  // ParentNodeHashInput =
+  //   1 || 1 || pubkey || 0x20 || left_hash || 0x20 || right_hash
+  const bytes hashA = from_hex(
+    "971c7d829997b7dd79bc9c2450aeba2aa63c26bba2488091c45f9b4240be569b");
+  const bytes hashB = from_hex(
+    "c46ca31e392ccd3b0d232bd43b7a40e8b755825d46359c3f089343f7c25f8414");
+  const bytes hashC = from_hex(
+    "2c9c435697ed4b30cce1991107c2a841675789982b3415bbaf17e9265b1355ff");
+  const bytes hashD = from_hex(
+    "c24512dbd37d0c8f00054a8e135141db57fcc48478e881fef8316910e5f6797b");
+  const bytes hashAB = from_hex(
+    "610c949d5e73aca1d138ca4b74523fc8974e1734f94364d56de10094fcbc59b2");
+  const bytes hashCD = from_hex(
+    "a280eeb4461a33cec3b3a01c0a8f2da5cc25764c0a2415a850931ce7dc4831d9");
+  const bytes hashABC = from_hex(
+    "146e80ab5bb121b357e928083d894538a640d17303a3633e622bb0355417e309");
+  const bytes hashABCD = from_hex(
+    "4564f8ae24f7f13a88aa1bf40d93bbbb88f84e03e217dec36128c631d5246888");
 };
 
 TEST_F(RatchetTreeTest, OneMember)
@@ -44,27 +67,38 @@ TEST_F(RatchetTreeTest, MultipleMembers)
 TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ suite, secretA };
-  ASSERT_NE(tree.root_hash().size(), 0);
+  ASSERT_NE(tree.root_secret(), secretAn);
+  ASSERT_EQ(tree.root_hash(), hashA);
 
+  // Add B
   tree.add_leaf(LeafIndex{ 1 }, secretB);
   tree.set_path(LeafIndex{ 1 }, secretB);
 
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(tree.root_secret(), secretAB);
+  ASSERT_EQ(tree.root_hash(), hashAB);
+
   RatchetTree directAB{ suite, { secretA, secretB } };
   ASSERT_EQ(tree, directAB);
 
+  // Add C
   tree.add_leaf(LeafIndex{ 2 }, secretC);
   tree.set_path(LeafIndex{ 2 }, secretC);
 
   ASSERT_EQ(tree.size(), 3);
   ASSERT_EQ(tree.root_secret(), secretABC);
+  ASSERT_EQ(tree.root_hash(), hashABC);
 
+  RatchetTree directABC{ suite, { secretA, secretB, secretC } };
+  ASSERT_EQ(tree, directAB);
+
+  // Add D
   tree.add_leaf(LeafIndex{ 3 }, secretD);
   tree.set_path(LeafIndex{ 3 }, secretD);
 
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.root_secret(), secretABCD);
+  ASSERT_EQ(tree.root_hash(), hashABCD);
 
   RatchetTree direct{ suite, { secretA, secretB, secretC, secretD } };
   ASSERT_EQ(tree, direct);

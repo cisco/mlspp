@@ -423,7 +423,6 @@ RatchetTree::blank_path(LeafIndex index)
   auto curr = NodeIndex{ index };
   while (curr != root) {
     _nodes[curr] = nullopt;
-    set_hash(curr);
     curr = tree_math::parent(curr, node_count);
   }
 
