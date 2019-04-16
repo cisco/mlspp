@@ -81,11 +81,11 @@ RatchetTreeNode::merge(const RatchetTreeNode& other)
   }
 
   if (other._priv && !_priv) {
-    *_priv = *other._priv;
+    _priv = other._priv.value();
   }
 
   if (other._secret && !_secret) {
-    *_secret = *other._secret;
+    _secret = other._secret.value();
   }
 }
 
