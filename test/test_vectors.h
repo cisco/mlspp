@@ -162,6 +162,32 @@ operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& tv);
 
 /////
 
+struct TreeTestVectors
+{
+  static const std::string file_name;
+
+  struct TreeNode
+  {
+    optional<tls::opaque<1>> secret;
+    optional<DHPublicKey> public_key;
+    tls::opaque<1> hash;
+  };
+
+  typedef tls::vector<TreeNode, 4> TreeCase;
+  typedef tls::vector<TreeCase, 4> TestCase;
+
+  uint32_t tree_size;
+  TestCase case_p256;
+  TestCase case_x25519;
+};
+
+tls::istream&
+operator>>(tls::istream& str, TreeTestVectors& tv);
+tls::ostream&
+operator<<(tls::ostream& str, const TreeTestVectors& tv);
+
+/////
+
 struct MessagesTestVectors
 {
   static const std::string file_name;

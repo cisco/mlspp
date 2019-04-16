@@ -118,7 +118,7 @@ public:
   bytes root_hash() const;
   bool check_invariant(LeafIndex from) const;
 
-private:
+protected:
   RatchetTreeNodeVector _nodes;
   size_t _secret_size;
 
@@ -137,5 +137,17 @@ private:
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
+
+namespace test {
+
+// Enable tests to see the internals of the tree
+class TestRatchetTree : public RatchetTree
+{
+public:
+  using RatchetTree::RatchetTree;
+  RatchetTreeNodeVector nodes() const;
+};
+
+} // namespace test
 
 } // namespace mls

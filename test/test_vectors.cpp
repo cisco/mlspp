@@ -182,6 +182,36 @@ operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& obj)
 }
 
 ///
+/// TreeTestVectors
+///
+
+const std::string TreeTestVectors::file_name = "./tree.bin";
+
+tls::istream&
+operator>>(tls::istream& str, TreeTestVectors::TreeNode& obj)
+{
+  return str >> obj.secret >> obj.public_key >> obj.hash;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const TreeTestVectors::TreeNode& obj)
+{
+  return str << obj.secret << obj.public_key << obj.hash;
+}
+
+tls::istream&
+operator>>(tls::istream& str, TreeTestVectors& obj)
+{
+  return str >> obj.tree_size >> obj.case_p256 >> obj.case_x25519;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const TreeTestVectors& obj)
+{
+  return str << obj.tree_size << obj.case_p256 << obj.case_x25519;
+}
+
+///
 /// MessagesTestVectors
 ///
 
@@ -329,5 +359,6 @@ template struct TestLoader<ResolutionTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
 template struct TestLoader<AppKeyScheduleTestVectors>;
+template struct TestLoader<TreeTestVectors>;
 template struct TestLoader<MessagesTestVectors>;
 template struct TestLoader<BasicSessionTestVectors>;

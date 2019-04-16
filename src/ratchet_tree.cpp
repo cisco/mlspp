@@ -651,4 +651,14 @@ operator>>(tls::istream& in, RatchetTree& obj)
   return in;
 }
 
+namespace test {
+
+RatchetTreeNodeVector
+TestRatchetTree::nodes() const
+{
+  return _nodes;
+}
+
+} // namespace test
+
 } // namespace mls
