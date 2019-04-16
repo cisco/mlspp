@@ -129,7 +129,7 @@ private:
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
 // ensure that credentials are populated with blank values on
 // unmarshal.  Otherwise, `*opt` will access uninitialized memory.
-class OptionalCredential : public optional<Credential>
+class OptionalCredential : public tls::optional<Credential>
 {
 public:
   typedef optional<Credential> parent;

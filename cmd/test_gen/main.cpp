@@ -211,6 +211,65 @@ generate_app_key_schedule()
   return tv;
 }
 
+TreeTestVectors::TreeCase
+tree_to_case(const test::TestRatchetTree& tree)
+{
+  auto nodes = tree.nodes();
+  TreeTestVectors::TreeCase tc(nodes.size());
+  for (int i = 0; i < nodes.size(); ++i) {
+    tc[i].hash = nodes[i].hash();
+    if (!nodes[i].blank()) {
+      tc[i].secret = nodes[i]->secret();
+      tc[i].public_key = nodes[i]->public_key().to_bytes();
+    }
+  }
+  return tc;
+}
+
+TreeTestVectors
+generate_tree()
+{
+  TreeTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<TreeTestVectors::TestCase*> cases{
+    &tv.case_p256,
+    &tv.case_x25519,
+  };
+
+  int n_leaves = 2;
+  tv.leaf_secrets.resize(n_leaves);
+  for (int i = 0; i < n_leaves; ++i) {
+    tv.leaf_secrets[i] = { uint8_t(i) };
+  }
+
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+
+    test::TestRatchetTree tree{ suite };
+
+    // Add the leaves
+    for (uint32_t j = 0; j < n_leaves; ++j) {
+      tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j]);
+      tree.set_path(LeafIndex{ j }, tv.leaf_secrets[j]);
+      test_case->push_back(tree_to_case(tree));
+    }
+
+    // Blank out even-numbered leaves
+    for (uint32_t j = 0; j < n_leaves; j += 2) {
+      tree.blank_path(LeafIndex{ j });
+      test_case->push_back(tree_to_case(tree));
+    }
+  }
+
+  return tv;
+}
+
 MessagesTestVectors
 generate_messages()
 {
@@ -478,6 +537,7 @@ verify_session_repro(const F& generator)
 int
 main()
 {
+  /*
   TreeMathTestVectors tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
@@ -492,32 +552,48 @@ main()
 
   AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
   write_test_vectors(app_key_schedule);
+  */
 
+  TreeTestVectors tree = generate_tree();
+  write_test_vectors(tree);
+
+  /*
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
 
   BasicSessionTestVectors basic_session = generate_basic_session();
   write_test_vectors(basic_session);
+  */
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
+  /*
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
   verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_app_key_schedule);
+  */
+  verify_reproducible(generate_tree);
+  /*
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
+  */
 
   // Verify that the test vectors load
   try {
+    /*
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<AppKeyScheduleTestVectors>::get();
+    */
+    TestLoader<TreeTestVectors>::get();
+    /*
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
+    */
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }

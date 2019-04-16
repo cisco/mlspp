@@ -5,6 +5,7 @@
 #include "tls_syntax.h"
 #include "tree_math.h"
 #include <iosfwd>
+#include <optional>
 
 namespace mls {
 
@@ -20,15 +21,15 @@ public:
   RatchetTreeNode(const DHPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
-  const optional<bytes>& secret() const;
-  const optional<DHPrivateKey>& private_key() const;
+  const std::optional<bytes>& secret() const;
+  const std::optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
 
   void merge(const RatchetTreeNode& other);
 
 private:
-  optional<bytes> _secret;
-  optional<DHPrivateKey> _priv;
+  tls::optional<bytes> _secret;
+  tls::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
 
   friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,
@@ -47,14 +48,11 @@ private:
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
 // ensure that nodes are populated with blank values on unmarshal.
 // Otherwise, `*opt` will access uninitialized memory.
-struct OptionalRatchetTreeNode : public optional<RatchetTreeNode>
+struct OptionalRatchetTreeNode
+  : public tls::variant_optional<RatchetTreeNode, CipherSuite>
 {
-  typedef optional<RatchetTreeNode> parent;
+  typedef tls::variant_optional<RatchetTreeNode, CipherSuite> parent;
   using parent::parent;
-
-  OptionalRatchetTreeNode(CipherSuite suite)
-    : parent(RatchetTreeNode(suite))
-  {}
 
   OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret)
     : parent(RatchetTreeNode(suite, secret))
@@ -145,7 +143,7 @@ class TestRatchetTree : public RatchetTree
 {
 public:
   using RatchetTree::RatchetTree;
-  RatchetTreeNodeVector nodes() const;
+  const RatchetTreeNodeVector& nodes() const;
 };
 
 } // namespace test

@@ -6,6 +6,8 @@
 #include "roster.h"
 #include "tls_syntax.h"
 
+#include <optional>
+
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
 #define DUMMY_SCHEME SignatureScheme::P256_SHA256
 
@@ -83,7 +85,7 @@ struct UserInitKey
   {}
 
   void add_init_key(const DHPublicKey& pub);
-  optional<DHPublicKey> find_init_key(CipherSuite suite) const;
+  std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   void sign(const SignaturePrivateKey& identity_priv,
             const Credential& credential);
   bool verify() const;

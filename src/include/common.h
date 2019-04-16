@@ -2,7 +2,6 @@
 
 #include <array>
 #include <iomanip>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -27,59 +26,6 @@ namespace mls {
 typedef uint16_t ProtocolVersion;
 
 static const ProtocolVersion mls10Version = 0xABCD;
-
-///
-/// Optional and its serialization
-///
-
-template<typename T>
-using optional = std::optional<T>;
-
-using nullopt_t = std::nullopt_t;
-
-static const nullopt_t nullopt = std::nullopt;
-
-template<typename T>
-std::ostream&
-operator<<(std::ostream& out, const optional<T>& opt)
-{
-  if (!opt) {
-    return out << "_";
-  }
-
-  return out << *opt;
-}
-
-template<typename T>
-tls::ostream&
-operator<<(tls::ostream& out, const optional<T>& opt)
-{
-  if (!opt) {
-    return out << uint8_t(0);
-  }
-
-  return out << uint8_t(1) << *opt;
-}
-
-template<typename T>
-tls::istream&
-operator>>(tls::istream& in, optional<T>& opt)
-{
-  uint8_t present = 0;
-  in >> present;
-
-  switch (present) {
-    case 0:
-      opt = nullopt;
-      return in;
-
-    case 1:
-      return in >> *opt;
-
-    default:
-      throw std::invalid_argument("Malformed optional");
-  }
-}
 
 ///
 /// Byte strings and serialization

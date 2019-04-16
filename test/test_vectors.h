@@ -169,14 +169,14 @@ struct TreeTestVectors
   struct TreeNode
   {
     optional<tls::opaque<1>> secret;
-    optional<DHPublicKey> public_key;
+    optional<tls::opaque<1>> public_key;
     tls::opaque<1> hash;
   };
 
   typedef tls::vector<TreeNode, 4> TreeCase;
   typedef tls::vector<TreeCase, 4> TestCase;
 
-  uint32_t tree_size;
+  tls::vector<tls::opaque<1>, 4> leaf_secrets;
   TestCase case_p256;
   TestCase case_x25519;
 };

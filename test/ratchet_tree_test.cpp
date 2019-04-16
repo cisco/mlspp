@@ -1,5 +1,6 @@
 #include "messages.h"
 #include "ratchet_tree.h"
+#include "test_vectors.h"
 #include "tls_syntax.h"
 #include <gtest/gtest.h>
 
@@ -26,12 +27,7 @@ protected:
   const bytes secretABCD = from_hex(
     "43793000dbf64b8606bfcd75c23b57f3096053eafdf182357fd013fbf8b9834a");
 
-  // def LeafNodeHashInput(pubkey):
-  //  "0001" + pubkey
-  // ParentNodeHashInput = "0101" + pubkey + "20" + lHash + "20" + rHash
-  //
-  // ParentNodeHashInput =
-  //   1 || 1 || pubkey || 0x20 || left_hash || 0x20 || right_hash
+  // Manually computed via a Python script
   const bytes hashA = from_hex(
     "971c7d829997b7dd79bc9c2450aeba2aa63c26bba2488091c45f9b4240be569b");
   const bytes hashB = from_hex(
@@ -48,7 +44,45 @@ protected:
     "146e80ab5bb121b357e928083d894538a640d17303a3633e622bb0355417e309");
   const bytes hashABCD = from_hex(
     "4564f8ae24f7f13a88aa1bf40d93bbbb88f84e03e217dec36128c631d5246888");
+
+  const TreeTestVectors& tv;
+
+  RatchetTreeTest()
+    : tv(TestLoader<TreeTestVectors>::get())
+  {}
+
+  void interop(const TreeTestVectors::TestCase& tc, CipherSuite test_suite)
+  {
+    test::TestRatchetTree tree{ test_suite };
+
+    // Add the leaves
+    int tci = 0;
+    for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
+      tree.add_leaf(LeafIndex{ i }, tv.leaf_secrets[i]);
+      tree.set_path(LeafIndex{ i }, tv.leaf_secrets[i]);
+
+      auto vec = tc[tci];
+      auto nodes = tree.nodes();
+      ASSERT_EQ(vec.size(), nodes.size());
+
+      for (int j = 0; j < vec.size(); ++j) {
+        ASSERT_EQ(vec[j].hash, nodes[j].hash());
+        ASSERT_EQ(!!vec[j].secret, !nodes[j].blank());
+        if (!nodes[j].blank()) {
+          ASSERT_EQ(vec[j].secret.value(), nodes[j]->secret().value());
+          ASSERT_EQ(vec[j].public_key.value(),
+                    nodes[j]->public_key().to_bytes());
+        }
+      }
+    }
+  }
 };
+
+TEST_F(RatchetTreeTest, Interop)
+{
+  interop(tv.case_p256, CipherSuite::P256_SHA256_AES128GCM);
+  interop(tv.case_x25519, CipherSuite::X25519_SHA256_AES128GCM);
+}
 
 TEST_F(RatchetTreeTest, OneMember)
 {
@@ -66,8 +100,11 @@ TEST_F(RatchetTreeTest, MultipleMembers)
 
 TEST_F(RatchetTreeTest, ByExtension)
 {
-  RatchetTree tree{ suite, secretA };
-  ASSERT_NE(tree.root_secret(), secretAn);
+  RatchetTree tree{ suite };
+
+  // Add A
+  tree.add_leaf(LeafIndex{ 0 }, secretA);
+  ASSERT_EQ(tree.root_secret(), secretAn);
   ASSERT_EQ(tree.root_hash(), hashA);
 
   // Add B
@@ -90,7 +127,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   ASSERT_EQ(tree.root_hash(), hashABC);
 
   RatchetTree directABC{ suite, { secretA, secretB, secretC } };
-  ASSERT_EQ(tree, directAB);
+  ASSERT_EQ(tree, directABC);
 
   // Add D
   tree.add_leaf(LeafIndex{ 3 }, secretD);
