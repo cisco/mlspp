@@ -103,22 +103,22 @@ protected:
   const bytes enc_optional_null = from_hex("00");
 
   const uint8_t variant_param = 0xff;
-  typedef tls::variant_vector<MustInitialize, uint8_t, 1> test_variant_vector;
-  typedef tls::variant_optional<MustInitialize, uint8_t> test_variant_optional;
+  typedef tls::variant_vector<MustInitialize, uint8_t, 1> test_var_vector;
+  typedef tls::variant_optional<MustInitialize, uint8_t> test_var_optional;
 
-  test_variant_vector val_variant_vector;
-  const bytes enc_variant_vector = from_hex("02f00f");
+  test_var_vector val_var_vector;
+  const bytes enc_var_vector = from_hex("02f00f");
 
-  test_variant_optional val_variant_optional;
-  const bytes enc_variant_optional = from_hex("01f0");
+  test_var_optional val_var_optional;
+  const bytes enc_var_optional = from_hex("01f0");
 
   TLSSyntaxTest()
-    : val_variant_vector(variant_param)
-    , val_variant_optional(variant_param)
+    : val_var_vector(variant_param)
+    , val_var_optional(variant_param)
   {
-    val_variant_vector.push_back({ 0xff, 0x0f });
-    val_variant_vector.push_back({ 0xff, 0xf0 });
-    val_variant_optional = MustInitialize{ 0xff, 0x0f };
+    val_var_vector.push_back({ 0xff, 0x0f });
+    val_var_vector.push_back({ 0xff, 0xf0 });
+    val_var_optional = MustInitialize{ 0xff, 0x0f };
   }
 };
 
@@ -147,7 +147,8 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_struct, enc_struct);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
-  ostream_test(val_variant_vector, enc_variant_vector);
+  ostream_test(val_var_vector, enc_var_vector);
+  ostream_test(val_var_optional, enc_var_optional);
 }
 
 template<typename T>
@@ -182,23 +183,17 @@ TEST_F(TLSSyntaxTest, IStream)
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);
 
-  test_variant_vector data_variant_vector(variant_param);
-  istream_test(val_variant_vector, data_variant_vector, enc_variant_vector);
-
-  // XXX(rlb@ipv.sx): The equality operators for std::optional are
-  // too broadly written, so it's effectively impossible to use ==
-  // with subclasses.
   tls::optional<ExampleStruct> data_optional;
-  tls::unmarshal(enc_optional, data_optional);
-  ASSERT_TRUE(data_optional.equal(val_optional));
+  istream_test(val_optional, data_optional, enc_optional);
 
   tls::optional<ExampleStruct> data_optional_null;
-  tls::unmarshal(enc_optional_null, data_optional_null);
-  ASSERT_TRUE(data_optional_null.equal(val_optional_null));
+  istream_test(val_optional_null, data_optional_null, enc_optional_null);
 
-  test_variant_optional data_variant_optional(variant_param);
-  tls::unmarshal(enc_variant_optional, data_variant_optional);
-  ASSERT_TRUE(data_variant_optional.equal(val_variant_optional));
+  test_var_vector data_var_vector(variant_param);
+  istream_test(val_var_vector, data_var_vector, enc_var_vector);
+
+  test_var_optional data_var_optional(variant_param);
+  istream_test(val_var_optional, data_var_optional, enc_var_optional);
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

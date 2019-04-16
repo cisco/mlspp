@@ -99,21 +99,10 @@ class optional_base : public std::optional<T>
 public:
   typedef std::optional<T> parent;
   using parent::parent;
+  virtual ~optional_base() = default;
 
   virtual T& emplace_new() = 0;
-
-  bool equal(const optional_base<T>& other) const
-  {
-    auto both_blank = (!this->has_value() && !other.has_value());
-    auto both_occupied = (this->has_value() && other.has_value());
-    return (both_blank || (both_occupied && (this->value() == other.value())));
-  }
 };
-
-template<typename T>
-bool
-operator==(const optional_base<T>& lhs, const optional_base<T>& rhs)
-{}
 
 template<typename T>
 class optional : public optional_base<T>
@@ -124,6 +113,15 @@ public:
 
   virtual T& emplace_new() { return this->emplace(); }
 };
+
+template<typename T>
+bool
+operator==(const optional<T>& lhs, const optional<T>& rhs)
+{
+  auto both_blank = (!lhs.has_value() && !rhs.has_value());
+  auto both_occupied = (lhs.has_value() && rhs.has_value());
+  return (both_blank || (both_occupied && (lhs.value() == rhs.value())));
+}
 
 template<typename T, typename C>
 class variant_optional : public optional_base<T>
@@ -141,6 +139,15 @@ public:
 private:
   C _ctor_arg;
 };
+
+template<typename T, typename C>
+bool
+operator==(const variant_optional<T, C>& lhs, const variant_optional<T, C>& rhs)
+{
+  auto both_blank = (!lhs.has_value() && !rhs.has_value());
+  auto both_occupied = (lhs.has_value() && rhs.has_value());
+  return (both_blank || (both_occupied && (lhs.value() == rhs.value())));
+}
 
 template<size_t head, size_t min = tls::none, size_t max = tls::none>
 using opaque = vector<uint8_t, head, min, max>;
@@ -238,7 +245,7 @@ template<typename T>
 tls::ostream&
 operator<<(tls::ostream& out, const optional_base<T>& opt)
 {
-  if (!opt) {
+  if (!opt.has_value()) {
     return out << uint8_t(0);
   }
 
