@@ -4,6 +4,7 @@
 #include "messages.h"
 #include "ratchet_tree.h"
 #include "roster.h"
+#include <optional>
 #include <vector>
 
 namespace mls {
@@ -207,7 +208,7 @@ private:
   // Inner logic shared by Update, self-Update, and Remove handlers
   void update_leaf(LeafIndex index,
                    const DirectPath& path,
-                   const optional<bytes>& leaf_secret);
+                   const std::optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);

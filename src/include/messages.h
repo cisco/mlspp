@@ -5,6 +5,7 @@
 #include "ratchet_tree.h"
 #include "roster.h"
 #include "tls_syntax.h"
+#include <optional>
 
 #include <optional>
 

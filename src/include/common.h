@@ -28,6 +28,21 @@ typedef uint16_t ProtocolVersion;
 static const ProtocolVersion mls10Version = 0xABCD;
 
 ///
+/// Serialization of optional values
+///
+
+template<typename T>
+std::ostream&
+operator<<(std::ostream& out, const std::optional<T>& opt)
+{
+  if (!opt) {
+    return out << "_";
+  }
+
+  return out << *opt;
+}
+
+///
 /// Byte strings and serialization
 ///
 

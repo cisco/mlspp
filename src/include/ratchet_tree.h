@@ -28,8 +28,8 @@ public:
   void merge(const RatchetTreeNode& other);
 
 private:
-  tls::optional<bytes> _secret;
-  tls::optional<DHPrivateKey> _priv;
+  std::optional<bytes> _secret;
+  std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
 
   friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,

@@ -334,7 +334,7 @@ State::handle(const Add& add)
 void
 State::handle(LeafIndex index, const Update& update)
 {
-  optional<bytes> leaf_secret = nullopt;
+  std::optional<bytes> leaf_secret = std::nullopt;
   if (index == _index) {
     if (_cached_leaf_secret.empty()) {
       throw InvalidParameterError("Got self-update without generating one");
@@ -350,7 +350,7 @@ State::handle(LeafIndex index, const Update& update)
 void
 State::handle(const Remove& remove)
 {
-  auto leaf_secret = nullopt;
+  auto leaf_secret = std::nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
   _state.roster.remove(remove.removed.val);
@@ -403,7 +403,7 @@ operator!=(const State& lhs, const State& rhs)
 void
 State::update_leaf(LeafIndex index,
                    const DirectPath& path,
-                   const optional<bytes>& leaf_secret)
+                   const std::optional<bytes>& leaf_secret)
 {
   if (leaf_secret) {
     _state.tree.set_path(index, *leaf_secret);
