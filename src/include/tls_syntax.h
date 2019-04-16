@@ -94,27 +94,49 @@ private:
 };
 
 template<typename T>
-class optional : public std::optional<T>
+class optional_base : public std::optional<T>
 {
 public:
   typedef std::optional<T> parent;
   using parent::parent;
 
-  virtual T new_element() const { return T{}; }
+  virtual T& emplace_new() = 0;
+
+  bool equal(const optional_base<T>& other) const
+  {
+    auto both_blank = (!this->has_value() && !other.has_value());
+    auto both_occupied = (this->has_value() && other.has_value());
+    return (both_blank || (both_occupied && (this->value() == other.value())));
+  }
+};
+
+template<typename T>
+bool
+operator==(const optional_base<T>& lhs, const optional_base<T>& rhs)
+{}
+
+template<typename T>
+class optional : public optional_base<T>
+{
+public:
+  typedef optional_base<T> parent;
+  using parent::parent;
+
+  virtual T& emplace_new() { return this->emplace(); }
 };
 
 template<typename T, typename C>
-class variant_optional : public optional<T>
+class variant_optional : public optional_base<T>
 {
 public:
-  typedef std::optional<T> parent;
+  typedef optional_base<T> parent;
   using parent::parent;
 
   variant_optional(C ctor_arg)
     : _ctor_arg(ctor_arg)
   {}
 
-  virtual T new_element() const { return T{}; }
+  virtual T& emplace_new() { return this->emplace(_ctor_arg); }
 
 private:
   C _ctor_arg;
@@ -214,7 +236,7 @@ operator<<(ostream& out, const vector_base<T, head, min, max>& data)
 // Optional writer
 template<typename T>
 tls::ostream&
-operator<<(tls::ostream& out, const optional<T>& opt)
+operator<<(tls::ostream& out, const optional_base<T>& opt)
 {
   if (!opt) {
     return out << uint8_t(0);
@@ -318,18 +340,18 @@ operator>>(istream& in, vector_base<T, head, min, max>& data)
 // Optional reader
 template<typename T>
 tls::istream&
-operator>>(tls::istream& in, optional<T>& opt)
+operator>>(tls::istream& in, optional_base<T>& opt)
 {
   uint8_t present = 0;
   in >> present;
 
   switch (present) {
     case 0:
-      opt = std::nullopt;
+      opt.reset();
       return in;
 
     case 1:
-      opt.reset(opt.new_value());
+      opt.emplace_new();
       return in >> opt.value();
 
     default:
