@@ -73,6 +73,18 @@ RatchetTreeNode::public_key() const
   return _pub;
 }
 
+const std::optional<Credential>&
+RatchetTreeNode::credential() const
+{
+  return _cred;
+}
+
+void
+RatchetTreeNode::set_credential(const Credential& cred)
+{
+  _cred = cred;
+}
+
 void
 RatchetTreeNode::merge(const RatchetTreeNode& other)
 {
@@ -87,13 +99,15 @@ RatchetTreeNode::merge(const RatchetTreeNode& other)
   if (other._secret && !_secret) {
     _secret = other._secret.value();
   }
+
+  // Credential is immutable
 }
 
 bool
 operator==(const RatchetTreeNode& lhs, const RatchetTreeNode& rhs)
 {
   return (lhs._secret == rhs._secret) && (lhs._priv == rhs._priv) &&
-         (lhs._pub == rhs._pub);
+         (lhs._pub == rhs._pub) && (lhs._cred == rhs._cred);
 }
 
 bool
@@ -111,7 +125,7 @@ operator<<(std::ostream& out, const RatchetTreeNode& node)
 tls::ostream&
 operator<<(tls::ostream& out, const RatchetTreeNode& obj)
 {
-  return out << obj._pub;
+  return out << obj._pub << obj._cred;
 }
 
 tls::istream&
@@ -119,7 +133,7 @@ operator>>(tls::istream& in, RatchetTreeNode& obj)
 {
   obj._priv = std::nullopt;
   obj._secret = std::nullopt;
-  return in >> obj._pub;
+  return in >> obj._pub >> obj._cred;
 }
 
 ///
@@ -151,12 +165,13 @@ OptionalRatchetTreeNode::merge(const RatchetTreeNode& other)
 struct LeafNodeInfo
 {
   DHPublicKey public_key;
+  Credential credential;
 };
 
 tls::ostream&
 operator<<(tls::ostream& out, const LeafNodeInfo& obj)
 {
-  return out << obj.public_key;
+  return out << obj.public_key << obj.credential;
 }
 
 struct LeafNodeHashInput
@@ -176,7 +191,14 @@ OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
 {
   auto hash_input_str = LeafNodeHashInput{};
   if (!blank()) {
-    hash_input_str.info = LeafNodeInfo{ (*this)->public_key() };
+    auto pub = (*this)->public_key();
+    auto cred = (*this)->credential();
+    if (!cred.has_value()) {
+      throw InvalidParameterError(
+        "Leaf node not provisioned with a credential");
+    }
+
+    hash_input_str.info = LeafNodeInfo{ pub, cred.value() };
   }
 
   auto hash_input = tls::marshal(hash_input_str);
@@ -252,21 +274,29 @@ RatchetTree::RatchetTree(CipherSuite suite)
   , _secret_size(Digest(suite).output_size())
 {}
 
-RatchetTree::RatchetTree(CipherSuite suite, const bytes& secret)
+RatchetTree::RatchetTree(CipherSuite suite,
+                         const bytes& secret,
+                         const Credential& cred)
   : CipherAware(suite)
   , _nodes(suite)
   , _secret_size(Digest(suite).output_size())
 {
-  add_leaf(LeafIndex{ 0 }, secret);
+  add_leaf(LeafIndex{ 0 }, secret, cred);
 }
 
-RatchetTree::RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets)
+RatchetTree::RatchetTree(CipherSuite suite,
+                         const std::vector<bytes>& secrets,
+                         const std::vector<Credential>& creds)
   : CipherAware(suite)
   , _nodes(suite)
   , _secret_size(Digest(suite).output_size())
 {
+  if (secrets.size() != creds.size()) {
+    throw InvalidParameterError("Incorrect tree initialization data");
+  }
+
   for (uint32_t i = 0; i < secrets.size(); i += 1) {
-    add_leaf(LeafIndex{ i }, secrets[i]);
+    add_leaf(LeafIndex{ i }, secrets[i], creds[i]);
     set_path(LeafIndex{ i }, secrets[i]);
   }
 }
@@ -388,17 +418,28 @@ RatchetTree::merge_path(LeafIndex from, const RatchetTree::MergeInfo& info)
 }
 
 void
-RatchetTree::add_leaf(LeafIndex index, const DHPublicKey& pub)
+RatchetTree::add_leaf(LeafIndex index,
+                      const DHPublicKey& pub,
+                      const Credential& cred)
 {
   if (_suite != pub.cipher_suite()) {
     throw InvalidParameterError("Incorrect ciphersuite");
   }
+
+  auto node = RatchetTreeNode(pub);
+  node.set_credential(cred);
+
   add_leaf_inner(index, RatchetTreeNode(pub));
 }
 
 void
-RatchetTree::add_leaf(LeafIndex index, const bytes& leaf_secret)
+RatchetTree::add_leaf(LeafIndex index,
+                      const bytes& leaf_secret,
+                      const Credential& cred)
 {
+  auto node = new_node(leaf_secret);
+  node.set_credential(cred);
+
   add_leaf_inner(index, new_node(leaf_secret));
 }
 
@@ -447,8 +488,15 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
   const auto root = tree_math::root(node_count);
 
   auto curr = NodeIndex{ index };
+  if (_nodes[curr].blank()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+  _nodes[curr].value().merge(new_node(leaf));
+
   auto path_secret = leaf;
+  curr = tree_math::parent(curr, node_count);
   while (curr != root) {
+    // XXX(rlb@ipv.sx) Can this be deleted?
     while (curr.val > _nodes.size() - 1) {
       _nodes.emplace_back(_suite);
     }
@@ -461,6 +509,24 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
 
   _nodes[root] = new_node(path_secret);
   set_hash_path(index);
+}
+
+const Credential&
+RatchetTree::get_credential(LeafIndex index) const
+{
+  auto node = NodeIndex{ index };
+
+  if (_nodes[node].blank()) {
+    throw InvalidParameterError("Requested credential for a blank leaf");
+  }
+
+  auto cred = _nodes[node].value().credential();
+  if (!cred.has_value()) {
+    throw InvalidParameterError(
+      "Leaf node was not populated with a credential");
+  }
+
+  return cred.value();
 }
 
 LeafCount

@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "crypto.h"
+#include "roster.h"
 #include "tls_syntax.h"
 #include "tree_math.h"
 #include <iosfwd>
@@ -24,13 +25,18 @@ public:
   const std::optional<bytes>& secret() const;
   const std::optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
+  const std::optional<Credential>& credential() const;
 
   void merge(const RatchetTreeNode& other);
+  void set_credential(const Credential& cred);
 
 private:
   std::optional<bytes> _secret;
   std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
+
+  // A credential is populated iff this is a leaf node
+  tls::optional<Credential> _cred;
 
   friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,
                                    const RatchetTreeNode& rhs);
@@ -89,8 +95,10 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(CipherSuite suite, const bytes& secret);
-  RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets);
+  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred);
+  RatchetTree(CipherSuite suite,
+              const std::vector<bytes>& secrets,
+              const std::vector<Credential>& creds);
 
   struct MergeInfo
   {
@@ -102,10 +110,16 @@ public:
   MergeInfo decrypt(LeafIndex from, const DirectPath& path) const;
   void merge_path(LeafIndex from, const MergeInfo& info);
 
-  void add_leaf(LeafIndex index, const DHPublicKey& pub);
-  void add_leaf(LeafIndex index, const bytes& leaf_secret);
+  void add_leaf(LeafIndex index,
+                const DHPublicKey& pub,
+                const Credential& cred);
+  void add_leaf(LeafIndex index,
+                const bytes& leaf_secret,
+                const Credential& cred);
   void blank_path(LeafIndex index);
   void set_path(LeafIndex index, const bytes& leaf);
+
+  const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;
   void truncate(LeafCount leaves);

@@ -12,7 +12,7 @@ GroupState::GroupState(const bytes& group_id,
                        const Credential& credential)
   : group_id(group_id)
   , epoch(0)
-  , tree(suite, leaf_secret)
+  , tree(suite, leaf_secret, credential)
   , transcript_hash(Digest(suite).output_size(), 0)
 {
   roster.add(0, credential);
@@ -151,9 +151,10 @@ State::State(SignaturePrivateKey identity_priv,
                              .digest();
 
   // Add to the tree
-  _state.tree.add_leaf(_index, init_secret);
+  _state.tree.add_leaf(_index, init_secret, credential);
 
   // Add to the roster
+  // TODO delete
   _state.roster.add(_index.val, credential);
 
   // Ratchet forward into shared state
@@ -322,9 +323,10 @@ State::handle(const Add& add)
   if (!init_key) {
     throw ProtocolError("New node does not support group's cipher suite");
   }
-  _state.tree.add_leaf(add.index, *init_key);
+  _state.tree.add_leaf(add.index, *init_key, add.init_key.credential);
 
   // Add to the roster
+  // TODO delete
   _state.roster.add(add.index.val, add.init_key.credential);
 
   // Update symmetric state
@@ -353,10 +355,12 @@ State::handle(const Remove& remove)
   auto leaf_secret = std::nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
+  // TODO delete
   _state.roster.remove(remove.removed.val);
 
   auto cut = _state.tree.leaf_span();
   _state.tree.truncate(cut);
+  // TODO delete
   _state.roster.truncate(cut.val);
 }
 
@@ -443,7 +447,7 @@ State::sign(const GroupOperation& operation) const
 bool
 State::verify(const Handshake& handshake) const
 {
-  auto pub = _state.roster.get(handshake.signer_index.val).public_key();
+  auto pub = _state.tree.get_credential(handshake.signer_index).public_key();
   auto sig_data = _state.transcript_hash;
   auto sig = handshake.signature;
   auto sig_ver = pub.verify(sig_data, sig);

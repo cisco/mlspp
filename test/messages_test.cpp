@@ -40,16 +40,17 @@ protected:
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
 
-    mls::test::DeterministicHPKE lock;
-    auto ratchet_tree =
-      RatchetTree{ tc.cipher_suite,
-                   { tv.random, tv.random, tv.random, tv.random } };
-    ratchet_tree.blank_path(LeafIndex{ 2 });
-    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
-
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};
     roster.add(0, cred);
+
+    mls::test::DeterministicHPKE lock;
+    auto ratchet_tree =
+      RatchetTree{ tc.cipher_suite,
+                   { tv.random, tv.random, tv.random, tv.random },
+                   { cred, cred, cred, cred } };
+    ratchet_tree.blank_path(LeafIndex{ 2 });
+    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // UserInitKey
     UserInitKey user_init_key_c;

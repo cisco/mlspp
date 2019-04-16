@@ -241,6 +241,10 @@ generate_tree()
     &tv.case_x25519,
   };
 
+  // TODO present credentials in test vectors
+  auto sig = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto cred = Credential::basic({ 'x' }, sig.public_key());
+
   int n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
   for (int i = 0; i < n_leaves; ++i) {
@@ -255,7 +259,7 @@ generate_tree()
 
     // Add the leaves
     for (uint32_t j = 0; j < n_leaves; ++j) {
-      tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j]);
+      tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j], cred);
       tree.set_path(LeafIndex{ j }, tv.leaf_secrets[j]);
       test_case->push_back(tree_to_case(tree));
     }
@@ -329,14 +333,16 @@ generate_messages()
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
 
-    auto ratchet_tree =
-      RatchetTree{ suite, { tv.random, tv.random, tv.random, tv.random } };
-    ratchet_tree.blank_path(LeafIndex{ 2 });
-    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
-
     auto cred = Credential::basic(tv.user_id, sig_key);
     auto roster = Roster{};
     roster.add(0, cred);
+
+    auto ratchet_tree =
+      RatchetTree{ suite,
+                   { tv.random, tv.random, tv.random, tv.random },
+                   { cred, cred, cred, cred } };
+    ratchet_tree.blank_path(LeafIndex{ 2 });
+    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // Construct UIK
     auto user_init_key = UserInitKey{};
