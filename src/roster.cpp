@@ -152,24 +152,6 @@ operator>>(tls::istream& in, Credential& obj)
 }
 
 ///
-/// OptionalCredential
-///
-
-bool
-operator==(const OptionalCredential& lhs, const OptionalCredential& rhs)
-{
-  if (!!lhs != !!rhs) {
-    return false;
-  }
-
-  if (!lhs) {
-    return true;
-  }
-
-  return (*lhs == *rhs);
-}
-
-///
 /// Roster
 ///
 
@@ -190,7 +172,7 @@ Roster::remove(uint32_t index)
     throw InvalidParameterError("Unknown credential index");
   }
 
-  _credentials[index] = nullopt;
+  _credentials[index] = std::nullopt;
 }
 
 Credential

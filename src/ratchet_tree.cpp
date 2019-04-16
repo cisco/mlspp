@@ -11,8 +11,8 @@ namespace mls {
 
 RatchetTreeNode::RatchetTreeNode(CipherSuite suite)
   : CipherAware(suite)
-  , _secret(nullopt)
-  , _priv(nullopt)
+  , _secret(std::nullopt)
+  , _priv(std::nullopt)
   , _pub(suite)
 {}
 
@@ -37,15 +37,15 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
 
 RatchetTreeNode::RatchetTreeNode(const DHPrivateKey& priv)
   : CipherAware(priv.cipher_suite())
-  , _secret(nullopt)
+  , _secret(std::nullopt)
   , _priv(priv)
   , _pub(priv.public_key())
 {}
 
 RatchetTreeNode::RatchetTreeNode(const DHPublicKey& pub)
   : CipherAware(pub.cipher_suite())
-  , _secret(nullopt)
-  , _priv(nullopt)
+  , _secret(std::nullopt)
+  , _priv(std::nullopt)
   , _pub(pub)
 {}
 
@@ -55,13 +55,13 @@ RatchetTreeNode::public_equal(const RatchetTreeNode& other) const
   return _pub == other._pub;
 }
 
-const optional<bytes>&
+const std::optional<bytes>&
 RatchetTreeNode::secret() const
 {
   return _secret;
 }
 
-const optional<DHPrivateKey>&
+const std::optional<DHPrivateKey>&
 RatchetTreeNode::private_key() const
 {
   return _priv;
@@ -81,11 +81,11 @@ RatchetTreeNode::merge(const RatchetTreeNode& other)
   }
 
   if (other._priv && !_priv) {
-    *_priv = *other._priv;
+    _priv = other._priv.value();
   }
 
   if (other._secret && !_secret) {
-    *_secret = *other._secret;
+    _secret = other._secret.value();
   }
 }
 
@@ -117,8 +117,8 @@ operator<<(tls::ostream& out, const RatchetTreeNode& obj)
 tls::istream&
 operator>>(tls::istream& in, RatchetTreeNode& obj)
 {
-  obj._priv = nullopt;
-  obj._secret = nullopt;
+  obj._priv = std::nullopt;
+  obj._secret = std::nullopt;
   return in >> obj._pub;
 }
 
@@ -292,7 +292,7 @@ RatchetTree::add_leaf(LeafIndex index, const DHPublicKey& pub)
 
   if (index.val == size()) {
     if (!_nodes.empty()) {
-      _nodes.emplace_back(nullopt);
+      _nodes.emplace_back(std::nullopt);
     }
 
     _nodes.emplace_back(RatchetTreeNode(pub));
@@ -307,7 +307,7 @@ RatchetTree::add_leaf(LeafIndex index, const bytes& leaf_secret)
 {
   if (index.val == size()) {
     if (!_nodes.empty()) {
-      _nodes.emplace_back(nullopt);
+      _nodes.emplace_back(std::nullopt);
     }
 
     _nodes.emplace_back(new_node(leaf_secret));
@@ -325,7 +325,7 @@ RatchetTree::blank_path(LeafIndex index)
 
   auto curr = NodeIndex{ index };
   while (curr != root) {
-    _nodes[curr] = nullopt;
+    _nodes[curr] = std::nullopt;
     curr = tree_math::parent(curr, node_count);
   }
 }

@@ -52,7 +52,7 @@ UserInitKey::add_init_key(const DHPublicKey& pub)
   init_keys.push_back(pub.to_bytes());
 }
 
-optional<DHPublicKey>
+std::optional<DHPublicKey>
 UserInitKey::find_init_key(CipherSuite suite) const
 {
   for (size_t i = 0; i < cipher_suites.size(); ++i) {
@@ -61,7 +61,7 @@ UserInitKey::find_init_key(CipherSuite suite) const
     }
   }
 
-  return nullopt;
+  return std::nullopt;
 }
 
 void
