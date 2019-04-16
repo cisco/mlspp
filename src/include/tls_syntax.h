@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 #include <vector>
 
 // Note: Different namespace because this is TLS-generic (might
@@ -87,6 +88,33 @@ public:
   {}
 
   virtual T new_element() const { return T{ _ctor_arg }; }
+
+private:
+  C _ctor_arg;
+};
+
+template<typename T>
+class optional : public std::optional<T>
+{
+public:
+  typedef std::optional<T> parent;
+  using parent::parent;
+
+  virtual T new_element() const { return T{}; }
+};
+
+template<typename T, typename C>
+class variant_optional : public optional<T>
+{
+public:
+  typedef std::optional<T> parent;
+  using parent::parent;
+
+  variant_optional(C ctor_arg)
+    : _ctor_arg(ctor_arg)
+  {}
+
+  virtual T new_element() const { return T{}; }
 
 private:
   C _ctor_arg;
@@ -183,6 +211,18 @@ operator<<(ostream& out, const vector_base<T, head, min, max>& data)
   return out;
 }
 
+// Optional writer
+template<typename T>
+tls::ostream&
+operator<<(tls::ostream& out, const optional<T>& opt)
+{
+  if (!opt) {
+    return out << uint8_t(0);
+  }
+
+  return out << uint8_t(1) << opt.value();
+}
+
 class istream
 {
 public:
@@ -273,6 +313,28 @@ operator>>(istream& in, vector_base<T, head, min, max>& data)
   in._buffer.erase(in._buffer.end() - size, in._buffer.end());
 
   return in;
+}
+
+// Optional reader
+template<typename T>
+tls::istream&
+operator>>(tls::istream& in, optional<T>& opt)
+{
+  uint8_t present = 0;
+  in >> present;
+
+  switch (present) {
+    case 0:
+      opt = std::nullopt;
+      return in;
+
+    case 1:
+      opt.reset(opt.new_value());
+      return in >> opt.value();
+
+    default:
+      throw std::invalid_argument("Malformed optional");
+  }
 }
 
 // Abbreviations
