@@ -85,33 +85,36 @@ protected:
     }
   }
 
-  void interop(const TreeTestVectors::TestCase& tc, CipherSuite test_suite)
+  void interop(const TreeTestVectors::TestCase& tc,
+               CipherSuite test_suite,
+               SignatureScheme test_scheme)
   {
-    // TODO re-enable
-    /*
     test::TestRatchetTree tree{ test_suite };
 
     // Add the leaves
     int tci = 0;
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
-      tree.add_leaf(LeafIndex{ i }, tv.leaf_secrets[i]);
+      tree.add_leaf(LeafIndex{ i }, tv.leaf_secrets[i], tc.credentials[i]);
       tree.set_path(LeafIndex{ i }, tv.leaf_secrets[i]);
-      assert_tree_eq(tc[tci], tree);
+      assert_tree_eq(tc.trees[tci], tree);
     }
 
     // Blank even-numbered leaves
     for (uint32_t j = 0; j < tv.leaf_secrets.size(); j += 2, ++tci) {
       tree.blank_path(LeafIndex{ j });
-      assert_tree_eq(tc[tci], tree);
+      assert_tree_eq(tc.trees[tci], tree);
     }
-    */
   }
 };
 
 TEST_F(RatchetTreeTest, Interop)
 {
-  interop(tv.case_p256, CipherSuite::P256_SHA256_AES128GCM);
-  interop(tv.case_x25519, CipherSuite::X25519_SHA256_AES128GCM);
+  interop(tv.case_p256_p256,
+          CipherSuite::P256_SHA256_AES128GCM,
+          SignatureScheme::P256_SHA256);
+  interop(tv.case_x25519_ed25519,
+          CipherSuite::X25519_SHA256_AES128GCM,
+          SignatureScheme::Ed25519);
 }
 
 TEST_F(RatchetTreeTest, OneMember)

@@ -236,14 +236,15 @@ generate_tree()
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
-  std::vector<TreeTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
+  std::vector<SignatureScheme> schemes{
+    SignatureScheme::P256_SHA256,
+    SignatureScheme::Ed25519,
   };
 
-  // TODO present credentials in test vectors
-  auto sig = SignaturePrivateKey::derive(SignatureScheme::Ed25519, { 'x' });
-  auto cred = Credential::basic({ 'x' }, sig.public_key());
+  std::vector<TreeTestVectors::TestCase*> cases{
+    &tv.case_p256_p256,
+    &tv.case_x25519_ed25519,
+  };
 
   int n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
@@ -253,21 +254,27 @@ generate_tree()
 
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
+    auto scheme = schemes[i];
     auto test_case = cases[i];
 
     test::TestRatchetTree tree{ suite };
 
     // Add the leaves
     for (uint32_t j = 0; j < n_leaves; ++j) {
+      auto id = bytes(1, uint8_t(j));
+      auto sig = SignaturePrivateKey::derive(scheme, id);
+      auto cred = Credential::basic(id, sig);
+      test_case->credentials.push_back(cred);
+
       tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j], cred);
       tree.set_path(LeafIndex{ j }, tv.leaf_secrets[j]);
-      test_case->push_back(tree_to_case(tree));
+      test_case->trees.push_back(tree_to_case(tree));
     }
 
     // Blank out even-numbered leaves
     for (uint32_t j = 0; j < n_leaves; j += 2) {
       tree.blank_path(LeafIndex{ j });
-      test_case->push_back(tree_to_case(tree));
+      test_case->trees.push_back(tree_to_case(tree));
     }
   }
 

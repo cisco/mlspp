@@ -200,15 +200,29 @@ operator<<(tls::ostream& str, const TreeTestVectors::TreeNode& obj)
 }
 
 tls::istream&
+operator>>(tls::istream& str, TreeTestVectors::TestCase& obj)
+{
+  return str >> obj.credentials >> obj.trees;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const TreeTestVectors::TestCase& obj)
+{
+  return str << obj.credentials << obj.trees;
+}
+
+tls::istream&
 operator>>(tls::istream& str, TreeTestVectors& obj)
 {
-  return str >> obj.leaf_secrets >> obj.case_p256 >> obj.case_x25519;
+  return str >> obj.leaf_secrets >> obj.case_p256_p256 >>
+         obj.case_x25519_ed25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const TreeTestVectors& obj)
 {
-  return str << obj.leaf_secrets << obj.case_p256 << obj.case_x25519;
+  return str << obj.leaf_secrets << obj.case_p256_p256
+             << obj.case_x25519_ed25519;
 }
 
 ///

@@ -174,11 +174,17 @@ struct TreeTestVectors
   };
 
   typedef tls::vector<TreeNode, 4> TreeCase;
-  typedef tls::vector<TreeCase, 4> TestCase;
+
+  struct TestCase
+  {
+    tls::vector<Credential, 4> credentials;
+    tls::vector<TreeCase, 4> trees;
+  };
 
   tls::vector<tls::opaque<1>, 4> leaf_secrets;
-  TestCase case_p256;
-  TestCase case_x25519;
+  tls::vector<Credential, 4> credentials;
+  TestCase case_p256_p256;
+  TestCase case_x25519_ed25519;
 };
 
 tls::istream&
