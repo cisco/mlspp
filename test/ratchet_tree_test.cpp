@@ -35,21 +35,21 @@ protected:
 
   // Manually computed via a Python script
   const bytes hashA = from_hex(
-    "971c7d829997b7dd79bc9c2450aeba2aa63c26bba2488091c45f9b4240be569b");
+    "30a1ceecab0b150dd15d1a851d7ed36923e872d7344aea6197a8a82f943266f6");
   const bytes hashB = from_hex(
-    "c46ca31e392ccd3b0d232bd43b7a40e8b755825d46359c3f089343f7c25f8414");
+    "c314eb7da4e11019cd105c1935f6e94000cc0059c1b35b2fd661f1a2a722c857");
   const bytes hashC = from_hex(
-    "2c9c435697ed4b30cce1991107c2a841675789982b3415bbaf17e9265b1355ff");
+    "b5b1bf5e264c2c3ec60faf5abcd9f69d076674774ff929337ccb345ea4fd983a");
   const bytes hashD = from_hex(
-    "c24512dbd37d0c8f00054a8e135141db57fcc48478e881fef8316910e5f6797b");
+    "ed1526270fdca2222730bb48c92825c7518399dfb266ecd1c8564e2b36f63d71");
   const bytes hashAB = from_hex(
-    "610c949d5e73aca1d138ca4b74523fc8974e1734f94364d56de10094fcbc59b2");
+    "34c656e7bf8b535f5781e561f3b5115946e373c108ace3cf9bbae09e6963530e");
   const bytes hashCD = from_hex(
-    "a280eeb4461a33cec3b3a01c0a8f2da5cc25764c0a2415a850931ce7dc4831d9");
+    "775c50add1cf6ab09c84d67c050a97d5290d541453292fe35e033ca3e416bfd5");
   const bytes hashABC = from_hex(
-    "146e80ab5bb121b357e928083d894538a640d17303a3633e622bb0355417e309");
+    "0107f66c071a4c073af7f42de07f014e386bf9d47bfcabe366985e9d228b8c79");
   const bytes hashABCD = from_hex(
-    "4564f8ae24f7f13a88aa1bf40d93bbbb88f84e03e217dec36128c631d5246888");
+    "0121303fd31ce16c64328e4fea1cdb3232387f7929f4754463484a927363d572");
 
   const TreeTestVectors& tv;
 
@@ -142,12 +142,11 @@ TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ suite };
 
-  // TODO check credentials at all steps
-
   // Add A
   tree.add_leaf(LeafIndex{ 0 }, secretA, credA);
   ASSERT_EQ(tree.root_secret(), secretAn);
-  // ASSERT_EQ(tree.root_hash(), hashA); // TODO re-enable
+  ASSERT_EQ(tree.root_hash(), hashA);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
 
   // Add B
   tree.add_leaf(LeafIndex{ 1 }, secretB, credB);
@@ -155,7 +154,9 @@ TEST_F(RatchetTreeTest, ByExtension)
 
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(tree.root_secret(), secretAB);
-  // ASSERT_EQ(tree.root_hash(), hashAB); // TODO re-enable
+  ASSERT_EQ(tree.root_hash(), hashAB);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
 
   RatchetTree directAB{ suite, { secretA, secretB }, { credA, credB } };
   ASSERT_EQ(tree, directAB);
@@ -166,7 +167,10 @@ TEST_F(RatchetTreeTest, ByExtension)
 
   ASSERT_EQ(tree.size(), 3);
   ASSERT_EQ(tree.root_secret(), secretABC);
-  // ASSERT_EQ(tree.root_hash(), hashABC); // TODO re-enable
+  ASSERT_EQ(tree.root_hash(), hashABC);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 2 }), credC);
 
   RatchetTree directABC{ suite,
                          { secretA, secretB, secretC },
@@ -179,7 +183,11 @@ TEST_F(RatchetTreeTest, ByExtension)
 
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.root_secret(), secretABCD);
-  // ASSERT_EQ(tree.root_hash(), hashABCD); // TODO re-enable
+  ASSERT_EQ(tree.root_hash(), hashABCD);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 2 }), credC);
+  ASSERT_EQ(tree.get_credential(LeafIndex{ 3 }), credD);
 
   RatchetTree direct{ suite,
                       { secretA, secretB, secretC, secretD },
