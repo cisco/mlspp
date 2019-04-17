@@ -23,6 +23,7 @@ RatchetTreeNode::operator=(const RatchetTreeNode& other)
   _secret = other._secret;
   _priv = other._priv;
   _pub = other._pub;
+  _cred = other._cred;
   return *this;
 }
 
@@ -89,7 +90,9 @@ void
 RatchetTreeNode::merge(const RatchetTreeNode& other)
 {
   if (other._pub != _pub) {
-    *this = other;
+    _pub = other._pub;
+    _priv = std::nullopt;
+    _secret = std::nullopt;
   }
 
   if (other._priv && !_priv) {
@@ -429,7 +432,7 @@ RatchetTree::add_leaf(LeafIndex index,
   auto node = RatchetTreeNode(pub);
   node.set_credential(cred);
 
-  add_leaf_inner(index, RatchetTreeNode(pub));
+  add_leaf_inner(index, node);
 }
 
 void
@@ -440,7 +443,7 @@ RatchetTree::add_leaf(LeafIndex index,
   auto node = new_node(leaf_secret);
   node.set_credential(cred);
 
-  add_leaf_inner(index, new_node(leaf_secret));
+  add_leaf_inner(index, node);
 }
 
 void
@@ -493,7 +496,7 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
   }
   _nodes[curr].value().merge(new_node(leaf));
 
-  auto path_secret = leaf;
+  auto path_secret = path_step(leaf);
   curr = tree_math::parent(curr, node_count);
   while (curr != root) {
     // XXX(rlb@ipv.sx) Can this be deleted?
@@ -507,11 +510,13 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
     curr = tree_math::parent(curr, node_count);
   }
 
-  _nodes[root] = new_node(path_secret);
+  if (root != NodeIndex{ index }) {
+    _nodes[root] = new_node(path_secret);
+  }
   set_hash_path(index);
 }
 
-const Credential&
+Credential
 RatchetTree::get_credential(LeafIndex index) const
 {
   auto node = NodeIndex{ index };
@@ -572,6 +577,18 @@ RatchetTree::root_hash() const
 {
   auto root = tree_math::root(node_size());
   return _nodes[root].hash();
+}
+
+bool
+RatchetTree::check_credentials() const
+{
+  for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
+    auto node = _nodes[NodeIndex{ i }];
+    if (node.has_value() && !node.value().credential().has_value()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool

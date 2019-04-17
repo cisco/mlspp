@@ -119,7 +119,10 @@ public:
   void blank_path(LeafIndex index);
   void set_path(LeafIndex index, const bytes& leaf);
 
-  const Credential& get_credential(LeafIndex index) const;
+  // XXX(rlb@ipv.sx): It seems like it should be possible for this
+  // to be `const Credential&`.  But that causes some odd breakage,
+  // so I've kept it simpler for now.
+  Credential get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;
   void truncate(LeafCount leaves);
@@ -128,6 +131,7 @@ public:
   bool occupied(LeafIndex index) const;
   bytes root_secret() const;
   bytes root_hash() const;
+  bool check_credentials() const;
   bool check_invariant(LeafIndex from) const;
 
 protected:

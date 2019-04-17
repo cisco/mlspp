@@ -20,7 +20,6 @@ struct GroupState
 {
   tls::opaque<1> group_id;
   uint32_t epoch;
-  Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
 

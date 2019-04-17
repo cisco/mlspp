@@ -127,8 +127,7 @@ bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.group_id == rhs.group_id) && (lhs.epoch == rhs.epoch) &&
-         (lhs.index == rhs.index) && (lhs.roster == rhs.roster) &&
-         (lhs.tree == rhs.tree) &&
+         (lhs.index == rhs.index) && (lhs.tree == rhs.tree) &&
          (lhs.transcript_hash == rhs.transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
@@ -136,7 +135,7 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.index << obj.roster << obj.tree
+  return out << obj.group_id << obj.epoch << obj.index << obj.tree
              << obj.transcript_hash << obj.init_secret;
 }
 
@@ -149,7 +148,6 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
   // group
   obj.tree = RatchetTree(obj.cipher_suite());
 
-  in >> obj.roster;
   in >> obj.tree;
   in >> obj.transcript_hash;
   in >> obj.init_secret;

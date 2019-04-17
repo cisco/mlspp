@@ -242,7 +242,7 @@ generate_tree()
   };
 
   // TODO present credentials in test vectors
-  auto sig = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
+  auto sig = SignaturePrivateKey::derive(SignatureScheme::Ed25519, { 'x' });
   auto cred = Credential::basic({ 'x' }, sig.public_key());
 
   int n_leaves = 10;
@@ -332,10 +332,7 @@ generate_messages()
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-
     auto cred = Credential::basic(tv.user_id, sig_key);
-    auto roster = Roster{};
-    roster.add(0, cred);
 
     auto ratchet_tree =
       RatchetTree{ suite,
@@ -353,8 +350,7 @@ generate_messages()
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
-      tv.group_id,  tv.epoch,  tv.removed, roster,
-      ratchet_tree, tv.random, tv.random,
+      tv.group_id, tv.epoch, tv.removed, ratchet_tree, tv.random, tv.random,
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 

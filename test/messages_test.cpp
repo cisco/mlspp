@@ -39,10 +39,7 @@ protected:
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-
     auto cred = Credential::basic(tv.user_id, sig_key);
-    auto roster = Roster{};
-    roster.add(0, cred);
 
     mls::test::DeterministicHPKE lock;
     auto ratchet_tree =
@@ -65,8 +62,7 @@ protected:
 
     // WelcomeInfo and Welcome
     WelcomeInfo welcome_info_c{
-      tv.group_id,  tv.epoch,  tv.removed, roster,
-      ratchet_tree, tv.random, tv.random,
+      tv.group_id, tv.epoch, tv.removed, ratchet_tree, tv.random, tv.random,
     };
     Welcome welcome_c{ tv.uik_id, dh_key, welcome_info_c };
 

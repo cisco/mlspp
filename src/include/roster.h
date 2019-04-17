@@ -126,23 +126,4 @@ private:
   friend tls::istream& operator>>(tls::istream& in, Credential& obj);
 };
 
-class Roster
-{
-public:
-  void add(uint32_t index, const Credential& cred);
-  void remove(uint32_t index);
-  Credential get(uint32_t index) const;
-  size_t size() const;
-  void truncate(uint32_t size);
-
-private:
-  typedef tls::optional<Credential> OptionalCredential;
-  typedef tls::vector<OptionalCredential, 4> CredentialVector;
-  CredentialVector _credentials;
-
-  friend bool operator==(const Roster& lhs, const Roster& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const Roster& obj);
-  friend tls::istream& operator>>(tls::istream& in, Roster& obj);
-};
-
 } // namespace mls

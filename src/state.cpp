@@ -14,14 +14,11 @@ GroupState::GroupState(const bytes& group_id,
   , epoch(0)
   , tree(suite, leaf_secret, credential)
   , transcript_hash(Digest(suite).output_size(), 0)
-{
-  roster.add(0, credential);
-}
+{}
 
 GroupState::GroupState(const WelcomeInfo& info)
   : group_id(info.group_id)
   , epoch(info.epoch + 1)
-  , roster(info.roster)
   , tree(info.tree)
   , transcript_hash(info.transcript_hash)
 {}
@@ -34,15 +31,13 @@ GroupState::GroupState(CipherSuite suite)
 tls::ostream&
 operator<<(tls::ostream& out, const GroupState& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.roster << obj.tree
-             << obj.transcript_hash;
+  return out << obj.group_id << obj.epoch << obj.tree << obj.transcript_hash;
 }
 
 tls::istream&
 operator>>(tls::istream& out, GroupState& obj)
 {
-  return out >> obj.group_id >> obj.epoch >> obj.roster >> obj.tree >>
-         obj.transcript_hash;
+  return out >> obj.group_id >> obj.epoch >> obj.tree >> obj.transcript_hash;
 }
 
 bool
@@ -50,10 +45,9 @@ operator==(const GroupState& lhs, const GroupState& rhs)
 {
   auto group_id = (lhs.group_id == rhs.group_id);
   auto epoch = (lhs.epoch == rhs.epoch);
-  auto roster = (lhs.roster == rhs.roster);
   auto tree = (lhs.tree == rhs.tree);
   auto transcript_hash = (lhs.transcript_hash == rhs.transcript_hash);
-  return group_id && epoch && roster && tree && transcript_hash;
+  return group_id && epoch && tree && transcript_hash;
 }
 
 ///
@@ -153,10 +147,6 @@ State::State(SignaturePrivateKey identity_priv,
   // Add to the tree
   _state.tree.add_leaf(_index, init_secret, credential);
 
-  // Add to the roster
-  // TODO delete
-  _state.roster.add(_index.val, credential);
-
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
 
@@ -225,10 +215,9 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _state.group_id,    _state.epoch,
-                            LeafIndex{ index }, _state.roster,
-                            _state.tree,        _state.transcript_hash,
-                            _init_secret };
+  WelcomeInfo welcome_info{ _state.group_id,        _state.epoch,
+                            LeafIndex{ index },     _state.tree,
+                            _state.transcript_hash, _init_secret };
 
   Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
 
@@ -325,10 +314,6 @@ State::handle(const Add& add)
   }
   _state.tree.add_leaf(add.index, *init_key, add.init_key.credential);
 
-  // Add to the roster
-  // TODO delete
-  _state.roster.add(add.index.val, add.init_key.credential);
-
   // Update symmetric state
   update_epoch_secrets(_zero);
 }
@@ -355,13 +340,9 @@ State::handle(const Remove& remove)
   auto leaf_secret = std::nullopt;
   update_leaf(remove.removed, remove.path, leaf_secret);
   _state.tree.blank_path(remove.removed);
-  // TODO delete
-  _state.roster.remove(remove.removed.val);
 
   auto cut = _state.tree.leaf_span();
   _state.tree.truncate(cut);
-  // TODO delete
-  _state.roster.truncate(cut.val);
 }
 
 State::EpochSecrets

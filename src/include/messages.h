@@ -117,7 +117,6 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex index;
-  Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
   tls::opaque<1> init_secret;
@@ -130,7 +129,6 @@ struct WelcomeInfo : public CipherAware
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
               LeafIndex index,
-              Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
               tls::opaque<1> init_secret)
@@ -138,7 +136,6 @@ struct WelcomeInfo : public CipherAware
     , group_id(group_id)
     , epoch(epoch)
     , index(index)
-    , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)
     , init_secret(init_secret)
