@@ -78,7 +78,7 @@ protected:
     for (int j = 0; j < vec.size(); ++j) {
       ASSERT_EQ(vec[j].hash, nodes[j].hash());
       ASSERT_EQ(vec[j].secret.has_value(), nodes[j].has_value());
-      if (!nodes[j].blank()) {
+      if (nodes[j].has_value()) {
         ASSERT_EQ(vec[j].secret.value(), nodes[j]->secret().value());
         ASSERT_EQ(vec[j].public_key.value(), nodes[j]->public_key().to_bytes());
       }

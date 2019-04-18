@@ -1,4 +1,4 @@
-#include "roster.h"
+#include "credential.h"
 #include <gtest/gtest.h>
 
 using namespace mls;

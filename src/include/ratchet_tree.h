@@ -1,8 +1,8 @@
 #pragma once
 
 #include "common.h"
+#include "credential.h"
 #include "crypto.h"
-#include "roster.h"
 #include "tls_syntax.h"
 #include "tree_math.h"
 #include <iosfwd>
@@ -64,7 +64,7 @@ struct OptionalRatchetTreeNode
     : parent(RatchetTreeNode(suite, secret))
   {}
 
-  bool blank() const;
+  bool has_private() const;
   const bytes& hash() const;
 
   void merge(const RatchetTreeNode& other);
@@ -119,10 +119,7 @@ public:
   void blank_path(LeafIndex index);
   void set_path(LeafIndex index, const bytes& leaf);
 
-  // XXX(rlb@ipv.sx): It seems like it should be possible for this
-  // to be `const Credential&`.  But that causes some odd breakage,
-  // so I've kept it simpler for now.
-  Credential get_credential(LeafIndex index) const;
+  const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;
   void truncate(LeafCount leaves);
@@ -138,6 +135,7 @@ protected:
   RatchetTreeNodeVector _nodes;
   size_t _secret_size;
 
+  NodeIndex root_index() const;
   NodeCount node_size() const;
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;

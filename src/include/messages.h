@@ -3,10 +3,7 @@
 #include "common.h"
 #include "crypto.h"
 #include "ratchet_tree.h"
-#include "roster.h"
 #include "tls_syntax.h"
-#include <optional>
-
 #include <optional>
 
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM

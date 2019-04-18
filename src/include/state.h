@@ -3,7 +3,6 @@
 #include "crypto.h"
 #include "messages.h"
 #include "ratchet_tree.h"
-#include "roster.h"
 #include <optional>
 #include <vector>
 

@@ -137,8 +137,7 @@ tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
   return out << obj.version << obj.group_id << obj.epoch << obj.index
-             << obj.tree << obj.transcript_hash
-             << obj.init_secret;
+             << obj.tree << obj.transcript_hash << obj.init_secret;
 }
 
 tls::istream&
