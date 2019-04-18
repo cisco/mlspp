@@ -126,8 +126,9 @@ operator>>(tls::istream& in, UserInitKey& obj)
 bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
-  return (lhs.group_id == rhs.group_id) && (lhs.epoch == rhs.epoch) &&
-         (lhs.index == rhs.index) && (lhs.tree == rhs.tree) &&
+  return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
+         (lhs.epoch == rhs.epoch) && (lhs.index == rhs.index) &&
+         (lhs.tree == rhs.tree) &&
          (lhs.transcript_hash == rhs.transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
@@ -135,14 +136,15 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.index << obj.tree
-             << obj.transcript_hash << obj.init_secret;
+  return out << obj.version << obj.group_id << obj.epoch << obj.index
+             << obj.tree << obj.transcript_hash
+             << obj.init_secret;
 }
 
 tls::istream&
 operator>>(tls::istream& in, WelcomeInfo& obj)
 {
-  in >> obj.group_id >> obj.epoch >> obj.index;
+  in >> obj.version >> obj.group_id >> obj.epoch >> obj.index;
 
   // Set the tree struct to use the correct ciphersuite for this
   // group

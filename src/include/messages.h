@@ -101,11 +101,12 @@ tls::istream&
 operator>>(tls::istream& in, UserInitKey& obj);
 
 // struct {
+//   ProtocolVersion version;
 //   opaque group_id<0..255>;
 //   uint32 epoch;
-//   uint32 index; // XXX see below
+//   uint32 index;
 //   optional<Credential> roster<1..2^32-1>;
-//   optional<PublicKey> tree<1..2^32-1>;
+//   optional<HPKEPublicKey> tree<1..2^32-1>;
 //   opaque transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
@@ -114,6 +115,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 // struct needs to have an index field.
 struct WelcomeInfo : public CipherAware
 {
+  ProtocolVersion version;
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex index;
@@ -133,6 +135,7 @@ struct WelcomeInfo : public CipherAware
               tls::opaque<1> transcript_hash,
               tls::opaque<1> init_secret)
     : CipherAware(tree)
+    , version(mls10Version)
     , group_id(group_id)
     , epoch(epoch)
     , index(index)
