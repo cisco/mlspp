@@ -123,6 +123,13 @@ operator>>(tls::istream& in, UserInitKey& obj)
 
 // WelcomeInfo
 
+bytes
+WelcomeInfo::hash(CipherSuite suite) const
+{
+  auto marshaled = tls::marshal(*this);
+  return Digest(suite).write(marshaled).digest();
+}
+
 bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
@@ -224,19 +231,20 @@ const GroupOperationType Add::type = GroupOperationType::add;
 bool
 operator==(const Add& lhs, const Add& rhs)
 {
-  return (lhs.index == rhs.index) && (lhs.init_key == rhs.init_key);
+  return (lhs.index == rhs.index) && (lhs.init_key == rhs.init_key) &&
+         (lhs.welcome_info_hash == rhs.welcome_info_hash);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Add& obj)
 {
-  return out << obj.index << obj.init_key;
+  return out << obj.index << obj.init_key << obj.welcome_info_hash;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Add& obj)
 {
-  return in >> obj.index >> obj.init_key;
+  return in >> obj.index >> obj.init_key >> obj.welcome_info_hash;
 }
 
 // Update

@@ -137,6 +137,8 @@ struct WelcomeInfo : public CipherAware
     , transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
+
+  bytes hash(CipherSuite suite) const;
 };
 
 bool
@@ -186,19 +188,23 @@ tls::istream&
 operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
+//     uint32 index;
 //     UserInitKey init_key;
+//     opaque welcome_info_hash<0..255>;
 // } Add;
 struct Add
 {
 public:
   LeafIndex index;
   UserInitKey init_key;
+  tls::opaque<1> welcome_info_hash;
 
   Add() {}
 
-  Add(LeafIndex index, const UserInitKey& init_key)
+  Add(LeafIndex index, const UserInitKey& init_key, bytes welcome_info_hash)
     : index(index)
     , init_key(init_key)
+    , welcome_info_hash(std::move(welcome_info_hash))
   {}
 
   static const GroupOperationType type;

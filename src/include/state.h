@@ -190,25 +190,28 @@ private:
   State handle(LeafIndex signer_index, const GroupOperation& operation) const;
 
   // Handle a Add (for existing participants only)
-  void handle(const Add& add);
+  bytes handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
-  void handle(LeafIndex index, const Update& update);
+  bytes handle(LeafIndex index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  void handle(const Remove& remove);
+  bytes handle(const Remove& remove);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
-  // Marshal the shared confirmed state
-  friend tls::ostream& operator<<(tls::ostream& out, const State& obj);
+  // Generate a WelcomeInfo object describing this state
+  WelcomeInfo welcome_info() const;
+
+  // Add a new group operation into the transcript hash
+  void update_transcript_hash(const GroupOperation& operation);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
-  void update_leaf(LeafIndex index,
-                   const DirectPath& path,
-                   const std::optional<bytes>& leaf_secret);
+  bytes update_leaf(LeafIndex index,
+                    const DirectPath& path,
+                    const std::optional<bytes>& leaf_secret);
 
   // Derive the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);

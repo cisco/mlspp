@@ -293,7 +293,7 @@ generate_messages()
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
     // Construct Handshake messages
-    auto add_op = Add{ tv.removed, user_init_key };
+    auto add_op = Add{ tv.removed, user_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
     auto add =
