@@ -64,8 +64,7 @@ protected:
 
     // WelcomeInfo and Welcome
     WelcomeInfo welcome_info_c{
-      tv.group_id,  tv.epoch,  tv.removed, roster,
-      ratchet_tree, tv.random, tv.random,
+      tv.group_id, tv.epoch, roster, ratchet_tree, tv.random, tv.random,
     };
     Welcome welcome_c{ tv.uik_id, dh_key, welcome_info_c };
 

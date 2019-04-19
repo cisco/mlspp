@@ -139,7 +139,6 @@ State::State(SignaturePrivateKey identity_priv,
 
   _state = GroupState{ welcome_info };
 
-  _index = welcome_info.index;
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
 
@@ -151,6 +150,7 @@ State::State(SignaturePrivateKey identity_priv,
                              .digest();
 
   // Add to the tree
+  _index = handshake.operation.add.index;
   _state.tree.add_leaf(_index, init_secret);
 
   // Add to the roster
@@ -224,10 +224,9 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _state.group_id,    _state.epoch,
-                            LeafIndex{ index }, _state.roster,
-                            _state.tree,        _state.transcript_hash,
-                            _init_secret };
+  WelcomeInfo welcome_info{ _state.group_id,        _state.epoch,
+                            _state.roster,          _state.tree,
+                            _state.transcript_hash, _init_secret };
 
   Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
 
