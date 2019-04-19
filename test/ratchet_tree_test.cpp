@@ -22,16 +22,12 @@ protected:
   const bytes secretC = from_hex("08090a0b");
   const bytes secretD = from_hex("0c0d0e0f");
 
-  const bytes secretAn = from_hex(
-    "6454ab64c6af8091859b13da01f6154820fef5f1b17d7c2b8b242d03b7bd5fc3");
   const bytes secretAB = from_hex(
-    "2ccbf0bd1209c2f7b4095726897aa8487b723492f19b7f6c3e4a415df79d00d0");
-  const bytes secretCD = from_hex(
-    "293926d4d12149366ff84fabeb3d699558e39f333a116baf6a60a2588e1c601a");
+    "e8de418a07b497953174c71f5ad83d63d90bc68582a9a340c6023fba536455f4");
   const bytes secretABC = from_hex(
-    "31ce14ca8317bf564b12706367b8423ed69a520fad6c0acd2608da65d0bb2916");
+    "1dbd153c8f2ca387cfc3104b39b0954bbf287bfeb94d2a5bd92e05ff510c2244");
   const bytes secretABCD = from_hex(
-    "43793000dbf64b8606bfcd75c23b57f3096053eafdf182357fd013fbf8b9834a");
+    "ca118da171367f30e5c03e2e651558f55c57fba6319101ccb56f8a34953b25f2");
 
   // Manually computed via a Python script
   const bytes hashA = from_hex(
@@ -72,14 +68,13 @@ protected:
   void assert_tree_eq(const TreeTestVectors::TreeCase& vec,
                       const test::TestRatchetTree& tree)
   {
-    auto nodes = tree.nodes();
+    auto& nodes = tree.nodes();
     ASSERT_EQ(vec.size(), nodes.size());
 
     for (int j = 0; j < vec.size(); ++j) {
       ASSERT_EQ(vec[j].hash, nodes[j].hash());
-      ASSERT_EQ(vec[j].secret.has_value(), nodes[j].has_value());
+      ASSERT_EQ(vec[j].public_key.has_value(), nodes[j].has_value());
       if (nodes[j].has_value()) {
-        ASSERT_EQ(vec[j].secret.value(), nodes[j]->secret().value());
         ASSERT_EQ(vec[j].public_key.value(), nodes[j]->public_key().to_bytes());
       }
     }
@@ -121,7 +116,6 @@ TEST_F(RatchetTreeTest, OneMember)
 {
   RatchetTree tree{ suite, secretA, credA };
   ASSERT_EQ(tree.size(), 1);
-  ASSERT_EQ(tree.root_secret(), secretAn);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
 }
 
@@ -131,7 +125,6 @@ TEST_F(RatchetTreeTest, MultipleMembers)
                     { secretA, secretB, secretC, secretD },
                     { credA, credB, credC, credD } };
   ASSERT_EQ(tree.size(), 4);
-  ASSERT_EQ(tree.root_secret(), secretABCD);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 2 }), credC);
@@ -141,19 +134,21 @@ TEST_F(RatchetTreeTest, MultipleMembers)
 TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ suite };
+  bytes root_secret;
 
   // Add A
   tree.add_leaf(LeafIndex{ 0 }, secretA, credA);
-  ASSERT_EQ(tree.root_secret(), secretAn);
+  root_secret = tree.set_path(LeafIndex{ 0 }, secretA);
   ASSERT_EQ(tree.root_hash(), hashA);
+  ASSERT_EQ(root_secret, secretA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
 
   // Add B
   tree.add_leaf(LeafIndex{ 1 }, secretB, credB);
-  tree.set_path(LeafIndex{ 1 }, secretB);
+  root_secret = tree.set_path(LeafIndex{ 1 }, secretB);
 
   ASSERT_EQ(tree.size(), 2);
-  ASSERT_EQ(tree.root_secret(), secretAB);
+  ASSERT_EQ(root_secret, secretAB);
   ASSERT_EQ(tree.root_hash(), hashAB);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
@@ -163,10 +158,10 @@ TEST_F(RatchetTreeTest, ByExtension)
 
   // Add C
   tree.add_leaf(LeafIndex{ 2 }, secretC, credC);
-  tree.set_path(LeafIndex{ 2 }, secretC);
+  root_secret = tree.set_path(LeafIndex{ 2 }, secretC);
 
   ASSERT_EQ(tree.size(), 3);
-  ASSERT_EQ(tree.root_secret(), secretABC);
+  ASSERT_EQ(root_secret, secretABC);
   ASSERT_EQ(tree.root_hash(), hashABC);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
@@ -179,10 +174,10 @@ TEST_F(RatchetTreeTest, ByExtension)
 
   // Add D
   tree.add_leaf(LeafIndex{ 3 }, secretD, credD);
-  tree.set_path(LeafIndex{ 3 }, secretD);
+  root_secret = tree.set_path(LeafIndex{ 3 }, secretD);
 
   ASSERT_EQ(tree.size(), 4);
-  ASSERT_EQ(tree.root_secret(), secretABCD);
+  ASSERT_EQ(root_secret, secretABCD);
   ASSERT_EQ(tree.root_hash(), hashABCD);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);

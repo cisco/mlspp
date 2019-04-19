@@ -366,14 +366,16 @@ State::update_leaf(LeafIndex index,
                    const DirectPath& path,
                    const std::optional<bytes>& leaf_secret)
 {
-  if (leaf_secret) {
-    _tree.set_path(index, *leaf_secret);
+  bytes update_secret;
+  if (leaf_secret.has_value()) {
+    update_secret = _tree.set_path(index, *leaf_secret);
   } else {
-    auto secrets = _tree.decrypt(index, path);
-    _tree.merge_path(index, secrets);
+    auto merge_path = _tree.decrypt(index, path);
+    update_secret = merge_path.root_path_secret;
+    _tree.merge_path(index, merge_path);
   }
 
-  update_epoch_secrets(_tree.root_secret());
+  update_epoch_secrets(update_secret);
 }
 
 void

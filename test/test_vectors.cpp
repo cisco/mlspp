@@ -190,13 +190,13 @@ const std::string TreeTestVectors::file_name = "./tree.bin";
 tls::istream&
 operator>>(tls::istream& str, TreeTestVectors::TreeNode& obj)
 {
-  return str >> obj.secret >> obj.public_key >> obj.hash;
+  return str >> obj.public_key >> obj.hash;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const TreeTestVectors::TreeNode& obj)
 {
-  return str << obj.secret << obj.public_key << obj.hash;
+  return str << obj.public_key << obj.hash;
 }
 
 tls::istream&

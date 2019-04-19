@@ -22,7 +22,6 @@ public:
   RatchetTreeNode(const DHPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
-  const std::optional<bytes>& secret() const;
   const std::optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
   const std::optional<Credential>& credential() const;
@@ -31,7 +30,6 @@ public:
   void set_credential(const Credential& cred);
 
 private:
-  std::optional<bytes> _secret;
   std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
 
@@ -100,15 +98,15 @@ public:
               const std::vector<bytes>& secrets,
               const std::vector<Credential>& creds);
 
-  struct MergeInfo
+  struct MergePath
   {
-    std::vector<DHPublicKey> public_keys;
-    std::vector<bytes> secrets;
+    bytes root_path_secret;
+    std::vector<RatchetTreeNode> nodes;
   };
 
   DirectPath encrypt(LeafIndex from, const bytes& leaf) const;
-  MergeInfo decrypt(LeafIndex from, const DirectPath& path) const;
-  void merge_path(LeafIndex from, const MergeInfo& info);
+  MergePath decrypt(LeafIndex from, const DirectPath& path) const;
+  void merge_path(LeafIndex from, const MergePath& path);
 
   void add_leaf(LeafIndex index,
                 const DHPublicKey& pub,
@@ -117,7 +115,7 @@ public:
                 const bytes& leaf_secret,
                 const Credential& cred);
   void blank_path(LeafIndex index);
-  void set_path(LeafIndex index, const bytes& leaf);
+  bytes set_path(LeafIndex index, const bytes& leaf);
 
   const Credential& get_credential(LeafIndex index) const;
 
@@ -126,7 +124,6 @@ public:
 
   uint32_t size() const;
   bool occupied(LeafIndex index) const;
-  bytes root_secret() const;
   bytes root_hash() const;
   bool check_credentials() const;
   bool check_invariant(LeafIndex from) const;

@@ -222,7 +222,6 @@ tree_to_case(const test::TestRatchetTree& tree)
   for (int i = 0; i < nodes.size(); ++i) {
     tc[i].hash = nodes[i].hash();
     if (nodes[i].has_value()) {
-      tc[i].secret = nodes[i]->secret();
       tc[i].public_key = nodes[i]->public_key().to_bytes();
     }
   }
