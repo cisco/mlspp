@@ -252,12 +252,13 @@ protected:
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
-    GroupState group_state(suite);
+    GroupState group_state;
     tls::unmarshal(tv.base_group_state, group_state);
 
     for (const auto& epoch : test_case.epochs) {
+      auto group_state_bytes = tls::marshal(group_state);
       auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, epoch.update_secret, group_state);
+        suite, init_secret, epoch.update_secret, group_state_bytes);
       ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
       ASSERT_EQ(epoch.application_secret, secrets.application_secret);
       ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);

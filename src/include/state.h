@@ -11,30 +11,21 @@ namespace mls {
 // struct {
 //   opaque group_id<0..255>;
 //   uint32 epoch;
-//   optional<Credential> roster<1..2^32-1>;
-//   optional<PublicKey> tree<1..2^32-1>;
+//   opaque tree_hash<0..255>;
 //   opaque transcript_hash<0..255>;
 // } GroupState;
 struct GroupState
 {
   tls::opaque<1> group_id;
-  uint32_t epoch;
-  RatchetTree tree;
+  epoch_t epoch;
+  tls::opaque<1> tree_hash;
   tls::opaque<1> transcript_hash;
-
-  GroupState(const bytes& group_id,
-             CipherSuite suite,
-             const bytes& leaf_secret,
-             const Credential& credential);
-
-  GroupState(const WelcomeInfo& info);
-
-  GroupState(CipherSuite suite);
-
-  friend tls::ostream& operator<<(tls::ostream& out, const GroupState& obj);
-  friend tls::istream& operator>>(tls::istream& out, GroupState& obj);
-  friend bool operator==(const GroupState& lhs, const GroupState& rhs);
 };
+
+tls::ostream&
+operator<<(tls::ostream& out, const GroupState& obj);
+tls::istream&
+operator>>(tls::istream& out, GroupState& obj);
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we
 // never ratchet forward the base secret.  This allows for maximal
@@ -93,7 +84,7 @@ public:
   ///
 
   // Initialize an empty group
-  State(const bytes& group_id,
+  State(bytes group_id,
         CipherSuite suite,
         const bytes& leaf_secret,
         SignaturePrivateKey identity_priv,
@@ -142,7 +133,7 @@ public:
   ///
   /// Accessors
   ///
-  epoch_t epoch() const { return _state.epoch; }
+  epoch_t epoch() const { return _epoch; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   bytes epoch_secret() const { return _epoch_secret; }
@@ -163,12 +154,17 @@ public:
   static EpochSecrets derive_epoch_secrets(CipherSuite suite,
                                            const bytes& init_secret,
                                            const bytes& update_secret,
-                                           const GroupState& state);
+                                           const bytes& state);
 
 private:
-  // Shared confirmed state:
+  // Shared confirmed state
+  // XXX(rlb@ipv.sx): Can these be made const?
   CipherSuite _suite;
-  GroupState _state;
+  bytes _group_id;
+  epoch_t _epoch;
+  RatchetTree _tree;
+  bytes _transcript_hash;
+  bytes _group_state;
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;

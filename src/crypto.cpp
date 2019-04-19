@@ -8,7 +8,6 @@
 #include "openssl/obj_mac.h"
 #include "openssl/rand.h"
 #include "openssl/sha.h"
-#include "state.h"
 
 #include <string>
 
