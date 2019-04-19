@@ -288,13 +288,12 @@ generate_messages()
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
-      tv.group_id,  tv.epoch,  tv.removed, roster,
-      ratchet_tree, tv.random, tv.random,
+      tv.group_id, tv.epoch, roster, ratchet_tree, tv.random, tv.random,
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
     // Construct Handshake messages
-    auto add_op = Add{ tv.removed, user_init_key };
+    auto add_op = Add{ tv.removed, user_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
     auto add =

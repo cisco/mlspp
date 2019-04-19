@@ -73,7 +73,7 @@ operator>>(tls::istream& in, DirectPath& obj);
 struct UserInitKey
 {
   tls::opaque<1> user_init_key_id;
-  tls::vector<ProtocolVersion, 1, 2> supported_versions;
+  tls::vector<ProtocolVersion, 1> supported_versions;
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
   Credential credential;
@@ -102,21 +102,16 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   ProtocolVersion version;
 //   opaque group_id<0..255>;
 //   uint32 epoch;
-//   uint32 index;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<HPKEPublicKey> tree<1..2^32-1>;
 //   opaque transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
-//
-// XXX-SPEC(rlb@ipv.sx): To support add-in-place, the WelcomeInfo
-// struct needs to have an index field.
 struct WelcomeInfo : public CipherAware
 {
   ProtocolVersion version;
   tls::opaque<1> group_id;
   epoch_t epoch;
-  LeafIndex index;
   Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
@@ -129,7 +124,6 @@ struct WelcomeInfo : public CipherAware
 
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
-              LeafIndex index,
               Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
@@ -138,12 +132,13 @@ struct WelcomeInfo : public CipherAware
     , version(mls10Version)
     , group_id(group_id)
     , epoch(epoch)
-    , index(index)
     , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
+
+  bytes hash(CipherSuite suite) const;
 };
 
 bool
@@ -193,19 +188,23 @@ tls::istream&
 operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
+//     uint32 index;
 //     UserInitKey init_key;
+//     opaque welcome_info_hash<0..255>;
 // } Add;
 struct Add
 {
 public:
   LeafIndex index;
   UserInitKey init_key;
+  tls::opaque<1> welcome_info_hash;
 
   Add() {}
 
-  Add(LeafIndex index, const UserInitKey& init_key)
+  Add(LeafIndex index, const UserInitKey& init_key, bytes welcome_info_hash)
     : index(index)
     , init_key(init_key)
+    , welcome_info_hash(std::move(welcome_info_hash))
   {}
 
   static const GroupOperationType type;

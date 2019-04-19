@@ -123,12 +123,19 @@ operator>>(tls::istream& in, UserInitKey& obj)
 
 // WelcomeInfo
 
+bytes
+WelcomeInfo::hash(CipherSuite suite) const
+{
+  auto marshaled = tls::marshal(*this);
+  return Digest(suite).write(marshaled).digest();
+}
+
 bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
-         (lhs.epoch == rhs.epoch) && (lhs.index == rhs.index) &&
-         (lhs.roster == rhs.roster) && (lhs.tree == rhs.tree) &&
+         (lhs.epoch == rhs.epoch) && (lhs.roster == rhs.roster) &&
+         (lhs.tree == rhs.tree) &&
          (lhs.transcript_hash == rhs.transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
@@ -136,15 +143,14 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.version << obj.group_id << obj.epoch << obj.index
-             << obj.roster << obj.tree << obj.transcript_hash
-             << obj.init_secret;
+  return out << obj.version << obj.group_id << obj.epoch << obj.roster
+             << obj.tree << obj.transcript_hash << obj.init_secret;
 }
 
 tls::istream&
 operator>>(tls::istream& in, WelcomeInfo& obj)
 {
-  in >> obj.version >> obj.group_id >> obj.epoch >> obj.index;
+  in >> obj.version >> obj.group_id >> obj.epoch;
 
   // Set the tree struct to use the correct ciphersuite for this
   // group
@@ -225,19 +231,20 @@ const GroupOperationType Add::type = GroupOperationType::add;
 bool
 operator==(const Add& lhs, const Add& rhs)
 {
-  return (lhs.index == rhs.index) && (lhs.init_key == rhs.init_key);
+  return (lhs.index == rhs.index) && (lhs.init_key == rhs.init_key) &&
+         (lhs.welcome_info_hash == rhs.welcome_info_hash);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const Add& obj)
 {
-  return out << obj.index << obj.init_key;
+  return out << obj.index << obj.init_key << obj.welcome_info_hash;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Add& obj)
 {
-  return in >> obj.index >> obj.init_key;
+  return in >> obj.index >> obj.init_key >> obj.welcome_info_hash;
 }
 
 // Update
