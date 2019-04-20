@@ -23,9 +23,9 @@ namespace mls {
 /// Protocol versions
 ///
 
-typedef uint16_t ProtocolVersion;
+typedef uint8_t ProtocolVersion;
 
-static const ProtocolVersion mls10Version = 0xABCD;
+static const ProtocolVersion mls10Version = 0xFF;
 
 ///
 /// Byte strings and serialization

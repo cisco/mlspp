@@ -62,7 +62,6 @@ protected:
 
     // WelcomeInfo and Welcome
     WelcomeInfo welcome_info_c{
-      tv.group_id, tv.epoch, tv.removed, ratchet_tree, tv.random, tv.random,
     };
     Welcome welcome_c{ tv.uik_id, dh_key, welcome_info_c };
 
@@ -73,7 +72,7 @@ protected:
     tls_round_trip(tc.welcome, welcome_c, welcome, true);
 
     // Handshake messages
-    Add add_op{ tv.removed, user_init_key_c };
+    Add add_op{ tv.removed, user_init_key_c, tv.random };
     Update update_op{ direct_path };
     Remove remove_op{ tv.removed, direct_path };
 

@@ -101,22 +101,25 @@ State::State(SignaturePrivateKey identity_priv,
     throw ProtocolError("Incorrect init key");
   }
 
-  // Decrypt and ingest the Welcome
+  // Decrypt the Welcome
   auto welcome_info = welcome.decrypt(init_priv);
 
+  // Make sure the WelcomeInfo matches the Add
+  if (add.welcome_info_hash != welcome_info.hash(_suite)) {
+    throw ProtocolError("Mismatch in welcome info hash");
+  }
+
+  // Ingest the WelcomeInfo
   _epoch = welcome_info.epoch + 1;
   _group_id = welcome_info.group_id;
   _tree = welcome_info.tree;
   _transcript_hash = welcome_info.transcript_hash;
 
-  _index = welcome_info.index;
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
-  auto operation_bytes = tls::marshal(handshake.operation);
-  _transcript_hash =
-    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
+  update_transcript_hash(handshake.operation);
 
   // Add to the tree
   _tree.add_leaf(_index, init_secret, credential);
@@ -189,12 +192,12 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
-  WelcomeInfo welcome_info{ _group_id, _epoch,           LeafIndex{ index },
-                            _tree,     _transcript_hash, _init_secret };
+  auto welcome_info_str = welcome_info();
+  auto welcome =
+    Welcome{ user_init_key.user_init_key_id, *pub, welcome_info_str };
 
-  Welcome welcome{ user_init_key.user_init_key_id, *pub, welcome_info };
-
-  auto add = sign(Add{ LeafIndex{ index }, user_init_key });
+  auto welcome_info_hash = welcome_info_str.hash(_suite);
+  auto add = sign(Add{ LeafIndex{ index }, user_init_key, welcome_info_hash });
   return std::pair<Welcome, Handshake>(welcome, add);
 }
 
@@ -241,28 +244,27 @@ State
 State::handle(LeafIndex signer_index, const GroupOperation& operation) const
 {
   auto next = *this;
-  next._epoch = _epoch + 1;
-
-  auto operation_bytes = tls::marshal(operation);
-  next._transcript_hash =
-    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
-
+  bytes update_secret;
   switch (operation.type) {
     case GroupOperationType::add:
-      next.handle(operation.add);
+      update_secret = next.handle(operation.add);
       break;
     case GroupOperationType::update:
-      next.handle(signer_index, operation.update);
+      update_secret = next.handle(signer_index, operation.update);
       break;
     case GroupOperationType::remove:
-      next.handle(operation.remove);
+      update_secret = next.handle(operation.remove);
       break;
   }
+
+  next.update_transcript_hash(operation);
+  next._state.epoch = _state.epoch + 1;
+  next.update_epoch_secrets(update_secret);
 
   return next;
 }
 
-void
+bytes
 State::handle(const Add& add)
 {
   // Verify the UserInitKey in the Add message
@@ -278,6 +280,11 @@ State::handle(const Add& add)
     throw InvalidParameterError("Leaf is not available for add");
   }
 
+  // Verify the WelcomeInfo hash
+  if (add.welcome_info_hash != welcome_info().hash(_suite)) {
+    throw ProtocolError("Mismatch in welcome info hash");
+  }
+
   // Add to the tree
   auto init_key = add.init_key.find_init_key(_suite);
   if (!init_key) {
@@ -285,11 +292,10 @@ State::handle(const Add& add)
   }
   _tree.add_leaf(add.index, *init_key, add.init_key.credential);
 
-  // Update symmetric state
-  update_epoch_secrets(_zero);
+  return _zero;
 }
 
-void
+bytes
 State::handle(LeafIndex index, const Update& update)
 {
   std::optional<bytes> leaf_secret = std::nullopt;
@@ -302,18 +308,21 @@ State::handle(LeafIndex index, const Update& update)
     _cached_leaf_secret.clear();
   }
 
-  update_leaf(index, update.path, leaf_secret);
+  return update_leaf(index, update.path, leaf_secret);
 }
 
-void
+bytes
 State::handle(const Remove& remove)
 {
   auto leaf_secret = std::nullopt;
-  update_leaf(remove.removed, remove.path, leaf_secret);
+  auto update_secret = update_leaf(remove.removed, remove.path, leaf_secret);
   _tree.blank_path(remove.removed);
+  _roster.remove(remove.removed.val);
 
   auto cut = _tree.leaf_span();
   _tree.truncate(cut);
+
+  return update_secret;
 }
 
 State::EpochSecrets
@@ -361,7 +370,24 @@ operator!=(const State& lhs, const State& rhs)
   return !(lhs == rhs);
 }
 
+WelcomeInfo
+State::welcome_info() const
+{
+  return { _group_id, _epoch,
+           _tree,     _transcript_hash, _init_secret };
+}
+
 void
+State::update_transcript_hash(const GroupOperation& operation)
+{
+  auto operation_bytes = tls::marshal(operation);
+  _transcript_hash = Digest(_suite)
+                             .write(_transcript_hash)
+                             .write(operation_bytes)
+                             .digest();
+}
+
+bytes
 State::update_leaf(LeafIndex index,
                    const DirectPath& path,
                    const std::optional<bytes>& leaf_secret)
@@ -375,7 +401,7 @@ State::update_leaf(LeafIndex index,
     _tree.merge_path(index, merge_path);
   }
 
-  update_epoch_secrets(update_secret);
+  return update_secret;
 }
 
 void
