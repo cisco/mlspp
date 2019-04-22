@@ -134,8 +134,7 @@ bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
-         (lhs.epoch == rhs.epoch) &&
-         (lhs.tree == rhs.tree) &&
+         (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
          (lhs.transcript_hash == rhs.transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
@@ -143,8 +142,8 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
-  return out << obj.version << obj.group_id << obj.epoch
-             << obj.tree << obj.transcript_hash << obj.init_secret;
+  return out << obj.version << obj.group_id << obj.epoch << obj.tree
+             << obj.transcript_hash << obj.init_secret;
 }
 
 tls::istream&

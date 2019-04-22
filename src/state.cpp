@@ -122,6 +122,7 @@ State::State(SignaturePrivateKey identity_priv,
   update_transcript_hash(handshake.operation);
 
   // Add to the tree
+  _index = add.index;
   _tree.add_leaf(_index, init_secret, credential);
 
   // Ratchet forward into shared state
@@ -258,7 +259,7 @@ State::handle(LeafIndex signer_index, const GroupOperation& operation) const
   }
 
   next.update_transcript_hash(operation);
-  next._state.epoch = _state.epoch + 1;
+  next._epoch += 1;
   next.update_epoch_secrets(update_secret);
 
   return next;
@@ -317,7 +318,6 @@ State::handle(const Remove& remove)
   auto leaf_secret = std::nullopt;
   auto update_secret = update_leaf(remove.removed, remove.path, leaf_secret);
   _tree.blank_path(remove.removed);
-  _roster.remove(remove.removed.val);
 
   auto cut = _tree.leaf_span();
   _tree.truncate(cut);
@@ -373,18 +373,15 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _group_id, _epoch,
-           _tree,     _transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _transcript_hash, _init_secret };
 }
 
 void
 State::update_transcript_hash(const GroupOperation& operation)
 {
   auto operation_bytes = tls::marshal(operation);
-  _transcript_hash = Digest(_suite)
-                             .write(_transcript_hash)
-                             .write(operation_bytes)
-                             .digest();
+  _transcript_hash =
+    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
 }
 
 bytes
