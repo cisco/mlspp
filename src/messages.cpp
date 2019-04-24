@@ -348,31 +348,6 @@ operator>>(tls::istream& in, GroupOperation& obj)
   return in;
 }
 
-// Handshake
-bool
-operator==(const Handshake& lhs, const Handshake& rhs)
-{
-  return (lhs.prior_epoch == rhs.prior_epoch) &&
-         (lhs.operation == rhs.operation) &&
-         (lhs.signer_index == rhs.signer_index) &&
-         (lhs.signature == rhs.signature) &&
-         (lhs.confirmation == rhs.confirmation);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Handshake& obj)
-{
-  return out << obj.prior_epoch << obj.operation << obj.signer_index
-             << obj.signature << obj.confirmation;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Handshake& obj)
-{
-  return in >> obj.prior_epoch >> obj.operation >> obj.signer_index >>
-         obj.signature >> obj.confirmation;
-}
-
 // ContentType
 
 tls::ostream&
@@ -459,15 +434,13 @@ bytes
 MLSPlaintext::to_be_signed() const
 {
   bytes content;
-  tls::opaque<4> app_data;
   switch (content_type) {
     case ContentType::handshake:
       content = tls::marshal(operation.value());
       break;
 
     case ContentType::application:
-      app_data = application_data.value();
-      content = tls::marshal(app_data);
+      content = tls::marshal(application_data.value());
       break;
 
     default:
@@ -491,6 +464,38 @@ MLSPlaintext::verify(const SignaturePublicKey& pub) const
 {
   auto tbs = to_be_signed();
   return pub.verify(tbs, signature);
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSPlaintext& obj)
+{
+  out.write_raw(obj.to_be_signed());
+  out << obj.signature;
+  return out;
+}
+
+tls::istream&
+operator>>(tls::istream& in, MLSPlaintext& obj)
+{
+  in >> obj.epoch >> obj.sender >> obj.content_type;
+
+  switch (obj.content_type) {
+    case ContentType::handshake:
+      obj.operation = GroupOperation(obj._suite);
+      in >> obj.operation.value();
+      break;
+
+    case ContentType::application:
+      obj.application_data = tls::opaque<4>();
+      in >> obj.application_data.value();
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  in >> obj.signature;
+  return in;
 }
 
 // MLSCiphertext

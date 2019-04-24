@@ -368,12 +368,15 @@ generate_messages()
     auto add_op = Add{ tv.removed, user_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
+    // TODO re-enable
+    /*
     auto add =
       Handshake{ tv.epoch, add_op, tv.signer_index, tv.random, tv.random };
     auto update =
       Handshake{ tv.epoch, update_op, tv.signer_index, tv.random, tv.random };
     auto remove =
       Handshake{ tv.epoch, remove_op, tv.signer_index, tv.random, tv.random };
+    */
 
     *cases[i] = {
       suite,
@@ -381,9 +384,9 @@ generate_messages()
       tls::marshal(user_init_key),
       tls::marshal(welcome_info),
       tls::marshal(welcome),
-      tls::marshal(add),
-      tls::marshal(update),
-      tls::marshal(remove),
+      bytes(), // tls::marshal(add),
+      bytes(), // tls::marshal(update),
+      bytes(), // tls::marshal(remove),
     };
   }
 

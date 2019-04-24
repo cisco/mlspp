@@ -100,21 +100,21 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   Welcome welcome;
   tls::unmarshal(welcome_data, welcome);
 
-  Handshake add{ welcome.cipher_suite };
+  MLSPlaintext add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
   State next(_identity_priv, _credential, _init_secret, welcome, add);
-  add_state(add.prior_epoch, next);
+  add_state(add.epoch, next);
 }
 
 void
 Session::handle(const bytes& handshake_data)
 {
-  Handshake handshake{ current_state().cipher_suite() };
+  MLSPlaintext handshake{ current_state().cipher_suite() };
   tls::unmarshal(handshake_data, handshake);
 
   auto next = current_state().handle(handshake);
-  add_state(handshake.prior_epoch, next);
+  add_state(handshake.epoch, next);
 }
 
 void

@@ -345,53 +345,6 @@ operator<<(tls::ostream& out, const GroupOperation& obj);
 tls::istream&
 operator>>(tls::istream& in, GroupOperation& obj);
 
-// struct {
-//     uint32 prior_epoch;
-//     GroupOperation operation;
-//
-//     uint32 signer_index;
-//     opaque signature<1..2^16-1>;
-//     opaque confirmation<1..2^8-1>;
-// } Handshake;
-//
-// TODO delete
-struct Handshake : public CipherAware
-{
-  epoch_t prior_epoch;
-  GroupOperation operation;
-
-  LeafIndex signer_index;
-  tls::opaque<2> signature;
-  tls::opaque<1> confirmation;
-
-  epoch_t epoch() const { return prior_epoch + 1; }
-
-  Handshake(CipherSuite suite)
-    : CipherAware(suite)
-    , operation(suite)
-  {}
-
-  Handshake(epoch_t prior_epoch,
-            const GroupOperation& operation,
-            LeafIndex signer_index,
-            const bytes& signature,
-            const bytes& confirmation)
-    : CipherAware(operation)
-    , prior_epoch(prior_epoch)
-    , operation(operation)
-    , signer_index(signer_index)
-    , signature(signature)
-    , confirmation(confirmation)
-  {}
-};
-
-bool
-operator==(const Handshake& lhs, const Handshake& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Handshake& obj);
-tls::istream&
-operator>>(tls::istream& in, Handshake& obj);
-
 // enum {
 //     invalid(0),
 //     handshake(1),
@@ -425,15 +378,16 @@ operator>>(tls::istream& in, ContentType& obj);
 //
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
-struct MLSCiphertext;
-struct MLSPlaintext
+struct MLSPlaintext : public CipherAware
 {
+  using CipherAware::CipherAware;
+
   uint32_t epoch;
   LeafIndex sender;
   ContentType content_type;
 
   std::optional<GroupOperation> operation;
-  std::optional<bytes> application_data;
+  std::optional<tls::opaque<4>> application_data;
 
   tls::opaque<2> signature;
 
@@ -443,12 +397,10 @@ struct MLSPlaintext
 
   bytes marshal_content(size_t padding_size) const;
   void unmarshal_content(CipherSuite suite, const bytes& marshaled);
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const MLSPlaintext& obj);
-tls::istream&
-operator>>(tls::istream& in, MLSPlaintext& obj);
+  friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);
+  friend tls::istream& operator>>(tls::istream& in, MLSPlaintext& obj);
+};
 
 // struct {
 //     uint32 epoch;

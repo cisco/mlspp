@@ -95,11 +95,11 @@ public:
         const Credential& credential,
         const bytes& init_secret,
         const Welcome& welcome_info,
-        const Handshake& handshake);
+        const MLSPlaintext& handshake);
 
   // Negotiate an initial state with another peer based on their
   // UserInitKey
-  typedef std::pair<State, std::pair<Welcome, Handshake>> InitialInfo;
+  typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
   static InitialInfo negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
@@ -113,22 +113,22 @@ public:
   ///
 
   // Generate a Add message
-  std::pair<Welcome, Handshake> add(const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(const UserInitKey& user_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, Handshake> add(uint32_t index,
-                                    const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(uint32_t index,
+                                       const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  Handshake update(const bytes& leaf_secret);
+  MLSPlaintext update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake remove(const bytes& evict_secret, uint32_t index) const;
+  MLSPlaintext remove(const bytes& evict_secret, uint32_t index) const;
 
   ///
   /// Generic handshake message handler
   ///
-  State handle(const Handshake& handshake) const;
+  State handle(const MLSPlaintext& handshake) const;
 
   ///
   /// Accessors
@@ -218,21 +218,15 @@ private:
   // Derive the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);
 
-  // Sign this state with the associated private key
-  Handshake sign(const GroupOperation& operation) const;
+  // Signing of handshake messages (including creation of the
+  // confirmation MAC)
+  MLSPlaintext sign(const GroupOperation& operation) const;
 
-  // Verify this state with the indicated public key
-  bool verify(const Handshake& handshake) const;
+  // Signature verification over a handshake message
+  bool verify(const MLSPlaintext& pt) const;
 
-  /////
-
-  // Confirmation MACs
-  void do_confirm(GroupOperation& operation) const;
-  bool check_confirm(const GroupOperation& operation) const;
-
-  // Sign and verification of handshake messages
-  MLSPlaintext sign2(const GroupOperation& operation) const;
-  bool verify2(const MLSPlaintext& pt) const;
+  // Verification of the confirmation MAC
+  bool verify_confirmation(const GroupOperation& operation) const;
 
   // Encrypt and decrypt MLS framed objects
   // XXX These probably need to be public

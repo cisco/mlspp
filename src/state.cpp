@@ -99,7 +99,7 @@ State::State(SignaturePrivateKey identity_priv,
              const Credential& credential,
              const bytes& init_secret,
              const Welcome& welcome,
-             const Handshake& handshake)
+             const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _handshake_keys(welcome.cipher_suite)
@@ -107,11 +107,12 @@ State::State(SignaturePrivateKey identity_priv,
   , _identity_priv(std::move(identity_priv))
 {
   // Verify that we have an add and it is for us
-  if (handshake.operation.type != GroupOperationType::add) {
+  if (handshake.operation.value().type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  auto add = handshake.operation.add;
+  auto operation = handshake.operation.value();
+  auto add = operation.add;
   if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
@@ -146,7 +147,7 @@ State::State(SignaturePrivateKey identity_priv,
   _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
-  update_transcript_hash(handshake.operation);
+  update_transcript_hash(operation);
 
   // Add to the tree
   _index = add.index;
@@ -202,13 +203,13 @@ State::negotiate(const bytes& group_id,
 /// Message factories
 ///
 
-std::pair<Welcome, Handshake>
+std::pair<Welcome, MLSPlaintext>
 State::add(const UserInitKey& user_init_key) const
 {
   return add(_tree.size(), user_init_key);
 }
 
-std::pair<Welcome, Handshake>
+std::pair<Welcome, MLSPlaintext>
 State::add(uint32_t index, const UserInitKey& user_init_key) const
 {
   if (!user_init_key.verify()) {
@@ -226,10 +227,10 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
   auto add = sign(Add{ LeafIndex{ index }, user_init_key, welcome_info_hash });
-  return std::pair<Welcome, Handshake>(welcome, add);
+  return std::pair<Welcome, MLSPlaintext>(welcome, add);
 }
 
-Handshake
+MLSPlaintext
 State::update(const bytes& leaf_secret)
 {
   auto path = _tree.encrypt(_index, leaf_secret);
@@ -237,7 +238,7 @@ State::update(const bytes& leaf_secret)
   return sign(Update{ path });
 }
 
-Handshake
+MLSPlaintext
 State::remove(const bytes& evict_secret, uint32_t index) const
 {
   if (index >= _tree.size()) {
@@ -253,16 +254,25 @@ State::remove(const bytes& evict_secret, uint32_t index) const
 ///
 
 State
-State::handle(const Handshake& handshake) const
+State::handle(const MLSPlaintext& handshake) const
 {
-  if (handshake.prior_epoch != _epoch) {
+  if (handshake.epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
   }
 
-  auto next = handle(handshake.signer_index, handshake.operation);
+  if (handshake.content_type != ContentType::handshake) {
+    throw InvalidParameterError("Incorrect content type");
+  }
 
-  if (!next.verify(handshake)) {
-    throw InvalidParameterError("Invalid handshake message signature");
+  if (!verify(handshake)) {
+    throw ProtocolError("Invalid handshake message signature");
+  }
+
+  auto& operation = handshake.operation.value();
+  auto next = handle(handshake.sender, operation);
+
+  if (!next.verify_confirmation(operation)) {
+    throw InvalidParameterError("Invalid confirmation MAC");
   }
 
   return next;
@@ -454,35 +464,6 @@ State::update_epoch_secrets(const bytes& update_secret)
   _handshake_keys.start(_index, _handshake_secret);
 }
 
-Handshake
-State::sign(const GroupOperation& operation) const
-{
-  auto next = handle(_index, operation);
-
-  auto sig_data = next._transcript_hash;
-  auto sig = _identity_priv.sign(sig_data);
-
-  auto confirm_data = sig_data + sig;
-  auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
-
-  return Handshake{ _epoch, operation, _index, sig, confirm };
-}
-
-bool
-State::verify(const Handshake& handshake) const
-{
-  auto pub = _tree.get_credential(handshake.signer_index).public_key();
-  auto sig_data = _transcript_hash;
-  auto sig = handshake.signature;
-  auto sig_ver = pub.verify(sig_data, sig);
-
-  auto confirm_data = sig_data + sig;
-  auto confirm = hmac(_suite, _confirmation_key, confirm_data);
-  auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
-
-  return sig_ver && confirm_ver;
-}
-
 ///
 /// Message encryption and decryption
 ///
@@ -544,38 +525,35 @@ sender_data_mask(CipherSuite suite,
   return mask;
 }
 
-void
-State::do_confirm(GroupOperation& operation) const
+MLSPlaintext
+State::sign(const GroupOperation& operation) const
 {
   auto next = handle(_index, operation);
-  operation.confirmation =
+  auto confirmation =
     hmac(_suite, next._confirmation_key, next._transcript_hash);
-}
 
-bool
-State::check_confirm(const GroupOperation& operation) const
-{
-  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
-  return constant_time_eq(confirm, operation.confirmation);
-}
-
-MLSPlaintext
-State::sign2(const GroupOperation& operation) const
-{
-  auto pt = MLSPlaintext{};
+  auto pt = MLSPlaintext{ _suite };
   pt.epoch = _epoch;
   pt.sender = _index;
   pt.content_type = ContentType::handshake;
   pt.operation = operation;
+  pt.operation.value().confirmation = confirmation;
   pt.sign(_identity_priv);
   return pt;
 }
 
 bool
-State::verify2(const MLSPlaintext& pt) const
+State::verify(const MLSPlaintext& pt) const
 {
   auto pub = _tree.get_credential(pt.sender).public_key();
   return pt.verify(pub);
+}
+
+bool
+State::verify_confirmation(const GroupOperation& operation) const
+{
+  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+  return constant_time_eq(confirm, operation.confirmation);
 }
 
 MLSCiphertext
@@ -669,7 +647,7 @@ State::decrypt(const MLSCiphertext& ct) const
   auto content = gcm.encrypt(ct.ciphertext);
 
   // Set up a template plaintext and parse into it
-  auto pt = MLSPlaintext{};
+  auto pt = MLSPlaintext{ _suite };
   pt.epoch = _epoch;
   pt.sender = sender_data.sender;
   pt.content_type = sender_data.content_type;
