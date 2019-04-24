@@ -335,6 +335,8 @@ State::derive_epoch_secrets(CipherSuite suite,
   return {
     epoch_secret,
     derive_secret(suite, epoch_secret, "app", group_state),
+    derive_secret(suite, epoch_secret, "hs", group_state),
+    derive_secret(suite, epoch_secret, "sender", group_state),
     derive_secret(suite, epoch_secret, "confirm", group_state),
     derive_secret(suite, epoch_secret, "init", group_state),
   };
@@ -416,6 +418,8 @@ State::update_epoch_secrets(const bytes& update_secret)
     derive_epoch_secrets(_suite, _init_secret, update_secret, _group_state);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
+  _handshake_secret = secrets.handshake_secret;
+  _sender_data_secret = secrets.sender_data_secret;
   _confirmation_key = secrets.confirmation_key;
   _init_secret = secrets.init_secret;
 }
@@ -447,6 +451,112 @@ State::verify(const Handshake& handshake) const
   auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
 
   return sig_ver && confirm_ver;
+}
+
+///
+/// Message encryption and decryption
+///
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint32 epoch;
+//     uint32 sender;
+//     ContentType content_type;
+//     uint32 generation;
+// } MLSContentAAD;
+static bytes
+content_aad(const bytes& group_id,
+            uint32_t epoch,
+            uint32_t sender,
+            ContentType content_type,
+            uint32_t generation)
+{
+  tls::ostream wc;
+  tls::opaque<1> tls_group_id = group_id;
+  wc << tls_group_id << epoch << sender << content_type << generation;
+  return wc.bytes();
+}
+
+struct SenderData
+{
+  uint32_t sender;
+  ContentType content_type;
+  uint32_t generation;
+};
+
+static tls::ostream&
+operator<<(tls::ostream& out, const SenderData& obj)
+{
+  return out << obj.sender << obj.content_type << obj.generation;
+}
+
+/*
+static tls::istream&
+operator>>(tls::istream& in, SenderData& obj)
+{
+  return in >> obj.sender >> obj.content_type >> obj.generation;
+}
+*/
+
+// sample = ciphertext[:Hash.length]
+// mask = HMAC(sender_data_secret, sample)[:9]
+static bytes
+sender_data_mask(CipherSuite suite,
+                 const bytes& sender_data_secret,
+                 const bytes& ciphertext)
+{
+  const size_t sender_data_size = 9;
+  size_t sample_size = Digest(suite).output_size();
+  if (sample_size > ciphertext.size()) {
+    sample_size = ciphertext.size();
+  }
+  auto sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
+  auto mask = hmac(suite, sender_data_secret, sample);
+  mask.resize(sender_data_size);
+  return mask;
+}
+
+MLSCiphertext
+State::encrypt(const MLSPlaintext& pt) const
+{
+  // TODO get from key schedule
+  bytes content_key;
+  bytes content_nonce;
+  uint32_t generation = 0;
+
+  // Compute the plaintext input and AAD
+  // XXX(rlb@ipv.sx): Apply padding?
+  auto content = pt.marshal_content(0);
+  auto aad =
+    content_aad(_group_id, _epoch, _index.val, pt.content_type, generation);
+
+  // Encrypt the plaintext
+  auto gcm = AESGCM(content_key, content_nonce);
+  gcm.set_aad(aad);
+  auto ciphertext = gcm.encrypt(content);
+
+  // Compute and mask the sender data
+  // TODO generate sender_data_secret
+  auto sender_data =
+    tls::marshal(SenderData{ _index.val, pt.content_type, generation });
+  auto mask = sender_data_mask(_suite, _sender_data_secret, ciphertext);
+  auto masked_sender_data = sender_data ^ mask;
+
+  // Assemble the MLSCiphertext
+  MLSCiphertext out;
+  out.epoch = _epoch;
+  std::copy(masked_sender_data.begin(),
+            masked_sender_data.end(),
+            out.masked_sender_data.begin());
+  out.ciphertext = ciphertext;
+  return out;
+}
+
+MLSPlaintext
+State::decrypt(const MLSCiphertext& ct) const
+{
+  // TODO
+  return MLSPlaintext{};
 }
 
 } // namespace mls

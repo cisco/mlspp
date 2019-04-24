@@ -351,6 +351,8 @@ operator>>(tls::istream& in, GroupOperation& obj);
 //     opaque signature<1..2^16-1>;
 //     opaque confirmation<1..2^8-1>;
 // } Handshake;
+//
+// TODO delete
 struct Handshake : public CipherAware
 {
   epoch_t prior_epoch;
@@ -387,5 +389,80 @@ tls::ostream&
 operator<<(tls::ostream& out, const Handshake& obj);
 tls::istream&
 operator>>(tls::istream& in, Handshake& obj);
+
+// enum {
+//     invalid(0),
+//     handshake(1),
+//     application(2),
+//     (255)
+// } ContentType;
+enum struct ContentType : uint8_t
+{
+  invalid = 0,
+  handshake = 1,
+  application = 2,
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const ContentType& obj);
+tls::istream&
+operator>>(tls::istream& in, ContentType& obj);
+
+// struct {
+//     uint32 epoch;
+//     uint32 sender;
+//     ContentType content_type;
+//
+//     select (MLSPlaintext.type) {
+//         case handshake:
+//             GroupOperation operation;
+//
+//         case application:
+//             opaque application_data<0..2^32-1>;
+//     }
+//
+//     opaque signature<0..2^16-1>;
+// } MLSPlaintext;
+struct MLSCiphertext;
+class State;
+struct MLSPlaintext
+{
+  uint32_t epoch;
+  uint32_t sender;
+  ContentType content_type;
+
+  std::optional<GroupOperation> operation;
+  std::optional<bytes> application_data;
+
+  tls::opaque<2> signature;
+
+  void sign(const SignaturePrivateKey& priv);
+  bool verify(const SignaturePublicKey& pub) const;
+
+  bytes marshal_content(size_t padding_size) const;
+  void unmarshal_content(CipherSuite suite, const bytes& marshaled);
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSPlaintext& obj);
+tls::istream&
+operator>>(tls::istream& in, MLSPlaintext& obj);
+
+// struct {
+//     uint32 epoch;
+//     opaque masked_sender_data[9];
+//     opaque ciphertext<0..2^32-1>;
+// } MLSCiphertext;
+struct MLSCiphertext
+{
+  uint32_t epoch;
+  std::array<uint8_t, 9> masked_sender_data;
+  tls::opaque<4> ciphertext;
+};
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSCiphertext& obj);
+tls::istream&
+operator>>(tls::istream& in, MLSCiphertext& obj);
 
 } // namespace mls

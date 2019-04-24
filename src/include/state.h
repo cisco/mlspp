@@ -148,6 +148,8 @@ public:
   {
     bytes epoch_secret;
     bytes application_secret;
+    bytes handshake_secret;
+    bytes sender_data_secret;
     bytes confirmation_key;
     bytes init_secret;
   };
@@ -168,6 +170,8 @@ private:
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;
+  tls::opaque<1> _sender_data_secret;
+  tls::opaque<1> _handshake_secret;
   tls::opaque<1> _application_secret;
   tls::opaque<1> _confirmation_key;
   tls::opaque<1> _init_secret;
@@ -215,6 +219,11 @@ private:
 
   // Verify this state with the indicated public key
   bool verify(const Handshake& handshake) const;
+
+  // Encrypt and decrypt MLS framed objects
+  // XXX These probably need to be public
+  MLSCiphertext encrypt(const MLSPlaintext& pt) const;
+  MLSPlaintext decrypt(const MLSCiphertext& ct) const;
 };
 
 } // namespace mls

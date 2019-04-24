@@ -48,8 +48,22 @@ operator+=(bytes& lhs, const bytes& rhs)
 bytes
 operator+(const bytes& lhs, const bytes& rhs)
 {
-  bytes out(lhs);
+  bytes out = lhs;
   out += rhs;
+  return out;
+}
+
+bytes
+operator^(const bytes& lhs, const bytes& rhs)
+{
+  if (lhs.size() != rhs.size()) {
+    throw InvalidParameterError("XOR with unequal size");
+  }
+
+  bytes out(lhs.size());
+  for (int i = 0; i < lhs.size(); ++i) {
+    out[i] = lhs[i] ^ rhs[i];
+  }
   return out;
 }
 

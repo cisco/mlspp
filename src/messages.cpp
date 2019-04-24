@@ -360,4 +360,98 @@ operator>>(tls::istream& in, Handshake& obj)
          obj.signature >> obj.confirmation;
 }
 
+// ContentType
+
+tls::ostream&
+operator<<(tls::ostream& out, const ContentType& obj)
+{
+  return out << static_cast<uint8_t>(obj);
+}
+
+tls::istream&
+operator>>(tls::istream& in, ContentType& obj)
+{
+  uint8_t val;
+  in >> val;
+  obj = static_cast<ContentType>(val);
+  return in;
+}
+
+// MLSPlaintext
+
+// struct {
+//     opaque content[MLSPlaintext.length];
+//     uint8 signature[MLSInnerPlaintext.sig_len];
+//     uint16 sig_len;
+//     uint8  marker = 1;
+//     uint8  zero\_padding[length\_of\_padding];
+// } MLSContentPlaintext;
+bytes
+MLSPlaintext::marshal_content(size_t padding_size) const
+{
+  bytes content;
+  if (content_type == ContentType::handshake) {
+    content = tls::marshal(operation.value());
+  } else if (content_type == ContentType::application) {
+    content = application_data.value();
+  } else {
+    throw InvalidParameterError("Unknown content type");
+  }
+
+  uint16_t sig_len = signature.size();
+  auto marker = bytes{ 0x01 };
+  auto pad = zero_bytes(padding_size);
+  content = content + signature + tls::marshal(sig_len) + marker + pad;
+  return content;
+}
+
+void
+MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
+{
+  int cut = marshaled.size() - 1;
+  for (; marshaled[cut] == 0 && cut >= 0; cut -= 1) {
+  }
+  if (marshaled[cut] != 0x01) {
+    throw ProtocolError("Invalid marker byte");
+  }
+
+  uint16_t sig_len;
+  auto start = marshaled.begin();
+  auto sig_len_bytes = bytes(start + cut - 2, start + cut);
+  tls::unmarshal(sig_len_bytes, sig_len);
+  cut -= 2;
+  if (sig_len > cut) {
+    throw ProtocolError("Invalid signature size");
+  }
+
+  signature = bytes(start + cut - sig_len, start + cut);
+  auto content = bytes(start, start + cut - sig_len);
+
+  switch (content_type) {
+    case ContentType::handshake:
+      operation = GroupOperation(suite);
+      tls::unmarshal(content, operation.value());
+
+    case ContentType::application:
+      application_data = content;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+}
+
+// MLSCiphertext
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSCiphertext& obj)
+{
+  return out << obj.epoch << obj.masked_sender_data << obj.ciphertext;
+}
+
+tls::istream&
+operator>>(tls::istream& in, MLSCiphertext& obj)
+{
+  return in >> obj.epoch >> obj.masked_sender_data >> obj.ciphertext;
+}
+
 } // namespace mls
