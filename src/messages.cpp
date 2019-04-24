@@ -298,7 +298,8 @@ operator==(const GroupOperation& lhs, const GroupOperation& rhs)
           ((lhs.type == GroupOperationType::update) &&
            (lhs.update == rhs.update)) ||
           ((lhs.type == GroupOperationType::remove) &&
-           (lhs.remove == rhs.remove)));
+           (lhs.remove == rhs.remove))) &&
+         (lhs.confirmation == rhs.confirmation);
 }
 
 tls::ostream&
@@ -308,14 +309,20 @@ operator<<(tls::ostream& out, const GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      return out << obj.add;
+      out << obj.add;
+      break;
     case GroupOperationType::update:
-      return out << obj.update;
+      out << obj.update;
+      break;
     case GroupOperationType::remove:
-      return out << obj.remove;
+      out << obj.remove;
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
   }
 
-  throw InvalidParameterError("Unknown group operation type");
+  out << obj.confirmation;
+  return out;
 }
 
 tls::istream&
@@ -325,14 +332,20 @@ operator>>(tls::istream& in, GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      return in >> obj.add;
+      in >> obj.add;
+      break;
     case GroupOperationType::update:
-      return in >> obj.update;
+      in >> obj.update;
+      break;
     case GroupOperationType::remove:
-      return in >> obj.remove;
+      in >> obj.remove;
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
   }
 
-  throw InvalidParameterError("Unknown group operation type");
+  in >> obj.confirmation;
+  return in;
 }
 
 // Handshake
@@ -431,13 +444,53 @@ MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
     case ContentType::handshake:
       operation = GroupOperation(suite);
       tls::unmarshal(content, operation.value());
+      break;
 
     case ContentType::application:
       application_data = content;
+      break;
 
     default:
       throw InvalidParameterError("Unknown content type");
   }
+}
+
+bytes
+MLSPlaintext::to_be_signed() const
+{
+  bytes content;
+  tls::opaque<4> app_data;
+  switch (content_type) {
+    case ContentType::handshake:
+      content = tls::marshal(operation.value());
+      break;
+
+    case ContentType::application:
+      app_data = application_data.value();
+      content = tls::marshal(app_data);
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  tls::ostream w;
+  w << epoch << sender << content_type;
+  return w.bytes() + content;
+}
+
+void
+MLSPlaintext::sign(const SignaturePrivateKey& priv)
+{
+  auto tbs = to_be_signed();
+  signature = priv.sign(tbs);
+}
+
+bool
+MLSPlaintext::verify(const SignaturePublicKey& pub) const
+{
+  auto tbs = to_be_signed();
+  return pub.verify(tbs, signature);
 }
 
 // MLSCiphertext

@@ -544,6 +544,40 @@ sender_data_mask(CipherSuite suite,
   return mask;
 }
 
+void
+State::do_confirm(GroupOperation& operation) const
+{
+  auto next = handle(_index, operation);
+  operation.confirmation =
+    hmac(_suite, next._confirmation_key, next._transcript_hash);
+}
+
+bool
+State::check_confirm(const GroupOperation& operation) const
+{
+  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+  return constant_time_eq(confirm, operation.confirmation);
+}
+
+MLSPlaintext
+State::sign2(const GroupOperation& operation) const
+{
+  auto pt = MLSPlaintext{};
+  pt.epoch = _epoch;
+  pt.sender = _index;
+  pt.content_type = ContentType::handshake;
+  pt.operation = operation;
+  pt.sign(_identity_priv);
+  return pt;
+}
+
+bool
+State::verify2(const MLSPlaintext& pt) const
+{
+  auto pub = _tree.get_credential(pt.sender).public_key();
+  return pt.verify(pub);
+}
+
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
@@ -552,8 +586,12 @@ State::encrypt(const MLSPlaintext& pt)
   switch (pt.content_type) {
     case ContentType::handshake:
       keys = _handshake_keys.next();
+      break;
+
     case ContentType::application:
       keys = _application_keys.next();
+      break;
+
     default:
       throw InvalidParameterError("Unknown content type");
   }
@@ -610,8 +648,12 @@ State::decrypt(const MLSCiphertext& ct) const
   switch (sender_data.content_type) {
     case ContentType::handshake:
       keys = _handshake_keys.get(sender_data.sender, sender_data.generation);
+      break;
+
     case ContentType::application:
       keys = _application_keys.get(sender_data.sender, sender_data.generation);
+      break;
+
     default:
       throw InvalidParameterError("Unknown content type");
   }

@@ -296,6 +296,8 @@ struct GroupOperation : public CipherAware
   Update update;
   Remove remove;
 
+  tls::opaque<1> confirmation;
+
   GroupOperation()
     : CipherAware(DUMMY_CIPHERSUITE)
     , add()
@@ -424,7 +426,6 @@ operator>>(tls::istream& in, ContentType& obj);
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
 struct MLSCiphertext;
-class State;
 struct MLSPlaintext
 {
   uint32_t epoch;
@@ -436,6 +437,7 @@ struct MLSPlaintext
 
   tls::opaque<2> signature;
 
+  bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);
   bool verify(const SignaturePublicKey& pub) const;
 

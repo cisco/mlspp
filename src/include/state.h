@@ -224,6 +224,16 @@ private:
   // Verify this state with the indicated public key
   bool verify(const Handshake& handshake) const;
 
+  /////
+
+  // Confirmation MACs
+  void do_confirm(GroupOperation& operation) const;
+  bool check_confirm(const GroupOperation& operation) const;
+
+  // Sign and verification of handshake messages
+  MLSPlaintext sign2(const GroupOperation& operation) const;
+  bool verify2(const MLSPlaintext& pt) const;
+
   // Encrypt and decrypt MLS framed objects
   // XXX These probably need to be public
   MLSCiphertext encrypt(const MLSPlaintext& pt);
