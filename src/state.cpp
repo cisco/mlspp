@@ -28,6 +28,14 @@ const char* KeyChain::_secret_label = "sender";
 const char* KeyChain::_nonce_label = "nonce";
 const char* KeyChain::_key_label = "key";
 
+void
+KeyChain::start(LeafIndex my_sender, const bytes& root_secret)
+{
+  _my_generation = 0;
+  _my_sender = my_sender;
+  _root_secret = root_secret;
+}
+
 KeyChain::Generation
 KeyChain::next()
 {
@@ -80,6 +88,8 @@ State::State(bytes group_id,
   , _tree(suite, leaf_secret, credential)
   , _transcript_hash(zero_bytes(Digest(suite).output_size()))
   , _init_secret(Digest(suite).output_size())
+  , _handshake_keys(suite)
+  , _application_keys(suite)
   , _index(0)
   , _identity_priv(std::move(identity_priv))
   , _zero(Digest(suite).output_size(), 0)
@@ -92,6 +102,8 @@ State::State(SignaturePrivateKey identity_priv,
              const Handshake& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
+  , _handshake_keys(welcome.cipher_suite)
+  , _application_keys(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
   // Verify that we have an add and it is for us
@@ -437,6 +449,9 @@ State::update_epoch_secrets(const bytes& update_secret)
   _sender_data_secret = secrets.sender_data_secret;
   _confirmation_key = secrets.confirmation_key;
   _init_secret = secrets.init_secret;
+
+  _application_keys.start(_index, _application_secret);
+  _handshake_keys.start(_index, _handshake_secret);
 }
 
 Handshake
@@ -482,7 +497,7 @@ State::verify(const Handshake& handshake) const
 static bytes
 content_aad(const bytes& group_id,
             uint32_t epoch,
-            uint32_t sender,
+            LeafIndex sender,
             ContentType content_type,
             uint32_t generation)
 {
@@ -494,7 +509,7 @@ content_aad(const bytes& group_id,
 
 struct SenderData
 {
-  uint32_t sender;
+  LeafIndex sender;
   ContentType content_type;
   uint32_t generation;
 };
@@ -505,13 +520,11 @@ operator<<(tls::ostream& out, const SenderData& obj)
   return out << obj.sender << obj.content_type << obj.generation;
 }
 
-/*
 static tls::istream&
 operator>>(tls::istream& in, SenderData& obj)
 {
   return in >> obj.sender >> obj.content_type >> obj.generation;
 }
-*/
 
 // sample = ciphertext[:Hash.length]
 // mask = HMAC(sender_data_secret, sample)[:9]
@@ -532,46 +545,94 @@ sender_data_mask(CipherSuite suite,
 }
 
 MLSCiphertext
-State::encrypt(const MLSPlaintext& pt) const
+State::encrypt(const MLSPlaintext& pt)
 {
-  // TODO get from key schedule
-  bytes content_key;
-  bytes content_nonce;
-  uint32_t generation = 0;
+  // Pull from the key schedule
+  KeyChain::Generation keys;
+  switch (pt.content_type) {
+    case ContentType::handshake:
+      keys = _handshake_keys.next();
+    case ContentType::application:
+      keys = _application_keys.next();
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
 
   // Compute the plaintext input and AAD
   // XXX(rlb@ipv.sx): Apply padding?
   auto content = pt.marshal_content(0);
   auto aad =
-    content_aad(_group_id, _epoch, _index.val, pt.content_type, generation);
+    content_aad(_group_id, _epoch, _index, pt.content_type, keys.generation);
 
   // Encrypt the plaintext
-  auto gcm = AESGCM(content_key, content_nonce);
+  auto gcm = AESGCM(keys.key, keys.nonce);
   gcm.set_aad(aad);
   auto ciphertext = gcm.encrypt(content);
 
   // Compute and mask the sender data
   // TODO generate sender_data_secret
   auto sender_data =
-    tls::marshal(SenderData{ _index.val, pt.content_type, generation });
+    tls::marshal(SenderData{ _index, pt.content_type, keys.generation });
   auto mask = sender_data_mask(_suite, _sender_data_secret, ciphertext);
   auto masked_sender_data = sender_data ^ mask;
 
   // Assemble the MLSCiphertext
-  MLSCiphertext out;
-  out.epoch = _epoch;
+  MLSCiphertext ct;
+  ct.epoch = _epoch;
   std::copy(masked_sender_data.begin(),
             masked_sender_data.end(),
-            out.masked_sender_data.begin());
-  out.ciphertext = ciphertext;
-  return out;
+            ct.masked_sender_data.begin());
+  ct.ciphertext = ciphertext;
+  return ct;
 }
 
 MLSPlaintext
 State::decrypt(const MLSCiphertext& ct) const
 {
-  // TODO
-  return MLSPlaintext{};
+  // Verify the epoch
+  if (ct.epoch != _epoch) {
+    throw InvalidParameterError("Ciphertext not from this epoch");
+  }
+
+  // Unmask, parse, and validate the sender data
+  auto mask = sender_data_mask(_suite, _sender_data_secret, ct.ciphertext);
+  auto masked_sender_data =
+    bytes(ct.masked_sender_data.begin(), ct.masked_sender_data.end());
+  auto sender_data_data = masked_sender_data ^ mask;
+  SenderData sender_data;
+  tls::unmarshal(sender_data_data, sender_data);
+  if (!_tree.occupied(sender_data.sender)) {
+    throw ProtocolError("Encryption from unoccupied leaf");
+  }
+
+  // Pull from the key schedule
+  KeyChain::Generation keys;
+  switch (sender_data.content_type) {
+    case ContentType::handshake:
+      keys = _handshake_keys.get(sender_data.sender, sender_data.generation);
+    case ContentType::application:
+      keys = _application_keys.get(sender_data.sender, sender_data.generation);
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  // Compute the plaintext AAD and decrypt
+  auto aad = content_aad(_group_id,
+                         _epoch,
+                         sender_data.sender,
+                         sender_data.content_type,
+                         sender_data.generation);
+  auto gcm = AESGCM(keys.key, keys.nonce);
+  gcm.set_aad(aad);
+  auto content = gcm.encrypt(ct.ciphertext);
+
+  // Set up a template plaintext and parse into it
+  auto pt = MLSPlaintext{};
+  pt.epoch = _epoch;
+  pt.sender = sender_data.sender;
+  pt.content_type = sender_data.content_type;
+  pt.unmarshal_content(_suite, content);
+  return pt;
 }
 
 } // namespace mls

@@ -34,10 +34,8 @@ operator>>(tls::istream& out, GroupState& obj);
 class KeyChain
 {
 public:
-  KeyChain(CipherSuite suite, LeafIndex my_index, const bytes& root_secret)
+  KeyChain(CipherSuite suite)
     : _suite(suite)
-    , _my_sender(my_index)
-    , _my_generation(0)
     , _secret_size(Digest(suite).output_size())
     , _key_size(AESGCM::key_size(suite))
     , _nonce_size(AESGCM::nonce_size)
@@ -51,6 +49,7 @@ public:
     bytes nonce;
   };
 
+  void start(LeafIndex my_index, const bytes& root_secret);
   Generation next();
   Generation get(LeafIndex sender, uint32_t generation) const;
 
@@ -177,6 +176,10 @@ private:
   tls::opaque<1> _confirmation_key;
   tls::opaque<1> _init_secret;
 
+  // Message protection keys
+  KeyChain _handshake_keys;
+  KeyChain _application_keys;
+
   // Per-participant state
   LeafIndex _index;
   SignaturePrivateKey _identity_priv;
@@ -223,7 +226,7 @@ private:
 
   // Encrypt and decrypt MLS framed objects
   // XXX These probably need to be public
-  MLSCiphertext encrypt(const MLSPlaintext& pt) const;
+  MLSCiphertext encrypt(const MLSPlaintext& pt);
   MLSPlaintext decrypt(const MLSCiphertext& ct) const;
 };
 

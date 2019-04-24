@@ -428,7 +428,7 @@ class State;
 struct MLSPlaintext
 {
   uint32_t epoch;
-  uint32_t sender;
+  LeafIndex sender;
   ContentType content_type;
 
   std::optional<GroupOperation> operation;

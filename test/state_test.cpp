@@ -16,7 +16,8 @@ protected:
   void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
   {
     ASSERT_EQ(tc.size(), tv.n_members);
-    KeyChain chain(suite, LeafIndex{ 0 }, tv.application_secret);
+    KeyChain chain(suite);
+    chain.start(LeafIndex{ 0 }, tv.application_secret);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
       ASSERT_EQ(tc[j].size(), tv.n_generations);
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
