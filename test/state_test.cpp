@@ -16,12 +16,11 @@ protected:
   void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
   {
     ASSERT_EQ(tc.size(), tv.n_members);
+    KeyChain chain(suite, LeafIndex{ 0 }, tv.application_secret);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.application_secret);
-
       ASSERT_EQ(tc[j].size(), tv.n_generations);
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(k);
+        auto kn = chain.get(LeafIndex{ j }, k);
         ASSERT_EQ(tc[j][k].secret, kn.secret);
         ASSERT_EQ(tc[j][k].key, kn.key);
         ASSERT_EQ(tc[j][k].nonce, kn.nonce);

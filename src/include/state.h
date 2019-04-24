@@ -31,34 +31,34 @@ operator>>(tls::istream& out, GroupState& obj);
 // never ratchet forward the base secret.  This allows for maximal
 // out-of-order delivery, but provides no forward secrecy within an
 // epoch.
-class ApplicationKeyChain
+class KeyChain
 {
 public:
-  ApplicationKeyChain(CipherSuite suite,
-                      uint32_t sender,
-                      const bytes& app_secret)
+  KeyChain(CipherSuite suite, LeafIndex my_index, const bytes& root_secret)
     : _suite(suite)
-    , _sender(tls::marshal(sender))
+    , _my_sender(my_index)
+    , _my_generation(0)
     , _secret_size(Digest(suite).output_size())
     , _key_size(AESGCM::key_size(suite))
     , _nonce_size(AESGCM::nonce_size)
-  {
-    _base_secret = derive(app_secret, _secret_label, _secret_size);
-  }
+  {}
 
-  struct KeyAndNonce
+  struct Generation
   {
+    uint32_t generation;
     bytes secret;
     bytes key;
     bytes nonce;
   };
 
-  KeyAndNonce get(uint32_t generation) const;
+  Generation next();
+  Generation get(LeafIndex sender, uint32_t generation) const;
 
 private:
   CipherSuite _suite;
-  bytes _sender;
-  bytes _base_secret;
+  LeafIndex _my_sender;
+  uint32_t _my_generation;
+  bytes _root_secret;
 
   size_t _secret_size;
   size_t _key_size;
@@ -73,6 +73,7 @@ private:
 
   bytes derive(const bytes& secret,
                const std::string& label,
+               const bytes& context,
                const size_t size) const;
 };
 

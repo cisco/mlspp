@@ -200,12 +200,12 @@ generate_app_key_schedule()
     auto suite = suites[i];
     auto test_case = cases[i];
 
+    KeyChain chain(suite, LeafIndex{ 0 }, tv.application_secret);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.application_secret);
       test_case->emplace_back();
 
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(k);
+        auto kn = chain.get(LeafIndex{ j }, k);
         test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
       }
     }

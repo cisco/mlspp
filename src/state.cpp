@@ -24,30 +24,45 @@ operator>>(tls::istream& out, GroupState& obj)
 /// ApplicationKeyChain
 ///
 
-const char* ApplicationKeyChain::_secret_label = "app sender";
-const char* ApplicationKeyChain::_nonce_label = "nonce";
-const char* ApplicationKeyChain::_key_label = "key";
+const char* KeyChain::_secret_label = "sender";
+const char* KeyChain::_nonce_label = "nonce";
+const char* KeyChain::_key_label = "key";
 
-ApplicationKeyChain::KeyAndNonce
-ApplicationKeyChain::get(uint32_t generation) const
+KeyChain::Generation
+KeyChain::next()
 {
-  auto secret = _base_secret;
+  _my_generation += 1;
+  return get(_my_sender, _my_generation);
+}
+
+KeyChain::Generation
+KeyChain::get(LeafIndex sender, uint32_t generation) const
+{
+  auto sender_bytes = tls::marshal(sender.val);
+  auto secret = _root_secret;
+
+  // Split off onto the sender chain
+  secret = derive(secret, _secret_label, sender_bytes, _secret_size);
+
+  // Work down the generations
   for (uint32_t i = 0; i < generation; ++i) {
-    secret = derive(secret, _secret_label, _secret_size);
+    secret = derive(secret, _secret_label, sender_bytes, _secret_size);
   }
 
-  auto key = derive(secret, _key_label, _key_size);
-  auto nonce = derive(secret, _nonce_label, _nonce_size);
+  // Derive the key and nonce
+  auto key = derive(secret, _key_label, bytes(), _key_size);
+  auto nonce = derive(secret, _nonce_label, bytes(), _nonce_size);
 
-  return KeyAndNonce{ secret, key, nonce };
+  return Generation{ generation, secret, key, nonce };
 }
 
 bytes
-ApplicationKeyChain::derive(const bytes& secret,
-                            const std::string& label,
-                            const size_t size) const
+KeyChain::derive(const bytes& secret,
+                 const std::string& label,
+                 const bytes& context,
+                 const size_t size) const
 {
-  return hkdf_expand_label(_suite, secret, label, _sender, size);
+  return hkdf_expand_label(_suite, secret, label, context, size);
 }
 
 ///
