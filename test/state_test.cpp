@@ -56,6 +56,8 @@ protected:
   std::vector<UserInitKey> user_init_keys;
   std::vector<State> states;
 
+  const bytes test_message = from_hex("01020304");
+
   GroupCreationTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
@@ -94,6 +96,11 @@ TEST_F(GroupCreationTest, TwoPerson)
     State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
   ASSERT_EQ(first, second);
+
+  // Verify that they can exchange protected messages
+  auto encrypted = first.protect(test_message);
+  auto decrypted = second.unprotect(encrypted);
+  ASSERT_EQ(decrypted, test_message);
 }
 
 TEST_F(GroupCreationTest, FullSize)
@@ -118,6 +125,17 @@ TEST_F(GroupCreationTest, FullSize)
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
       ASSERT_EQ(state, states[0]);
+    }
+
+    // Check that everyone can send and be received
+    for (auto& state : states) {
+      auto encrypted = state.protect(test_message);
+      std::cout << state.index().val << " -> " << tls::marshal(encrypted)
+                << std::endl;
+      for (auto& other : states) {
+        auto decrypted = other.unprotect(encrypted);
+        ASSERT_EQ(decrypted, test_message);
+      }
     }
   }
 }

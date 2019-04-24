@@ -380,6 +380,35 @@ State::derive_epoch_secrets(CipherSuite suite,
 }
 
 ///
+/// Message protection
+///
+
+MLSCiphertext
+State::protect(const bytes& data)
+{
+  MLSPlaintext pt{ _epoch, _index, data };
+  pt.sign(_identity_priv);
+
+  return encrypt(pt);
+}
+
+bytes
+State::unprotect(const MLSCiphertext& ct)
+{
+  MLSPlaintext pt = decrypt(ct);
+
+  if (!verify(pt)) {
+    throw ProtocolError("Invalid message signature");
+  }
+
+  if (pt.content_type != ContentType::application) {
+    throw ProtocolError("Unprotect of non-application message");
+  }
+
+  return pt.application_data.value();
+}
+
+///
 /// Inner logic and convenience functions
 ///
 
@@ -643,7 +672,7 @@ State::decrypt(const MLSCiphertext& ct) const
                          sender_data.generation);
   auto gcm = AESGCM(keys.key, keys.nonce);
   gcm.set_aad(aad);
-  auto content = gcm.encrypt(ct.ciphertext);
+  auto content = gcm.decrypt(ct.ciphertext);
 
   // Set up a template plaintext and parse into it
   auto pt = MLSPlaintext{ _suite };

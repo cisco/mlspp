@@ -142,6 +142,12 @@ public:
   bytes init_secret() const { return _init_secret; }
 
   ///
+  /// Encryption and decryption
+  ///
+  MLSCiphertext protect(const bytes& pt);
+  bytes unprotect(const MLSCiphertext& ct);
+
+  ///
   /// Static access to the key schedule
   ///
   struct EpochSecrets
@@ -229,7 +235,6 @@ private:
   bool verify_confirmation(const GroupOperation& operation) const;
 
   // Encrypt and decrypt MLS framed objects
-  // XXX These probably need to be public
   MLSCiphertext encrypt(const MLSPlaintext& pt);
   MLSPlaintext decrypt(const MLSCiphertext& ct) const;
 };
