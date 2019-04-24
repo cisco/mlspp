@@ -292,58 +292,43 @@ struct GroupOperation : public CipherAware
 {
   GroupOperationType type;
 
-  Add add;
-  Update update;
-  Remove remove;
+  std::optional<Add> add;
+  std::optional<Update> update;
+  std::optional<Remove> remove;
 
   tls::opaque<1> confirmation;
 
   GroupOperation()
     : CipherAware(DUMMY_CIPHERSUITE)
-    , add()
-    , update(DUMMY_CIPHERSUITE)
-    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(CipherSuite suite)
     : CipherAware(suite)
-    , add()
-    , update(suite)
-    , remove(suite)
   {}
 
   GroupOperation(const Add& add)
     : CipherAware(DUMMY_CIPHERSUITE)
     , type(add.type)
     , add(add)
-    , update(DUMMY_CIPHERSUITE)
-    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(const Update& update)
     : CipherAware(update)
     , type(update.type)
-    , add()
     , update(update)
-    , remove(update.cipher_suite())
 
   {}
 
   GroupOperation(const Remove& remove)
     : CipherAware(remove)
     , type(remove.type)
-    , add()
-    , update(remove.cipher_suite())
     , remove(remove)
   {}
-};
 
-bool
-operator==(const GroupOperation& lhs, const GroupOperation& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const GroupOperation& obj);
-tls::istream&
-operator>>(tls::istream& in, GroupOperation& obj);
+  friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
+  friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);
+};
 
 // enum {
 //     invalid(0),

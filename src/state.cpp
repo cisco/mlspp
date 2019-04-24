@@ -112,7 +112,7 @@ State::State(SignaturePrivateKey identity_priv,
   }
 
   auto operation = handshake.operation.value();
-  auto add = operation.add;
+  auto add = operation.add.value();
   if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
@@ -285,13 +285,13 @@ State::handle(LeafIndex signer_index, const GroupOperation& operation) const
   bytes update_secret;
   switch (operation.type) {
     case GroupOperationType::add:
-      update_secret = next.handle(operation.add);
+      update_secret = next.handle(operation.add.value());
       break;
     case GroupOperationType::update:
-      update_secret = next.handle(signer_index, operation.update);
+      update_secret = next.handle(signer_index, operation.update.value());
       break;
     case GroupOperationType::remove:
-      update_secret = next.handle(operation.remove);
+      update_secret = next.handle(operation.remove.value());
       break;
   }
 

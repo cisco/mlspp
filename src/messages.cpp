@@ -294,11 +294,12 @@ bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 {
   return (lhs.type == rhs.type) &&
-         (((lhs.type == GroupOperationType::add) && (lhs.add == rhs.add)) ||
+         (((lhs.type == GroupOperationType::add) &&
+           (lhs.add.value() == rhs.add.value())) ||
           ((lhs.type == GroupOperationType::update) &&
-           (lhs.update == rhs.update)) ||
+           (lhs.update.value() == rhs.update.value())) ||
           ((lhs.type == GroupOperationType::remove) &&
-           (lhs.remove == rhs.remove))) &&
+           (lhs.remove.value() == rhs.remove.value()))) &&
          (lhs.confirmation == rhs.confirmation);
 }
 
@@ -309,13 +310,13 @@ operator<<(tls::ostream& out, const GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      out << obj.add;
+      out << obj.add.value();
       break;
     case GroupOperationType::update:
-      out << obj.update;
+      out << obj.update.value();
       break;
     case GroupOperationType::remove:
-      out << obj.remove;
+      out << obj.remove.value();
       break;
     default:
       throw InvalidParameterError("Unknown group operation type");
@@ -332,13 +333,16 @@ operator>>(tls::istream& in, GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      in >> obj.add;
+      obj.add = Add();
+      in >> obj.add.value();
       break;
     case GroupOperationType::update:
-      in >> obj.update;
+      obj.update = Update(obj._suite);
+      in >> obj.update.value();
       break;
     case GroupOperationType::remove:
-      in >> obj.remove;
+      obj.remove = Remove(obj._suite);
+      in >> obj.remove.value();
       break;
     default:
       throw InvalidParameterError("Unknown group operation type");
