@@ -479,6 +479,22 @@ MLSPlaintext::verify(const SignaturePublicKey& pub) const
   return pub.verify(tbs, signature);
 }
 
+bool
+operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs)
+{
+  auto epoch = (lhs.epoch == rhs.epoch);
+  auto sender = (lhs.sender == rhs.sender);
+  auto content_type = (lhs.content_type == rhs.content_type);
+  auto operation = ((lhs.content_type == ContentType::handshake) &&
+                    (lhs.operation.value() == rhs.operation.value()));
+  auto application_data = ((lhs.content_type == ContentType::application) &&
+                           (lhs.operation.value() == rhs.operation.value()));
+  auto signature = (lhs.signature == rhs.signature);
+
+  return epoch && sender && content_type && (operation || application_data) &&
+         signature;
+}
+
 tls::ostream&
 operator<<(tls::ostream& out, const MLSPlaintext& obj)
 {
@@ -512,6 +528,16 @@ operator>>(tls::istream& in, MLSPlaintext& obj)
 }
 
 // MLSCiphertext
+
+bool
+operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
+{
+  auto epoch = (lhs.epoch == rhs.epoch);
+  auto masked_sender_data = (lhs.masked_sender_data == rhs.masked_sender_data);
+  auto ciphertext = (lhs.ciphertext == rhs.ciphertext);
+
+  return epoch && masked_sender_data && ciphertext;
+}
 
 tls::ostream&
 operator<<(tls::ostream& out, const MLSCiphertext& obj)

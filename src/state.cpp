@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -420,15 +418,9 @@ State::welcome_info() const
 void
 State::update_transcript_hash(const GroupOperation& operation)
 {
-  std::cout << std::endl;
-  std::cout << _index.val << " upd " << _transcript_hash << std::endl;
-
   auto operation_bytes = operation.for_transcript();
   _transcript_hash =
     Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
-
-  std::cout << _index.val << "     " << operation_bytes << std::endl;
-  std::cout << _index.val << "  -> " << _transcript_hash << std::endl;
 }
 
 bytes
@@ -539,11 +531,6 @@ State::sign(const GroupOperation& operation) const
   auto next = handle(_index, operation);
   auto confirm = hmac(_suite, next._confirmation_key, next._transcript_hash);
 
-  std::cout << std::endl;
-  std::cout << _index.val << " sig " << next._confirmation_key << std::endl;
-  std::cout << _index.val << "     " << next._transcript_hash << std::endl;
-  std::cout << _index.val << "     " << confirm << std::endl;
-
   auto pt = MLSPlaintext{ _suite };
   pt.epoch = _epoch;
   pt.sender = _index;
@@ -565,13 +552,6 @@ bool
 State::verify_confirmation(const GroupOperation& operation) const
 {
   auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
-
-  std::cout << std::endl;
-  std::cout << _index.val << " ver " << _confirmation_key << std::endl;
-  std::cout << _index.val << "     " << _transcript_hash << std::endl;
-  std::cout << _index.val << "     " << confirm << std::endl;
-  std::cout << _index.val << "  == " << operation.confirmation << std::endl;
-
   return constant_time_eq(confirm, operation.confirmation);
 }
 

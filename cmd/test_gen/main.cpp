@@ -364,19 +364,24 @@ generate_messages()
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
-    // Construct Handshake messages
+    // Construct handshake messages
     auto add_op = Add{ tv.removed, user_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
-    // TODO re-enable
-    /*
-    auto add =
-      Handshake{ tv.epoch, add_op, tv.signer_index, tv.random, tv.random };
-    auto update =
-      Handshake{ tv.epoch, update_op, tv.signer_index, tv.random, tv.random };
-    auto remove =
-      Handshake{ tv.epoch, remove_op, tv.signer_index, tv.random, tv.random };
-    */
+
+    auto add = MLSPlaintext{ tv.epoch, tv.signer_index, add_op };
+    auto update = MLSPlaintext{ tv.epoch, tv.signer_index, update_op };
+    auto remove = MLSPlaintext{ tv.epoch, tv.signer_index, remove_op };
+    add.signature = tv.random;
+    update.signature = tv.random;
+    remove.signature = tv.random;
+
+    // Construct an MLSCiphertext
+    auto ciphertext = MLSCiphertext{
+      tv.epoch,
+      { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8 },
+      tv.random,
+    };
 
     *cases[i] = {
       suite,
@@ -384,9 +389,10 @@ generate_messages()
       tls::marshal(user_init_key),
       tls::marshal(welcome_info),
       tls::marshal(welcome),
-      bytes(), // tls::marshal(add),
-      bytes(), // tls::marshal(update),
-      bytes(), // tls::marshal(remove),
+      tls::marshal(add),
+      tls::marshal(update),
+      tls::marshal(remove),
+      tls::marshal(ciphertext),
     };
   }
 

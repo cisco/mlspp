@@ -369,7 +369,7 @@ struct MLSPlaintext : public CipherAware
 {
   using CipherAware::CipherAware;
 
-  uint32_t epoch;
+  epoch_t epoch;
   LeafIndex sender;
   ContentType content_type;
 
@@ -378,6 +378,22 @@ struct MLSPlaintext : public CipherAware
 
   tls::opaque<2> signature;
 
+  MLSPlaintext(epoch_t epoch, LeafIndex sender, GroupOperation operation)
+    : CipherAware(operation.cipher_suite())
+    , epoch(epoch)
+    , sender(sender)
+    , content_type(ContentType::handshake)
+    , operation(operation)
+  {}
+
+  MLSPlaintext(epoch_t epoch, LeafIndex sender, const bytes& application_data)
+    : CipherAware(DUMMY_CIPHERSUITE)
+    , epoch(epoch)
+    , sender(sender)
+    , content_type(ContentType::application)
+    , application_data(application_data)
+  {}
+
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);
   bool verify(const SignaturePublicKey& pub) const;
@@ -385,6 +401,7 @@ struct MLSPlaintext : public CipherAware
   bytes marshal_content(size_t padding_size) const;
   void unmarshal_content(CipherSuite suite, const bytes& marshaled);
 
+  friend bool operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);
   friend tls::istream& operator>>(tls::istream& in, MLSPlaintext& obj);
 };
@@ -401,6 +418,8 @@ struct MLSCiphertext
   tls::opaque<4> ciphertext;
 };
 
+bool
+operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs);
 tls::ostream&
 operator<<(tls::ostream& out, const MLSCiphertext& obj);
 tls::istream&
