@@ -325,6 +325,8 @@ struct GroupOperation : public CipherAware
     , remove(remove)
   {}
 
+  bytes for_transcript() const;
+
   friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
   friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);

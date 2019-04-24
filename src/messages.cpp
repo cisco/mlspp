@@ -290,6 +290,30 @@ operator>>(tls::istream& in, Remove& obj)
 }
 
 // GroupOperation
+
+bytes
+GroupOperation::for_transcript() const
+{
+  tls::ostream w;
+  w << type;
+
+  switch (type) {
+    case GroupOperationType::add:
+      w << add.value();
+      break;
+    case GroupOperationType::update:
+      w << update.value();
+      break;
+    case GroupOperationType::remove:
+      w << remove.value();
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
+  }
+
+  return w.bytes();
+}
+
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 {
@@ -306,22 +330,7 @@ operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const GroupOperation& obj)
 {
-  out << obj.type;
-
-  switch (obj.type) {
-    case GroupOperationType::add:
-      out << obj.add.value();
-      break;
-    case GroupOperationType::update:
-      out << obj.update.value();
-      break;
-    case GroupOperationType::remove:
-      out << obj.remove.value();
-      break;
-    default:
-      throw InvalidParameterError("Unknown group operation type");
-  }
-
+  out.write_raw(obj.for_transcript());
   out << obj.confirmation;
   return out;
 }

@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -418,9 +420,15 @@ State::welcome_info() const
 void
 State::update_transcript_hash(const GroupOperation& operation)
 {
-  auto operation_bytes = tls::marshal(operation);
+  std::cout << std::endl;
+  std::cout << _index.val << " upd " << _transcript_hash << std::endl;
+
+  auto operation_bytes = operation.for_transcript();
   _transcript_hash =
     Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
+
+  std::cout << _index.val << "     " << operation_bytes << std::endl;
+  std::cout << _index.val << "  -> " << _transcript_hash << std::endl;
 }
 
 bytes
@@ -529,15 +537,19 @@ MLSPlaintext
 State::sign(const GroupOperation& operation) const
 {
   auto next = handle(_index, operation);
-  auto confirmation =
-    hmac(_suite, next._confirmation_key, next._transcript_hash);
+  auto confirm = hmac(_suite, next._confirmation_key, next._transcript_hash);
+
+  std::cout << std::endl;
+  std::cout << _index.val << " sig " << next._confirmation_key << std::endl;
+  std::cout << _index.val << "     " << next._transcript_hash << std::endl;
+  std::cout << _index.val << "     " << confirm << std::endl;
 
   auto pt = MLSPlaintext{ _suite };
   pt.epoch = _epoch;
   pt.sender = _index;
   pt.content_type = ContentType::handshake;
   pt.operation = operation;
-  pt.operation.value().confirmation = confirmation;
+  pt.operation.value().confirmation = confirm;
   pt.sign(_identity_priv);
   return pt;
 }
@@ -553,6 +565,13 @@ bool
 State::verify_confirmation(const GroupOperation& operation) const
 {
   auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+
+  std::cout << std::endl;
+  std::cout << _index.val << " ver " << _confirmation_key << std::endl;
+  std::cout << _index.val << "     " << _transcript_hash << std::endl;
+  std::cout << _index.val << "     " << confirm << std::endl;
+  std::cout << _index.val << "  == " << operation.confirmation << std::endl;
+
   return constant_time_eq(confirm, operation.confirmation);
 }
 
