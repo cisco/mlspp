@@ -72,8 +72,8 @@ ApplicationKeyChain::get(uint32_t generation) const
     secret = derive(secret, _secret_label, _secret_size);
   }
 
-  auto key = derive(secret, _key_label, _key_size);
-  auto nonce = derive(secret, _nonce_label, _nonce_size);
+  auto key = hkdf_expand_label(_suite, secret, _key_label, {}, _key_size);
+  auto nonce = hkdf_expand_label(_suite, secret, _nonce_label, {}, _nonce_size);
 
   return KeyAndNonce{ secret, key, nonce };
 }
