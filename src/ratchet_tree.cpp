@@ -365,7 +365,7 @@ RatchetTree::decrypt(LeafIndex from, const DirectPath& path) const
         throw InvalidParameterError("Incorrect node public key");
       }
 
-      merge_path.nodes.push_back(new_node(path_secret));
+      merge_path.nodes.push_back(temp);
     } else {
       merge_path.nodes.emplace_back(path_node.public_key);
     }
