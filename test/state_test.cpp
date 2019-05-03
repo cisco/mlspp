@@ -87,8 +87,8 @@ TEST_F(GroupCreationTest, TwoPerson)
 
   // Create a Add for the new participant
   auto welcome_add = first.add(user_init_keys[1]);
-  auto welcome = welcome_add.first;
-  auto add = welcome_add.second;
+  auto welcome = std::get<0>(welcome_add);
+  auto add = std::get<1>(welcome_add);
 
   // Process the Add
   first = first.handle(add);
@@ -112,8 +112,8 @@ TEST_F(GroupCreationTest, FullSize)
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
     auto welcome_add = states[i - 1].add(user_init_keys[i]);
-    auto welcome = welcome_add.first;
-    auto add = welcome_add.second;
+    auto welcome = std::get<0>(welcome_add);
+    auto add = std::get<1>(welcome_add);
 
     for (auto& state : states) {
       state = state.handle(add);
@@ -165,14 +165,14 @@ protected:
 
       auto welcome_add = states[0].add(cik);
       for (auto& state : states) {
-        state = state.handle(welcome_add.second);
+        state = state.handle(std::get<1>(welcome_add));
       }
 
       states.emplace_back(identity_priv,
                           credential,
                           init_secret,
-                          welcome_add.first,
-                          welcome_add.second);
+                          std::get<0>(welcome_add),
+                          std::get<1>(welcome_add));
     }
   }
 
@@ -193,7 +193,7 @@ TEST_F(RunningGroupTest, Update)
     auto update = states[i].update(new_leaf);
 
     for (size_t j = 0; j < group_size; j += 1) {
-      states[j] = states[j].handle(update);
+      states[j] = states[j].handle(std::get<0>(update));
     }
 
     check_consistency();
@@ -208,7 +208,7 @@ TEST_F(RunningGroupTest, Remove)
     states.pop_back();
 
     for (auto& state : states) {
-      state = state.handle(remove);
+      state = state.handle(std::get<0>(remove));
     }
 
     check_consistency();
@@ -242,13 +242,13 @@ TEST(OtherStateTest, CipherNegotiation)
 
   // Bob should choose P-256
   auto initialB =
-    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, cikA);
-  auto stateB = initialB.first;
+    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, uikA);
+  auto stateB = std::get<2>(initialB);
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
-  auto welcome = initialB.second.first;
-  auto add = initialB.second.second;
+  auto welcome = std::get<0>(initialB);
+  auto add = std::get<1>(initialB);
   auto stateA = State(idkA, credA, insA, welcome, add);
   ASSERT_EQ(stateA, stateB);
 }

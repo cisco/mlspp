@@ -100,7 +100,7 @@ public:
 
   // Negotiate an initial state with another peer based on their
   // ClientInitKey
-  typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
+  typedef std::tuple<Welcome, MLSPlaintext, State> InitialInfo;
   static InitialInfo negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
@@ -114,19 +114,20 @@ public:
   ///
 
   // Generate a Add message
-  std::pair<Welcome, MLSPlaintext> add(
-    const ClientInitKey& client_init_key) const;
+  std::tuple<Welcome, MLSPlaintext, State> add(
+    const UserInitKey& user_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, MLSPlaintext> add(
+  std::tuple<Welcome, MLSPlaintext, State> add(
     uint32_t index,
-    const ClientInitKey& client_init_key) const;
+    const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  MLSPlaintext update(const bytes& leaf_secret);
+  std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  MLSPlaintext remove(const bytes& leaf_secret, uint32_t index);
+  std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
+                                         uint32_t index) const;
 
   ///
   /// Generic handshake message handler
@@ -230,7 +231,7 @@ private:
 
   // Signing of handshake messages (including creation of the
   // confirmation MAC)
-  MLSPlaintext sign(const GroupOperation& operation) const;
+  std::tuple<MLSPlaintext, State> sign(const GroupOperation& operation) const;
 
   // Signature verification over a handshake message
   bool verify(const MLSPlaintext& pt) const;

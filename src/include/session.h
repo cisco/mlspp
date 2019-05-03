@@ -41,6 +41,8 @@ protected:
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;
 
+  std::optional<std::tuple<bytes, State>> _outbound_cache;
+
   void make_init_key();
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();

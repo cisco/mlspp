@@ -60,13 +60,11 @@ Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
                                _credential,
                                client_init_key);
 
-  auto root = init.first;
-  add_state(0, root);
+  add_state(0, std::get<2>(init));
 
-  auto welcome_add = init.second;
-  auto welcome = tls::marshal(welcome_add.first);
-  auto add = tls::marshal(welcome_add.second);
-  return std::pair<bytes, bytes>(welcome, add);
+  auto welcome = tls::marshal(std::get<0>(init));
+  auto add = tls::marshal(std::get<1>(init));
+  return std::make_pair(welcome, add);
 }
 
 std::pair<bytes, bytes>
@@ -74,24 +72,38 @@ Session::add(const bytes& client_init_key_bytes) const
 {
   ClientInitKey client_init_key;
   tls::unmarshal(client_init_key_bytes, client_init_key);
-  auto welcome_add = current_state().add(client_init_key);
-  auto welcome = tls::marshal(welcome_add.first);
-  auto add = tls::marshal(welcome_add.second);
+  auto welcome_add_state = current_state().add(user_init_key);
+  auto welcome = tls::marshal(std::get<0>(welcome_add_state));
+  auto add = tls::marshal(std::get<1>(welcome_add_state));
+  auto state = std::get<2>(welcome_add_state);
+
+  _outbound_cache = std::make_tuple(add, state);
+
   return std::pair<bytes, bytes>(welcome, add);
 }
 
 bytes
 Session::update(const bytes& leaf_secret)
 {
-  auto update = current_state().update(leaf_secret);
-  return tls::marshal(update);
+  auto update_state = current_state().update(leaf_secret);
+  auto update = tls::marshal(std::get<0>(update_state));
+  auto state = std::get<1>(update_state);
+
+  _outbound_cache = std::make_tuple(update, state);
+
+  return update;
 }
 
 bytes
 Session::remove(const bytes& evict_secret, uint32_t index)
 {
-  auto update = current_state().remove(evict_secret, index);
-  return tls::marshal(update);
+  auto remove_state = current_state().remove(evict_secret, index);
+  auto remove = tls::marshal(std::get<0>(remove_state));
+  auto state = std::get<1>(remove_state);
+
+  _outbound_cache = std::make_tuple(remove, state);
+
+  return remove;
 }
 
 void
@@ -112,6 +124,16 @@ Session::handle(const bytes& handshake_data)
 {
   MLSPlaintext handshake{ current_state().cipher_suite() };
   tls::unmarshal(handshake_data, handshake);
+
+  if (_outbound_cache.has_value()) {
+    auto message = std::get<0>(_outbound_cache.value());
+    auto state = std::get<1>(_outbound_cache.value());
+    if (message == handshake_data) {
+      add_state(handshake.epoch, state);
+      _outbound_cache = std::nullopt;
+      return;
+    }
+  }
 
   auto next = current_state().handle(handshake);
   add_state(handshake.epoch, next);

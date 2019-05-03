@@ -189,23 +189,20 @@ State::negotiate(const bytes& group_id,
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
-  auto welcome_add = state.add(client_init_key);
-  state = state.handle(welcome_add.second);
-
-  return InitialInfo(state, welcome_add);
+  return state.add(client_init_key);
 }
 
 ///
 /// Message factories
 ///
 
-std::pair<Welcome, MLSPlaintext>
+std::tuple<Welcome, MLSPlaintext, State>
 State::add(const ClientInitKey& client_init_key) const
 {
   return add(_tree.size(), client_init_key);
 }
 
-std::pair<Welcome, MLSPlaintext>
+std::tuple<Welcome, MLSPlaintext, State>
 State::add(uint32_t index, const ClientInitKey& client_init_key) const
 {
   if (!client_init_key.verify()) {
@@ -219,15 +216,16 @@ State::add(uint32_t index, const ClientInitKey& client_init_key) const
 
   auto welcome_info_str = welcome_info();
   auto welcome =
-    Welcome{ client_init_key.client_init_key_id, *pub, welcome_info_str };
+    Welcome{ user_init_key.user_init_key_id, *pub, welcome_info_str };
+  auto welcome_tuple = std::make_tuple(welcome);
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add =
+  auto add_state =
     sign(Add{ LeafIndex{ index }, client_init_key, welcome_info_hash });
-  return std::pair<Welcome, MLSPlaintext>(welcome, add);
+  return std::tuple_cat(welcome_tuple, add_state);
 }
 
-MLSPlaintext
+std::tuple<MLSPlaintext, State>
 State::update(const bytes& leaf_secret)
 {
   auto path = _tree.encrypt(_index, leaf_secret);
@@ -235,7 +233,7 @@ State::update(const bytes& leaf_secret)
   return sign(Update{ path });
 }
 
-MLSPlaintext
+std::tuple<MLSPlaintext, State>
 State::remove(const bytes& leaf_secret, uint32_t index)
 {
   if (index >= _tree.size()) {
@@ -568,7 +566,7 @@ sender_data_aad(const tls::opaque<1>& group_id,
   return w.bytes();
 }
 
-MLSPlaintext
+std::tuple<MLSPlaintext, State>
 State::sign(const GroupOperation& operation) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
@@ -576,7 +574,7 @@ State::sign(const GroupOperation& operation) const
   pt.confirmation =
     hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
   pt.sign(_identity_priv);
-  return pt;
+  return std::make_tuple(pt, next);
 }
 
 bool
