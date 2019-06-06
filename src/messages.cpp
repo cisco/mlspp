@@ -548,24 +548,29 @@ operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
 {
   auto group_id = (lhs.group_id == rhs.group_id);
   auto epoch = (lhs.epoch == rhs.epoch);
-  auto masked_sender_data = (lhs.masked_sender_data == rhs.masked_sender_data);
+  auto content_type = (lhs.content_type == rhs.content_type);
+  auto sender_data_nonce = (lhs.sender_data_nonce == rhs.sender_data_nonce);
+  auto encrypted_sender_data =
+    (lhs.encrypted_sender_data == rhs.encrypted_sender_data);
   auto ciphertext = (lhs.ciphertext == rhs.ciphertext);
 
-  return group_id && epoch && masked_sender_data && ciphertext;
+  return group_id && epoch && content_type && sender_data_nonce &&
+         encrypted_sender_data && ciphertext;
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const MLSCiphertext& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.masked_sender_data
+  return out << obj.group_id << obj.epoch << obj.content_type
+             << obj.sender_data_nonce << obj.encrypted_sender_data
              << obj.ciphertext;
 }
 
 tls::istream&
 operator>>(tls::istream& in, MLSCiphertext& obj)
 {
-  return in >> obj.group_id >> obj.epoch >> obj.masked_sender_data >>
-         obj.ciphertext;
+  return in >> obj.group_id >> obj.epoch >> obj.content_type >>
+         obj.sender_data_nonce >> obj.encrypted_sender_data >> obj.ciphertext;
 }
 
 } // namespace mls

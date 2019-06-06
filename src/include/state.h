@@ -184,6 +184,8 @@ private:
   tls::opaque<1> _init_secret;
 
   // Message protection keys
+  // TODO(rlb@ipv.sx): Single HS keys
+  tls::opaque<1> _sender_data_key;
   KeyChain _handshake_keys;
   KeyChain _application_keys;
 

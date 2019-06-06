@@ -420,14 +420,18 @@ struct MLSPlaintext : public CipherAware
 // struct {
 //     opaque group_id<0..255>;
 //     uint32 epoch;
-//     opaque masked_sender_data[9];
+//     ContentType content_type;
+//     opaque sender_data_nonce<0..255>;
+//     opaque encrypted_sender_data<0..255>;
 //     opaque ciphertext<0..2^32-1>;
 // } MLSCiphertext;
 struct MLSCiphertext
 {
   tls::opaque<1> group_id;
   uint32_t epoch;
-  std::array<uint8_t, 9> masked_sender_data;
+  ContentType content_type;
+  tls::opaque<1> sender_data_nonce;
+  tls::opaque<1> encrypted_sender_data;
   tls::opaque<4> ciphertext;
 };
 
