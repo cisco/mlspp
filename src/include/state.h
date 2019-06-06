@@ -171,8 +171,8 @@ private:
   bytes _group_id;
   epoch_t _epoch;
   RatchetTree _tree;
-  bytes _intermediate_hash;
   bytes _transcript_hash;
+  bytes _next_transcript_hash;
   bytes _group_state;
 
   // Shared secret state
@@ -194,6 +194,8 @@ private:
 
   // A zero vector, for convenience
   bytes _zero;
+
+  State handle(const MLSPlaintext& handshake, bool skipVerify) const;
 
   // Handle an Add (for existing participants only)
   bytes handle(const Add& add);

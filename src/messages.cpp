@@ -135,7 +135,7 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
          (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
-         (lhs.transcript_hash == rhs.transcript_hash) &&
+         (lhs.next_transcript_hash == rhs.next_transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
 
@@ -143,7 +143,7 @@ tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
   return out << obj.version << obj.group_id << obj.epoch << obj.tree
-             << obj.transcript_hash << obj.init_secret;
+             << obj.next_transcript_hash << obj.init_secret;
 }
 
 tls::istream&
@@ -156,7 +156,7 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
   obj.tree = RatchetTree(obj.cipher_suite());
 
   in >> obj.tree;
-  in >> obj.transcript_hash;
+  in >> obj.next_transcript_hash;
   in >> obj.init_secret;
   return in;
 }
@@ -382,7 +382,7 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   if (content_type == ContentType::handshake) {
     content = tls::marshal(operation.value());
   } else if (content_type == ContentType::application) {
-    content = application_data.value();
+    content = application_data;
   } else {
     throw InvalidParameterError("Unknown content type");
   }
@@ -454,7 +454,7 @@ bytes
 MLSPlaintext::auth_data() const
 {
   tls::ostream w;
-  w << confirmation.value() << signature;
+  w << confirmation << signature;
   return w.bytes();
 }
 
@@ -465,11 +465,11 @@ MLSPlaintext::to_be_signed() const
   w << group_id << epoch << sender << content_type;
   switch (content_type) {
     case ContentType::handshake:
-      w << operation.value() << confirmation.value();
+      w << operation.value() << confirmation;
       break;
 
     case ContentType::application:
-      w << application_data.value();
+      w << application_data;
       break;
 
     default:
@@ -526,12 +526,11 @@ operator>>(tls::istream& in, MLSPlaintext& obj)
   switch (obj.content_type) {
     case ContentType::handshake:
       obj.operation = GroupOperation(obj._suite);
-      in >> obj.operation.value();
+      in >> obj.operation.value() >> obj.confirmation;
       break;
 
     case ContentType::application:
-      obj.application_data = tls::opaque<4>();
-      in >> obj.application_data.value();
+      in >> obj.application_data;
       break;
 
     default:
@@ -547,23 +546,26 @@ operator>>(tls::istream& in, MLSPlaintext& obj)
 bool
 operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
 {
+  auto group_id = (lhs.group_id == rhs.group_id);
   auto epoch = (lhs.epoch == rhs.epoch);
   auto masked_sender_data = (lhs.masked_sender_data == rhs.masked_sender_data);
   auto ciphertext = (lhs.ciphertext == rhs.ciphertext);
 
-  return epoch && masked_sender_data && ciphertext;
+  return group_id && epoch && masked_sender_data && ciphertext;
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const MLSCiphertext& obj)
 {
-  return out << obj.epoch << obj.masked_sender_data << obj.ciphertext;
+  return out << obj.group_id << obj.epoch << obj.masked_sender_data
+             << obj.ciphertext;
 }
 
 tls::istream&
 operator>>(tls::istream& in, MLSCiphertext& obj)
 {
-  return in >> obj.epoch >> obj.masked_sender_data >> obj.ciphertext;
+  return in >> obj.group_id >> obj.epoch >> obj.masked_sender_data >>
+         obj.ciphertext;
 }
 
 } // namespace mls

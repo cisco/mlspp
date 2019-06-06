@@ -141,7 +141,7 @@ State::State(SignaturePrivateKey identity_priv,
   _epoch = welcome_info.epoch + 1;
   _group_id = welcome_info.group_id;
   _tree = welcome_info.tree;
-  _transcript_hash = welcome_info.transcript_hash;
+  _next_transcript_hash = welcome_info.next_transcript_hash;
 
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
@@ -256,6 +256,12 @@ State::remove(const bytes& evict_secret, uint32_t index) const
 State
 State::handle(const MLSPlaintext& handshake) const
 {
+  return handle(handshake, false);
+}
+
+State
+State::handle(const MLSPlaintext& handshake, bool skipVerify) const
+{
   // Pre-validate the MLSPlaintext
   if (handshake.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
@@ -269,7 +275,7 @@ State::handle(const MLSPlaintext& handshake) const
     throw InvalidParameterError("Incorrect content type");
   }
 
-  if (!verify(handshake)) {
+  if (!skipVerify && !verify(handshake)) {
     throw ProtocolError("Invalid handshake message signature");
   }
 
@@ -295,7 +301,7 @@ State::handle(const MLSPlaintext& handshake) const
   next.update_epoch_secrets(update_secret);
 
   // Verify the  confirmation MAC
-  if (!next.verify_confirmation(handshake.confirmation.value())) {
+  if (!skipVerify && !next.verify_confirmation(handshake.confirmation)) {
     throw InvalidParameterError("Invalid confirmation MAC");
   }
 
@@ -405,7 +411,7 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Unprotect of non-application message");
   }
 
-  return pt.application_data.value();
+  return pt.application_data;
 }
 
 ///
@@ -441,23 +447,23 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _group_id, _epoch, _tree, _transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _next_transcript_hash, _init_secret };
 }
 
 void
 State::update_transcript_hash(const MLSPlaintext& plaintext)
 {
-  // Transcript hash for this epoch
+  // Transcript hash for use in this epoch
   _transcript_hash = Digest(_suite)
-                       .write(_intermediate_hash)
+                       .write(_next_transcript_hash)
                        .write(plaintext.content())
                        .digest();
 
-  // Intermediate hash for next epoch
-  _intermediate_hash = Digest(_suite)
-                         .write(_transcript_hash)
-                         .write(plaintext.auth_data())
-                         .digest();
+  // Transcript hash input for the next epoch
+  _next_transcript_hash = Digest(_suite)
+                            .write(_transcript_hash)
+                            .write(plaintext.auth_data())
+                            .digest();
 }
 
 bytes
@@ -566,7 +572,7 @@ MLSPlaintext
 State::sign(const GroupOperation& operation) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
-  auto next = handle(pt);
+  auto next = handle(pt, true);
   pt.confirmation = hmac(_suite, next._confirmation_key, next._transcript_hash);
   pt.sign(_identity_priv);
   return pt;
@@ -624,6 +630,7 @@ State::encrypt(const MLSPlaintext& pt)
 
   // Assemble the MLSCiphertext
   MLSCiphertext ct;
+  ct.group_id = _group_id;
   ct.epoch = _epoch;
   std::copy(masked_sender_data.begin(),
             masked_sender_data.end(),
@@ -636,6 +643,10 @@ MLSPlaintext
 State::decrypt(const MLSCiphertext& ct) const
 {
   // Verify the epoch
+  if (ct.group_id != _group_id) {
+    throw InvalidParameterError("Ciphertext not from this group");
+  }
+
   if (ct.epoch != _epoch) {
     throw InvalidParameterError("Ciphertext not from this epoch");
   }
@@ -678,6 +689,7 @@ State::decrypt(const MLSCiphertext& ct) const
 
   // Set up a template plaintext and parse into it
   auto pt = MLSPlaintext{ _suite };
+  pt.group_id = _group_id;
   pt.epoch = _epoch;
   pt.sender = sender_data.sender;
   pt.content_type = sender_data.content_type;

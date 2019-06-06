@@ -103,7 +103,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   uint32 epoch;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<HPKEPublicKey> tree<1..2^32-1>;
-//   opaque transcript_hash<0..255>;
+//   opaque next_transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
 struct WelcomeInfo : public CipherAware
@@ -112,7 +112,7 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
-  tls::opaque<1> transcript_hash;
+  tls::opaque<1> next_transcript_hash;
   tls::opaque<1> init_secret;
 
   WelcomeInfo(CipherSuite suite)
@@ -130,7 +130,7 @@ struct WelcomeInfo : public CipherAware
     , group_id(group_id)
     , epoch(epoch)
     , tree(tree)
-    , transcript_hash(transcript_hash)
+    , next_transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
 
@@ -373,8 +373,8 @@ struct MLSPlaintext : public CipherAware
   ContentType content_type;
 
   std::optional<GroupOperation> operation;
-  std::optional<tls::opaque<1>> confirmation;
-  std::optional<tls::opaque<4>> application_data;
+  tls::opaque<1> confirmation;
+  tls::opaque<4> application_data;
 
   tls::opaque<2> signature;
 
@@ -418,12 +418,14 @@ struct MLSPlaintext : public CipherAware
 };
 
 // struct {
+//     opaque group_id<0..255>;
 //     uint32 epoch;
 //     opaque masked_sender_data[9];
 //     opaque ciphertext<0..2^32-1>;
 // } MLSCiphertext;
 struct MLSCiphertext
 {
+  tls::opaque<1> group_id;
   uint32_t epoch;
   std::array<uint8_t, 9> masked_sender_data;
   tls::opaque<4> ciphertext;

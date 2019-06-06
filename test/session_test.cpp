@@ -315,9 +315,15 @@ protected:
 
 TEST_F(SessionInteropTest, BasicP256)
 {
+  // XXX(rlb@ipv.sx): This test is disabled for the moment becuase
+  // it requires signatures to be reproducible.  Otherwise, the
+  // following endpoint will generate a different message than the
+  // other endpoints have seen.
+  /*
   follow_all(CipherSuite::P256_SHA256_AES128GCM,
              SignatureScheme::P256_SHA256,
              basic_tv.case_p256_p256);
+  */
 }
 
 TEST_F(SessionInteropTest, BasicX25519)
