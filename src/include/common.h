@@ -2,7 +2,6 @@
 
 #include <array>
 #include <iomanip>
-#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -27,21 +26,6 @@ namespace mls {
 typedef uint8_t ProtocolVersion;
 
 static const ProtocolVersion mls10Version = 0xFF;
-
-///
-/// Serialization of optional values
-///
-
-template<typename T>
-std::ostream&
-operator<<(std::ostream& out, const std::optional<T>& opt)
-{
-  if (!opt) {
-    return out << "_";
-  }
-
-  return out << *opt;
-}
 
 ///
 /// Byte strings and serialization

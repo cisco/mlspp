@@ -63,6 +63,6 @@ public:
   bytes current_init_secret() const;
 };
 
-}
+} // namespace test
 
 } // namespace mls

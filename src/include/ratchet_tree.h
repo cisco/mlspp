@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "credential.h"
 #include "crypto.h"
 #include "tls_syntax.h"
 #include "tree_math.h"
@@ -21,16 +22,19 @@ public:
   RatchetTreeNode(const DHPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
-  const std::optional<bytes>& secret() const;
   const std::optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
+  const std::optional<Credential>& credential() const;
 
   void merge(const RatchetTreeNode& other);
+  void set_credential(const Credential& cred);
 
 private:
-  std::optional<bytes> _secret;
   std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
+
+  // A credential is populated iff this is a leaf node
+  tls::optional<Credential> _cred;
 
   friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,
                                    const RatchetTreeNode& rhs);
@@ -58,14 +62,17 @@ struct OptionalRatchetTreeNode
     : parent(RatchetTreeNode(suite, secret))
   {}
 
-  void merge(const RatchetTreeNode& other)
-  {
-    if (!this->has_value()) {
-      this->emplace(other);
-    } else {
-      this->value().merge(other);
-    }
-  }
+  bool has_private() const;
+  const bytes& hash() const;
+
+  void merge(const RatchetTreeNode& other);
+  void set_leaf_hash(CipherSuite suite);
+  void set_hash(CipherSuite suite,
+                const OptionalRatchetTreeNode& left,
+                const OptionalRatchetTreeNode& right);
+
+private:
+  bytes _hash;
 };
 
 struct RatchetTreeNodeVector
@@ -86,45 +93,72 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(CipherSuite suite, const bytes& secret);
-  RatchetTree(CipherSuite suite, const std::vector<bytes>& secrets);
+  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred);
+  RatchetTree(CipherSuite suite,
+              const std::vector<bytes>& secrets,
+              const std::vector<Credential>& creds);
 
-  struct MergeInfo
+  struct MergePath
   {
-    std::vector<DHPublicKey> public_keys;
-    std::vector<bytes> secrets;
+    bytes root_path_secret;
+    std::vector<RatchetTreeNode> nodes;
   };
 
   DirectPath encrypt(LeafIndex from, const bytes& leaf) const;
-  MergeInfo decrypt(LeafIndex from, const DirectPath& path) const;
-  void merge_path(LeafIndex from, const MergeInfo& info);
+  MergePath decrypt(LeafIndex from, const DirectPath& path) const;
+  void merge_path(LeafIndex from, const MergePath& path);
 
-  void add_leaf(LeafIndex index, const DHPublicKey& pub);
-  void add_leaf(LeafIndex index, const bytes& leaf_secret);
+  void add_leaf(LeafIndex index,
+                const DHPublicKey& pub,
+                const Credential& cred);
+  void add_leaf(LeafIndex index,
+                const bytes& leaf_secret,
+                const Credential& cred);
   void blank_path(LeafIndex index);
-  void set_path(LeafIndex index, const bytes& leaf);
+  bytes set_path(LeafIndex index, const bytes& leaf);
+
+  const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;
   void truncate(LeafCount leaves);
 
   uint32_t size() const;
   bool occupied(LeafIndex index) const;
-  bytes root_secret() const;
+  bytes root_hash() const;
+  bool check_credentials() const;
   bool check_invariant(LeafIndex from) const;
 
-private:
+protected:
   RatchetTreeNodeVector _nodes;
   size_t _secret_size;
 
+  NodeIndex root_index() const;
   NodeCount node_size() const;
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
+
+  void add_leaf_inner(LeafIndex index, const RatchetTreeNode& node_val);
+  void set_hash(NodeIndex index);
+  void set_hash_path(LeafIndex index);
+  void set_hash_all(NodeIndex index);
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
+
+namespace test {
+
+// Enable tests to see the internals of the tree
+class TestRatchetTree : public RatchetTree
+{
+public:
+  using RatchetTree::RatchetTree;
+  const RatchetTreeNodeVector& nodes() const;
+};
+
+} // namespace test
 
 } // namespace mls

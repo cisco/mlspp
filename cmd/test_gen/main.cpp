@@ -131,9 +131,12 @@ generate_key_schedule()
 
   auto base_suite = CipherSuite::P256_SHA256_AES128GCM;
   auto zero = bytes(Digest(base_suite).output_size(), 0x00);
-  GroupState base_group_state(base_suite);
-  base_group_state.group_id = { 0xA0, 0xA0, 0xA0, 0xA0 };
-  base_group_state.transcript_hash = zero;
+  GroupState base_group_state{
+    { 0xA0, 0xA0, 0xA0, 0xA0 },
+    0,
+    bytes(32, 0xA1),
+    bytes(32, 0xA2),
+  };
 
   tv.n_epochs = 100;
   tv.base_group_state = tls::marshal(base_group_state);
@@ -147,13 +150,13 @@ generate_key_schedule()
     test_case->suite = suite;
 
     auto group_state = base_group_state;
-    group_state.transcript_hash = zero;
     bytes init_secret(secret_size, 0);
     bytes update_secret(secret_size, 0);
 
     for (int j = 0; j < tv.n_epochs; ++j) {
+      auto group_state_bytes = tls::marshal(group_state);
       auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, update_secret, group_state);
+        suite, init_secret, update_secret, group_state_bytes);
 
       test_case->epochs.push_back({
         update_secret,
@@ -205,6 +208,75 @@ generate_app_key_schedule()
         auto kn = chain.get(k);
         test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
       }
+    }
+  }
+
+  return tv;
+}
+
+TreeTestVectors::TreeCase
+tree_to_case(const test::TestRatchetTree& tree)
+{
+  auto nodes = tree.nodes();
+  TreeTestVectors::TreeCase tc(nodes.size());
+  for (int i = 0; i < nodes.size(); ++i) {
+    tc[i].hash = nodes[i].hash();
+    if (nodes[i].has_value()) {
+      tc[i].public_key = nodes[i]->public_key().to_bytes();
+    }
+  }
+  return tc;
+}
+
+TreeTestVectors
+generate_tree()
+{
+  TreeTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<SignatureScheme> schemes{
+    SignatureScheme::P256_SHA256,
+    SignatureScheme::Ed25519,
+  };
+
+  std::vector<TreeTestVectors::TestCase*> cases{
+    &tv.case_p256_p256,
+    &tv.case_x25519_ed25519,
+  };
+
+  int n_leaves = 10;
+  tv.leaf_secrets.resize(n_leaves);
+  for (int i = 0; i < n_leaves; ++i) {
+    tv.leaf_secrets[i] = { uint8_t(i) };
+  }
+
+  for (int i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto scheme = schemes[i];
+    auto test_case = cases[i];
+
+    test::TestRatchetTree tree{ suite };
+
+    // Add the leaves
+    for (uint32_t j = 0; j < n_leaves; ++j) {
+      auto id = bytes(1, uint8_t(j));
+      auto sig = SignaturePrivateKey::derive(scheme, id);
+      auto cred = Credential::basic(id, sig);
+      test_case->credentials.push_back(cred);
+
+      tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j], cred);
+      tree.set_path(LeafIndex{ j }, tv.leaf_secrets[j]);
+      test_case->trees.push_back(tree_to_case(tree));
+    }
+
+    // Blank out even-numbered leaves
+    for (uint32_t j = 0; j < n_leaves; j += 2) {
+      tree.blank_path(LeafIndex{ j });
+      test_case->trees.push_back(tree_to_case(tree));
     }
   }
 
@@ -269,15 +341,14 @@ generate_messages()
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
+    auto cred = Credential::basic(tv.user_id, sig_key);
 
     auto ratchet_tree =
-      RatchetTree{ suite, { tv.random, tv.random, tv.random, tv.random } };
+      RatchetTree{ suite,
+                   { tv.random, tv.random, tv.random, tv.random },
+                   { cred, cred, cred, cred } };
     ratchet_tree.blank_path(LeafIndex{ 2 });
     auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
-
-    auto cred = Credential::basic(tv.user_id, sig_key);
-    auto roster = Roster{};
-    roster.add(0, cred);
 
     // Construct UIK
     auto user_init_key = UserInitKey{};
@@ -288,7 +359,7 @@ generate_messages()
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
-      tv.group_id, tv.epoch, roster, ratchet_tree, tv.random, tv.random,
+      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
@@ -492,6 +563,9 @@ main()
   AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
   write_test_vectors(app_key_schedule);
 
+  TreeTestVectors tree = generate_tree();
+  write_test_vectors(tree);
+
   MessagesTestVectors messages = generate_messages();
   write_test_vectors(messages);
 
@@ -505,6 +579,7 @@ main()
   verify_reproducible(generate_crypto);
   verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_app_key_schedule);
+  verify_reproducible(generate_tree);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
 
@@ -515,6 +590,7 @@ main()
     TestLoader<CryptoTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<AppKeyScheduleTestVectors>::get();
+    TestLoader<TreeTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {

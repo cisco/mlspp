@@ -126,42 +126,4 @@ private:
   friend tls::istream& operator>>(tls::istream& in, Credential& obj);
 };
 
-// XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
-// ensure that credentials are populated with blank values on
-// unmarshal.  Otherwise, `*opt` will access uninitialized memory.
-/*
-class OptionalCredential : public optional<Credential>
-{
-public:
-  typedef optional<Credential> parent;
-  using parent::parent;
-
-  OptionalCredential()
-    : parent(Credential())
-  {}
-};
-
-bool
-operator==(const OptionalCredential& lhs, const OptionalCredential& rhs);
-*/
-
-class Roster
-{
-public:
-  void add(uint32_t index, const Credential& cred);
-  void remove(uint32_t index);
-  Credential get(uint32_t index) const;
-  size_t size() const;
-  void truncate(uint32_t size);
-
-private:
-  typedef tls::optional<Credential> OptionalCredential;
-  typedef tls::vector<OptionalCredential, 4> CredentialVector;
-  CredentialVector _credentials;
-
-  friend bool operator==(const Roster& lhs, const Roster& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const Roster& obj);
-  friend tls::istream& operator>>(tls::istream& in, Roster& obj);
-};
-
 } // namespace mls

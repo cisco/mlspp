@@ -3,7 +3,6 @@
 #include "common.h"
 #include "crypto.h"
 #include "ratchet_tree.h"
-#include "roster.h"
 #include "tls_syntax.h"
 #include <optional>
 
@@ -112,7 +111,6 @@ struct WelcomeInfo : public CipherAware
   ProtocolVersion version;
   tls::opaque<1> group_id;
   epoch_t epoch;
-  Roster roster;
   RatchetTree tree;
   tls::opaque<1> transcript_hash;
   tls::opaque<1> init_secret;
@@ -124,7 +122,6 @@ struct WelcomeInfo : public CipherAware
 
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
-              Roster roster,
               RatchetTree tree,
               tls::opaque<1> transcript_hash,
               tls::opaque<1> init_secret)
@@ -132,7 +129,6 @@ struct WelcomeInfo : public CipherAware
     , version(mls10Version)
     , group_id(group_id)
     , epoch(epoch)
-    , roster(roster)
     , tree(tree)
     , transcript_hash(transcript_hash)
     , init_secret(init_secret)

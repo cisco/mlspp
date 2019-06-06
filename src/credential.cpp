@@ -1,4 +1,4 @@
-#include "roster.h"
+#include "credential.h"
 
 namespace mls {
 
@@ -125,7 +125,9 @@ Credential::create(CredentialType type)
 bool
 operator==(const Credential& lhs, const Credential& rhs)
 {
-  return (lhs._type == rhs._type) && lhs._cred->equal(rhs._cred.get());
+  auto type = (lhs._type == rhs._type);
+  auto cred = lhs._cred->equal(rhs._cred.get());
+  return type && cred;
 }
 
 bool
@@ -149,70 +151,6 @@ operator>>(tls::istream& in, Credential& obj)
   obj._cred.reset(Credential::create(obj._type));
   obj._cred->read(in);
   return in;
-}
-
-///
-/// Roster
-///
-
-void
-Roster::add(uint32_t index, const Credential& cred)
-{
-  if (index == _credentials.size()) {
-    _credentials.push_back(cred);
-  } else {
-    _credentials[index] = cred;
-  }
-}
-
-void
-Roster::remove(uint32_t index)
-{
-  if (index > _credentials.size()) {
-    throw InvalidParameterError("Unknown credential index");
-  }
-
-  _credentials[index] = std::nullopt;
-}
-
-Credential
-Roster::get(uint32_t index) const
-{
-  if (!_credentials[index]) {
-    throw InvalidParameterError("No credential available");
-  }
-
-  return *_credentials[index];
-}
-
-size_t
-Roster::size() const
-{
-  return _credentials.size();
-}
-
-void
-Roster::truncate(uint32_t size)
-{
-  _credentials.resize(size);
-}
-
-bool
-operator==(const Roster& lhs, const Roster& rhs)
-{
-  return lhs._credentials == rhs._credentials;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Roster& obj)
-{
-  return out << obj._credentials;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Roster& obj)
-{
-  return in >> obj._credentials;
 }
 
 } // namespace mls

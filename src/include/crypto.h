@@ -288,6 +288,14 @@ class DHPublicKey : public PublicKey
 {
 public:
   using PublicKey::PublicKey;
+
+  // XXX(rlb@ipv.sx): This is a bit of a hack, but it means that if
+  // we're constructing objects for serialization, then we don't
+  // need to do all the variant stuff
+  DHPublicKey()
+    : PublicKey(CipherSuite::X25519_SHA256_AES128GCM)
+  {}
+
   HPKECiphertext encrypt(const bytes& plaintext) const;
 
 private:

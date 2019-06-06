@@ -6,54 +6,18 @@ namespace mls {
 /// GroupState
 ///
 
-GroupState::GroupState(const bytes& group_id,
-                       CipherSuite suite,
-                       const bytes& leaf_secret,
-                       const Credential& credential)
-  : group_id(group_id)
-  , epoch(0)
-  , tree(suite, leaf_secret)
-  , transcript_hash(Digest(suite).output_size(), 0)
-{
-  roster.add(0, credential);
-}
-
-GroupState::GroupState(const WelcomeInfo& info)
-  : group_id(info.group_id)
-  , epoch(info.epoch + 1)
-  , roster(info.roster)
-  , tree(info.tree)
-  , transcript_hash(info.transcript_hash)
-{}
-
-GroupState::GroupState(CipherSuite suite)
-  : epoch(0)
-  , tree(suite)
-{}
-
 tls::ostream&
 operator<<(tls::ostream& out, const GroupState& obj)
 {
-  return out << obj.group_id << obj.epoch << obj.roster << obj.tree
+  return out << obj.group_id << obj.epoch << obj.tree_hash
              << obj.transcript_hash;
 }
 
 tls::istream&
 operator>>(tls::istream& out, GroupState& obj)
 {
-  return out >> obj.group_id >> obj.epoch >> obj.roster >> obj.tree >>
+  return out >> obj.group_id >> obj.epoch >> obj.tree_hash >>
          obj.transcript_hash;
-}
-
-bool
-operator==(const GroupState& lhs, const GroupState& rhs)
-{
-  auto group_id = (lhs.group_id == rhs.group_id);
-  auto epoch = (lhs.epoch == rhs.epoch);
-  auto roster = (lhs.roster == rhs.roster);
-  auto tree = (lhs.tree == rhs.tree);
-  auto transcript_hash = (lhs.transcript_hash == rhs.transcript_hash);
-  return group_id && epoch && roster && tree && transcript_hash;
 }
 
 ///
@@ -90,14 +54,17 @@ ApplicationKeyChain::derive(const bytes& secret,
 /// Constructors
 ///
 
-State::State(const bytes& group_id,
+State::State(bytes group_id,
              CipherSuite suite,
              const bytes& leaf_secret,
              SignaturePrivateKey identity_priv,
              const Credential& credential)
   : _suite(suite)
-  , _state(group_id, suite, leaf_secret, credential)
-  , _init_secret(zero_bytes(32))
+  , _group_id(std::move(group_id))
+  , _epoch(0)
+  , _tree(suite, leaf_secret, credential)
+  , _transcript_hash(zero_bytes(Digest(suite).output_size()))
+  , _init_secret(Digest(suite).output_size())
   , _index(0)
   , _identity_priv(std::move(identity_priv))
   , _zero(Digest(suite).output_size(), 0)
@@ -109,7 +76,7 @@ State::State(SignaturePrivateKey identity_priv,
              const Welcome& welcome,
              const Handshake& handshake)
   : _suite(welcome.cipher_suite)
-  , _state(welcome.cipher_suite)
+  , _tree(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
   // Verify that we have an add and it is for us
@@ -143,7 +110,10 @@ State::State(SignaturePrivateKey identity_priv,
   }
 
   // Ingest the WelcomeInfo
-  _state = GroupState{ welcome_info };
+  _epoch = welcome_info.epoch + 1;
+  _group_id = welcome_info.group_id;
+  _tree = welcome_info.tree;
+  _transcript_hash = welcome_info.transcript_hash;
 
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
@@ -153,10 +123,7 @@ State::State(SignaturePrivateKey identity_priv,
 
   // Add to the tree
   _index = add.index;
-  _state.tree.add_leaf(_index, init_secret);
-
-  // Add to the roster
-  _state.roster.add(_index.val, credential);
+  _tree.add_leaf(_index, init_secret, credential);
 
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
@@ -211,7 +178,7 @@ State::negotiate(const bytes& group_id,
 std::pair<Welcome, Handshake>
 State::add(const UserInitKey& user_init_key) const
 {
-  return add(_state.tree.size(), user_init_key);
+  return add(_tree.size(), user_init_key);
 }
 
 std::pair<Welcome, Handshake>
@@ -238,7 +205,7 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
 Handshake
 State::update(const bytes& leaf_secret)
 {
-  auto path = _state.tree.encrypt(_index, leaf_secret);
+  auto path = _tree.encrypt(_index, leaf_secret);
   _cached_leaf_secret = leaf_secret;
   return sign(Update{ path });
 }
@@ -246,11 +213,11 @@ State::update(const bytes& leaf_secret)
 Handshake
 State::remove(const bytes& evict_secret, uint32_t index) const
 {
-  if (index >= _state.tree.size()) {
+  if (index >= _tree.size()) {
     throw InvalidParameterError("Index too large for tree");
   }
 
-  auto path = _state.tree.encrypt(LeafIndex{ index }, evict_secret);
+  auto path = _tree.encrypt(LeafIndex{ index }, evict_secret);
   return sign(Remove{ LeafIndex{ index }, path });
 }
 
@@ -261,7 +228,7 @@ State::remove(const bytes& evict_secret, uint32_t index) const
 State
 State::handle(const Handshake& handshake) const
 {
-  if (handshake.prior_epoch != _state.epoch) {
+  if (handshake.prior_epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
   }
 
@@ -292,7 +259,7 @@ State::handle(LeafIndex signer_index, const GroupOperation& operation) const
   }
 
   next.update_transcript_hash(operation);
-  next._state.epoch = _state.epoch + 1;
+  next._epoch += 1;
   next.update_epoch_secrets(update_secret);
 
   return next;
@@ -307,10 +274,10 @@ State::handle(const Add& add)
   }
 
   // Verify the index in the Add message
-  if (add.index.val > _state.tree.size()) {
+  if (add.index.val > _tree.size()) {
     throw InvalidParameterError("Invalid leaf index");
   }
-  if (add.index.val < _state.tree.size() && _state.tree.occupied(add.index)) {
+  if (add.index.val < _tree.size() && _tree.occupied(add.index)) {
     throw InvalidParameterError("Leaf is not available for add");
   }
 
@@ -324,10 +291,7 @@ State::handle(const Add& add)
   if (!init_key) {
     throw ProtocolError("New node does not support group's cipher suite");
   }
-  _state.tree.add_leaf(add.index, *init_key);
-
-  // Add to the roster
-  _state.roster.add(add.index.val, add.init_key.credential);
+  _tree.add_leaf(add.index, *init_key, add.init_key.credential);
 
   return _zero;
 }
@@ -353,12 +317,10 @@ State::handle(const Remove& remove)
 {
   auto leaf_secret = std::nullopt;
   auto update_secret = update_leaf(remove.removed, remove.path, leaf_secret);
-  _state.tree.blank_path(remove.removed);
-  _state.roster.remove(remove.removed.val);
+  _tree.blank_path(remove.removed);
 
-  auto cut = _state.tree.leaf_span();
-  _state.tree.truncate(cut);
-  _state.roster.truncate(cut.val);
+  auto cut = _tree.leaf_span();
+  _tree.truncate(cut);
 
   return update_secret;
 }
@@ -367,15 +329,14 @@ State::EpochSecrets
 State::derive_epoch_secrets(CipherSuite suite,
                             const bytes& init_secret,
                             const bytes& update_secret,
-                            const GroupState& state)
+                            const bytes& group_state)
 {
-  auto state_bytes = tls::marshal(state);
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
   return {
     epoch_secret,
-    derive_secret(suite, epoch_secret, "app", state_bytes),
-    derive_secret(suite, epoch_secret, "confirm", state_bytes),
-    derive_secret(suite, epoch_secret, "init", state_bytes),
+    derive_secret(suite, epoch_secret, "app", group_state),
+    derive_secret(suite, epoch_secret, "confirm", group_state),
+    derive_secret(suite, epoch_secret, "init", group_state),
   };
 }
 
@@ -386,15 +347,21 @@ State::derive_epoch_secrets(CipherSuite suite,
 bool
 operator==(const State& lhs, const State& rhs)
 {
-  auto state = (lhs._state == rhs._state);
+  auto suite = (lhs._suite == rhs._suite);
+  auto group_id = (lhs._group_id == rhs._group_id);
+  auto epoch = (lhs._epoch == rhs._epoch);
+  auto tree = (lhs._tree == rhs._tree);
+  auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
+  auto group_state = (lhs._group_state == rhs._group_state);
+
   auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
   auto application_secret =
     (lhs._application_secret == rhs._application_secret);
   auto confirmation_key = (lhs._confirmation_key == rhs._confirmation_key);
   auto init_secret = (lhs._init_secret == rhs._init_secret);
 
-  return state && epoch_secret && application_secret && confirmation_key &&
-         init_secret;
+  return suite && group_id && epoch && tree && transcript_hash && group_state &&
+         epoch_secret && application_secret && confirmation_key && init_secret;
 }
 
 bool
@@ -406,18 +373,15 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _state.group_id, _state.epoch,           _state.roster,
-           _state.tree,     _state.transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _transcript_hash, _init_secret };
 }
 
 void
 State::update_transcript_hash(const GroupOperation& operation)
 {
   auto operation_bytes = tls::marshal(operation);
-  _state.transcript_hash = Digest(_suite)
-                             .write(_state.transcript_hash)
-                             .write(operation_bytes)
-                             .digest();
+  _transcript_hash =
+    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
 }
 
 bytes
@@ -425,21 +389,31 @@ State::update_leaf(LeafIndex index,
                    const DirectPath& path,
                    const std::optional<bytes>& leaf_secret)
 {
-  if (leaf_secret) {
-    _state.tree.set_path(index, *leaf_secret);
+  bytes update_secret;
+  if (leaf_secret.has_value()) {
+    update_secret = _tree.set_path(index, *leaf_secret);
   } else {
-    auto secrets = _state.tree.decrypt(index, path);
-    _state.tree.merge_path(index, secrets);
+    auto merge_path = _tree.decrypt(index, path);
+    update_secret = merge_path.root_path_secret;
+    _tree.merge_path(index, merge_path);
   }
 
-  return _state.tree.root_secret();
+  return update_secret;
 }
 
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
+  auto group_state_str = GroupState{
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _transcript_hash,
+  };
+  _group_state = tls::marshal(group_state_str);
+
   auto secrets =
-    derive_epoch_secrets(_suite, _init_secret, update_secret, _state);
+    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_state);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
   _confirmation_key = secrets.confirmation_key;
@@ -451,20 +425,20 @@ State::sign(const GroupOperation& operation) const
 {
   auto next = handle(_index, operation);
 
-  auto sig_data = next._state.transcript_hash;
+  auto sig_data = next._transcript_hash;
   auto sig = _identity_priv.sign(sig_data);
 
   auto confirm_data = sig_data + sig;
   auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
 
-  return Handshake{ _state.epoch, operation, _index, sig, confirm };
+  return Handshake{ _epoch, operation, _index, sig, confirm };
 }
 
 bool
 State::verify(const Handshake& handshake) const
 {
-  auto pub = _state.roster.get(handshake.signer_index.val).public_key();
-  auto sig_data = _state.transcript_hash;
+  auto pub = _tree.get_credential(handshake.signer_index).public_key();
+  auto sig_data = _transcript_hash;
   auto sig = handshake.signature;
   auto sig_ver = pub.verify(sig_data, sig);
 
