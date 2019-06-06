@@ -77,9 +77,11 @@ protected:
     Update update_op{ direct_path };
     Remove remove_op{ tv.removed, direct_path };
 
-    auto add_c = MLSPlaintext{ tv.epoch, tv.signer_index, add_op };
-    auto update_c = MLSPlaintext{ tv.epoch, tv.signer_index, update_op };
-    auto remove_c = MLSPlaintext{ tv.epoch, tv.signer_index, remove_op };
+    auto add_c = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
+    auto update_c =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
+    auto remove_c =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
     add_c.signature = tv.random;
     update_c.signature = tv.random;
     remove_c.signature = tv.random;

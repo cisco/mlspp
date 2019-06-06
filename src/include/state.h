@@ -171,6 +171,7 @@ private:
   bytes _group_id;
   epoch_t _epoch;
   RatchetTree _tree;
+  bytes _intermediate_hash;
   bytes _transcript_hash;
   bytes _group_state;
 
@@ -194,10 +195,7 @@ private:
   // A zero vector, for convenience
   bytes _zero;
 
-  // Specific operation handlers
-  State handle(LeafIndex signer_index, const GroupOperation& operation) const;
-
-  // Handle a Add (for existing participants only)
+  // Handle an Add (for existing participants only)
   bytes handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
@@ -214,7 +212,7 @@ private:
   WelcomeInfo welcome_info() const;
 
   // Add a new group operation into the transcript hash
-  void update_transcript_hash(const GroupOperation& operation);
+  void update_transcript_hash(const MLSPlaintext& plaintext);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
   bytes update_leaf(LeafIndex index,
@@ -232,7 +230,7 @@ private:
   bool verify(const MLSPlaintext& pt) const;
 
   // Verification of the confirmation MAC
-  bool verify_confirmation(const GroupOperation& operation) const;
+  bool verify_confirmation(const bytes& confirmation) const;
 
   // Encrypt and decrypt MLS framed objects
   MLSCiphertext encrypt(const MLSPlaintext& pt);

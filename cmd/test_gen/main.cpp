@@ -369,9 +369,11 @@ generate_messages()
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
 
-    auto add = MLSPlaintext{ tv.epoch, tv.signer_index, add_op };
-    auto update = MLSPlaintext{ tv.epoch, tv.signer_index, update_op };
-    auto remove = MLSPlaintext{ tv.epoch, tv.signer_index, remove_op };
+    auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
+    auto update =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
+    auto remove =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
     add.signature = tv.random;
     update.signature = tv.random;
     remove.signature = tv.random;

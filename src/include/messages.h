@@ -296,8 +296,6 @@ struct GroupOperation : public CipherAware
   std::optional<Update> update;
   std::optional<Remove> remove;
 
-  tls::opaque<1> confirmation;
-
   GroupOperation()
     : CipherAware(DUMMY_CIPHERSUITE)
   {}
@@ -325,8 +323,6 @@ struct GroupOperation : public CipherAware
     , remove(remove)
   {}
 
-  bytes for_transcript() const;
-
   friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
   friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);
@@ -351,13 +347,15 @@ tls::istream&
 operator>>(tls::istream& in, ContentType& obj);
 
 // struct {
+//     opaque group_id<0..255>;
 //     uint32 epoch;
 //     uint32 sender;
 //     ContentType content_type;
 //
-//     select (MLSPlaintext.type) {
+//     select (MLSPlaintext.content_type) {
 //         case handshake:
 //             GroupOperation operation;
+//             opaque confirmation<0..255>;
 //
 //         case application:
 //             opaque application_data<0..2^32-1>;
@@ -369,25 +367,35 @@ struct MLSPlaintext : public CipherAware
 {
   using CipherAware::CipherAware;
 
+  tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
   ContentType content_type;
 
   std::optional<GroupOperation> operation;
+  std::optional<tls::opaque<1>> confirmation;
   std::optional<tls::opaque<4>> application_data;
 
   tls::opaque<2> signature;
 
-  MLSPlaintext(epoch_t epoch, LeafIndex sender, GroupOperation operation)
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               GroupOperation operation)
     : CipherAware(operation.cipher_suite())
+    , group_id(group_id)
     , epoch(epoch)
     , sender(sender)
     , content_type(ContentType::handshake)
     , operation(operation)
   {}
 
-  MLSPlaintext(epoch_t epoch, LeafIndex sender, const bytes& application_data)
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               const bytes& application_data)
     : CipherAware(DUMMY_CIPHERSUITE)
+    , group_id(group_id)
     , epoch(epoch)
     , sender(sender)
     , content_type(ContentType::application)
@@ -400,6 +408,9 @@ struct MLSPlaintext : public CipherAware
 
   bytes marshal_content(size_t padding_size) const;
   void unmarshal_content(CipherSuite suite, const bytes& marshaled);
+
+  bytes content() const;
+  bytes auth_data() const;
 
   friend bool operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);

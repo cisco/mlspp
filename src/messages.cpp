@@ -291,29 +291,6 @@ operator>>(tls::istream& in, Remove& obj)
 
 // GroupOperation
 
-bytes
-GroupOperation::for_transcript() const
-{
-  tls::ostream w;
-  w << type;
-
-  switch (type) {
-    case GroupOperationType::add:
-      w << add.value();
-      break;
-    case GroupOperationType::update:
-      w << update.value();
-      break;
-    case GroupOperationType::remove:
-      w << remove.value();
-      break;
-    default:
-      throw InvalidParameterError("Unknown group operation type");
-  }
-
-  return w.bytes();
-}
-
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 {
@@ -323,15 +300,27 @@ operator==(const GroupOperation& lhs, const GroupOperation& rhs)
           ((lhs.type == GroupOperationType::update) &&
            (lhs.update.value() == rhs.update.value())) ||
           ((lhs.type == GroupOperationType::remove) &&
-           (lhs.remove.value() == rhs.remove.value()))) &&
-         (lhs.confirmation == rhs.confirmation);
+           (lhs.remove.value() == rhs.remove.value())));
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupOperation& obj)
 {
-  out.write_raw(obj.for_transcript());
-  out << obj.confirmation;
+  out << obj.type;
+
+  switch (obj.type) {
+    case GroupOperationType::add:
+      out << obj.add.value();
+      break;
+    case GroupOperationType::update:
+      out << obj.update.value();
+      break;
+    case GroupOperationType::remove:
+      out << obj.remove.value();
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
+  }
   return out;
 }
 
@@ -357,7 +346,6 @@ operator>>(tls::istream& in, GroupOperation& obj)
       throw InvalidParameterError("Unknown group operation type");
   }
 
-  in >> obj.confirmation;
   return in;
 }
 
@@ -443,26 +431,52 @@ MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
   }
 }
 
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   uint32 sender;
+//   ContentType content_type = handshake;
+//   GroupOperation operation;
+// } MLSPlaintextOpContent;
+bytes
+MLSPlaintext::content() const
+{
+  tls::ostream w;
+  w << group_id << epoch << sender << content_type << operation.value();
+  return w.bytes();
+}
+
+// struct {
+//   opaque confirmation<0..255>;
+//   opaque signature<0..2^16-1>;
+// } MLSPlaintextOpAuthData;
+bytes
+MLSPlaintext::auth_data() const
+{
+  tls::ostream w;
+  w << confirmation.value() << signature;
+  return w.bytes();
+}
+
 bytes
 MLSPlaintext::to_be_signed() const
 {
-  bytes content;
+  tls::ostream w;
+  w << group_id << epoch << sender << content_type;
   switch (content_type) {
     case ContentType::handshake:
-      content = tls::marshal(operation.value());
+      w << operation.value() << confirmation.value();
       break;
 
     case ContentType::application:
-      content = tls::marshal(application_data.value());
+      w << application_data.value();
       break;
 
     default:
       throw InvalidParameterError("Unknown content type");
   }
 
-  tls::ostream w;
-  w << epoch << sender << content_type;
-  return w.bytes() + content;
+  return w.bytes();
 }
 
 void
@@ -482,6 +496,7 @@ MLSPlaintext::verify(const SignaturePublicKey& pub) const
 bool
 operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs)
 {
+  auto group_id = (lhs.group_id == rhs.group_id);
   auto epoch = (lhs.epoch == rhs.epoch);
   auto sender = (lhs.sender == rhs.sender);
   auto content_type = (lhs.content_type == rhs.content_type);
@@ -491,8 +506,8 @@ operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs)
                            (lhs.operation.value() == rhs.operation.value()));
   auto signature = (lhs.signature == rhs.signature);
 
-  return epoch && sender && content_type && (operation || application_data) &&
-         signature;
+  return group_id && epoch && sender && content_type &&
+         (operation || application_data) && signature;
 }
 
 tls::ostream&
@@ -506,7 +521,7 @@ operator<<(tls::ostream& out, const MLSPlaintext& obj)
 tls::istream&
 operator>>(tls::istream& in, MLSPlaintext& obj)
 {
-  in >> obj.epoch >> obj.sender >> obj.content_type;
+  in >> obj.group_id >> obj.epoch >> obj.sender >> obj.content_type;
 
   switch (obj.content_type) {
     case ContentType::handshake:

@@ -107,12 +107,12 @@ State::State(SignaturePrivateKey identity_priv,
   , _identity_priv(std::move(identity_priv))
 {
   // Verify that we have an add and it is for us
+  const auto& operation = handshake.operation.value();
   if (handshake.operation.value().type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  auto operation = handshake.operation.value();
-  auto add = operation.add.value();
+  const auto& add = operation.add.value();
   if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
@@ -147,7 +147,7 @@ State::State(SignaturePrivateKey identity_priv,
   _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
-  update_transcript_hash(operation);
+  update_transcript_hash(handshake);
 
   // Add to the tree
   _index = add.index;
@@ -256,6 +256,11 @@ State::remove(const bytes& evict_secret, uint32_t index) const
 State
 State::handle(const MLSPlaintext& handshake) const
 {
+  // Pre-validate the MLSPlaintext
+  if (handshake.group_id != _group_id) {
+    throw InvalidParameterError("GroupID mismatch");
+  }
+
   if (handshake.epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
   }
@@ -268,36 +273,31 @@ State::handle(const MLSPlaintext& handshake) const
     throw ProtocolError("Invalid handshake message signature");
   }
 
-  auto& operation = handshake.operation.value();
-  auto next = handle(handshake.sender, operation);
-
-  if (!next.verify_confirmation(operation)) {
-    throw InvalidParameterError("Invalid confirmation MAC");
-  }
-
-  return next;
-}
-
-State
-State::handle(LeafIndex signer_index, const GroupOperation& operation) const
-{
+  // Apply the operation
+  const auto& operation = handshake.operation.value();
   auto next = *this;
+
   bytes update_secret;
   switch (operation.type) {
     case GroupOperationType::add:
       update_secret = next.handle(operation.add.value());
       break;
     case GroupOperationType::update:
-      update_secret = next.handle(signer_index, operation.update.value());
+      update_secret = next.handle(handshake.sender, operation.update.value());
       break;
     case GroupOperationType::remove:
       update_secret = next.handle(operation.remove.value());
       break;
   }
 
-  next.update_transcript_hash(operation);
+  next.update_transcript_hash(handshake);
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
+
+  // Verify the  confirmation MAC
+  if (!next.verify_confirmation(handshake.confirmation.value())) {
+    throw InvalidParameterError("Invalid confirmation MAC");
+  }
 
   return next;
 }
@@ -386,7 +386,7 @@ State::derive_epoch_secrets(CipherSuite suite,
 MLSCiphertext
 State::protect(const bytes& data)
 {
-  MLSPlaintext pt{ _epoch, _index, data };
+  MLSPlaintext pt{ _group_id, _epoch, _index, data };
   pt.sign(_identity_priv);
 
   return encrypt(pt);
@@ -445,11 +445,19 @@ State::welcome_info() const
 }
 
 void
-State::update_transcript_hash(const GroupOperation& operation)
+State::update_transcript_hash(const MLSPlaintext& plaintext)
 {
-  auto operation_bytes = operation.for_transcript();
-  _transcript_hash =
-    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
+  // Transcript hash for this epoch
+  _transcript_hash = Digest(_suite)
+                       .write(_intermediate_hash)
+                       .write(plaintext.content())
+                       .digest();
+
+  // Intermediate hash for next epoch
+  _intermediate_hash = Digest(_suite)
+                         .write(_transcript_hash)
+                         .write(plaintext.auth_data())
+                         .digest();
 }
 
 bytes
@@ -557,15 +565,9 @@ sender_data_mask(CipherSuite suite,
 MLSPlaintext
 State::sign(const GroupOperation& operation) const
 {
-  auto next = handle(_index, operation);
-  auto confirm = hmac(_suite, next._confirmation_key, next._transcript_hash);
-
-  auto pt = MLSPlaintext{ _suite };
-  pt.epoch = _epoch;
-  pt.sender = _index;
-  pt.content_type = ContentType::handshake;
-  pt.operation = operation;
-  pt.operation.value().confirmation = confirm;
+  auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
+  auto next = handle(pt);
+  pt.confirmation = hmac(_suite, next._confirmation_key, next._transcript_hash);
   pt.sign(_identity_priv);
   return pt;
 }
@@ -578,10 +580,10 @@ State::verify(const MLSPlaintext& pt) const
 }
 
 bool
-State::verify_confirmation(const GroupOperation& operation) const
+State::verify_confirmation(const bytes& confirmation) const
 {
   auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
-  return constant_time_eq(confirm, operation.confirmation);
+  return constant_time_eq(confirm, confirmation);
 }
 
 MLSCiphertext
