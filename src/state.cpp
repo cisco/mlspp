@@ -57,9 +57,8 @@ KeyChain::get(LeafIndex sender, uint32_t generation) const
     secret = derive(secret, _secret_label, sender_bytes, _secret_size);
   }
 
-  // Derive the key and nonce
-  auto key = derive(secret, _key_label, bytes(), _key_size);
-  auto nonce = derive(secret, _nonce_label, bytes(), _nonce_size);
+  auto key = hkdf_expand_label(_suite, secret, _key_label, {}, _key_size);
+  auto nonce = hkdf_expand_label(_suite, secret, _nonce_label, {}, _nonce_size);
 
   return Generation{ generation, secret, key, nonce };
 }
