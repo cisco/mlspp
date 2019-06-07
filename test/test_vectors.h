@@ -202,7 +202,7 @@ struct MessagesTestVectors
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
 
-    tls::opaque<4> user_init_key;
+    tls::opaque<4> client_init_key;
     tls::opaque<4> welcome_info;
     tls::opaque<4> welcome;
     tls::opaque<4> add;
@@ -216,13 +216,13 @@ struct MessagesTestVectors
   LeafIndex removed;
   tls::opaque<1> user_id;
   tls::opaque<1> group_id;
-  tls::opaque<1> uik_id;
+  tls::opaque<1> client_init_key_id;
   tls::opaque<1> dh_seed;
   tls::opaque<1> sig_seed;
   tls::opaque<1> random;
 
-  SignatureScheme uik_all_scheme;
-  tls::opaque<4> user_init_key_all;
+  SignatureScheme cik_all_scheme;
+  tls::opaque<4> client_init_key_all;
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
@@ -275,7 +275,7 @@ struct SessionTestVectors
   {
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
-    tls::vector<tls::opaque<4>, 4> user_init_keys;
+    tls::vector<tls::opaque<4>, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
   };
 

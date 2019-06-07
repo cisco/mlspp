@@ -310,26 +310,26 @@ generate_messages()
   tv.removed = LeafIndex{ 0xC0C1C2C3 };
   tv.user_id = bytes(16, 0xD1);
   tv.group_id = bytes(16, 0xD2);
-  tv.uik_id = bytes(16, 0xD3);
+  tv.client_init_key_id = bytes(16, 0xD3);
   tv.dh_seed = bytes(32, 0xD4);
   tv.sig_seed = bytes(32, 0xD5);
   tv.random = bytes(32, 0xD6);
-  tv.uik_all_scheme = SignatureScheme::Ed25519;
+  tv.cik_all_scheme = SignatureScheme::Ed25519;
 
-  // Construct a UIK with all the ciphersuites
-  auto uik_all = UserInitKey{};
-  uik_all.user_init_key_id = tv.uik_id;
+  // Construct a CIK with all the ciphersuites
+  auto cik_all = ClientInitKey{};
+  cik_all.client_init_key_id = tv.client_init_key_id;
   for (const auto& suite : suites) {
     auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    uik_all.add_init_key(priv.public_key());
+    cik_all.add_init_key(priv.public_key());
   }
 
   auto identity_priv =
-    SignaturePrivateKey::derive(tv.uik_all_scheme, tv.sig_seed);
-  uik_all.credential = Credential::basic(tv.user_id, identity_priv);
-  uik_all.signature = tv.random;
+    SignaturePrivateKey::derive(tv.cik_all_scheme, tv.sig_seed);
+  cik_all.credential = Credential::basic(tv.user_id, identity_priv);
+  cik_all.signature = tv.random;
 
-  tv.user_init_key_all = tls::marshal(uik_all);
+  tv.client_init_key_all = tls::marshal(cik_all);
 
   // Construct a test case for each suite
   test::DeterministicHPKE lock;
@@ -351,21 +351,21 @@ generate_messages()
     ratchet_tree.blank_path(LeafIndex{ 2 });
     auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
-    // Construct UIK
-    auto user_init_key = UserInitKey{};
-    user_init_key.user_init_key_id = tv.uik_id;
-    user_init_key.add_init_key(dh_key);
-    user_init_key.credential = cred;
-    user_init_key.signature = tv.random;
+    // Construct CIK
+    auto client_init_key = ClientInitKey{};
+    client_init_key.client_init_key_id = tv.client_init_key_id;
+    client_init_key.add_init_key(dh_key);
+    client_init_key.credential = cred;
+    client_init_key.signature = tv.random;
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
-    auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
+    auto welcome = Welcome{ tv.client_init_key_id, dh_key, welcome_info };
 
     // Construct handshake messages
-    auto add_op = Add{ tv.removed, user_init_key, tv.random };
+    auto add_op = Add{ tv.removed, client_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
 
@@ -391,7 +391,7 @@ generate_messages()
     *cases[i] = {
       suite,
       scheme,
-      tls::marshal(user_init_key),
+      tls::marshal(client_init_key),
       tls::marshal(welcome_info),
       tls::marshal(welcome),
       tls::marshal(add),
@@ -446,20 +446,20 @@ generate_basic_session()
       sessions.emplace_back(ciphersuites, seed, identity_priv, cred);
     }
 
-    std::vector<tls::opaque<4>> uiks;
+    std::vector<tls::opaque<4>> ciks;
     for (const auto& session : sessions) {
-      uiks.push_back(session.user_init_key());
+      ciks.push_back(session.client_init_key());
     }
 
     // Add everyone
     for (int j = 1; j < tv.group_size; ++j) {
-      auto uik = sessions[j].user_init_key();
+      auto cik = sessions[j].client_init_key();
 
       std::pair<bytes, bytes> welcome_add;
       if (j == 1) {
-        welcome_add = sessions[0].start(tv.group_id, uik);
+        welcome_add = sessions[0].start(tv.group_id, cik);
       } else {
-        welcome_add = sessions[j - 1].add(uik);
+        welcome_add = sessions[j - 1].add(cik);
         for (int k = 0; k < j; ++k) {
           sessions[k].handle(welcome_add.second);
         }
@@ -500,7 +500,7 @@ generate_basic_session()
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, uiks, transcript };
+    *cases[i] = { suite, scheme, ciks, transcript };
   }
 
   return tv;

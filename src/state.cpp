@@ -115,13 +115,13 @@ State::State(SignaturePrivateKey identity_priv,
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  auto init_uik = add.init_key.find_init_key(_suite);
-  if (!init_uik) {
+  auto init_cik = add.init_key.find_init_key(_suite);
+  if (!init_cik) {
     throw ProtocolError("Selected cipher suite not supported");
   }
 
   auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
-  if (*init_uik != init_priv.public_key()) {
+  if (*init_cik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
 
@@ -163,13 +163,13 @@ State::negotiate(const bytes& group_id,
                  const bytes& leaf_secret,
                  const SignaturePrivateKey& identity_priv,
                  const Credential& credential,
-                 const UserInitKey& user_init_key)
+                 const ClientInitKey& client_init_key)
 {
   // Negotiate a ciphersuite with the other party
   CipherSuite suite;
   auto selected = false;
   for (auto my_suite : supported_ciphersuites) {
-    for (auto other_suite : user_init_key.cipher_suites) {
+    for (auto other_suite : client_init_key.cipher_suites) {
       if (my_suite == other_suite) {
         selected = true;
         suite = my_suite;
@@ -189,7 +189,7 @@ State::negotiate(const bytes& group_id,
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
-  auto welcome_add = state.add(user_init_key);
+  auto welcome_add = state.add(client_init_key);
   state = state.handle(welcome_add.second);
 
   return InitialInfo(state, welcome_add);
@@ -200,29 +200,30 @@ State::negotiate(const bytes& group_id,
 ///
 
 std::pair<Welcome, MLSPlaintext>
-State::add(const UserInitKey& user_init_key) const
+State::add(const ClientInitKey& client_init_key) const
 {
-  return add(_tree.size(), user_init_key);
+  return add(_tree.size(), client_init_key);
 }
 
 std::pair<Welcome, MLSPlaintext>
-State::add(uint32_t index, const UserInitKey& user_init_key) const
+State::add(uint32_t index, const ClientInitKey& client_init_key) const
 {
-  if (!user_init_key.verify()) {
+  if (!client_init_key.verify()) {
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  auto pub = user_init_key.find_init_key(_suite);
+  auto pub = client_init_key.find_init_key(_suite);
   if (!pub) {
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
   auto welcome_info_str = welcome_info();
   auto welcome =
-    Welcome{ user_init_key.user_init_key_id, *pub, welcome_info_str };
+    Welcome{ client_init_key.client_init_key_id, *pub, welcome_info_str };
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add = sign(Add{ LeafIndex{ index }, user_init_key, welcome_info_hash });
+  auto add =
+    sign(Add{ LeafIndex{ index }, client_init_key, welcome_info_hash });
   return std::pair<Welcome, MLSPlaintext>(welcome, add);
 }
 
@@ -307,7 +308,7 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
 bytes
 State::handle(const Add& add)
 {
-  // Verify the UserInitKey in the Add message
+  // Verify the ClientInitKey in the Add message
   if (!add.init_key.verify()) {
     throw InvalidParameterError("Invalid signature on init key in group add");
   }

@@ -99,7 +99,7 @@ public:
         const MLSPlaintext& handshake);
 
   // Negotiate an initial state with another peer based on their
-  // UserInitKey
+  // ClientInitKey
   typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
   static InitialInfo negotiate(
     const bytes& group_id,
@@ -107,18 +107,20 @@ public:
     const bytes& leaf_secret,
     const SignaturePrivateKey& identity_priv,
     const Credential& credential,
-    const UserInitKey& user_init_key);
+    const ClientInitKey& client_init_key);
 
   ///
   /// Message factories
   ///
 
   // Generate a Add message
-  std::pair<Welcome, MLSPlaintext> add(const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, MLSPlaintext> add(uint32_t index,
-                                       const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(
+    uint32_t index,
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   MLSPlaintext update(const bytes& leaf_secret);

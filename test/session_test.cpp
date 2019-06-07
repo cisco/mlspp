@@ -67,14 +67,14 @@ protected:
 
     // Initial add is different
     if (sessions.size() == 1) {
-      auto welcome_add = sessions[0].start(group_id, next.user_init_key());
+      auto welcome_add = sessions[0].start(group_id, next.client_init_key());
       next.join(welcome_add.first, welcome_add.second);
       sessions.push_back(next);
       // NB: Don't check epoch change, because it doesn't
       return;
     }
 
-    auto welcome_add = sessions[from].add(next.user_init_key());
+    auto welcome_add = sessions[from].add(next.client_init_key());
     next.join(welcome_add.first, welcome_add.second);
     broadcast(welcome_add.second, index);
 
@@ -147,7 +147,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
                    idB,
                    credB };
 
-  auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.user_init_key());
+  auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.client_init_key());
   bob.join(welcome_add.first, welcome_add.second);
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
@@ -256,7 +256,7 @@ protected:
     int curr = 0;
     if (index == 0) {
       // Member 0 creates the group
-      session.start(basic_tv.group_id, tc.user_init_keys[1]);
+      session.start(basic_tv.group_id, tc.client_init_keys[1]);
       curr = 1;
     } else {
       // Member i>0 is initialized with a welcome on step i-1

@@ -43,17 +43,17 @@ operator>>(tls::istream& in, DirectPath& obj)
   return in >> obj.nodes;
 }
 
-// UserInitKey
+// ClientInitKey
 
 void
-UserInitKey::add_init_key(const DHPublicKey& pub)
+ClientInitKey::add_init_key(const DHPublicKey& pub)
 {
   cipher_suites.push_back(pub.cipher_suite());
   init_keys.push_back(pub.to_bytes());
 }
 
 std::optional<DHPublicKey>
-UserInitKey::find_init_key(CipherSuite suite) const
+ClientInitKey::find_init_key(CipherSuite suite) const
 {
   for (size_t i = 0; i < cipher_suites.size(); ++i) {
     if (cipher_suites[i] == suite) {
@@ -65,11 +65,11 @@ UserInitKey::find_init_key(CipherSuite suite) const
 }
 
 void
-UserInitKey::sign(const SignaturePrivateKey& identity_priv,
-                  const Credential& credential_in)
+ClientInitKey::sign(const SignaturePrivateKey& identity_priv,
+                    const Credential& credential_in)
 {
   if (cipher_suites.size() != init_keys.size()) {
-    throw InvalidParameterError("Mal-formed UserInitKey");
+    throw InvalidParameterError("Mal-formed ClientInitKey");
   }
 
   credential = credential_in;
@@ -79,7 +79,7 @@ UserInitKey::sign(const SignaturePrivateKey& identity_priv,
 }
 
 bool
-UserInitKey::verify() const
+ClientInitKey::verify() const
 {
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
@@ -87,7 +87,7 @@ UserInitKey::verify() const
 }
 
 bytes
-UserInitKey::to_be_signed() const
+ClientInitKey::to_be_signed() const
 {
   tls::ostream out;
   out << cipher_suites << init_keys << credential;
@@ -99,7 +99,7 @@ UserInitKey::to_be_signed() const
 // the public keys are the same and both signatures are valid over
 // the same contents.
 bool
-operator==(const UserInitKey& lhs, const UserInitKey& rhs)
+operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
 {
   return (lhs.cipher_suites == rhs.cipher_suites) &&
          (lhs.init_keys == rhs.init_keys) &&
@@ -107,17 +107,17 @@ operator==(const UserInitKey& lhs, const UserInitKey& rhs)
 }
 
 tls::ostream&
-operator<<(tls::ostream& out, const UserInitKey& obj)
+operator<<(tls::ostream& out, const ClientInitKey& obj)
 {
-  return out << obj.user_init_key_id << obj.supported_versions
+  return out << obj.client_init_key_id << obj.supported_versions
              << obj.cipher_suites << obj.init_keys << obj.credential
              << obj.signature;
 }
 
 tls::istream&
-operator>>(tls::istream& in, UserInitKey& obj)
+operator>>(tls::istream& in, ClientInitKey& obj)
 {
-  return in >> obj.user_init_key_id >> obj.supported_versions >>
+  return in >> obj.client_init_key_id >> obj.supported_versions >>
          obj.cipher_suites >> obj.init_keys >> obj.credential >> obj.signature;
 }
 
@@ -166,7 +166,7 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
 Welcome::Welcome(const bytes& id,
                  const DHPublicKey& pub,
                  const WelcomeInfo& info)
-  : user_init_key_id(id)
+  : client_init_key_id(id)
   , cipher_suite(pub.cipher_suite())
   , encrypted_welcome_info(pub.encrypt(tls::marshal(info)))
 {}
@@ -183,7 +183,7 @@ Welcome::decrypt(const DHPrivateKey& priv) const
 bool
 operator==(const Welcome& lhs, const Welcome& rhs)
 {
-  return (lhs.user_init_key_id == rhs.user_init_key_id) &&
+  return (lhs.client_init_key_id == rhs.client_init_key_id) &&
          (lhs.cipher_suite == rhs.cipher_suite) &&
          (lhs.encrypted_welcome_info == rhs.encrypted_welcome_info);
 }
@@ -191,14 +191,14 @@ operator==(const Welcome& lhs, const Welcome& rhs)
 tls::ostream&
 operator<<(tls::ostream& out, const Welcome& obj)
 {
-  return out << obj.user_init_key_id << obj.cipher_suite
+  return out << obj.client_init_key_id << obj.cipher_suite
              << obj.encrypted_welcome_info;
 }
 
 tls::istream&
 operator>>(tls::istream& in, Welcome& obj)
 {
-  in >> obj.user_init_key_id >> obj.cipher_suite;
+  in >> obj.client_init_key_id >> obj.cipher_suite;
 
   obj.encrypted_welcome_info = HPKECiphertext{ obj.cipher_suite };
   in >> obj.encrypted_welcome_info;
