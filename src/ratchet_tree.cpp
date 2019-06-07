@@ -533,7 +533,12 @@ RatchetTree::size() const
 bool
 RatchetTree::occupied(LeafIndex index) const
 {
-  return _nodes[NodeIndex{ index }].has_value();
+  auto node = NodeIndex{ index };
+  if (node.val >= _nodes.size()) {
+    return false;
+  }
+
+  return _nodes[node].has_value();
 }
 
 bytes

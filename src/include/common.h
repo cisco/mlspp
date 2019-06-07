@@ -48,6 +48,9 @@ operator+=(bytes& lhs, const bytes& rhs);
 bytes
 operator+(const bytes& lhs, const bytes& rhs);
 
+bytes
+operator^(const bytes& lhs, const bytes& rhs);
+
 std::ostream&
 operator<<(std::ostream& out, const bytes& data);
 

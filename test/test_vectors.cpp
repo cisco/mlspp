@@ -235,7 +235,8 @@ tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 {
   return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_key >>
-         obj.welcome_info >> obj.welcome >> obj.add >> obj.update >> obj.remove;
+         obj.welcome_info >> obj.welcome >> obj.add >> obj.update >>
+         obj.remove >> obj.ciphertext;
 }
 
 tls::ostream&
@@ -243,7 +244,7 @@ operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& obj)
 {
   return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_key
              << obj.welcome_info << obj.welcome << obj.add << obj.update
-             << obj.remove;
+             << obj.remove << obj.ciphertext;
 }
 
 tls::istream&

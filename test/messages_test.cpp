@@ -77,22 +77,31 @@ protected:
     Update update_op{ direct_path };
     Remove remove_op{ tv.removed, direct_path };
 
-    Handshake add_c{ tv.epoch, add_op, tv.signer_index, tv.random, tv.random };
-    Handshake update_c{
-      tv.epoch, update_op, tv.signer_index, tv.random, tv.random
-    };
-    Handshake remove_c{
-      tv.epoch, remove_op, tv.signer_index, tv.random, tv.random
-    };
+    auto add_c = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
+    auto update_c =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
+    auto remove_c =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
+    add_c.signature = tv.random;
+    update_c.signature = tv.random;
+    remove_c.signature = tv.random;
 
-    Handshake add{ tc.cipher_suite };
+    MLSPlaintext add{ tc.cipher_suite };
     tls_round_trip(tc.add, add_c, add, reproducible);
 
-    Handshake update{ tc.cipher_suite };
+    MLSPlaintext update{ tc.cipher_suite };
     tls_round_trip(tc.update, update_c, update, true);
 
-    Handshake remove{ tc.cipher_suite };
+    MLSPlaintext remove{ tc.cipher_suite };
     tls_round_trip(tc.remove, remove_c, remove, true);
+
+    // MLSCiphertext
+    MLSCiphertext ciphertext_c{
+      tv.group_id, tv.epoch,  ContentType::handshake,
+      tv.random,   tv.random, tv.random,
+    };
+    MLSCiphertext ciphertext{};
+    tls_round_trip(tc.ciphertext, ciphertext_c, ciphertext, true);
   }
 };
 

@@ -208,6 +208,7 @@ struct MessagesTestVectors
     tls::opaque<4> add;
     tls::opaque<4> update;
     tls::opaque<4> remove;
+    tls::opaque<4> ciphertext;
   };
 
   epoch_t epoch;

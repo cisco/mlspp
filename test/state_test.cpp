@@ -16,12 +16,12 @@ protected:
   void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
   {
     ASSERT_EQ(tc.size(), tv.n_members);
+    KeyChain chain(suite);
+    chain.start(LeafIndex{ 0 }, tv.application_secret);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.application_secret);
-
       ASSERT_EQ(tc[j].size(), tv.n_generations);
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(k);
+        auto kn = chain.get(LeafIndex{ j }, k);
         ASSERT_EQ(tc[j][k].secret, kn.secret);
         ASSERT_EQ(tc[j][k].key, kn.key);
         ASSERT_EQ(tc[j][k].nonce, kn.nonce);
@@ -55,6 +55,8 @@ protected:
   std::vector<bytes> init_secrets;
   std::vector<UserInitKey> user_init_keys;
   std::vector<State> states;
+
+  const bytes test_message = from_hex("01020304");
 
   GroupCreationTest()
   {
@@ -94,6 +96,11 @@ TEST_F(GroupCreationTest, TwoPerson)
     State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
   ASSERT_EQ(first, second);
+
+  // Verify that they can exchange protected messages
+  auto encrypted = first.protect(test_message);
+  auto decrypted = second.unprotect(encrypted);
+  ASSERT_EQ(decrypted, test_message);
 }
 
 TEST_F(GroupCreationTest, FullSize)
@@ -118,6 +125,17 @@ TEST_F(GroupCreationTest, FullSize)
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
       ASSERT_EQ(state, states[0]);
+    }
+
+    // Check that everyone can send and be received
+    for (auto& state : states) {
+      auto encrypted = state.protect(test_message);
+      std::cout << state.index().val << " -> " << tls::marshal(encrypted)
+                << std::endl;
+      for (auto& other : states) {
+        auto decrypted = other.unprotect(encrypted);
+        ASSERT_EQ(decrypted, test_message);
+      }
     }
   }
 }

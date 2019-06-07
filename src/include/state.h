@@ -4,6 +4,7 @@
 #include "messages.h"
 #include "ratchet_tree.h"
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace mls {
@@ -31,34 +32,33 @@ operator>>(tls::istream& out, GroupState& obj);
 // never ratchet forward the base secret.  This allows for maximal
 // out-of-order delivery, but provides no forward secrecy within an
 // epoch.
-class ApplicationKeyChain
+class KeyChain
 {
 public:
-  ApplicationKeyChain(CipherSuite suite,
-                      uint32_t sender,
-                      const bytes& app_secret)
+  KeyChain(CipherSuite suite)
     : _suite(suite)
-    , _sender(tls::marshal(sender))
     , _secret_size(Digest(suite).output_size())
     , _key_size(AESGCM::key_size(suite))
     , _nonce_size(AESGCM::nonce_size)
-  {
-    _base_secret = derive(app_secret, _secret_label, _secret_size);
-  }
+  {}
 
-  struct KeyAndNonce
+  struct Generation
   {
+    uint32_t generation;
     bytes secret;
     bytes key;
     bytes nonce;
   };
 
-  KeyAndNonce get(uint32_t generation) const;
+  void start(LeafIndex my_index, const bytes& root_secret);
+  Generation next();
+  Generation get(LeafIndex sender, uint32_t generation) const;
 
 private:
   CipherSuite _suite;
-  bytes _sender;
-  bytes _base_secret;
+  LeafIndex _my_sender;
+  uint32_t _my_generation;
+  bytes _root_secret;
 
   size_t _secret_size;
   size_t _key_size;
@@ -73,6 +73,7 @@ private:
 
   bytes derive(const bytes& secret,
                const std::string& label,
+               const bytes& context,
                const size_t size) const;
 };
 
@@ -95,11 +96,11 @@ public:
         const Credential& credential,
         const bytes& init_secret,
         const Welcome& welcome_info,
-        const Handshake& handshake);
+        const MLSPlaintext& handshake);
 
   // Negotiate an initial state with another peer based on their
   // UserInitKey
-  typedef std::pair<State, std::pair<Welcome, Handshake>> InitialInfo;
+  typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
   static InitialInfo negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
@@ -113,22 +114,22 @@ public:
   ///
 
   // Generate a Add message
-  std::pair<Welcome, Handshake> add(const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(const UserInitKey& user_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, Handshake> add(uint32_t index,
-                                    const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(uint32_t index,
+                                       const UserInitKey& user_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  Handshake update(const bytes& leaf_secret);
+  MLSPlaintext update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  Handshake remove(const bytes& evict_secret, uint32_t index) const;
+  MLSPlaintext remove(const bytes& evict_secret, uint32_t index) const;
 
   ///
   /// Generic handshake message handler
   ///
-  State handle(const Handshake& handshake) const;
+  State handle(const MLSPlaintext& handshake) const;
 
   ///
   /// Accessors
@@ -142,12 +143,20 @@ public:
   bytes init_secret() const { return _init_secret; }
 
   ///
+  /// Encryption and decryption
+  ///
+  MLSCiphertext protect(const bytes& pt);
+  bytes unprotect(const MLSCiphertext& ct);
+
+  ///
   /// Static access to the key schedule
   ///
   struct EpochSecrets
   {
     bytes epoch_secret;
     bytes application_secret;
+    bytes handshake_secret;
+    bytes sender_data_secret;
     bytes confirmation_key;
     bytes init_secret;
   };
@@ -164,13 +173,21 @@ private:
   epoch_t _epoch;
   RatchetTree _tree;
   bytes _transcript_hash;
+  bytes _next_transcript_hash;
   bytes _group_state;
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;
+  tls::opaque<1> _sender_data_secret;
+  tls::opaque<1> _handshake_secret;
   tls::opaque<1> _application_secret;
   tls::opaque<1> _confirmation_key;
   tls::opaque<1> _init_secret;
+
+  // Message protection keys
+  tls::opaque<1> _sender_data_key;
+  std::set<LeafIndex> _handshake_key_used;
+  KeyChain _application_keys;
 
   // Per-participant state
   LeafIndex _index;
@@ -180,10 +197,9 @@ private:
   // A zero vector, for convenience
   bytes _zero;
 
-  // Specific operation handlers
-  State handle(LeafIndex signer_index, const GroupOperation& operation) const;
+  State handle(const MLSPlaintext& handshake, bool skipVerify) const;
 
-  // Handle a Add (for existing participants only)
+  // Handle an Add (for existing participants only)
   bytes handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
@@ -200,7 +216,7 @@ private:
   WelcomeInfo welcome_info() const;
 
   // Add a new group operation into the transcript hash
-  void update_transcript_hash(const GroupOperation& operation);
+  void update_transcript_hash(const MLSPlaintext& plaintext);
 
   // Inner logic shared by Update, self-Update, and Remove handlers
   bytes update_leaf(LeafIndex index,
@@ -210,11 +226,23 @@ private:
   // Derive the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);
 
-  // Sign this state with the associated private key
-  Handshake sign(const GroupOperation& operation) const;
+  // Signing of handshake messages (including creation of the
+  // confirmation MAC)
+  MLSPlaintext sign(const GroupOperation& operation) const;
 
-  // Verify this state with the indicated public key
-  bool verify(const Handshake& handshake) const;
+  // Signature verification over a handshake message
+  bool verify(const MLSPlaintext& pt) const;
+
+  // Verification of the confirmation MAC
+  bool verify_confirmation(const bytes& confirmation) const;
+
+  // Generate handshake keys
+  KeyChain::Generation generate_handshake_keys(const LeafIndex& sender,
+                                               bool encrypt);
+
+  // Encrypt and decrypt MLS framed objects
+  MLSCiphertext encrypt(const MLSPlaintext& pt);
+  MLSPlaintext decrypt(const MLSCiphertext& ct);
 };
 
 } // namespace mls

@@ -135,7 +135,7 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
          (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
-         (lhs.transcript_hash == rhs.transcript_hash) &&
+         (lhs.next_transcript_hash == rhs.next_transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
 
@@ -143,7 +143,7 @@ tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
   return out << obj.version << obj.group_id << obj.epoch << obj.tree
-             << obj.transcript_hash << obj.init_secret;
+             << obj.next_transcript_hash << obj.init_secret;
 }
 
 tls::istream&
@@ -156,7 +156,7 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
   obj.tree = RatchetTree(obj.cipher_suite());
 
   in >> obj.tree;
-  in >> obj.transcript_hash;
+  in >> obj.next_transcript_hash;
   in >> obj.init_secret;
   return in;
 }
@@ -290,15 +290,17 @@ operator>>(tls::istream& in, Remove& obj)
 }
 
 // GroupOperation
+
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 {
   return (lhs.type == rhs.type) &&
-         (((lhs.type == GroupOperationType::add) && (lhs.add == rhs.add)) ||
+         (((lhs.type == GroupOperationType::add) &&
+           (lhs.add.value() == rhs.add.value())) ||
           ((lhs.type == GroupOperationType::update) &&
-           (lhs.update == rhs.update)) ||
+           (lhs.update.value() == rhs.update.value())) ||
           ((lhs.type == GroupOperationType::remove) &&
-           (lhs.remove == rhs.remove)));
+           (lhs.remove.value() == rhs.remove.value())));
 }
 
 tls::ostream&
@@ -308,14 +310,18 @@ operator<<(tls::ostream& out, const GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      return out << obj.add;
+      out << obj.add.value();
+      break;
     case GroupOperationType::update:
-      return out << obj.update;
+      out << obj.update.value();
+      break;
     case GroupOperationType::remove:
-      return out << obj.remove;
+      out << obj.remove.value();
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
   }
-
-  throw InvalidParameterError("Unknown group operation type");
+  return out;
 }
 
 tls::istream&
@@ -325,39 +331,246 @@ operator>>(tls::istream& in, GroupOperation& obj)
 
   switch (obj.type) {
     case GroupOperationType::add:
-      return in >> obj.add;
+      obj.add = Add();
+      in >> obj.add.value();
+      break;
     case GroupOperationType::update:
-      return in >> obj.update;
+      obj.update = Update(obj._suite);
+      in >> obj.update.value();
+      break;
     case GroupOperationType::remove:
-      return in >> obj.remove;
+      obj.remove = Remove(obj._suite);
+      in >> obj.remove.value();
+      break;
+    default:
+      throw InvalidParameterError("Unknown group operation type");
   }
 
-  throw InvalidParameterError("Unknown group operation type");
+  return in;
 }
 
-// Handshake
-bool
-operator==(const Handshake& lhs, const Handshake& rhs)
-{
-  return (lhs.prior_epoch == rhs.prior_epoch) &&
-         (lhs.operation == rhs.operation) &&
-         (lhs.signer_index == rhs.signer_index) &&
-         (lhs.signature == rhs.signature) &&
-         (lhs.confirmation == rhs.confirmation);
-}
+// ContentType
 
 tls::ostream&
-operator<<(tls::ostream& out, const Handshake& obj)
+operator<<(tls::ostream& out, const ContentType& obj)
 {
-  return out << obj.prior_epoch << obj.operation << obj.signer_index
-             << obj.signature << obj.confirmation;
+  return out << static_cast<uint8_t>(obj);
 }
 
 tls::istream&
-operator>>(tls::istream& in, Handshake& obj)
+operator>>(tls::istream& in, ContentType& obj)
 {
-  return in >> obj.prior_epoch >> obj.operation >> obj.signer_index >>
-         obj.signature >> obj.confirmation;
+  uint8_t val;
+  in >> val;
+  obj = static_cast<ContentType>(val);
+  return in;
+}
+
+// MLSPlaintext
+
+// struct {
+//     opaque content[MLSPlaintext.length];
+//     uint8 signature[MLSInnerPlaintext.sig_len];
+//     uint16 sig_len;
+//     uint8  marker = 1;
+//     uint8  zero\_padding[length\_of\_padding];
+// } MLSContentPlaintext;
+bytes
+MLSPlaintext::marshal_content(size_t padding_size) const
+{
+  bytes content;
+  if (content_type == ContentType::handshake) {
+    content = tls::marshal(operation.value());
+  } else if (content_type == ContentType::application) {
+    content = application_data;
+  } else {
+    throw InvalidParameterError("Unknown content type");
+  }
+
+  uint16_t sig_len = signature.size();
+  auto marker = bytes{ 0x01 };
+  auto pad = zero_bytes(padding_size);
+  content = content + signature + tls::marshal(sig_len) + marker + pad;
+  return content;
+}
+
+void
+MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
+{
+  int cut = marshaled.size() - 1;
+  for (; marshaled[cut] == 0 && cut >= 0; cut -= 1) {
+  }
+  if (marshaled[cut] != 0x01) {
+    throw ProtocolError("Invalid marker byte");
+  }
+
+  uint16_t sig_len;
+  auto start = marshaled.begin();
+  auto sig_len_bytes = bytes(start + cut - 2, start + cut);
+  tls::unmarshal(sig_len_bytes, sig_len);
+  cut -= 2;
+  if (sig_len > cut) {
+    throw ProtocolError("Invalid signature size");
+  }
+
+  signature = bytes(start + cut - sig_len, start + cut);
+  auto content = bytes(start, start + cut - sig_len);
+
+  switch (content_type) {
+    case ContentType::handshake:
+      operation = GroupOperation(suite);
+      tls::unmarshal(content, operation.value());
+      break;
+
+    case ContentType::application:
+      application_data = content;
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+}
+
+// struct {
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   uint32 sender;
+//   ContentType content_type = handshake;
+//   GroupOperation operation;
+// } MLSPlaintextOpContent;
+bytes
+MLSPlaintext::content() const
+{
+  tls::ostream w;
+  w << group_id << epoch << sender << content_type << operation.value();
+  return w.bytes();
+}
+
+// struct {
+//   opaque confirmation<0..255>;
+//   opaque signature<0..2^16-1>;
+// } MLSPlaintextOpAuthData;
+bytes
+MLSPlaintext::auth_data() const
+{
+  tls::ostream w;
+  w << confirmation << signature;
+  return w.bytes();
+}
+
+bytes
+MLSPlaintext::to_be_signed() const
+{
+  tls::ostream w;
+  w << group_id << epoch << sender << content_type;
+  switch (content_type) {
+    case ContentType::handshake:
+      w << operation.value() << confirmation;
+      break;
+
+    case ContentType::application:
+      w << application_data;
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  return w.bytes();
+}
+
+void
+MLSPlaintext::sign(const SignaturePrivateKey& priv)
+{
+  auto tbs = to_be_signed();
+  signature = priv.sign(tbs);
+}
+
+bool
+MLSPlaintext::verify(const SignaturePublicKey& pub) const
+{
+  auto tbs = to_be_signed();
+  return pub.verify(tbs, signature);
+}
+
+bool
+operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs)
+{
+  auto group_id = (lhs.group_id == rhs.group_id);
+  auto epoch = (lhs.epoch == rhs.epoch);
+  auto sender = (lhs.sender == rhs.sender);
+  auto content_type = (lhs.content_type == rhs.content_type);
+  auto operation = ((lhs.content_type == ContentType::handshake) &&
+                    (lhs.operation.value() == rhs.operation.value()));
+  auto application_data = ((lhs.content_type == ContentType::application) &&
+                           (lhs.operation.value() == rhs.operation.value()));
+  auto signature = (lhs.signature == rhs.signature);
+
+  return group_id && epoch && sender && content_type &&
+         (operation || application_data) && signature;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSPlaintext& obj)
+{
+  out.write_raw(obj.to_be_signed());
+  out << obj.signature;
+  return out;
+}
+
+tls::istream&
+operator>>(tls::istream& in, MLSPlaintext& obj)
+{
+  in >> obj.group_id >> obj.epoch >> obj.sender >> obj.content_type;
+
+  switch (obj.content_type) {
+    case ContentType::handshake:
+      obj.operation = GroupOperation(obj._suite);
+      in >> obj.operation.value() >> obj.confirmation;
+      break;
+
+    case ContentType::application:
+      in >> obj.application_data;
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  in >> obj.signature;
+  return in;
+}
+
+// MLSCiphertext
+
+bool
+operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
+{
+  auto group_id = (lhs.group_id == rhs.group_id);
+  auto epoch = (lhs.epoch == rhs.epoch);
+  auto content_type = (lhs.content_type == rhs.content_type);
+  auto sender_data_nonce = (lhs.sender_data_nonce == rhs.sender_data_nonce);
+  auto encrypted_sender_data =
+    (lhs.encrypted_sender_data == rhs.encrypted_sender_data);
+  auto ciphertext = (lhs.ciphertext == rhs.ciphertext);
+
+  return group_id && epoch && content_type && sender_data_nonce &&
+         encrypted_sender_data && ciphertext;
+}
+
+tls::ostream&
+operator<<(tls::ostream& out, const MLSCiphertext& obj)
+{
+  return out << obj.group_id << obj.epoch << obj.content_type
+             << obj.sender_data_nonce << obj.encrypted_sender_data
+             << obj.ciphertext;
+}
+
+tls::istream&
+operator>>(tls::istream& in, MLSCiphertext& obj)
+{
+  return in >> obj.group_id >> obj.epoch >> obj.content_type >>
+         obj.sender_data_nonce >> obj.encrypted_sender_data >> obj.ciphertext;
 }
 
 } // namespace mls

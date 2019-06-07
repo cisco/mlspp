@@ -24,30 +24,52 @@ operator>>(tls::istream& out, GroupState& obj)
 /// ApplicationKeyChain
 ///
 
-const char* ApplicationKeyChain::_secret_label = "app sender";
-const char* ApplicationKeyChain::_nonce_label = "nonce";
-const char* ApplicationKeyChain::_key_label = "key";
+const char* KeyChain::_secret_label = "sender";
+const char* KeyChain::_nonce_label = "nonce";
+const char* KeyChain::_key_label = "key";
 
-ApplicationKeyChain::KeyAndNonce
-ApplicationKeyChain::get(uint32_t generation) const
+void
+KeyChain::start(LeafIndex my_sender, const bytes& root_secret)
 {
-  auto secret = _base_secret;
+  _my_generation = 0;
+  _my_sender = my_sender;
+  _root_secret = root_secret;
+}
+
+KeyChain::Generation
+KeyChain::next()
+{
+  _my_generation += 1;
+  return get(_my_sender, _my_generation);
+}
+
+KeyChain::Generation
+KeyChain::get(LeafIndex sender, uint32_t generation) const
+{
+  auto sender_bytes = tls::marshal(sender.val);
+  auto secret = _root_secret;
+
+  // Split off onto the sender chain
+  secret = derive(secret, _secret_label, sender_bytes, _secret_size);
+
+  // Work down the generations
   for (uint32_t i = 0; i < generation; ++i) {
-    secret = derive(secret, _secret_label, _secret_size);
+    secret = derive(secret, _secret_label, sender_bytes, _secret_size);
   }
 
   auto key = hkdf_expand_label(_suite, secret, _key_label, {}, _key_size);
   auto nonce = hkdf_expand_label(_suite, secret, _nonce_label, {}, _nonce_size);
 
-  return KeyAndNonce{ secret, key, nonce };
+  return Generation{ generation, secret, key, nonce };
 }
 
 bytes
-ApplicationKeyChain::derive(const bytes& secret,
-                            const std::string& label,
-                            const size_t size) const
+KeyChain::derive(const bytes& secret,
+                 const std::string& label,
+                 const bytes& context,
+                 const size_t size) const
 {
-  return hkdf_expand_label(_suite, secret, label, _sender, size);
+  return hkdf_expand_label(_suite, secret, label, context, size);
 }
 
 ///
@@ -65,6 +87,7 @@ State::State(bytes group_id,
   , _tree(suite, leaf_secret, credential)
   , _transcript_hash(zero_bytes(Digest(suite).output_size()))
   , _init_secret(Digest(suite).output_size())
+  , _application_keys(suite)
   , _index(0)
   , _identity_priv(std::move(identity_priv))
   , _zero(Digest(suite).output_size(), 0)
@@ -74,17 +97,19 @@ State::State(SignaturePrivateKey identity_priv,
              const Credential& credential,
              const bytes& init_secret,
              const Welcome& welcome,
-             const Handshake& handshake)
+             const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
+  , _application_keys(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
   // Verify that we have an add and it is for us
-  if (handshake.operation.type != GroupOperationType::add) {
+  const auto& operation = handshake.operation.value();
+  if (handshake.operation.value().type != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  auto add = handshake.operation.add;
+  const auto& add = operation.add.value();
   if (credential != add.init_key.credential) {
     throw InvalidParameterError("Add not targeted for this node");
   }
@@ -113,13 +138,13 @@ State::State(SignaturePrivateKey identity_priv,
   _epoch = welcome_info.epoch + 1;
   _group_id = welcome_info.group_id;
   _tree = welcome_info.tree;
-  _transcript_hash = welcome_info.transcript_hash;
+  _next_transcript_hash = welcome_info.next_transcript_hash;
 
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add to the transcript hash
-  update_transcript_hash(handshake.operation);
+  update_transcript_hash(handshake);
 
   // Add to the tree
   _index = add.index;
@@ -175,13 +200,13 @@ State::negotiate(const bytes& group_id,
 /// Message factories
 ///
 
-std::pair<Welcome, Handshake>
+std::pair<Welcome, MLSPlaintext>
 State::add(const UserInitKey& user_init_key) const
 {
   return add(_tree.size(), user_init_key);
 }
 
-std::pair<Welcome, Handshake>
+std::pair<Welcome, MLSPlaintext>
 State::add(uint32_t index, const UserInitKey& user_init_key) const
 {
   if (!user_init_key.verify()) {
@@ -199,10 +224,10 @@ State::add(uint32_t index, const UserInitKey& user_init_key) const
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
   auto add = sign(Add{ LeafIndex{ index }, user_init_key, welcome_info_hash });
-  return std::pair<Welcome, Handshake>(welcome, add);
+  return std::pair<Welcome, MLSPlaintext>(welcome, add);
 }
 
-Handshake
+MLSPlaintext
 State::update(const bytes& leaf_secret)
 {
   auto path = _tree.encrypt(_index, leaf_secret);
@@ -210,7 +235,7 @@ State::update(const bytes& leaf_secret)
   return sign(Update{ path });
 }
 
-Handshake
+MLSPlaintext
 State::remove(const bytes& evict_secret, uint32_t index) const
 {
   if (index >= _tree.size()) {
@@ -226,41 +251,56 @@ State::remove(const bytes& evict_secret, uint32_t index) const
 ///
 
 State
-State::handle(const Handshake& handshake) const
+State::handle(const MLSPlaintext& handshake) const
 {
-  if (handshake.prior_epoch != _epoch) {
-    throw InvalidParameterError("Epoch mismatch");
-  }
-
-  auto next = handle(handshake.signer_index, handshake.operation);
-
-  if (!next.verify(handshake)) {
-    throw InvalidParameterError("Invalid handshake message signature");
-  }
-
-  return next;
+  return handle(handshake, false);
 }
 
 State
-State::handle(LeafIndex signer_index, const GroupOperation& operation) const
+State::handle(const MLSPlaintext& handshake, bool skipVerify) const
 {
+  // Pre-validate the MLSPlaintext
+  if (handshake.group_id != _group_id) {
+    throw InvalidParameterError("GroupID mismatch");
+  }
+
+  if (handshake.epoch != _epoch) {
+    throw InvalidParameterError("Epoch mismatch");
+  }
+
+  if (handshake.content_type != ContentType::handshake) {
+    throw InvalidParameterError("Incorrect content type");
+  }
+
+  if (!skipVerify && !verify(handshake)) {
+    throw ProtocolError("Invalid handshake message signature");
+  }
+
+  // Apply the operation
+  const auto& operation = handshake.operation.value();
   auto next = *this;
+
   bytes update_secret;
   switch (operation.type) {
     case GroupOperationType::add:
-      update_secret = next.handle(operation.add);
+      update_secret = next.handle(operation.add.value());
       break;
     case GroupOperationType::update:
-      update_secret = next.handle(signer_index, operation.update);
+      update_secret = next.handle(handshake.sender, operation.update.value());
       break;
     case GroupOperationType::remove:
-      update_secret = next.handle(operation.remove);
+      update_secret = next.handle(operation.remove.value());
       break;
   }
 
-  next.update_transcript_hash(operation);
+  next.update_transcript_hash(handshake);
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
+
+  // Verify the  confirmation MAC
+  if (!skipVerify && !next.verify_confirmation(handshake.confirmation)) {
+    throw InvalidParameterError("Invalid confirmation MAC");
+  }
 
   return next;
 }
@@ -335,9 +375,40 @@ State::derive_epoch_secrets(CipherSuite suite,
   return {
     epoch_secret,
     derive_secret(suite, epoch_secret, "app", group_state),
+    derive_secret(suite, epoch_secret, "handshake", group_state),
+    derive_secret(suite, epoch_secret, "sender data", group_state),
     derive_secret(suite, epoch_secret, "confirm", group_state),
     derive_secret(suite, epoch_secret, "init", group_state),
   };
+}
+
+///
+/// Message protection
+///
+
+MLSCiphertext
+State::protect(const bytes& data)
+{
+  MLSPlaintext pt{ _group_id, _epoch, _index, data };
+  pt.sign(_identity_priv);
+
+  return encrypt(pt);
+}
+
+bytes
+State::unprotect(const MLSCiphertext& ct)
+{
+  MLSPlaintext pt = decrypt(ct);
+
+  if (!verify(pt)) {
+    throw ProtocolError("Invalid message signature");
+  }
+
+  if (pt.content_type != ContentType::application) {
+    throw ProtocolError("Unprotect of non-application message");
+  }
+
+  return pt.application_data;
 }
 
 ///
@@ -373,15 +444,23 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _group_id, _epoch, _tree, _transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _next_transcript_hash, _init_secret };
 }
 
 void
-State::update_transcript_hash(const GroupOperation& operation)
+State::update_transcript_hash(const MLSPlaintext& plaintext)
 {
-  auto operation_bytes = tls::marshal(operation);
-  _transcript_hash =
-    Digest(_suite).write(_transcript_hash).write(operation_bytes).digest();
+  // Transcript hash for use in this epoch
+  _transcript_hash = Digest(_suite)
+                       .write(_next_transcript_hash)
+                       .write(plaintext.content())
+                       .digest();
+
+  // Transcript hash input for the next epoch
+  _next_transcript_hash = Digest(_suite)
+                            .write(_transcript_hash)
+                            .write(plaintext.auth_data())
+                            .digest();
 }
 
 bytes
@@ -416,37 +495,225 @@ State::update_epoch_secrets(const bytes& update_secret)
     derive_epoch_secrets(_suite, _init_secret, update_secret, _group_state);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
+  _handshake_secret = secrets.handshake_secret;
+  _sender_data_secret = secrets.sender_data_secret;
   _confirmation_key = secrets.confirmation_key;
   _init_secret = secrets.init_secret;
+
+  auto key_size = AESGCM::key_size(_suite);
+  _sender_data_key =
+    hkdf_expand_label(_suite, _sender_data_secret, "sd key", {}, key_size);
+  _handshake_key_used.clear();
+
+  _application_keys.start(_index, _application_secret);
 }
 
-Handshake
+///
+/// Message encryption and decryption
+///
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint32 epoch;
+//     ContentType content_type;
+//     opaque sender_data_nonce<0..255>;
+//     opaque encrypted_sender_data<0..255>;
+// } MLSCiphertextContentAAD;
+static bytes
+content_aad(const tls::opaque<1>& group_id,
+            uint32_t epoch,
+            ContentType content_type,
+            const tls::opaque<1>& sender_data_nonce,
+            const tls::opaque<1>& encrypted_sender_data)
+{
+  tls::ostream w;
+  w << group_id << epoch << content_type << sender_data_nonce
+    << encrypted_sender_data;
+  return w.bytes();
+}
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint32 epoch;
+//     ContentType content_type;
+//     opaque sender_data_nonce<0..255>;
+// } MLSCiphertextSenderDataAAD;
+static bytes
+sender_data_aad(const tls::opaque<1>& group_id,
+                uint32_t epoch,
+                ContentType content_type,
+                const tls::opaque<1>& sender_data_nonce)
+{
+  tls::ostream w;
+  w << group_id << epoch << content_type << sender_data_nonce;
+  return w.bytes();
+}
+
+MLSPlaintext
 State::sign(const GroupOperation& operation) const
 {
-  auto next = handle(_index, operation);
-
-  auto sig_data = next._transcript_hash;
-  auto sig = _identity_priv.sign(sig_data);
-
-  auto confirm_data = sig_data + sig;
-  auto confirm = hmac(_suite, next._confirmation_key, confirm_data);
-
-  return Handshake{ _epoch, operation, _index, sig, confirm };
+  auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
+  auto next = handle(pt, true);
+  pt.confirmation = hmac(_suite, next._confirmation_key, next._transcript_hash);
+  pt.sign(_identity_priv);
+  return pt;
 }
 
 bool
-State::verify(const Handshake& handshake) const
+State::verify(const MLSPlaintext& pt) const
 {
-  auto pub = _tree.get_credential(handshake.signer_index).public_key();
-  auto sig_data = _transcript_hash;
-  auto sig = handshake.signature;
-  auto sig_ver = pub.verify(sig_data, sig);
+  auto pub = _tree.get_credential(pt.sender).public_key();
+  return pt.verify(pub);
+}
 
-  auto confirm_data = sig_data + sig;
-  auto confirm = hmac(_suite, _confirmation_key, confirm_data);
-  auto confirm_ver = constant_time_eq(confirm, handshake.confirmation);
+bool
+State::verify_confirmation(const bytes& confirmation) const
+{
+  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+  return constant_time_eq(confirm, confirmation);
+}
 
-  return sig_ver && confirm_ver;
+KeyChain::Generation
+State::generate_handshake_keys(const LeafIndex& sender, bool encrypt)
+{
+  auto context = tls::marshal(sender);
+  auto key_size = AESGCM::key_size(_suite);
+  auto nonce_size = AESGCM::nonce_size;
+
+  if (encrypt && _handshake_key_used.count(sender) > 0) {
+    throw ProtocolError("Attempt to encrypt two handshake messages");
+  }
+
+  if (encrypt) {
+    _handshake_key_used.insert(sender);
+  }
+
+  return KeyChain::Generation{
+    0,
+    _handshake_secret,
+    hkdf_expand_label(_suite, _handshake_secret, "hs key", context, key_size),
+    hkdf_expand_label(
+      _suite, _handshake_secret, "hs nonce", context, nonce_size),
+  };
+}
+
+MLSCiphertext
+State::encrypt(const MLSPlaintext& pt)
+{
+  // Pull from the key schedule
+  KeyChain::Generation keys;
+  switch (pt.content_type) {
+    case ContentType::handshake:
+      keys = generate_handshake_keys(_index, true);
+      break;
+
+    case ContentType::application:
+      keys = _application_keys.next();
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  // Encrypt the sender data
+  tls::ostream sender_data;
+  sender_data << _index << keys.generation;
+
+  auto sender_data_nonce = random_bytes(AESGCM::nonce_size);
+  auto sender_data_aad_val =
+    sender_data_aad(_group_id, _epoch, pt.content_type, sender_data_nonce);
+
+  auto sender_data_gcm = AESGCM(_sender_data_key, sender_data_nonce);
+  sender_data_gcm.set_aad(sender_data_aad_val);
+  auto encrypted_sender_data = sender_data_gcm.encrypt(sender_data.bytes());
+
+  // Compute the plaintext input and AAD
+  // XXX(rlb@ipv.sx): Apply padding?
+  auto content = pt.marshal_content(0);
+  auto aad = content_aad(_group_id,
+                         _epoch,
+                         pt.content_type,
+                         sender_data_nonce,
+                         encrypted_sender_data);
+
+  // Encrypt the plaintext
+  auto gcm = AESGCM(keys.key, keys.nonce);
+  gcm.set_aad(aad);
+  auto ciphertext = gcm.encrypt(content);
+
+  // Assemble the MLSCiphertext
+  MLSCiphertext ct;
+  ct.group_id = _group_id;
+  ct.epoch = _epoch;
+  ct.content_type = pt.content_type;
+  ct.sender_data_nonce = sender_data_nonce;
+  ct.encrypted_sender_data = encrypted_sender_data;
+  ct.ciphertext = ciphertext;
+  return ct;
+}
+
+MLSPlaintext
+State::decrypt(const MLSCiphertext& ct)
+{
+  // Verify the epoch
+  if (ct.group_id != _group_id) {
+    throw InvalidParameterError("Ciphertext not from this group");
+  }
+
+  if (ct.epoch != _epoch) {
+    throw InvalidParameterError("Ciphertext not from this epoch");
+  }
+
+  // Decrypt and parse the sender data
+  auto sender_data_aad_val = sender_data_aad(
+    ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
+
+  auto sender_data_gcm = AESGCM(_sender_data_key, ct.sender_data_nonce);
+  sender_data_gcm.set_aad(sender_data_aad_val);
+  auto sender_data = sender_data_gcm.decrypt(ct.encrypted_sender_data);
+
+  tls::istream r(sender_data);
+  LeafIndex sender;
+  uint32_t generation;
+  r >> sender >> generation;
+
+  if (!_tree.occupied(sender)) {
+    throw ProtocolError("Encryption from unoccupied leaf");
+  }
+
+  // Pull from the key schedule
+  KeyChain::Generation keys;
+  switch (ct.content_type) {
+    case ContentType::handshake:
+      keys = generate_handshake_keys(_index, false);
+      break;
+
+    case ContentType::application:
+      keys = _application_keys.get(sender, generation);
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+
+  // Compute the plaintext AAD and decrypt
+  auto aad = content_aad(ct.group_id,
+                         ct.epoch,
+                         ct.content_type,
+                         ct.sender_data_nonce,
+                         ct.encrypted_sender_data);
+  auto gcm = AESGCM(keys.key, keys.nonce);
+  gcm.set_aad(aad);
+  auto content = gcm.decrypt(ct.ciphertext);
+
+  // Set up a template plaintext and parse into it
+  auto pt = MLSPlaintext{ _suite };
+  pt.group_id = _group_id;
+  pt.epoch = _epoch;
+  pt.sender = sender;
+  pt.content_type = ct.content_type;
+  pt.unmarshal_content(_suite, content);
+  return pt;
 }
 
 } // namespace mls

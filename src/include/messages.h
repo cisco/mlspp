@@ -103,7 +103,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   uint32 epoch;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<HPKEPublicKey> tree<1..2^32-1>;
-//   opaque transcript_hash<0..255>;
+//   opaque next_transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
 struct WelcomeInfo : public CipherAware
@@ -112,7 +112,7 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
-  tls::opaque<1> transcript_hash;
+  tls::opaque<1> next_transcript_hash;
   tls::opaque<1> init_secret;
 
   WelcomeInfo(CipherSuite suite)
@@ -130,7 +130,7 @@ struct WelcomeInfo : public CipherAware
     , group_id(group_id)
     , epoch(epoch)
     , tree(tree)
-    , transcript_hash(transcript_hash)
+    , next_transcript_hash(transcript_hash)
     , init_secret(init_secret)
   {}
 
@@ -292,100 +292,154 @@ struct GroupOperation : public CipherAware
 {
   GroupOperationType type;
 
-  Add add;
-  Update update;
-  Remove remove;
+  std::optional<Add> add;
+  std::optional<Update> update;
+  std::optional<Remove> remove;
 
   GroupOperation()
     : CipherAware(DUMMY_CIPHERSUITE)
-    , add()
-    , update(DUMMY_CIPHERSUITE)
-    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(CipherSuite suite)
     : CipherAware(suite)
-    , add()
-    , update(suite)
-    , remove(suite)
   {}
 
   GroupOperation(const Add& add)
     : CipherAware(DUMMY_CIPHERSUITE)
     , type(add.type)
     , add(add)
-    , update(DUMMY_CIPHERSUITE)
-    , remove(DUMMY_CIPHERSUITE)
   {}
 
   GroupOperation(const Update& update)
     : CipherAware(update)
     , type(update.type)
-    , add()
     , update(update)
-    , remove(update.cipher_suite())
 
   {}
 
   GroupOperation(const Remove& remove)
     : CipherAware(remove)
     , type(remove.type)
-    , add()
-    , update(remove.cipher_suite())
     , remove(remove)
   {}
+
+  friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
+  friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);
 };
 
-bool
-operator==(const GroupOperation& lhs, const GroupOperation& rhs);
+// enum {
+//     invalid(0),
+//     handshake(1),
+//     application(2),
+//     (255)
+// } ContentType;
+enum struct ContentType : uint8_t
+{
+  invalid = 0,
+  handshake = 1,
+  application = 2,
+};
+
 tls::ostream&
-operator<<(tls::ostream& out, const GroupOperation& obj);
+operator<<(tls::ostream& out, const ContentType& obj);
 tls::istream&
-operator>>(tls::istream& in, GroupOperation& obj);
+operator>>(tls::istream& in, ContentType& obj);
 
 // struct {
-//     uint32 prior_epoch;
-//     GroupOperation operation;
+//     opaque group_id<0..255>;
+//     uint32 epoch;
+//     uint32 sender;
+//     ContentType content_type;
 //
-//     uint32 signer_index;
-//     opaque signature<1..2^16-1>;
-//     opaque confirmation<1..2^8-1>;
-// } Handshake;
-struct Handshake : public CipherAware
+//     select (MLSPlaintext.content_type) {
+//         case handshake:
+//             GroupOperation operation;
+//             opaque confirmation<0..255>;
+//
+//         case application:
+//             opaque application_data<0..2^32-1>;
+//     }
+//
+//     opaque signature<0..2^16-1>;
+// } MLSPlaintext;
+struct MLSPlaintext : public CipherAware
 {
-  epoch_t prior_epoch;
-  GroupOperation operation;
+  using CipherAware::CipherAware;
 
-  LeafIndex signer_index;
-  tls::opaque<2> signature;
+  tls::opaque<1> group_id;
+  epoch_t epoch;
+  LeafIndex sender;
+  ContentType content_type;
+
+  std::optional<GroupOperation> operation;
   tls::opaque<1> confirmation;
+  tls::opaque<4> application_data;
 
-  epoch_t epoch() const { return prior_epoch + 1; }
+  tls::opaque<2> signature;
 
-  Handshake(CipherSuite suite)
-    : CipherAware(suite)
-    , operation(suite)
-  {}
-
-  Handshake(epoch_t prior_epoch,
-            const GroupOperation& operation,
-            LeafIndex signer_index,
-            const bytes& signature,
-            const bytes& confirmation)
-    : CipherAware(operation)
-    , prior_epoch(prior_epoch)
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               GroupOperation operation)
+    : CipherAware(operation.cipher_suite())
+    , group_id(group_id)
+    , epoch(epoch)
+    , sender(sender)
+    , content_type(ContentType::handshake)
     , operation(operation)
-    , signer_index(signer_index)
-    , signature(signature)
-    , confirmation(confirmation)
   {}
+
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               const bytes& application_data)
+    : CipherAware(DUMMY_CIPHERSUITE)
+    , group_id(group_id)
+    , epoch(epoch)
+    , sender(sender)
+    , content_type(ContentType::application)
+    , application_data(application_data)
+  {}
+
+  bytes to_be_signed() const;
+  void sign(const SignaturePrivateKey& priv);
+  bool verify(const SignaturePublicKey& pub) const;
+
+  bytes marshal_content(size_t padding_size) const;
+  void unmarshal_content(CipherSuite suite, const bytes& marshaled);
+
+  bytes content() const;
+  bytes auth_data() const;
+
+  friend bool operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs);
+  friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);
+  friend tls::istream& operator>>(tls::istream& in, MLSPlaintext& obj);
+};
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint32 epoch;
+//     ContentType content_type;
+//     opaque sender_data_nonce<0..255>;
+//     opaque encrypted_sender_data<0..255>;
+//     opaque ciphertext<0..2^32-1>;
+// } MLSCiphertext;
+struct MLSCiphertext
+{
+  tls::opaque<1> group_id;
+  uint32_t epoch;
+  ContentType content_type;
+  tls::opaque<1> sender_data_nonce;
+  tls::opaque<1> encrypted_sender_data;
+  tls::opaque<4> ciphertext;
 };
 
 bool
-operator==(const Handshake& lhs, const Handshake& rhs);
+operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs);
 tls::ostream&
-operator<<(tls::ostream& out, const Handshake& obj);
+operator<<(tls::ostream& out, const MLSCiphertext& obj);
 tls::istream&
-operator>>(tls::istream& in, Handshake& obj);
+operator>>(tls::istream& in, MLSCiphertext& obj);
 
 } // namespace mls

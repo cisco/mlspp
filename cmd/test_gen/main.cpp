@@ -200,12 +200,13 @@ generate_app_key_schedule()
     auto suite = suites[i];
     auto test_case = cases[i];
 
+    KeyChain chain(suite);
+    chain.start(LeafIndex{ 0 }, tv.application_secret);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
-      ApplicationKeyChain chain(suite, j, tv.application_secret);
       test_case->emplace_back();
 
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(k);
+        auto kn = chain.get(LeafIndex{ j }, k);
         test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
       }
     }
@@ -363,16 +364,29 @@ generate_messages()
     };
     auto welcome = Welcome{ tv.uik_id, dh_key, welcome_info };
 
-    // Construct Handshake messages
+    // Construct handshake messages
     auto add_op = Add{ tv.removed, user_init_key, tv.random };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
-    auto add =
-      Handshake{ tv.epoch, add_op, tv.signer_index, tv.random, tv.random };
+
+    auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
     auto update =
-      Handshake{ tv.epoch, update_op, tv.signer_index, tv.random, tv.random };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
     auto remove =
-      Handshake{ tv.epoch, remove_op, tv.signer_index, tv.random, tv.random };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
+    add.signature = tv.random;
+    update.signature = tv.random;
+    remove.signature = tv.random;
+
+    // Construct an MLSCiphertext
+    auto ciphertext = MLSCiphertext{
+      tv.group_id,
+      tv.epoch,
+      ContentType::handshake, // XXX(rlb@ipv.sx): Make a parameter
+      tv.random,
+      tv.random,
+      tv.random,
+    };
 
     *cases[i] = {
       suite,
@@ -383,6 +397,7 @@ generate_messages()
       tls::marshal(add),
       tls::marshal(update),
       tls::marshal(remove),
+      tls::marshal(ciphertext),
     };
   }
 
