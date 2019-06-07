@@ -85,7 +85,6 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite, leaf_secret, credential)
-  , _transcript_hash(zero_bytes(Digest(suite).output_size()))
   , _init_secret(Digest(suite).output_size())
   , _application_keys(suite)
   , _index(0)
@@ -138,7 +137,7 @@ State::State(SignaturePrivateKey identity_priv,
   _epoch = welcome_info.epoch + 1;
   _group_id = welcome_info.group_id;
   _tree = welcome_info.tree;
-  _next_transcript_hash = welcome_info.next_transcript_hash;
+  _interim_transcript_hash = welcome_info.interim_transcript_hash;
 
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
@@ -422,7 +421,10 @@ operator==(const State& lhs, const State& rhs)
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
   auto tree = (lhs._tree == rhs._tree);
-  auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
+  auto confirmed_transcript_hash =
+    (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
+  auto interim_transcript_hash =
+    (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
   auto group_state = (lhs._group_state == rhs._group_state);
 
   auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
@@ -431,8 +433,9 @@ operator==(const State& lhs, const State& rhs)
   auto confirmation_key = (lhs._confirmation_key == rhs._confirmation_key);
   auto init_secret = (lhs._init_secret == rhs._init_secret);
 
-  return suite && group_id && epoch && tree && transcript_hash && group_state &&
-         epoch_secret && application_secret && confirmation_key && init_secret;
+  return suite && group_id && epoch && tree && confirmed_transcript_hash &&
+         interim_transcript_hash && group_state && epoch_secret &&
+         application_secret && confirmation_key && init_secret;
 }
 
 bool
@@ -444,23 +447,23 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _group_id, _epoch, _tree, _next_transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _interim_transcript_hash, _init_secret };
 }
 
 void
 State::update_transcript_hash(const MLSPlaintext& plaintext)
 {
   // Transcript hash for use in this epoch
-  _transcript_hash = Digest(_suite)
-                       .write(_next_transcript_hash)
-                       .write(plaintext.content())
-                       .digest();
+  _confirmed_transcript_hash = Digest(_suite)
+                                 .write(_interim_transcript_hash)
+                                 .write(plaintext.content())
+                                 .digest();
 
   // Transcript hash input for the next epoch
-  _next_transcript_hash = Digest(_suite)
-                            .write(_transcript_hash)
-                            .write(plaintext.auth_data())
-                            .digest();
+  _interim_transcript_hash = Digest(_suite)
+                               .write(_confirmed_transcript_hash)
+                               .write(plaintext.auth_data())
+                               .digest();
 }
 
 bytes
@@ -487,7 +490,7 @@ State::update_epoch_secrets(const bytes& update_secret)
     _group_id,
     _epoch,
     _tree.root_hash(),
-    _transcript_hash,
+    _confirmed_transcript_hash,
   };
   _group_state = tls::marshal(group_state_str);
 
@@ -554,7 +557,8 @@ State::sign(const GroupOperation& operation) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
   auto next = handle(pt, true);
-  pt.confirmation = hmac(_suite, next._confirmation_key, next._transcript_hash);
+  pt.confirmation =
+    hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
   pt.sign(_identity_priv);
   return pt;
 }
@@ -569,7 +573,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+  auto confirm = hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
 

@@ -103,7 +103,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   uint32 epoch;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<HPKEPublicKey> tree<1..2^32-1>;
-//   opaque next_transcript_hash<0..255>;
+//   opaque interim_transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
 struct WelcomeInfo : public CipherAware
@@ -112,7 +112,7 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
-  tls::opaque<1> next_transcript_hash;
+  tls::opaque<1> interim_transcript_hash;
   tls::opaque<1> init_secret;
 
   WelcomeInfo(CipherSuite suite)
@@ -123,14 +123,14 @@ struct WelcomeInfo : public CipherAware
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
               RatchetTree tree,
-              tls::opaque<1> transcript_hash,
+              tls::opaque<1> interim_transcript_hash,
               tls::opaque<1> init_secret)
     : CipherAware(tree)
     , version(mls10Version)
     , group_id(group_id)
     , epoch(epoch)
     , tree(tree)
-    , next_transcript_hash(transcript_hash)
+    , interim_transcript_hash(interim_transcript_hash)
     , init_secret(init_secret)
   {}
 

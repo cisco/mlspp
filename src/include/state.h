@@ -172,8 +172,8 @@ private:
   bytes _group_id;
   epoch_t _epoch;
   RatchetTree _tree;
-  bytes _transcript_hash;
-  bytes _next_transcript_hash;
+  bytes _confirmed_transcript_hash;
+  bytes _interim_transcript_hash;
   bytes _group_state;
 
   // Shared secret state

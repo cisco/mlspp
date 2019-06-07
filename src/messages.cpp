@@ -135,7 +135,7 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
 {
   return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
          (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
-         (lhs.next_transcript_hash == rhs.next_transcript_hash) &&
+         (lhs.interim_transcript_hash == rhs.interim_transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
 }
 
@@ -143,7 +143,7 @@ tls::ostream&
 operator<<(tls::ostream& out, const WelcomeInfo& obj)
 {
   return out << obj.version << obj.group_id << obj.epoch << obj.tree
-             << obj.next_transcript_hash << obj.init_secret;
+             << obj.interim_transcript_hash << obj.init_secret;
 }
 
 tls::istream&
@@ -156,7 +156,7 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
   obj.tree = RatchetTree(obj.cipher_suite());
 
   in >> obj.tree;
-  in >> obj.next_transcript_hash;
+  in >> obj.interim_transcript_hash;
   in >> obj.init_secret;
   return in;
 }
