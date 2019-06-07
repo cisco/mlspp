@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -250,7 +248,6 @@ State::remove(const bytes& leaf_secret, uint32_t index)
   tree.truncate(cut);
 
   _cached_leaf_secret = leaf_secret;
-  std::cout << "remove " << _index.val << " in " << tree.size() << std::endl;
   auto path = tree.encrypt(_index, leaf_secret);
 
   return sign(Remove{ LeafIndex{ index }, path });
@@ -372,14 +369,14 @@ State::handle(LeafIndex sender, const Remove& remove)
   std::optional<bytes> leaf_secret = std::nullopt;
   if (sender == _index) {
     if (_cached_leaf_secret.empty()) {
-      throw InvalidParameterError("Got remove from myself without generating one");
+      throw InvalidParameterError(
+        "Got remove from myself without generating one");
     }
 
     leaf_secret = _cached_leaf_secret;
     _cached_leaf_secret.clear();
   }
 
-  std::cout << "handle " << sender.val << " in " << _tree.size() << std::endl;
   return update_leaf(sender, remove.path, leaf_secret);
 }
 

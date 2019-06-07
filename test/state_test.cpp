@@ -130,8 +130,6 @@ TEST_F(GroupCreationTest, FullSize)
     // Check that everyone can send and be received
     for (auto& state : states) {
       auto encrypted = state.protect(test_message);
-      std::cout << state.index().val << " -> " << tls::marshal(encrypted)
-                << std::endl;
       for (auto& other : states) {
         auto decrypted = other.unprotect(encrypted);
         ASSERT_EQ(decrypted, test_message);
