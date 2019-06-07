@@ -4,6 +4,7 @@
 #include "messages.h"
 #include "ratchet_tree.h"
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace mls {
@@ -184,9 +185,8 @@ private:
   tls::opaque<1> _init_secret;
 
   // Message protection keys
-  // TODO(rlb@ipv.sx): Single HS keys
   tls::opaque<1> _sender_data_key;
-  KeyChain _handshake_keys;
+  std::set<LeafIndex> _handshake_key_used;
   KeyChain _application_keys;
 
   // Per-participant state
@@ -236,9 +236,13 @@ private:
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
 
+  // Generate handshake keys
+  KeyChain::Generation generate_handshake_keys(const LeafIndex& sender,
+                                               bool encrypt);
+
   // Encrypt and decrypt MLS framed objects
   MLSCiphertext encrypt(const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const MLSCiphertext& ct) const;
+  MLSPlaintext decrypt(const MLSCiphertext& ct);
 };
 
 } // namespace mls

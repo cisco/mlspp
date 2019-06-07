@@ -88,7 +88,6 @@ State::State(bytes group_id,
   , _tree(suite, leaf_secret, credential)
   , _transcript_hash(zero_bytes(Digest(suite).output_size()))
   , _init_secret(Digest(suite).output_size())
-  , _handshake_keys(suite)
   , _application_keys(suite)
   , _index(0)
   , _identity_priv(std::move(identity_priv))
@@ -102,7 +101,6 @@ State::State(SignaturePrivateKey identity_priv,
              const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
-  , _handshake_keys(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
   , _identity_priv(std::move(identity_priv))
 {
@@ -378,7 +376,7 @@ State::derive_epoch_secrets(CipherSuite suite,
   return {
     epoch_secret,
     derive_secret(suite, epoch_secret, "app", group_state),
-    derive_secret(suite, epoch_secret, "hs", group_state),
+    derive_secret(suite, epoch_secret, "handshake", group_state),
     derive_secret(suite, epoch_secret, "sender data", group_state),
     derive_secret(suite, epoch_secret, "confirm", group_state),
     derive_secret(suite, epoch_secret, "init", group_state),
@@ -506,10 +504,9 @@ State::update_epoch_secrets(const bytes& update_secret)
   auto key_size = AESGCM::key_size(_suite);
   _sender_data_key =
     hkdf_expand_label(_suite, _sender_data_secret, "sd key", {}, key_size);
-  // TODO(rlb@ipv.sx): Single HS keys
+  _handshake_key_used.clear();
 
   _application_keys.start(_index, _application_secret);
-  _handshake_keys.start(_index, _handshake_secret);
 }
 
 ///
@@ -577,6 +574,30 @@ State::verify_confirmation(const bytes& confirmation) const
   return constant_time_eq(confirm, confirmation);
 }
 
+KeyChain::Generation
+State::generate_handshake_keys(const LeafIndex& sender, bool encrypt)
+{
+  auto context = tls::marshal(sender);
+  auto key_size = AESGCM::key_size(_suite);
+  auto nonce_size = AESGCM::nonce_size;
+
+  if (encrypt && _handshake_key_used.count(sender) > 0) {
+    throw ProtocolError("Attempt to encrypt two handshake messages");
+  }
+
+  if (encrypt) {
+    _handshake_key_used.insert(sender);
+  }
+
+  return KeyChain::Generation{
+    0,
+    _handshake_secret,
+    hkdf_expand_label(_suite, _handshake_secret, "hs key", context, key_size),
+    hkdf_expand_label(
+      _suite, _handshake_secret, "hs nonce", context, nonce_size),
+  };
+}
+
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
@@ -584,7 +605,7 @@ State::encrypt(const MLSPlaintext& pt)
   KeyChain::Generation keys;
   switch (pt.content_type) {
     case ContentType::handshake:
-      keys = _handshake_keys.next();
+      keys = generate_handshake_keys(_index, true);
       break;
 
     case ContentType::application:
@@ -633,7 +654,7 @@ State::encrypt(const MLSPlaintext& pt)
 }
 
 MLSPlaintext
-State::decrypt(const MLSCiphertext& ct) const
+State::decrypt(const MLSCiphertext& ct)
 {
   // Verify the epoch
   if (ct.group_id != _group_id) {
@@ -665,7 +686,7 @@ State::decrypt(const MLSCiphertext& ct) const
   KeyChain::Generation keys;
   switch (ct.content_type) {
     case ContentType::handshake:
-      keys = _handshake_keys.get(sender, generation);
+      keys = generate_handshake_keys(_index, false);
       break;
 
     case ContentType::application:
