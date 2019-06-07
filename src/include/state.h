@@ -124,7 +124,7 @@ public:
   MLSPlaintext update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
-  MLSPlaintext remove(const bytes& evict_secret, uint32_t index) const;
+  MLSPlaintext remove(const bytes& leaf_secret, uint32_t index);
 
   ///
   /// Generic handshake message handler
@@ -206,7 +206,7 @@ private:
   bytes handle(LeafIndex index, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  bytes handle(const Remove& remove);
+  bytes handle(LeafIndex index, const Remove& remove);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
