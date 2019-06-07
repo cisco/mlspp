@@ -625,6 +625,9 @@ State::encrypt(const MLSPlaintext& pt)
   MLSCiphertext ct;
   ct.group_id = _group_id;
   ct.epoch = _epoch;
+  ct.content_type = pt.content_type;
+  ct.sender_data_nonce = sender_data_nonce;
+  ct.encrypted_sender_data = encrypted_sender_data;
   ct.ciphertext = ciphertext;
   return ct;
 }

@@ -14,7 +14,7 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
 	cmake -H. -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug
 
 test: all
-	cd ${BUILD_DIR} && ctest # -V -R SessionInteropTest.BasicP256
+	cd ${BUILD_DIR} && ctest #-V -R GroupCreationTest.TwoPerson
 
 gen: all
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}
