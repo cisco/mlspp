@@ -120,7 +120,7 @@ struct KeyScheduleTestVectors
   };
 
   uint32_t n_epochs;
-  tls::opaque<4> base_group_state;
+  tls::opaque<4> base_group_context;
 
   TestCase case_p256;
   TestCase case_x25519;

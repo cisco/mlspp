@@ -137,14 +137,14 @@ operator<<(tls::ostream& str, const KeyScheduleTestVectors::TestCase& obj)
 tls::istream&
 operator>>(tls::istream& str, KeyScheduleTestVectors& obj)
 {
-  return str >> obj.n_epochs >> obj.base_group_state >> obj.case_p256 >>
+  return str >> obj.n_epochs >> obj.base_group_context >> obj.case_p256 >>
          obj.case_x25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const KeyScheduleTestVectors& obj)
 {
-  return str << obj.n_epochs << obj.base_group_state << obj.case_p256
+  return str << obj.n_epochs << obj.base_group_context << obj.case_p256
              << obj.case_x25519;
 }
 

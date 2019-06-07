@@ -270,19 +270,19 @@ protected:
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
-    GroupState group_state;
-    tls::unmarshal(tv.base_group_state, group_state);
+    GroupContext group_context;
+    tls::unmarshal(tv.base_group_context, group_context);
 
     for (const auto& epoch : test_case.epochs) {
-      auto group_state_bytes = tls::marshal(group_state);
+      auto group_context_bytes = tls::marshal(group_context);
       auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, epoch.update_secret, group_state_bytes);
+        suite, init_secret, epoch.update_secret, group_context_bytes);
       ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
       ASSERT_EQ(epoch.application_secret, secrets.application_secret);
       ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);
       ASSERT_EQ(epoch.init_secret, secrets.init_secret);
 
-      group_state.epoch += 1;
+      group_context.epoch += 1;
       init_secret = secrets.init_secret;
     }
   }

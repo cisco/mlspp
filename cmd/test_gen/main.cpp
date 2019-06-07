@@ -131,7 +131,7 @@ generate_key_schedule()
 
   auto base_suite = CipherSuite::P256_SHA256_AES128GCM;
   auto zero = bytes(Digest(base_suite).output_size(), 0x00);
-  GroupState base_group_state{
+  GroupContext base_group_context{
     { 0xA0, 0xA0, 0xA0, 0xA0 },
     0,
     bytes(32, 0xA1),
@@ -139,7 +139,7 @@ generate_key_schedule()
   };
 
   tv.n_epochs = 100;
-  tv.base_group_state = tls::marshal(base_group_state);
+  tv.base_group_context = tls::marshal(base_group_context);
 
   // Construct a test case for each suite
   for (int i = 0; i < suites.size(); ++i) {
@@ -149,14 +149,14 @@ generate_key_schedule()
 
     test_case->suite = suite;
 
-    auto group_state = base_group_state;
+    auto group_context = base_group_context;
     bytes init_secret(secret_size, 0);
     bytes update_secret(secret_size, 0);
 
     for (int j = 0; j < tv.n_epochs; ++j) {
-      auto group_state_bytes = tls::marshal(group_state);
+      auto group_context_bytes = tls::marshal(group_context);
       auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, update_secret, group_state_bytes);
+        suite, init_secret, update_secret, group_context_bytes);
 
       test_case->epochs.push_back({
         update_secret,
@@ -170,7 +170,7 @@ generate_key_schedule()
       for (auto& val : update_secret) {
         val += 1;
       }
-      group_state.epoch += 1;
+      group_context.epoch += 1;
     }
   }
 

@@ -3,18 +3,18 @@
 namespace mls {
 
 ///
-/// GroupState
+/// GroupContext
 ///
 
 tls::ostream&
-operator<<(tls::ostream& out, const GroupState& obj)
+operator<<(tls::ostream& out, const GroupContext& obj)
 {
   return out << obj.group_id << obj.epoch << obj.tree_hash
              << obj.transcript_hash;
 }
 
 tls::istream&
-operator>>(tls::istream& out, GroupState& obj)
+operator>>(tls::istream& out, GroupContext& obj)
 {
   return out >> obj.group_id >> obj.epoch >> obj.tree_hash >>
          obj.transcript_hash;
@@ -369,16 +369,16 @@ State::EpochSecrets
 State::derive_epoch_secrets(CipherSuite suite,
                             const bytes& init_secret,
                             const bytes& update_secret,
-                            const bytes& group_state)
+                            const bytes& group_context)
 {
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
   return {
     epoch_secret,
-    derive_secret(suite, epoch_secret, "app", group_state),
-    derive_secret(suite, epoch_secret, "handshake", group_state),
-    derive_secret(suite, epoch_secret, "sender data", group_state),
-    derive_secret(suite, epoch_secret, "confirm", group_state),
-    derive_secret(suite, epoch_secret, "init", group_state),
+    derive_secret(suite, epoch_secret, "app", group_context),
+    derive_secret(suite, epoch_secret, "handshake", group_context),
+    derive_secret(suite, epoch_secret, "sender data", group_context),
+    derive_secret(suite, epoch_secret, "confirm", group_context),
+    derive_secret(suite, epoch_secret, "init", group_context),
   };
 }
 
@@ -426,7 +426,7 @@ operator==(const State& lhs, const State& rhs)
     (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
   auto interim_transcript_hash =
     (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
-  auto group_state = (lhs._group_state == rhs._group_state);
+  auto group_context = (lhs._group_context == rhs._group_context);
 
   auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
   auto application_secret =
@@ -435,7 +435,7 @@ operator==(const State& lhs, const State& rhs)
   auto init_secret = (lhs._init_secret == rhs._init_secret);
 
   return suite && group_id && epoch && tree && confirmed_transcript_hash &&
-         interim_transcript_hash && group_state && epoch_secret &&
+         interim_transcript_hash && group_context && epoch_secret &&
          application_secret && confirmation_key && init_secret;
 }
 
@@ -487,16 +487,16 @@ State::update_leaf(LeafIndex index,
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
-  auto group_state_str = GroupState{
+  auto group_context_str = GroupContext{
     _group_id,
     _epoch,
     _tree.root_hash(),
     _confirmed_transcript_hash,
   };
-  _group_state = tls::marshal(group_state_str);
+  _group_context = tls::marshal(group_context_str);
 
   auto secrets =
-    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_state);
+    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_context);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
   _handshake_secret = secrets.handshake_secret;

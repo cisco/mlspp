@@ -14,8 +14,8 @@ namespace mls {
 //   uint32 epoch;
 //   opaque tree_hash<0..255>;
 //   opaque transcript_hash<0..255>;
-// } GroupState;
-struct GroupState
+// } GroupContext;
+struct GroupContext
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
@@ -24,9 +24,9 @@ struct GroupState
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const GroupState& obj);
+operator<<(tls::ostream& out, const GroupContext& obj);
 tls::istream&
-operator>>(tls::istream& out, GroupState& obj);
+operator>>(tls::istream& out, GroupContext& obj);
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we
 // never ratchet forward the base secret.  This allows for maximal
@@ -176,7 +176,7 @@ private:
   RatchetTree _tree;
   bytes _confirmed_transcript_hash;
   bytes _interim_transcript_hash;
-  bytes _group_state;
+  bytes _group_context;
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;
