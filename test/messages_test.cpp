@@ -49,22 +49,22 @@ protected:
     ratchet_tree.blank_path(LeafIndex{ 2 });
     auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
-    // UserInitKey
-    UserInitKey user_init_key_c;
-    user_init_key_c.user_init_key_id = tv.uik_id;
-    user_init_key_c.add_init_key(dh_key);
-    user_init_key_c.credential = cred;
-    user_init_key_c.signature = tv.random;
+    // ClientInitKey
+    ClientInitKey client_init_key_c;
+    client_init_key_c.client_init_key_id = tv.client_init_key_id;
+    client_init_key_c.add_init_key(dh_key);
+    client_init_key_c.credential = cred;
+    client_init_key_c.signature = tv.random;
 
-    UserInitKey user_init_key;
+    ClientInitKey client_init_key;
     tls_round_trip(
-      tc.user_init_key, user_init_key_c, user_init_key, reproducible);
+      tc.client_init_key, client_init_key_c, client_init_key, reproducible);
 
     // WelcomeInfo and Welcome
     WelcomeInfo welcome_info_c{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
-    Welcome welcome_c{ tv.uik_id, dh_key, welcome_info_c };
+    Welcome welcome_c{ tv.client_init_key_id, dh_key, welcome_info_c };
 
     WelcomeInfo welcome_info{ tc.cipher_suite };
     tls_round_trip(tc.welcome_info, welcome_info_c, welcome_info, true);
@@ -73,7 +73,7 @@ protected:
     tls_round_trip(tc.welcome, welcome_c, welcome, true);
 
     // Handshake messages
-    Add add_op{ tv.removed, user_init_key_c, tv.random };
+    Add add_op{ tv.removed, client_init_key_c, tv.random };
     Update update_op{ direct_path };
     Remove remove_op{ tv.removed, direct_path };
 
@@ -105,29 +105,29 @@ protected:
   }
 };
 
-TEST_F(MessagesTest, UserInitKey)
+TEST_F(MessagesTest, ClientInitKey)
 {
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
-  UserInitKey constructed;
-  constructed.user_init_key_id = tv.uik_id;
+  ClientInitKey constructed;
+  constructed.client_init_key_id = tv.client_init_key_id;
   for (const auto& suite : suites) {
     auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
     constructed.add_init_key(priv.public_key());
   }
 
   auto identity_priv =
-    SignaturePrivateKey::derive(tv.uik_all_scheme, tv.sig_seed);
+    SignaturePrivateKey::derive(tv.cik_all_scheme, tv.sig_seed);
   constructed.credential = Credential::basic(tv.user_id, identity_priv);
   constructed.signature = tv.random;
 
-  UserInitKey after;
+  ClientInitKey after;
   auto reproducible =
-    mls::test::deterministic_signature_scheme(tv.uik_all_scheme);
-  tls_round_trip(tv.user_init_key_all, constructed, after, reproducible);
+    mls::test::deterministic_signature_scheme(tv.cik_all_scheme);
+  tls_round_trip(tv.client_init_key_all, constructed, after, reproducible);
 }
 
 TEST_F(MessagesTest, Suite_P256_P256)

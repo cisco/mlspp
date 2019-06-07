@@ -3,18 +3,18 @@
 namespace mls {
 
 ///
-/// GroupState
+/// GroupContext
 ///
 
 tls::ostream&
-operator<<(tls::ostream& out, const GroupState& obj)
+operator<<(tls::ostream& out, const GroupContext& obj)
 {
   return out << obj.group_id << obj.epoch << obj.tree_hash
              << obj.transcript_hash;
 }
 
 tls::istream&
-operator>>(tls::istream& out, GroupState& obj)
+operator>>(tls::istream& out, GroupContext& obj)
 {
   return out >> obj.group_id >> obj.epoch >> obj.tree_hash >>
          obj.transcript_hash;
@@ -85,7 +85,6 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite, leaf_secret, credential)
-  , _transcript_hash(zero_bytes(Digest(suite).output_size()))
   , _init_secret(Digest(suite).output_size())
   , _application_keys(suite)
   , _index(0)
@@ -116,13 +115,13 @@ State::State(SignaturePrivateKey identity_priv,
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  auto init_uik = add.init_key.find_init_key(_suite);
-  if (!init_uik) {
+  auto init_cik = add.init_key.find_init_key(_suite);
+  if (!init_cik) {
     throw ProtocolError("Selected cipher suite not supported");
   }
 
   auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
-  if (*init_uik != init_priv.public_key()) {
+  if (*init_cik != init_priv.public_key()) {
     throw ProtocolError("Incorrect init key");
   }
 
@@ -138,7 +137,7 @@ State::State(SignaturePrivateKey identity_priv,
   _epoch = welcome_info.epoch + 1;
   _group_id = welcome_info.group_id;
   _tree = welcome_info.tree;
-  _next_transcript_hash = welcome_info.next_transcript_hash;
+  _interim_transcript_hash = welcome_info.interim_transcript_hash;
 
   _init_secret = welcome_info.init_secret;
   _zero = bytes(Digest(_suite).output_size(), 0);
@@ -164,13 +163,13 @@ State::negotiate(const bytes& group_id,
                  const bytes& leaf_secret,
                  const SignaturePrivateKey& identity_priv,
                  const Credential& credential,
-                 const UserInitKey& user_init_key)
+                 const ClientInitKey& client_init_key)
 {
   // Negotiate a ciphersuite with the other party
   CipherSuite suite;
   auto selected = false;
   for (auto my_suite : supported_ciphersuites) {
-    for (auto other_suite : user_init_key.cipher_suites) {
+    for (auto other_suite : client_init_key.cipher_suites) {
       if (my_suite == other_suite) {
         selected = true;
         suite = my_suite;
@@ -190,7 +189,7 @@ State::negotiate(const bytes& group_id,
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
-  auto welcome_add = state.add(user_init_key);
+  auto welcome_add = state.add(client_init_key);
   state = state.handle(welcome_add.second);
 
   return InitialInfo(state, welcome_add);
@@ -201,29 +200,30 @@ State::negotiate(const bytes& group_id,
 ///
 
 std::pair<Welcome, MLSPlaintext>
-State::add(const UserInitKey& user_init_key) const
+State::add(const ClientInitKey& client_init_key) const
 {
-  return add(_tree.size(), user_init_key);
+  return add(_tree.size(), client_init_key);
 }
 
 std::pair<Welcome, MLSPlaintext>
-State::add(uint32_t index, const UserInitKey& user_init_key) const
+State::add(uint32_t index, const ClientInitKey& client_init_key) const
 {
-  if (!user_init_key.verify()) {
+  if (!client_init_key.verify()) {
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  auto pub = user_init_key.find_init_key(_suite);
+  auto pub = client_init_key.find_init_key(_suite);
   if (!pub) {
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
 
   auto welcome_info_str = welcome_info();
   auto welcome =
-    Welcome{ user_init_key.user_init_key_id, *pub, welcome_info_str };
+    Welcome{ client_init_key.client_init_key_id, *pub, welcome_info_str };
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add = sign(Add{ LeafIndex{ index }, user_init_key, welcome_info_hash });
+  auto add =
+    sign(Add{ LeafIndex{ index }, client_init_key, welcome_info_hash });
   return std::pair<Welcome, MLSPlaintext>(welcome, add);
 }
 
@@ -308,7 +308,7 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
 bytes
 State::handle(const Add& add)
 {
-  // Verify the UserInitKey in the Add message
+  // Verify the ClientInitKey in the Add message
   if (!add.init_key.verify()) {
     throw InvalidParameterError("Invalid signature on init key in group add");
   }
@@ -369,16 +369,16 @@ State::EpochSecrets
 State::derive_epoch_secrets(CipherSuite suite,
                             const bytes& init_secret,
                             const bytes& update_secret,
-                            const bytes& group_state)
+                            const bytes& group_context)
 {
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
   return {
     epoch_secret,
-    derive_secret(suite, epoch_secret, "app", group_state),
-    derive_secret(suite, epoch_secret, "handshake", group_state),
-    derive_secret(suite, epoch_secret, "sender data", group_state),
-    derive_secret(suite, epoch_secret, "confirm", group_state),
-    derive_secret(suite, epoch_secret, "init", group_state),
+    derive_secret(suite, epoch_secret, "app", group_context),
+    derive_secret(suite, epoch_secret, "handshake", group_context),
+    derive_secret(suite, epoch_secret, "sender data", group_context),
+    derive_secret(suite, epoch_secret, "confirm", group_context),
+    derive_secret(suite, epoch_secret, "init", group_context),
   };
 }
 
@@ -422,8 +422,11 @@ operator==(const State& lhs, const State& rhs)
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
   auto tree = (lhs._tree == rhs._tree);
-  auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
-  auto group_state = (lhs._group_state == rhs._group_state);
+  auto confirmed_transcript_hash =
+    (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
+  auto interim_transcript_hash =
+    (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
+  auto group_context = (lhs._group_context == rhs._group_context);
 
   auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
   auto application_secret =
@@ -431,8 +434,9 @@ operator==(const State& lhs, const State& rhs)
   auto confirmation_key = (lhs._confirmation_key == rhs._confirmation_key);
   auto init_secret = (lhs._init_secret == rhs._init_secret);
 
-  return suite && group_id && epoch && tree && transcript_hash && group_state &&
-         epoch_secret && application_secret && confirmation_key && init_secret;
+  return suite && group_id && epoch && tree && confirmed_transcript_hash &&
+         interim_transcript_hash && group_context && epoch_secret &&
+         application_secret && confirmation_key && init_secret;
 }
 
 bool
@@ -444,23 +448,23 @@ operator!=(const State& lhs, const State& rhs)
 WelcomeInfo
 State::welcome_info() const
 {
-  return { _group_id, _epoch, _tree, _next_transcript_hash, _init_secret };
+  return { _group_id, _epoch, _tree, _interim_transcript_hash, _init_secret };
 }
 
 void
 State::update_transcript_hash(const MLSPlaintext& plaintext)
 {
   // Transcript hash for use in this epoch
-  _transcript_hash = Digest(_suite)
-                       .write(_next_transcript_hash)
-                       .write(plaintext.content())
-                       .digest();
+  _confirmed_transcript_hash = Digest(_suite)
+                                 .write(_interim_transcript_hash)
+                                 .write(plaintext.content())
+                                 .digest();
 
   // Transcript hash input for the next epoch
-  _next_transcript_hash = Digest(_suite)
-                            .write(_transcript_hash)
-                            .write(plaintext.auth_data())
-                            .digest();
+  _interim_transcript_hash = Digest(_suite)
+                               .write(_confirmed_transcript_hash)
+                               .write(plaintext.auth_data())
+                               .digest();
 }
 
 bytes
@@ -483,16 +487,16 @@ State::update_leaf(LeafIndex index,
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
-  auto group_state_str = GroupState{
+  auto group_context_str = GroupContext{
     _group_id,
     _epoch,
     _tree.root_hash(),
-    _transcript_hash,
+    _confirmed_transcript_hash,
   };
-  _group_state = tls::marshal(group_state_str);
+  _group_context = tls::marshal(group_context_str);
 
   auto secrets =
-    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_state);
+    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_context);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
   _handshake_secret = secrets.handshake_secret;
@@ -554,7 +558,8 @@ State::sign(const GroupOperation& operation) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
   auto next = handle(pt, true);
-  pt.confirmation = hmac(_suite, next._confirmation_key, next._transcript_hash);
+  pt.confirmation =
+    hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
   pt.sign(_identity_priv);
   return pt;
 }
@@ -569,7 +574,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = hmac(_suite, _confirmation_key, _transcript_hash);
+  auto confirm = hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
 

@@ -137,14 +137,14 @@ operator<<(tls::ostream& str, const KeyScheduleTestVectors::TestCase& obj)
 tls::istream&
 operator>>(tls::istream& str, KeyScheduleTestVectors& obj)
 {
-  return str >> obj.n_epochs >> obj.base_group_state >> obj.case_p256 >>
+  return str >> obj.n_epochs >> obj.base_group_context >> obj.case_p256 >>
          obj.case_x25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const KeyScheduleTestVectors& obj)
 {
-  return str << obj.n_epochs << obj.base_group_state << obj.case_p256
+  return str << obj.n_epochs << obj.base_group_context << obj.case_p256
              << obj.case_x25519;
 }
 
@@ -234,7 +234,7 @@ const std::string MessagesTestVectors::file_name = "./messages.bin";
 tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 {
-  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_key >>
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.client_init_key >>
          obj.welcome_info >> obj.welcome >> obj.add >> obj.update >>
          obj.remove >> obj.ciphertext;
 }
@@ -242,7 +242,7 @@ operator>>(tls::istream& str, MessagesTestVectors::TestCase& obj)
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& obj)
 {
-  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_key
+  return str << obj.cipher_suite << obj.sig_scheme << obj.client_init_key
              << obj.welcome_info << obj.welcome << obj.add << obj.update
              << obj.remove << obj.ciphertext;
 }
@@ -251,18 +251,20 @@ tls::istream&
 operator>>(tls::istream& str, MessagesTestVectors& obj)
 {
   return str >> obj.epoch >> obj.signer_index >> obj.removed >> obj.user_id >>
-         obj.group_id >> obj.uik_id >> obj.dh_seed >> obj.sig_seed >>
-         obj.random >> obj.uik_all_scheme >> obj.user_init_key_all >>
-         obj.case_p256_p256 >> obj.case_x25519_ed25519;
+         obj.group_id >> obj.client_init_key_id >> obj.dh_seed >>
+         obj.sig_seed >> obj.random >> obj.cik_all_scheme >>
+         obj.client_init_key_all >> obj.case_p256_p256 >>
+         obj.case_x25519_ed25519;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const MessagesTestVectors& obj)
 {
   return str << obj.epoch << obj.signer_index << obj.removed << obj.user_id
-             << obj.group_id << obj.uik_id << obj.dh_seed << obj.sig_seed
-             << obj.random << obj.uik_all_scheme << obj.user_init_key_all
-             << obj.case_p256_p256 << obj.case_x25519_ed25519;
+             << obj.group_id << obj.client_init_key_id << obj.dh_seed
+             << obj.sig_seed << obj.random << obj.cik_all_scheme
+             << obj.client_init_key_all << obj.case_p256_p256
+             << obj.case_x25519_ed25519;
 }
 
 ///
@@ -287,14 +289,14 @@ operator<<(tls::ostream& str, const SessionTestVectors::Epoch& obj)
 tls::istream&
 operator>>(tls::istream& str, SessionTestVectors::TestCase& obj)
 {
-  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.user_init_keys >>
+  return str >> obj.cipher_suite >> obj.sig_scheme >> obj.client_init_keys >>
          obj.transcript;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const SessionTestVectors::TestCase& obj)
 {
-  return str << obj.cipher_suite << obj.sig_scheme << obj.user_init_keys
+  return str << obj.cipher_suite << obj.sig_scheme << obj.client_init_keys
              << obj.transcript;
 }
 

@@ -14,8 +14,8 @@ namespace mls {
 //   uint32 epoch;
 //   opaque tree_hash<0..255>;
 //   opaque transcript_hash<0..255>;
-// } GroupState;
-struct GroupState
+// } GroupContext;
+struct GroupContext
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
@@ -24,9 +24,9 @@ struct GroupState
 };
 
 tls::ostream&
-operator<<(tls::ostream& out, const GroupState& obj);
+operator<<(tls::ostream& out, const GroupContext& obj);
 tls::istream&
-operator>>(tls::istream& out, GroupState& obj);
+operator>>(tls::istream& out, GroupContext& obj);
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we
 // never ratchet forward the base secret.  This allows for maximal
@@ -99,7 +99,7 @@ public:
         const MLSPlaintext& handshake);
 
   // Negotiate an initial state with another peer based on their
-  // UserInitKey
+  // ClientInitKey
   typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
   static InitialInfo negotiate(
     const bytes& group_id,
@@ -107,18 +107,20 @@ public:
     const bytes& leaf_secret,
     const SignaturePrivateKey& identity_priv,
     const Credential& credential,
-    const UserInitKey& user_init_key);
+    const ClientInitKey& client_init_key);
 
   ///
   /// Message factories
   ///
 
   // Generate a Add message
-  std::pair<Welcome, MLSPlaintext> add(const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, MLSPlaintext> add(uint32_t index,
-                                       const UserInitKey& user_init_key) const;
+  std::pair<Welcome, MLSPlaintext> add(
+    uint32_t index,
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   MLSPlaintext update(const bytes& leaf_secret);
@@ -172,9 +174,9 @@ private:
   bytes _group_id;
   epoch_t _epoch;
   RatchetTree _tree;
-  bytes _transcript_hash;
-  bytes _next_transcript_hash;
-  bytes _group_state;
+  bytes _confirmed_transcript_hash;
+  bytes _interim_transcript_hash;
+  bytes _group_context;
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;

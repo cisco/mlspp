@@ -53,7 +53,7 @@ protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
   std::vector<bytes> init_secrets;
-  std::vector<UserInitKey> user_init_keys;
+  std::vector<ClientInitKey> user_init_keys;
   std::vector<State> states;
 
   const bytes test_message = from_hex("01020304");
@@ -66,7 +66,7 @@ protected:
       auto init_secret = random_bytes(32);
       auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
 
-      auto user_init_key = UserInitKey{};
+      auto user_init_key = ClientInitKey{};
       user_init_key.add_init_key(init_priv.public_key());
       user_init_key.sign(identity_priv, credential);
 
@@ -161,11 +161,11 @@ protected:
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
 
-      UserInitKey uik;
-      uik.add_init_key(init_priv.public_key());
-      uik.sign(identity_priv, credential);
+      ClientInitKey cik;
+      cik.add_init_key(init_priv.public_key());
+      cik.sign(identity_priv, credential);
 
-      auto welcome_add = states[0].add(uik);
+      auto welcome_add = states[0].add(cik);
       for (auto& state : states) {
         state = state.handle(welcome_add.second);
       }
@@ -228,10 +228,10 @@ TEST(OtherStateTest, CipherNegotiation)
   auto inkA2 =
     DHPrivateKey::node_derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
 
-  auto uikA = UserInitKey{};
-  uikA.add_init_key(inkA1.public_key());
-  uikA.add_init_key(inkA2.public_key());
-  uikA.sign(idkA, credA);
+  auto cikA = ClientInitKey{};
+  cikA.add_init_key(inkA1.public_key());
+  cikA.add_init_key(inkA2.public_key());
+  cikA.sign(idkA, credA);
 
   // Bob spuports P-256 and P-521
   auto supported_ciphers =
@@ -244,7 +244,7 @@ TEST(OtherStateTest, CipherNegotiation)
 
   // Bob should choose P-256
   auto initialB =
-    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, uikA);
+    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, cikA);
   auto stateB = initialB.first;
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
@@ -270,19 +270,19 @@ protected:
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
-    GroupState group_state;
-    tls::unmarshal(tv.base_group_state, group_state);
+    GroupContext group_context;
+    tls::unmarshal(tv.base_group_context, group_context);
 
     for (const auto& epoch : test_case.epochs) {
-      auto group_state_bytes = tls::marshal(group_state);
+      auto group_context_bytes = tls::marshal(group_context);
       auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, epoch.update_secret, group_state_bytes);
+        suite, init_secret, epoch.update_secret, group_context_bytes);
       ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
       ASSERT_EQ(epoch.application_secret, secrets.application_secret);
       ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);
       ASSERT_EQ(epoch.init_secret, secrets.init_secret);
 
-      group_state.epoch += 1;
+      group_context.epoch += 1;
       init_secret = secrets.init_secret;
     }
   }

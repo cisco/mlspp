@@ -38,27 +38,27 @@ operator==(const Session& lhs, const Session& rhs)
 }
 
 bytes
-Session::user_init_key() const
+Session::client_init_key() const
 {
-  return _user_init_key;
+  return _client_init_key;
 }
 
 std::pair<bytes, bytes>
-Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
+Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
 {
   if (!_state.empty()) {
     throw InvalidParameterError("start called on an initialized session");
   }
 
-  UserInitKey user_init_key;
-  tls::unmarshal(user_init_key_bytes, user_init_key);
+  ClientInitKey client_init_key;
+  tls::unmarshal(client_init_key_bytes, client_init_key);
 
   auto init = State::negotiate(group_id,
                                _supported_ciphersuites,
                                _init_secret,
                                _identity_priv,
                                _credential,
-                               user_init_key);
+                               client_init_key);
 
   auto root = init.first;
   add_state(0, root);
@@ -70,11 +70,11 @@ Session::start(const bytes& group_id, const bytes& user_init_key_bytes)
 }
 
 std::pair<bytes, bytes>
-Session::add(const bytes& user_init_key_bytes) const
+Session::add(const bytes& client_init_key_bytes) const
 {
-  UserInitKey user_init_key;
-  tls::unmarshal(user_init_key_bytes, user_init_key);
-  auto welcome_add = current_state().add(user_init_key);
+  ClientInitKey client_init_key;
+  tls::unmarshal(client_init_key_bytes, client_init_key);
+  auto welcome_add = current_state().add(client_init_key);
   auto welcome = tls::marshal(welcome_add.first);
   auto add = tls::marshal(welcome_add.second);
   return std::pair<bytes, bytes>(welcome, add);
@@ -120,18 +120,18 @@ Session::handle(const bytes& handshake_data)
 void
 Session::make_init_key()
 {
-  auto user_init_key = UserInitKey{};
+  auto client_init_key = ClientInitKey{};
 
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
   // from the same secret.  Maybe we should include the ciphersuite
   // in the key derivation...
   for (auto suite : _supported_ciphersuites) {
     auto init_priv = DHPrivateKey::node_derive(suite, _init_secret);
-    user_init_key.add_init_key(init_priv.public_key());
+    client_init_key.add_init_key(init_priv.public_key());
   }
 
-  user_init_key.sign(_identity_priv, _credential);
-  _user_init_key = tls::marshal(user_init_key);
+  client_init_key.sign(_identity_priv, _credential);
+  _client_init_key = tls::marshal(client_init_key);
 }
 
 void

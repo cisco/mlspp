@@ -20,12 +20,12 @@ public:
   // (2) they agree on the current epoch
   friend bool operator==(const Session& lhs, const Session& rhs);
 
-  bytes user_init_key() const;
+  bytes client_init_key() const;
 
   std::pair<bytes, bytes> start(const bytes& group_id,
-                                const bytes& user_init_key);
+                                const bytes& client_init_key);
 
-  std::pair<bytes, bytes> add(const bytes& user_init_key) const;
+  std::pair<bytes, bytes> add(const bytes& client_init_key) const;
   bytes update(const bytes& leaf_secret);
   bytes remove(const bytes& evict_secret, uint32_t index) const;
 
@@ -35,7 +35,7 @@ public:
 protected:
   CipherList _supported_ciphersuites;
   bytes _init_secret;
-  tls::opaque<2> _user_init_key;
+  tls::opaque<2> _client_init_key;
   SignaturePrivateKey _identity_priv;
   Credential _credential;
   std::map<epoch_t, State> _state;

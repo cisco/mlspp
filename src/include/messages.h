@@ -62,23 +62,23 @@ tls::istream&
 operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
-//     opaque user_init_key_id<0..255>;
+//     opaque client_init_key_id<0..255>;
 //     ProtocolVersion supported_versions<0..255>;
 //     CipherSuite cipher_suites<0..255>;
 //     HPKEPublicKey init_keys<1..2^16-1>;
 //     Credential credential;
 //     opaque signature<0..2^16-1>;
-// } UserInitKey;
-struct UserInitKey
+// } ClientInitKey;
+struct ClientInitKey
 {
-  tls::opaque<1> user_init_key_id;
+  tls::opaque<1> client_init_key_id;
   tls::vector<ProtocolVersion, 1> supported_versions;
   tls::vector<CipherSuite, 1> cipher_suites;
   tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
   Credential credential;
   tls::opaque<2> signature;
 
-  UserInitKey()
+  ClientInitKey()
     : supported_versions(1, mls10Version)
   {}
 
@@ -91,11 +91,11 @@ struct UserInitKey
 };
 
 bool
-operator==(const UserInitKey& lhs, const UserInitKey& rhs);
+operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
 tls::ostream&
-operator<<(tls::ostream& out, const UserInitKey& obj);
+operator<<(tls::ostream& out, const ClientInitKey& obj);
 tls::istream&
-operator>>(tls::istream& in, UserInitKey& obj);
+operator>>(tls::istream& in, ClientInitKey& obj);
 
 // struct {
 //   ProtocolVersion version;
@@ -103,7 +103,7 @@ operator>>(tls::istream& in, UserInitKey& obj);
 //   uint32 epoch;
 //   optional<Credential> roster<1..2^32-1>;
 //   optional<HPKEPublicKey> tree<1..2^32-1>;
-//   opaque next_transcript_hash<0..255>;
+//   opaque interim_transcript_hash<0..255>;
 //   opaque init_secret<0..255>;
 // } WelcomeInfo;
 struct WelcomeInfo : public CipherAware
@@ -112,7 +112,7 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
-  tls::opaque<1> next_transcript_hash;
+  tls::opaque<1> interim_transcript_hash;
   tls::opaque<1> init_secret;
 
   WelcomeInfo(CipherSuite suite)
@@ -123,14 +123,14 @@ struct WelcomeInfo : public CipherAware
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
               RatchetTree tree,
-              tls::opaque<1> transcript_hash,
+              tls::opaque<1> interim_transcript_hash,
               tls::opaque<1> init_secret)
     : CipherAware(tree)
     , version(mls10Version)
     , group_id(group_id)
     , epoch(epoch)
     , tree(tree)
-    , next_transcript_hash(transcript_hash)
+    , interim_transcript_hash(interim_transcript_hash)
     , init_secret(init_secret)
   {}
 
@@ -145,13 +145,13 @@ tls::istream&
 operator>>(tls::istream& in, WelcomeInfo& obj);
 
 // struct {
-//   opaque user_init_key_id<0..255>;
+//   opaque client_init_key_id<0..255>;
 //   CipherSuite cipher_suite;
 //   HPKECiphertext encrypted_welcome_info;
 // } Welcome;
 struct Welcome
 {
-  tls::opaque<1> user_init_key_id;
+  tls::opaque<1> client_init_key_id;
   CipherSuite cipher_suite;
   HPKECiphertext encrypted_welcome_info;
 
@@ -185,19 +185,19 @@ operator>>(tls::istream& in, GroupOperationType& obj);
 
 // struct {
 //     uint32 index;
-//     UserInitKey init_key;
+//     ClientInitKey init_key;
 //     opaque welcome_info_hash<0..255>;
 // } Add;
 struct Add
 {
 public:
   LeafIndex index;
-  UserInitKey init_key;
+  ClientInitKey init_key;
   tls::opaque<1> welcome_info_hash;
 
   Add() {}
 
-  Add(LeafIndex index, const UserInitKey& init_key, bytes welcome_info_hash)
+  Add(LeafIndex index, const ClientInitKey& init_key, bytes welcome_info_hash)
     : index(index)
     , init_key(init_key)
     , welcome_info_hash(std::move(welcome_info_hash))
