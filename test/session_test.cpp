@@ -287,9 +287,15 @@ protected:
     }
 
     // Process removes until this member has been removed
-    for (int i = 0; i < basic_tv.group_size - 1; ++i, ++curr) {
-      if (index >= basic_tv.group_size - 1 - i) {
+    for (int sender = basic_tv.group_size - 2; sender >= 0; --sender, ++curr) {
+      if (index > sender) {
         break;
+      }
+
+      // If this member is the sender, generate a remove to cache
+      // the secret
+      if (sender == index) {
+        session.remove({ uint8_t(sender), 2 }, sender + 1);
       }
 
       auto& epoch = tc.transcript[curr];

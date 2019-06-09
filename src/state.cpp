@@ -236,13 +236,20 @@ State::update(const bytes& leaf_secret)
 }
 
 MLSPlaintext
-State::remove(const bytes& evict_secret, uint32_t index) const
+State::remove(const bytes& leaf_secret, uint32_t index)
 {
   if (index >= _tree.size()) {
     throw InvalidParameterError("Index too large for tree");
   }
 
-  auto path = _tree.encrypt(LeafIndex{ index }, evict_secret);
+  auto tree = _tree;
+  tree.blank_path(LeafIndex{ index });
+  auto cut = tree.leaf_span();
+  tree.truncate(cut);
+
+  _cached_leaf_secret = leaf_secret;
+  auto path = tree.encrypt(_index, leaf_secret);
+
   return sign(Remove{ LeafIndex{ index }, path });
 }
 
@@ -289,7 +296,7 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
       update_secret = next.handle(handshake.sender, operation.update.value());
       break;
     case GroupOperationType::remove:
-      update_secret = next.handle(operation.remove.value());
+      update_secret = next.handle(handshake.sender, operation.remove.value());
       break;
   }
 
@@ -337,10 +344,10 @@ State::handle(const Add& add)
 }
 
 bytes
-State::handle(LeafIndex index, const Update& update)
+State::handle(LeafIndex sender, const Update& update)
 {
   std::optional<bytes> leaf_secret = std::nullopt;
-  if (index == _index) {
+  if (sender == _index) {
     if (_cached_leaf_secret.empty()) {
       throw InvalidParameterError("Got self-update without generating one");
     }
@@ -349,20 +356,28 @@ State::handle(LeafIndex index, const Update& update)
     _cached_leaf_secret.clear();
   }
 
-  return update_leaf(index, update.path, leaf_secret);
+  return update_leaf(sender, update.path, leaf_secret);
 }
 
 bytes
-State::handle(const Remove& remove)
+State::handle(LeafIndex sender, const Remove& remove)
 {
-  auto leaf_secret = std::nullopt;
-  auto update_secret = update_leaf(remove.removed, remove.path, leaf_secret);
   _tree.blank_path(remove.removed);
-
   auto cut = _tree.leaf_span();
   _tree.truncate(cut);
 
-  return update_secret;
+  std::optional<bytes> leaf_secret = std::nullopt;
+  if (sender == _index) {
+    if (_cached_leaf_secret.empty()) {
+      throw InvalidParameterError(
+        "Got remove from myself without generating one");
+    }
+
+    leaf_secret = _cached_leaf_secret;
+    _cached_leaf_secret.clear();
+  }
+
+  return update_leaf(sender, remove.path, leaf_secret);
 }
 
 State::EpochSecrets

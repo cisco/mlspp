@@ -27,7 +27,7 @@ public:
 
   std::pair<bytes, bytes> add(const bytes& client_init_key) const;
   bytes update(const bytes& leaf_secret);
-  bytes remove(const bytes& evict_secret, uint32_t index) const;
+  bytes remove(const bytes& evict_secret, uint32_t index);
 
   void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake_data);

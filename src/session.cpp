@@ -88,7 +88,7 @@ Session::update(const bytes& leaf_secret)
 }
 
 bytes
-Session::remove(const bytes& evict_secret, uint32_t index) const
+Session::remove(const bytes& evict_secret, uint32_t index)
 {
   auto update = current_state().remove(evict_secret, index);
   return tls::marshal(update);
