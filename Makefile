@@ -11,10 +11,10 @@ all: ${BUILD_DIR} format src/* test/*
 	cmake --build ${BUILD_DIR}
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
-	cmake -H. -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug
+	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
 
 test: all
-	cd ${BUILD_DIR} && ctest #-V -R GroupCreationTest.TwoPerson
+	cd ${BUILD_DIR} && ctest
 
 gen: all
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}

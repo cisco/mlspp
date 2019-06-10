@@ -28,31 +28,36 @@ MESSAGE( STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR} )
 MESSAGE( STATUS "GTEST_LIBRARY: " ${GTEST_LIBRARY} )
 MESSAGE( STATUS "GTEST_MAIN_LIBRARY: " ${GTEST_MAIN_LIBRARY} )
 
-# Find clang-tidy
-#find_program(
-#  CLANG_TIDY_EXE
-#  NAMES "clang-tidy"
-#  DOC "Path to clang-tidy executable"
-#  )
-#if(NOT CLANG_TIDY_EXE)
-#  message(STATUS "clang-tidy not found.")
-#else()
-#  message(STATUS "clang-tidy: ${CLANG_TIDY_EXE}")
-#  set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator")
-#endif()
+option(MLSPP_LINT "Whether to run linters" ON)
 
-# Enable pedantic mode
-# XXX(rlb@ipv.sx): I would include -Wextra here, but it fails on
-# gtest.  The right answer is probably just to apply -Werror to the
-# library and not to the tests, since the library is where these
-# things matter most.
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wshadow -pedantic-errors")
-
-# Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
-#set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")
-#set(SANITIZERS "-fno-sanitize-recover=all -fsanitize=undefined -fsanitize=address") 
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
-#set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
+if(NOT ${MLSPP_LINT} STREQUAL "OFF")
+  # Find clang-tidy
+  find_program(
+    CLANG_TIDY_EXE
+    NAMES "clang-tidy"
+    DOC "Path to clang-tidy executable"
+    )
+  if(NOT CLANG_TIDY_EXE)
+    message(STATUS "clang-tidy not found.")
+  else()
+    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator")
+  endif()
+  
+  # Enable pedantic mode
+  # XXX(rlb@ipv.sx): I would include -Wextra here, but it fails on
+  # gtest.  The right answer is probably just to apply -Werror to the
+  # library and not to the tests, since the library is where these
+  # things matter most.
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wshadow -pedantic-errors")
+  
+  # Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
+  set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")
+  set(SANITIZERS "-fno-sanitize-recover=all -fsanitize=undefined -fsanitize=address") 
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
+  set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
+else()
+  message(STATUS "Linters disabled!")
+endif()
 
 ###
 ### Library Config

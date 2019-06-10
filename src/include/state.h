@@ -50,7 +50,7 @@ public:
     bytes nonce;
   };
 
-  void start(LeafIndex my_index, const bytes& root_secret);
+  void start(LeafIndex my_sender, const bytes& root_secret);
   Generation next();
   Generation get(LeafIndex sender, uint32_t generation) const;
 
@@ -165,7 +165,7 @@ public:
   static EpochSecrets derive_epoch_secrets(CipherSuite suite,
                                            const bytes& init_secret,
                                            const bytes& update_secret,
-                                           const bytes& state);
+                                           const bytes& group_context);
 
 private:
   // Shared confirmed state
@@ -207,10 +207,10 @@ private:
   bytes handle(const Add& add);
 
   // Handle an Update (for the participant that sent the update)
-  bytes handle(LeafIndex index, const Update& update);
+  bytes handle(LeafIndex sender, const Update& update);
 
   // Handle a Remove (for the remaining participants, obviously)
-  bytes handle(LeafIndex index, const Remove& remove);
+  bytes handle(LeafIndex sender, const Remove& remove);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
