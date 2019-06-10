@@ -68,11 +68,11 @@ Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
 }
 
 std::pair<bytes, bytes>
-Session::add(const bytes& client_init_key_bytes) const
+Session::add(const bytes& client_init_key_bytes)
 {
   ClientInitKey client_init_key;
   tls::unmarshal(client_init_key_bytes, client_init_key);
-  auto welcome_add_state = current_state().add(user_init_key);
+  auto welcome_add_state = current_state().add(client_init_key);
   auto welcome = tls::marshal(std::get<0>(welcome_add_state));
   auto add = tls::marshal(std::get<1>(welcome_add_state));
   auto state = std::get<2>(welcome_add_state);

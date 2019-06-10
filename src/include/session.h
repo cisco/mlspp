@@ -25,7 +25,7 @@ public:
   std::pair<bytes, bytes> start(const bytes& group_id,
                                 const bytes& client_init_key);
 
-  std::pair<bytes, bytes> add(const bytes& client_init_key) const;
+  std::pair<bytes, bytes> add(const bytes& client_init_key);
   bytes update(const bytes& leaf_secret);
   bytes remove(const bytes& evict_secret, uint32_t index);
 

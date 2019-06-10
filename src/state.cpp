@@ -216,7 +216,7 @@ State::add(uint32_t index, const ClientInitKey& client_init_key) const
 
   auto welcome_info_str = welcome_info();
   auto welcome =
-    Welcome{ user_init_key.user_init_key_id, *pub, welcome_info_str };
+    Welcome{ client_init_key.client_init_key_id, *pub, welcome_info_str };
   auto welcome_tuple = std::make_tuple(welcome);
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
@@ -256,32 +256,8 @@ State::remove(const bytes& leaf_secret, uint32_t index)
 ///
 
 State
-State::handle(const MLSPlaintext& handshake) const
+State::apply(const MLSPlaintext& handshake) const
 {
-  return handle(handshake, false);
-}
-
-State
-State::handle(const MLSPlaintext& handshake, bool skipVerify) const
-{
-  // Pre-validate the MLSPlaintext
-  if (handshake.group_id != _group_id) {
-    throw InvalidParameterError("GroupID mismatch");
-  }
-
-  if (handshake.epoch != _epoch) {
-    throw InvalidParameterError("Epoch mismatch");
-  }
-
-  if (handshake.content_type != ContentType::handshake) {
-    throw InvalidParameterError("Incorrect content type");
-  }
-
-  if (!skipVerify && !verify(handshake)) {
-    throw ProtocolError("Invalid handshake message signature");
-  }
-
-  // Apply the operation
   const auto& operation = handshake.operation.value();
   auto next = *this;
 
@@ -301,9 +277,34 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
   next.update_transcript_hash(handshake);
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
+  return next;
+}
+
+State
+State::handle(const MLSPlaintext& handshake) const
+{
+  // Pre-validate the MLSPlaintext
+  if (handshake.group_id != _group_id) {
+    throw InvalidParameterError("GroupID mismatch");
+  }
+
+  if (handshake.epoch != _epoch) {
+    throw InvalidParameterError("Epoch mismatch");
+  }
+
+  if (handshake.content_type != ContentType::handshake) {
+    throw InvalidParameterError("Incorrect content type");
+  }
+
+  if (!verify(handshake)) {
+    throw ProtocolError("Invalid handshake message signature");
+  }
+
+  // Apply the operation
+  auto next = apply(handshake);
 
   // Verify the  confirmation MAC
-  if (!skipVerify && !next.verify_confirmation(handshake.confirmation)) {
+  if (!next.verify_confirmation(handshake.confirmation)) {
     throw InvalidParameterError("Invalid confirmation MAC");
   }
 
@@ -569,12 +570,21 @@ sender_data_aad(const tls::opaque<1>& group_id,
 std::tuple<MLSPlaintext, State>
 State::sign(const GroupOperation& operation) const
 {
-  auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
-  auto next = handle(pt, true);
-  pt.confirmation =
+  auto handshake = MLSPlaintext{ _group_id, _epoch, _index, operation };
+
+  // Apply the operation
+  auto next = apply(handshake);
+
+  // Compute the confirmation MAC and signature
+  handshake.confirmation =
     hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
-  pt.sign(_identity_priv);
-  return std::make_tuple(pt, next);
+  handshake.sign(_identity_priv);
+
+  // Reset the state's transcript hash to use the signed message
+  next._interim_transcript_hash = _interim_transcript_hash;
+  next.update_transcript_hash(handshake);
+
+  return std::make_tuple(handshake, next);
 }
 
 bool

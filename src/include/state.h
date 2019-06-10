@@ -115,19 +115,19 @@ public:
 
   // Generate a Add message
   std::tuple<Welcome, MLSPlaintext, State> add(
-    const UserInitKey& user_init_key) const;
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Add message at a specific location
   std::tuple<Welcome, MLSPlaintext, State> add(
     uint32_t index,
-    const UserInitKey& user_init_key) const;
+    const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret);
 
   // Generate a Remove message (to remove another participant)
   std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
-                                         uint32_t index) const;
+                                         uint32_t index);
 
   ///
   /// Generic handshake message handler
@@ -200,7 +200,8 @@ private:
   // A zero vector, for convenience
   bytes _zero;
 
-  State handle(const MLSPlaintext& handshake, bool skipVerify) const;
+  // Apply a group operation (without verification)
+  State apply(const MLSPlaintext& handshake) const;
 
   // Handle an Add (for existing participants only)
   bytes handle(const Add& add);

@@ -242,7 +242,7 @@ TEST(OtherStateTest, CipherNegotiation)
 
   // Bob should choose P-256
   auto initialB =
-    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, uikA);
+    State::negotiate(group_id, supported_ciphers, insB, idkB, credB, cikA);
   auto stateB = std::get<2>(initialB);
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
