@@ -157,7 +157,7 @@ State::State(SignaturePrivateKey identity_priv,
   }
 }
 
-State::InitialInfo
+std::tuple<Welcome, MLSPlaintext, State>
 State::negotiate(const bytes& group_id,
                  const std::vector<CipherSuite> supported_ciphersuites,
                  const bytes& leaf_secret,
@@ -189,82 +189,117 @@ State::negotiate(const bytes& group_id,
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
-  auto welcome_add = state.add(client_init_key);
-  state = state.handle(welcome_add.second);
-
-  return InitialInfo(state, welcome_add);
+  return state.add(client_init_key);
 }
 
 ///
 /// Message factories
 ///
 
-std::pair<Welcome, MLSPlaintext>
+std::tuple<Welcome, MLSPlaintext, State>
 State::add(const ClientInitKey& client_init_key) const
 {
-  return add(_tree.size(), client_init_key);
+  return add(LeafIndex{ _tree.size() }, client_init_key);
 }
 
-std::pair<Welcome, MLSPlaintext>
-State::add(uint32_t index, const ClientInitKey& client_init_key) const
+std::tuple<Welcome, MLSPlaintext, State>
+State::add(LeafIndex index, const ClientInitKey& client_init_key) const
 {
   if (!client_init_key.verify()) {
     throw InvalidParameterError("bad signature on user init key");
   }
 
-  auto pub = client_init_key.find_init_key(_suite);
-  if (!pub) {
+  auto maybe_pub = client_init_key.find_init_key(_suite);
+  if (!maybe_pub.has_value()) {
     throw ProtocolError("New member does not support the group's ciphersuite");
   }
+  auto pub = maybe_pub.value();
 
+  // Add to the tree
+  auto next = *this;
+  next._tree.add_leaf(index, pub, client_init_key.credential);
+
+  // Construct the welcome message
   auto welcome_info_str = welcome_info();
   auto welcome =
-    Welcome{ client_init_key.client_init_key_id, *pub, welcome_info_str };
+    Welcome{ client_init_key.client_init_key_id, pub, welcome_info_str };
+  auto welcome_tuple = std::make_tuple(welcome);
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add =
-    sign(Add{ LeafIndex{ index }, client_init_key, welcome_info_hash });
-  return std::pair<Welcome, MLSPlaintext>(welcome, add);
+  auto add = Add{ LeafIndex{ index }, client_init_key, welcome_info_hash };
+  auto handshake = next.ratchet_and_sign(add, _zero);
+  return std::make_tuple(welcome, handshake, next);
 }
 
-MLSPlaintext
-State::update(const bytes& leaf_secret)
+std::tuple<MLSPlaintext, State>
+State::update(const bytes& leaf_secret) const
 {
-  auto path = _tree.encrypt(_index, leaf_secret);
-  _cached_leaf_secret = leaf_secret;
-  return sign(Update{ path });
+  auto next = *this;
+  DirectPath path(_suite);
+  bytes update_secret;
+  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
+
+  auto update = Update{ path };
+  auto handshake = next.ratchet_and_sign(update, update_secret);
+  return std::make_tuple(handshake, next);
 }
 
-MLSPlaintext
-State::remove(const bytes& leaf_secret, uint32_t index)
+std::tuple<MLSPlaintext, State>
+State::remove(const bytes& leaf_secret, LeafIndex index) const
 {
-  if (index >= _tree.size()) {
+  if (index.val >= _tree.size()) {
     throw InvalidParameterError("Index too large for tree");
   }
 
-  auto tree = _tree;
-  tree.blank_path(LeafIndex{ index });
-  auto cut = tree.leaf_span();
-  tree.truncate(cut);
+  if (index == _index) {
+    throw InvalidParameterError("Cannot self-remove");
+  }
 
-  _cached_leaf_secret = leaf_secret;
-  auto path = tree.encrypt(_index, leaf_secret);
+  auto next = *this;
+  next._tree.blank_path(LeafIndex{ index });
+  auto cut = next._tree.leaf_span();
+  next._tree.truncate(cut);
 
-  return sign(Remove{ LeafIndex{ index }, path });
+  DirectPath path(_suite);
+  bytes update_secret;
+  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
+
+  auto remove = Remove{ LeafIndex{ index }, path };
+  auto handshake = next.ratchet_and_sign(remove, update_secret);
+  return std::make_tuple(handshake, next);
 }
 
 ///
 /// Message handlers
 ///
 
-State
-State::handle(const MLSPlaintext& handshake) const
+MLSPlaintext
+State::ratchet_and_sign(const GroupOperation& op, const bytes& update_secret)
 {
-  return handle(handshake, false);
+  auto handshake = MLSPlaintext{ _group_id, _epoch, _index, op };
+
+  _confirmed_transcript_hash = Digest(_suite)
+                                 .write(_interim_transcript_hash)
+                                 .write(handshake.content())
+                                 .digest();
+
+  _epoch += 1;
+  update_epoch_secrets(update_secret);
+
+  handshake.confirmation =
+    hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
+  handshake.sign(_identity_priv);
+
+  _interim_transcript_hash = Digest(_suite)
+                               .write(_confirmed_transcript_hash)
+                               .write(handshake.auth_data())
+                               .digest();
+
+  return handshake;
 }
 
 State
-State::handle(const MLSPlaintext& handshake, bool skipVerify) const
+State::handle(const MLSPlaintext& handshake) const
 {
   // Pre-validate the MLSPlaintext
   if (handshake.group_id != _group_id) {
@@ -279,7 +314,11 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
     throw InvalidParameterError("Incorrect content type");
   }
 
-  if (!skipVerify && !verify(handshake)) {
+  if (handshake.sender == _index) {
+    throw InvalidParameterError("Handle own messages with caching");
+  }
+
+  if (!verify(handshake)) {
     throw ProtocolError("Invalid handshake message signature");
   }
 
@@ -305,7 +344,7 @@ State::handle(const MLSPlaintext& handshake, bool skipVerify) const
   next.update_epoch_secrets(update_secret);
 
   // Verify the  confirmation MAC
-  if (!skipVerify && !next.verify_confirmation(handshake.confirmation)) {
+  if (!next.verify_confirmation(handshake.confirmation)) {
     throw InvalidParameterError("Invalid confirmation MAC");
   }
 
@@ -347,15 +386,6 @@ bytes
 State::handle(LeafIndex sender, const Update& update)
 {
   std::optional<bytes> leaf_secret = std::nullopt;
-  if (sender == _index) {
-    if (_cached_leaf_secret.empty()) {
-      throw InvalidParameterError("Got self-update without generating one");
-    }
-
-    leaf_secret = _cached_leaf_secret;
-    _cached_leaf_secret.clear();
-  }
-
   return update_leaf(sender, update.path, leaf_secret);
 }
 
@@ -367,16 +397,6 @@ State::handle(LeafIndex sender, const Remove& remove)
   _tree.truncate(cut);
 
   std::optional<bytes> leaf_secret = std::nullopt;
-  if (sender == _index) {
-    if (_cached_leaf_secret.empty()) {
-      throw InvalidParameterError(
-        "Got remove from myself without generating one");
-    }
-
-    leaf_secret = _cached_leaf_secret;
-    _cached_leaf_secret.clear();
-  }
-
   return update_leaf(sender, remove.path, leaf_secret);
 }
 
@@ -566,17 +586,6 @@ sender_data_aad(const tls::opaque<1>& group_id,
   tls::ostream w;
   w << group_id << epoch << content_type << sender_data_nonce;
   return w.bytes();
-}
-
-MLSPlaintext
-State::sign(const GroupOperation& operation) const
-{
-  auto pt = MLSPlaintext{ _group_id, _epoch, _index, operation };
-  auto next = handle(pt, true);
-  pt.confirmation =
-    hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
-  pt.sign(_identity_priv);
-  return pt;
 }
 
 bool

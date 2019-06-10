@@ -349,7 +349,11 @@ generate_messages()
                    { tv.random, tv.random, tv.random, tv.random },
                    { cred, cred, cred, cred } };
     ratchet_tree.blank_path(LeafIndex{ 2 });
-    auto direct_path = ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
+
+    DirectPath direct_path(ratchet_tree.cipher_suite());
+    bytes dummy;
+    std::tie(direct_path, dummy) =
+      ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // Construct CIK
     auto client_init_key = ClientInitKey{};

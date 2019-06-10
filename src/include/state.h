@@ -100,8 +100,7 @@ public:
 
   // Negotiate an initial state with another peer based on their
   // ClientInitKey
-  typedef std::pair<State, std::pair<Welcome, MLSPlaintext>> InitialInfo;
-  static InitialInfo negotiate(
+  static std::tuple<Welcome, MLSPlaintext, State> negotiate(
     const bytes& group_id,
     const std::vector<CipherSuite> supported_ciphersuites,
     const bytes& leaf_secret,
@@ -114,19 +113,20 @@ public:
   ///
 
   // Generate a Add message
-  std::pair<Welcome, MLSPlaintext> add(
+  std::tuple<Welcome, MLSPlaintext, State> add(
     const ClientInitKey& client_init_key) const;
 
   // Generate an Add message at a specific location
-  std::pair<Welcome, MLSPlaintext> add(
-    uint32_t index,
+  std::tuple<Welcome, MLSPlaintext, State> add(
+    LeafIndex index,
     const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  MLSPlaintext update(const bytes& leaf_secret);
+  std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret) const;
 
   // Generate a Remove message (to remove another participant)
-  MLSPlaintext remove(const bytes& leaf_secret, uint32_t index);
+  std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
+                                         LeafIndex index) const;
 
   ///
   /// Generic handshake message handler
@@ -194,12 +194,14 @@ private:
   // Per-participant state
   LeafIndex _index;
   SignaturePrivateKey _identity_priv;
-  bytes _cached_leaf_secret;
 
   // A zero vector, for convenience
   bytes _zero;
 
-  State handle(const MLSPlaintext& handshake, bool skipVerify) const;
+  // Ratchet the key schedule forward and sign the operation that
+  // caused the transition
+  MLSPlaintext ratchet_and_sign(const GroupOperation& op,
+                                const bytes& update_secret);
 
   // Handle an Add (for existing participants only)
   bytes handle(const Add& add);
@@ -227,10 +229,6 @@ private:
 
   // Derive the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);
-
-  // Signing of handshake messages (including creation of the
-  // confirmation MAC)
-  MLSPlaintext sign(const GroupOperation& operation) const;
 
   // Signature verification over a handshake message
   bool verify(const MLSPlaintext& pt) const;

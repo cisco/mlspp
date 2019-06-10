@@ -86,12 +86,12 @@ TEST_F(GroupCreationTest, TwoPerson)
   };
 
   // Create a Add for the new participant
-  auto welcome_add = first.add(user_init_keys[1]);
-  auto welcome = welcome_add.first;
-  auto add = welcome_add.second;
+  auto welcome_add_state = first.add(user_init_keys[1]);
+  auto welcome = std::get<0>(welcome_add_state);
+  auto add = std::get<1>(welcome_add_state);
 
   // Process the Add
-  first = first.handle(add);
+  first = std::get<2>(welcome_add_state);
   auto second =
     State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
@@ -111,12 +111,17 @@ TEST_F(GroupCreationTest, FullSize)
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
-    auto welcome_add = states[i - 1].add(user_init_keys[i]);
-    auto welcome = welcome_add.first;
-    auto add = welcome_add.second;
+    auto sender = i - 1;
+    auto welcome_add_state = states[sender].add(user_init_keys[i]);
+    auto welcome = std::get<0>(welcome_add_state);
+    auto add = std::get<1>(welcome_add_state);
 
-    for (auto& state : states) {
-      state = state.handle(add);
+    for (size_t j = 0; j < states.size(); j += 1) {
+      if (j == sender) {
+        states[j] = std::get<2>(welcome_add_state);
+      } else {
+        states[j] = states[j].handle(add);
+      }
     }
 
     states.emplace_back(
@@ -163,16 +168,19 @@ protected:
       cik.add_init_key(init_priv.public_key());
       cik.sign(identity_priv, credential);
 
-      auto welcome_add = states[0].add(cik);
+      auto welcome_add_state = states[0].add(cik);
+      auto&& welcome = std::get<0>(welcome_add_state);
+      auto&& add = std::get<1>(welcome_add_state);
+      auto&& next = std::get<2>(welcome_add_state);
       for (auto& state : states) {
-        state = state.handle(welcome_add.second);
+        if (state.index().val == 0) {
+          state = next;
+        } else {
+          state = state.handle(add);
+        }
       }
 
-      states.emplace_back(identity_priv,
-                          credential,
-                          init_secret,
-                          welcome_add.first,
-                          welcome_add.second);
+      states.emplace_back(identity_priv, credential, init_secret, welcome, add);
     }
   }
 
@@ -190,10 +198,16 @@ TEST_F(RunningGroupTest, Update)
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = random_bytes(32);
-    auto update = states[i].update(new_leaf);
+    auto message_next = states[i].update(new_leaf);
+    auto&& message = std::get<0>(message_next);
+    auto&& next = std::get<1>(message_next);
 
-    for (size_t j = 0; j < group_size; j += 1) {
-      states[j] = states[j].handle(update);
+    for (auto& state : states) {
+      if (state.index().val == i) {
+        state = next;
+      } else {
+        state = state.handle(message);
+      }
     }
 
     check_consistency();
@@ -204,11 +218,18 @@ TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
     auto evict_secret = random_bytes(32);
-    auto remove = states[i].remove(evict_secret, i + 1);
+    auto message_next =
+      states[i].remove(evict_secret, LeafIndex{ uint32_t(i + 1) });
+    auto&& message = std::get<0>(message_next);
+    auto&& next = std::get<1>(message_next);
     states.pop_back();
 
     for (auto& state : states) {
-      state = state.handle(remove);
+      if (state.index().val == i) {
+        state = next;
+      } else {
+        state = state.handle(message);
+      }
     }
 
     check_consistency();
@@ -243,12 +264,12 @@ TEST(OtherStateTest, CipherNegotiation)
   // Bob should choose P-256
   auto initialB =
     State::negotiate(group_id, supported_ciphers, insB, idkB, credB, cikA);
-  auto stateB = initialB.first;
+  auto stateB = std::get<2>(initialB);
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
-  auto welcome = initialB.second.first;
-  auto add = initialB.second.second;
+  auto welcome = std::get<0>(initialB);
+  auto add = std::get<1>(initialB);
   auto stateA = State(idkA, credA, insA, welcome, add);
   ASSERT_EQ(stateA, stateB);
 }

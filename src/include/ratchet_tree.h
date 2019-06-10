@@ -104,7 +104,7 @@ public:
     std::vector<RatchetTreeNode> nodes;
   };
 
-  DirectPath encrypt(LeafIndex from, const bytes& leaf) const;
+  std::tuple<DirectPath, bytes> encrypt(LeafIndex from, const bytes& leaf);
   MergePath decrypt(LeafIndex from, const DirectPath& path) const;
   void merge_path(LeafIndex from, const MergePath& path);
 
