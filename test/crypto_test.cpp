@@ -212,7 +212,7 @@ protected:
     auto derive_key_pair_pub = derive_key_pair_priv.public_key();
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
-    ::mls::test::DeterministicHPKE lock;
+    mls::test::DeterministicHPKE lock;
     auto ecies_out = derive_key_pair_pub.encrypt(tv.ecies_plaintext);
     ASSERT_EQ(ecies_out, test_case.ecies_out);
   }

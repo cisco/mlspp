@@ -269,6 +269,12 @@ protected:
     // Process the adds after join
     for (; curr < basic_tv.group_size - 1; curr += 1) {
       auto& epoch = tc.transcript[curr];
+
+      // Generate an add to cache the next state
+      if (curr == index) {
+        session.add(tc.client_init_keys[curr + 1]);
+      }
+
       session.handle(epoch.handshake);
       assert_consistency(session, epoch);
     }
@@ -277,7 +283,7 @@ protected:
     for (int i = 0; i < basic_tv.group_size; ++i, ++curr) {
       auto& epoch = tc.transcript[curr];
 
-      // Generate an update to cache the secret
+      // Generate an update to cache next state
       if (i == index) {
         session.update({ uint8_t(i), 1 });
       }
@@ -292,8 +298,7 @@ protected:
         break;
       }
 
-      // If this member is the sender, generate a remove to cache
-      // the secret
+      // Generate a remove to cache next state
       if (sender == index) {
         session.remove({ uint8_t(sender), 2 }, sender + 1);
       }
@@ -308,6 +313,7 @@ protected:
                   SignatureScheme scheme,
                   const SessionTestVectors::TestCase& tc)
   {
+    mls::test::DeterministicHPKE lock;
     CipherList ciphers{ suite };
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };

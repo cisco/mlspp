@@ -287,21 +287,25 @@ RatchetTree::RatchetTree(CipherSuite suite,
   }
 }
 
-DirectPath
-RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret) const
+std::tuple<DirectPath, bytes>
+RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret)
 {
   DirectPath path{ _suite };
 
-  auto leaf_node = new_node(leaf_secret);
-  path.nodes.push_back({ leaf_node.public_key(), {} });
+  auto leaf_node = NodeIndex{ from };
+  _nodes[leaf_node].merge(new_node(leaf_secret));
+  path.nodes.push_back({ _nodes[leaf_node].value().public_key(), {} });
 
   auto path_secret = leaf_secret;
   auto copath = tree_math::copath(NodeIndex{ from }, node_size());
   for (const auto& node : copath) {
     path_secret = path_step(path_secret);
 
+    auto parent = tree_math::parent(node, node_size());
+    _nodes[parent] = new_node(path_secret);
+
     RatchetNode path_node{ _suite };
-    path_node.public_key = new_node(path_secret).public_key();
+    path_node.public_key = _nodes[parent].value().public_key();
 
     for (const auto& res_node : tree_math::resolve(_nodes, node)) {
       auto& pub = _nodes[res_node].value().public_key();
@@ -312,7 +316,9 @@ RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret) const
     path.nodes.push_back(path_node);
   }
 
-  return path;
+  set_hash_path(from);
+
+  return std::make_tuple(path, path_secret);
 }
 
 RatchetTree::MergePath

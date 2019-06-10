@@ -246,13 +246,18 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   // other members
   for (LeafIndex i{ 0 }; i.val < size; i.val += 1) {
     auto secret = random_bytes(32);
-    auto ct = trees[i.val].encrypt(i, secret);
+
+    DirectPath path(trees[i.val].cipher_suite());
+    bytes root_path_secret;
+    std::tie(path, root_path_secret) = trees[i.val].encrypt(i, secret);
 
     for (int j = 0; j < size; ++j) {
       if (i.val == j) {
-        trees[j].set_path(i, secret);
+        auto update_secret = trees[j].set_path(i, secret);
+        ASSERT_EQ(update_secret, root_path_secret);
       } else {
-        auto info = trees[j].decrypt(i, ct);
+        auto info = trees[j].decrypt(i, path);
+        ASSERT_EQ(info.root_path_secret, root_path_secret);
         trees[j].merge_path(i, info);
       }
     }

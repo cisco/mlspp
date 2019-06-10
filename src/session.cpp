@@ -2,6 +2,8 @@
 #include "common.h"
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 Session::Session(CipherList supported_ciphersuites,
@@ -125,14 +127,23 @@ Session::handle(const bytes& handshake_data)
   MLSPlaintext handshake{ current_state().cipher_suite() };
   tls::unmarshal(handshake_data, handshake);
 
-  if (_outbound_cache.has_value()) {
+  if (handshake.sender == current_state().index()) {
+    if (!_outbound_cache.has_value()) {
+      throw ProtocolError("Received from self without sending");
+    }
+
     auto message = std::get<0>(_outbound_cache.value());
     auto state = std::get<1>(_outbound_cache.value());
-    if (message == handshake_data) {
-      add_state(handshake.epoch, state);
-      _outbound_cache = std::nullopt;
-      return;
+
+    if (message != handshake_data) {
+      std::cout << "sent " << message << std::endl;
+      std::cout << "recv " << handshake_data << std::endl;
+      throw ProtocolError("Received different own message");
     }
+
+    add_state(handshake.epoch, state);
+    _outbound_cache = std::nullopt;
+    return;
   }
 
   auto next = current_state().handle(handshake);

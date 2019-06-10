@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -228,9 +230,37 @@ State::add(uint32_t index, const ClientInitKey& client_init_key) const
 std::tuple<MLSPlaintext, State>
 State::update(const bytes& leaf_secret)
 {
+  /* xxx
   auto path = _tree.encrypt(_index, leaf_secret);
   _cached_leaf_secret = leaf_secret;
   return sign(Update{ path });
+  */
+
+  auto next = *this;
+  DirectPath path(_suite);
+  bytes update_secret;
+  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
+  auto update = Update{ path };
+
+  // TODO encapsulate the below in a new ratchet_and_sign() method
+  auto handshake = MLSPlaintext{ _group_id, _epoch, _index, update };
+  next.update_transcript_hash(handshake);
+  next._epoch += 1;
+  next.update_epoch_secrets(update_secret);
+
+  handshake.confirmation =
+    hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
+  handshake.sign(_identity_priv);
+
+  std::cout << "conf_gen " << _index.val << std::endl;
+  std::cout << "         " << next._confirmation_key << std::endl;
+  std::cout << "       + " << next._confirmed_transcript_hash << std::endl;
+  std::cout << "       = " << handshake.confirmation << std::endl;
+
+  next._interim_transcript_hash = _interim_transcript_hash;
+  next.update_transcript_hash(handshake);
+
+  return std::make_tuple(handshake, next);
 }
 
 std::tuple<MLSPlaintext, State>
@@ -240,6 +270,11 @@ State::remove(const bytes& leaf_secret, uint32_t index)
     throw InvalidParameterError("Index too large for tree");
   }
 
+  if (index == _index.val) {
+    throw InvalidParameterError("Cannot self-remove");
+  }
+
+  /* xxx
   auto tree = _tree;
   tree.blank_path(LeafIndex{ index });
   auto cut = tree.leaf_span();
@@ -249,6 +284,33 @@ State::remove(const bytes& leaf_secret, uint32_t index)
   auto path = tree.encrypt(_index, leaf_secret);
 
   return sign(Remove{ LeafIndex{ index }, path });
+  */
+
+  auto next = *this;
+  next._tree.blank_path(LeafIndex{ index });
+  auto cut = next._tree.leaf_span();
+  next._tree.truncate(cut);
+
+  DirectPath path(_suite);
+  bytes update_secret;
+  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
+
+  auto remove = Remove{ LeafIndex{ index }, path };
+
+  // TODO encapsulate the below in a new ratchet_and_sign() method
+  auto handshake = MLSPlaintext{ _group_id, _epoch, _index, remove };
+  next.update_transcript_hash(handshake);
+  next._epoch += 1;
+  next.update_epoch_secrets(update_secret);
+
+  handshake.confirmation =
+    hmac(_suite, next._confirmation_key, next._confirmed_transcript_hash);
+  handshake.sign(_identity_priv);
+
+  next._interim_transcript_hash = _interim_transcript_hash;
+  next.update_transcript_hash(handshake);
+
+  return std::make_tuple(handshake, next);
 }
 
 ///
@@ -294,6 +356,12 @@ State::handle(const MLSPlaintext& handshake) const
 
   if (handshake.content_type != ContentType::handshake) {
     throw InvalidParameterError("Incorrect content type");
+  }
+
+  if (handshake.sender == _index &&
+      handshake.operation.value().type != GroupOperationType::add) {
+    // xxx: remove add caveat
+    throw InvalidParameterError("Handle own messages with caching");
   }
 
   if (!verify(handshake)) {
@@ -346,6 +414,7 @@ bytes
 State::handle(LeafIndex sender, const Update& update)
 {
   std::optional<bytes> leaf_secret = std::nullopt;
+  /* xxx
   if (sender == _index) {
     if (_cached_leaf_secret.empty()) {
       throw InvalidParameterError("Got self-update without generating one");
@@ -354,6 +423,7 @@ State::handle(LeafIndex sender, const Update& update)
     leaf_secret = _cached_leaf_secret;
     _cached_leaf_secret.clear();
   }
+  */
 
   return update_leaf(sender, update.path, leaf_secret);
 }
@@ -366,6 +436,7 @@ State::handle(LeafIndex sender, const Remove& remove)
   _tree.truncate(cut);
 
   std::optional<bytes> leaf_secret = std::nullopt;
+  /* xxx
   if (sender == _index) {
     if (_cached_leaf_secret.empty()) {
       throw InvalidParameterError(
@@ -375,6 +446,7 @@ State::handle(LeafIndex sender, const Remove& remove)
     leaf_secret = _cached_leaf_secret;
     _cached_leaf_secret.clear();
   }
+  */
 
   return update_leaf(sender, remove.path, leaf_secret);
 }
@@ -479,6 +551,12 @@ State::update_transcript_hash(const MLSPlaintext& plaintext)
                                .write(_confirmed_transcript_hash)
                                .write(plaintext.auth_data())
                                .digest();
+
+  std::cout << "upd_tx " << _index.val << std::endl;
+  std::cout << "    ++ " << plaintext.content() << std::endl;
+  std::cout << "    -> " << _confirmed_transcript_hash << std::endl;
+  std::cout << "    ++ " << plaintext.auth_data() << std::endl;
+  std::cout << "    -> " << _interim_transcript_hash << std::endl;
 }
 
 bytes
@@ -501,6 +579,15 @@ State::update_leaf(LeafIndex index,
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
+  std::cout << "upd_epch " << _index.val << std::endl;
+  std::cout << "    init " << _init_secret << std::endl;
+  std::cout << "     upd " << update_secret << std::endl;
+  std::cout << "     gid " << _group_id << std::endl;
+  std::cout << "    epch " << _epoch << std::endl;
+  std::cout << "      th " << _tree.root_hash() << std::endl;
+  std::cout << "      tx " << _confirmed_transcript_hash << std::endl;
+  std::cout << "    tree " << _tree << std::endl << std::endl;
+
   auto group_context_str = GroupContext{
     _group_id,
     _epoch,
@@ -598,6 +685,13 @@ bool
 State::verify_confirmation(const bytes& confirmation) const
 {
   auto confirm = hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
+
+  std::cout << "conf_ver " << _index.val << std::endl;
+  std::cout << "         " << _confirmation_key << std::endl;
+  std::cout << "       + " << _confirmed_transcript_hash << std::endl;
+  std::cout << "       = " << confirm << std::endl;
+  std::cout << "       ? " << confirmation << std::endl;
+
   return constant_time_eq(confirm, confirmation);
 }
 

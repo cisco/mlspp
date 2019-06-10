@@ -190,10 +190,16 @@ TEST_F(RunningGroupTest, Update)
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = random_bytes(32);
-    auto update = states[i].update(new_leaf);
+    auto message_next = states[i].update(new_leaf);
+    auto&& message = std::get<0>(message_next);
+    auto&& next = std::get<1>(message_next);
 
     for (size_t j = 0; j < group_size; j += 1) {
-      states[j] = states[j].handle(std::get<0>(update));
+      if (j == i) {
+        states[j] = next;
+      } else {
+        states[j] = states[j].handle(message);
+      }
     }
 
     check_consistency();
@@ -204,11 +210,17 @@ TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
     auto evict_secret = random_bytes(32);
-    auto remove = states[i].remove(evict_secret, i + 1);
+    auto message_next = states[i].remove(evict_secret, i + 1);
+    auto&& message = std::get<0>(message_next);
+    auto&& next = std::get<1>(message_next);
     states.pop_back();
 
-    for (auto& state : states) {
-      state = state.handle(std::get<0>(remove));
+    for (int j = 0; j < states.size(); j += 1) {
+      if (i == j) {
+        states[j] = next;
+      } else {
+        states[j] = states[j].handle(message);
+      }
     }
 
     check_consistency();

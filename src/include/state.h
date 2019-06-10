@@ -123,11 +123,11 @@ public:
     const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
-  std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret);
+  std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret) const;
 
   // Generate a Remove message (to remove another participant)
   std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
-                                         uint32_t index);
+                                         uint32_t index) const;
 
   ///
   /// Generic handshake message handler
