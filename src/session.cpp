@@ -99,7 +99,7 @@ Session::update(const bytes& leaf_secret)
 bytes
 Session::remove(const bytes& evict_secret, uint32_t index)
 {
-  auto remove_state = current_state().remove(evict_secret, index);
+  auto remove_state = current_state().remove(evict_secret, LeafIndex{ index });
   auto remove = tls::marshal(std::get<0>(remove_state));
   auto state = std::get<1>(remove_state);
 

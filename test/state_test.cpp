@@ -86,12 +86,12 @@ TEST_F(GroupCreationTest, TwoPerson)
   };
 
   // Create a Add for the new participant
-  auto welcome_add = first.add(user_init_keys[1]);
-  auto welcome = std::get<0>(welcome_add);
-  auto add = std::get<1>(welcome_add);
+  auto welcome_add_state = first.add(user_init_keys[1]);
+  auto welcome = std::get<0>(welcome_add_state);
+  auto add = std::get<1>(welcome_add_state);
 
   // Process the Add
-  first = first.handle(add);
+  first = std::get<2>(welcome_add_state);
   auto second =
     State{ identity_privs[1], credentials[1], init_secrets[1], welcome, add };
 
@@ -111,12 +111,17 @@ TEST_F(GroupCreationTest, FullSize)
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
-    auto welcome_add = states[i - 1].add(user_init_keys[i]);
-    auto welcome = std::get<0>(welcome_add);
-    auto add = std::get<1>(welcome_add);
+    auto sender = i - 1;
+    auto welcome_add_state = states[sender].add(user_init_keys[i]);
+    auto welcome = std::get<0>(welcome_add_state);
+    auto add = std::get<1>(welcome_add_state);
 
-    for (auto& state : states) {
-      state = state.handle(add);
+    for (size_t j = 0; j < states.size(); j += 1) {
+      if (j == sender) {
+        states[j] = std::get<2>(welcome_add_state);
+      } else {
+        states[j] = states[j].handle(add);
+      }
     }
 
     states.emplace_back(
@@ -163,16 +168,19 @@ protected:
       cik.add_init_key(init_priv.public_key());
       cik.sign(identity_priv, credential);
 
-      auto welcome_add = states[0].add(cik);
+      auto welcome_add_state = states[0].add(cik);
+      auto&& welcome = std::get<0>(welcome_add_state);
+      auto&& add = std::get<1>(welcome_add_state);
+      auto&& next = std::get<2>(welcome_add_state);
       for (auto& state : states) {
-        state = state.handle(std::get<1>(welcome_add));
+        if (state.index().val == 0) {
+          state = next;
+        } else {
+          state = state.handle(add);
+        }
       }
 
-      states.emplace_back(identity_priv,
-                          credential,
-                          init_secret,
-                          std::get<0>(welcome_add),
-                          std::get<1>(welcome_add));
+      states.emplace_back(identity_priv, credential, init_secret, welcome, add);
     }
   }
 
@@ -194,11 +202,11 @@ TEST_F(RunningGroupTest, Update)
     auto&& message = std::get<0>(message_next);
     auto&& next = std::get<1>(message_next);
 
-    for (size_t j = 0; j < group_size; j += 1) {
-      if (j == i) {
-        states[j] = next;
+    for (auto& state : states) {
+      if (state.index().val == i) {
+        state = next;
       } else {
-        states[j] = states[j].handle(message);
+        state = state.handle(message);
       }
     }
 
@@ -210,16 +218,17 @@ TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
     auto evict_secret = random_bytes(32);
-    auto message_next = states[i].remove(evict_secret, i + 1);
+    auto message_next =
+      states[i].remove(evict_secret, LeafIndex{ uint32_t(i + 1) });
     auto&& message = std::get<0>(message_next);
     auto&& next = std::get<1>(message_next);
     states.pop_back();
 
-    for (int j = 0; j < states.size(); j += 1) {
-      if (i == j) {
-        states[j] = next;
+    for (auto& state : states) {
+      if (state.index().val == i) {
+        state = next;
       } else {
-        states[j] = states[j].handle(message);
+        state = state.handle(message);
       }
     }
 
