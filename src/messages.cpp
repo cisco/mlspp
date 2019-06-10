@@ -418,7 +418,7 @@ MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
 
   switch (content_type) {
     case ContentType::handshake:
-      operation = GroupOperation(suite);
+      operation.emplace(suite);
       tls::unmarshal(content, operation.value());
       break;
 
@@ -525,7 +525,7 @@ operator>>(tls::istream& in, MLSPlaintext& obj)
 
   switch (obj.content_type) {
     case ContentType::handshake:
-      obj.operation = GroupOperation(obj._suite);
+      obj.operation.emplace(obj._suite);
       in >> obj.operation.value() >> obj.confirmation;
       break;
 

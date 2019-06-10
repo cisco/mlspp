@@ -422,12 +422,11 @@ State::derive_epoch_secrets(CipherSuite suite,
 ///
 
 MLSCiphertext
-State::protect(const bytes& data)
+State::protect(const bytes& pt)
 {
-  MLSPlaintext pt{ _group_id, _epoch, _index, data };
-  pt.sign(_identity_priv);
-
-  return encrypt(pt);
+  MLSPlaintext mpt{ _group_id, _epoch, _index, pt };
+  mpt.sign(_identity_priv);
+  return encrypt(mpt);
 }
 
 bytes
