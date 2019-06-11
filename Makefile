@@ -7,7 +7,7 @@ CLANG_FORMAT=clang-format -i -style=mozilla
 TEST_VECTOR_DIR=third_party/mls-implementations/test_vectors
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-all: ${BUILD_DIR} format src/* test/*
+all: ${BUILD_DIR} format src/* include/** test/*
 	cmake --build ${BUILD_DIR}
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt

@@ -1,8 +1,17 @@
 #pragma once
 
+/*
 #include "common.h"
 #include "crypto.h"
 #include <iosfwd>
+*/
+
+namespace tls {
+
+class istream;
+class ostream;
+
+} // namespace tls
 
 namespace mls {
 

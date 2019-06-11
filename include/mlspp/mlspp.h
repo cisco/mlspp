@@ -1,7 +1,4 @@
 #pragma once
 
-namespace mls {
+#include "credential.h"
 
-// TODO
-
-} // namespace mls
