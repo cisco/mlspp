@@ -1,8 +1,23 @@
 #include "messages.h"
 
+#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+
 namespace mls {
 
 // RatchetNode
+
+RatchetNode::RatchetNode(CipherSuite suite)
+  : CipherAware(suite)
+  , public_key(suite)
+  , node_secrets(suite)
+{}
+
+RatchetNode::RatchetNode(const DHPublicKey& public_key,
+                         const std::vector<HPKECiphertext>& node_secrets)
+  : CipherAware(public_key)
+  , public_key(public_key)
+  , node_secrets(node_secrets)
+{}
 
 bool
 operator==(const RatchetNode& lhs, const RatchetNode& rhs)
@@ -25,6 +40,11 @@ operator>>(tls::istream& in, RatchetNode& obj)
 
 // DirectPath
 
+DirectPath::DirectPath(CipherSuite suite)
+  : CipherAware(suite)
+  , nodes(suite)
+{}
+
 bool
 operator==(const DirectPath& lhs, const DirectPath& rhs)
 {
@@ -44,6 +64,10 @@ operator>>(tls::istream& in, DirectPath& obj)
 }
 
 // ClientInitKey
+
+ClientInitKey::ClientInitKey()
+  : supported_versions(1, mls10Version)
+{}
 
 void
 ClientInitKey::add_init_key(const DHPublicKey& pub)
@@ -123,6 +147,25 @@ operator>>(tls::istream& in, ClientInitKey& obj)
 
 // WelcomeInfo
 
+WelcomeInfo::WelcomeInfo(CipherSuite suite)
+  : CipherAware(suite)
+  , tree(suite)
+{}
+
+WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id,
+                         epoch_t epoch,
+                         RatchetTree tree,
+                         tls::opaque<1> interim_transcript_hash,
+                         tls::opaque<1> init_secret)
+  : CipherAware(tree)
+  , version(mls10Version)
+  , group_id(group_id)
+  , epoch(epoch)
+  , tree(tree)
+  , interim_transcript_hash(interim_transcript_hash)
+  , init_secret(init_secret)
+{}
+
 bytes
 WelcomeInfo::hash(CipherSuite suite) const
 {
@@ -162,6 +205,10 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
 }
 
 // Welcome
+
+Welcome::Welcome()
+  : encrypted_welcome_info(DUMMY_CIPHERSUITE)
+{}
 
 Welcome::Welcome(const bytes& id,
                  const DHPublicKey& pub,
@@ -224,6 +271,14 @@ operator>>(tls::istream& in, GroupOperationType& obj)
 
 // Add
 
+Add::Add(LeafIndex index,
+         const ClientInitKey& init_key,
+         bytes welcome_info_hash)
+  : index(index)
+  , init_key(init_key)
+  , welcome_info_hash(std::move(welcome_info_hash))
+{}
+
 const GroupOperationType Add::type = GroupOperationType::add;
 
 bool
@@ -247,6 +302,16 @@ operator>>(tls::istream& in, Add& obj)
 
 // Update
 
+Update::Update(CipherSuite suite)
+  : CipherAware(suite)
+  , path(suite)
+{}
+
+Update::Update(const DirectPath& path)
+  : CipherAware(path)
+  , path(path)
+{}
+
 const GroupOperationType Update::type = GroupOperationType::update;
 
 bool
@@ -269,6 +334,17 @@ operator>>(tls::istream& in, Update& obj)
 
 // Remove
 
+Remove::Remove(CipherSuite suite)
+  : CipherAware(suite)
+  , path(suite)
+{}
+
+Remove::Remove(LeafIndex removed, const DirectPath& path)
+  : CipherAware(path)
+  , removed(removed)
+  , path(path)
+{}
+
 const GroupOperationType Remove::type = GroupOperationType::remove;
 
 bool
@@ -290,6 +366,33 @@ operator>>(tls::istream& in, Remove& obj)
 }
 
 // GroupOperation
+
+GroupOperation::GroupOperation()
+  : CipherAware(DUMMY_CIPHERSUITE)
+{}
+
+GroupOperation::GroupOperation(CipherSuite suite)
+  : CipherAware(suite)
+{}
+
+GroupOperation::GroupOperation(const Add& add)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , type(add.type)
+  , add(add)
+{}
+
+GroupOperation::GroupOperation(const Update& update)
+  : CipherAware(update)
+  , type(update.type)
+  , update(update)
+
+{}
+
+GroupOperation::GroupOperation(const Remove& remove)
+  : CipherAware(remove)
+  , type(remove.type)
+  , remove(remove)
+{}
 
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
@@ -367,6 +470,30 @@ operator>>(tls::istream& in, ContentType& obj)
 }
 
 // MLSPlaintext
+
+MLSPlaintext::MLSPlaintext(bytes group_id,
+                           epoch_t epoch,
+                           LeafIndex sender,
+                           GroupOperation operation)
+  : CipherAware(operation.cipher_suite())
+  , group_id(group_id)
+  , epoch(epoch)
+  , sender(sender)
+  , content_type(ContentType::handshake)
+  , operation(operation)
+{}
+
+MLSPlaintext::MLSPlaintext(bytes group_id,
+                           epoch_t epoch,
+                           LeafIndex sender,
+                           const bytes& application_data)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , group_id(group_id)
+  , epoch(epoch)
+  , sender(sender)
+  , content_type(ContentType::application)
+  , application_data(application_data)
+{}
 
 // struct {
 //     opaque content[MLSPlaintext.length];

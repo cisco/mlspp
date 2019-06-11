@@ -58,9 +58,7 @@ struct OptionalRatchetTreeNode
   typedef tls::variant_optional<RatchetTreeNode, CipherSuite> parent;
   using parent::parent;
 
-  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret)
-    : parent(RatchetTreeNode(suite, secret))
-  {}
+  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret);
 
   bool has_private() const;
   const bytes& hash() const;

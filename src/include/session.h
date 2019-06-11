@@ -15,9 +15,6 @@ public:
           SignaturePrivateKey identity_priv,
           Credential credential);
 
-  // Two sessions are considered equal if:
-  // (1) they agree on the states they have in common
-  // (2) they agree on the current epoch
   friend bool operator==(const Session& lhs, const Session& rhs);
 
   bytes client_init_key() const;

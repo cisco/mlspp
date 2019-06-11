@@ -126,6 +126,11 @@ operator>>(tls::istream& in, RatchetTreeNode& obj)
 /// OptionalRatchetTreeNode
 ///
 
+OptionalRatchetTreeNode::OptionalRatchetTreeNode(CipherSuite suite,
+                                                 const bytes& secret)
+  : parent(RatchetTreeNode(suite, secret))
+{}
+
 bool
 OptionalRatchetTreeNode::has_private() const
 {

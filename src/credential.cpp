@@ -1,5 +1,7 @@
 #include "credential.h"
 
+#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
+
 namespace mls {
 
 ///
@@ -24,6 +26,16 @@ operator>>(tls::istream& in, CredentialType& type)
 ///
 /// BasicCredential
 ///
+
+BasicCredential::BasicCredential()
+  : _public_key(DUMMY_SIG_SCHEME)
+{}
+
+BasicCredential::BasicCredential(const bytes& identity,
+                                 const SignaturePublicKey& public_key)
+  : _identity(identity)
+  , _public_key(public_key)
+{}
 
 std::unique_ptr<AbstractCredential>
 BasicCredential::dup() const
@@ -70,6 +82,37 @@ BasicCredential::equal(const AbstractCredential* other) const
 ///
 /// Credential
 ///
+
+Credential::Credential(const Credential& other)
+  : _type(other._type)
+  , _cred(nullptr)
+{
+  if (other._cred) {
+    _cred = other._cred->dup();
+  }
+}
+
+Credential::Credential(Credential&& other)
+  : _type(other._type)
+  , _cred(nullptr)
+{
+  if (other._cred) {
+    _cred.reset(other._cred.release());
+  }
+}
+
+Credential&
+Credential::operator=(const Credential& other)
+{
+  if (this != &other) {
+    _type = other._type;
+    _cred.reset(nullptr);
+    if (other._cred) {
+      _cred = other._cred->dup();
+    }
+  }
+  return *this;
+}
 
 bytes
 Credential::identity() const

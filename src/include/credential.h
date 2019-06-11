@@ -5,8 +5,6 @@
 #include "tls_syntax.h"
 #include <iosfwd>
 
-#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
-
 namespace mls {
 
 // enum {
@@ -39,14 +37,8 @@ struct AbstractCredential
 class BasicCredential : public AbstractCredential
 {
 public:
-  BasicCredential()
-    : _public_key(DUMMY_SIG_SCHEME)
-  {}
-
-  BasicCredential(const bytes& identity, const SignaturePublicKey& public_key)
-    : _identity(identity)
-    , _public_key(public_key)
-  {}
+  BasicCredential();
+  BasicCredential(const bytes& identity, const SignaturePublicKey& public_key);
 
   virtual std::unique_ptr<AbstractCredential> dup() const;
   virtual bytes identity() const;
@@ -75,35 +67,9 @@ class Credential
 public:
   Credential() = default;
 
-  Credential(const Credential& other)
-    : _type(other._type)
-    , _cred(nullptr)
-  {
-    if (other._cred) {
-      _cred = other._cred->dup();
-    }
-  }
-
-  Credential(Credential&& other)
-    : _type(other._type)
-    , _cred(nullptr)
-  {
-    if (other._cred) {
-      _cred.reset(other._cred.release());
-    }
-  }
-
-  Credential& operator=(const Credential& other)
-  {
-    if (this != &other) {
-      _type = other._type;
-      _cred.reset(nullptr);
-      if (other._cred) {
-        _cred = other._cred->dup();
-      }
-    }
-    return *this;
-  }
+  Credential(const Credential& other);
+  Credential(Credential&& other);
+  Credential& operator=(const Credential& other);
 
   bytes identity() const;
   SignaturePublicKey public_key() const;

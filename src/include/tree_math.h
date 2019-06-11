@@ -36,6 +36,8 @@ class ostream;
 namespace mls {
 
 // Index types go in the overall namespace
+// XXX(rlb@ipv.sx): Seems like this stuff can probably get
+// simplified down a fair bit.
 struct UInt32
 {
   uint32_t val;

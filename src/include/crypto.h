@@ -20,20 +20,6 @@ enum struct CipherSuite : uint16_t
 
 typedef std::vector<CipherSuite> CipherList;
 
-// Utility class to avoid a bit of boilerplate
-class CipherAware
-{
-public:
-  CipherAware(CipherSuite suite)
-    : _suite(suite)
-  {}
-
-  CipherSuite cipher_suite() const { return _suite; }
-
-protected:
-  CipherSuite _suite;
-};
-
 tls::ostream&
 operator<<(tls::ostream& out, const CipherSuite& obj);
 tls::istream&
@@ -47,25 +33,33 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808
 };
 
-class SignatureAware
-{
-public:
-  SignatureAware(SignatureScheme scheme)
-    : _scheme(scheme)
-  {}
-
-  SignatureScheme signature_scheme() const { return _scheme; }
-
-protected:
-  SignatureScheme _scheme;
-};
-
 tls::ostream&
 operator<<(tls::ostream& out, const SignatureScheme& obj);
 tls::istream&
 operator>>(tls::istream& in, SignatureScheme& obj);
 
-// Methods to help with testing
+// Utility classes to avoid a bit of boilerplate
+class CipherAware
+{
+public:
+  CipherAware(CipherSuite suite);
+  CipherSuite cipher_suite() const;
+
+protected:
+  CipherSuite _suite;
+};
+
+class SignatureAware
+{
+public:
+  SignatureAware(SignatureScheme scheme);
+  SignatureScheme signature_scheme() const;
+
+protected:
+  SignatureScheme _scheme;
+};
+
+// Test mode controls
 namespace test {
 
 // DeterministicHPKE enables RAII-based requests for HPKE to be
@@ -88,7 +82,7 @@ private:
 bool
 deterministic_signature_scheme(SignatureScheme scheme);
 
-}
+} // namespace test
 
 // Adapt standard pointers so that they can be "typed" to handle
 // custom deleters more easily.
@@ -109,14 +103,8 @@ class typed_unique_ptr : public typed_unique_ptr_base<T>
 public:
   typedef typed_unique_ptr_base<T> parent;
   using parent::parent;
-
-  typed_unique_ptr()
-    : typed_unique_ptr_base<T>(nullptr, TypedDelete<T>)
-  {}
-
-  typed_unique_ptr(T* ptr)
-    : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
-  {}
+  typed_unique_ptr();
+  typed_unique_ptr(T* ptr);
 };
 
 // Interface cleanup wrapper for raw OpenSSL EVP keys
@@ -126,16 +114,6 @@ enum struct OpenSSLKeyType;
 template<>
 void
 TypedDelete(OpenSSLKey* ptr);
-
-// Wrapper for OpenSSL errors
-class OpenSSLError : public std::runtime_error
-{
-public:
-  typedef std::runtime_error parent;
-  using parent::parent;
-
-  static OpenSSLError current();
-};
 
 // Digests
 enum struct DigestType
@@ -147,7 +125,7 @@ enum struct DigestType
 class Digest
 {
 public:
-  Digest(DigestType type);
+  Digest(DigestType type); // XXX(rlb@ipv.sx) delete?
   Digest(CipherSuite suite);
   Digest& write(uint8_t byte);
   Digest& write(const bytes& data);
@@ -182,8 +160,6 @@ hkdf_expand_label(CipherSuite suite,
                   const bytes& context,
                   const size_t length);
 
-// Derive-Secret(Secret, Label, Context) =
-//     HKDF-Expand-Label(Secret, Label, Hash(Context), Hash.length)
 bytes
 derive_secret(CipherSuite suite,
               const bytes& secret,
@@ -288,14 +264,7 @@ class DHPublicKey : public PublicKey
 {
 public:
   using PublicKey::PublicKey;
-
-  // XXX(rlb@ipv.sx): This is a bit of a hack, but it means that if
-  // we're constructing objects for serialization, then we don't
-  // need to do all the variant stuff
-  DHPublicKey()
-    : PublicKey(CipherSuite::X25519_SHA256_AES128GCM)
-  {}
-
+  DHPublicKey();
   HPKECiphertext encrypt(const bytes& plaintext) const;
 
 private:

@@ -21,8 +21,15 @@ operator>>(tls::istream& out, GroupContext& obj)
 }
 
 ///
-/// ApplicationKeyChain
+/// KeyChain
 ///
+
+KeyChain::KeyChain(CipherSuite suite)
+  : _suite(suite)
+  , _secret_size(Digest(suite).output_size())
+  , _key_size(AESGCM::key_size(suite))
+  , _nonce_size(AESGCM::nonce_size)
+{}
 
 const char* KeyChain::_secret_label = "sender";
 const char* KeyChain::_nonce_label = "nonce";
