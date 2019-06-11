@@ -2,7 +2,6 @@
 
 #include "common.h"
 #include "crypto.h"
-#include "tls_syntax.h"
 #include <iosfwd>
 
 namespace mls {
@@ -27,29 +26,6 @@ struct AbstractCredential
   virtual void read(tls::istream& in) = 0;
   virtual void write(tls::ostream& out) const = 0;
   virtual bool equal(const AbstractCredential* other) const = 0;
-};
-
-// struct {
-//     opaque identity<0..2^16-1>;
-//     SignatureScheme algorithm;
-//     SignaturePublicKey public_key;
-// } BasicCredential;
-class BasicCredential : public AbstractCredential
-{
-public:
-  BasicCredential();
-  BasicCredential(const bytes& identity, const SignaturePublicKey& public_key);
-
-  virtual std::unique_ptr<AbstractCredential> dup() const;
-  virtual bytes identity() const;
-  virtual SignaturePublicKey public_key() const;
-  virtual void read(tls::istream& in);
-  virtual void write(tls::ostream& out) const;
-  virtual bool equal(const AbstractCredential* other) const;
-
-private:
-  tls::opaque<2> _identity;
-  SignaturePublicKey _public_key;
 };
 
 // struct {
