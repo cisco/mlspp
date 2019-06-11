@@ -75,26 +75,7 @@ SignatureAware::signature_scheme() const
 /// Test mode controls
 ///
 
-namespace test {
-
 int DeterministicHPKE::_refct = 0;
-
-bool
-deterministic_signature_scheme(SignatureScheme scheme)
-{
-  switch (scheme) {
-    case SignatureScheme::P256_SHA256:
-      return false;
-    case SignatureScheme::P521_SHA512:
-      return false;
-    case SignatureScheme::Ed25519:
-      return true;
-    case SignatureScheme::Ed448:
-      return true;
-  }
-}
-
-} // namespace test
 
 ///
 /// typed_unique_ptr
@@ -1358,7 +1339,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 {
   // SetupBaseI
   auto ephemeral = DHPrivateKey::generate(_suite);
-  if (test::DeterministicHPKE::enabled()) {
+  if (DeterministicHPKE::enabled()) {
     auto seed = to_bytes() + plaintext;
     ephemeral = DHPrivateKey::derive(_suite, seed);
   }

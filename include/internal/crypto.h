@@ -68,6 +68,11 @@ namespace test {
 // between multiple requests for determinism, determinism is turned
 // off when the last object in the stack is destroyed; it's
 // basically a ref-counted bool.
+//
+// This should only be used for interop testing / test vector
+// purposes; it should not be enabled in production systems.
+//
+// TODO(rlb@ipv.sx): Find a way to hide this API from normal usage.
 class DeterministicHPKE
 {
 public:
@@ -78,11 +83,6 @@ public:
 private:
   static int _refct;
 };
-
-bool
-deterministic_signature_scheme(SignatureScheme scheme);
-
-} // namespace test
 
 // Adapt standard pointers so that they can be "typed" to handle
 // custom deleters more easily.

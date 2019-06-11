@@ -8,6 +8,8 @@
 
 using namespace mls;
 
+/////
+
 struct TreeMathTestVectors
 {
   static const std::string file_name;
@@ -162,6 +164,13 @@ operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& tv);
 
 /////
 
+class TestRatchetTree : public RatchetTree
+{
+public:
+  using RatchetTree::RatchetTree;
+  const RatchetTreeNodeVector& nodes() const { return _nodes; }
+};
+
 struct TreeTestVectors
 {
   static const std::string file_name;
@@ -240,6 +249,32 @@ operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
 /////
 
+class TestSession : public Session
+{
+public:
+  using Session::Session;
+
+  uint32_t index() const { return current_state().index().val; }
+
+  epoch_t current_epoch() const { return _current_epoch; }
+
+  CipherSuite cipher_suite() const { return current_state().cipher_suite(); }
+
+  bytes current_epoch_secret() const { return current_state().epoch_secret(); }
+
+  bytes current_application_secret() const
+  {
+    return current_state().application_secret();
+  }
+
+  bytes current_confirmation_key() const
+  {
+    return current_state().confirmation_key();
+  }
+
+  bytes current_init_secret() const { return current_state().init_secret(); }
+};
+
 // Splitting the test data from the file definition here allows us
 // to have a consistent struct for different scenarios that live in
 // different files.
@@ -260,7 +295,7 @@ struct SessionTestVectors
 
     Epoch(const bytes& welcome,
           const bytes& handshake,
-          const mls::test::TestSession& session)
+          const TestSession& session)
       : welcome(welcome)
       , handshake(handshake)
       , epoch(session.current_epoch())

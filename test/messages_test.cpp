@@ -22,6 +22,21 @@ tls_round_trip(const bytes& vector,
   ASSERT_EQ(tls::marshal(unmarshaled), vector);
 }
 
+bool
+deterministic_signature_scheme(SignatureScheme scheme)
+{
+  switch (scheme) {
+    case SignatureScheme::P256_SHA256:
+      return false;
+    case SignatureScheme::P521_SHA512:
+      return false;
+    case SignatureScheme::Ed25519:
+      return true;
+    case SignatureScheme::Ed448:
+      return true;
+  }
+}
+
 class MessagesTest : public ::testing::Test
 {
 protected:
@@ -41,7 +56,7 @@ protected:
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_key);
 
-    mls::test::DeterministicHPKE lock;
+    DeterministicHPKE lock;
     auto ratchet_tree =
       RatchetTree{ tc.cipher_suite,
                    { tv.random, tv.random, tv.random, tv.random },
@@ -129,8 +144,7 @@ TEST_F(MessagesTest, ClientInitKey)
   constructed.signature = tv.random;
 
   ClientInitKey after;
-  auto reproducible =
-    mls::test::deterministic_signature_scheme(tv.cik_all_scheme);
+  auto reproducible = deterministic_signature_scheme(tv.cik_all_scheme);
   tls_round_trip(tv.client_init_key_all, constructed, after, reproducible);
 }
 

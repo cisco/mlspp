@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 using namespace mls;
-using namespace mls::test;
 
 class SessionTest : public ::testing::Test
 {
@@ -313,8 +312,8 @@ protected:
                   SignatureScheme scheme,
                   const SessionTestVectors::TestCase& tc)
   {
-    mls::test::DeterministicHPKE lock;
-    CipherList ciphers{ suite };
+    DeterministicHPKE lock;
+    std::vector<CipherSuite> ciphers{ suite };
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);

@@ -107,7 +107,7 @@ generate_crypto()
     test_case->derive_key_pair_pub = pub;
 
     // HPKE
-    test::DeterministicHPKE lock;
+    DeterministicHPKE lock;
     test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
   }
 
@@ -216,7 +216,7 @@ generate_app_key_schedule()
 }
 
 TreeTestVectors::TreeCase
-tree_to_case(const test::TestRatchetTree& tree)
+tree_to_case(const TestRatchetTree& tree)
 {
   auto nodes = tree.nodes();
   TreeTestVectors::TreeCase tc(nodes.size());
@@ -260,7 +260,7 @@ generate_tree()
     auto scheme = schemes[i];
     auto test_case = cases[i];
 
-    test::TestRatchetTree tree{ suite };
+    TestRatchetTree tree{ suite };
 
     // Add the leaves
     for (uint32_t j = 0; j < n_leaves; ++j) {
@@ -332,7 +332,7 @@ generate_messages()
   tv.client_init_key_all = tls::marshal(cik_all);
 
   // Construct a test case for each suite
-  test::DeterministicHPKE lock;
+  DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -431,7 +431,7 @@ generate_basic_session()
   tv.group_size = 5;
   tv.group_id = bytes(16, 0xA0);
 
-  test::DeterministicHPKE lock;
+  DeterministicHPKE lock;
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -439,7 +439,7 @@ generate_basic_session()
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
-    std::vector<test::TestSession> sessions;
+    std::vector<TestSession> sessions;
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
     for (int j = 0; j < tv.group_size; ++j) {

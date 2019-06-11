@@ -46,22 +46,4 @@ protected:
   const State& current_state() const;
 };
 
-namespace test {
-
-// Enable tests to ispect the internals of the session
-class TestSession : public Session
-{
-public:
-  using Session::Session;
-  uint32_t index() const;
-  epoch_t current_epoch() const;
-  CipherSuite cipher_suite() const;
-  bytes current_epoch_secret() const;
-  bytes current_application_secret() const;
-  bytes current_confirmation_key() const;
-  bytes current_init_secret() const;
-};
-
-} // namespace test
-
 } // namespace mls

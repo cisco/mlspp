@@ -147,16 +147,4 @@ protected:
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
 
-namespace test {
-
-// Enable tests to see the internals of the tree
-class TestRatchetTree : public RatchetTree
-{
-public:
-  using RatchetTree::RatchetTree;
-  const RatchetTreeNodeVector& nodes() const;
-};
-
-} // namespace test
-
 } // namespace mls
