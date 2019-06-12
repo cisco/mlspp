@@ -15,8 +15,6 @@ public:
           SignaturePrivateKey identity_priv,
           Credential credential);
 
-  friend bool operator==(const Session& lhs, const Session& rhs);
-
   bytes client_init_key() const;
 
   std::pair<bytes, bytes> start(const bytes& group_id,
@@ -28,6 +26,9 @@ public:
 
   void join(const bytes& welcome, const bytes& add);
   void handle(const bytes& handshake_data);
+
+  bytes protect(const bytes& plaintext);
+  bytes unprotect(const bytes& ciphertext);
 
 protected:
   CipherList _supported_ciphersuites;
@@ -44,6 +45,9 @@ protected:
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;
+
+  friend bool operator==(const Session& lhs, const Session& rhs);
+  friend bool operator!=(const Session& lhs, const Session& rhs);
 };
 
 } // namespace mls

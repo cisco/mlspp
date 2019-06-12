@@ -4,6 +4,7 @@
 #include "session.h"
 
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 using namespace mls;
@@ -34,6 +35,28 @@ private:
   Credential _cred;
   std::map<bytes, ClientInitKey> _ciks;
 };
+
+void
+verify_send(std::string label, Session& send, Session& recv)
+{
+  auto plaintext = bytes{ 0, 1, 2, 3 };
+  auto encrypted = send.protect(plaintext);
+  auto decrypted = recv.unprotect(encrypted);
+  if (plaintext != decrypted) {
+    throw std::runtime_error(label + ": send/receive failure");
+  }
+}
+
+void
+verify(std::string label, Session& alice, Session& bob)
+{
+  if (alice != bob) {
+    throw std::runtime_error(label + ": not equal");
+  }
+
+  verify_send(label, alice, bob);
+  verify_send(label, bob, alice);
+}
 
 int
 main()
@@ -79,15 +102,12 @@ main()
   alice.join(welcome_add.first, welcome_add.second);
 
   // Alice and Bob should now be on the same page
-  if (alice == bob) {
-    std::cout << "yes" << std::endl;
-  } else {
-    std::cout << "no" << std::endl;
-  }
+  verify("create", alice, bob);
 
   // TODO: UIK keeps track of init private keys, signature priv key
   // TODO: CIK-based session initialization
-  // TODO: Add encrypt / decrypt
   // TODO: Make all these objects serializable so they can be saved
+
+  std::cout << "ok" << std::endl;
   return 0;
 }

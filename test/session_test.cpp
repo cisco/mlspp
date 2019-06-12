@@ -89,22 +89,34 @@ protected:
     check(initial_epoch);
   }
 
-  void check(epoch_t initial_epoch) const { check(initial_epoch, no_except); }
+  void check(epoch_t initial_epoch) { check(initial_epoch, no_except); }
 
-  void check(epoch_t initial_epoch, uint32_t except) const
+  void check(epoch_t initial_epoch, uint32_t except)
   {
     uint32_t ref = 0;
     if (except == 0 && sessions.size() > 1) {
       ref = 1;
     }
 
-    // Verify that everyone ended up in consistent states
-    for (const auto& session : sessions) {
+    // Verify that everyone ended up in consistent states, and that
+    // they can send and be received.
+    for (auto& session : sessions) {
       if (except != no_except && session.index() == except) {
         continue;
       }
 
       ASSERT_EQ(session, sessions[ref]);
+
+      auto plaintext = bytes{ 0, 1, 2, 3 };
+      auto encrypted = session.protect(plaintext);
+      for (auto& other : sessions) {
+        if (except != no_except && other.index() == except) {
+          continue;
+        }
+
+        auto decrypted = other.unprotect(encrypted);
+        ASSERT_EQ(plaintext, decrypted);
+      }
     }
 
     // Verify that the epoch got updated

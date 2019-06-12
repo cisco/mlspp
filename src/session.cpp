@@ -2,8 +2,6 @@
 #include "common.h"
 #include "state.h"
 
-#include <iostream>
-
 namespace mls {
 
 Session::Session(CipherList supported_ciphersuites,
@@ -37,6 +35,12 @@ operator==(const Session& lhs, const Session& rhs)
   }
 
   return true;
+}
+
+bool
+operator!=(const Session& lhs, const Session& rhs)
+{
+  return !(lhs == rhs);
 }
 
 bytes
@@ -136,8 +140,6 @@ Session::handle(const bytes& handshake_data)
     auto state = std::get<1>(_outbound_cache.value());
 
     if (message != handshake_data) {
-      std::cout << "sent " << message << std::endl;
-      std::cout << "recv " << handshake_data << std::endl;
       throw ProtocolError("Received different own message");
     }
 
@@ -148,6 +150,30 @@ Session::handle(const bytes& handshake_data)
 
   auto next = current_state().handle(handshake);
   add_state(handshake.epoch, next);
+}
+
+bytes
+Session::protect(const bytes& plaintext)
+{
+  auto ciphertext = current_state().protect(plaintext);
+  return tls::marshal(ciphertext);
+}
+
+// TODO(rlb@ipv.sx): It would be good to expose identity information
+// here, since ciphertexts are authenticated per sender.  Who sent
+// this ciphertext?
+bytes
+Session::unprotect(const bytes& ciphertext)
+{
+  MLSCiphertext ciphertext_obj;
+  tls::unmarshal(ciphertext, ciphertext_obj);
+
+  if (_state.count(ciphertext_obj.epoch) == 0) {
+    throw MissingStateError("No state available to decrypt ciphertext");
+  }
+
+  auto& state = _state.at(ciphertext_obj.epoch);
+  return state.unprotect(ciphertext_obj);
 }
 
 void
