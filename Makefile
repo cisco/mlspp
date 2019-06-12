@@ -19,6 +19,9 @@ test: all
 gen: all
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}
 
+example: all
+	./build/cmd/api_example/api_example
+
 clean:
 	rm -rf ${BUILD_DIR}
 
