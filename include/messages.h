@@ -64,16 +64,22 @@ struct ClientInitKey
 
   ClientInitKey();
 
-  void add_init_key(const DHPublicKey& pub);
+  void add_init_key(const DHPrivateKey& pub);
   std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
+  std::optional<DHPrivateKey> find_private_key(CipherSuite suite) const;
   void sign(const SignaturePrivateKey& identity_priv,
             const Credential& credential);
   bool verify() const;
   bytes to_be_signed() const;
+
+  private:
+  std::map<CipherSuite, DHPrivateKey> _private_keys;
 };
 
 bool
 operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
+bool
+operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
 tls::ostream&
 operator<<(tls::ostream& out, const ClientInitKey& obj);
 tls::istream&

@@ -91,7 +91,8 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred);
+  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred); // XXX dele?
+  RatchetTree(const DHPrivateKey& priv, const Credential& cred);
   RatchetTree(CipherSuite suite,
               const std::vector<bytes>& secrets,
               const std::vector<Credential>& creds);
@@ -108,6 +109,9 @@ public:
 
   void add_leaf(LeafIndex index,
                 const DHPublicKey& pub,
+                const Credential& cred);
+  void add_leaf(LeafIndex index,
+                const DHPrivateKey& priv,
                 const Credential& cred);
   void add_leaf(LeafIndex index,
                 const bytes& leaf_secret,

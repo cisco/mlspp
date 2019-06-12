@@ -71,7 +71,7 @@ protected:
     // ClientInitKey
     ClientInitKey client_init_key_c;
     client_init_key_c.client_init_key_id = tv.client_init_key_id;
-    client_init_key_c.add_init_key(dh_key);
+    client_init_key_c.add_init_key(dh_priv);
     client_init_key_c.credential = cred;
     client_init_key_c.signature = tv.random;
 
@@ -135,7 +135,7 @@ TEST_F(MessagesTest, ClientInitKey)
   constructed.client_init_key_id = tv.client_init_key_id;
   for (const auto& suite : suites) {
     auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    constructed.add_init_key(priv.public_key());
+    constructed.add_init_key(priv);
   }
 
   auto identity_priv =

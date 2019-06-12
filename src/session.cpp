@@ -9,12 +9,11 @@ Session::Session(CipherList supported_ciphersuites,
                  SignaturePrivateKey identity_priv,
                  Credential credential)
   : _supported_ciphersuites(std::move(supported_ciphersuites))
-  , _init_secret(std::move(init_secret))
   , _identity_priv(std::move(identity_priv))
   , _credential(std::move(credential))
   , _current_epoch(0)
 {
-  make_init_key();
+  make_init_key(init_secret);
 }
 
 bool
@@ -46,7 +45,7 @@ operator!=(const Session& lhs, const Session& rhs)
 bytes
 Session::client_init_key() const
 {
-  return _client_init_key;
+  return tls::marshal(_client_init_key);
 }
 
 std::pair<bytes, bytes>
@@ -59,12 +58,8 @@ Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
   ClientInitKey client_init_key;
   tls::unmarshal(client_init_key_bytes, client_init_key);
 
-  auto init = State::negotiate(group_id,
-                               _supported_ciphersuites,
-                               _init_secret,
-                               _identity_priv,
-                               _credential,
-                               client_init_key);
+  auto init = State::negotiate(
+    group_id, _client_init_key, _identity_priv, client_init_key);
 
   add_state(0, std::get<2>(init));
 
@@ -121,7 +116,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   MLSPlaintext add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
-  State next(_identity_priv, _credential, _init_secret, welcome, add);
+  State next(_identity_priv, _client_init_key, welcome, add);
   add_state(add.epoch, next);
 }
 
@@ -177,20 +172,23 @@ Session::unprotect(const bytes& ciphertext)
 }
 
 void
-Session::make_init_key()
+Session::make_init_key(const bytes& init_secret)
 {
-  auto client_init_key = ClientInitKey{};
+  _client_init_key = ClientInitKey{};
 
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
   // from the same secret.  Maybe we should include the ciphersuite
   // in the key derivation...
+  //
+  // Note, though, that since ClientInitKey objects track private
+  // keys, it would be safe to just generate keys here, if we were
+  // OK having internal keygen.
   for (auto suite : _supported_ciphersuites) {
-    auto init_priv = DHPrivateKey::node_derive(suite, _init_secret);
-    client_init_key.add_init_key(init_priv.public_key());
+    auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
+    _client_init_key.add_init_key(init_priv);
   }
 
-  client_init_key.sign(_identity_priv, _credential);
-  _client_init_key = tls::marshal(client_init_key);
+  _client_init_key.sign(_identity_priv, _credential);
 }
 
 void

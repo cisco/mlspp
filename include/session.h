@@ -32,8 +32,7 @@ public:
 
 protected:
   CipherList _supported_ciphersuites;
-  bytes _init_secret;
-  tls::opaque<2> _client_init_key;
+  ClientInitKey _client_init_key;
   SignaturePrivateKey _identity_priv;
   Credential _credential;
   std::map<epoch_t, State> _state;
@@ -41,7 +40,7 @@ protected:
 
   std::optional<std::tuple<bytes, State>> _outbound_cache;
 
-  void make_init_key();
+  void make_init_key(const bytes& init_secret);
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;

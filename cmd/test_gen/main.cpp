@@ -321,7 +321,7 @@ generate_messages()
   cik_all.client_init_key_id = tv.client_init_key_id;
   for (const auto& suite : suites) {
     auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    cik_all.add_init_key(priv.public_key());
+    cik_all.add_init_key(priv);
   }
 
   auto identity_priv =
@@ -358,7 +358,7 @@ generate_messages()
     // Construct CIK
     auto client_init_key = ClientInitKey{};
     client_init_key.client_init_key_id = tv.client_init_key_id;
-    client_init_key.add_init_key(dh_key);
+    client_init_key.add_init_key(dh_priv);
     client_init_key.credential = cred;
     client_init_key.signature = tv.random;
 

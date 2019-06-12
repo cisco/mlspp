@@ -70,10 +70,12 @@ ClientInitKey::ClientInitKey()
 {}
 
 void
-ClientInitKey::add_init_key(const DHPublicKey& pub)
+ClientInitKey::add_init_key(const DHPrivateKey& priv)
 {
-  cipher_suites.push_back(pub.cipher_suite());
-  init_keys.push_back(pub.to_bytes());
+  auto suite = priv.cipher_suite();
+  cipher_suites.push_back(suite);
+  init_keys.push_back(priv.public_key().to_bytes());
+  _private_keys.emplace(suite, priv);
 }
 
 std::optional<DHPublicKey>
@@ -86,6 +88,16 @@ ClientInitKey::find_init_key(CipherSuite suite) const
   }
 
   return std::nullopt;
+}
+
+std::optional<DHPrivateKey>
+ClientInitKey::find_private_key(CipherSuite suite) const
+{
+  if (_private_keys.count(suite) == 0) {
+    return std::nullopt;
+  }
+
+  return _private_keys.at(suite);
 }
 
 void
@@ -128,6 +140,12 @@ operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
   return (lhs.cipher_suites == rhs.cipher_suites) &&
          (lhs.init_keys == rhs.init_keys) &&
          (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
+}
+
+bool
+operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
+{
+  return !(lhs == rhs);
 }
 
 tls::ostream&

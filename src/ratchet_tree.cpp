@@ -106,6 +106,7 @@ operator!=(const RatchetTreeNode& lhs, const RatchetTreeNode& rhs)
 std::ostream&
 operator<<(std::ostream& out, const RatchetTreeNode& node)
 {
+  auto cred = tls::marshal(node._cred);
   return out << node._pub.to_bytes();
 }
 
@@ -275,6 +276,16 @@ RatchetTree::RatchetTree(CipherSuite suite,
   add_leaf(LeafIndex{ 0 }, secret, cred);
 }
 
+RatchetTree::RatchetTree(const DHPrivateKey& priv, const Credential& cred)
+  : CipherAware(priv.cipher_suite())
+  , _nodes(priv.cipher_suite())
+  , _secret_size(Digest(priv.cipher_suite()).output_size())
+{
+  _nodes.emplace_back(priv);
+  _nodes[0].value().set_credential(cred);
+  set_hash(NodeIndex{ 0 });
+}
+
 RatchetTree::RatchetTree(CipherSuite suite,
                          const std::vector<bytes>& secrets,
                          const std::vector<Credential>& creds)
@@ -413,6 +424,21 @@ RatchetTree::add_leaf(LeafIndex index,
   }
 
   auto node = RatchetTreeNode(pub);
+  node.set_credential(cred);
+
+  add_leaf_inner(index, node);
+}
+
+void
+RatchetTree::add_leaf(LeafIndex index,
+                      const DHPrivateKey& priv,
+                      const Credential& cred)
+{
+  if (_suite != priv.cipher_suite()) {
+    throw InvalidParameterError("Incorrect ciphersuite");
+  }
+
+  auto node = RatchetTreeNode(priv);
   node.set_credential(cred);
 
   add_leaf_inner(index, node);
