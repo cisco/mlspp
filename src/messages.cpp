@@ -69,10 +69,12 @@ ClientInitKey::ClientInitKey()
   : supported_versions(1, mls10Version)
 {}
 
-ClientInitKey::ClientInitKey(CipherList supported_ciphersuites,
+ClientInitKey::ClientInitKey(bytes client_init_key_id,
+                             CipherList supported_ciphersuites,
                              bytes init_secret,
                              Credential credential)
-  : supported_versions(1, mls10Version)
+  : client_init_key_id(client_init_key_id)
+  , supported_versions(1, mls10Version)
 {
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
   // from the same secret.  Maybe we should include the ciphersuite

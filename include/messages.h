@@ -53,6 +53,12 @@ operator>>(tls::istream& in, DirectPath& obj);
 //     Credential credential;
 //     opaque signature<0..2^16-1>;
 // } ClientInitKey;
+//
+// XXX(rlb@ipv.sx): Right now, we use this to represent both the
+// public version of a client's capabilities, and the private
+// version (with private keys).  This results in some ugly checking
+// code when private keys are needed, so it might be nice to split
+// these two cases in the type system.
 struct ClientInitKey
 {
   tls::opaque<1> client_init_key_id;
@@ -63,7 +69,8 @@ struct ClientInitKey
   tls::opaque<2> signature;
 
   ClientInitKey();
-  ClientInitKey(CipherList supported_ciphersuites,
+  ClientInitKey(bytes client_init_key_id,
+                CipherList supported_ciphersuites,
                 bytes init_secret,
                 Credential credential);
 

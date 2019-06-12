@@ -14,18 +14,11 @@ protected:
   const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
+  const bytes client_init_key_id = { 8, 9, 0xA, 0xB };
 
   static const uint32_t no_except = 0xffffffff;
 
   std::vector<TestSession> sessions;
-
-  SessionTest()
-  {
-    auto init_secret = fresh_secret();
-    auto id_priv = new_identity_key();
-    auto cred = Credential::basic(user_id, id_priv);
-    sessions.emplace_back(suites, init_secret, cred);
-  }
 
   SignaturePrivateKey new_identity_key()
   {
@@ -60,18 +53,31 @@ protected:
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto cred = Credential::basic(user_id, id_priv);
-    auto initial_epoch = sessions[0].current_epoch();
-    auto client_init_key = ClientInitKey{ suites, init_secret, cred };
+    auto client_init_key =
+      ClientInitKey{ client_init_key_id, suites, init_secret, cred };
 
     // Initial add is different
     Welcome welcome;
     bytes add;
-    if (sessions.size() == 1) {
-      std::tie(welcome, add) = sessions[from].start(group_id, client_init_key);
-      auto next = Session::join(client_init_key, welcome, add);
-      sessions.push_back(next);
+    if (sessions.size() == 0) {
+      auto my_init_secret = fresh_secret();
+      auto my_id_priv = new_identity_key();
+      auto my_cred = Credential::basic(user_id, id_priv);
+      auto my_client_init_key =
+        ClientInitKey{ client_init_key_id, suites, my_init_secret, my_cred };
+
+      auto session_welcome_add =
+        Session::start(group_id, my_client_init_key, client_init_key);
+      auto creator = std::get<0>(session_welcome_add);
+      auto welcome = std::get<1>(session_welcome_add);
+      auto add = std::get<2>(session_welcome_add);
+      auto joiner = Session::join(client_init_key, welcome, add);
+      sessions.push_back(creator);
+      sessions.push_back(joiner);
       return;
     }
+
+    auto initial_epoch = sessions[0].current_epoch();
 
     std::tie(welcome, add) = sessions[from].add(client_init_key);
     auto next = Session::join(client_init_key, welcome, add);
@@ -142,22 +148,26 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   auto idA = new_identity_key();
   auto initA = fresh_secret();
   auto credA = Credential::basic(user_id, idA);
-  TestSession alice{ { CipherSuite::P256_SHA256_AES128GCM,
-                       CipherSuite::X25519_SHA256_AES128GCM },
-                     initA,
-                     credA };
+  auto cikA = ClientInitKey{ client_init_key_id,
+                             { CipherSuite::P256_SHA256_AES128GCM,
+                               CipherSuite::X25519_SHA256_AES128GCM },
+                             initA,
+                             credA };
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
   auto initB = fresh_secret();
   auto credB = Credential::basic(user_id, idB);
-  auto cikB = ClientInitKey{ { CipherSuite::P256_SHA256_AES128GCM,
+  auto cikB = ClientInitKey{ client_init_key_id,
+                             { CipherSuite::P256_SHA256_AES128GCM,
                                CipherSuite::X25519_SHA256_AES128GCM },
                              initB,
                              credB };
 
-  auto welcome_add = alice.start({ 0, 1, 2, 3 }, cikB);
-  auto bob = Session::join(cikB, welcome_add.first, welcome_add.second);
+  auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, cikA, cikB);
+  TestSession alice = std::get<0>(session_welcome_add);
+  TestSession bob = Session::join(
+    cikB, std::get<1>(session_welcome_add), std::get<2>(session_welcome_add));
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
@@ -259,21 +269,23 @@ protected:
   }
 
   void follow_basic(uint32_t index,
-                    TestSession& session,
                     const ClientInitKey& my_client_init_key,
                     const SessionTestVectors::TestCase& tc)
   {
     int curr = 0;
+    std::optional<Session> session;
     if (index == 0) {
       // Member 0 creates the group
-      session.start(basic_tv.group_id, tc.client_init_keys[1]);
+      auto swa = Session::start(
+        basic_tv.group_id, my_client_init_key, tc.client_init_keys[1]);
+      session = std::get<0>(swa);
       curr = 1;
     } else {
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript[index - 1];
-      session = session.join(
+      session = Session::join(
         my_client_init_key, epoch.welcome.value(), epoch.handshake);
-      assert_consistency(session, epoch);
+      assert_consistency(*session, epoch);
       curr = index;
     }
 
@@ -283,11 +295,11 @@ protected:
 
       // Generate an add to cache the next state
       if (curr == index) {
-        session.add(tc.client_init_keys[curr + 1]);
+        session->add(tc.client_init_keys[curr + 1]);
       }
 
-      session.handle(epoch.handshake);
-      assert_consistency(session, epoch);
+      session->handle(epoch.handshake);
+      assert_consistency(*session, epoch);
     }
 
     // Process updates
@@ -296,11 +308,11 @@ protected:
 
       // Generate an update to cache next state
       if (i == index) {
-        session.update({ uint8_t(i), 1 });
+        session->update({ uint8_t(i), 1 });
       }
 
-      session.handle(epoch.handshake);
-      assert_consistency(session, epoch);
+      session->handle(epoch.handshake);
+      assert_consistency(*session, epoch);
     }
 
     // Process removes until this member has been removed
@@ -311,12 +323,12 @@ protected:
 
       // Generate a remove to cache next state
       if (sender == index) {
-        session.remove({ uint8_t(sender), 2 }, sender + 1);
+        session->remove({ uint8_t(sender), 2 }, sender + 1);
       }
 
       auto& epoch = tc.transcript[curr];
-      session.handle(epoch.handshake);
-      assert_consistency(session, epoch);
+      session->handle(epoch.handshake);
+      assert_consistency(*session, epoch);
     }
   }
 
@@ -325,14 +337,15 @@ protected:
                   const SessionTestVectors::TestCase& tc)
   {
     DeterministicHPKE lock;
+    const bytes client_init_key_id = { 0, 1, 2, 3 };
     std::vector<CipherSuite> ciphers{ suite };
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
-      auto session = TestSession{ ciphers, seed, cred };
-      auto my_client_init_key = ClientInitKey{ ciphers, seed, cred };
-      follow_basic(i, session, my_client_init_key, tc);
+      auto my_client_init_key =
+        ClientInitKey{ client_init_key_id, ciphers, seed, cred };
+      follow_basic(i, my_client_init_key, tc);
     }
   }
 };

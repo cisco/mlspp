@@ -11,20 +11,11 @@ class Session
 {
 public:
   Session(const Session& other) = default;
-  Session(CipherList supported_ciphersuites,
-          bytes init_secret,
-          Credential credential);
 
-  bytes client_init_key() const;
-
-  /* todo
-  std::tuple<Session, bytes, bytes>
+  static std::tuple<Session, Welcome, bytes>
     start(const bytes& group_id,
           const ClientInitKey& my_client_init_key,
           const ClientInitKey& client_init_key);
-  */
-  std::pair<Welcome, bytes> start(const bytes& group_id,
-                                const ClientInitKey& client_init_key);
   static Session join(const ClientInitKey& cik,
                       const Welcome& welcome,
                       const bytes& add);
@@ -39,9 +30,7 @@ public:
   bytes unprotect(const bytes& ciphertext);
 
 protected:
-  CipherList _supported_ciphersuites;
   ClientInitKey _client_init_key;
-  Credential _credential;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;
 

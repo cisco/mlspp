@@ -13,23 +13,38 @@ const auto suites =
   std::vector<CipherSuite>{ CipherSuite::X25519_SHA256_AES128GCM };
 const auto scheme = SignatureScheme::Ed25519;
 
-Session
-new_user(const std::string& name)
-{
-  auto init = random_bytes(32);
-  auto priv = SignaturePrivateKey::generate(scheme);
-  auto id = bytes(name.begin(), name.end());
-  auto cred = Credential::basic(id, priv);
-  return Session{ suites, init, cred };
-}
-
-// To be used with new API
 class User
 {
 public:
-  User(const std::string& name);
-  ClientInitKey fresh_cik();
-  ClientInitKey find_cik(const bytes& cik_id);
+  User(const std::string& name)
+  {
+    auto priv = SignaturePrivateKey::generate(scheme);
+    auto id = bytes(name.begin(), name.end());
+    _cred = Credential::basic(id, priv);
+  }
+
+  ClientInitKey temp_cik()
+  {
+    auto cikID = random_bytes(16);
+    auto init = random_bytes(32);
+    return ClientInitKey{ cikID, suites, init, _cred };
+  }
+
+  ClientInitKey fresh_cik()
+  {
+    auto cik = temp_cik();
+    _ciks.emplace(cik.client_init_key_id, cik);
+    return cik;
+  }
+
+  ClientInitKey find_cik(const bytes& cik_id)
+  {
+    if (_ciks.count(cik_id) == 0) {
+      throw std::runtime_error("Unkown CIK");
+    }
+
+    return _ciks.at(cik_id);
+  }
 
 private:
   Credential _cred;
@@ -61,55 +76,77 @@ verify(std::string label, Session& alice, Session& bob)
 int
 main()
 {
-  /*
+  ////////// DRAMATIS PERSONAE ///////////
 
-  Notes for future API:
+  auto alice = User{ "alice" };
+  auto bob = User{ "bob" };
+  auto charlie = User{ "charlie" };
 
-  auto alice = User("alice");
-  auto cikA = alice.fresh_cik();
+  ////////// ACT I: CREATION ///////////
 
-  auto bob = User("bob");
-  auto sessionB = Session::start(group_id, bob.credential);
-  bytes welcome_data, add_data;
-  std::tie(welcome_data, add_data) = sessionB.add(cikA);
+  // Bob posts a ClientInitKey
+  auto cikB1 = bob.fresh_cik();
 
-  Welcome welcome;
-  tls::unmarshal(welcome_data);
-  auto cikA = alice.find_cik(welcome.client_init_key_id);
-
-  auto sessionA = cikA.join(welcome, add_data);
-
-  verify_send(sessionA, sessionB);
-  verify_send(sessionB, sessionA);
-
-  // Now update, then verify
-  // Now add C, then verify
-  // Now remove A, then verify
-
-  */
-
-  auto bob = new_user("bob");
-
-  // Alice posts a ClientInitKey
-  auto nameA = std::string("alice");
-  auto initA = random_bytes(32);
-  auto privA = SignaturePrivateKey::generate(scheme);
-  auto idA = bytes(nameA.begin(), nameA.end());
-  auto credA = Credential::basic(idA, privA);
-  auto cikA = ClientInitKey{ suites, initA, credA };
-
-  // Bob starts a group and sends Alice a Welcome+Add
+  // Bob starts a session with alice
+  auto cikA = alice.temp_cik();
   auto group_id = bytes{ 0, 1, 2, 3 };
-  auto welcome_add = bob.start(group_id, cikA);
+  auto session_welcome_add = Session::start(group_id, cikA, cikB1);
+  auto sessionA = std::get<0>(session_welcome_add);
+  auto welcome = std::get<1>(session_welcome_add);
+  auto add = std::get<2>(session_welcome_add);
 
-  // Alice processes the Welcome+Add
-  auto alice = Session::join(cikA, welcome_add.first, welcome_add.second);
+  // Alice looks up her CIK based on the welcome, and initializes
+  // her session
+  auto cikB2 = bob.find_cik(welcome.client_init_key_id);
+  auto sessionB = Session::join(cikB2, welcome, add);
 
   // Alice and Bob should now be on the same page
-  verify("create", alice, bob);
+  verify("create", sessionA, sessionB);
 
-  // TODO: CIK-based session initialization
-  // TODO: Make all these objects serializable so they can be saved
+  ////////// ACT II: ADDITION ///////////
+
+  // Charlie posts a ClientInitKey
+  auto cikC1 = charlie.fresh_cik();
+
+  // Alice adds Charlie to the session
+  std::tie(welcome, add) = sessionA.add(cikC1);
+
+  // Charlie initializes his session
+  auto cikC2 = charlie.find_cik(welcome.client_init_key_id);
+  auto sessionC = Session::join(cikC2, welcome, add);
+
+  // Alice and Bob updates their sessions to reflect Charlie's addition
+  sessionA.handle(add);
+  sessionB.handle(add);
+
+  verify("add A->B", sessionA, sessionB);
+  verify("add A->C", sessionA, sessionC);
+  verify("add B->C", sessionB, sessionC);
+
+  ////////// ACT III: UPDATE ///////////
+
+  // Bob updates his key
+  auto update = sessionB.update(random_bytes(32));
+
+  // Everyone processes the update
+  sessionA.handle(update);
+  sessionB.handle(update);
+  sessionC.handle(update);
+
+  verify("update A->B", sessionA, sessionB);
+  verify("update A->C", sessionA, sessionC);
+  verify("update B->C", sessionB, sessionC);
+
+  ////////// ACT IV: REMVOE ///////////
+
+  // Charlie removes Bob
+  auto remove = sessionC.remove(random_bytes(32), 1);
+
+  // Alice and Charlie process the message (Bob is gone)
+  sessionA.handle(remove);
+  sessionC.handle(remove);
+
+  verify("remove A->C", sessionA, sessionC);
 
   std::cout << "ok" << std::endl;
   return 0;

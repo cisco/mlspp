@@ -435,6 +435,7 @@ generate_basic_session()
   for (int i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
+    const bytes client_init_key_id = { 0, 1, 2, 3 };
 
     std::vector<SessionTestVectors::Epoch> transcript;
 
@@ -448,27 +449,31 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       seeds.push_back(seed);
-      client_init_keys.emplace_back(ciphersuites, seed, cred);
-      sessions.emplace_back(ciphersuites, seed, cred);
+      client_init_keys.emplace_back(
+        client_init_key_id, ciphersuites, seed, cred);
     }
 
     // Add everyone
     for (int j = 1; j < tv.group_size; ++j) {
-      std::pair<Welcome, bytes> welcome_add;
+      Welcome welcome;
+      bytes add;
       if (j == 1) {
-        welcome_add = sessions[0].start(tv.group_id, client_init_keys[j]);
+        auto session_welcome_add =
+          Session::start(tv.group_id, client_init_keys[0], client_init_keys[1]);
+        sessions.push_back(std::get<0>(session_welcome_add));
+        welcome = std::get<1>(session_welcome_add);
+        add = std::get<2>(session_welcome_add);
       } else {
-        welcome_add = sessions[j - 1].add(client_init_keys[j]);
+        std::tie(welcome, add) = sessions[j - 1].add(client_init_keys[j]);
         for (int k = 0; k < j; ++k) {
-          sessions[k].handle(welcome_add.second);
+          sessions[k].handle(add);
         }
       }
 
-      sessions[j] = Session::join(
-        client_init_keys[j], welcome_add.first, welcome_add.second);
+      auto joiner = Session::join(client_init_keys[j], welcome, add);
+      sessions.push_back(joiner);
 
-      transcript.emplace_back(
-        welcome_add.first, welcome_add.second, sessions[0]);
+      transcript.emplace_back(welcome, add, sessions[0]);
     }
 
     // Update everyone (L->R)

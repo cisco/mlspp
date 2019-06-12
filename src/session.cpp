@@ -4,66 +4,19 @@
 
 namespace mls {
 
-Session::Session(CipherList supported_ciphersuites,
-                 bytes init_secret,
-                 Credential credential)
-  : _supported_ciphersuites(std::move(supported_ciphersuites))
-  , _credential(std::move(credential))
-  , _current_epoch(0)
+std::tuple<Session, Welcome, bytes>
+Session::start(const bytes& group_id,
+               const ClientInitKey& my_client_init_key,
+               const ClientInitKey& client_init_key)
 {
-  if (!credential.private_key().has_value()) {
-    throw InvalidParameterError("Credential must have a private key");
-  }
+  auto welcome_add_state =
+    State::negotiate(group_id, my_client_init_key, client_init_key);
 
-  make_init_key(init_secret);
-}
-
-bool
-operator==(const Session& lhs, const Session& rhs)
-{
-  if (lhs._current_epoch != rhs._current_epoch) {
-    return false;
-  }
-
-  for (const auto& pair : lhs._state) {
-    if (rhs._state.count(pair.first) == 0) {
-      continue;
-    }
-
-    if (rhs._state.at(pair.first) != pair.second) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool
-operator!=(const Session& lhs, const Session& rhs)
-{
-  return !(lhs == rhs);
-}
-
-bytes
-Session::client_init_key() const
-{
-  return tls::marshal(_client_init_key);
-}
-
-std::pair<Welcome, bytes>
-Session::start(const bytes& group_id, const ClientInitKey& client_init_key)
-{
-  if (!_state.empty()) {
-    throw InvalidParameterError("start called on an initialized session");
-  }
-
-  auto init = State::negotiate(group_id, _client_init_key, client_init_key);
-
-  add_state(0, std::get<2>(init));
-
-  auto welcome = std::get<0>(init);
-  auto add = tls::marshal(std::get<1>(init));
-  return std::make_pair(welcome, add);
+  Session session;
+  session.add_state(0, std::get<2>(welcome_add_state));
+  auto welcome = std::get<0>(welcome_add_state);
+  auto add = tls::marshal(std::get<1>(welcome_add_state));
+  return std::make_tuple(session, welcome, add);
 }
 
 Session
@@ -169,26 +122,6 @@ Session::unprotect(const bytes& ciphertext)
 }
 
 void
-Session::make_init_key(const bytes& init_secret)
-{
-  _client_init_key = ClientInitKey{};
-
-  // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
-  // from the same secret.  Maybe we should include the ciphersuite
-  // in the key derivation...
-  //
-  // Note, though, that since ClientInitKey objects track private
-  // keys, it would be safe to just generate keys here, if we were
-  // OK having internal keygen.
-  for (auto suite : _supported_ciphersuites) {
-    auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
-    _client_init_key.add_init_key(init_priv);
-  }
-
-  _client_init_key.sign(_credential);
-}
-
-void
 Session::add_state(epoch_t prior_epoch, const State& state)
 {
   // XXX(rlb@ipv.sx) Assumes no epoch collisions, which is clearly
@@ -219,6 +152,32 @@ Session::current_state()
   }
 
   return _state.at(_current_epoch);
+}
+
+bool
+operator==(const Session& lhs, const Session& rhs)
+{
+  if (lhs._current_epoch != rhs._current_epoch) {
+    return false;
+  }
+
+  for (const auto& pair : lhs._state) {
+    if (rhs._state.count(pair.first) == 0) {
+      continue;
+    }
+
+    if (rhs._state.at(pair.first) != pair.second) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool
+operator!=(const Session& lhs, const Session& rhs)
+{
+  return !(lhs == rhs);
 }
 
 } // namespace mls
