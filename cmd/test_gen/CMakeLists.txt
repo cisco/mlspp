@@ -10,7 +10,6 @@ set(APP_SOURCE_FILES ${APP_SOURCE_FILES} PARENT_SCOPE)
 add_executable(${APP_NAME} ${APP_SOURCE_FILES})
 target_sources(${APP_NAME} PRIVATE ${TEST_VECTORS_SRC})
 target_include_directories(${APP_NAME} PRIVATE ${LIBRARY_INCLUDE_PATH}
-                                       PRIVATE ${LIBRARY_PRIVATE_INCLUDE_PATH}
                                        PRIVATE ${OPENSSL_INCLUDE_DIR}
                                        PRIVATE ${TEST_INCLUDE_PATH})
 target_link_libraries(${APP_NAME} ${OPENSSL_LIBRARIES})

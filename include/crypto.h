@@ -59,9 +59,6 @@ protected:
   SignatureScheme _scheme;
 };
 
-// Test mode controls
-namespace test {
-
 // DeterministicHPKE enables RAII-based requests for HPKE to be
 // done deterministically.  The RAII pattern is used here to ensure
 // that the determinism always gets turned off.  To avoid conflicts

@@ -1,2 +1,2 @@
 add_subdirectory(test_gen)
-add_subdirectory(public_api)
+add_subdirectory(api_example)

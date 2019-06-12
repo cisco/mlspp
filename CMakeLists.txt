@@ -66,21 +66,13 @@ endif()
 set(LIB_NAME "${PROJECT_NAME}")
 
 set(LIBRARY_SRC_PATH  "${PROJECT_SOURCE_DIR}/src" )
-set(LIBRARY_INCLUDE_PATH  "${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}")
-set(LIBRARY_PRIVATE_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/include/internal")
+set(LIBRARY_INCLUDE_PATH  "${PROJECT_SOURCE_DIR}/include")
 
-#include_directories(${OPENSSL_INCLUDE_DIR})
-#include_directories(${LIBRARY_INCLUDE_PATH})
-#include_directories(${LIBRARY_PRIVATE_INCLUDE_PATH})
-
-#file(GLOB LIB_HEADER_FILES "${LIBRARY_INCLUDE_PATH}/*.h")
-#file(GLOB LIB_PRIVATE_HEADER_FILES "${LIBRARY_PRIVATE_INCLUDE_PATH}/*.h")
 file(GLOB LIB_SOURCE_FILES "${LIBRARY_SRC_PATH}/*.cpp")
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES})
 target_include_directories(${LIB_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR}
-                                       PRIVATE ${LIBRARY_INCLUDE_PATH}
-                                       PRIVATE ${LIBRARY_PRIVATE_INCLUDE_PATH})
+                                       PRIVATE ${LIBRARY_INCLUDE_PATH})
 target_link_libraries(${LIB_NAME} ${OPENSSL_LIBRARIES})
 
 if(CLANG_TIDY_EXE)
