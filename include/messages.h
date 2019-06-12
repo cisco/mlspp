@@ -63,6 +63,9 @@ struct ClientInitKey
   tls::opaque<2> signature;
 
   ClientInitKey();
+  ClientInitKey(CipherList supported_ciphersuites,
+                bytes init_secret,
+                Credential credential);
 
   void add_init_key(const DHPrivateKey& pub);
   std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;

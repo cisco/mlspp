@@ -249,10 +249,15 @@ operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
 /////
 
+namespace mls {
+
 class TestSession : public Session
 {
 public:
   using Session::Session;
+  TestSession(const Session& other)
+    : Session(other)
+  {}
 
   uint32_t index() const { return current_state().index().val; }
 
@@ -275,6 +280,8 @@ public:
   bytes current_init_secret() const { return current_state().init_secret(); }
 };
 
+} // namespace mls
+
 // Splitting the test data from the file definition here allows us
 // to have a consistent struct for different scenarios that live in
 // different files.
@@ -282,7 +289,7 @@ struct SessionTestVectors
 {
   struct Epoch
   {
-    tls::opaque<4> welcome; // may be zero-size
+    tls::optional<Welcome> welcome;
     tls::opaque<4> handshake;
 
     epoch_t epoch;
@@ -293,7 +300,7 @@ struct SessionTestVectors
 
     Epoch() = default;
 
-    Epoch(const bytes& welcome,
+    Epoch(const tls::optional<Welcome>& welcome,
           const bytes& handshake,
           const TestSession& session)
       : welcome(welcome)
@@ -310,7 +317,7 @@ struct SessionTestVectors
   {
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
-    tls::vector<tls::opaque<4>, 4> client_init_keys;
+    tls::vector<ClientInitKey, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
   };
 

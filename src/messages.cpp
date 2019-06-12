@@ -69,6 +69,26 @@ ClientInitKey::ClientInitKey()
   : supported_versions(1, mls10Version)
 {}
 
+ClientInitKey::ClientInitKey(CipherList supported_ciphersuites,
+                             bytes init_secret,
+                             Credential credential)
+  : supported_versions(1, mls10Version)
+{
+  // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
+  // from the same secret.  Maybe we should include the ciphersuite
+  // in the key derivation...
+  //
+  // Note, though, that since ClientInitKey objects track private
+  // keys, it would be safe to just generate keys here, if we were
+  // OK having internal keygen.
+  for (auto suite : supported_ciphersuites) {
+    auto init_priv = DHPrivateKey::derive(suite, init_secret);
+    add_init_key(init_priv);
+  }
+
+  sign(credential);
+}
+
 void
 ClientInitKey::add_init_key(const DHPrivateKey& priv)
 {

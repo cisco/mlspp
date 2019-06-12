@@ -439,6 +439,7 @@ generate_basic_session()
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
+    std::vector<ClientInitKey> client_init_keys;
     std::vector<TestSession> sessions;
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
@@ -447,29 +448,24 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       seeds.push_back(seed);
+      client_init_keys.emplace_back(ciphersuites, seed, cred);
       sessions.emplace_back(ciphersuites, seed, cred);
-    }
-
-    std::vector<tls::opaque<4>> ciks;
-    for (const auto& session : sessions) {
-      ciks.push_back(session.client_init_key());
     }
 
     // Add everyone
     for (int j = 1; j < tv.group_size; ++j) {
-      auto cik = sessions[j].client_init_key();
-
-      std::pair<bytes, bytes> welcome_add;
+      std::pair<Welcome, bytes> welcome_add;
       if (j == 1) {
-        welcome_add = sessions[0].start(tv.group_id, cik);
+        welcome_add = sessions[0].start(tv.group_id, client_init_keys[j]);
       } else {
-        welcome_add = sessions[j - 1].add(cik);
+        welcome_add = sessions[j - 1].add(client_init_keys[j]);
         for (int k = 0; k < j; ++k) {
           sessions[k].handle(welcome_add.second);
         }
       }
 
-      sessions[j].join(welcome_add.first, welcome_add.second);
+      sessions[j] = Session::join(
+        client_init_keys[j], welcome_add.first, welcome_add.second);
 
       transcript.emplace_back(
         welcome_add.first, welcome_add.second, sessions[0]);
@@ -483,7 +479,7 @@ generate_basic_session()
         session.handle(update);
       }
 
-      transcript.emplace_back(bytes{}, update, sessions[0]);
+      transcript.emplace_back(std::nullopt, update, sessions[0]);
     }
 
     // Remove everyone (R->L)
@@ -500,11 +496,11 @@ generate_basic_session()
         }
       }
 
-      transcript.emplace_back(bytes{}, remove, sessions[0]);
+      transcript.emplace_back(std::nullopt, remove, sessions[0]);
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, ciks, transcript };
+    *cases[i] = { suite, scheme, client_init_keys, transcript };
   }
 
   return tv;

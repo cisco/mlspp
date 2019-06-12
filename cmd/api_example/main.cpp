@@ -88,23 +88,26 @@ main()
 
   */
 
-  auto alice = new_user("alice");
   auto bob = new_user("bob");
 
   // Alice posts a ClientInitKey
-  auto cikA = alice.client_init_key();
+  auto nameA = std::string("alice");
+  auto initA = random_bytes(32);
+  auto privA = SignaturePrivateKey::generate(scheme);
+  auto idA = bytes(nameA.begin(), nameA.end());
+  auto credA = Credential::basic(idA, privA);
+  auto cikA = ClientInitKey{ suites, initA, credA };
 
   // Bob starts a group and sends Alice a Welcome+Add
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto welcome_add = bob.start(group_id, cikA);
 
   // Alice processes the Welcome+Add
-  alice.join(welcome_add.first, welcome_add.second);
+  auto alice = Session::join(cikA, welcome_add.first, welcome_add.second);
 
   // Alice and Bob should now be on the same page
   verify("create", alice, bob);
 
-  // TODO: Credential keeps track of signature priv key
   // TODO: CIK-based session initialization
   // TODO: Make all these objects serializable so they can be saved
 

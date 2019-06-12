@@ -50,38 +50,47 @@ Session::client_init_key() const
   return tls::marshal(_client_init_key);
 }
 
-std::pair<bytes, bytes>
-Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
+std::pair<Welcome, bytes>
+Session::start(const bytes& group_id, const ClientInitKey& client_init_key)
 {
   if (!_state.empty()) {
     throw InvalidParameterError("start called on an initialized session");
   }
 
-  ClientInitKey client_init_key;
-  tls::unmarshal(client_init_key_bytes, client_init_key);
-
   auto init = State::negotiate(group_id, _client_init_key, client_init_key);
 
   add_state(0, std::get<2>(init));
 
-  auto welcome = tls::marshal(std::get<0>(init));
+  auto welcome = std::get<0>(init);
   auto add = tls::marshal(std::get<1>(init));
   return std::make_pair(welcome, add);
 }
 
-std::pair<bytes, bytes>
-Session::add(const bytes& client_init_key_bytes)
+Session
+Session::join(const ClientInitKey& client_init_key,
+              const Welcome& welcome,
+              const bytes& add_data)
 {
-  ClientInitKey client_init_key;
-  tls::unmarshal(client_init_key_bytes, client_init_key);
+  MLSPlaintext add{ welcome.cipher_suite };
+  tls::unmarshal(add_data, add);
+
+  Session session;
+  State next(client_init_key, welcome, add);
+  session.add_state(add.epoch, next);
+  return session;
+}
+
+std::pair<Welcome, bytes>
+Session::add(const ClientInitKey& client_init_key)
+{
   auto welcome_add_state = current_state().add(client_init_key);
-  auto welcome = tls::marshal(std::get<0>(welcome_add_state));
+  auto welcome = std::get<0>(welcome_add_state);
   auto add = tls::marshal(std::get<1>(welcome_add_state));
   auto state = std::get<2>(welcome_add_state);
 
   _outbound_cache = std::make_tuple(add, state);
 
-  return std::pair<bytes, bytes>(welcome, add);
+  return std::make_pair(welcome, add);
 }
 
 bytes
@@ -106,19 +115,6 @@ Session::remove(const bytes& evict_secret, uint32_t index)
   _outbound_cache = std::make_tuple(remove, state);
 
   return remove;
-}
-
-void
-Session::join(const bytes& welcome_data, const bytes& add_data)
-{
-  Welcome welcome;
-  tls::unmarshal(welcome_data, welcome);
-
-  MLSPlaintext add{ welcome.cipher_suite };
-  tls::unmarshal(add_data, add);
-
-  State next(_client_init_key, welcome, add);
-  add_state(add.epoch, next);
 }
 
 void

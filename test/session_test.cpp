@@ -61,21 +61,21 @@ protected:
     auto id_priv = new_identity_key();
     auto cred = Credential::basic(user_id, id_priv);
     auto initial_epoch = sessions[0].current_epoch();
-
-    TestSession next{ suites, init_secret, cred };
+    auto client_init_key = ClientInitKey{ suites, init_secret, cred };
 
     // Initial add is different
+    Welcome welcome;
+    bytes add;
     if (sessions.size() == 1) {
-      auto welcome_add = sessions[0].start(group_id, next.client_init_key());
-      next.join(welcome_add.first, welcome_add.second);
+      std::tie(welcome, add) = sessions[from].start(group_id, client_init_key);
+      auto next = Session::join(client_init_key, welcome, add);
       sessions.push_back(next);
-      // NB: Don't check epoch change, because it doesn't
       return;
     }
 
-    auto welcome_add = sessions[from].add(next.client_init_key());
-    next.join(welcome_add.first, welcome_add.second);
-    broadcast(welcome_add.second, index);
+    std::tie(welcome, add) = sessions[from].add(client_init_key);
+    auto next = Session::join(client_init_key, welcome, add);
+    broadcast(add, index);
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
@@ -151,13 +151,13 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   auto idB = new_identity_key();
   auto initB = fresh_secret();
   auto credB = Credential::basic(user_id, idB);
-  TestSession bob{ { CipherSuite::P256_SHA256_AES128GCM,
-                     CipherSuite::X25519_SHA256_AES128GCM },
-                   initB,
-                   credB };
+  auto cikB = ClientInitKey{ { CipherSuite::P256_SHA256_AES128GCM,
+                               CipherSuite::X25519_SHA256_AES128GCM },
+                             initB,
+                             credB };
 
-  auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.client_init_key());
-  bob.join(welcome_add.first, welcome_add.second);
+  auto welcome_add = alice.start({ 0, 1, 2, 3 }, cikB);
+  auto bob = Session::join(cikB, welcome_add.first, welcome_add.second);
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
@@ -260,6 +260,7 @@ protected:
 
   void follow_basic(uint32_t index,
                     TestSession& session,
+                    const ClientInitKey& my_client_init_key,
                     const SessionTestVectors::TestCase& tc)
   {
     int curr = 0;
@@ -270,7 +271,8 @@ protected:
     } else {
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript[index - 1];
-      session.join(epoch.welcome, epoch.handshake);
+      session = session.join(
+        my_client_init_key, epoch.welcome.value(), epoch.handshake);
       assert_consistency(session, epoch);
       curr = index;
     }
@@ -329,7 +331,8 @@ protected:
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       auto session = TestSession{ ciphers, seed, cred };
-      follow_basic(i, session, tc);
+      auto my_client_init_key = ClientInitKey{ ciphers, seed, cred };
+      follow_basic(i, session, my_client_init_key, tc);
     }
   }
 };
