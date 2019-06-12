@@ -24,7 +24,7 @@ protected:
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto cred = Credential::basic(user_id, id_priv);
-    sessions.push_back({ suites, init_secret, id_priv, cred });
+    sessions.emplace_back(suites, init_secret, cred);
   }
 
   SignaturePrivateKey new_identity_key()
@@ -62,7 +62,7 @@ protected:
     auto cred = Credential::basic(user_id, id_priv);
     auto initial_epoch = sessions[0].current_epoch();
 
-    TestSession next{ suites, init_secret, id_priv, cred };
+    TestSession next{ suites, init_secret, cred };
 
     // Initial add is different
     if (sessions.size() == 1) {
@@ -145,7 +145,6 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   TestSession alice{ { CipherSuite::P256_SHA256_AES128GCM,
                        CipherSuite::X25519_SHA256_AES128GCM },
                      initA,
-                     idA,
                      credA };
 
   // Bob supports P-256 and P-521
@@ -155,7 +154,6 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   TestSession bob{ { CipherSuite::P256_SHA256_AES128GCM,
                      CipherSuite::X25519_SHA256_AES128GCM },
                    initB,
-                   idB,
                    credB };
 
   auto welcome_add = alice.start({ 0, 1, 2, 3 }, bob.client_init_key());
@@ -330,7 +328,7 @@ protected:
       bytes seed = { uint8_t(i), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
-      auto session = TestSession{ ciphers, seed, identity_priv, cred };
+      auto session = TestSession{ ciphers, seed, cred };
       follow_basic(i, session, tc);
     }
   }

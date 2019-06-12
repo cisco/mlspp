@@ -114,6 +114,9 @@ Credential::Credential(const Credential& other)
   if (other._cred) {
     _cred = other._cred->dup();
   }
+  if (other._priv.has_value()) {
+    _priv = other._priv.value();
+  }
 }
 
 Credential::Credential(Credential&& other)
@@ -122,6 +125,9 @@ Credential::Credential(Credential&& other)
 {
   if (other._cred) {
     _cred.reset(other._cred.release());
+  }
+  if (other._priv.has_value()) {
+    _priv = other._priv.value();
   }
 }
 
@@ -133,6 +139,9 @@ Credential::operator=(const Credential& other)
     _cred.reset(nullptr);
     if (other._cred) {
       _cred = other._cred->dup();
+    }
+    if (other._priv.has_value()) {
+      _priv = other._priv.value();
     }
   }
   return *this;
@@ -162,16 +171,25 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
   auto cred = Credential{};
   cred._type = CredentialType::basic;
   cred._cred = std::make_unique<BasicCredential>(identity, public_key);
+  cred._priv = std::nullopt;
   return cred;
 }
 
 Credential
 Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
 {
-  // XXX(rlb@ipv.sx): This might merit invesetigation, but for now,
-  // just disabling the check.  It seems like this is just a
-  // pass-through, so how could it leak?
-  return basic(identity, private_key.public_key());
+  auto cred = Credential{};
+  cred._type = CredentialType::basic;
+  cred._cred =
+    std::make_unique<BasicCredential>(identity, private_key.public_key());
+  cred._priv = private_key;
+  return cred;
+}
+
+std::optional<SignaturePrivateKey>
+Credential::private_key() const
+{
+  return _priv;
 }
 
 AbstractCredential*

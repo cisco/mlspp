@@ -12,7 +12,6 @@ class Session
 public:
   Session(CipherList supported_ciphersuites,
           bytes init_secret,
-          SignaturePrivateKey identity_priv,
           Credential credential);
 
   bytes client_init_key() const;
@@ -33,7 +32,6 @@ public:
 protected:
   CipherList _supported_ciphersuites;
   ClientInitKey _client_init_key;
-  SignaturePrivateKey _identity_priv;
   Credential _credential;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;

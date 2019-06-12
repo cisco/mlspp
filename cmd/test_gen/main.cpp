@@ -447,7 +447,7 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       seeds.push_back(seed);
-      sessions.emplace_back(ciphersuites, seed, identity_priv, cred);
+      sessions.emplace_back(ciphersuites, seed, cred);
     }
 
     std::vector<tls::opaque<4>> ciks;

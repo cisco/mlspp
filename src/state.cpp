@@ -86,7 +86,6 @@ KeyChain::derive(const bytes& secret,
 State::State(bytes group_id,
              CipherSuite suite,
              const DHPrivateKey& leaf_priv,
-             SignaturePrivateKey identity_priv,
              const Credential& credential)
   : _suite(suite)
   , _group_id(std::move(group_id))
@@ -95,18 +94,17 @@ State::State(bytes group_id,
   , _init_secret(Digest(suite).output_size())
   , _application_keys(suite)
   , _index(0)
-  , _identity_priv(std::move(identity_priv))
+  , _identity_priv(credential.private_key().value())
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(SignaturePrivateKey identity_priv,
-             const ClientInitKey& my_client_init_key,
+State::State(const ClientInitKey& my_client_init_key,
              const Welcome& welcome,
              const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
-  , _identity_priv(std::move(identity_priv))
+  , _identity_priv(my_client_init_key.credential.private_key().value())
 {
   // Verify that we have an add and it is for us
   const auto& operation = handshake.operation.value();
@@ -169,7 +167,6 @@ State::State(SignaturePrivateKey identity_priv,
 std::tuple<Welcome, MLSPlaintext, State>
 State::negotiate(const bytes& group_id,
                  const ClientInitKey& my_client_init_key,
-                 const SignaturePrivateKey& identity_priv,
                  const ClientInitKey& client_init_key)
 {
   // Negotiate a ciphersuite with the other party
@@ -200,11 +197,8 @@ State::negotiate(const bytes& group_id,
 
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-  auto state = State{ group_id,
-                      suite,
-                      leaf_priv.value(),
-                      identity_priv,
-                      my_client_init_key.credential };
+  auto state =
+    State{ group_id, suite, leaf_priv.value(), my_client_init_key.credential };
   return state.add(client_init_key);
 }
 

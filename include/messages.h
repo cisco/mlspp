@@ -67,8 +67,7 @@ struct ClientInitKey
   void add_init_key(const DHPrivateKey& pub);
   std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   std::optional<DHPrivateKey> find_private_key(CipherSuite suite) const;
-  void sign(const SignaturePrivateKey& identity_priv,
-            const Credential& credential);
+  void sign(const Credential& credential);
   bool verify() const;
   bytes to_be_signed() const;
 

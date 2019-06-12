@@ -6,13 +6,15 @@ namespace mls {
 
 Session::Session(CipherList supported_ciphersuites,
                  bytes init_secret,
-                 SignaturePrivateKey identity_priv,
                  Credential credential)
   : _supported_ciphersuites(std::move(supported_ciphersuites))
-  , _identity_priv(std::move(identity_priv))
   , _credential(std::move(credential))
   , _current_epoch(0)
 {
+  if (!credential.private_key().has_value()) {
+    throw InvalidParameterError("Credential must have a private key");
+  }
+
   make_init_key(init_secret);
 }
 
@@ -58,8 +60,7 @@ Session::start(const bytes& group_id, const bytes& client_init_key_bytes)
   ClientInitKey client_init_key;
   tls::unmarshal(client_init_key_bytes, client_init_key);
 
-  auto init = State::negotiate(
-    group_id, _client_init_key, _identity_priv, client_init_key);
+  auto init = State::negotiate(group_id, _client_init_key, client_init_key);
 
   add_state(0, std::get<2>(init));
 
@@ -116,7 +117,7 @@ Session::join(const bytes& welcome_data, const bytes& add_data)
   MLSPlaintext add{ welcome.cipher_suite };
   tls::unmarshal(add_data, add);
 
-  State next(_identity_priv, _client_init_key, welcome, add);
+  State next(_client_init_key, welcome, add);
   add_state(add.epoch, next);
 }
 
@@ -188,7 +189,7 @@ Session::make_init_key(const bytes& init_secret)
     _client_init_key.add_init_key(init_priv);
   }
 
-  _client_init_key.sign(_identity_priv, _credential);
+  _client_init_key.sign(_credential);
 }
 
 void

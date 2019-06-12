@@ -50,6 +50,8 @@ public:
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 
+  std::optional<SignaturePrivateKey> private_key() const;
+
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
   static Credential basic(const bytes& identity,
@@ -58,6 +60,7 @@ public:
 private:
   CredentialType _type;
   std::unique_ptr<AbstractCredential> _cred;
+  std::optional<SignaturePrivateKey> _priv;
 
   static AbstractCredential* create(CredentialType type);
 

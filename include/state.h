@@ -83,12 +83,10 @@ public:
   State(bytes group_id,
         CipherSuite suite,
         const DHPrivateKey& leaf_priv,
-        SignaturePrivateKey identity_priv,
         const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
-  State(SignaturePrivateKey identity_priv,
-        const ClientInitKey& my_client_init_key,
+  State(const ClientInitKey& my_client_init_key,
         const Welcome& welcome_info,
         const MLSPlaintext& handshake);
 
@@ -97,7 +95,6 @@ public:
   static std::tuple<Welcome, MLSPlaintext, State> negotiate(
     const bytes& group_id,
     const ClientInitKey& my_client_init_key,
-    const SignaturePrivateKey& identity_priv,
     const ClientInitKey& client_init_key);
 
   ///

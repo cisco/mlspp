@@ -101,9 +101,13 @@ ClientInitKey::find_private_key(CipherSuite suite) const
 }
 
 void
-ClientInitKey::sign(const SignaturePrivateKey& identity_priv,
-                    const Credential& credential_in)
+ClientInitKey::sign(const Credential& credential_in)
 {
+  if (!credential_in.private_key().has_value()) {
+    throw InvalidParameterError("Credential must have a private key");
+  }
+  auto identity_priv = credential_in.private_key().value();
+
   if (cipher_suites.size() != init_keys.size()) {
     throw InvalidParameterError("Mal-formed ClientInitKey");
   }

@@ -20,7 +20,7 @@ new_user(const std::string& name)
   auto priv = SignaturePrivateKey::generate(scheme);
   auto id = bytes(name.begin(), name.end());
   auto cred = Credential::basic(id, priv);
-  return Session{ suites, init, priv, cred };
+  return Session{ suites, init, cred };
 }
 
 // To be used with new API
@@ -104,7 +104,7 @@ main()
   // Alice and Bob should now be on the same page
   verify("create", alice, bob);
 
-  // TODO: UIK keeps track of init private keys, signature priv key
+  // TODO: Credential keeps track of signature priv key
   // TODO: CIK-based session initialization
   // TODO: Make all these objects serializable so they can be saved
 
