@@ -98,6 +98,10 @@ TypedDelete(T* ptr);
 
 template<>
 void
+TypedDelete(EVP_MD_CTX* ptr);
+
+template<>
+void
 TypedDelete(EVP_PKEY* ptr);
 
 template<typename T>

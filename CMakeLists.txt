@@ -12,22 +12,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find OpenSSL
-set(OPENSSL_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/third_party/openssl/include")
-set(OPENSSL_LIBRARIES "${PROJECT_SOURCE_DIR}/third_party/openssl/libcrypto.a")
+find_package(OpenSSL REQUIRED)
 
-MESSAGE( STATUS "OPENSSL_INCLUDE_DIR: " ${OPENSSL_INCLUDE_DIR} )
-MESSAGE( STATUS "OPENSSL_LIBRARIES: " ${OPENSSL_LIBRARIES} )
-
-# Find GTest
-set(GTEST_DIR "${PROJECT_SOURCE_DIR}/third_party/googletest/googletest")
-set(GTEST_INCLUDE_DIR "${GTEST_DIR}/include")
-set(GTEST_LIBRARY "${GTEST_DIR}/make/libgtest.a")
-set(GTEST_MAIN_LIBRARY "${GTEST_DIR}/make/libgtest_main.a")
-
-MESSAGE( STATUS "GTEST_INCLUDE_DIR: " ${GTEST_INCLUDE_DIR} )
-MESSAGE( STATUS "GTEST_LIBRARY: " ${GTEST_LIBRARY} )
-MESSAGE( STATUS "GTEST_MAIN_LIBRARY: " ${GTEST_MAIN_LIBRARY} )
-
+# Maybe set up linters
 option(MLSPP_LINT "Whether to run linters" ON)
 
 if(NOT ${MLSPP_LINT} STREQUAL "OFF")
