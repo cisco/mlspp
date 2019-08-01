@@ -42,7 +42,7 @@ generate_resolution()
   tv.n_leaves = LeafCount{ 7 };
 
   auto width = NodeCount{ tv.n_leaves };
-  auto n_cases = (1 << width.val);
+  uint32_t n_cases = (1 << width.val);
 
   tv.cases.resize(n_cases);
   for (uint32_t t = 0; t < n_cases; ++t) {
@@ -87,7 +87,7 @@ generate_crypto()
   tv.ecies_plaintext = bytes(128, 0xB1);
 
   // Construct a test case for each suite
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto test_case = cases[i];
 
@@ -142,7 +142,7 @@ generate_key_schedule()
   tv.base_group_context = tls::marshal(base_group_context);
 
   // Construct a test case for each suite
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto test_case = cases[i];
     auto secret_size = Digest(suite).output_size();
@@ -153,7 +153,7 @@ generate_key_schedule()
     bytes init_secret(secret_size, 0);
     bytes update_secret(secret_size, 0);
 
-    for (int j = 0; j < tv.n_epochs; ++j) {
+    for (size_t j = 0; j < tv.n_epochs; ++j) {
       auto group_context_bytes = tls::marshal(group_context);
       auto secrets = State::derive_epoch_secrets(
         suite, init_secret, update_secret, group_context_bytes);
@@ -196,7 +196,7 @@ generate_app_key_schedule()
   tv.n_generations = 16;
   tv.application_secret = bytes(32, 0xA0);
 
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto test_case = cases[i];
 
@@ -220,7 +220,7 @@ tree_to_case(const test::TestRatchetTree& tree)
 {
   auto nodes = tree.nodes();
   TreeTestVectors::TreeCase tc(nodes.size());
-  for (int i = 0; i < nodes.size(); ++i) {
+  for (size_t i = 0; i < nodes.size(); ++i) {
     tc[i].hash = nodes[i].hash();
     if (nodes[i].has_value()) {
       tc[i].public_key = nodes[i]->public_key().to_bytes();
@@ -249,13 +249,13 @@ generate_tree()
     &tv.case_x25519_ed25519,
   };
 
-  int n_leaves = 10;
+  size_t n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
-  for (int i = 0; i < n_leaves; ++i) {
+  for (size_t i = 0; i < n_leaves; ++i) {
     tv.leaf_secrets[i] = { uint8_t(i) };
   }
 
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
     auto test_case = cases[i];
@@ -333,7 +333,7 @@ generate_messages()
 
   // Construct a test case for each suite
   test::DeterministicHPKE lock;
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
 
@@ -432,7 +432,7 @@ generate_basic_session()
   tv.group_id = bytes(16, 0xA0);
 
   test::DeterministicHPKE lock;
-  for (int i = 0; i < suites.size(); ++i) {
+  for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
 
@@ -442,7 +442,7 @@ generate_basic_session()
     std::vector<test::TestSession> sessions;
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
-    for (int j = 0; j < tv.group_size; ++j) {
+    for (size_t j = 0; j < tv.group_size; ++j) {
       bytes seed = { uint8_t(j), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
@@ -456,7 +456,7 @@ generate_basic_session()
     }
 
     // Add everyone
-    for (int j = 1; j < tv.group_size; ++j) {
+    for (size_t j = 1; j < tv.group_size; ++j) {
       auto cik = sessions[j].client_init_key();
 
       std::pair<bytes, bytes> welcome_add;
@@ -464,7 +464,7 @@ generate_basic_session()
         welcome_add = sessions[0].start(tv.group_id, cik);
       } else {
         welcome_add = sessions[j - 1].add(cik);
-        for (int k = 0; k < j; ++k) {
+        for (size_t k = 0; k < j; ++k) {
           sessions[k].handle(welcome_add.second);
         }
       }
@@ -476,7 +476,7 @@ generate_basic_session()
     }
 
     // Update everyone (L->R)
-    for (int j = 0; j < tv.group_size; ++j) {
+    for (size_t j = 0; j < tv.group_size; ++j) {
       seeds[j][1] += 1;
       auto update = sessions[j].update(seeds[j]);
       for (auto& session : sessions) {

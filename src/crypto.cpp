@@ -34,6 +34,8 @@ deterministic_signature_scheme(SignatureScheme scheme)
     case SignatureScheme::Ed448:
       return true;
   }
+
+  throw InvalidParameterError("Invalid signature scheme");
 }
 
 } // namespace test
@@ -638,6 +640,8 @@ OpenSSLKey::create(OpenSSLKeyType type)
     case OpenSSLKeyType::P521:
       return new ECKey(ECKeyType::P521);
   }
+
+  throw InvalidParameterError("Unknown key type");
 }
 
 OpenSSLKey*
@@ -692,6 +696,8 @@ ossl_digest_type(DigestType type)
     case DigestType::SHA512:
       return EVP_sha512();
   }
+
+  throw InvalidParameterError("Unknown digest type");
 }
 
 Digest::Digest(DigestType type)

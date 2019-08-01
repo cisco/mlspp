@@ -61,7 +61,7 @@ operator^(const bytes& lhs, const bytes& rhs)
   }
 
   bytes out(lhs.size());
-  for (int i = 0; i < lhs.size(); ++i) {
+  for (size_t i = 0; i < lhs.size(); ++i) {
     out[i] = lhs[i] ^ rhs[i];
   }
   return out;
@@ -71,7 +71,7 @@ std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
   // Adjust this threshold to make output more compact
-  auto threshold = 0xffff;
+  size_t threshold = 0xffff;
   if (data.size() < threshold) {
     return out << to_hex(data);
   }
