@@ -300,11 +300,11 @@ struct SessionTestVectors
 
     Epoch() = default;
 
-    Epoch(const tls::optional<Welcome>& welcome,
-          const bytes& handshake,
+    Epoch(const tls::optional<Welcome>& welcome_in,
+          const bytes& handshake_in,
           const TestSession& session)
-      : welcome(welcome)
-      , handshake(handshake)
+      : welcome(welcome_in)
+      , handshake(handshake_in)
       , epoch(session.current_epoch())
       , epoch_secret(session.current_epoch_secret())
       , application_secret(session.current_application_secret())

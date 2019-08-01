@@ -4,7 +4,7 @@
 BUILD_DIR=build
 CLANG_FORMAT=clang-format -i -style=mozilla
 
-TEST_VECTOR_DIR=third_party/mls-implementations/test_vectors
+TEST_VECTOR_DIR=./build/test/vectors
 TEST_GEN=./build/cmd/test_gen/test_gen
 
 all: ${BUILD_DIR} format src/* include/** test/*
@@ -17,12 +17,16 @@ test: all
 	cd ${BUILD_DIR} && ctest
 
 gen: all
+	mkdir -p ${TEST_VECTOR_DIR}
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}
 
 example: all
 	./build/cmd/api_example/api_example
 
 clean:
+	cd ${BUILD_DIR} && make clean
+
+cclean:
 	rm -rf ${BUILD_DIR}
 
 format:

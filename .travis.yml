@@ -1,0 +1,15 @@
+language: c++
+
+os: linux
+dist: bionic
+addons:
+  apt:
+    packages:
+      - cmake
+      - clang-format
+      - libssl-dev
+
+script:
+  - MLSPP_LINT=ON make
+  - make gen
+  - make test

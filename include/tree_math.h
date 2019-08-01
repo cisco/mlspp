@@ -46,8 +46,8 @@ struct UInt32
     : val(0)
   {}
 
-  explicit UInt32(uint32_t val)
-    : val(val)
+  explicit UInt32(uint32_t val_in)
+    : val(val_in)
   {}
 };
 

@@ -30,7 +30,6 @@ public:
   bytes unprotect(const bytes& ciphertext);
 
 protected:
-  ClientInitKey _client_init_key;
   std::map<epoch_t, State> _state;
   epoch_t _current_epoch;
 
