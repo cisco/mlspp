@@ -21,6 +21,9 @@ gen: all
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}
 
 clean:
+	cd ${BUILD_DIR} && make clean
+
+cclean:
 	rm -rf ${BUILD_DIR}
 
 format:

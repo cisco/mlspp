@@ -10,6 +10,6 @@ addons:
       - libssl-dev
 
 script:
-  - make
+  - MLSPP_LINT=ON make
   - make gen
   - make test

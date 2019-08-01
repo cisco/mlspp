@@ -15,10 +15,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenSSL 1.1 REQUIRED)
 
 # Maybe set up linters
-option(MLSPP_LINT "Whether to run linters" ON)
+option(MLSPP_LINT "Whether to run linters" OFF)
 
+if(MLSPP_LINT)
+  message(STATUS "Enabling linters...")
 
-if(NOT ${MLSPP_LINT} STREQUAL "OFF")
   # Find clang-tidy
   find_program(
     CLANG_TIDY_EXE
