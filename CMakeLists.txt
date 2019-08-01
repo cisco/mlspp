@@ -12,10 +12,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find OpenSSL
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL 1.1 REQUIRED)
 
 # Maybe set up linters
 option(MLSPP_LINT "Whether to run linters" ON)
+
 
 if(NOT ${MLSPP_LINT} STREQUAL "OFF")
   # Find clang-tidy

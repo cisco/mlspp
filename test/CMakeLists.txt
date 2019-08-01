@@ -2,7 +2,7 @@ include(GoogleTest)
 
 set(GTEST_APP_NAME "${LIB_NAME}_gtest")
 set(GTEST_SRC_PATH "${PROJECT_SOURCE_DIR}/test")
-set(GTEST_RUN_PATH "${PROJECT_SOURCE_DIR}/third_party/mls-implementations/test_vectors")
+set(GTEST_RUN_PATH "${CMAKE_CURRENT_BINARY_DIR}/vectors")
 
 # Fetch and install GTest at configure time
 # See https://github.com/google/googletest/blob/master/googletest/README.md
