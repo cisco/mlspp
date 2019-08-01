@@ -29,7 +29,10 @@ if(MLSPP_LINT)
   if(NOT CLANG_TIDY_EXE)
     message(STATUS "clang-tidy not found.")
   else()
-    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator")
+    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,"
+                      "-clang-analyzer-alpha.*,"
+                      "-fuchsia-overloaded-operator,"
+                      "-fuchsia-default-arguments")
   endif()
   
   # Enable pedantic mode
