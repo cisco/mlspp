@@ -1,0 +1,15 @@
+language: c++
+
+os: linux
+dist: bionic
+addons:
+  apt:
+    packages:
+      - cmake
+      - clang-format
+      - libssl-dev
+
+script:
+  - make
+  - make gen
+  - make test
