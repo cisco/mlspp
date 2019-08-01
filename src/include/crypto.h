@@ -364,10 +364,10 @@ struct HPKECiphertext : public CipherAware
     , ephemeral(suite)
   {}
 
-  HPKECiphertext(const DHPublicKey& ephemeral, const bytes& content)
-    : CipherAware(ephemeral.cipher_suite())
-    , ephemeral(ephemeral)
-    , content(content)
+  HPKECiphertext(const DHPublicKey& ephemeral_in, const bytes& content_in)
+    : CipherAware(ephemeral_in.cipher_suite())
+    , ephemeral(ephemeral_in)
+    , content(content_in)
   {}
 
   friend bool operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs);

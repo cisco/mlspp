@@ -35,14 +35,14 @@ struct MustInitialize
   uint8_t offset;
   uint8_t val;
 
-  MustInitialize(uint8_t offset)
-    : offset(offset)
+  MustInitialize(uint8_t offset_in)
+    : offset(offset_in)
     , val(0)
   {}
 
-  MustInitialize(uint8_t offset, uint8_t val)
-    : offset(offset)
-    , val(val)
+  MustInitialize(uint8_t offset_in, uint8_t val_in)
+    : offset(offset_in)
+    , val(val_in)
   {}
 };
 

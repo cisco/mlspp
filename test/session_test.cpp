@@ -11,7 +11,7 @@ protected:
   const CipherList suites{ CipherSuite::P256_SHA256_AES128GCM,
                            CipherSuite::X25519_SHA256_AES128GCM };
   const SignatureScheme scheme = SignatureScheme::Ed25519;
-  const size_t group_size = 5;
+  const int group_size = 5;
   const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
@@ -253,7 +253,7 @@ protected:
                     TestSession& session,
                     const SessionTestVectors::TestCase& tc)
   {
-    int curr = 0;
+    size_t curr = 0;
     if (index == 0) {
       // Member 0 creates the group
       session.start(basic_tv.group_id, tc.client_init_keys[1]);
@@ -280,7 +280,7 @@ protected:
     }
 
     // Process updates
-    for (int i = 0; i < basic_tv.group_size; ++i, ++curr) {
+    for (size_t i = 0; i < basic_tv.group_size; ++i, ++curr) {
       auto& epoch = tc.transcript[curr];
 
       // Generate an update to cache next state
@@ -294,12 +294,12 @@ protected:
 
     // Process removes until this member has been removed
     for (int sender = basic_tv.group_size - 2; sender >= 0; --sender, ++curr) {
-      if (index > sender) {
+      if (int(index) > sender) {
         break;
       }
 
       // Generate a remove to cache next state
-      if (sender == index) {
+      if (int(index) == sender) {
         session.remove({ uint8_t(sender), 2 }, sender + 1);
       }
 

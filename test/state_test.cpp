@@ -225,7 +225,7 @@ TEST_F(RunningGroupTest, Remove)
     states.pop_back();
 
     for (auto& state : states) {
-      if (state.index().val == i) {
+      if (state.index().val == size_t(i)) {
         state = next;
       } else {
         state = state.handle(message);

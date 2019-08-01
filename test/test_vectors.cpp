@@ -35,7 +35,7 @@ std::vector<bool>
 ResolutionTestVectors::make_tree(uint32_t t, NodeCount w)
 {
   auto vec = std::vector<bool>(w.val);
-  for (int i = 0; i < vec.size(); ++i) {
+  for (size_t i = 0; i < vec.size(); ++i) {
     vec[i] = t & 1;
     t >>= 1;
   }

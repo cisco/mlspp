@@ -71,7 +71,7 @@ protected:
     auto& nodes = tree.nodes();
     ASSERT_EQ(vec.size(), nodes.size());
 
-    for (int j = 0; j < vec.size(); ++j) {
+    for (size_t j = 0; j < vec.size(); ++j) {
       ASSERT_EQ(vec[j].hash, nodes[j].hash());
       ASSERT_EQ(vec[j].public_key.has_value(), nodes[j].has_value());
       if (nodes[j].has_value()) {
@@ -251,7 +251,7 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
     bytes root_path_secret;
     std::tie(path, root_path_secret) = trees[i.val].encrypt(i, secret);
 
-    for (int j = 0; j < size; ++j) {
+    for (size_t j = 0; j < size; ++j) {
       if (i.val == j) {
         auto update_secret = trees[j].set_path(i, secret);
         ASSERT_EQ(update_secret, root_path_secret);

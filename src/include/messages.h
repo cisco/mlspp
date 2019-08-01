@@ -26,11 +26,11 @@ struct RatchetNode : public CipherAware
     , node_secrets(suite)
   {}
 
-  RatchetNode(const DHPublicKey& public_key,
-              const std::vector<HPKECiphertext>& node_secrets)
+  RatchetNode(const DHPublicKey& public_key_in,
+              const std::vector<HPKECiphertext>& node_secrets_in)
     : CipherAware(public_key)
-    , public_key(public_key)
-    , node_secrets(node_secrets)
+    , public_key(public_key_in)
+    , node_secrets(node_secrets_in)
   {}
 };
 
@@ -120,18 +120,18 @@ struct WelcomeInfo : public CipherAware
     , tree(suite)
   {}
 
-  WelcomeInfo(tls::opaque<2> group_id,
-              epoch_t epoch,
-              RatchetTree tree,
-              tls::opaque<1> interim_transcript_hash,
-              tls::opaque<1> init_secret)
-    : CipherAware(tree)
+  WelcomeInfo(tls::opaque<2> group_id_in,
+              epoch_t epoch_in,
+              RatchetTree tree_in,
+              tls::opaque<1> interim_transcript_hash_in,
+              tls::opaque<1> init_secret_in)
+    : CipherAware(tree_in)
     , version(mls10Version)
-    , group_id(group_id)
-    , epoch(epoch)
-    , tree(tree)
-    , interim_transcript_hash(interim_transcript_hash)
-    , init_secret(init_secret)
+    , group_id(group_id_in)
+    , epoch(epoch_in)
+    , tree(tree_in)
+    , interim_transcript_hash(interim_transcript_hash_in)
+    , init_secret(init_secret_in)
   {}
 
   bytes hash(CipherSuite suite) const;
@@ -197,10 +197,12 @@ public:
 
   Add() {}
 
-  Add(LeafIndex index, const ClientInitKey& init_key, bytes welcome_info_hash)
-    : index(index)
-    , init_key(init_key)
-    , welcome_info_hash(std::move(welcome_info_hash))
+  Add(LeafIndex index_in,
+      const ClientInitKey& init_key_in,
+      bytes welcome_info_hash_in)
+    : index(index_in)
+    , init_key(init_key_in)
+    , welcome_info_hash(std::move(welcome_info_hash_in))
   {}
 
   static const GroupOperationType type;
@@ -226,9 +228,9 @@ public:
     , path(suite)
   {}
 
-  Update(const DirectPath& path)
-    : CipherAware(path)
-    , path(path)
+  Update(const DirectPath& path_in)
+    : CipherAware(path_in)
+    , path(path_in)
   {}
 
   static const GroupOperationType type;
@@ -256,10 +258,10 @@ public:
     , path(suite)
   {}
 
-  Remove(LeafIndex removed, const DirectPath& path)
-    : CipherAware(path)
-    , removed(removed)
-    , path(path)
+  Remove(LeafIndex removed_in, const DirectPath& path_in)
+    : CipherAware(path_in)
+    , removed(removed_in)
+    , path(path_in)
   {}
 
   static const GroupOperationType type;
@@ -304,23 +306,23 @@ struct GroupOperation : public CipherAware
     : CipherAware(suite)
   {}
 
-  GroupOperation(const Add& add)
+  GroupOperation(const Add& add_in)
     : CipherAware(DUMMY_CIPHERSUITE)
-    , type(add.type)
-    , add(add)
+    , type(add_in.type)
+    , add(add_in)
   {}
 
-  GroupOperation(const Update& update)
-    : CipherAware(update)
-    , type(update.type)
-    , update(update)
+  GroupOperation(const Update& update_in)
+    : CipherAware(update_in)
+    , type(update_in.type)
+    , update(update_in)
 
   {}
 
-  GroupOperation(const Remove& remove)
-    : CipherAware(remove)
-    , type(remove.type)
-    , remove(remove)
+  GroupOperation(const Remove& remove_in)
+    : CipherAware(remove_in)
+    , type(remove_in.type)
+    , remove(remove_in)
   {}
 
   friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
@@ -378,28 +380,28 @@ struct MLSPlaintext : public CipherAware
 
   tls::opaque<2> signature;
 
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               LeafIndex sender,
-               GroupOperation operation)
-    : CipherAware(operation.cipher_suite())
-    , group_id(group_id)
-    , epoch(epoch)
-    , sender(sender)
+  MLSPlaintext(bytes group_id_in,
+               epoch_t epoch_in,
+               LeafIndex sender_in,
+               GroupOperation operation_in)
+    : CipherAware(operation_in.cipher_suite())
+    , group_id(group_id_in)
+    , epoch(epoch_in)
+    , sender(sender_in)
     , content_type(ContentType::handshake)
-    , operation(operation)
+    , operation(operation_in)
   {}
 
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               LeafIndex sender,
-               const bytes& application_data)
+  MLSPlaintext(bytes group_id_in,
+               epoch_t epoch_in,
+               LeafIndex sender_in,
+               const bytes& application_data_in)
     : CipherAware(DUMMY_CIPHERSUITE)
-    , group_id(group_id)
-    , epoch(epoch)
-    , sender(sender)
+    , group_id(group_id_in)
+    , epoch(epoch_in)
+    , sender(sender_in)
     , content_type(ContentType::application)
-    , application_data(application_data)
+    , application_data(application_data_in)
   {}
 
   bytes to_be_signed() const;

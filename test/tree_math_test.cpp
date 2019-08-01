@@ -71,7 +71,7 @@ TEST(ResolutionTest, Interop)
   auto tv = TestLoader<ResolutionTestVectors>::get();
 
   auto width = NodeCount{ tv.n_leaves };
-  auto n_cases = (1 << width.val);
+  uint32_t n_cases = (1 << width.val);
 
   for (uint32_t t = 0; t < n_cases; ++t) {
     auto nodes = ResolutionTestVectors::make_tree(t, width);
