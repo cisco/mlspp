@@ -66,7 +66,7 @@ protected:
   }
 
   void assert_tree_eq(const TreeTestVectors::TreeCase& vec,
-                      const test::TestRatchetTree& tree)
+                      const TestRatchetTree& tree)
   {
     auto& nodes = tree.nodes();
     ASSERT_EQ(vec.size(), nodes.size());
@@ -84,7 +84,7 @@ protected:
                CipherSuite test_suite,
                SignatureScheme test_scheme)
   {
-    test::TestRatchetTree tree{ test_suite };
+    TestRatchetTree tree{ test_suite };
 
     // Add the leaves
     int tci = 0;

@@ -1,8 +1,23 @@
 #include "messages.h"
 
+#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
+
 namespace mls {
 
 // RatchetNode
+
+RatchetNode::RatchetNode(CipherSuite suite)
+  : CipherAware(suite)
+  , public_key(suite)
+  , node_secrets(suite)
+{}
+
+RatchetNode::RatchetNode(DHPublicKey public_key_in,
+                         const std::vector<HPKECiphertext>& node_secrets_in)
+  : CipherAware(public_key_in.cipher_suite())
+  , public_key(std::move(public_key_in))
+  , node_secrets(node_secrets_in)
+{}
 
 bool
 operator==(const RatchetNode& lhs, const RatchetNode& rhs)
@@ -25,6 +40,11 @@ operator>>(tls::istream& in, RatchetNode& obj)
 
 // DirectPath
 
+DirectPath::DirectPath(CipherSuite suite)
+  : CipherAware(suite)
+  , nodes(suite)
+{}
+
 bool
 operator==(const DirectPath& lhs, const DirectPath& rhs)
 {
@@ -45,11 +65,39 @@ operator>>(tls::istream& in, DirectPath& obj)
 
 // ClientInitKey
 
-void
-ClientInitKey::add_init_key(const DHPublicKey& pub)
+ClientInitKey::ClientInitKey()
+  : supported_versions(1, mls10Version)
+{}
+
+ClientInitKey::ClientInitKey(bytes client_init_key_id_in,
+                             const CipherList& supported_ciphersuites,
+                             const bytes& init_secret,
+                             const Credential& credential_in)
+  : client_init_key_id(std::move(client_init_key_id_in))
+  , supported_versions(1, mls10Version)
 {
-  cipher_suites.push_back(pub.cipher_suite());
-  init_keys.push_back(pub.to_bytes());
+  // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
+  // from the same secret.  Maybe we should include the ciphersuite
+  // in the key derivation...
+  //
+  // Note, though, that since ClientInitKey objects track private
+  // keys, it would be safe to just generate keys here, if we were
+  // OK having internal keygen.
+  for (const auto suite : supported_ciphersuites) {
+    auto init_priv = DHPrivateKey::derive(suite, init_secret);
+    add_init_key(init_priv);
+  }
+
+  sign(credential_in);
+}
+
+void
+ClientInitKey::add_init_key(const DHPrivateKey& priv)
+{
+  auto suite = priv.cipher_suite();
+  cipher_suites.push_back(suite);
+  init_keys.push_back(priv.public_key().to_bytes());
+  _private_keys.emplace(suite, priv);
 }
 
 std::optional<DHPublicKey>
@@ -64,10 +112,24 @@ ClientInitKey::find_init_key(CipherSuite suite) const
   return std::nullopt;
 }
 
-void
-ClientInitKey::sign(const SignaturePrivateKey& identity_priv,
-                    const Credential& credential_in)
+std::optional<DHPrivateKey>
+ClientInitKey::find_private_key(CipherSuite suite) const
 {
+  if (_private_keys.count(suite) == 0) {
+    return std::nullopt;
+  }
+
+  return _private_keys.at(suite);
+}
+
+void
+ClientInitKey::sign(const Credential& credential_in)
+{
+  if (!credential_in.private_key().has_value()) {
+    throw InvalidParameterError("Credential must have a private key");
+  }
+  auto identity_priv = credential_in.private_key().value();
+
   if (cipher_suites.size() != init_keys.size()) {
     throw InvalidParameterError("Mal-formed ClientInitKey");
   }
@@ -106,6 +168,12 @@ operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
          (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
 }
 
+bool
+operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
+{
+  return !(lhs == rhs);
+}
+
 tls::ostream&
 operator<<(tls::ostream& out, const ClientInitKey& obj)
 {
@@ -122,6 +190,27 @@ operator>>(tls::istream& in, ClientInitKey& obj)
 }
 
 // WelcomeInfo
+
+WelcomeInfo::WelcomeInfo(CipherSuite suite)
+  : CipherAware(suite)
+  , version(mls10Version)
+  , epoch(0)
+  , tree(suite)
+{}
+
+WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id_in,
+                         epoch_t epoch_in,
+                         RatchetTree tree_in,
+                         const tls::opaque<1>& interim_transcript_hash_in,
+                         const tls::opaque<1>& init_secret_in)
+  : CipherAware(tree_in.cipher_suite())
+  , version(mls10Version)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , tree(std::move(tree_in))
+  , interim_transcript_hash(interim_transcript_hash_in)
+  , init_secret(init_secret_in)
+{}
 
 bytes
 WelcomeInfo::hash(CipherSuite suite) const
@@ -162,6 +251,11 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
 }
 
 // Welcome
+
+Welcome::Welcome()
+  : cipher_suite(DUMMY_CIPHERSUITE)
+  , encrypted_welcome_info(DUMMY_CIPHERSUITE)
+{}
 
 Welcome::Welcome(const bytes& id,
                  const DHPublicKey& pub,
@@ -224,6 +318,14 @@ operator>>(tls::istream& in, GroupOperationType& obj)
 
 // Add
 
+Add::Add(LeafIndex index_in,
+         ClientInitKey init_key_in,
+         bytes welcome_info_hash_in)
+  : index(index_in)
+  , init_key(std::move(init_key_in))
+  , welcome_info_hash(std::move(welcome_info_hash_in))
+{}
+
 const GroupOperationType Add::type = GroupOperationType::add;
 
 bool
@@ -247,6 +349,16 @@ operator>>(tls::istream& in, Add& obj)
 
 // Update
 
+Update::Update(CipherSuite suite)
+  : CipherAware(suite)
+  , path(suite)
+{}
+
+Update::Update(const DirectPath& path_in)
+  : CipherAware(path_in.cipher_suite())
+  , path(path_in)
+{}
+
 const GroupOperationType Update::type = GroupOperationType::update;
 
 bool
@@ -269,6 +381,17 @@ operator>>(tls::istream& in, Update& obj)
 
 // Remove
 
+Remove::Remove(CipherSuite suite)
+  : CipherAware(suite)
+  , path(suite)
+{}
+
+Remove::Remove(LeafIndex removed_in, const DirectPath& path_in)
+  : CipherAware(path_in.cipher_suite())
+  , removed(removed_in)
+  , path(path_in)
+{}
+
 const GroupOperationType Remove::type = GroupOperationType::remove;
 
 bool
@@ -290,6 +413,35 @@ operator>>(tls::istream& in, Remove& obj)
 }
 
 // GroupOperation
+
+GroupOperation::GroupOperation()
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , type(GroupOperationType::none)
+{}
+
+GroupOperation::GroupOperation(CipherSuite suite)
+  : CipherAware(suite)
+  , type(GroupOperationType::none)
+{}
+
+GroupOperation::GroupOperation(const Add& add_in)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , type(GroupOperationType::add)
+  , add(add_in)
+{}
+
+GroupOperation::GroupOperation(const Update& update_in)
+  : CipherAware(update_in.cipher_suite())
+  , type(GroupOperationType::update)
+  , update(update_in)
+
+{}
+
+GroupOperation::GroupOperation(const Remove& remove_in)
+  : CipherAware(remove_in.cipher_suite())
+  , type(GroupOperationType::remove)
+  , remove(remove_in)
+{}
 
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
@@ -367,6 +519,30 @@ operator>>(tls::istream& in, ContentType& obj)
 }
 
 // MLSPlaintext
+
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           GroupOperation operation_in)
+  : CipherAware(operation_in.cipher_suite())
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
+  , content_type(ContentType::handshake)
+  , operation(std::move(operation_in))
+{}
+
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           bytes application_data_in)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
+  , content_type(ContentType::application)
+  , application_data(std::move(application_data_in))
+{}
 
 // struct {
 //     opaque content[MLSPlaintext.length];

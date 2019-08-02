@@ -28,6 +28,7 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
 include_directories(${LIBRARY_INCLUDE_PATH})
 include_directories(${LIBRARY_PRIVATE_INCLUDE_PATH})
 include_directories(${GTEST_INCLUDE_DIR})
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 file(GLOB GTEST_SOURCE_FILES "${GTEST_SRC_PATH}/*.cpp")
 set(GTEST_SOURCE_FILES ${GTEST_SOURCE_FILES} PARENT_SCOPE)

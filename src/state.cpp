@@ -21,8 +21,16 @@ operator>>(tls::istream& out, GroupContext& obj)
 }
 
 ///
-/// ApplicationKeyChain
+/// KeyChain
 ///
+
+KeyChain::KeyChain(CipherSuite suite)
+  : _suite(suite)
+  , _my_generation(0)
+  , _secret_size(Digest(suite).output_size())
+  , _key_size(AESGCM::key_size(suite))
+  , _nonce_size(AESGCM::nonce_size)
+{}
 
 const char* KeyChain::_secret_label = "sender";
 const char* KeyChain::_nonce_label = "nonce";
@@ -78,29 +86,26 @@ KeyChain::derive(const bytes& secret,
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const bytes& leaf_secret,
-             SignaturePrivateKey identity_priv,
+             const DHPrivateKey& leaf_priv,
              const Credential& credential)
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
-  , _tree(suite, leaf_secret, credential)
+  , _tree(leaf_priv, credential)
   , _init_secret(Digest(suite).output_size())
   , _application_keys(suite)
   , _index(0)
-  , _identity_priv(std::move(identity_priv))
+  , _identity_priv(credential.private_key().value())
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(SignaturePrivateKey identity_priv,
-             const Credential& credential,
-             const bytes& init_secret,
+State::State(const ClientInitKey& my_client_init_key,
              const Welcome& welcome,
              const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
-  , _identity_priv(std::move(identity_priv))
+  , _identity_priv(my_client_init_key.credential.private_key().value())
 {
   // Verify that we have an add and it is for us
   const auto& operation = handshake.operation.value();
@@ -109,19 +114,22 @@ State::State(SignaturePrivateKey identity_priv,
   }
 
   const auto& add = operation.add.value();
-  if (credential != add.init_key.credential) {
+  if (my_client_init_key != add.init_key) {
     throw InvalidParameterError("Add not targeted for this node");
   }
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  auto init_cik = add.init_key.find_init_key(_suite);
-  if (!init_cik) {
+  auto maybe_init_pub = add.init_key.find_init_key(_suite);
+  auto maybe_init_priv = my_client_init_key.find_private_key(_suite);
+  if (!maybe_init_pub.has_value() || !maybe_init_priv.has_value()) {
     throw ProtocolError("Selected cipher suite not supported");
   }
 
-  auto init_priv = DHPrivateKey::node_derive(_suite, init_secret);
-  if (*init_cik != init_priv.public_key()) {
+  auto& init_pub = maybe_init_pub.value();
+  auto& init_priv = maybe_init_priv.value();
+
+  if (init_priv.public_key() != init_pub) {
     throw ProtocolError("Incorrect init key");
   }
 
@@ -147,7 +155,7 @@ State::State(SignaturePrivateKey identity_priv,
 
   // Add to the tree
   _index = add.index;
-  _tree.add_leaf(_index, init_secret, credential);
+  _tree.add_leaf(_index, init_priv, my_client_init_key.credential);
 
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
@@ -159,16 +167,13 @@ State::State(SignaturePrivateKey identity_priv,
 
 std::tuple<Welcome, MLSPlaintext, State>
 State::negotiate(const bytes& group_id,
-                 const std::vector<CipherSuite> supported_ciphersuites,
-                 const bytes& leaf_secret,
-                 const SignaturePrivateKey& identity_priv,
-                 const Credential& credential,
+                 const ClientInitKey& my_client_init_key,
                  const ClientInitKey& client_init_key)
 {
   // Negotiate a ciphersuite with the other party
   CipherSuite suite;
   auto selected = false;
-  for (auto my_suite : supported_ciphersuites) {
+  for (auto my_suite : my_client_init_key.cipher_suites) {
     for (auto other_suite : client_init_key.cipher_suites) {
       if (my_suite == other_suite) {
         selected = true;
@@ -186,9 +191,15 @@ State::negotiate(const bytes& group_id,
     throw ProtocolError("Negotiation failure");
   }
 
+  auto leaf_priv = my_client_init_key.find_private_key(suite);
+  if (!leaf_priv.has_value()) {
+    throw ProtocolError("No private key for negotiated suite");
+  }
+
   // We have manually guaranteed that `suite` is always initialized
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-  auto state = State{ group_id, suite, leaf_secret, identity_priv, credential };
+  auto state =
+    State{ group_id, suite, leaf_priv.value(), my_client_init_key.credential };
   return state.add(client_init_key);
 }
 
@@ -328,6 +339,8 @@ State::handle(const MLSPlaintext& handshake) const
 
   bytes update_secret;
   switch (operation.type) {
+    case GroupOperationType::none:
+      throw InvalidParameterError("Uninitialized group operation");
     case GroupOperationType::add:
       update_secret = next.handle(operation.add.value());
       break;

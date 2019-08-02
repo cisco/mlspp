@@ -8,6 +8,8 @@
 
 using namespace mls;
 
+/////
+
 struct TreeMathTestVectors
 {
   static const std::string file_name;
@@ -162,6 +164,13 @@ operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& tv);
 
 /////
 
+class TestRatchetTree : public RatchetTree
+{
+public:
+  using RatchetTree::RatchetTree;
+  const RatchetTreeNodeVector& nodes() const { return _nodes; }
+};
+
 struct TreeTestVectors
 {
   static const std::string file_name;
@@ -240,6 +249,39 @@ operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
 /////
 
+namespace mls {
+
+class TestSession : public Session
+{
+public:
+  using Session::Session;
+  TestSession(const Session& other)
+    : Session(other)
+  {}
+
+  uint32_t index() const { return current_state().index().val; }
+
+  epoch_t current_epoch() const { return _current_epoch; }
+
+  CipherSuite cipher_suite() const { return current_state().cipher_suite(); }
+
+  bytes current_epoch_secret() const { return current_state().epoch_secret(); }
+
+  bytes current_application_secret() const
+  {
+    return current_state().application_secret();
+  }
+
+  bytes current_confirmation_key() const
+  {
+    return current_state().confirmation_key();
+  }
+
+  bytes current_init_secret() const { return current_state().init_secret(); }
+};
+
+} // namespace mls
+
 // Splitting the test data from the file definition here allows us
 // to have a consistent struct for different scenarios that live in
 // different files.
@@ -247,7 +289,7 @@ struct SessionTestVectors
 {
   struct Epoch
   {
-    tls::opaque<4> welcome; // may be zero-size
+    tls::optional<Welcome> welcome;
     tls::opaque<4> handshake;
 
     epoch_t epoch;
@@ -258,9 +300,9 @@ struct SessionTestVectors
 
     Epoch() = default;
 
-    Epoch(const bytes& welcome_in,
+    Epoch(const tls::optional<Welcome>& welcome_in,
           const bytes& handshake_in,
-          const mls::test::TestSession& session)
+          const TestSession& session)
       : welcome(welcome_in)
       , handshake(handshake_in)
       , epoch(session.current_epoch())
@@ -275,7 +317,7 @@ struct SessionTestVectors
   {
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
-    tls::vector<tls::opaque<4>, 4> client_init_keys;
+    tls::vector<ClientInitKey, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
   };
 

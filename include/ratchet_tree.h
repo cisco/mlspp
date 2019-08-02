@@ -55,12 +55,10 @@ private:
 struct OptionalRatchetTreeNode
   : public tls::variant_optional<RatchetTreeNode, CipherSuite>
 {
-  typedef tls::variant_optional<RatchetTreeNode, CipherSuite> parent;
+  using parent = tls::variant_optional<RatchetTreeNode, CipherSuite>;
   using parent::parent;
 
-  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret)
-    : parent(RatchetTreeNode(suite, secret))
-  {}
+  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret);
 
   bool has_private() const;
   const bytes& hash() const;
@@ -78,7 +76,7 @@ private:
 struct RatchetTreeNodeVector
   : public tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>
 {
-  typedef tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> parent;
+  using parent = tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>;
   using parent::parent;
   using parent::operator[];
 
@@ -93,7 +91,8 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred);
+  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred); // XXX dele?
+  RatchetTree(const DHPrivateKey& priv, const Credential& cred);
   RatchetTree(CipherSuite suite,
               const std::vector<bytes>& secrets,
               const std::vector<Credential>& creds);
@@ -110,6 +109,9 @@ public:
 
   void add_leaf(LeafIndex index,
                 const DHPublicKey& pub,
+                const Credential& cred);
+  void add_leaf(LeafIndex index,
+                const DHPrivateKey& priv,
                 const Credential& cred);
   void add_leaf(LeafIndex index,
                 const bytes& leaf_secret,
@@ -148,17 +150,5 @@ protected:
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
-
-namespace test {
-
-// Enable tests to see the internals of the tree
-class TestRatchetTree : public RatchetTree
-{
-public:
-  using RatchetTree::RatchetTree;
-  const RatchetTreeNodeVector& nodes() const;
-};
-
-} // namespace test
 
 } // namespace mls

@@ -1,4 +1,7 @@
 #include "credential.h"
+#include "tls_syntax.h"
+
+#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
 
 namespace mls {
 
@@ -24,6 +27,38 @@ operator>>(tls::istream& in, CredentialType& type)
 ///
 /// BasicCredential
 ///
+
+// struct {
+//     opaque identity<0..2^16-1>;
+//     SignatureScheme algorithm;
+//     SignaturePublicKey public_key;
+// } BasicCredential;
+class BasicCredential : public AbstractCredential
+{
+public:
+  BasicCredential();
+  BasicCredential(bytes identity, SignaturePublicKey public_key);
+
+  std::unique_ptr<AbstractCredential> dup() const override;
+  bytes identity() const override;
+  SignaturePublicKey public_key() const override;
+  void read(tls::istream& in) override;
+  void write(tls::ostream& out) const override;
+  bool equal(const AbstractCredential* other) const override;
+
+private:
+  tls::opaque<2> _identity;
+  SignaturePublicKey _public_key;
+};
+
+BasicCredential::BasicCredential()
+  : _public_key(DUMMY_SIG_SCHEME)
+{}
+
+BasicCredential::BasicCredential(bytes identity, SignaturePublicKey public_key)
+  : _identity(std::move(identity))
+  , _public_key(std::move(public_key))
+{}
 
 std::unique_ptr<AbstractCredential>
 BasicCredential::dup() const
@@ -71,6 +106,46 @@ BasicCredential::equal(const AbstractCredential* other) const
 /// Credential
 ///
 
+Credential::Credential(const Credential& other)
+  : _type(other._type)
+  , _cred(nullptr)
+{
+  if (other._cred) {
+    _cred = other._cred->dup();
+  }
+  if (other._priv.has_value()) {
+    _priv = other._priv.value();
+  }
+}
+
+Credential::Credential(Credential&& other) noexcept
+  : _type(other._type)
+  , _cred(nullptr)
+{
+  if (other._cred) {
+    _cred = std::move(other._cred);
+  }
+  if (other._priv.has_value()) {
+    _priv = other._priv.value();
+  }
+}
+
+Credential&
+Credential::operator=(const Credential& other)
+{
+  if (this != &other) {
+    _type = other._type;
+    _cred.reset(nullptr);
+    if (other._cred) {
+      _cred = other._cred->dup();
+    }
+    if (other._priv.has_value()) {
+      _priv = other._priv.value();
+    }
+  }
+  return *this;
+}
+
 bytes
 Credential::identity() const
 {
@@ -95,16 +170,25 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
   auto cred = Credential{};
   cred._type = CredentialType::basic;
   cred._cred = std::make_unique<BasicCredential>(identity, public_key);
+  cred._priv = std::nullopt;
   return cred;
 }
 
 Credential
 Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
 {
-  // XXX(rlb@ipv.sx): This might merit invesetigation, but for now,
-  // just disabling the check.  It seems like this is just a
-  // pass-through, so how could it leak?
-  return basic(identity, private_key.public_key());
+  auto cred = Credential{};
+  cred._type = CredentialType::basic;
+  cred._cred =
+    std::make_unique<BasicCredential>(identity, private_key.public_key());
+  cred._priv = private_key;
+  return cred;
+}
+
+std::optional<SignaturePrivateKey>
+Credential::private_key() const
+{
+  return _priv;
 }
 
 AbstractCredential*

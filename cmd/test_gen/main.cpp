@@ -107,7 +107,7 @@ generate_crypto()
     test_case->derive_key_pair_pub = pub;
 
     // HPKE
-    test::DeterministicHPKE lock;
+    DeterministicHPKE lock;
     test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
   }
 
@@ -216,7 +216,7 @@ generate_app_key_schedule()
 }
 
 TreeTestVectors::TreeCase
-tree_to_case(const test::TestRatchetTree& tree)
+tree_to_case(const TestRatchetTree& tree)
 {
   auto nodes = tree.nodes();
   TreeTestVectors::TreeCase tc(nodes.size());
@@ -260,7 +260,7 @@ generate_tree()
     auto scheme = schemes[i];
     auto test_case = cases[i];
 
-    test::TestRatchetTree tree{ suite };
+    TestRatchetTree tree{ suite };
 
     // Add the leaves
     for (uint32_t j = 0; j < n_leaves; ++j) {
@@ -321,7 +321,7 @@ generate_messages()
   cik_all.client_init_key_id = tv.client_init_key_id;
   for (const auto& suite : suites) {
     auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    cik_all.add_init_key(priv.public_key());
+    cik_all.add_init_key(priv);
   }
 
   auto identity_priv =
@@ -332,7 +332,7 @@ generate_messages()
   tv.client_init_key_all = tls::marshal(cik_all);
 
   // Construct a test case for each suite
-  test::DeterministicHPKE lock;
+  DeterministicHPKE lock;
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
@@ -358,7 +358,7 @@ generate_messages()
     // Construct CIK
     auto client_init_key = ClientInitKey{};
     client_init_key.client_init_key_id = tv.client_init_key_id;
-    client_init_key.add_init_key(dh_key);
+    client_init_key.add_init_key(dh_priv);
     client_init_key.credential = cred;
     client_init_key.signature = tv.random;
 
@@ -431,15 +431,17 @@ generate_basic_session()
   tv.group_size = 5;
   tv.group_id = bytes(16, 0xA0);
 
-  test::DeterministicHPKE lock;
+  DeterministicHPKE lock;
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
+    const bytes client_init_key_id = { 0, 1, 2, 3 };
 
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
-    std::vector<test::TestSession> sessions;
+    std::vector<ClientInitKey> client_init_keys;
+    std::vector<TestSession> sessions;
     std::vector<bytes> seeds;
     auto ciphersuites = CipherList{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
@@ -447,32 +449,31 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       seeds.push_back(seed);
-      sessions.emplace_back(ciphersuites, seed, identity_priv, cred);
-    }
-
-    std::vector<tls::opaque<4>> ciks;
-    for (const auto& session : sessions) {
-      ciks.push_back(session.client_init_key());
+      client_init_keys.emplace_back(
+        client_init_key_id, ciphersuites, seed, cred);
     }
 
     // Add everyone
     for (size_t j = 1; j < tv.group_size; ++j) {
-      auto cik = sessions[j].client_init_key();
-
-      std::pair<bytes, bytes> welcome_add;
+      Welcome welcome;
+      bytes add;
       if (j == 1) {
-        welcome_add = sessions[0].start(tv.group_id, cik);
+        auto session_welcome_add =
+          Session::start(tv.group_id, client_init_keys[0], client_init_keys[1]);
+        sessions.push_back(std::get<0>(session_welcome_add));
+        welcome = std::get<1>(session_welcome_add);
+        add = std::get<2>(session_welcome_add);
       } else {
-        welcome_add = sessions[j - 1].add(cik);
+        std::tie(welcome, add) = sessions[j - 1].add(client_init_keys[j]);
         for (size_t k = 0; k < j; ++k) {
-          sessions[k].handle(welcome_add.second);
+          sessions[k].handle(add);
         }
       }
 
-      sessions[j].join(welcome_add.first, welcome_add.second);
+      auto joiner = Session::join(client_init_keys[j], welcome, add);
+      sessions.push_back(joiner);
 
-      transcript.emplace_back(
-        welcome_add.first, welcome_add.second, sessions[0]);
+      transcript.emplace_back(welcome, add, sessions[0]);
     }
 
     // Update everyone (L->R)
@@ -483,7 +484,7 @@ generate_basic_session()
         session.handle(update);
       }
 
-      transcript.emplace_back(bytes{}, update, sessions[0]);
+      transcript.emplace_back(std::nullopt, update, sessions[0]);
     }
 
     // Remove everyone (R->L)
@@ -500,11 +501,11 @@ generate_basic_session()
         }
       }
 
-      transcript.emplace_back(bytes{}, remove, sessions[0]);
+      transcript.emplace_back(std::nullopt, remove, sessions[0]);
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, ciks, transcript };
+    *cases[i] = { suite, scheme, client_init_keys, transcript };
   }
 
   return tv;

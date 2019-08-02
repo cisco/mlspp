@@ -35,12 +35,7 @@ operator>>(tls::istream& out, GroupContext& obj);
 class KeyChain
 {
 public:
-  KeyChain(CipherSuite suite)
-    : _suite(suite)
-    , _secret_size(Digest(suite).output_size())
-    , _key_size(AESGCM::key_size(suite))
-    , _nonce_size(AESGCM::nonce_size)
-  {}
+  KeyChain(CipherSuite suite);
 
   struct Generation
   {
@@ -87,14 +82,11 @@ public:
   // Initialize an empty group
   State(bytes group_id,
         CipherSuite suite,
-        const bytes& leaf_secret,
-        SignaturePrivateKey identity_priv,
+        const DHPrivateKey& leaf_priv,
         const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
-  State(SignaturePrivateKey identity_priv,
-        const Credential& credential,
-        const bytes& init_secret,
+  State(const ClientInitKey& my_client_init_key,
         const Welcome& welcome_info,
         const MLSPlaintext& handshake);
 
@@ -102,10 +94,7 @@ public:
   // ClientInitKey
   static std::tuple<Welcome, MLSPlaintext, State> negotiate(
     const bytes& group_id,
-    const std::vector<CipherSuite> supported_ciphersuites,
-    const bytes& leaf_secret,
-    const SignaturePrivateKey& identity_priv,
-    const Credential& credential,
+    const ClientInitKey& my_client_init_key,
     const ClientInitKey& client_init_key);
 
   ///

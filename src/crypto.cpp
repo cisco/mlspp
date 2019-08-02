@@ -14,33 +14,6 @@
 namespace mls {
 
 ///
-/// Test mode controls
-///
-
-namespace test {
-
-int DeterministicHPKE::_refct = 0;
-
-bool
-deterministic_signature_scheme(SignatureScheme scheme)
-{
-  switch (scheme) {
-    case SignatureScheme::P256_SHA256:
-      return false;
-    case SignatureScheme::P521_SHA512:
-      return false;
-    case SignatureScheme::Ed25519:
-      return true;
-    case SignatureScheme::Ed448:
-      return true;
-  }
-
-  throw InvalidParameterError("Invalid signature scheme");
-}
-
-} // namespace test
-
-///
 /// CipherSuite and SignatureScheme
 ///
 
@@ -78,9 +51,59 @@ operator>>(tls::istream& in, SignatureScheme& obj)
   return in;
 }
 
+CipherAware::CipherAware(CipherSuite suite)
+  : _suite(suite)
+{}
+
+CipherSuite
+CipherAware::cipher_suite() const
+{
+  return _suite;
+}
+
+SignatureAware::SignatureAware(SignatureScheme scheme)
+  : _scheme(scheme)
+{}
+
+SignatureScheme
+SignatureAware::signature_scheme() const
+{
+  return _scheme;
+}
+
+///
+/// Test mode controls
+///
+
+int DeterministicHPKE::_refct = 0;
+
+///
+/// typed_unique_ptr
+///
+
+template<typename T>
+typed_unique_ptr<T>::typed_unique_ptr()
+  : typed_unique_ptr_base<T>(nullptr, TypedDelete<T>)
+{}
+
+template<typename T>
+typed_unique_ptr<T>::typed_unique_ptr(T* ptr)
+  : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
+{}
+
 ///
 /// OpenSSLError
 ///
+
+// Wrapper for OpenSSL errors
+class OpenSSLError : public std::runtime_error
+{
+public:
+  using parent = std::runtime_error;
+  using parent::parent;
+
+  static OpenSSLError current();
+};
 
 OpenSSLError
 OpenSSLError::current()
@@ -672,7 +695,7 @@ OpenSSLKey::derive(OpenSSLKeyType type, const bytes& data)
 /// Digest
 ///
 
-DigestType
+static DigestType
 digest_type(CipherSuite suite)
 {
   switch (suite) {
@@ -687,7 +710,7 @@ digest_type(CipherSuite suite)
   throw InvalidParameterError("Unknown ciphersuite");
 }
 
-const EVP_MD*
+static const EVP_MD*
 ossl_digest_type(DigestType type)
 {
   switch (type) {
@@ -1222,6 +1245,13 @@ PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
 /// DHPublicKey and DHPrivateKey
 ///
 
+// XXX(rlb@ipv.sx): This is a bit of a hack, but it means that if
+// we're constructing objects for serialization, then we don't
+// need to do all the variant stuff
+DHPublicKey::DHPublicKey()
+  : PublicKey(CipherSuite::X25519_SHA256_AES128GCM)
+{}
+
 enum struct HPKEMode : uint8_t
 {
   base = 0x00,
@@ -1313,7 +1343,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 {
   // SetupBaseI
   auto ephemeral = DHPrivateKey::generate(_suite);
-  if (test::DeterministicHPKE::enabled()) {
+  if (DeterministicHPKE::enabled()) {
     auto seed = to_bytes() + plaintext;
     ephemeral = DHPrivateKey::derive(_suite, seed);
   }

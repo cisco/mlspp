@@ -6,9 +6,6 @@
 #include "tls_syntax.h"
 #include <optional>
 
-#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
-#define DUMMY_SCHEME SignatureScheme::P256_SHA256
-
 namespace mls {
 
 // struct {
@@ -20,18 +17,9 @@ struct RatchetNode : public CipherAware
   DHPublicKey public_key;
   tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
 
-  RatchetNode(CipherSuite suite)
-    : CipherAware(suite)
-    , public_key(suite)
-    , node_secrets(suite)
-  {}
-
-  RatchetNode(const DHPublicKey& public_key_in,
-              const std::vector<HPKECiphertext>& node_secrets_in)
-    : CipherAware(public_key)
-    , public_key(public_key_in)
-    , node_secrets(node_secrets_in)
-  {}
+  RatchetNode(CipherSuite suite);
+  RatchetNode(DHPublicKey public_key,
+              const std::vector<HPKECiphertext>& node_secrets);
 };
 
 bool
@@ -47,11 +35,7 @@ operator>>(tls::istream& in, RatchetNode& obj);
 struct DirectPath : public CipherAware
 {
   tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
-
-  DirectPath(CipherSuite suite)
-    : CipherAware(suite)
-    , nodes(suite)
-  {}
+  DirectPath(CipherSuite suite);
 };
 
 bool
@@ -69,6 +53,12 @@ operator>>(tls::istream& in, DirectPath& obj);
 //     Credential credential;
 //     opaque signature<0..2^16-1>;
 // } ClientInitKey;
+//
+// XXX(rlb@ipv.sx): Right now, we use this to represent both the
+// public version of a client's capabilities, and the private
+// version (with private keys).  This results in some ugly checking
+// code when private keys are needed, so it might be nice to split
+// these two cases in the type system.
 struct ClientInitKey
 {
   tls::opaque<1> client_init_key_id;
@@ -78,20 +68,27 @@ struct ClientInitKey
   Credential credential;
   tls::opaque<2> signature;
 
-  ClientInitKey()
-    : supported_versions(1, mls10Version)
-  {}
+  ClientInitKey();
+  ClientInitKey(bytes client_init_key_id,
+                const CipherList& supported_ciphersuites,
+                const bytes& init_secret,
+                const Credential& credential);
 
-  void add_init_key(const DHPublicKey& pub);
+  void add_init_key(const DHPrivateKey& priv);
   std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
-  void sign(const SignaturePrivateKey& identity_priv,
-            const Credential& credential);
+  std::optional<DHPrivateKey> find_private_key(CipherSuite suite) const;
+  void sign(const Credential& credential);
   bool verify() const;
   bytes to_be_signed() const;
+
+  private:
+  std::map<CipherSuite, DHPrivateKey> _private_keys;
 };
 
 bool
 operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
+bool
+operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
 tls::ostream&
 operator<<(tls::ostream& out, const ClientInitKey& obj);
 tls::istream&
@@ -115,24 +112,12 @@ struct WelcomeInfo : public CipherAware
   tls::opaque<1> interim_transcript_hash;
   tls::opaque<1> init_secret;
 
-  WelcomeInfo(CipherSuite suite)
-    : CipherAware(suite)
-    , tree(suite)
-  {}
-
-  WelcomeInfo(tls::opaque<2> group_id_in,
-              epoch_t epoch_in,
-              RatchetTree tree_in,
-              tls::opaque<1> interim_transcript_hash_in,
-              tls::opaque<1> init_secret_in)
-    : CipherAware(tree_in)
-    , version(mls10Version)
-    , group_id(group_id_in)
-    , epoch(epoch_in)
-    , tree(tree_in)
-    , interim_transcript_hash(interim_transcript_hash_in)
-    , init_secret(init_secret_in)
-  {}
+  WelcomeInfo(CipherSuite suite);
+  WelcomeInfo(tls::opaque<2> group_id,
+              epoch_t epoch,
+              RatchetTree tree,
+              const tls::opaque<1>& interim_transcript_hash,
+              const tls::opaque<1>& init_secret);
 
   bytes hash(CipherSuite suite) const;
 };
@@ -155,10 +140,7 @@ struct Welcome
   CipherSuite cipher_suite;
   HPKECiphertext encrypted_welcome_info;
 
-  Welcome()
-    : encrypted_welcome_info(DUMMY_CIPHERSUITE)
-  {}
-
+  Welcome();
   Welcome(const bytes& id, const DHPublicKey& pub, const WelcomeInfo& info);
   WelcomeInfo decrypt(const DHPrivateKey& priv) const;
 };
@@ -173,6 +155,7 @@ operator>>(tls::istream& in, Welcome& obj);
 // enum { ... } GroupOperationType;
 enum class GroupOperationType : uint8_t
 {
+  none = 0,
   add = 1,
   update = 2,
   remove = 3,
@@ -195,16 +178,8 @@ public:
   ClientInitKey init_key;
   tls::opaque<1> welcome_info_hash;
 
-  Add() {}
-
-  Add(LeafIndex index_in,
-      const ClientInitKey& init_key_in,
-      bytes welcome_info_hash_in)
-    : index(index_in)
-    , init_key(init_key_in)
-    , welcome_info_hash(std::move(welcome_info_hash_in))
-  {}
-
+  Add() = default;
+  Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
   static const GroupOperationType type;
 };
 
@@ -223,16 +198,8 @@ struct Update : public CipherAware
 public:
   DirectPath path;
 
-  Update(CipherSuite suite)
-    : CipherAware(suite)
-    , path(suite)
-  {}
-
-  Update(const DirectPath& path_in)
-    : CipherAware(path_in)
-    , path(path_in)
-  {}
-
+  Update(CipherSuite suite);
+  Update(const DirectPath& path);
   static const GroupOperationType type;
 };
 
@@ -253,17 +220,8 @@ public:
   LeafIndex removed;
   DirectPath path;
 
-  Remove(CipherSuite suite)
-    : CipherAware(suite)
-    , path(suite)
-  {}
-
-  Remove(LeafIndex removed_in, const DirectPath& path_in)
-    : CipherAware(path_in)
-    , removed(removed_in)
-    , path(path_in)
-  {}
-
+  Remove(CipherSuite suite);
+  Remove(LeafIndex removed, const DirectPath& path);
   static const GroupOperationType type;
 };
 
@@ -298,32 +256,11 @@ struct GroupOperation : public CipherAware
   std::optional<Update> update;
   std::optional<Remove> remove;
 
-  GroupOperation()
-    : CipherAware(DUMMY_CIPHERSUITE)
-  {}
-
-  GroupOperation(CipherSuite suite)
-    : CipherAware(suite)
-  {}
-
-  GroupOperation(const Add& add_in)
-    : CipherAware(DUMMY_CIPHERSUITE)
-    , type(add_in.type)
-    , add(add_in)
-  {}
-
-  GroupOperation(const Update& update_in)
-    : CipherAware(update_in)
-    , type(update_in.type)
-    , update(update_in)
-
-  {}
-
-  GroupOperation(const Remove& remove_in)
-    : CipherAware(remove_in)
-    , type(remove_in.type)
-    , remove(remove_in)
-  {}
+  GroupOperation();
+  GroupOperation(CipherSuite suite);
+  GroupOperation(const Add& add);
+  GroupOperation(const Update& update);
+  GroupOperation(const Remove& remove);
 
   friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
@@ -380,29 +317,14 @@ struct MLSPlaintext : public CipherAware
 
   tls::opaque<2> signature;
 
-  MLSPlaintext(bytes group_id_in,
-               epoch_t epoch_in,
-               LeafIndex sender_in,
-               GroupOperation operation_in)
-    : CipherAware(operation_in.cipher_suite())
-    , group_id(group_id_in)
-    , epoch(epoch_in)
-    , sender(sender_in)
-    , content_type(ContentType::handshake)
-    , operation(operation_in)
-  {}
-
-  MLSPlaintext(bytes group_id_in,
-               epoch_t epoch_in,
-               LeafIndex sender_in,
-               const bytes& application_data_in)
-    : CipherAware(DUMMY_CIPHERSUITE)
-    , group_id(group_id_in)
-    , epoch(epoch_in)
-    , sender(sender_in)
-    , content_type(ContentType::application)
-    , application_data(application_data_in)
-  {}
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               GroupOperation operation);
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               bytes application_data);
 
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);

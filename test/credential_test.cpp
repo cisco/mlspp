@@ -14,4 +14,8 @@ TEST(CredentialTest, Basic)
   auto cred = Credential::basic(user_id, priv);
   ASSERT_EQ(cred.identity(), user_id);
   ASSERT_EQ(cred.public_key(), pub);
+
+  auto maybe_priv = cred.private_key();
+  ASSERT_TRUE(maybe_priv.has_value());
+  ASSERT_EQ(maybe_priv.value(), priv);
 }

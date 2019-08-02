@@ -2,10 +2,6 @@
 
 #include "common.h"
 #include "crypto.h"
-#include "tls_syntax.h"
-#include <iosfwd>
-
-#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
 
 namespace mls {
 
@@ -32,35 +28,6 @@ struct AbstractCredential
 };
 
 // struct {
-//     opaque identity<0..2^16-1>;
-//     SignatureScheme algorithm;
-//     SignaturePublicKey public_key;
-// } BasicCredential;
-class BasicCredential : public AbstractCredential
-{
-public:
-  BasicCredential()
-    : _public_key(DUMMY_SIG_SCHEME)
-  {}
-
-  BasicCredential(const bytes& identity, const SignaturePublicKey& public_key)
-    : _identity(identity)
-    , _public_key(public_key)
-  {}
-
-  virtual std::unique_ptr<AbstractCredential> dup() const;
-  virtual bytes identity() const;
-  virtual SignaturePublicKey public_key() const;
-  virtual void read(tls::istream& in);
-  virtual void write(tls::ostream& out) const;
-  virtual bool equal(const AbstractCredential* other) const;
-
-private:
-  tls::opaque<2> _identity;
-  SignaturePublicKey _public_key;
-};
-
-// struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
 //         case basic:
@@ -75,39 +42,15 @@ class Credential
 public:
   Credential() = default;
 
-  Credential(const Credential& other)
-    : _type(other._type)
-    , _cred(nullptr)
-  {
-    if (other._cred) {
-      _cred = other._cred->dup();
-    }
-  }
-
-  Credential(Credential&& other)
-    : _type(other._type)
-    , _cred(nullptr)
-  {
-    if (other._cred) {
-      _cred.reset(other._cred.release());
-    }
-  }
-
-  Credential& operator=(const Credential& other)
-  {
-    if (this != &other) {
-      _type = other._type;
-      _cred.reset(nullptr);
-      if (other._cred) {
-        _cred = other._cred->dup();
-      }
-    }
-    return *this;
-  }
+  Credential(const Credential& other);
+  Credential(Credential&& other) noexcept;
+  Credential& operator=(const Credential& other);
 
   bytes identity() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
+
+  std::optional<SignaturePrivateKey> private_key() const;
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
@@ -117,6 +60,7 @@ public:
 private:
   CredentialType _type;
   std::unique_ptr<AbstractCredential> _cred;
+  std::optional<SignaturePrivateKey> _priv;
 
   static AbstractCredential* create(CredentialType type);
 
