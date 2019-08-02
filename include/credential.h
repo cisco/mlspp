@@ -43,7 +43,7 @@ public:
   Credential() = default;
 
   Credential(const Credential& other);
-  Credential(Credential&& other);
+  Credential(Credential&& other) noexcept;
   Credential& operator=(const Credential& other);
 
   bytes identity() const;

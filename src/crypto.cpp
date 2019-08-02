@@ -99,7 +99,7 @@ typed_unique_ptr<T>::typed_unique_ptr(T* ptr)
 class OpenSSLError : public std::runtime_error
 {
 public:
-  typedef std::runtime_error parent;
+  using parent = std::runtime_error;
   using parent::parent;
 
   static OpenSSLError current();

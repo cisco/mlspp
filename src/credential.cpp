@@ -37,14 +37,14 @@ class BasicCredential : public AbstractCredential
 {
 public:
   BasicCredential();
-  BasicCredential(const bytes& identity, const SignaturePublicKey& public_key);
+  BasicCredential(bytes identity, SignaturePublicKey public_key);
 
-  virtual std::unique_ptr<AbstractCredential> dup() const;
-  virtual bytes identity() const;
-  virtual SignaturePublicKey public_key() const;
-  virtual void read(tls::istream& in);
-  virtual void write(tls::ostream& out) const;
-  virtual bool equal(const AbstractCredential* other) const;
+  std::unique_ptr<AbstractCredential> dup() const override;
+  bytes identity() const override;
+  SignaturePublicKey public_key() const override;
+  void read(tls::istream& in) override;
+  void write(tls::ostream& out) const override;
+  bool equal(const AbstractCredential* other) const override;
 
 private:
   tls::opaque<2> _identity;
@@ -55,10 +55,9 @@ BasicCredential::BasicCredential()
   : _public_key(DUMMY_SIG_SCHEME)
 {}
 
-BasicCredential::BasicCredential(const bytes& identity,
-                                 const SignaturePublicKey& public_key)
-  : _identity(identity)
-  , _public_key(public_key)
+BasicCredential::BasicCredential(bytes identity, SignaturePublicKey public_key)
+  : _identity(std::move(identity))
+  , _public_key(std::move(public_key))
 {}
 
 std::unique_ptr<AbstractCredential>
@@ -119,12 +118,12 @@ Credential::Credential(const Credential& other)
   }
 }
 
-Credential::Credential(Credential&& other)
+Credential::Credential(Credential&& other) noexcept
   : _type(other._type)
   , _cred(nullptr)
 {
   if (other._cred) {
-    _cred.reset(other._cred.release());
+    _cred = std::move(other._cred);
   }
   if (other._priv.has_value()) {
     _priv = other._priv.value();

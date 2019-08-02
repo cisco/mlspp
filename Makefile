@@ -13,6 +13,9 @@ all: ${BUILD_DIR} format src/* include/** test/*
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
 
+lint: ${BUILD_DIR}
+	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=ON -DCMAKE_BUILD_TYPE=Debug
+
 test: all
 	cd ${BUILD_DIR} && ctest
 

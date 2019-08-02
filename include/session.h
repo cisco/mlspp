@@ -16,7 +16,7 @@ public:
     start(const bytes& group_id,
           const ClientInitKey& my_client_init_key,
           const ClientInitKey& client_init_key);
-  static Session join(const ClientInitKey& cik,
+  static Session join(const ClientInitKey& client_init_key,
                       const Welcome& welcome,
                       const bytes& add);
 

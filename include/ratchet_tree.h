@@ -55,7 +55,7 @@ private:
 struct OptionalRatchetTreeNode
   : public tls::variant_optional<RatchetTreeNode, CipherSuite>
 {
-  typedef tls::variant_optional<RatchetTreeNode, CipherSuite> parent;
+  using parent = tls::variant_optional<RatchetTreeNode, CipherSuite>;
   using parent::parent;
 
   OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret);
@@ -76,7 +76,7 @@ private:
 struct RatchetTreeNodeVector
   : public tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>
 {
-  typedef tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4> parent;
+  using parent = tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>;
   using parent::parent;
   using parent::operator[];
 

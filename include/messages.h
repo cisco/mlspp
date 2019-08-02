@@ -70,11 +70,11 @@ struct ClientInitKey
 
   ClientInitKey();
   ClientInitKey(bytes client_init_key_id,
-                CipherList supported_ciphersuites,
-                bytes init_secret,
-                Credential credential);
+                const CipherList& supported_ciphersuites,
+                const bytes& init_secret,
+                const Credential& credential);
 
-  void add_init_key(const DHPrivateKey& pub);
+  void add_init_key(const DHPrivateKey& priv);
   std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
   std::optional<DHPrivateKey> find_private_key(CipherSuite suite) const;
   void sign(const Credential& credential);
@@ -116,8 +116,8 @@ struct WelcomeInfo : public CipherAware
   WelcomeInfo(tls::opaque<2> group_id,
               epoch_t epoch,
               RatchetTree tree,
-              tls::opaque<1> interim_transcript_hash,
-              tls::opaque<1> init_secret);
+              const tls::opaque<1>& interim_transcript_hash,
+              const tls::opaque<1>& init_secret);
 
   bytes hash(CipherSuite suite) const;
 };
@@ -155,6 +155,7 @@ operator>>(tls::istream& in, Welcome& obj);
 // enum { ... } GroupOperationType;
 enum class GroupOperationType : uint8_t
 {
+  none = 0,
   add = 1,
   update = 2,
   remove = 3,
@@ -178,7 +179,7 @@ public:
   tls::opaque<1> welcome_info_hash;
 
   Add() = default;
-  Add(LeafIndex index, const ClientInitKey& init_key, bytes welcome_info_hash);
+  Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
   static const GroupOperationType type;
 };
 
@@ -323,7 +324,7 @@ struct MLSPlaintext : public CipherAware
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
-               const bytes& application_data);
+               bytes application_data);
 
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);

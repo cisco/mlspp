@@ -14,7 +14,7 @@ RatchetNode::RatchetNode(CipherSuite suite)
 
 RatchetNode::RatchetNode(const DHPublicKey& public_key,
                          const std::vector<HPKECiphertext>& node_secrets)
-  : CipherAware(public_key)
+  : CipherAware(public_key.cipher_suite())
   , public_key(public_key)
   , node_secrets(node_secrets)
 {}
@@ -70,10 +70,10 @@ ClientInitKey::ClientInitKey()
 {}
 
 ClientInitKey::ClientInitKey(bytes client_init_key_id,
-                             CipherList supported_ciphersuites,
-                             bytes init_secret,
-                             Credential credential)
-  : client_init_key_id(client_init_key_id)
+                             const CipherList& supported_ciphersuites,
+                             const bytes& init_secret,
+                             const Credential& credential)
+  : client_init_key_id(std::move(client_init_key_id))
   , supported_versions(1, mls10Version)
 {
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
@@ -83,7 +83,7 @@ ClientInitKey::ClientInitKey(bytes client_init_key_id,
   // Note, though, that since ClientInitKey objects track private
   // keys, it would be safe to just generate keys here, if we were
   // OK having internal keygen.
-  for (auto suite : supported_ciphersuites) {
+  for (const auto suite : supported_ciphersuites) {
     auto init_priv = DHPrivateKey::derive(suite, init_secret);
     add_init_key(init_priv);
   }
@@ -193,19 +193,21 @@ operator>>(tls::istream& in, ClientInitKey& obj)
 
 WelcomeInfo::WelcomeInfo(CipherSuite suite)
   : CipherAware(suite)
+  , version(mls10Version)
+  , epoch(0)
   , tree(suite)
 {}
 
 WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id,
                          epoch_t epoch,
                          RatchetTree tree,
-                         tls::opaque<1> interim_transcript_hash,
-                         tls::opaque<1> init_secret)
-  : CipherAware(tree)
+                         const tls::opaque<1>& interim_transcript_hash,
+                         const tls::opaque<1>& init_secret)
+  : CipherAware(tree.cipher_suite())
   , version(mls10Version)
-  , group_id(group_id)
+  , group_id(std::move(group_id))
   , epoch(epoch)
-  , tree(tree)
+  , tree(std::move(tree))
   , interim_transcript_hash(interim_transcript_hash)
   , init_secret(init_secret)
 {}
@@ -251,7 +253,8 @@ operator>>(tls::istream& in, WelcomeInfo& obj)
 // Welcome
 
 Welcome::Welcome()
-  : encrypted_welcome_info(DUMMY_CIPHERSUITE)
+  : cipher_suite(DUMMY_CIPHERSUITE)
+  , encrypted_welcome_info(DUMMY_CIPHERSUITE)
 {}
 
 Welcome::Welcome(const bytes& id,
@@ -315,11 +318,9 @@ operator>>(tls::istream& in, GroupOperationType& obj)
 
 // Add
 
-Add::Add(LeafIndex index,
-         const ClientInitKey& init_key,
-         bytes welcome_info_hash)
+Add::Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash)
   : index(index)
-  , init_key(init_key)
+  , init_key(std::move(init_key))
   , welcome_info_hash(std::move(welcome_info_hash))
 {}
 
@@ -352,7 +353,7 @@ Update::Update(CipherSuite suite)
 {}
 
 Update::Update(const DirectPath& path)
-  : CipherAware(path)
+  : CipherAware(path.cipher_suite())
   , path(path)
 {}
 
@@ -384,7 +385,7 @@ Remove::Remove(CipherSuite suite)
 {}
 
 Remove::Remove(LeafIndex removed, const DirectPath& path)
-  : CipherAware(path)
+  : CipherAware(path.cipher_suite())
   , removed(removed)
   , path(path)
 {}
@@ -413,28 +414,30 @@ operator>>(tls::istream& in, Remove& obj)
 
 GroupOperation::GroupOperation()
   : CipherAware(DUMMY_CIPHERSUITE)
+  , type(GroupOperationType::none)
 {}
 
 GroupOperation::GroupOperation(CipherSuite suite)
   : CipherAware(suite)
+  , type(GroupOperationType::none)
 {}
 
 GroupOperation::GroupOperation(const Add& add)
   : CipherAware(DUMMY_CIPHERSUITE)
-  , type(add.type)
+  , type(GroupOperationType::add)
   , add(add)
 {}
 
 GroupOperation::GroupOperation(const Update& update)
-  : CipherAware(update)
-  , type(update.type)
+  : CipherAware(update.cipher_suite())
+  , type(GroupOperationType::update)
   , update(update)
 
 {}
 
 GroupOperation::GroupOperation(const Remove& remove)
-  : CipherAware(remove)
-  , type(remove.type)
+  : CipherAware(remove.cipher_suite())
+  , type(GroupOperationType::remove)
   , remove(remove)
 {}
 
@@ -520,23 +523,23 @@ MLSPlaintext::MLSPlaintext(bytes group_id,
                            LeafIndex sender,
                            GroupOperation operation)
   : CipherAware(operation.cipher_suite())
-  , group_id(group_id)
+  , group_id(std::move(group_id))
   , epoch(epoch)
   , sender(sender)
   , content_type(ContentType::handshake)
-  , operation(operation)
+  , operation(std::move(operation))
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id,
                            epoch_t epoch,
                            LeafIndex sender,
-                           const bytes& application_data)
+                           bytes application_data)
   : CipherAware(DUMMY_CIPHERSUITE)
-  , group_id(group_id)
+  , group_id(std::move(group_id))
   , epoch(epoch)
   , sender(sender)
   , content_type(ContentType::application)
-  , application_data(application_data)
+  , application_data(std::move(application_data))
 {}
 
 // struct {

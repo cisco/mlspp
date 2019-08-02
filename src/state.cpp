@@ -26,6 +26,7 @@ operator>>(tls::istream& out, GroupContext& obj)
 
 KeyChain::KeyChain(CipherSuite suite)
   : _suite(suite)
+  , _my_generation(0)
   , _secret_size(Digest(suite).output_size())
   , _key_size(AESGCM::key_size(suite))
   , _nonce_size(AESGCM::nonce_size)
@@ -338,6 +339,8 @@ State::handle(const MLSPlaintext& handshake) const
 
   bytes update_secret;
   switch (operation.type) {
+    case GroupOperationType::none:
+      throw InvalidParameterError("Uninitialized group operation");
     case GroupOperationType::add:
       update_secret = next.handle(operation.add.value());
       break;

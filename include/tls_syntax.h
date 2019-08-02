@@ -17,14 +17,14 @@ const size_t none = -1;
 class WriteError : public std::invalid_argument
 {
 public:
-  typedef std::invalid_argument parent;
+  using parent = std::invalid_argument;
   using parent::parent;
 };
 
 class ReadError : public std::invalid_argument
 {
 public:
-  typedef std::invalid_argument parent;
+  using parent = std::invalid_argument;
   using parent::parent;
 };
 
@@ -33,7 +33,7 @@ class vector_base : public std::vector<T>
 {
 public:
   // Explicitly import constructors
-  typedef std::vector<T> parent;
+  using parent = std::vector<T>;
   using parent::parent;
 
   vector_base(const parent& other)
@@ -60,7 +60,7 @@ class vector : public vector_base<T, head, min, max>
 {
 public:
   // Explicitly import constructors
-  typedef vector_base<T, head, min, max> parent;
+  using parent = vector_base<T, head, min, max>;
   using parent::parent;
   virtual ~vector() = default;
 
@@ -80,7 +80,7 @@ class variant_vector : public vector_base<T, head, min, max>
 {
 public:
   // Explicitly import constructors
-  typedef vector_base<T, head, min, max> parent;
+  using parent = vector_base<T, head, min, max>;
   using parent::parent;
 
   variant_vector(C ctor_arg)
@@ -97,7 +97,7 @@ template<typename T>
 class optional_base : public std::optional<T>
 {
 public:
-  typedef std::optional<T> parent;
+  using parent = std::optional<T>;
   using parent::parent;
   virtual ~optional_base() = default;
 
@@ -108,7 +108,7 @@ template<typename T>
 class optional : public optional_base<T>
 {
 public:
-  typedef optional_base<T> parent;
+  using parent = optional_base<T>;
   using parent::parent;
 
   virtual T& emplace_new() { return this->emplace(); }
@@ -127,7 +127,7 @@ template<typename T, typename C>
 class variant_optional : public optional_base<T>
 {
 public:
-  typedef optional_base<T> parent;
+  using parent = optional_base<T>;
   using parent::parent;
 
   variant_optional(C ctor_arg)

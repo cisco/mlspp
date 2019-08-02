@@ -57,8 +57,6 @@ protected:
       ClientInitKey{ client_init_key_id, suites, init_secret, cred };
 
     // Initial add is different
-    Welcome welcome;
-    bytes add;
     if (sessions.size() == 0) {
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
@@ -79,6 +77,8 @@ protected:
 
     auto initial_epoch = sessions[0].current_epoch();
 
+    Welcome welcome;
+    bytes add;
     std::tie(welcome, add) = sessions[from].add(client_init_key);
     auto next = Session::join(client_init_key, welcome, add);
     broadcast(add, index);

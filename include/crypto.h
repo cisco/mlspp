@@ -102,7 +102,7 @@ template<typename T>
 class typed_unique_ptr : public typed_unique_ptr_base<T>
 {
 public:
-  typedef typed_unique_ptr_base<T> parent;
+  using parent = typed_unique_ptr_base<T>;
   using parent::parent;
   typed_unique_ptr();
   typed_unique_ptr(T* ptr);
