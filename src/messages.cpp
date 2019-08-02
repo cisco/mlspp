@@ -12,11 +12,11 @@ RatchetNode::RatchetNode(CipherSuite suite)
   , node_secrets(suite)
 {}
 
-RatchetNode::RatchetNode(const DHPublicKey& public_key,
-                         const std::vector<HPKECiphertext>& node_secrets)
-  : CipherAware(public_key.cipher_suite())
-  , public_key(public_key)
-  , node_secrets(node_secrets)
+RatchetNode::RatchetNode(DHPublicKey public_key_in,
+                         const std::vector<HPKECiphertext>& node_secrets_in)
+  : CipherAware(public_key_in.cipher_suite())
+  , public_key(std::move(public_key_in))
+  , node_secrets(node_secrets_in)
 {}
 
 bool
@@ -69,11 +69,11 @@ ClientInitKey::ClientInitKey()
   : supported_versions(1, mls10Version)
 {}
 
-ClientInitKey::ClientInitKey(bytes client_init_key_id,
+ClientInitKey::ClientInitKey(bytes client_init_key_id_in,
                              const CipherList& supported_ciphersuites,
                              const bytes& init_secret,
-                             const Credential& credential)
-  : client_init_key_id(std::move(client_init_key_id))
+                             const Credential& credential_in)
+  : client_init_key_id(std::move(client_init_key_id_in))
   , supported_versions(1, mls10Version)
 {
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
@@ -88,7 +88,7 @@ ClientInitKey::ClientInitKey(bytes client_init_key_id,
     add_init_key(init_priv);
   }
 
-  sign(credential);
+  sign(credential_in);
 }
 
 void
@@ -198,18 +198,18 @@ WelcomeInfo::WelcomeInfo(CipherSuite suite)
   , tree(suite)
 {}
 
-WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id,
-                         epoch_t epoch,
-                         RatchetTree tree,
-                         const tls::opaque<1>& interim_transcript_hash,
-                         const tls::opaque<1>& init_secret)
-  : CipherAware(tree.cipher_suite())
+WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id_in,
+                         epoch_t epoch_in,
+                         RatchetTree tree_in,
+                         const tls::opaque<1>& interim_transcript_hash_in,
+                         const tls::opaque<1>& init_secret_in)
+  : CipherAware(tree_in.cipher_suite())
   , version(mls10Version)
-  , group_id(std::move(group_id))
-  , epoch(epoch)
-  , tree(std::move(tree))
-  , interim_transcript_hash(interim_transcript_hash)
-  , init_secret(init_secret)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , tree(std::move(tree_in))
+  , interim_transcript_hash(interim_transcript_hash_in)
+  , init_secret(init_secret_in)
 {}
 
 bytes
@@ -318,10 +318,12 @@ operator>>(tls::istream& in, GroupOperationType& obj)
 
 // Add
 
-Add::Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash)
-  : index(index)
-  , init_key(std::move(init_key))
-  , welcome_info_hash(std::move(welcome_info_hash))
+Add::Add(LeafIndex index_in,
+         ClientInitKey init_key_in,
+         bytes welcome_info_hash_in)
+  : index(index_in)
+  , init_key(std::move(init_key_in))
+  , welcome_info_hash(std::move(welcome_info_hash_in))
 {}
 
 const GroupOperationType Add::type = GroupOperationType::add;
@@ -352,9 +354,9 @@ Update::Update(CipherSuite suite)
   , path(suite)
 {}
 
-Update::Update(const DirectPath& path)
-  : CipherAware(path.cipher_suite())
-  , path(path)
+Update::Update(const DirectPath& path_in)
+  : CipherAware(path_in.cipher_suite())
+  , path(path_in)
 {}
 
 const GroupOperationType Update::type = GroupOperationType::update;
@@ -384,10 +386,10 @@ Remove::Remove(CipherSuite suite)
   , path(suite)
 {}
 
-Remove::Remove(LeafIndex removed, const DirectPath& path)
-  : CipherAware(path.cipher_suite())
-  , removed(removed)
-  , path(path)
+Remove::Remove(LeafIndex removed_in, const DirectPath& path_in)
+  : CipherAware(path_in.cipher_suite())
+  , removed(removed_in)
+  , path(path_in)
 {}
 
 const GroupOperationType Remove::type = GroupOperationType::remove;
@@ -422,23 +424,23 @@ GroupOperation::GroupOperation(CipherSuite suite)
   , type(GroupOperationType::none)
 {}
 
-GroupOperation::GroupOperation(const Add& add)
+GroupOperation::GroupOperation(const Add& add_in)
   : CipherAware(DUMMY_CIPHERSUITE)
   , type(GroupOperationType::add)
-  , add(add)
+  , add(add_in)
 {}
 
-GroupOperation::GroupOperation(const Update& update)
-  : CipherAware(update.cipher_suite())
+GroupOperation::GroupOperation(const Update& update_in)
+  : CipherAware(update_in.cipher_suite())
   , type(GroupOperationType::update)
-  , update(update)
+  , update(update_in)
 
 {}
 
-GroupOperation::GroupOperation(const Remove& remove)
-  : CipherAware(remove.cipher_suite())
+GroupOperation::GroupOperation(const Remove& remove_in)
+  : CipherAware(remove_in.cipher_suite())
   , type(GroupOperationType::remove)
-  , remove(remove)
+  , remove(remove_in)
 {}
 
 bool
@@ -518,28 +520,28 @@ operator>>(tls::istream& in, ContentType& obj)
 
 // MLSPlaintext
 
-MLSPlaintext::MLSPlaintext(bytes group_id,
-                           epoch_t epoch,
-                           LeafIndex sender,
-                           GroupOperation operation)
-  : CipherAware(operation.cipher_suite())
-  , group_id(std::move(group_id))
-  , epoch(epoch)
-  , sender(sender)
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           GroupOperation operation_in)
+  : CipherAware(operation_in.cipher_suite())
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
   , content_type(ContentType::handshake)
-  , operation(std::move(operation))
+  , operation(std::move(operation_in))
 {}
 
-MLSPlaintext::MLSPlaintext(bytes group_id,
-                           epoch_t epoch,
-                           LeafIndex sender,
-                           bytes application_data)
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           bytes application_data_in)
   : CipherAware(DUMMY_CIPHERSUITE)
-  , group_id(std::move(group_id))
-  , epoch(epoch)
-  , sender(sender)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
   , content_type(ContentType::application)
-  , application_data(std::move(application_data))
+  , application_data(std::move(application_data_in))
 {}
 
 // struct {

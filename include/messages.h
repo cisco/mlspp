@@ -18,7 +18,7 @@ struct RatchetNode : public CipherAware
   tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
 
   RatchetNode(CipherSuite suite);
-  RatchetNode(const DHPublicKey& public_key,
+  RatchetNode(DHPublicKey public_key,
               const std::vector<HPKECiphertext>& node_secrets);
 };
 
