@@ -35,6 +35,8 @@ deterministic_signature_scheme(SignatureScheme scheme)
     case SignatureScheme::Ed448:
       return true;
   }
+
+  return false;
 }
 
 class MessagesTest : public ::testing::Test
