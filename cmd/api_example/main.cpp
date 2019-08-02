@@ -137,7 +137,7 @@ main()
   verify("update A->C", sessionA, sessionC);
   verify("update B->C", sessionB, sessionC);
 
-  ////////// ACT IV: REMVOE ///////////
+  ////////// ACT IV: REMOVE ///////////
 
   // Charlie removes Bob
   auto remove = sessionC.remove(random_bytes(32), 1);
