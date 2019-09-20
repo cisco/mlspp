@@ -1553,14 +1553,4 @@ SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
   _pub = std::make_unique<SignaturePublicKey>(scheme, key->dup_public());
 }
 
-///
-/// HPKECiphertext
-///
-
-bool
-operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs)
-{
-  return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
-}
-
 } // namespace mls

@@ -336,8 +336,6 @@ struct HPKECiphertext : public CipherAware
     , content(content_in)
   {}
 
-  friend bool operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs);
-
   TLS_SERIALIZABLE(ephemeral, content);
 };
 

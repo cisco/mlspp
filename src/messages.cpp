@@ -19,25 +19,12 @@ RatchetNode::RatchetNode(DHPublicKey public_key_in,
   , node_secrets(node_secrets_in)
 {}
 
-bool
-operator==(const RatchetNode& lhs, const RatchetNode& rhs)
-{
-  return (lhs.public_key == rhs.public_key) &&
-         (lhs.node_secrets == rhs.node_secrets);
-}
-
 // DirectPath
 
 DirectPath::DirectPath(CipherSuite suite)
   : CipherAware(suite)
   , nodes(suite)
 {}
-
-bool
-operator==(const DirectPath& lhs, const DirectPath& rhs)
-{
-  return (lhs.nodes == rhs.nodes);
-}
 
 // ClientInitKey
 
@@ -132,24 +119,6 @@ ClientInitKey::to_be_signed() const
   return out.bytes();
 }
 
-// XXX(rlb@ipv.sx): Don't compare signature, since some signature
-// algorithms are non-deterministic.  Instead, we just verify that
-// the public keys are the same and both signatures are valid over
-// the same contents.
-bool
-operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
-{
-  return (lhs.cipher_suites == rhs.cipher_suites) &&
-         (lhs.init_keys == rhs.init_keys) &&
-         (lhs.credential == rhs.credential) && (lhs.signature == rhs.signature);
-}
-
-bool
-operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
-{
-  return !(lhs == rhs);
-}
-
 // WelcomeInfo
 
 WelcomeInfo::WelcomeInfo(CipherSuite suite)
@@ -178,15 +147,6 @@ WelcomeInfo::hash(CipherSuite suite) const
 {
   auto marshaled = tls::marshal(*this);
   return Digest(suite).write(marshaled).digest();
-}
-
-bool
-operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
-{
-  return (lhs.version == rhs.version) && (lhs.group_id == rhs.group_id) &&
-         (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
-         (lhs.interim_transcript_hash == rhs.interim_transcript_hash) &&
-         (lhs.init_secret == rhs.init_secret);
 }
 
 // Welcome
@@ -267,13 +227,6 @@ Add::Add(LeafIndex index_in,
 
 const GroupOperationType Add::type = GroupOperationType::add;
 
-bool
-operator==(const Add& lhs, const Add& rhs)
-{
-  return (lhs.index == rhs.index) && (lhs.init_key == rhs.init_key) &&
-         (lhs.welcome_info_hash == rhs.welcome_info_hash);
-}
-
 // Update
 
 Update::Update(CipherSuite suite)
@@ -287,12 +240,6 @@ Update::Update(const DirectPath& path_in)
 {}
 
 const GroupOperationType Update::type = GroupOperationType::update;
-
-bool
-operator==(const Update& lhs, const Update& rhs)
-{
-  return (lhs.path == rhs.path);
-}
 
 // Remove
 
@@ -308,12 +255,6 @@ Remove::Remove(LeafIndex removed_in, const DirectPath& path_in)
 {}
 
 const GroupOperationType Remove::type = GroupOperationType::remove;
-
-bool
-operator==(const Remove& lhs, const Remove& rhs)
-{
-  return (lhs.path == rhs.path);
-}
 
 // GroupOperation
 
@@ -618,23 +559,6 @@ operator>>(tls::istream& in, MLSPlaintext& obj)
 
   in >> obj.signature;
   return in;
-}
-
-// MLSCiphertext
-
-bool
-operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
-{
-  auto group_id = (lhs.group_id == rhs.group_id);
-  auto epoch = (lhs.epoch == rhs.epoch);
-  auto content_type = (lhs.content_type == rhs.content_type);
-  auto sender_data_nonce = (lhs.sender_data_nonce == rhs.sender_data_nonce);
-  auto encrypted_sender_data =
-    (lhs.encrypted_sender_data == rhs.encrypted_sender_data);
-  auto ciphertext = (lhs.ciphertext == rhs.ciphertext);
-
-  return group_id && epoch && content_type && sender_data_nonce &&
-         encrypted_sender_data && ciphertext;
 }
 
 } // namespace mls

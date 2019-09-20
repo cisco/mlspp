@@ -24,9 +24,6 @@ struct RatchetNode : public CipherAware
   TLS_SERIALIZABLE(public_key, node_secrets);
 };
 
-bool
-operator==(const RatchetNode& lhs, const RatchetNode& rhs);
-
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
 // } DirectPath;
@@ -37,9 +34,6 @@ struct DirectPath : public CipherAware
 
   TLS_SERIALIZABLE(nodes);
 };
-
-bool
-operator==(const DirectPath& lhs, const DirectPath& rhs);
 
 // struct {
 //     opaque client_init_key_id<0..255>;
@@ -84,11 +78,6 @@ struct ClientInitKey
   std::map<CipherSuite, DHPrivateKey> _private_keys;
 };
 
-bool
-operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
-bool
-operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
-
 // struct {
 //   ProtocolVersion version;
 //   opaque group_id<0..255>;
@@ -118,9 +107,6 @@ struct WelcomeInfo : public CipherAware
 
   TLS_SERIALIZABLE(version, group_id, epoch, tree, interim_transcript_hash, init_secret);
 };
-
-bool
-operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs);
 
 // struct {
 //   opaque client_init_key_id<0..255>;
@@ -178,9 +164,6 @@ public:
   TLS_SERIALIZABLE(index, init_key, welcome_info_hash)
 };
 
-bool
-operator==(const Add& lhs, const Add& rhs);
-
 // struct {
 //     DirectPath path;
 // } Update;
@@ -195,9 +178,6 @@ public:
 
   TLS_SERIALIZABLE(path);
 };
-
-bool
-operator==(const Update& lhs, const Update& rhs);
 
 // struct {
 //     uint32 removed;
@@ -215,9 +195,6 @@ public:
 
   TLS_SERIALIZABLE(removed, path);
 };
-
-bool
-operator==(const Remove& lhs, const Remove& rhs);
 
 // Container class for all operations
 //
@@ -348,8 +325,5 @@ struct MLSCiphertext
   TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
                    encrypted_sender_data, ciphertext);
 };
-
-bool
-operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs);
 
 } // namespace mls

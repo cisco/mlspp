@@ -36,13 +36,6 @@ private:
 
   // A credential is populated iff this is a leaf node
   tls::optional<Credential> _cred;
-
-  friend RatchetTreeNode operator+(const RatchetTreeNode& lhs,
-                                   const RatchetTreeNode& rhs);
-  friend bool operator==(const RatchetTreeNode& lhs,
-                         const RatchetTreeNode& rhs);
-  friend bool operator!=(const RatchetTreeNode& lhs,
-                         const RatchetTreeNode& rhs);
 };
 
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
@@ -143,10 +136,9 @@ protected:
   void set_hash_path(LeafIndex index);
   void set_hash_all(NodeIndex index);
 
-  friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
-
   // XXX(rlb): These are still necessary because operator>> triggers the
   // computation of the tree hash
+  friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };

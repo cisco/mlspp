@@ -26,18 +26,6 @@ NodeCount::NodeCount(const LeafCount n)
   : UInt32(2 * (n.val - 1) + 1)
 {}
 
-tls::istream&
-operator>>(tls::istream& in, UInt32& obj)
-{
-  return in >> obj.val;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const UInt32& obj)
-{
-  return out << obj.val;
-}
-
 namespace tree_math {
 
 static uint32_t

@@ -57,6 +57,22 @@ operator<<(std::ostream& out, const bytes& data);
 typedef uint32_t epoch_t;
 
 ///
+/// Auto-generate equality and inequality operators for TLS-serializable things
+///
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, bool>::type
+operator==(const T& lhs, const T& rhs) {
+  return lhs._tls_fields_w() == rhs._tls_fields_w();
+}
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, bool>::type
+operator!=(const T& lhs, const T& rhs) {
+  return lhs._tls_fields_w() != rhs._tls_fields_w();
+}
+
+///
 /// Error types
 ///
 

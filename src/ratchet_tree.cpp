@@ -90,19 +90,6 @@ RatchetTreeNode::merge(const RatchetTreeNode& other)
   // Credential is immutable
 }
 
-bool
-operator==(const RatchetTreeNode& lhs, const RatchetTreeNode& rhs)
-{
-  // Equality is based on public attributes only
-  return (lhs._pub == rhs._pub) && (lhs._cred == rhs._cred);
-}
-
-bool
-operator!=(const RatchetTreeNode& lhs, const RatchetTreeNode& rhs)
-{
-  return !(lhs == rhs);
-}
-
 ///
 /// OptionalRatchetTreeNode
 ///
