@@ -867,13 +867,9 @@ struct HKDFLabel
   uint16_t length;
   tls::opaque<1> label;
   tls::opaque<4> context;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const HKDFLabel& obj)
-{
-  return out << obj.length << obj.label << obj.context;
-}
+  TLS_SERIALIZABLE(length, label, context);
+};
 
 bytes
 hkdf_expand_label(CipherSuite suite,
@@ -1291,13 +1287,9 @@ struct HPKEContext
   uint8_t mode;
   tls::opaque<2> kem_context;
   tls::opaque<2> info;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const HPKEContext& obj)
-{
-  return out << obj.ciphersuite << obj.mode << obj.kem_context << obj.info;
-}
+  TLS_SERIALIZABLE(ciphersuite, mode, kem_context, info)
+};
 
 static std::pair<bytes, bytes>
 setup_core(CipherSuite suite,
@@ -1569,18 +1561,6 @@ bool
 operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs)
 {
   return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const HPKECiphertext& obj)
-{
-  return out << obj.ephemeral << obj.content;
-}
-
-tls::istream&
-operator>>(tls::istream& in, HPKECiphertext& obj)
-{
-  return in >> obj.ephemeral >> obj.content;
 }
 
 } // namespace mls

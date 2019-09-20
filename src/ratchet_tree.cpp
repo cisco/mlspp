@@ -103,26 +103,6 @@ operator!=(const RatchetTreeNode& lhs, const RatchetTreeNode& rhs)
   return !(lhs == rhs);
 }
 
-std::ostream&
-operator<<(std::ostream& out, const RatchetTreeNode& node)
-{
-  auto cred = tls::marshal(node._cred);
-  return out << node._pub.to_bytes();
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const RatchetTreeNode& obj)
-{
-  return out << obj._pub << obj._cred;
-}
-
-tls::istream&
-operator>>(tls::istream& in, RatchetTreeNode& obj)
-{
-  obj._priv = std::nullopt;
-  return in >> obj._pub >> obj._cred;
-}
-
 ///
 /// OptionalRatchetTreeNode
 ///
@@ -158,25 +138,17 @@ struct LeafNodeInfo
 {
   DHPublicKey public_key;
   Credential credential;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const LeafNodeInfo& obj)
-{
-  return out << obj.public_key << obj.credential;
-}
+  TLS_SERIALIZABLE(public_key, credential);
+};
 
 struct LeafNodeHashInput
 {
   const uint8_t hash_type = 0;
   tls::optional<LeafNodeInfo> info;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const LeafNodeHashInput& obj)
-{
-  return out << obj.hash_type << obj.info;
-}
+  TLS_SERIALIZABLE(hash_type, info);
+};
 
 void
 OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
@@ -203,14 +175,9 @@ struct ParentNodeHashInput
   tls::optional<DHPublicKey> public_key;
   tls::opaque<1> left_hash;
   tls::opaque<1> right_hash;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const ParentNodeHashInput& obj)
-{
-  return out << obj.hash_type << obj.public_key << obj.left_hash
-             << obj.right_hash;
-}
+  TLS_SERIALIZABLE(hash_type, public_key, left_hash, right_hash);
+};
 
 void
 OptionalRatchetTreeNode::set_hash(CipherSuite suite,
@@ -226,16 +193,6 @@ OptionalRatchetTreeNode::set_hash(CipherSuite suite,
 
   auto hash_input = tls::marshal(hash_input_str);
   _hash = Digest(suite).write(hash_input).digest();
-}
-
-std::ostream&
-operator<<(std::ostream& out, const OptionalRatchetTreeNode& opt)
-{
-  if (!opt.has_value()) {
-    return out << "_";
-  }
-
-  return out << opt.value();
 }
 
 ///
@@ -732,15 +689,6 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   return true;
-}
-
-std::ostream&
-operator<<(std::ostream& out, const RatchetTree& obj)
-{
-  for (const auto& node : obj._nodes) {
-    out << node << " ";
-  }
-  return out;
 }
 
 tls::ostream&

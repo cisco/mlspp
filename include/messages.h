@@ -20,14 +20,12 @@ struct RatchetNode : public CipherAware
   RatchetNode(CipherSuite suite);
   RatchetNode(DHPublicKey public_key,
               const std::vector<HPKECiphertext>& node_secrets);
+
+  TLS_SERIALIZABLE(public_key, node_secrets);
 };
 
 bool
 operator==(const RatchetNode& lhs, const RatchetNode& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const RatchetNode& obj);
-tls::istream&
-operator>>(tls::istream& in, RatchetNode& obj);
 
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
@@ -36,14 +34,12 @@ struct DirectPath : public CipherAware
 {
   tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
   DirectPath(CipherSuite suite);
+
+  TLS_SERIALIZABLE(nodes);
 };
 
 bool
 operator==(const DirectPath& lhs, const DirectPath& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const DirectPath& obj);
-tls::istream&
-operator>>(tls::istream& in, DirectPath& obj);
 
 // struct {
 //     opaque client_init_key_id<0..255>;
@@ -81,6 +77,9 @@ struct ClientInitKey
   bool verify() const;
   bytes to_be_signed() const;
 
+  TLS_SERIALIZABLE(client_init_key_id, supported_versions, cipher_suites,
+                   init_keys, credential, signature)
+
   private:
   std::map<CipherSuite, DHPrivateKey> _private_keys;
 };
@@ -89,10 +88,6 @@ bool
 operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
 bool
 operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const ClientInitKey& obj);
-tls::istream&
-operator>>(tls::istream& in, ClientInitKey& obj);
 
 // struct {
 //   ProtocolVersion version;
@@ -120,14 +115,12 @@ struct WelcomeInfo : public CipherAware
               const tls::opaque<1>& init_secret);
 
   bytes hash(CipherSuite suite) const;
+
+  TLS_SERIALIZABLE(version, group_id, epoch, tree, interim_transcript_hash, init_secret);
 };
 
 bool
 operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const WelcomeInfo& obj);
-tls::istream&
-operator>>(tls::istream& in, WelcomeInfo& obj);
 
 // struct {
 //   opaque client_init_key_id<0..255>;
@@ -181,14 +174,12 @@ public:
   Add() = default;
   Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
   static const GroupOperationType type;
+
+  TLS_SERIALIZABLE(index, init_key, welcome_info_hash)
 };
 
 bool
 operator==(const Add& lhs, const Add& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Add& obj);
-tls::istream&
-operator>>(tls::istream& in, Add& obj);
 
 // struct {
 //     DirectPath path;
@@ -201,14 +192,12 @@ public:
   Update(CipherSuite suite);
   Update(const DirectPath& path);
   static const GroupOperationType type;
+
+  TLS_SERIALIZABLE(path);
 };
 
 bool
 operator==(const Update& lhs, const Update& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Update& obj);
-tls::istream&
-operator>>(tls::istream& in, Update& obj);
 
 // struct {
 //     uint32 removed;
@@ -223,14 +212,12 @@ public:
   Remove(CipherSuite suite);
   Remove(LeafIndex removed, const DirectPath& path);
   static const GroupOperationType type;
+
+  TLS_SERIALIZABLE(removed, path);
 };
 
 bool
 operator==(const Remove& lhs, const Remove& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Remove& obj);
-tls::istream&
-operator>>(tls::istream& in, Remove& obj);
 
 // Container class for all operations
 //
@@ -357,13 +344,12 @@ struct MLSCiphertext
   tls::opaque<1> sender_data_nonce;
   tls::opaque<1> encrypted_sender_data;
   tls::opaque<4> ciphertext;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
+                   encrypted_sender_data, ciphertext);
 };
 
 bool
 operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj);
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj);
 
 } // namespace mls

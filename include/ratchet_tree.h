@@ -5,7 +5,6 @@
 #include "crypto.h"
 #include "tls_syntax.h"
 #include "tree_math.h"
-#include <iosfwd>
 #include <optional>
 
 namespace mls {
@@ -29,6 +28,8 @@ public:
   void merge(const RatchetTreeNode& other);
   void set_credential(const Credential& cred);
 
+  TLS_SERIALIZABLE(_pub, _cred);
+
 private:
   std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
@@ -42,11 +43,6 @@ private:
                          const RatchetTreeNode& rhs);
   friend bool operator!=(const RatchetTreeNode& lhs,
                          const RatchetTreeNode& rhs);
-  friend std::ostream& operator<<(std::ostream& out,
-                                  const RatchetTreeNode& node);
-  friend tls::ostream& operator<<(tls::ostream& out,
-                                  const RatchetTreeNode& obj);
-  friend tls::istream& operator>>(tls::istream& in, RatchetTreeNode& obj);
 };
 
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
@@ -130,6 +126,8 @@ public:
   bool check_credentials() const;
   bool check_invariant(LeafIndex from) const;
 
+  TLS_SERIALIZABLE(_nodes)
+
 protected:
   RatchetTreeNodeVector _nodes;
   size_t _secret_size;
@@ -146,7 +144,9 @@ protected:
   void set_hash_all(NodeIndex index);
 
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
-  friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
+
+  // XXX(rlb): These are still necessary because operator>> triggers the
+  // computation of the tree hash
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };

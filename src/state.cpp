@@ -3,24 +3,6 @@
 namespace mls {
 
 ///
-/// GroupContext
-///
-
-tls::ostream&
-operator<<(tls::ostream& out, const GroupContext& obj)
-{
-  return out << obj.group_id << obj.epoch << obj.tree_hash
-             << obj.transcript_hash;
-}
-
-tls::istream&
-operator>>(tls::istream& out, GroupContext& obj)
-{
-  return out >> obj.group_id >> obj.epoch >> obj.tree_hash >>
-         obj.transcript_hash;
-}
-
-///
 /// KeyChain
 ///
 

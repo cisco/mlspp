@@ -337,8 +337,8 @@ struct HPKECiphertext : public CipherAware
   {}
 
   friend bool operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const HPKECiphertext& obj);
-  friend tls::istream& operator>>(tls::istream& in, HPKECiphertext& obj);
+
+  TLS_SERIALIZABLE(ephemeral, content);
 };
 
 } // namespace mls

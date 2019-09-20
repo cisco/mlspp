@@ -26,18 +26,6 @@ operator==(const RatchetNode& lhs, const RatchetNode& rhs)
          (lhs.node_secrets == rhs.node_secrets);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const RatchetNode& obj)
-{
-  return out << obj.public_key << obj.node_secrets;
-}
-
-tls::istream&
-operator>>(tls::istream& in, RatchetNode& obj)
-{
-  return in >> obj.public_key >> obj.node_secrets;
-}
-
 // DirectPath
 
 DirectPath::DirectPath(CipherSuite suite)
@@ -49,18 +37,6 @@ bool
 operator==(const DirectPath& lhs, const DirectPath& rhs)
 {
   return (lhs.nodes == rhs.nodes);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const DirectPath& obj)
-{
-  return out << obj.nodes;
-}
-
-tls::istream&
-operator>>(tls::istream& in, DirectPath& obj)
-{
-  return in >> obj.nodes;
 }
 
 // ClientInitKey
@@ -174,21 +150,6 @@ operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
   return !(lhs == rhs);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const ClientInitKey& obj)
-{
-  return out << obj.client_init_key_id << obj.supported_versions
-             << obj.cipher_suites << obj.init_keys << obj.credential
-             << obj.signature;
-}
-
-tls::istream&
-operator>>(tls::istream& in, ClientInitKey& obj)
-{
-  return in >> obj.client_init_key_id >> obj.supported_versions >>
-         obj.cipher_suites >> obj.init_keys >> obj.credential >> obj.signature;
-}
-
 // WelcomeInfo
 
 WelcomeInfo::WelcomeInfo(CipherSuite suite)
@@ -226,28 +187,6 @@ operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs)
          (lhs.epoch == rhs.epoch) && (lhs.tree == rhs.tree) &&
          (lhs.interim_transcript_hash == rhs.interim_transcript_hash) &&
          (lhs.init_secret == rhs.init_secret);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const WelcomeInfo& obj)
-{
-  return out << obj.version << obj.group_id << obj.epoch << obj.tree
-             << obj.interim_transcript_hash << obj.init_secret;
-}
-
-tls::istream&
-operator>>(tls::istream& in, WelcomeInfo& obj)
-{
-  in >> obj.version >> obj.group_id >> obj.epoch;
-
-  // Set the tree struct to use the correct ciphersuite for this
-  // group
-  obj.tree = RatchetTree(obj.cipher_suite());
-
-  in >> obj.tree;
-  in >> obj.interim_transcript_hash;
-  in >> obj.init_secret;
-  return in;
 }
 
 // Welcome
@@ -335,18 +274,6 @@ operator==(const Add& lhs, const Add& rhs)
          (lhs.welcome_info_hash == rhs.welcome_info_hash);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const Add& obj)
-{
-  return out << obj.index << obj.init_key << obj.welcome_info_hash;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Add& obj)
-{
-  return in >> obj.index >> obj.init_key >> obj.welcome_info_hash;
-}
-
 // Update
 
 Update::Update(CipherSuite suite)
@@ -365,18 +292,6 @@ bool
 operator==(const Update& lhs, const Update& rhs)
 {
   return (lhs.path == rhs.path);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Update& obj)
-{
-  return out << obj.path;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Update& obj)
-{
-  return in >> obj.path;
 }
 
 // Remove
@@ -398,18 +313,6 @@ bool
 operator==(const Remove& lhs, const Remove& rhs)
 {
   return (lhs.path == rhs.path);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Remove& obj)
-{
-  return out << obj.removed << obj.path;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Remove& obj)
-{
-  return in >> obj.removed >> obj.path;
 }
 
 // GroupOperation
@@ -732,21 +635,6 @@ operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs)
 
   return group_id && epoch && content_type && sender_data_nonce &&
          encrypted_sender_data && ciphertext;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj)
-{
-  return out << obj.group_id << obj.epoch << obj.content_type
-             << obj.sender_data_nonce << obj.encrypted_sender_data
-             << obj.ciphertext;
-}
-
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj)
-{
-  return in >> obj.group_id >> obj.epoch >> obj.content_type >>
-         obj.sender_data_nonce >> obj.encrypted_sender_data >> obj.ciphertext;
 }
 
 } // namespace mls
