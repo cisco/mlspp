@@ -6,17 +6,6 @@
 #include <stdexcept>
 #include <vector>
 
-// Forward declarations to enable optional serialization below
-namespace tls {
-class ostream;
-class istream;
-
-ostream&
-operator<<(ostream& out, uint8_t data);
-istream&
-operator>>(istream& in, uint8_t& data);
-}
-
 namespace mls {
 
 ///

@@ -198,23 +198,6 @@ operator>>(tls::istream& in, Welcome& obj)
   return in;
 }
 
-// GroupOperationType
-
-tls::ostream&
-operator<<(tls::ostream& out, const GroupOperationType& obj)
-{
-  return out << uint8_t(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, GroupOperationType& obj)
-{
-  uint8_t type;
-  in >> type;
-  obj = GroupOperationType(type);
-  return in;
-}
-
 // Add
 
 Add::Add(LeafIndex index_in,
@@ -342,23 +325,6 @@ operator>>(tls::istream& in, GroupOperation& obj)
       throw InvalidParameterError("Unknown group operation type");
   }
 
-  return in;
-}
-
-// ContentType
-
-tls::ostream&
-operator<<(tls::ostream& out, const ContentType& obj)
-{
-  return out << static_cast<uint8_t>(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, ContentType& obj)
-{
-  uint8_t val;
-  in >> val;
-  obj = static_cast<ContentType>(val);
   return in;
 }
 

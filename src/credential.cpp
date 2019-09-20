@@ -6,25 +6,6 @@
 namespace mls {
 
 ///
-/// CredentialType
-///
-
-tls::ostream&
-operator<<(tls::ostream& out, CredentialType type)
-{
-  return out << uint8_t(type);
-}
-
-tls::istream&
-operator>>(tls::istream& in, CredentialType& type)
-{
-  uint8_t temp;
-  in >> temp;
-  type = CredentialType(temp);
-  return in;
-}
-
-///
 /// BasicCredential
 ///
 

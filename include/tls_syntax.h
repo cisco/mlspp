@@ -263,6 +263,14 @@ operator<<(tls::ostream& out, const optional_base<T>& opt)
   return out << uint8_t(1) << opt.value();
 }
 
+// Enum writer
+template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
+tls::ostream&
+operator<<(tls::ostream& str, const T& val) {
+  auto u = static_cast<std::underlying_type_t<T>>(val);
+  return str << u;
+}
+
 // Struct writer (enabled by macro)
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
@@ -400,6 +408,18 @@ operator>>(tls::istream& in, optional_base<T>& opt)
     default:
       throw std::invalid_argument("Malformed optional");
   }
+}
+
+// Enum reader
+// XXX(rlb): It would be nice if this could enforce that the values are valid,
+// but C++ doesn't seem to have that ability.
+template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
+tls::istream&
+operator>>(tls::istream& str, T& val) {
+  std::underlying_type_t<T> u;
+  str >> u;
+  val = static_cast<T>(u);
+  return str;
 }
 
 // Struct reader (enabled by macro)

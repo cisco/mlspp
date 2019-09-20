@@ -13,63 +13,9 @@
 
 namespace mls {
 
-///
-/// CipherSuite and SignatureScheme
-///
-
 static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
 static const SignatureScheme unknown_scheme =
   static_cast<SignatureScheme>(0xFFFF);
-
-tls::ostream&
-operator<<(tls::ostream& out, const CipherSuite& obj)
-{
-  return out << static_cast<uint16_t>(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, CipherSuite& obj)
-{
-  uint16_t val;
-  in >> val;
-  obj = static_cast<CipherSuite>(val);
-  return in;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignatureScheme& obj)
-{
-  return out << static_cast<uint16_t>(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignatureScheme& obj)
-{
-  uint16_t val;
-  in >> val;
-  obj = static_cast<SignatureScheme>(val);
-  return in;
-}
-
-CipherAware::CipherAware(CipherSuite suite)
-  : _suite(suite)
-{}
-
-CipherSuite
-CipherAware::cipher_suite() const
-{
-  return _suite;
-}
-
-SignatureAware::SignatureAware(SignatureScheme scheme)
-  : _scheme(scheme)
-{}
-
-SignatureScheme
-SignatureAware::signature_scheme() const
-{
-  return _scheme;
-}
 
 ///
 /// Test mode controls

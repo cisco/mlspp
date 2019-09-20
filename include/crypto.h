@@ -20,11 +20,6 @@ enum struct CipherSuite : uint16_t
 
 typedef std::vector<CipherSuite> CipherList;
 
-tls::ostream&
-operator<<(tls::ostream& out, const CipherSuite& obj);
-tls::istream&
-operator>>(tls::istream& in, CipherSuite& obj);
-
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0403,
@@ -33,17 +28,15 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808
 };
 
-tls::ostream&
-operator<<(tls::ostream& out, const SignatureScheme& obj);
-tls::istream&
-operator>>(tls::istream& in, SignatureScheme& obj);
-
 // Utility classes to avoid a bit of boilerplate
 class CipherAware
 {
 public:
-  CipherAware(CipherSuite suite);
-  CipherSuite cipher_suite() const;
+  CipherAware(CipherSuite suite)
+    : _suite(suite)
+  {}
+
+  CipherSuite cipher_suite() const { return _suite; }
 
 protected:
   CipherSuite _suite;
@@ -52,8 +45,11 @@ protected:
 class SignatureAware
 {
 public:
-  SignatureAware(SignatureScheme scheme);
-  SignatureScheme signature_scheme() const;
+  SignatureAware(SignatureScheme scheme)
+    : _scheme(scheme)
+  {}
+
+  SignatureScheme signature_scheme() const { return _scheme; }
 
 protected:
   SignatureScheme _scheme;

@@ -140,11 +140,6 @@ enum class GroupOperationType : uint8_t
   remove = 3,
 };
 
-tls::ostream&
-operator<<(tls::ostream& out, const GroupOperationType& obj);
-tls::istream&
-operator>>(tls::istream& in, GroupOperationType& obj);
-
 // struct {
 //     uint32 index;
 //     ClientInitKey init_key;
@@ -243,11 +238,6 @@ enum struct ContentType : uint8_t
   handshake = 1,
   application = 2,
 };
-
-tls::ostream&
-operator<<(tls::ostream& out, const ContentType& obj);
-tls::istream&
-operator>>(tls::istream& in, ContentType& obj);
 
 // struct {
 //     opaque group_id<0..255>;
