@@ -10,24 +10,14 @@ struct ExampleStruct
   uint16_t a;
   tls::vector<uint8_t, 2> b;
   std::array<uint32_t, 4> c;
+
+  TLS_SERIALIZABLE(a, b, c)
 };
 
 bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 {
   return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const ExampleStruct& data)
-{
-  return out << data.a << data.b << data.c;
-}
-
-tls::istream&
-operator>>(tls::istream& in, ExampleStruct& data)
-{
-  return in >> data.a >> data.b >> data.c;
 }
 
 struct MustInitialize

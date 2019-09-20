@@ -11,6 +11,13 @@
 // in the global namespace, e.g., vector, istream, ostream.
 namespace tls {
 
+// Use this macro to define struct serialization with minimal boilerplate
+#define TLS_SERIALIZABLE(...) \
+  static const bool _tls_serializable = true; \
+  auto _tls_fields_r() { return std::tie(__VA_ARGS__); } \
+  auto _tls_fields_w() const { return std::make_tuple(__VA_ARGS__); }
+
+
 // For indicating no min or max in vector definitions
 const size_t none = -1;
 
@@ -152,6 +159,10 @@ operator==(const variant_optional<T, C>& lhs, const variant_optional<T, C>& rhs)
 template<size_t head, size_t min = tls::none, size_t max = tls::none>
 using opaque = vector<uint8_t, head, min, max>;
 
+///
+/// ostream
+///
+
 class ostream
 {
 public:
@@ -251,6 +262,31 @@ operator<<(tls::ostream& out, const optional_base<T>& opt)
 
   return out << uint8_t(1) << opt.value();
 }
+
+// Struct writer (enabled by macro)
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+{ }
+
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+{
+  str << std::get<I>(t);
+  write_tuple<I + 1, Tp...>(str, t);
+}
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, tls::ostream&>::type
+operator<<(tls::ostream& str, const T& obj) {
+  write_tuple(str, obj._tls_fields_w());
+  return str;
+}
+
+///
+/// istream
+///
 
 class istream
 {
@@ -364,6 +400,27 @@ operator>>(tls::istream& in, optional_base<T>& opt)
     default:
       throw std::invalid_argument("Malformed optional");
   }
+}
+
+// Struct reader (enabled by macro)
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+{ }
+
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+{
+  str >> std::get<I>(t);
+  read_tuple<I + 1, Tp...>(str, t);
+}
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, tls::istream&>::type
+operator>>(tls::istream& str, T& obj) {
+  read_tuple(str, obj._tls_fields_r());
+  return str;
 }
 
 // Abbreviations
