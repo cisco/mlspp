@@ -7,8 +7,11 @@ CLANG_FORMAT=clang-format -i -style=mozilla
 TEST_VECTOR_DIR=./build/test/vectors
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-all: ${BUILD_DIR} format src/* include/** test/*
+all: ${BUILD_DIR} ${TEST_VECTOR_DIR} format src/* include/** test/*
 	cmake --build ${BUILD_DIR}
+
+${TEST_VECTOR_DIR}:
+	mkdir -p ${TEST_VECTOR_DIR}
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
@@ -16,11 +19,10 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
 lint: ${BUILD_DIR}
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=ON -DCMAKE_BUILD_TYPE=Debug
 
-test: all
+test: all ${TEST_VECTOR_DIR}
 	cd ${BUILD_DIR} && ctest
 
-gen: all
-	mkdir -p ${TEST_VECTOR_DIR}
+gen: all ${TEST_VECTOR_DIR}
 	cd ${TEST_VECTOR_DIR} && ../../../${TEST_GEN}
 
 example: all
