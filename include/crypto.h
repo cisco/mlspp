@@ -18,8 +18,6 @@ enum struct CipherSuite : uint16_t
   X448_SHA512_AES256GCM = 0x0011
 };
 
-typedef std::vector<CipherSuite> CipherList;
-
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0403,

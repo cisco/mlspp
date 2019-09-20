@@ -29,15 +29,16 @@ DirectPath::DirectPath(CipherSuite suite)
 // ClientInitKey
 
 ClientInitKey::ClientInitKey()
-  : supported_versions(1, mls10Version)
+  : supported_versions(1, ProtocolVersion::mls10)
 {}
 
-ClientInitKey::ClientInitKey(bytes client_init_key_id_in,
-                             const CipherList& supported_ciphersuites,
-                             const bytes& init_secret,
-                             const Credential& credential_in)
+ClientInitKey::ClientInitKey(
+  bytes client_init_key_id_in,
+  const std::vector<CipherSuite>& supported_ciphersuites,
+  const bytes& init_secret,
+  const Credential& credential_in)
   : client_init_key_id(std::move(client_init_key_id_in))
-  , supported_versions(1, mls10Version)
+  , supported_versions(1, ProtocolVersion::mls10)
 {
   // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
   // from the same secret.  Maybe we should include the ciphersuite
@@ -123,7 +124,7 @@ ClientInitKey::to_be_signed() const
 
 WelcomeInfo::WelcomeInfo(CipherSuite suite)
   : CipherAware(suite)
-  , version(mls10Version)
+  , version(ProtocolVersion::mls10)
   , epoch(0)
   , tree(suite)
 {}
@@ -134,7 +135,7 @@ WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id_in,
                          const tls::opaque<1>& interim_transcript_hash_in,
                          const tls::opaque<1>& init_secret_in)
   : CipherAware(tree_in.cipher_suite())
-  , version(mls10Version)
+  , version(ProtocolVersion::mls10)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))

@@ -9,18 +9,10 @@
 namespace mls {
 
 ///
-/// Protocol versions
-///
-
-typedef uint8_t ProtocolVersion;
-
-static const ProtocolVersion mls10Version = 0xFF;
-
-///
 /// Byte strings and serialization
 ///
 
-typedef std::vector<uint8_t> bytes;
+using bytes = std::vector<uint8_t>;
 
 bytes
 to_bytes(const std::string& ascii);
@@ -43,7 +35,7 @@ operator^(const bytes& lhs, const bytes& rhs);
 std::ostream&
 operator<<(std::ostream& out, const bytes& data);
 
-typedef uint32_t epoch_t;
+using epoch_t = uint32_t;
 
 ///
 /// Auto-generate equality and inequality operators for TLS-serializable things

@@ -9,6 +9,15 @@
 
 namespace mls {
 
+///
+/// Protocol versions
+///
+
+enum class ProtocolVersion : uint8_t
+{
+  mls10 = 0xFF,
+};
+
 // struct {
 //    DHPublicKey public_key;
 //    HPKECiphertext node_secrets<0..2^16-1>;
@@ -61,7 +70,7 @@ struct ClientInitKey
 
   ClientInitKey();
   ClientInitKey(bytes client_init_key_id,
-                const CipherList& supported_ciphersuites,
+                const std::vector<CipherSuite>& supported_ciphersuites,
                 const bytes& init_secret,
                 const Credential& credential);
 
