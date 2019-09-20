@@ -91,11 +91,11 @@ State::State(const ClientInitKey& my_client_init_key,
 {
   // Verify that we have an add and it is for us
   const auto& operation = handshake.operation.value();
-  if (handshake.operation.value().type != GroupOperationType::add) {
+  if (handshake.operation.value().type() != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
-  const auto& add = operation.add.value();
+  const auto& add = std::get<Add>(operation);
   if (my_client_init_key != add.init_key) {
     throw InvalidParameterError("Add not targeted for this node");
   }
@@ -320,17 +320,19 @@ State::handle(const MLSPlaintext& handshake) const
   auto next = *this;
 
   bytes update_secret;
-  switch (operation.type) {
+  switch (operation.type()) {
     case GroupOperationType::none:
       throw InvalidParameterError("Uninitialized group operation");
     case GroupOperationType::add:
-      update_secret = next.handle(operation.add.value());
+      update_secret = next.handle(std::get<Add>(operation));
       break;
     case GroupOperationType::update:
-      update_secret = next.handle(handshake.sender, operation.update.value());
+      update_secret =
+        next.handle(handshake.sender, std::get<Update>(operation));
       break;
     case GroupOperationType::remove:
-      update_secret = next.handle(handshake.sender, operation.remove.value());
+      update_secret =
+        next.handle(handshake.sender, std::get<Remove>(operation));
       break;
   }
 

@@ -5,6 +5,7 @@
 #include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include <optional>
+#include <variant>
 
 namespace mls {
 
@@ -202,24 +203,16 @@ public:
 //         case remove:    Remove;
 //     };
 // } GroupOperation;
-//
-// NB: This is a "pseudo-union" type, in that only one of the struct
-// members will be populated with a non-zero value.  This is a bit
-// wasteful of memory, but necessary to avoid the silliness of C++
-// union types over structs.
-struct GroupOperation : public CipherAware
+struct GroupOperation : public CipherAware, public std::variant<std::monostate, Add, Update, Remove>
 {
-  GroupOperationType type;
-
-  std::optional<Add> add;
-  std::optional<Update> update;
-  std::optional<Remove> remove;
-
+  using InnerOp = std::variant<std::monostate, Add, Update, Remove>;
   GroupOperation();
   GroupOperation(CipherSuite suite);
   GroupOperation(const Add& add);
   GroupOperation(const Update& update);
   GroupOperation(const Remove& remove);
+
+  GroupOperationType type() const;
 
   friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
   friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);

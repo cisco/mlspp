@@ -243,84 +243,78 @@ const GroupOperationType Remove::type = GroupOperationType::remove;
 
 GroupOperation::GroupOperation()
   : CipherAware(DUMMY_CIPHERSUITE)
-  , type(GroupOperationType::none)
 {}
 
 GroupOperation::GroupOperation(CipherSuite suite)
   : CipherAware(suite)
-  , type(GroupOperationType::none)
 {}
 
-GroupOperation::GroupOperation(const Add& add_in)
+GroupOperation::GroupOperation(const Add& add)
   : CipherAware(DUMMY_CIPHERSUITE)
-  , type(GroupOperationType::add)
-  , add(add_in)
+  , InnerOp(add)
 {}
 
-GroupOperation::GroupOperation(const Update& update_in)
-  : CipherAware(update_in.cipher_suite())
-  , type(GroupOperationType::update)
-  , update(update_in)
+GroupOperation::GroupOperation(const Update& update)
+  : CipherAware(update.cipher_suite())
+  , InnerOp(update)
 
 {}
 
-GroupOperation::GroupOperation(const Remove& remove_in)
-  : CipherAware(remove_in.cipher_suite())
-  , type(GroupOperationType::remove)
-  , remove(remove_in)
+GroupOperation::GroupOperation(const Remove& remove)
+  : CipherAware(remove.cipher_suite())
+  , InnerOp(remove)
 {}
+
+GroupOperationType
+GroupOperation::type() const
+{
+  switch (index()) {
+    case 1:
+      return GroupOperationType::add;
+    case 2:
+      return GroupOperationType::update;
+    case 3:
+      return GroupOperationType::remove;
+  }
+
+  throw std::bad_variant_access();
+}
 
 bool
 operator==(const GroupOperation& lhs, const GroupOperation& rhs)
 {
-  return (lhs.type == rhs.type) &&
-         (((lhs.type == GroupOperationType::add) &&
-           (lhs.add.value() == rhs.add.value())) ||
-          ((lhs.type == GroupOperationType::update) &&
-           (lhs.update.value() == rhs.update.value())) ||
-          ((lhs.type == GroupOperationType::remove) &&
-           (lhs.remove.value() == rhs.remove.value())));
+  return GroupOperation::InnerOp(lhs) == GroupOperation::InnerOp(rhs);
 }
 
 tls::ostream&
 operator<<(tls::ostream& out, const GroupOperation& obj)
 {
-  out << obj.type;
-
-  switch (obj.type) {
-    case GroupOperationType::add:
-      out << obj.add.value();
-      break;
-    case GroupOperationType::update:
-      out << obj.update.value();
-      break;
-    case GroupOperationType::remove:
-      out << obj.remove.value();
-      break;
-    default:
-      throw InvalidParameterError("Unknown group operation type");
+  out << obj.type();
+  switch (obj.index()) {
+    case 1:
+      return out << std::get<1>(obj);
+    case 2:
+      return out << std::get<2>(obj);
+    case 3:
+      return out << std::get<3>(obj);
   }
-  return out;
+
+  throw std::bad_variant_access();
 }
 
 tls::istream&
 operator>>(tls::istream& in, GroupOperation& obj)
 {
-  in >> obj.type;
+  GroupOperationType type;
+  in >> type;
 
-  switch (obj.type) {
+  switch (type) {
     case GroupOperationType::add:
-      obj.add = Add();
-      in >> obj.add.value();
-      break;
+      return in >> obj.emplace<Add>();
     case GroupOperationType::update:
-      obj.update = Update(obj._suite);
-      in >> obj.update.value();
-      break;
+      return in >> obj.emplace<Update>(obj._suite);
     case GroupOperationType::remove:
-      obj.remove = Remove(obj._suite);
-      in >> obj.remove.value();
-      break;
+      return in >> obj.emplace<Remove>(obj._suite);
     default:
       throw InvalidParameterError("Unknown group operation type");
   }
