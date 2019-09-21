@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <optional>
+#include <variant>
 #include <vector>
 
 // Note: Different namespace because this is TLS-generic (might
@@ -16,7 +17,6 @@ namespace tls {
   static const bool _tls_serializable = true; \
   auto _tls_fields_r() { return std::tie(__VA_ARGS__); } \
   auto _tls_fields_w() const { return std::make_tuple(__VA_ARGS__); }
-
 
 // For indicating no min or max in vector definitions
 const size_t none = -1;
@@ -33,6 +33,21 @@ class ReadError : public std::invalid_argument
 public:
   using parent = std::invalid_argument;
   using parent::parent;
+};
+
+// A variant class attached to a type enum
+// TODO: Enable this to pass a args to a ctor
+template<typename Te, typename... Tp>
+class variant : public std::variant<Tp...>
+{
+  public:
+  using parent = std::variant<Tp...>;
+  using parent::parent;
+
+  using type_enum = Te;
+
+  template<type_enum v>
+  struct type_map;
 };
 
 template<typename T, size_t head, size_t min = none, size_t max = none>
@@ -271,6 +286,35 @@ operator<<(tls::ostream& str, const T& val) {
   return str << u;
 }
 
+// Variant writer (requires ::type on underlying types)
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+write_variant(tls::ostream& str, const std::variant<Tp...>& t)
+{
+  throw WriteError("Empty variant");
+}
+
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+write_variant(tls::ostream& str, const std::variant<Tp...>& v)
+{
+  using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
+  if (std::holds_alternative<curr_type>(v)) {
+    str << curr_type::type << std::get<curr_type>(v);
+    return;
+  }
+
+  write_variant<I + 1, Tp...>(str, v);
+}
+
+template<typename... Tp>
+tls::ostream&
+operator<<(tls::ostream& str, const variant<Tp...>& v)
+{
+  write_variant(str, v);
+  return str;
+}
+
 // Struct writer (enabled by macro)
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
@@ -412,13 +456,47 @@ operator>>(tls::istream& in, optional_base<T>& opt)
 
 // Enum reader
 // XXX(rlb): It would be nice if this could enforce that the values are valid,
-// but C++ doesn't seem to have that ability.
+// but C++ doesn't seem to have that ability.  When used as a tag for variants,
+// the variant reader will enforce, at least.
 template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
 tls::istream&
 operator>>(tls::istream& str, T& val) {
   std::underlying_type_t<T> u;
   str >> u;
   val = static_cast<T>(u);
+  return str;
+}
+
+// Variant reader
+template<size_t I = 0, typename Te, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& t)
+{
+  throw ReadError("Invalid variant type label");
+}
+
+template<size_t I = 0, typename Te, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v)
+{
+  using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
+  if (curr_type::type == target_type) {
+    str >> v.template emplace<curr_type>();
+    return;
+  }
+
+  read_variant<I + 1, Te, Tp...>(str, target_type, v);
+}
+
+
+template<typename... Tp>
+tls::istream&
+operator>>(tls::istream& str, variant<Tp...>& v)
+{
+  using local_variant = variant<Tp...>;
+  typename local_variant::type_enum target_type;
+  str >> target_type;
+  read_variant(str, target_type, v);
   return str;
 }
 

@@ -74,13 +74,6 @@ public:
   using parent::parent;
 };
 
-class InvalidTLSSyntax : public std::invalid_argument
-{
-public:
-  using parent = std::invalid_argument;
-  using parent::parent;
-};
-
 class IncompatibleNodesError : public std::invalid_argument
 {
 public:
