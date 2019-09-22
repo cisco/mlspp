@@ -43,11 +43,23 @@ class variant : public std::variant<Tp...>
   public:
   using parent = std::variant<Tp...>;
   using parent::parent;
-
   using type_enum = Te;
+};
 
-  template<type_enum v>
-  struct type_map;
+template<typename Te, typename Tc, typename... Tp>
+class variant_variant : public variant<Te, Tp...>
+{
+  public:
+  using parent = variant<Te, Tp...>;
+  using parent::parent;
+
+  template<typename T>
+  variant_variant(const Tc& context, const T& value)
+    : parent(value)
+    , _context(context)
+  {}
+
+  Tc _context;
 };
 
 template<typename T, size_t head, size_t min = none, size_t max = none>
@@ -307,9 +319,9 @@ write_variant(tls::ostream& str, const std::variant<Tp...>& v)
   write_variant<I + 1, Tp...>(str, v);
 }
 
-template<typename... Tp>
+template<typename Te, typename... Tp>
 tls::ostream&
-operator<<(tls::ostream& str, const variant<Tp...>& v)
+operator<<(tls::ostream& str, const variant<Te, Tp...>& v)
 {
   write_variant(str, v);
   return str;
@@ -468,35 +480,45 @@ operator>>(tls::istream& str, T& val) {
 }
 
 // Variant reader
-template<size_t I = 0, typename Te, typename... Tp>
+template<size_t I = 0, typename Te, typename... Tp, typename... Tc>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
-read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& t)
+read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& t, Tc... context)
 {
   throw ReadError("Invalid variant type label");
 }
 
-template<size_t I = 0, typename Te, typename... Tp>
+template<size_t I = 0, typename Te, typename... Tp, typename... Tc>
 inline typename std::enable_if<I < sizeof...(Tp), void>::type
-read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v)
+read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v, Tc... context)
 {
   using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
   if (curr_type::type == target_type) {
-    str >> v.template emplace<curr_type>();
+    str >> v.template emplace<curr_type>(context...);
     return;
   }
 
   read_variant<I + 1, Te, Tp...>(str, target_type, v);
 }
 
-
-template<typename... Tp>
+template<typename Te, typename... Tp>
 tls::istream&
-operator>>(tls::istream& str, variant<Tp...>& v)
+operator>>(tls::istream& str, variant<Te, Tp...>& v)
 {
-  using local_variant = variant<Tp...>;
+  using local_variant = variant<Te, Tp...>;
   typename local_variant::type_enum target_type;
   str >> target_type;
   read_variant(str, target_type, v);
+  return str;
+}
+
+template<typename Te, typename Tc, typename... Tp>
+tls::istream&
+operator>>(tls::istream& str, variant_variant<Te, Tc, Tp...>& v)
+{
+  using local_variant = variant<Te, Tc, Tp...>;
+  typename local_variant::type_enum target_type;
+  str >> target_type;
+  read_variant(str, target_type, v, v._context);
   return str;
 }
 

@@ -44,7 +44,11 @@ struct MustInitialize
     : offset(offset_in)
     , val(val_in)
   {}
+
+  static const TypeSelector type;
 };
+
+const TypeSelector MustInitialize::type = TypeSelector::must_initialize;
 
 tls::ostream&
 operator<<(tls::ostream& out, const MustInitialize& data)
@@ -105,6 +109,8 @@ protected:
   const uint8_t variant_param = 0xff;
   typedef tls::variant_vector<MustInitialize, uint8_t, 1> test_var_vector;
   typedef tls::variant_optional<MustInitialize, uint8_t> test_var_optional;
+  typedef tls::variant_variant<TypeSelector, uint8_t, MustInitialize>
+    test_var_variant;
 
   test_var_vector val_var_vector;
   const bytes enc_var_vector = from_hex("02f00f");
@@ -118,7 +124,8 @@ protected:
   const tls::variant<TypeSelector, ExampleStruct> val_variant{ val_struct };
   const bytes enc_variant = from_hex("A0A0") + enc_struct;
 
-  // TODO init_variant
+  const test_var_variant val_var_variant{ 0xff, MustInitialize{ 0xff, 0x0f } };
+  const bytes enc_var_variant = from_hex("B0B0f0");
 
   TLSSyntaxTest()
     : val_var_vector(variant_param)
@@ -159,7 +166,7 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_var_optional, enc_var_optional);
   ostream_test(val_enum, enc_enum);
   ostream_test(val_variant, enc_variant);
-  // TODO init_variant
+  ostream_test(val_var_variant, enc_var_variant);
 }
 
 template<typename T>
@@ -212,7 +219,8 @@ TEST_F(TLSSyntaxTest, IStream)
   tls::variant<TypeSelector, ExampleStruct> data_variant;
   istream_test(val_variant, data_variant, enc_variant);
 
-  // TODO init_variant
+  test_var_variant data_var_variant(variant_param, MustInitialize{ 0, 0 });
+  istream_test(val_var_variant, data_var_variant, enc_var_variant);
 }
 
 // TODO(rlb@ipv.sx) Test failure cases
