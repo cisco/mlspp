@@ -26,6 +26,8 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808
 };
 
+#define DUMMY_SIGNATURE_SCHEME SignatureScheme::P256_SHA256
+
 // Utility classes to avoid a bit of boilerplate
 class CipherAware
 {
