@@ -263,56 +263,85 @@ GroupOperation::GroupOperation(const Remove& remove)
   , InnerOp(remove.cipher_suite(), remove)
 {}
 
-GroupOperationType
-GroupOperation::type() const
-{
-  switch (index()) {
-    case 0:
-      return GroupOperationType::add;
-    case 1:
-      return GroupOperationType::update;
-    case 2:
-      return GroupOperationType::remove;
-  }
-
-  throw std::bad_variant_access();
-}
-
-bool
-operator==(const GroupOperation& lhs, const GroupOperation& rhs)
-{
-  return GroupOperation::InnerOp(lhs) == GroupOperation::InnerOp(rhs);
-}
-
 // MLSPlaintext
+
+const ContentType HandshakeData::type = ContentType::handshake;
+const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite)
   : CipherAware(suite)
-  , operation(suite)
+  , content(suite, ApplicationData{ suite })
 {}
+
+MLSPlaintext::MLSPlaintext(CipherSuite suite,
+                           bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           ContentType content_type_in,
+                           bytes content_in)
+  : CipherAware(suite)
+  , group_id(group_id_in)
+  , epoch(epoch_in)
+  , sender(sender_in)
+  , content(suite, ApplicationData{ suite })
+{
+  int cut = content_in.size() - 1;
+  for (; content_in[cut] == 0 && cut >= 0; cut -= 1) {
+  }
+  if (content_in[cut] != 0x01) {
+    throw ProtocolError("Invalid marker byte");
+  }
+
+  uint16_t sig_len;
+  auto start = content_in.begin();
+  auto sig_len_bytes = bytes(start + cut - 2, start + cut);
+  tls::unmarshal(sig_len_bytes, sig_len);
+  cut -= 2;
+  if (sig_len > cut) {
+    throw ProtocolError("Invalid signature size");
+  }
+
+  signature = bytes(start + cut - sig_len, start + cut);
+  auto content_data = bytes(start, start + cut - sig_len);
+
+  switch (content_type_in) {
+    case ContentType::handshake: {
+      auto& operation = content.emplace<HandshakeData>(suite);
+      tls::unmarshal(content_data, operation);
+      break;
+    }
+
+    case ContentType::application: {
+      auto& application_data = content.emplace<ApplicationData>();
+      tls::unmarshal(content_data, application_data);
+      break;
+    }
+
+    default:
+      throw InvalidParameterError("Unknown content type");
+  }
+}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
-                           GroupOperation operation_in)
+                           const GroupOperation& operation_in)
   : CipherAware(operation_in.cipher_suite())
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content_type(ContentType::handshake)
-  , operation(std::move(operation_in))
+  , content(operation_in.cipher_suite(), HandshakeData{ operation_in, {} })
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
-                           bytes application_data_in)
+                           const ApplicationData& application_data_in)
   : CipherAware(DUMMY_CIPHERSUITE)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content_type(ContentType::application)
-  , application_data(std::move(application_data_in))
+  , content(DUMMY_CIPHERSUITE, application_data_in)
 {}
 
 // struct {
@@ -325,11 +354,11 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
-  bytes content;
-  if (content_type == ContentType::handshake) {
-    content = tls::marshal(operation.value());
-  } else if (content_type == ContentType::application) {
-    content = application_data;
+  bytes marshaled;
+  if (content.type() == ContentType::handshake) {
+    marshaled = tls::marshal(std::get<HandshakeData>(content));
+  } else if (content.type() == ContentType::application) {
+    marshaled = tls::marshal(std::get<ApplicationData>(content));
   } else {
     throw InvalidParameterError("Unknown content type");
   }
@@ -337,45 +366,8 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   uint16_t sig_len = signature.size();
   auto marker = bytes{ 0x01 };
   auto pad = zero_bytes(padding_size);
-  content = content + signature + tls::marshal(sig_len) + marker + pad;
-  return content;
-}
-
-void
-MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
-{
-  int cut = marshaled.size() - 1;
-  for (; marshaled[cut] == 0 && cut >= 0; cut -= 1) {
-  }
-  if (marshaled[cut] != 0x01) {
-    throw ProtocolError("Invalid marker byte");
-  }
-
-  uint16_t sig_len;
-  auto start = marshaled.begin();
-  auto sig_len_bytes = bytes(start + cut - 2, start + cut);
-  tls::unmarshal(sig_len_bytes, sig_len);
-  cut -= 2;
-  if (sig_len > cut) {
-    throw ProtocolError("Invalid signature size");
-  }
-
-  signature = bytes(start + cut - sig_len, start + cut);
-  auto content = bytes(start, start + cut - sig_len);
-
-  switch (content_type) {
-    case ContentType::handshake:
-      operation.emplace(suite);
-      tls::unmarshal(content, operation.value());
-      break;
-
-    case ContentType::application:
-      application_data = content;
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
-  }
+  marshaled = marshaled + signature + tls::marshal(sig_len) + marker + pad;
+  return marshaled;
 }
 
 // struct {
@@ -386,10 +378,12 @@ MLSPlaintext::unmarshal_content(CipherSuite suite, const bytes& marshaled)
 //   GroupOperation operation;
 // } MLSPlaintextOpContent;
 bytes
-MLSPlaintext::content() const
+MLSPlaintext::op_content() const
 {
+  auto& handshake_data = std::get<HandshakeData>(content);
   tls::ostream w;
-  w << group_id << epoch << sender << content_type << operation.value();
+  w << group_id << epoch << sender << content.type()
+    << handshake_data.operation;
   return w.bytes();
 }
 
@@ -400,8 +394,9 @@ MLSPlaintext::content() const
 bytes
 MLSPlaintext::auth_data() const
 {
+  auto& handshake_data = std::get<HandshakeData>(content);
   tls::ostream w;
-  w << confirmation << signature;
+  w << handshake_data.confirmation << signature;
   return w.bytes();
 }
 
@@ -409,20 +404,7 @@ bytes
 MLSPlaintext::to_be_signed() const
 {
   tls::ostream w;
-  w << group_id << epoch << sender << content_type;
-  switch (content_type) {
-    case ContentType::handshake:
-      w << operation.value() << confirmation;
-      break;
-
-    case ContentType::application:
-      w << application_data;
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
-  }
-
+  w << group_id << epoch << sender << content;
   return w.bytes();
 }
 
@@ -438,54 +420,6 @@ MLSPlaintext::verify(const SignaturePublicKey& pub) const
 {
   auto tbs = to_be_signed();
   return pub.verify(tbs, signature);
-}
-
-bool
-operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs)
-{
-  auto group_id = (lhs.group_id == rhs.group_id);
-  auto epoch = (lhs.epoch == rhs.epoch);
-  auto sender = (lhs.sender == rhs.sender);
-  auto content_type = (lhs.content_type == rhs.content_type);
-  auto operation = ((lhs.content_type == ContentType::handshake) &&
-                    (lhs.operation.value() == rhs.operation.value()));
-  auto application_data = ((lhs.content_type == ContentType::application) &&
-                           (lhs.operation.value() == rhs.operation.value()));
-  auto signature = (lhs.signature == rhs.signature);
-
-  return group_id && epoch && sender && content_type &&
-         (operation || application_data) && signature;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const MLSPlaintext& obj)
-{
-  out.write_raw(obj.to_be_signed());
-  out << obj.signature;
-  return out;
-}
-
-tls::istream&
-operator>>(tls::istream& in, MLSPlaintext& obj)
-{
-  in >> obj.group_id >> obj.epoch >> obj.sender >> obj.content_type;
-
-  switch (obj.content_type) {
-    case ContentType::handshake:
-      obj.operation.emplace(obj._suite);
-      in >> obj.operation.value() >> obj.confirmation;
-      break;
-
-    case ContentType::application:
-      in >> obj.application_data;
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
-  }
-
-  in >> obj.signature;
-  return in;
 }
 
 } // namespace mls

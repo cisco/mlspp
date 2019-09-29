@@ -90,8 +90,8 @@ State::State(const ClientInitKey& my_client_init_key,
   , _identity_priv(my_client_init_key.credential.private_key().value())
 {
   // Verify that we have an add and it is for us
-  const auto& operation = handshake.operation.value();
-  if (handshake.operation.value().type() != GroupOperationType::add) {
+  const auto& operation = std::get<HandshakeData>(handshake.content).operation;
+  if (operation.type() != GroupOperationType::add) {
     throw InvalidParameterError("Incorrect handshake type");
   }
 
@@ -273,13 +273,14 @@ State::ratchet_and_sign(const GroupOperation& op, const bytes& update_secret)
 
   _confirmed_transcript_hash = Digest(_suite)
                                  .write(_interim_transcript_hash)
-                                 .write(handshake.content())
+                                 .write(handshake.op_content())
                                  .digest();
 
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  handshake.confirmation =
+  auto& handshake_data = std::get<HandshakeData>(handshake.content);
+  handshake_data.confirmation =
     hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
   handshake.sign(_identity_priv);
 
@@ -303,7 +304,7 @@ State::handle(const MLSPlaintext& handshake) const
     throw InvalidParameterError("Epoch mismatch");
   }
 
-  if (handshake.content_type != ContentType::handshake) {
+  if (handshake.content.type() != ContentType::handshake) {
     throw InvalidParameterError("Incorrect content type");
   }
 
@@ -316,7 +317,7 @@ State::handle(const MLSPlaintext& handshake) const
   }
 
   // Apply the operation
-  const auto& operation = handshake.operation.value();
+  const auto& operation = std::get<HandshakeData>(handshake.content).operation;
   auto next = *this;
 
   bytes update_secret;
@@ -341,7 +342,9 @@ State::handle(const MLSPlaintext& handshake) const
   next.update_epoch_secrets(update_secret);
 
   // Verify the  confirmation MAC
-  if (!next.verify_confirmation(handshake.confirmation)) {
+  const auto& confirmation =
+    std::get<HandshakeData>(handshake.content).confirmation;
+  if (!next.verify_confirmation(confirmation)) {
     throw InvalidParameterError("Invalid confirmation MAC");
   }
 
@@ -435,11 +438,11 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Invalid message signature");
   }
 
-  if (pt.content_type != ContentType::application) {
+  if (pt.content.type() != ContentType::application) {
     throw ProtocolError("Unprotect of non-application message");
   }
 
-  return pt.application_data;
+  return std::get<ApplicationData>(pt.content);
 }
 
 ///
@@ -488,7 +491,7 @@ State::update_transcript_hash(const MLSPlaintext& plaintext)
   // Transcript hash for use in this epoch
   _confirmed_transcript_hash = Digest(_suite)
                                  .write(_interim_transcript_hash)
-                                 .write(plaintext.content())
+                                 .write(plaintext.op_content())
                                  .digest();
 
   // Transcript hash input for the next epoch
@@ -627,7 +630,7 @@ State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
   KeyChain::Generation keys;
-  switch (pt.content_type) {
+  switch (pt.content.type()) {
     case ContentType::handshake:
       keys = generate_handshake_keys(_index, true);
       break;
@@ -646,7 +649,7 @@ State::encrypt(const MLSPlaintext& pt)
 
   auto sender_data_nonce = random_bytes(AESGCM::nonce_size);
   auto sender_data_aad_val =
-    sender_data_aad(_group_id, _epoch, pt.content_type, sender_data_nonce);
+    sender_data_aad(_group_id, _epoch, pt.content.type(), sender_data_nonce);
 
   auto sender_data_gcm = AESGCM(_sender_data_key, sender_data_nonce);
   sender_data_gcm.set_aad(sender_data_aad_val);
@@ -657,7 +660,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto content = pt.marshal_content(0);
   auto aad = content_aad(_group_id,
                          _epoch,
-                         pt.content_type,
+                         pt.content.type(),
                          sender_data_nonce,
                          encrypted_sender_data);
 
@@ -670,7 +673,7 @@ State::encrypt(const MLSPlaintext& pt)
   MLSCiphertext ct;
   ct.group_id = _group_id;
   ct.epoch = _epoch;
-  ct.content_type = pt.content_type;
+  ct.content_type = pt.content.type();
   ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.ciphertext = ciphertext;
@@ -731,14 +734,9 @@ State::decrypt(const MLSCiphertext& ct)
   gcm.set_aad(aad);
   auto content = gcm.decrypt(ct.ciphertext);
 
-  // Set up a template plaintext and parse into it
-  auto pt = MLSPlaintext{ _suite };
-  pt.group_id = _group_id;
-  pt.epoch = _epoch;
-  pt.sender = sender;
-  pt.content_type = ct.content_type;
-  pt.unmarshal_content(_suite, content);
-  return pt;
+  // Set up a new plaintext based on the content
+  return MLSPlaintext{ _suite, _group_id,       _epoch,
+                       sender, ct.content_type, content };
 }
 
 } // namespace mls
