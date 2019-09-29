@@ -165,8 +165,8 @@ public:
   Add() = default;
   Add(CipherSuite suite) {}
   Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
-  static const GroupOperationType type;
 
+  static const GroupOperationType type;
   TLS_SERIALIZABLE(index, init_key, welcome_info_hash)
 };
 
@@ -180,8 +180,8 @@ public:
 
   Update(CipherSuite suite);
   Update(const DirectPath& path);
-  static const GroupOperationType type;
 
+  static const GroupOperationType type;
   TLS_SERIALIZABLE(path);
 };
 
@@ -197,8 +197,8 @@ public:
 
   Remove(CipherSuite suite);
   Remove(LeafIndex removed, const DirectPath& path);
-  static const GroupOperationType type;
 
+  static const GroupOperationType type;
   TLS_SERIALIZABLE(removed, path);
 };
 
@@ -221,8 +221,6 @@ struct GroupOperation : public CipherAware,
   GroupOperation(const Add& add);
   GroupOperation(const Update& update);
   GroupOperation(const Remove& remove);
-
-  GroupOperationType type() const;
 };
 
 // enum {
@@ -255,42 +253,75 @@ enum struct ContentType : uint8_t
 //
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
+struct HandshakeData
+{
+  GroupOperation operation;
+  tls::opaque<1> confirmation;
+
+  HandshakeData(CipherSuite suite)
+    : operation(suite)
+  {}
+
+  HandshakeData(const GroupOperation& operation_in,
+                const bytes& confirmation_in)
+    : operation(operation_in)
+    , confirmation(confirmation_in)
+  {}
+
+  static const ContentType type;
+  TLS_SERIALIZABLE(operation, confirmation);
+};
+
+struct ApplicationData : tls::opaque<4>
+{
+  using parent = tls::opaque<4>;
+  using parent::parent;
+
+  ApplicationData(CipherSuite suite)
+  {}
+
+  static const ContentType type;
+};
+
 struct MLSPlaintext : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
-  ContentType content_type;
-
-  std::optional<GroupOperation> operation;
-  tls::opaque<1> confirmation;
-  tls::opaque<4> application_data;
-
+  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData> content;
   tls::opaque<2> signature;
 
+  // Constructor for unmarshaling directly
   MLSPlaintext(CipherSuite suite);
+
+  // Constructor for decrypting
+  MLSPlaintext(CipherSuite suite,
+               bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               ContentType content_type,
+               bytes content);
+
+  // Constructors for encrypting
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
-               GroupOperation operation);
+               const GroupOperation& operation);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
-               bytes application_data);
+               const ApplicationData& application_data);
 
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);
   bool verify(const SignaturePublicKey& pub) const;
 
   bytes marshal_content(size_t padding_size) const;
-  void unmarshal_content(CipherSuite suite, const bytes& marshaled);
 
-  bytes content() const;
+  bytes op_content() const;
   bytes auth_data() const;
 
-  friend bool operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);
-  friend tls::istream& operator>>(tls::istream& in, MLSPlaintext& obj);
+  TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);
 };
 
 // struct {

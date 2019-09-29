@@ -43,6 +43,21 @@ class variant : public std::variant<Tp...>
   using parent = std::variant<Tp...>;
   using parent::parent;
   using type_enum = Te;
+
+  template<size_t I = 0>
+  inline typename std::enable_if_t<I < sizeof...(Tp), Te> type() const {
+    using curr_type = std::variant_alternative_t<I, parent>;
+    if (std::holds_alternative<curr_type>(*this)) {
+      return curr_type::type;
+    }
+
+    return type<I+1>();
+  }
+
+  template<size_t I = 0>
+  inline typename std::enable_if_t<I == sizeof...(Tp), Te> type() const {
+    throw std::bad_variant_access();
+  }
 };
 
 template<typename Te, typename Tc, typename... Tp>
@@ -492,8 +507,7 @@ read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v, Tc... co
 {
   using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
   if (curr_type::type == target_type) {
-    v.template emplace<I>(context...);
-    str >> std::get<I>(v);
+    str >> v.template emplace<I>(context...);
     return;
   }
 
