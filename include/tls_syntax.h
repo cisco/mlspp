@@ -36,7 +36,6 @@ public:
 };
 
 // A variant class attached to a type enum
-// TODO: Enable this to pass a args to a ctor
 template<typename Te, typename... Tp>
 class variant : public std::variant<Tp...>
 {
@@ -312,7 +311,7 @@ write_variant(tls::ostream& str, const std::variant<Tp...>& v)
 {
   using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
   if (std::holds_alternative<curr_type>(v)) {
-    str << curr_type::type << std::get<curr_type>(v);
+    str << curr_type::type << std::get<I>(v);
     return;
   }
 
@@ -493,11 +492,12 @@ read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v, Tc... co
 {
   using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
   if (curr_type::type == target_type) {
-    str >> v.template emplace<curr_type>(context...);
+    v.template emplace<I>(context...);
+    str >> std::get<I>(v);
     return;
   }
 
-  read_variant<I + 1, Te, Tp...>(str, target_type, v);
+  read_variant<I + 1>(str, target_type, v, context...);
 }
 
 template<typename Te, typename... Tp>
@@ -515,7 +515,7 @@ template<typename Te, typename Tc, typename... Tp>
 tls::istream&
 operator>>(tls::istream& str, variant_variant<Te, Tc, Tp...>& v)
 {
-  using local_variant = variant<Te, Tc, Tp...>;
+  using local_variant = variant_variant<Te, Tc, Tp...>;
   typename local_variant::type_enum target_type;
   str >> target_type;
   read_variant(str, target_type, v, v._context);

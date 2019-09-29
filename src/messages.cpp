@@ -242,39 +242,36 @@ const GroupOperationType Remove::type = GroupOperationType::remove;
 
 // GroupOperation
 
-GroupOperation::GroupOperation()
-  : CipherAware(DUMMY_CIPHERSUITE)
-{}
-
 GroupOperation::GroupOperation(CipherSuite suite)
   : CipherAware(suite)
+  , InnerOp(suite, Add{})
 {}
 
 GroupOperation::GroupOperation(const Add& add)
   : CipherAware(DUMMY_CIPHERSUITE)
-  , InnerOp(add)
+  , InnerOp(DUMMY_CIPHERSUITE, add)
 {}
 
 GroupOperation::GroupOperation(const Update& update)
   : CipherAware(update.cipher_suite())
-  , InnerOp(update)
+  , InnerOp(update.cipher_suite(), update)
 
 {}
 
 GroupOperation::GroupOperation(const Remove& remove)
   : CipherAware(remove.cipher_suite())
-  , InnerOp(remove)
+  , InnerOp(remove.cipher_suite(), remove)
 {}
 
 GroupOperationType
 GroupOperation::type() const
 {
   switch (index()) {
-    case 1:
+    case 0:
       return GroupOperationType::add;
-    case 2:
+    case 1:
       return GroupOperationType::update;
-    case 3:
+    case 2:
       return GroupOperationType::remove;
   }
 
@@ -287,43 +284,12 @@ operator==(const GroupOperation& lhs, const GroupOperation& rhs)
   return GroupOperation::InnerOp(lhs) == GroupOperation::InnerOp(rhs);
 }
 
-tls::ostream&
-operator<<(tls::ostream& out, const GroupOperation& obj)
-{
-  out << obj.type();
-  switch (obj.index()) {
-    case 1:
-      return out << std::get<1>(obj);
-    case 2:
-      return out << std::get<2>(obj);
-    case 3:
-      return out << std::get<3>(obj);
-  }
-
-  throw std::bad_variant_access();
-}
-
-tls::istream&
-operator>>(tls::istream& in, GroupOperation& obj)
-{
-  GroupOperationType type;
-  in >> type;
-
-  switch (type) {
-    case GroupOperationType::add:
-      return in >> obj.emplace<Add>();
-    case GroupOperationType::update:
-      return in >> obj.emplace<Update>(obj._suite);
-    case GroupOperationType::remove:
-      return in >> obj.emplace<Remove>(obj._suite);
-    default:
-      throw InvalidParameterError("Unknown group operation type");
-  }
-
-  return in;
-}
-
 // MLSPlaintext
+
+MLSPlaintext::MLSPlaintext(CipherSuite suite)
+  : CipherAware(suite)
+  , operation(suite)
+{}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,

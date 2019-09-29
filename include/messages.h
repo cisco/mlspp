@@ -163,6 +163,7 @@ public:
   tls::opaque<1> welcome_info_hash;
 
   Add() = default;
+  Add(CipherSuite suite) {}
   Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
   static const GroupOperationType type;
 
@@ -212,20 +213,16 @@ public:
 //         case remove:    Remove;
 //     };
 // } GroupOperation;
-struct GroupOperation : public CipherAware, public std::variant<std::monostate, Add, Update, Remove>
+struct GroupOperation : public CipherAware,
+                        public tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>
 {
-  using InnerOp = std::variant<std::monostate, Add, Update, Remove>;
-  GroupOperation();
+  using InnerOp = tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>;
   GroupOperation(CipherSuite suite);
   GroupOperation(const Add& add);
   GroupOperation(const Update& update);
   GroupOperation(const Remove& remove);
 
   GroupOperationType type() const;
-
-  friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
-  friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);
 };
 
 // enum {
@@ -260,8 +257,6 @@ enum struct ContentType : uint8_t
 // } MLSPlaintext;
 struct MLSPlaintext : public CipherAware
 {
-  using CipherAware::CipherAware;
-
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
@@ -273,6 +268,7 @@ struct MLSPlaintext : public CipherAware
 
   tls::opaque<2> signature;
 
+  MLSPlaintext(CipherSuite suite);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
