@@ -704,6 +704,7 @@ Digest::write(const bytes& data)
 bytes
 Digest::digest()
 {
+  // TODO: Increment hash invocation counter
   unsigned int outlen = output_size();
   auto out = bytes(outlen);
   auto ptr = out.data();
@@ -726,6 +727,7 @@ Digest::output_size() const
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
+  // TODO increment HMAC counter / hash counter
   unsigned int size = 0;
   auto type = ossl_digest_type(digest_type(suite));
   bytes md(EVP_MAX_MD_SIZE);
@@ -1302,6 +1304,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
+  // TODO: Increment fixed-base DH counter
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::generate(type));
 }
@@ -1316,6 +1319,7 @@ DHPrivateKey::parse(CipherSuite suite, const bytes& data)
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
+  // TODO: Increment fixed-base DH counter
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
 }
@@ -1335,6 +1339,8 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
   if (!_key->can_derive() || !pub._key->can_derive()) {
     throw InvalidParameterError("Inappropriate key(s) for derive");
   }
+
+  // TODO: Increment variable-base DH counter
 
   // This and the next line are acceptable because the OpenSSL
   // functions fail to mark the required EVP_PKEYs as const, even
