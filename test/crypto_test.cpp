@@ -226,8 +226,17 @@ TEST_F(CryptoTest, Interop)
 
 TEST_F(CryptoTest, SHA2)
 {
+  CryptoMetrics::reset();
   ASSERT_EQ(Digest(DigestType::SHA256).write(sha2_in).digest(), sha256_out);
+  auto metrics = CryptoMetrics::snapshot();
+  ASSERT_EQ(metrics.digest, 1);
+  ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
+
+  CryptoMetrics::reset();
   ASSERT_EQ(Digest(DigestType::SHA512).write(sha2_in).digest(), sha512_out);
+  metrics = CryptoMetrics::snapshot();
+  ASSERT_EQ(metrics.digest, 1);
+  ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
 }
 
 TEST_F(CryptoTest, AES128GCM)
@@ -283,8 +292,14 @@ TEST_F(CryptoTest, BasicDH)
 
   for (auto suite : suites) {
     auto s = bytes{ 0, 1, 2, 3 };
+
+    CryptoMetrics::reset();
     auto x = DHPrivateKey::generate(suite);
+    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
+
+    CryptoMetrics::reset();
     auto y = DHPrivateKey::derive(suite, { 0, 1, 2, 3 });
+    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
 
     ASSERT_EQ(x, x);
     ASSERT_EQ(y, y);
@@ -296,9 +311,12 @@ TEST_F(CryptoTest, BasicDH)
     ASSERT_EQ(gY, gY);
     ASSERT_NE(gX, gY);
 
+    CryptoMetrics::reset();
     auto gXY = x.derive(gY);
     auto gYX = y.derive(gX);
     ASSERT_EQ(gXY, gYX);
+    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 0);
+    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 2);
 
     auto nh = Digest(suite).output_size();
     auto ns = hkdf_expand_label(suite, s, "node", {}, nh);

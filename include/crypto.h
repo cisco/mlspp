@@ -77,6 +77,34 @@ private:
   static int _refct;
 };
 
+// Interface to metrics
+class CryptoMetrics {
+public:
+  struct Report {
+    uint32_t fixed_base_dh;
+    uint32_t var_base_dh;
+    uint32_t digest;
+    uint32_t digest_bytes;
+    uint32_t hmac;
+  };
+
+  static Report snapshot();
+  static void reset();
+
+  static void count_fixed_base_dh();
+  static void count_var_base_dh();
+  static void count_digest();
+  static void count_digest_bytes(uint32_t count);
+  static void count_hmac();
+
+private:
+  static uint32_t fixed_base_dh;
+  static uint32_t var_base_dh;
+  static uint32_t digest;
+  static uint32_t digest_bytes;
+  static uint32_t hmac;
+};
+
 // Adapt standard pointers so that they can be "typed" to handle
 // custom deleters more easily.
 template<typename T>

@@ -24,6 +24,64 @@ static const SignatureScheme unknown_scheme =
 int DeterministicHPKE::_refct = 0;
 
 ///
+/// Metrics
+///
+
+uint32_t CryptoMetrics::fixed_base_dh = 0;
+uint32_t CryptoMetrics::var_base_dh = 0;
+uint32_t CryptoMetrics::digest = 0;
+uint32_t CryptoMetrics::digest_bytes = 0;
+uint32_t CryptoMetrics::hmac = 0;
+
+CryptoMetrics::Report
+CryptoMetrics::snapshot()
+{
+  return {
+    fixed_base_dh, var_base_dh, digest, digest_bytes, hmac,
+  };
+}
+
+void
+CryptoMetrics::reset()
+{
+  fixed_base_dh = 0;
+  var_base_dh = 0;
+  digest = 0;
+  digest_bytes = 0;
+  hmac = 0;
+}
+
+void
+CryptoMetrics::count_fixed_base_dh()
+{
+  fixed_base_dh += 1;
+}
+
+void
+CryptoMetrics::count_var_base_dh()
+{
+  var_base_dh += 1;
+}
+
+void
+CryptoMetrics::count_digest()
+{
+  digest += 1;
+}
+
+void
+CryptoMetrics::count_digest_bytes(uint32_t count)
+{
+  digest_bytes += count;
+}
+
+void
+CryptoMetrics::count_hmac()
+{
+  hmac += 1;
+}
+
+///
 /// typed_unique_ptr
 ///
 
@@ -686,6 +744,7 @@ Digest::Digest(CipherSuite suite)
 Digest&
 Digest::write(uint8_t byte)
 {
+  CryptoMetrics::count_digest_bytes(1);
   if (EVP_DigestUpdate(_ctx.get(), &byte, 1) != 1) {
     throw OpenSSLError::current();
   }
@@ -695,6 +754,7 @@ Digest::write(uint8_t byte)
 Digest&
 Digest::write(const bytes& data)
 {
+  CryptoMetrics::count_digest_bytes(data.size());
   if (EVP_DigestUpdate(_ctx.get(), data.data(), data.size()) != 1) {
     throw OpenSSLError::current();
   }
@@ -704,7 +764,7 @@ Digest::write(const bytes& data)
 bytes
 Digest::digest()
 {
-  // TODO: Increment hash invocation counter
+  CryptoMetrics::count_digest();
   unsigned int outlen = output_size();
   auto out = bytes(outlen);
   auto ptr = out.data();
@@ -727,7 +787,7 @@ Digest::output_size() const
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
-  // TODO increment HMAC counter / hash counter
+  CryptoMetrics::count_hmac();
   unsigned int size = 0;
   auto type = ossl_digest_type(digest_type(suite));
   bytes md(EVP_MAX_MD_SIZE);
@@ -1304,7 +1364,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
-  // TODO: Increment fixed-base DH counter
+  CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::generate(type));
 }
@@ -1319,7 +1379,7 @@ DHPrivateKey::parse(CipherSuite suite, const bytes& data)
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  // TODO: Increment fixed-base DH counter
+  CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
 }
@@ -1340,7 +1400,7 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
     throw InvalidParameterError("Inappropriate key(s) for derive");
   }
 
-  // TODO: Increment variable-base DH counter
+  CryptoMetrics::count_var_base_dh();
 
   // This and the next line are acceptable because the OpenSSL
   // functions fail to mark the required EVP_PKEYs as const, even
