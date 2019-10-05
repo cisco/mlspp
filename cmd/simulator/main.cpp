@@ -1,17 +1,25 @@
 /*
 
-TODO: Add-in-place
-TODO: Streamable input?
-TODO: Metrics output (streamable?)
-
 Input format:
 
 {
   "initial_size": n,
   "steps": [
-    {"action": "add"}
+    {"action": "add",    "by": n}
     {"action": "update", "by": n},
     {"action": "remove", "by": n, "of": b},
+  ]
+}
+
+Output format (one per line):
+
+{
+  "sender": { ...crypto metrics... },
+  "receivers": [
+    { ...crypto metrics... },
+    { ...crypto metrics... },
+    { ...crypto metrics... },
+    ...
   ]
 }
 
@@ -26,6 +34,7 @@ Input format:
 #include "crypto.h"
 #include "session.h"
 
+#include "autojson.h"
 #include "json.hpp"
 
 using nlohmann::json;
@@ -41,56 +50,29 @@ enum struct Action
   remove
 };
 
-void
-from_json(const json& j, Action& obj)
-{
-  const auto& action = j.get<std::string>();
-  if (action == kActionAdd) {
-    obj = Action::add;
-  } else if (action == kActionUpdate) {
-    obj = Action::update;
-  } else if (action == kActionRemove) {
-    obj = Action::remove;
-  }
-
-  std::runtime_error("Invalid action type: " + action);
-}
+NLOHMANN_JSON_SERIALIZE_ENUM(Action,
+                             {
+                               { Action::add, "add" },
+                               { Action::update, "update" },
+                               { Action::remove, "remove" },
+                             })
 
 struct Step
 {
   Action action;
   uint32_t by;
   uint32_t of;
+
+  JSON_SERIALIZABLE(action, by, of);
 };
-
-void
-from_json(const json& j, Step& obj)
-{
-  obj.action = j.at("action").get<Action>();
-
-  obj.by = 0;
-  if (j.find("by") != j.end()) {
-    obj.by = j.at("by").get<uint32_t>();
-  }
-
-  obj.of = 0;
-  if (j.find("of") != j.end()) {
-    obj.of = j.at("of").get<uint32_t>();
-  }
-}
 
 struct Script
 {
   size_t initial_size;
   std::vector<Step> steps;
-};
 
-void
-from_json(const json& j, Script& obj)
-{
-  obj.initial_size = j.at("initial_size").get<size_t>();
-  obj.steps = j.at("steps").get<std::vector<Step>>();
-}
+  JSON_SERIALIZABLE(initial_size, steps);
+};
 
 std::string
 read_file(const std::string& filename)
@@ -112,12 +94,39 @@ read_file(const std::string& filename)
   return std::string(vec.begin(), vec.end());
 }
 
-struct Simulation
+namespace nlohmann {
+template<>
+struct adl_serializer<mls::CryptoMetrics::Report>
 {
+  static void to_json(json& j, const mls::CryptoMetrics::Report& report)
+  {
+    j = json{
+      { "fixed_base_dh", report.fixed_base_dh },
+      { "var_base_dh", report.var_base_dh },
+      { "digest", report.digest },
+      { "digest_bytes", report.digest_bytes },
+      { "hmac", report.hmac },
+    };
+  }
+};
+} // namespace nlohmann
+
+struct StepMetrics
+{
+  mls::CryptoMetrics::Report sender;
+  std::vector<mls::CryptoMetrics::Report> receivers;
+
+  JSON_SERIALIZABLE(sender, receivers);
+};
+
+class Simulation
+{
+private:
   std::vector<mls::CipherSuite> suites;
   mls::SignatureScheme scheme;
   std::vector<std::optional<mls::Session>> sessions;
 
+public:
   Simulation(std::vector<mls::CipherSuite> suites, mls::SignatureScheme scheme)
     : suites(suites)
     , scheme(scheme)
@@ -134,15 +143,21 @@ struct Simulation
     return mls::ClientInitKey{ id, suites, init, cred };
   }
 
-  void broadcast(const mls::bytes& message)
+  std::vector<mls::CryptoMetrics::Report> broadcast(const mls::bytes& message)
   {
+    std::vector<mls::CryptoMetrics::Report> reports;
     for (auto& session : sessions) {
       if (!session.has_value()) {
+        reports.emplace_back();
         continue;
       }
 
+      mls::CryptoMetrics::reset();
       session.value().handle(message);
+      reports.push_back(mls::CryptoMetrics::snapshot());
     }
+
+    return reports;
   }
 
   // XXX: Right now, this is by "create one-member and add"; it should be done
@@ -168,31 +183,43 @@ struct Simulation
   }
 
   // TODO Add at the leftmost blank slot instead of at the right edge
-  void add(uint32_t by)
+  StepMetrics add(uint32_t by)
   {
+    StepMetrics report{};
     auto cik = fresh_client_init_key();
+
+    mls::CryptoMetrics::reset();
     auto [welcome, add] = sessions[by].value().add(cik);
-    broadcast(add);
-    sessions.emplace_back(mls::Session::join(cik, welcome, add));
+    report.sender = mls::CryptoMetrics::snapshot();
+    report.receivers = broadcast(add);
 
-    std::cout << "Added by " << by << std::endl;
+    mls::CryptoMetrics::reset();
+    auto new_session = mls::Session::join(cik, welcome, add);
+    report.receivers.push_back(mls::CryptoMetrics::snapshot());
+    sessions.emplace_back(new_session);
+
+    return report;
   }
 
-  void update(uint32_t by)
+  StepMetrics update(uint32_t by)
   {
+    StepMetrics report{};
+    mls::CryptoMetrics::reset();
     auto update = sessions[by].value().update(random());
-    broadcast(update);
-
-    std::cout << "Updated member " << by << std::endl;
+    report.sender = mls::CryptoMetrics::snapshot();
+    report.receivers = broadcast(update);
+    return report;
   }
 
-  void remove(uint32_t by, uint32_t of)
+  StepMetrics remove(uint32_t by, uint32_t of)
   {
-    auto remove = sessions[by].value().remove(random(), of);
+    StepMetrics report{};
+    mls::CryptoMetrics::reset();
+    auto update = sessions[by].value().remove(random(), of);
+    report.sender = mls::CryptoMetrics::snapshot();
     sessions[of] = std::nullopt;
-    broadcast(remove);
-
-    std::cout << "Removed member " << of << " by " << by << std::endl;
+    report.receivers = broadcast(update);
+    return report;
   }
 };
 
@@ -217,19 +244,22 @@ main(int argc, char** argv)
 
   // Follow the steps in the script
   for (const auto& step : script.steps) {
+    StepMetrics report;
     switch (step.action) {
       case Action::add:
-        sim.add(step.by);
+        report = sim.add(step.by);
         break;
 
       case Action::update:
-        sim.update(step.by);
+        report = sim.update(step.by);
         break;
 
       case Action::remove:
-        sim.remove(step.by, step.of);
+        report = sim.remove(step.by, step.of);
         break;
     }
+
+    std::cout << json(report) << std::endl;
   }
 
   std::cout << "Done" << std::endl; // XXX
