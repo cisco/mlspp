@@ -246,6 +246,8 @@ struct OpenSSLKey
   virtual void set_public(const bytes& data) = 0;
   virtual void set_private(const bytes& data) = 0;
   virtual void set_secret(const bytes& data) = 0;
+  virtual void update_public(const bytes& delta) = 0;
+  virtual void update_private(const bytes& delta) = 0;
   virtual OpenSSLKey* dup() const = 0;
   virtual OpenSSLKey* dup_public() const = 0;
 
@@ -402,6 +404,12 @@ enum struct RawKeyType : int
   Ed448 = EVP_PKEY_ED448
 };
 
+static const char* n25519 =
+  "1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed";
+static const char* n448 =
+  "3fffffffffffffffffffffffffffffffffffffffffffffffffffffff7cca23e9c44edb49ae"
+  "d63690216cc2728dc58f552378c292ab5844f3";
+
 struct RawKey : OpenSSLKey
 {
 public:
@@ -523,6 +531,102 @@ public:
     bytes digest = Digest(digest_type).write(data).digest();
     digest.resize(secret_size());
     set_private(digest);
+  }
+
+  BIGNUM* clamp(const bytes& data)
+  {
+    auto clamped = data;
+    if (clamped.size() == 32) {
+      clamped[0] &= 0xf8;
+      clamped[31] &= 0x7f;
+      clamped[31] |= 0x40;
+    } else if (data.size() == 56) {
+      clamped[0] &= 0xfc;
+      clamped[55] |= 128;
+    } else {
+      throw std::runtime_error("Improper raw key size");
+    }
+
+    std::reverse(clamped.begin(), clamped.end());
+    return BN_bin2bn(clamped.data(), clamped.size(), nullptr);
+  }
+
+  BIGNUM* curve_order()
+  {
+    const char* hex;
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+        hex = n25519;
+      case RawKeyType::X448:
+        hex = n448;
+      default:
+        throw std::runtime_error("Invalid key type");
+    }
+
+    BIGNUM* n;
+    BN_hex2bn(&n, hex);
+    return n;
+  }
+
+  int high_order_bit()
+  {
+    auto enum_type = static_cast<RawKeyType>(_type);
+    switch (enum_type) {
+      case RawKeyType::X25519:
+        return 254;
+      case RawKeyType::X448:
+        return 447;
+      default:
+        throw std::runtime_error("Invalid key type");
+    }
+  }
+
+  void update_private(const bytes& delta) override
+  {
+    // Extract the raw private key
+    size_t raw_len = 0;
+    if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes raw(raw_len);
+    auto data_ptr = raw.data();
+    auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
+    if (rv == 1) {
+      throw OpenSSLError::current();
+    }
+
+    // Clamp both values
+    auto cpriv = typed_unique_ptr<BIGNUM>(clamp(raw));
+    auto cdelta = typed_unique_ptr<BIGNUM>(clamp(delta));
+
+    // Multiply the two values and reduce mod the curve order
+    auto order = typed_unique_ptr<BIGNUM>(curve_order());
+    auto updated = make_typed_unique(BN_new());
+    BN_mod_mul(updated.get(), cpriv.get(), cdelta.get(), order.get(), nullptr);
+
+    // Negate if necessary
+    if (BN_is_bit_set(updated.get(), high_order_bit()) != 0) {
+      BN_sub(updated.get(), order.get(), updated.get());
+    }
+
+    // Convert back to bytes, set raw
+    // TODO: Make sure we have the right number of bytes
+    bytes updated_priv(BN_num_bytes(updated.get()));
+    BN_bn2bin(updated.get(), updated_priv.data());
+    std::reverse(updated_priv.begin(), updated_priv.end());
+    set_private(updated_priv);
+  }
+
+  void update_public(const bytes& delta) override
+  {
+    auto enum_type = static_cast<RawKeyType>(_type);
+    auto raw_key = RawKey(enum_type);
+    raw_key.set_private(delta);
+
+    auto updated = raw_key.derive(*this);
+    set_public(updated);
   }
 
   OpenSSLKey* dup() const override
@@ -692,6 +796,32 @@ public:
     set_private(digest);
   }
 
+  void update_private(const bytes& delta) override
+  {
+    auto eckey = my_ec_key();
+    auto group = EC_KEY_get0_group(eckey);
+    auto d = EC_KEY_get0_private_key(eckey);
+    auto pt1 = EC_KEY_get0_public_key(eckey);
+    auto pt2 = make_typed_unique(EC_POINT_new(group));
+    auto dd = make_typed_unique(BN_bin2bn(delta.data(), delta.size(), nullptr));
+    BN_mul(dd.get(), dd.get(), d, nullptr);
+    EC_POINT_mul(group, pt2.get(), dd.get(), nullptr, nullptr, nullptr);
+
+    EC_KEY_set_private_key(eckey, dd.get());
+    EC_KEY_set_public_key(eckey, pt2.get());
+  }
+
+  void update_public(const bytes& delta) override
+  {
+    auto eckey = my_ec_key();
+    auto group = EC_KEY_get0_group(eckey);
+    auto pt1 = EC_KEY_get0_public_key(eckey);
+    auto pt2 = make_typed_unique(EC_POINT_new(group));
+    auto d = make_typed_unique(BN_bin2bn(delta.data(), delta.size(), nullptr));
+    EC_POINT_mul(group, pt2.get(), nullptr, pt1, d.get(), nullptr);
+    EC_KEY_set_public_key(eckey, pt2.get());
+  }
+
   OpenSSLKey* dup() const override
   {
     if (!_key || (_key.get() == nullptr)) {
@@ -731,6 +861,8 @@ private:
 
     _key.reset(pkey);
   }
+
+  EC_KEY* my_ec_key() { return EVP_PKEY_get0_EC_KEY(_key.get()); }
 
   const EC_KEY* my_ec_key() const { return EVP_PKEY_get0_EC_KEY(_key.get()); }
 
@@ -1343,6 +1475,12 @@ DHPublicKey::DHPublicKey()
   : PublicKey(CipherSuite::X25519_SHA256_AES128GCM)
 {}
 
+void
+DHPublicKey::update(const bytes& delta)
+{
+  _key->update_public(delta);
+}
+
 enum struct HPKEMode : uint8_t
 {
   base = 0x00,
@@ -1450,6 +1588,12 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   AESGCM gcm(key, nonce);
   auto content = gcm.encrypt(plaintext);
   return HPKECiphertext{ ephemeral.public_key(), content };
+}
+
+void
+DHPrivateKey::update(const bytes& delta)
+{
+  _key->update_private(delta);
 }
 
 DHPrivateKey
