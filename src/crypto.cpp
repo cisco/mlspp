@@ -459,10 +459,10 @@ TypedDelete(OpenSSLKey* ptr)
 /// Curve orders
 ///
 static const char* n25519 =
-  "1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed";
+  "80000000000000000000000000000000a6f7cef517bce6b2c09318d2e7ae9f68";
 static const char* n448 =
-  "3fffffffffffffffffffffffffffffffffffffffffffffffffffffff7cca23e9c44edb49ae"
-  "d63690216cc2728dc58f552378c292ab5844f3";
+  "fffffffffffffffffffffffffffffffffffffffffffffffffffffffdf3288fa7113b6d26bb58"
+  "da4085b309ca37163d548de30a4aad6113cc";
 static const char* n256 =
   "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
 static const char* n521 =
@@ -689,7 +689,7 @@ public:
       updated.get(), cpriv.get(), cdelta.get(), order.get(), ctx.get());
 
     // Negate if necessary
-    if (BN_is_bit_set(updated.get(), high_order_bit()) != 0) {
+    if (BN_is_bit_set(updated.get(), high_order_bit()) == 0) {
       BN_sub(updated.get(), order.get(), updated.get());
     }
 
@@ -698,11 +698,14 @@ public:
     bytes updated_priv(BN_num_bytes(updated.get()));
     BN_bn2bin(updated.get(), updated_priv.data());
     std::reverse(updated_priv.begin(), updated_priv.end());
+
     set_private(updated_priv);
   }
 
   void update_public(const bytes& delta) override
   {
+    auto clamped = delta;
+    std::reverse(clamped.begin(), clamped.end());
     auto enum_type = static_cast<RawKeyType>(_type);
     auto raw_key = RawKey(enum_type);
     raw_key.set_private(delta);

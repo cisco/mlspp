@@ -312,10 +312,10 @@ TEST_F(CryptoTest, BasicDH)
 TEST_F(CryptoTest, DHUpdate)
 {
   std::vector<CipherSuite> suites{
-    // CipherSuite::P256_SHA256_AES128GCM,
-    // CipherSuite::P521_SHA512_AES256GCM,
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::P521_SHA512_AES256GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
-    // CipherSuite::X448_SHA512_AES256GCM,
+    CipherSuite::X448_SHA512_AES256GCM,
   };
 
   for (auto suite : suites) {
@@ -326,16 +326,11 @@ TEST_F(CryptoTest, DHUpdate)
     auto key_size = xG.to_bytes().size();
     auto d = random_bytes(key_size);
 
-    std::cout << "x  " << x.public_key().to_bytes() << std::endl;
-
     auto dx = x;
     dx.update(d);
-    std::cout << "x   " << x.public_key().to_bytes() << std::endl;
-    std::cout << "dx  " << dx.public_key().to_bytes() << std::endl;
 
     auto d_xG = xG;
     d_xG.update(d);
-    std::cout << "d_x " << d_xG.to_bytes() << std::endl;
 
     ASSERT_NE(x, dx);
     ASSERT_NE(x.public_key(), dx.public_key());
