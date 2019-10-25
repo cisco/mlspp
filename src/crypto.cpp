@@ -99,6 +99,55 @@ make_typed_unique(T* ptr)
   return typed_unique_ptr<T>(ptr);
 }
 
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_KEY* ptr)
+{
+  EC_KEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_POINT* ptr)
+{
+  EC_POINT_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
 ///
 /// OpenSSLError
 ///
@@ -323,59 +372,6 @@ struct OpenSSLKey
 
   typed_unique_ptr<EVP_PKEY> _key;
 };
-
-///
-/// Deleters and smart pointers for OpenSSL types
-///
-
-template<>
-void
-TypedDelete(BIGNUM* ptr)
-{
-  BN_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_KEY* ptr)
-{
-  EC_KEY_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_POINT* ptr)
-{
-  EC_POINT_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_CIPHER_CTX* ptr)
-{
-  EVP_CIPHER_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr)
-{
-  EVP_MD_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY_CTX* ptr)
-{
-  EVP_PKEY_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr)
-{
-  EVP_PKEY_free(ptr);
-}
 
 template<>
 void
