@@ -1,6 +1,7 @@
 #include "crypto.h"
 #include "test_vectors.h"
 #include <gtest/gtest.h>
+#include <iostream> // XXX
 #include <string>
 
 using namespace mls;
@@ -305,6 +306,44 @@ TEST_F(CryptoTest, BasicDH)
     auto ny = DHPrivateKey::derive(suite, ns);
     auto nz = DHPrivateKey::node_derive(suite, s);
     ASSERT_EQ(ny, nz);
+  }
+}
+
+TEST_F(CryptoTest, DHUpdate)
+{
+  std::vector<CipherSuite> suites{
+    // CipherSuite::P256_SHA256_AES128GCM,
+    // CipherSuite::P521_SHA512_AES256GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+    // CipherSuite::X448_SHA512_AES256GCM,
+  };
+
+  for (auto suite : suites) {
+    auto s = bytes{ 0, 1, 2, 3 };
+    auto x = DHPrivateKey::derive(suite, { 0, 1, 2, 3 });
+    auto xG = x.public_key();
+
+    auto key_size = xG.to_bytes().size();
+    auto d = random_bytes(key_size);
+
+    std::cout << "x  " << x.public_key().to_bytes() << std::endl;
+
+    auto dx = x;
+    dx.update(d);
+    std::cout << "x   " << x.public_key().to_bytes() << std::endl;
+    std::cout << "dx  " << dx.public_key().to_bytes() << std::endl;
+
+    auto d_xG = xG;
+    d_xG.update(d);
+    std::cout << "d_x " << d_xG.to_bytes() << std::endl;
+
+    ASSERT_NE(x, dx);
+    ASSERT_NE(x.public_key(), dx.public_key());
+    ASSERT_NE(xG, d_xG);
+
+    auto dx_G = dx.public_key();
+    ASSERT_EQ(dx_G.to_bytes(), d_xG.to_bytes());
+    ASSERT_EQ(dx_G, d_xG);
   }
 }
 

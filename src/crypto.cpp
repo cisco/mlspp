@@ -101,6 +101,13 @@ make_typed_unique(T* ptr)
 
 template<>
 void
+TypedDelete(BN_CTX* ptr)
+{
+  BN_CTX_free(ptr);
+}
+    
+template<>
+void
 TypedDelete(BIGNUM* ptr)
 {
   BN_free(ptr);
@@ -375,6 +382,66 @@ struct OpenSSLKey
   typed_unique_ptr<EVP_PKEY> _key;
 };
 
+///
+/// Deleters and smart pointers for OpenSSL types
+///
+
+template<>
+void
+TypedDelete(BN_CTX* ptr)
+{
+  BN_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_KEY* ptr)
+{
+  EC_KEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_POINT* ptr)
+{
+  EC_POINT_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
 template<>
 void
 TypedDelete(OpenSSLKey* ptr)
@@ -387,6 +454,20 @@ TypedDelete(OpenSSLKey* ptr)
   // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
   delete ptr;
 }
+
+///
+/// Curve orders
+///
+static const char* n25519 =
+  "1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed";
+static const char* n448 =
+  "3fffffffffffffffffffffffffffffffffffffffffffffffffffffff7cca23e9c44edb49ae"
+  "d63690216cc2728dc58f552378c292ab5844f3";
+static const char* n256 =
+  "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
+static const char* n521 =
+  "01fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa51868783"
+  "bf2f966b7fcc0148f709a5d03bb5c9b8899c47aebb6fb71e91386409";
 
 ///
 /// OpenSSLKey
@@ -403,12 +484,6 @@ enum struct RawKeyType : int
   Ed25519 = EVP_PKEY_ED25519,
   Ed448 = EVP_PKEY_ED448
 };
-
-static const char* n25519 =
-  "1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed";
-static const char* n448 =
-  "3fffffffffffffffffffffffffffffffffffffffffffffffffffffff7cca23e9c44edb49ae"
-  "d63690216cc2728dc58f552378c292ab5844f3";
 
 struct RawKey : OpenSSLKey
 {
@@ -558,14 +633,19 @@ public:
     switch (enum_type) {
       case RawKeyType::X25519:
         hex = n25519;
+        break;
       case RawKeyType::X448:
         hex = n448;
+        break;
       default:
         throw std::runtime_error("Invalid key type");
     }
 
-    BIGNUM* n;
+    BIGNUM* n = nullptr;
     BN_hex2bn(&n, hex);
+    if (n == nullptr) {
+      throw OpenSSLError::current();
+    }
     return n;
   }
 
@@ -593,7 +673,7 @@ public:
     bytes raw(raw_len);
     auto data_ptr = raw.data();
     auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
-    if (rv == 1) {
+    if (rv != 1) {
       throw OpenSSLError::current();
     }
 
@@ -604,7 +684,9 @@ public:
     // Multiply the two values and reduce mod the curve order
     auto order = typed_unique_ptr<BIGNUM>(curve_order());
     auto updated = make_typed_unique(BN_new());
-    BN_mod_mul(updated.get(), cpriv.get(), cdelta.get(), order.get(), nullptr);
+    auto ctx = make_typed_unique(BN_CTX_new());
+    BN_mod_mul(
+      updated.get(), cpriv.get(), cdelta.get(), order.get(), ctx.get());
 
     // Negate if necessary
     if (BN_is_bit_set(updated.get(), high_order_bit()) != 0) {
@@ -763,12 +845,12 @@ public:
     reset(eckey.release());
   }
 
-  void set_private(const bytes& data) override
+  void set_private_bignum(BIGNUM* d_raw)
   {
-    auto eckey = make_typed_unique(new_ec_key());
+    auto d = make_typed_unique(d_raw);
 
+    auto eckey = make_typed_unique(new_ec_key());
     auto group = EC_KEY_get0_group(eckey.get());
-    auto d = make_typed_unique(BN_bin2bn(data.data(), data.size(), nullptr));
     auto pt = make_typed_unique(EC_POINT_new(group));
     EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
 
@@ -776,6 +858,12 @@ public:
     EC_KEY_set_public_key(eckey.get(), pt.get());
 
     reset(eckey.release());
+  }
+
+  void set_private(const bytes& data) override
+  {
+    auto d = make_typed_unique(BN_bin2bn(data.data(), data.size(), nullptr));
+    set_private_bignum(d.release());
   }
 
   void set_secret(const bytes& data) override
@@ -796,19 +884,41 @@ public:
     set_private(digest);
   }
 
+  BIGNUM* curve_order()
+  {
+    const char* hex;
+    switch (static_cast<ECKeyType>(_curve_nid)) {
+      case ECKeyType::P256:
+        hex = n256;
+        break;
+      case ECKeyType::P521:
+        hex = n521;
+        break;
+      default:
+        throw std::runtime_error("Invalid key type");
+    }
+
+    BIGNUM* n = nullptr;
+    BN_hex2bn(&n, hex);
+    if (n == nullptr) {
+      throw OpenSSLError::current();
+    }
+    return n;
+  }
+
   void update_private(const bytes& delta) override
   {
     auto eckey = my_ec_key();
     auto group = EC_KEY_get0_group(eckey);
-    auto d = EC_KEY_get0_private_key(eckey);
-    auto pt1 = EC_KEY_get0_public_key(eckey);
-    auto pt2 = make_typed_unique(EC_POINT_new(group));
-    auto dd = make_typed_unique(BN_bin2bn(delta.data(), delta.size(), nullptr));
-    BN_mul(dd.get(), dd.get(), d, nullptr);
-    EC_POINT_mul(group, pt2.get(), dd.get(), nullptr, nullptr, nullptr);
+    auto priv = EC_KEY_get0_private_key(eckey);
+    auto d = make_typed_unique(BN_bin2bn(delta.data(), delta.size(), nullptr));
 
-    EC_KEY_set_private_key(eckey, dd.get());
-    EC_KEY_set_public_key(eckey, pt2.get());
+    auto order = make_typed_unique(curve_order());
+    auto updated = make_typed_unique(BN_new());
+    auto ctx = make_typed_unique(BN_CTX_new());
+    BN_mod_mul(updated.get(), d.get(), priv, order.get(), ctx.get());
+
+    set_private_bignum(updated.release());
   }
 
   void update_public(const bytes& delta) override
@@ -1590,12 +1700,6 @@ DHPublicKey::encrypt(const bytes& plaintext) const
   return HPKECiphertext{ ephemeral.public_key(), content };
 }
 
-void
-DHPrivateKey::update(const bytes& delta)
-{
-  _key->update_private(delta);
-}
-
 DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
@@ -1630,6 +1734,13 @@ bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
   return _key->derive(*pub._key);
+}
+
+void
+DHPrivateKey::update(const bytes& delta)
+{
+  _key->update_private(delta);
+  _pub = std::make_unique<DHPublicKey>(_suite, _key->dup_public());
 }
 
 bytes
