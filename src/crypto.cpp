@@ -91,6 +91,63 @@ typed_unique_ptr<T>::typed_unique_ptr(T* ptr)
   : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
 {}
 
+// This shorthand just saves on explicit template arguments
+template<typename T>
+typed_unique_ptr<T>
+make_typed_unique(T* ptr)
+{
+  return typed_unique_ptr<T>(ptr);
+}
+
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_KEY* ptr)
+{
+  EC_KEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_POINT* ptr)
+{
+  EC_POINT_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
 ///
 /// OpenSSLError
 ///
@@ -199,6 +256,101 @@ struct OpenSSLKey
   static OpenSSLKey* parse_private(OpenSSLKeyType type, const bytes& data);
   static OpenSSLKey* derive(OpenSSLKeyType type, const bytes& data);
 
+  bytes derive(const OpenSSLKey& other) const
+  {
+    if (!can_derive() || !other.can_derive()) {
+      throw InvalidParameterError("Inappropriate key(s) for derive");
+    }
+
+    // This and the next line are acceptable because the OpenSSL
+    // functions fail to mark the required EVP_PKEYs as const, even
+    // though they are not modified.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+    auto priv_pkey = const_cast<EVP_PKEY*>(_key.get());
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+    auto pub_pkey = const_cast<EVP_PKEY*>(other._key.get());
+
+    auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+    if (ctx.get() == nullptr) {
+      throw OpenSSLError::current();
+    }
+
+    if (1 != EVP_PKEY_derive_init(ctx.get())) {
+      throw OpenSSLError::current();
+    }
+
+    if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+      throw OpenSSLError::current();
+    }
+
+    size_t out_len;
+    if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+      throw OpenSSLError::current();
+    }
+
+    bytes out(out_len);
+    uint8_t* ptr = out.data();
+    if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+      throw OpenSSLError::current();
+    }
+
+    return out;
+  }
+
+  bytes sign(const bytes& message) const
+  {
+    if (!can_sign()) {
+      throw InvalidParameterError("Inappropriate key for sign");
+    }
+
+    auto ctx = make_typed_unique(EVP_MD_CTX_create());
+    if (ctx.get() == nullptr) {
+      throw OpenSSLError::current();
+    }
+
+    if (1 !=
+        EVP_DigestSignInit(ctx.get(), nullptr, nullptr, nullptr, _key.get())) {
+      throw OpenSSLError::current();
+    }
+
+    auto siglen = sig_size();
+    bytes sig(sig_size());
+    if (1 !=
+        EVP_DigestSign(
+          ctx.get(), sig.data(), &siglen, message.data(), message.size())) {
+      throw OpenSSLError::current();
+    }
+
+    sig.resize(siglen);
+    return sig;
+  }
+
+  bool verify(const bytes& message, const bytes& signature) const
+  {
+    if (!can_sign()) {
+      throw InvalidParameterError("Inappropriate key for verify");
+    }
+
+    auto ctx = make_typed_unique(EVP_MD_CTX_create());
+    if (ctx.get() == nullptr) {
+      throw OpenSSLError::current();
+    }
+
+    if (1 != EVP_DigestVerifyInit(
+               ctx.get(), nullptr, nullptr, nullptr, _key.get())) {
+      throw OpenSSLError::current();
+    }
+
+    auto rv = EVP_DigestVerify(ctx.get(),
+                               signature.data(),
+                               signature.size(),
+                               message.data(),
+                               message.size());
+
+    return rv == 1;
+  }
+
   bool operator==(const OpenSSLKey& other)
   {
     // If one pointer is null and the other is not, then the two keys
@@ -221,59 +373,6 @@ struct OpenSSLKey
   typed_unique_ptr<EVP_PKEY> _key;
 };
 
-///
-/// Deleters and smart pointers for OpenSSL types
-///
-
-template<>
-void
-TypedDelete(BIGNUM* ptr)
-{
-  BN_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_KEY* ptr)
-{
-  EC_KEY_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_POINT* ptr)
-{
-  EC_POINT_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_CIPHER_CTX* ptr)
-{
-  EVP_CIPHER_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr)
-{
-  EVP_MD_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY_CTX* ptr)
-{
-  EVP_PKEY_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr)
-{
-  EVP_PKEY_free(ptr);
-}
-
 template<>
 void
 TypedDelete(OpenSSLKey* ptr)
@@ -285,14 +384,6 @@ TypedDelete(OpenSSLKey* ptr)
   // We are using a smart pointer here, just in a special way.
   // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
   delete ptr;
-}
-
-// This shorthand just saves on explicit template arguments
-template<typename T>
-typed_unique_ptr<T>
-make_typed_unique(T* ptr)
-{
-  return typed_unique_ptr<T>(ptr);
 }
 
 ///
@@ -1394,44 +1485,7 @@ DHPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
-  if (!_key->can_derive() || !pub._key->can_derive()) {
-    throw InvalidParameterError("Inappropriate key(s) for derive");
-  }
-
-  // This and the next line are acceptable because the OpenSSL
-  // functions fail to mark the required EVP_PKEYs as const, even
-  // though they are not modified.
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-  auto priv_pkey = const_cast<EVP_PKEY*>(_key->_key.get());
-
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-  auto pub_pkey = const_cast<EVP_PKEY*>(pub._key->_key.get());
-
-  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-  if (ctx.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_init(ctx.get())) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
-    throw OpenSSLError::current();
-  }
-
-  size_t out_len;
-  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
-    throw OpenSSLError::current();
-  }
-
-  bytes out(out_len);
-  uint8_t* ptr = out.data();
-  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
-    throw OpenSSLError::current();
-  }
-
-  return out;
+  return _key->derive(*pub._key);
 }
 
 bytes
@@ -1472,27 +1526,7 @@ DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
 bool
 SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 {
-  if (!_key->can_sign()) {
-    throw InvalidParameterError("Inappropriate key for verify");
-  }
-
-  auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (ctx.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_DigestVerifyInit(
-             ctx.get(), nullptr, nullptr, nullptr, _key->_key.get())) {
-    throw OpenSSLError::current();
-  }
-
-  auto rv = EVP_DigestVerify(ctx.get(),
-                             signature.data(),
-                             signature.size(),
-                             message.data(),
-                             message.size());
-
-  return rv == 1;
+  return _key->verify(message, signature);
 }
 
 SignaturePrivateKey
@@ -1519,29 +1553,7 @@ SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& secret)
 bytes
 SignaturePrivateKey::sign(const bytes& message) const
 {
-  if (!_key->can_sign()) {
-    throw InvalidParameterError("Inappropriate key for sign");
-  }
-
-  auto ctx = make_typed_unique(EVP_MD_CTX_create());
-  if (ctx.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_DigestSignInit(
-             ctx.get(), nullptr, nullptr, nullptr, _key->_key.get())) {
-    throw OpenSSLError::current();
-  }
-
-  auto siglen = _key->sig_size();
-  bytes sig(_key->sig_size());
-  if (1 != EVP_DigestSign(
-             ctx.get(), sig.data(), &siglen, message.data(), message.size())) {
-    throw OpenSSLError::current();
-  }
-
-  sig.resize(siglen);
-  return sig;
+  return _key->sign(message);
 }
 
 const SignaturePublicKey&
