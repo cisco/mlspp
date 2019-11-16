@@ -87,7 +87,7 @@ main()
   // Bob posts a ClientInitKey
   auto cikB1 = bob.fresh_cik();
 
-  // Bob starts a session with alice
+  // Alice starts a session with Bob
   auto cikA = alice.temp_cik();
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto session_welcome_add = Session::start(group_id, cikA, cikB1);
@@ -95,8 +95,8 @@ main()
   auto welcome = std::get<1>(session_welcome_add);
   auto add = std::get<2>(session_welcome_add);
 
-  // Alice looks up her CIK based on the welcome, and initializes
-  // her session
+  // Bob looks up his CIK based on the welcome, and initializes
+  // his session
   auto cikB2 = bob.find_cik(welcome.client_init_key_id);
   auto sessionB = Session::join(cikB2, welcome, add);
 
