@@ -82,7 +82,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 Credential
 Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
 {
-  auto pub = private_key.public_key();
+  const auto& pub = private_key.public_key();
   return Credential{ BasicCredential{ identity, pub }, private_key };
 }
 

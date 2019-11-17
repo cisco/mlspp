@@ -127,9 +127,10 @@ private:
   std::vector<std::optional<mls::Session>> sessions;
 
 public:
-  Simulation(std::vector<mls::CipherSuite> suites, mls::SignatureScheme scheme)
-    : suites(suites)
-    , scheme(scheme)
+  Simulation(std::vector<mls::CipherSuite> suites_in,
+             mls::SignatureScheme scheme_in)
+    : suites(suites_in)
+    , scheme(scheme_in)
   {}
 
   mls::bytes random() const { return mls::random_bytes(32); }
@@ -167,8 +168,8 @@ public:
     auto group_id = random();
     auto cik0 = fresh_client_init_key();
     auto cik1 = fresh_client_init_key();
-    auto [session0, welcome, add] = mls::Session::start(group_id, cik0, cik1);
-    auto session1 = mls::Session::join(cik1, welcome, add);
+    auto [session0, welcome1, add1] = mls::Session::start(group_id, cik0, cik1);
+    auto session1 = mls::Session::join(cik1, welcome1, add1);
 
     sessions = { session0, session1 };
     while (sessions.size() < initial_size) {

@@ -9,11 +9,11 @@
 
 using nlohmann::json;
 
-#define JSON_SERIALIZABLE(X...)                                                \
+#define JSON_SERIALIZABLE(...)                                                 \
   static const bool _json_serializable = true;                                 \
-  auto _json_field_names() const { return _field_names(#X); }                  \
-  auto _json_fields_r() { return std::tie(X); }                                \
-  auto _json_fields_w() const { return std::make_tuple(X); }
+  auto _json_field_names() const { return _field_names(#__VA_ARGS__); }        \
+  auto _json_fields_r() { return std::tie(__VA_ARGS__); }                      \
+  auto _json_fields_w() const { return std::make_tuple(__VA_ARGS__); }
 
 std::vector<std::string>
 _field_names(const std::string& comma_separated_fields)

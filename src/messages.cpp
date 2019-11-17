@@ -274,7 +274,7 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite)
 {}
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite,
-                           bytes group_id_in,
+                           const bytes& group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            ContentType content_type_in,
