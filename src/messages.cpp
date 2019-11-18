@@ -270,6 +270,8 @@ const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite)
   : CipherAware(suite)
+  , epoch(0)
+  , sender(0)
   , content(suite, ApplicationData{ suite })
 {}
 
