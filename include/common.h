@@ -6,32 +6,13 @@
 #include <stdexcept>
 #include <vector>
 
-// Forward declarations to enable optional serialization below
-namespace tls {
-class ostream;
-class istream;
-
-ostream&
-operator<<(ostream& out, uint8_t data);
-istream&
-operator>>(istream& in, uint8_t& data);
-}
-
 namespace mls {
-
-///
-/// Protocol versions
-///
-
-typedef uint8_t ProtocolVersion;
-
-static const ProtocolVersion mls10Version = 0xFF;
 
 ///
 /// Byte strings and serialization
 ///
 
-typedef std::vector<uint8_t> bytes;
+using bytes = std::vector<uint8_t>;
 
 bytes
 to_bytes(const std::string& ascii);
@@ -54,7 +35,23 @@ operator^(const bytes& lhs, const bytes& rhs);
 std::ostream&
 operator<<(std::ostream& out, const bytes& data);
 
-typedef uint32_t epoch_t;
+using epoch_t = uint32_t;
+
+///
+/// Auto-generate equality and inequality operators for TLS-serializable things
+///
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, bool>::type
+operator==(const T& lhs, const T& rhs) {
+  return lhs._tls_fields_w() == rhs._tls_fields_w();
+}
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, bool>::type
+operator!=(const T& lhs, const T& rhs) {
+  return lhs._tls_fields_w() != rhs._tls_fields_w();
+}
 
 ///
 /// Error types
@@ -74,13 +71,6 @@ class ProtocolError : public std::runtime_error
 {
 public:
   using parent = std::runtime_error;
-  using parent::parent;
-};
-
-class InvalidTLSSyntax : public std::invalid_argument
-{
-public:
-  using parent = std::invalid_argument;
   using parent::parent;
 };
 

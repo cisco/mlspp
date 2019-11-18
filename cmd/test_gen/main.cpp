@@ -443,7 +443,7 @@ generate_basic_session()
     std::vector<ClientInitKey> client_init_keys;
     std::vector<TestSession> sessions;
     std::vector<bytes> seeds;
-    auto ciphersuites = CipherList{ suite };
+    auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
       bytes seed = { uint8_t(j), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);

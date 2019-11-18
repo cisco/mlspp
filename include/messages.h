@@ -5,8 +5,18 @@
 #include "ratchet_tree.h"
 #include "tls_syntax.h"
 #include <optional>
+#include <variant>
 
 namespace mls {
+
+///
+/// Protocol versions
+///
+
+enum class ProtocolVersion : uint8_t
+{
+  mls10 = 0xFF,
+};
 
 // struct {
 //    DHPublicKey public_key;
@@ -20,14 +30,9 @@ struct RatchetNode : public CipherAware
   RatchetNode(CipherSuite suite);
   RatchetNode(DHPublicKey public_key,
               const std::vector<HPKECiphertext>& node_secrets);
-};
 
-bool
-operator==(const RatchetNode& lhs, const RatchetNode& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const RatchetNode& obj);
-tls::istream&
-operator>>(tls::istream& in, RatchetNode& obj);
+  TLS_SERIALIZABLE(public_key, node_secrets);
+};
 
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
@@ -36,14 +41,9 @@ struct DirectPath : public CipherAware
 {
   tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
   DirectPath(CipherSuite suite);
-};
 
-bool
-operator==(const DirectPath& lhs, const DirectPath& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const DirectPath& obj);
-tls::istream&
-operator>>(tls::istream& in, DirectPath& obj);
+  TLS_SERIALIZABLE(nodes);
+};
 
 // struct {
 //     opaque client_init_key_id<0..255>;
@@ -70,7 +70,7 @@ struct ClientInitKey
 
   ClientInitKey();
   ClientInitKey(bytes client_init_key_id,
-                const CipherList& supported_ciphersuites,
+                const std::vector<CipherSuite>& supported_ciphersuites,
                 const bytes& init_secret,
                 const Credential& credential);
 
@@ -81,18 +81,12 @@ struct ClientInitKey
   bool verify() const;
   bytes to_be_signed() const;
 
+  TLS_SERIALIZABLE(client_init_key_id, supported_versions, cipher_suites,
+                   init_keys, credential, signature)
+
   private:
   std::map<CipherSuite, DHPrivateKey> _private_keys;
 };
-
-bool
-operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
-bool
-operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const ClientInitKey& obj);
-tls::istream&
-operator>>(tls::istream& in, ClientInitKey& obj);
 
 // struct {
 //   ProtocolVersion version;
@@ -120,14 +114,9 @@ struct WelcomeInfo : public CipherAware
               const tls::opaque<1>& init_secret);
 
   bytes hash(CipherSuite suite) const;
-};
 
-bool
-operator==(const WelcomeInfo& lhs, const WelcomeInfo& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const WelcomeInfo& obj);
-tls::istream&
-operator>>(tls::istream& in, WelcomeInfo& obj);
+  TLS_SERIALIZABLE(version, group_id, epoch, tree, interim_transcript_hash, init_secret);
+};
 
 // struct {
 //   opaque client_init_key_id<0..255>;
@@ -161,11 +150,6 @@ enum class GroupOperationType : uint8_t
   remove = 3,
 };
 
-tls::ostream&
-operator<<(tls::ostream& out, const GroupOperationType& obj);
-tls::istream&
-operator>>(tls::istream& in, GroupOperationType& obj);
-
 // struct {
 //     uint32 index;
 //     ClientInitKey init_key;
@@ -179,16 +163,12 @@ public:
   tls::opaque<1> welcome_info_hash;
 
   Add() = default;
+  Add(CipherSuite suite) {}
   Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
-  static const GroupOperationType type;
-};
 
-bool
-operator==(const Add& lhs, const Add& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Add& obj);
-tls::istream&
-operator>>(tls::istream& in, Add& obj);
+  static const GroupOperationType type;
+  TLS_SERIALIZABLE(index, init_key, welcome_info_hash)
+};
 
 // struct {
 //     DirectPath path;
@@ -200,15 +180,10 @@ public:
 
   Update(CipherSuite suite);
   Update(const DirectPath& path);
-  static const GroupOperationType type;
-};
 
-bool
-operator==(const Update& lhs, const Update& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Update& obj);
-tls::istream&
-operator>>(tls::istream& in, Update& obj);
+  static const GroupOperationType type;
+  TLS_SERIALIZABLE(path);
+};
 
 // struct {
 //     uint32 removed;
@@ -222,15 +197,10 @@ public:
 
   Remove(CipherSuite suite);
   Remove(LeafIndex removed, const DirectPath& path);
-  static const GroupOperationType type;
-};
 
-bool
-operator==(const Remove& lhs, const Remove& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Remove& obj);
-tls::istream&
-operator>>(tls::istream& in, Remove& obj);
+  static const GroupOperationType type;
+  TLS_SERIALIZABLE(removed, path);
+};
 
 // Container class for all operations
 //
@@ -243,28 +213,14 @@ operator>>(tls::istream& in, Remove& obj);
 //         case remove:    Remove;
 //     };
 // } GroupOperation;
-//
-// NB: This is a "pseudo-union" type, in that only one of the struct
-// members will be populated with a non-zero value.  This is a bit
-// wasteful of memory, but necessary to avoid the silliness of C++
-// union types over structs.
-struct GroupOperation : public CipherAware
+struct GroupOperation : public CipherAware,
+                        public tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>
 {
-  GroupOperationType type;
-
-  std::optional<Add> add;
-  std::optional<Update> update;
-  std::optional<Remove> remove;
-
-  GroupOperation();
+  using InnerOp = tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>;
   GroupOperation(CipherSuite suite);
   GroupOperation(const Add& add);
   GroupOperation(const Update& update);
   GroupOperation(const Remove& remove);
-
-  friend bool operator==(const GroupOperation& lhs, const GroupOperation& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const GroupOperation& obj);
-  friend tls::istream& operator>>(tls::istream& in, GroupOperation& obj);
 };
 
 // enum {
@@ -279,11 +235,6 @@ enum struct ContentType : uint8_t
   handshake = 1,
   application = 2,
 };
-
-tls::ostream&
-operator<<(tls::ostream& out, const ContentType& obj);
-tls::istream&
-operator>>(tls::istream& in, ContentType& obj);
 
 // struct {
 //     opaque group_id<0..255>;
@@ -302,43 +253,75 @@ operator>>(tls::istream& in, ContentType& obj);
 //
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
+struct HandshakeData
+{
+  GroupOperation operation;
+  tls::opaque<1> confirmation;
+
+  HandshakeData(CipherSuite suite)
+    : operation(suite)
+  {}
+
+  HandshakeData(const GroupOperation& operation_in,
+                const bytes& confirmation_in)
+    : operation(operation_in)
+    , confirmation(confirmation_in)
+  {}
+
+  static const ContentType type;
+  TLS_SERIALIZABLE(operation, confirmation);
+};
+
+struct ApplicationData : tls::opaque<4>
+{
+  using parent = tls::opaque<4>;
+  using parent::parent;
+
+  ApplicationData(CipherSuite suite)
+  {}
+
+  static const ContentType type;
+};
+
 struct MLSPlaintext : public CipherAware
 {
-  using CipherAware::CipherAware;
-
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
-  ContentType content_type;
-
-  std::optional<GroupOperation> operation;
-  tls::opaque<1> confirmation;
-  tls::opaque<4> application_data;
-
+  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData> content;
   tls::opaque<2> signature;
 
+  // Constructor for unmarshaling directly
+  MLSPlaintext(CipherSuite suite);
+
+  // Constructor for decrypting
+  MLSPlaintext(CipherSuite suite,
+               const bytes& group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               ContentType content_type,
+               bytes content);
+
+  // Constructors for encrypting
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
-               GroupOperation operation);
+               const GroupOperation& operation);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
-               bytes application_data);
+               const ApplicationData& application_data);
 
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);
   bool verify(const SignaturePublicKey& pub) const;
 
   bytes marshal_content(size_t padding_size) const;
-  void unmarshal_content(CipherSuite suite, const bytes& marshaled);
 
-  bytes content() const;
+  bytes op_content() const;
   bytes auth_data() const;
 
-  friend bool operator==(const MLSPlaintext& lhs, const MLSPlaintext& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const MLSPlaintext& obj);
-  friend tls::istream& operator>>(tls::istream& in, MLSPlaintext& obj);
+  TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);
 };
 
 // struct {
@@ -357,13 +340,9 @@ struct MLSCiphertext
   tls::opaque<1> sender_data_nonce;
   tls::opaque<1> encrypted_sender_data;
   tls::opaque<4> ciphertext;
-};
 
-bool
-operator==(const MLSCiphertext& lhs, const MLSCiphertext& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const MLSCiphertext& obj);
-tls::istream&
-operator>>(tls::istream& in, MLSCiphertext& obj);
+  TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
+                   encrypted_sender_data, ciphertext);
+};
 
 } // namespace mls

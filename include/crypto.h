@@ -18,13 +18,6 @@ enum struct CipherSuite : uint16_t
   X448_SHA512_AES256GCM = 0x0011
 };
 
-typedef std::vector<CipherSuite> CipherList;
-
-tls::ostream&
-operator<<(tls::ostream& out, const CipherSuite& obj);
-tls::istream&
-operator>>(tls::istream& in, CipherSuite& obj);
-
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0403,
@@ -33,17 +26,17 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808
 };
 
-tls::ostream&
-operator<<(tls::ostream& out, const SignatureScheme& obj);
-tls::istream&
-operator>>(tls::istream& in, SignatureScheme& obj);
+#define DUMMY_SIGNATURE_SCHEME SignatureScheme::P256_SHA256
 
 // Utility classes to avoid a bit of boilerplate
 class CipherAware
 {
 public:
-  CipherAware(CipherSuite suite);
-  CipherSuite cipher_suite() const;
+  CipherAware(CipherSuite suite)
+    : _suite(suite)
+  {}
+
+  CipherSuite cipher_suite() const { return _suite; }
 
 protected:
   CipherSuite _suite;
@@ -52,8 +45,11 @@ protected:
 class SignatureAware
 {
 public:
-  SignatureAware(SignatureScheme scheme);
-  SignatureScheme signature_scheme() const;
+  SignatureAware(SignatureScheme scheme)
+    : _scheme(scheme)
+  {}
+
+  SignatureScheme signature_scheme() const { return _scheme; }
 
 protected:
   SignatureScheme _scheme;
@@ -79,6 +75,34 @@ public:
 
 private:
   static int _refct;
+};
+
+// Interface to metrics
+class CryptoMetrics {
+public:
+  struct Report {
+    uint32_t fixed_base_dh;
+    uint32_t var_base_dh;
+    uint32_t digest;
+    uint32_t digest_bytes;
+    uint32_t hmac;
+  };
+
+  static Report snapshot();
+  static void reset();
+
+  static void count_fixed_base_dh();
+  static void count_var_base_dh();
+  static void count_digest();
+  static void count_digest_bytes(uint32_t count);
+  static void count_hmac();
+
+private:
+  static uint32_t fixed_base_dh;
+  static uint32_t var_base_dh;
+  static uint32_t digest;
+  static uint32_t digest_bytes;
+  static uint32_t hmac;
 };
 
 // Adapt standard pointers so that they can be "typed" to handle
@@ -336,9 +360,7 @@ struct HPKECiphertext : public CipherAware
     , content(content_in)
   {}
 
-  friend bool operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const HPKECiphertext& obj);
-  friend tls::istream& operator>>(tls::istream& in, HPKECiphertext& obj);
+  TLS_SERIALIZABLE(ephemeral, content);
 };
 
 } // namespace mls

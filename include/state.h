@@ -21,12 +21,9 @@ struct GroupContext
   epoch_t epoch;
   tls::opaque<1> tree_hash;
   tls::opaque<1> transcript_hash;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const GroupContext& obj);
-tls::istream&
-operator>>(tls::istream& out, GroupContext& obj);
+  TLS_SERIALIZABLE(group_id, epoch, tree_hash, transcript_hash)
+};
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we
 // never ratchet forward the base secret.  This allows for maximal

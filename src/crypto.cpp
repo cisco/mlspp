@@ -13,69 +13,73 @@
 
 namespace mls {
 
-///
-/// CipherSuite and SignatureScheme
-///
-
 static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
 static const SignatureScheme unknown_scheme =
   static_cast<SignatureScheme>(0xFFFF);
-
-tls::ostream&
-operator<<(tls::ostream& out, const CipherSuite& obj)
-{
-  return out << static_cast<uint16_t>(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, CipherSuite& obj)
-{
-  uint16_t val;
-  in >> val;
-  obj = static_cast<CipherSuite>(val);
-  return in;
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const SignatureScheme& obj)
-{
-  return out << static_cast<uint16_t>(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& in, SignatureScheme& obj)
-{
-  uint16_t val;
-  in >> val;
-  obj = static_cast<SignatureScheme>(val);
-  return in;
-}
-
-CipherAware::CipherAware(CipherSuite suite)
-  : _suite(suite)
-{}
-
-CipherSuite
-CipherAware::cipher_suite() const
-{
-  return _suite;
-}
-
-SignatureAware::SignatureAware(SignatureScheme scheme)
-  : _scheme(scheme)
-{}
-
-SignatureScheme
-SignatureAware::signature_scheme() const
-{
-  return _scheme;
-}
 
 ///
 /// Test mode controls
 ///
 
 int DeterministicHPKE::_refct = 0;
+
+///
+/// Metrics
+///
+
+uint32_t CryptoMetrics::fixed_base_dh = 0;
+uint32_t CryptoMetrics::var_base_dh = 0;
+uint32_t CryptoMetrics::digest = 0;
+uint32_t CryptoMetrics::digest_bytes = 0;
+uint32_t CryptoMetrics::hmac = 0;
+
+CryptoMetrics::Report
+CryptoMetrics::snapshot()
+{
+  return {
+    fixed_base_dh, var_base_dh, digest, digest_bytes, hmac,
+  };
+}
+
+void
+CryptoMetrics::reset()
+{
+  fixed_base_dh = 0;
+  var_base_dh = 0;
+  digest = 0;
+  digest_bytes = 0;
+  hmac = 0;
+}
+
+void
+CryptoMetrics::count_fixed_base_dh()
+{
+  fixed_base_dh += 1;
+}
+
+void
+CryptoMetrics::count_var_base_dh()
+{
+  var_base_dh += 1;
+}
+
+void
+CryptoMetrics::count_digest()
+{
+  digest += 1;
+}
+
+void
+CryptoMetrics::count_digest_bytes(uint32_t count)
+{
+  digest_bytes += count;
+}
+
+void
+CryptoMetrics::count_hmac()
+{
+  hmac += 1;
+}
 
 ///
 /// typed_unique_ptr
@@ -831,6 +835,7 @@ Digest::Digest(CipherSuite suite)
 Digest&
 Digest::write(uint8_t byte)
 {
+  CryptoMetrics::count_digest_bytes(1);
   if (EVP_DigestUpdate(_ctx.get(), &byte, 1) != 1) {
     throw OpenSSLError::current();
   }
@@ -840,6 +845,7 @@ Digest::write(uint8_t byte)
 Digest&
 Digest::write(const bytes& data)
 {
+  CryptoMetrics::count_digest_bytes(data.size());
   if (EVP_DigestUpdate(_ctx.get(), data.data(), data.size()) != 1) {
     throw OpenSSLError::current();
   }
@@ -849,6 +855,7 @@ Digest::write(const bytes& data)
 bytes
 Digest::digest()
 {
+  CryptoMetrics::count_digest();
   unsigned int outlen = output_size();
   auto out = bytes(outlen);
   auto ptr = out.data();
@@ -871,6 +878,7 @@ Digest::output_size() const
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
+  CryptoMetrics::count_hmac();
   unsigned int size = 0;
   auto type = ossl_digest_type(digest_type(suite));
   bytes md(EVP_MAX_MD_SIZE);
@@ -958,13 +966,9 @@ struct HKDFLabel
   uint16_t length;
   tls::opaque<1> label;
   tls::opaque<4> context;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const HKDFLabel& obj)
-{
-  return out << obj.length << obj.label << obj.context;
-}
+  TLS_SERIALIZABLE(length, label, context);
+};
 
 bytes
 hkdf_expand_label(CipherSuite suite,
@@ -1382,13 +1386,9 @@ struct HPKEContext
   uint8_t mode;
   tls::opaque<2> kem_context;
   tls::opaque<2> info;
-};
 
-tls::ostream&
-operator<<(tls::ostream& out, const HPKEContext& obj)
-{
-  return out << obj.ciphersuite << obj.mode << obj.kem_context << obj.info;
-}
+  TLS_SERIALIZABLE(ciphersuite, mode, kem_context, info)
+};
 
 static std::pair<bytes, bytes>
 setup_core(CipherSuite suite,
@@ -1455,6 +1455,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 DHPrivateKey
 DHPrivateKey::generate(CipherSuite suite)
 {
+  CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::generate(type));
 }
@@ -1469,6 +1470,7 @@ DHPrivateKey::parse(CipherSuite suite, const bytes& data)
 DHPrivateKey
 DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
+  CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
   return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
 }
@@ -1485,6 +1487,7 @@ DHPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
 bytes
 DHPrivateKey::derive(const DHPublicKey& pub) const
 {
+  CryptoMetrics::count_var_base_dh();
   return _key->derive(*pub._key);
 }
 
@@ -1571,28 +1574,6 @@ SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
   : PrivateKey(scheme, key)
 {
   _pub = std::make_unique<SignaturePublicKey>(scheme, key->dup_public());
-}
-
-///
-/// HPKECiphertext
-///
-
-bool
-operator==(const HPKECiphertext& lhs, const HPKECiphertext& rhs)
-{
-  return (lhs.ephemeral == rhs.ephemeral) && (lhs.content == rhs.content);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const HPKECiphertext& obj)
-{
-  return out << obj.ephemeral << obj.content;
-}
-
-tls::istream&
-operator>>(tls::istream& in, HPKECiphertext& obj)
-{
-  return in >> obj.ephemeral >> obj.content;
 }
 
 } // namespace mls

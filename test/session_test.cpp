@@ -7,8 +7,8 @@ using namespace mls;
 class SessionTest : public ::testing::Test
 {
 protected:
-  const CipherList suites{ CipherSuite::P256_SHA256_AES128GCM,
-                           CipherSuite::X25519_SHA256_AES128GCM };
+  const std::vector<CipherSuite> suites{ CipherSuite::P256_SHA256_AES128GCM,
+                                         CipherSuite::X25519_SHA256_AES128GCM };
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   const int group_size = 5;
   const size_t secret_size = 32;

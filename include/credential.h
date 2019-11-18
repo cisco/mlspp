@@ -16,16 +16,35 @@ enum struct CredentialType : uint8_t
   x509 = 1,
 };
 
-struct AbstractCredential
+// struct {
+//     opaque identity<0..2^16-1>;
+//     SignatureScheme algorithm;
+//     SignaturePublicKey public_key;
+// } BasicCredential;
+struct BasicCredential
 {
-  virtual ~AbstractCredential() {}
-  virtual std::unique_ptr<AbstractCredential> dup() const = 0;
-  virtual bytes identity() const = 0;
-  virtual SignaturePublicKey public_key() const = 0;
-  virtual void read(tls::istream& in) = 0;
-  virtual void write(tls::ostream& out) const = 0;
-  virtual bool equal(const AbstractCredential* other) const = 0;
+  BasicCredential()
+    : identity()
+    , public_key(DUMMY_SIGNATURE_SCHEME)
+  {}
+
+  BasicCredential(tls::opaque<2> identity_in, SignaturePublicKey public_key_in)
+    : identity(std::move(identity_in))
+    , public_key(std::move(public_key_in))
+  {}
+
+  tls::opaque<2> identity;
+  SignaturePublicKey public_key;
+
+  static const CredentialType type;
 };
+
+tls::ostream&
+operator<<(tls::ostream& str, const BasicCredential& obj);
+tls::istream&
+operator>>(tls::istream& str, BasicCredential& obj);
+bool
+operator==(const BasicCredential& lhs, const BasicCredential& rhs);
 
 // struct {
 //     CredentialType credential_type;
@@ -40,34 +59,32 @@ struct AbstractCredential
 class Credential
 {
 public:
-  Credential() = default;
-
-  Credential(const Credential& other);
-  Credential(Credential&& other) noexcept;
-  Credential& operator=(const Credential& other);
+  Credential()
+    : _cred()
+    , _priv()
+  {}
 
   bytes identity() const;
   SignaturePublicKey public_key() const;
-  bool valid_for(const SignaturePrivateKey& priv) const;
-
   std::optional<SignaturePrivateKey> private_key() const;
+  bool valid_for(const SignaturePrivateKey& priv) const;
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
   static Credential basic(const bytes& identity,
                           const SignaturePrivateKey& private_key);
 
+  TLS_SERIALIZABLE(_cred)
+
 private:
-  CredentialType _type;
-  std::unique_ptr<AbstractCredential> _cred;
+  template<typename Tc>
+  Credential(const Tc& cred);
+
+  template<typename Tc>
+  Credential(const Tc& cred, const SignaturePrivateKey& priv);
+
+  tls::variant<CredentialType, BasicCredential> _cred;
   std::optional<SignaturePrivateKey> _priv;
-
-  static AbstractCredential* create(CredentialType type);
-
-  friend bool operator==(const Credential& lhs, const Credential& rhs);
-  friend bool operator!=(const Credential& lhs, const Credential& rhs);
-  friend tls::ostream& operator<<(tls::ostream& out, const Credential& obj);
-  friend tls::istream& operator>>(tls::istream& in, Credential& obj);
 };
 
 } // namespace mls

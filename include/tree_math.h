@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "tls_syntax.h"
+
 // The below functions provide the index calculus for the tree
 // structures used in MLS.  They are premised on a "flat"
 // representation of a balanced binary tree.  Leaf nodes are
@@ -27,12 +29,6 @@
 //
 //    01x = <00x, 10x>
 
-// Fordward declaration of TLS streams
-namespace tls {
-class istream;
-class ostream;
-}
-
 namespace mls {
 
 // Index types go in the overall namespace
@@ -49,12 +45,9 @@ struct UInt32
   explicit UInt32(uint32_t val_in)
     : val(val_in)
   {}
-};
 
-tls::istream&
-operator>>(tls::istream& in, UInt32& obj);
-tls::ostream&
-operator<<(tls::ostream& out, const UInt32& obj);
+  TLS_SERIALIZABLE(val);
+};
 
 struct NodeCount;
 
@@ -73,10 +66,7 @@ struct NodeCount : public UInt32
 struct LeafIndex : public UInt32
 {
   using UInt32::UInt32;
-
   bool operator<(const LeafIndex other) const { return val < other.val; }
-  bool operator==(const LeafIndex other) const { return val == other.val; }
-  bool operator!=(const LeafIndex other) const { return val != other.val; }
 };
 
 struct NodeIndex : public UInt32
@@ -85,9 +75,6 @@ struct NodeIndex : public UInt32
   explicit NodeIndex(const LeafIndex x)
     : UInt32(2 * x.val)
   {}
-
-  bool operator==(const NodeIndex other) const { return val == other.val; }
-  bool operator!=(const NodeIndex other) const { return val != other.val; }
 };
 
 // Internal namespace to keep these generic names clean
