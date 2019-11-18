@@ -296,7 +296,7 @@ struct MLSPlaintext : public CipherAware
 
   // Constructor for decrypting
   MLSPlaintext(CipherSuite suite,
-               bytes group_id,
+               const bytes& group_id,
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,
