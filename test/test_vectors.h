@@ -228,6 +228,10 @@ struct MessagesTestVectors
     SignatureScheme sig_scheme;
 
     tls::opaque<4> client_init_key;
+    tls::opaque<4> group_info;
+    tls::opaque<4> key_package;
+    tls::opaque<4> encrypted_key_package;
+    tls::opaque<4> welcome2;
     tls::opaque<4> welcome_info;
     tls::opaque<4> welcome;
     tls::opaque<4> add;
@@ -238,6 +242,10 @@ struct MessagesTestVectors
     TLS_SERIALIZABLE(cipher_suite,
                      sig_scheme,
                      client_init_key,
+                     group_info,
+                     key_package,
+                     encrypted_key_package,
+                     welcome2,
                      welcome_info,
                      welcome,
                      add,

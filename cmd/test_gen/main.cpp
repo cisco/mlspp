@@ -343,6 +343,23 @@ generate_messages()
     auto client_init_key = ClientInitKey{ dh_priv, cred };
     client_init_key.signature = tv.random;
 
+    // Construct Welcome2
+    auto group_info = GroupInfo{
+      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
+    };
+    group_info.signer_index = tv.signer_index;
+    group_info.signature = tv.random;
+
+    auto key_package = KeyPackage{ tv.random, tv.random };
+    auto encrypted_key_package =
+      EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
+
+    Welcome2 welcome2;
+    welcome2.version = ProtocolVersion::mls10;
+    welcome2.cipher_suite = suite;
+    welcome2.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome2.encrypted_group_info = tv.random;
+
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
@@ -377,6 +394,10 @@ generate_messages()
       suite,
       scheme,
       tls::marshal(client_init_key),
+      tls::marshal(group_info),
+      tls::marshal(key_package),
+      tls::marshal(encrypted_key_package),
+      tls::marshal(welcome2),
       tls::marshal(welcome_info),
       tls::marshal(welcome),
       tls::marshal(add),

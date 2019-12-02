@@ -135,6 +135,7 @@ public:
     : _ctor_arg(ctor_arg)
   {}
 
+  void set_arg(C ctor_arg) { _ctor_arg = ctor_arg; }
   virtual T new_element() const { return T{ _ctor_arg }; }
 
 private:

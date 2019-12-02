@@ -118,13 +118,18 @@ struct GroupInfo {
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
 
-  uint32_t signer_index;
+  LeafIndex signer_index;
   tls::opaque<2> signature;
 
   GroupInfo(CipherSuite suite);
+  GroupInfo(const bytes& group_id_in,
+            epoch_t epoch_in,
+            const RatchetTree tree_in,
+            const bytes& confirmed_transcript_hash_in,
+            const bytes& interim_transcript_hash_in);
 
   bytes to_be_signed() const;
-  void sign(uint32_t index, const SignaturePrivateKey& priv);
+  void sign(LeafIndex index, const SignaturePrivateKey& priv);
   bool verify() const;
 
   TLS_SERIALIZABLE(group_id,
@@ -187,6 +192,10 @@ struct Welcome2 {
   std::tuple<bytes, bytes> derive(CipherSuite suite, const bytes& epoch_secret) const;
   bytes _epoch_secret;
 };
+
+bool operator==(const Welcome2& lhs, const Welcome2& rhs);
+tls::ostream& operator<<(tls::ostream& str, const Welcome2& obj);
+tls::istream& operator>>(tls::istream& str, Welcome2& obj);
 
 // struct {
 //   ProtocolVersion version;

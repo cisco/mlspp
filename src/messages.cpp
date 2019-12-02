@@ -116,6 +116,18 @@ GroupInfo::GroupInfo(CipherSuite suite)
   : tree(suite)
 {}
 
+GroupInfo::GroupInfo(const bytes& group_id_in,
+                     epoch_t epoch_in,
+                     const RatchetTree tree_in,
+                     const bytes& confirmed_transcript_hash_in,
+                     const bytes& interim_transcript_hash_in)
+  : group_id(group_id_in)
+  , epoch(epoch_in)
+  , tree(tree_in)
+  , confirmed_transcript_hash(confirmed_transcript_hash_in)
+  , interim_transcript_hash(interim_transcript_hash_in)
+{}
+
 bytes
 GroupInfo::to_be_signed() const
 {
@@ -126,7 +138,7 @@ GroupInfo::to_be_signed() const
 }
 
 void
-GroupInfo::sign(uint32_t index, const SignaturePrivateKey& priv)
+GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 {
   auto cred = tree.get_credential(LeafIndex{ index });
   if (cred.public_key() != priv.public_key()) {
@@ -163,6 +175,7 @@ Welcome2::Welcome2(CipherSuite suite,
                    const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
+  , key_packages(suite)
   , _epoch_secret(epoch_secret)
 {
   auto [key, nonce] = derive(suite, epoch_secret);
@@ -232,6 +245,31 @@ Welcome2::decrypt(const std::vector<ClientInitKey>& ciks) const
 
   return std::make_tuple(
     i, key_pkg.epoch_secret, key_pkg.path_secret, group_info);
+}
+
+bool
+operator==(const Welcome2& lhs, const Welcome2& rhs)
+{
+  return (lhs.version == rhs.version) &&
+         (lhs.cipher_suite == rhs.cipher_suite) &&
+         (lhs.key_packages == rhs.key_packages) &&
+         (lhs.encrypted_group_info == rhs.encrypted_group_info);
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const Welcome2& obj)
+{
+  return str << obj.version << obj.cipher_suite << obj.key_packages
+             << obj.encrypted_group_info;
+}
+
+tls::istream&
+operator>>(tls::istream& str, Welcome2& obj)
+{
+  str >> obj.version >> obj.cipher_suite;
+  obj.key_packages.set_arg(obj.cipher_suite);
+  str >> obj.key_packages >> obj.encrypted_group_info;
+  return str;
 }
 
 // WelcomeInfo
