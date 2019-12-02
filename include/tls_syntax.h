@@ -575,4 +575,13 @@ unmarshal(const std::vector<uint8_t>& data, T& value)
   r >> value;
 }
 
+template<typename T, typename... Tp>
+T
+get(const std::vector<uint8_t>& data, Tp... args)
+{
+  T value(args...);
+  tls::unmarshal(data, value);
+  return value;
+}
+
 } // namespace tls

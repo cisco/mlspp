@@ -282,8 +282,7 @@ protected:
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
-    GroupContext group_context;
-    tls::unmarshal(tv.base_group_context, group_context);
+    auto group_context = tls::get<GroupContext>(tv.base_group_context);
 
     for (const auto& epoch : test_case.epochs) {
       auto group_context_bytes = tls::marshal(group_context);

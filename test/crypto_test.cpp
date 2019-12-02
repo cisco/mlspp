@@ -340,8 +340,7 @@ TEST_F(CryptoTest, DHSerialize)
     DHPublicKey parsed(suite, gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
-    DHPublicKey gX2(suite);
-    tls::unmarshal(tls::marshal(gX), gX2);
+    auto gX2 = tls::get<DHPublicKey>(tls::marshal(gX), suite);
     ASSERT_EQ(gX2, gX);
   }
 }
@@ -465,8 +464,7 @@ TEST_F(CryptoTest, SignatureSerialize)
     SignaturePublicKey parsed(scheme, gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
-    SignaturePublicKey gX2(scheme);
-    tls::unmarshal(tls::marshal(gX), gX2);
+    auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX), scheme);
     ASSERT_EQ(gX2, gX);
   }
 }

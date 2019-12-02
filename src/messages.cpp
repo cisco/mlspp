@@ -223,14 +223,12 @@ Welcome2::decrypt(const std::vector<ClientInitKey>& ciks) const
 
   auto key_pkg_data =
     cik.private_key().value().decrypt(pkg_ptr->encrypted_key_package);
-  KeyPackage key_pkg;
-  tls::unmarshal(key_pkg_data, key_pkg);
+  auto key_pkg = tls::get<KeyPackage>(key_pkg_data);
 
   // Decrypt the GroupInfo
   auto [key, nonce] = derive(cipher_suite, key_pkg.epoch_secret);
   auto group_info_data = AESGCM(key, nonce).decrypt(encrypted_group_info);
-  GroupInfo group_info(cipher_suite);
-  tls::unmarshal(group_info_data, group_info);
+  auto group_info = tls::get<GroupInfo>(group_info_data, cipher_suite);
 
   return std::make_tuple(
     i, key_pkg.epoch_secret, key_pkg.path_secret, group_info);
@@ -284,9 +282,9 @@ Welcome::Welcome(const bytes& id,
 WelcomeInfo
 Welcome::decrypt(const DHPrivateKey& priv) const
 {
-  auto welcome_info_bytes = priv.decrypt(encrypted_welcome_info);
-  auto welcome_info = WelcomeInfo{ priv.cipher_suite() };
-  tls::unmarshal(welcome_info_bytes, welcome_info);
+  auto welcome_info_data = priv.decrypt(encrypted_welcome_info);
+  auto welcome_info =
+    tls::get<WelcomeInfo>(welcome_info_data, priv.cipher_suite());
   return welcome_info;
 }
 
@@ -410,10 +408,10 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite,
     throw ProtocolError("Invalid marker byte");
   }
 
-  uint16_t sig_len;
   auto start = content_in.begin();
   auto sig_len_bytes = bytes(start + cut - 2, start + cut);
-  tls::unmarshal(sig_len_bytes, sig_len);
+  auto sig_len = tls::get<uint16_t>(sig_len_bytes);
+
   cut -= 2;
   if (sig_len > cut) {
     throw ProtocolError("Invalid signature size");

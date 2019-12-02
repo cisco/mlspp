@@ -24,8 +24,7 @@ Session::join(const std::vector<ClientInitKey>& client_init_keys,
               const Welcome& welcome,
               const bytes& add_data)
 {
-  MLSPlaintext add{ welcome.cipher_suite };
-  tls::unmarshal(add_data, add);
+  auto add = tls::get<MLSPlaintext>(add_data, welcome.cipher_suite);
 
   Session session;
   State next(client_init_keys, welcome, add);
@@ -73,8 +72,8 @@ Session::remove(const bytes& evict_secret, uint32_t index)
 void
 Session::handle(const bytes& handshake_data)
 {
-  MLSPlaintext handshake{ current_state().cipher_suite() };
-  tls::unmarshal(handshake_data, handshake);
+  auto handshake =
+    tls::get<MLSPlaintext>(handshake_data, current_state().cipher_suite());
 
   if (handshake.sender == current_state().index()) {
     if (!_outbound_cache.has_value()) {
@@ -110,9 +109,7 @@ Session::protect(const bytes& plaintext)
 bytes
 Session::unprotect(const bytes& ciphertext)
 {
-  MLSCiphertext ciphertext_obj;
-  tls::unmarshal(ciphertext, ciphertext_obj);
-
+  auto ciphertext_obj = tls::get<MLSCiphertext>(ciphertext);
   if (_state.count(ciphertext_obj.epoch) == 0) {
     throw MissingStateError("No state available to decrypt ciphertext");
   }

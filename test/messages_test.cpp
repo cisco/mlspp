@@ -5,23 +5,19 @@
 
 using namespace mls;
 
-template<typename T>
+template<typename T, typename... Tp>
 void
-tls_round_trip(const bytes& vector,
-               T& constructed,
-               T& unmarshaled,
-               bool reproducible)
+tls_round_trip_2(const bytes& vector,
+                 T& constructed,
+                 bool reproducible,
+                 Tp... args)
 {
   auto marshaled = tls::marshal(constructed);
-
-  std::cout << "vec " << vector << std::endl;
-  std::cout << "mar " << marshaled << std::endl;
-
   if (reproducible) {
     ASSERT_EQ(vector, marshaled);
   }
 
-  tls::unmarshal(vector, unmarshaled);
+  auto unmarshaled = tls::get<T>(vector, args...);
   ASSERT_EQ(constructed, unmarshaled);
   ASSERT_EQ(tls::marshal(unmarshaled), vector);
 }
@@ -75,55 +71,43 @@ protected:
       ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // ClientInitKey
-    ClientInitKey client_init_key_c{ dh_priv, cred };
-    client_init_key_c.signature = tv.random;
-
-    ClientInitKey client_init_key;
-    tls_round_trip(
-      tc.client_init_key, client_init_key_c, client_init_key, reproducible);
+    ClientInitKey client_init_key{ dh_priv, cred };
+    client_init_key.signature = tv.random;
+    tls_round_trip_2(tc.client_init_key, client_init_key, reproducible);
 
     // WelcomeInfo and Welcome
-    WelcomeInfo welcome_info_c{
+    WelcomeInfo welcome_info{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
-    Welcome welcome_c{ client_init_key.hash(), dh_key, welcome_info_c };
+    tls_round_trip_2(tc.welcome_info, welcome_info, true, tc.cipher_suite);
 
-    WelcomeInfo welcome_info{ tc.cipher_suite };
-    tls_round_trip(tc.welcome_info, welcome_info_c, welcome_info, true);
-
-    Welcome welcome;
-    tls_round_trip(tc.welcome, welcome_c, welcome, true);
+    Welcome welcome{ client_init_key.hash(), dh_key, welcome_info };
+    tls_round_trip_2(tc.welcome, welcome, true);
 
     // Handshake messages
-    Add add_op{ tv.removed, client_init_key_c, tv.random };
-    Update update_op{ direct_path };
-    Remove remove_op{ tv.removed, direct_path };
+    auto add_op = Add{ tv.removed, client_init_key, tv.random };
+    auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
+    add.signature = tv.random;
+    tls_round_trip_2(tc.add, add, reproducible, tc.cipher_suite);
 
-    auto add_c = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
-    auto update_c =
+    auto update_op = Update{ direct_path };
+    auto update =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
-    auto remove_c =
+    update.signature = tv.random;
+    tls_round_trip_2(tc.update, update, reproducible, tc.cipher_suite);
+
+    Remove remove_op{ tv.removed, direct_path };
+    auto remove =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
-    add_c.signature = tv.random;
-    update_c.signature = tv.random;
-    remove_c.signature = tv.random;
-
-    MLSPlaintext add{ tc.cipher_suite };
-    tls_round_trip(tc.add, add_c, add, reproducible);
-
-    MLSPlaintext update{ tc.cipher_suite };
-    tls_round_trip(tc.update, update_c, update, true);
-
-    MLSPlaintext remove{ tc.cipher_suite };
-    tls_round_trip(tc.remove, remove_c, remove, true);
+    remove.signature = tv.random;
+    tls_round_trip_2(tc.remove, remove, reproducible, tc.cipher_suite);
 
     // MLSCiphertext
-    MLSCiphertext ciphertext_c{
+    MLSCiphertext ciphertext{
       tv.group_id, tv.epoch,  ContentType::handshake,
       tv.random,   tv.random, tv.random,
     };
-    MLSCiphertext ciphertext{};
-    tls_round_trip(tc.ciphertext, ciphertext_c, ciphertext, true);
+    tls_round_trip_2(tc.ciphertext, ciphertext, true);
   }
 };
 
