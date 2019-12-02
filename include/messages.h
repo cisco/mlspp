@@ -92,6 +92,102 @@ bool operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
 tls::ostream& operator<<(tls::ostream& str, const ClientInitKey& obj);
 tls::istream& operator>>(tls::istream& str, ClientInitKey& obj);
 
+// TODO:
+// * Test GroupInfo marshal/unmarshal
+// * Test GroupInfo sign/verify
+
+// struct {
+//   // GroupContext inputs
+//   opaque group_id<0..255>;
+//   uint32 epoch;
+//   optional<RatchetNode> tree<1..2^32-1>;
+//   opaque confirmed_transcript_hash<0..255>;
+//
+//   // Inputs to the next round of the key schedule
+//   opaque interim_transcript_hash<0..255>;
+//   opaque epoch_secret<0..255>;
+//
+//   uint32 signer_index;
+//   opaque signature<0..255>;
+// } GroupInfo;
+struct GroupInfo {
+  tls::opaque<1> group_id;
+  epoch_t epoch;
+  RatchetTree tree;
+
+  tls::opaque<1> confirmed_transcript_hash;
+  tls::opaque<1> interim_transcript_hash;
+
+  uint32_t signer_index;
+  tls::opaque<2> signature;
+
+  GroupInfo(CipherSuite suite);
+
+  bytes to_be_signed() const;
+  void sign(uint32_t index, const SignaturePrivateKey& priv);
+  bool verify() const;
+
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   tree,
+                   confirmed_transcript_hash,
+                   interim_transcript_hash,
+                   signer_index,
+                   signature);
+};
+
+// struct {
+//   opaque group_info_key<1..255>;
+//   opaque group_info_nonce<1..255>;
+//   opaque path_secret<1..255>;
+// } KeyPackage;
+struct KeyPackage {
+  tls::opaque<1> epoch_secret;
+  tls::opaque<1> path_secret;
+
+  TLS_SERIALIZABLE(epoch_secret, path_secret);
+};
+
+// struct {
+//   opaque client_init_key_hash<1..255>;
+//   HPKECiphertext encrypted_key_package;
+// } EncryptedKeyPackage;
+struct EncryptedKeyPackage {
+  tls::opaque<1> client_init_key_hash;
+  HPKECiphertext encrypted_key_package;
+
+  EncryptedKeyPackage(CipherSuite suite);
+  EncryptedKeyPackage(const bytes& hash, const HPKECiphertext& package);
+
+  TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
+};
+
+
+// struct {
+//   ProtocolVersion version = mls10;
+//   CipherSuite cipher_suite;
+//   EncryptedKeyPackage key_packages<1..2^32-1>;
+//   opaque encrypted_group_info<1..2^32-1>;
+// } Welcome;
+struct Welcome2 {
+  ProtocolVersion version;
+  CipherSuite cipher_suite;
+  tls::variant_vector<EncryptedKeyPackage, CipherSuite, 4> key_packages;
+  tls::opaque<4> encrypted_group_info;
+
+  Welcome2() = default;
+  Welcome2(CipherSuite suite,
+           const bytes& epoch_secret,
+           const GroupInfo& group_info);
+
+  void encrypt(const ClientInitKey& cik, const bytes& path_secret);
+  std::tuple<size_t, bytes, bytes, GroupInfo> decrypt(const std::vector<ClientInitKey>& ciks) const;
+
+  private:
+  std::tuple<bytes, bytes> derive(CipherSuite suite, const bytes& epoch_secret) const;
+  bytes _epoch_secret;
+};
+
 // struct {
 //   ProtocolVersion version;
 //   opaque group_id<0..255>;

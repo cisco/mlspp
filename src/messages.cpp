@@ -110,6 +110,132 @@ operator>>(tls::istream& str, ClientInitKey& obj)
   return str;
 }
 
+// GroupInfo
+
+GroupInfo::GroupInfo(CipherSuite suite)
+  : tree(suite)
+{}
+
+bytes
+GroupInfo::to_be_signed() const
+{
+  tls::ostream w;
+  w << group_id << epoch << tree << confirmed_transcript_hash
+    << interim_transcript_hash << signer_index;
+  return w.bytes();
+}
+
+void
+GroupInfo::sign(uint32_t index, const SignaturePrivateKey& priv)
+{
+  auto cred = tree.get_credential(LeafIndex{ index });
+  if (cred.public_key() != priv.public_key()) {
+    throw InvalidParameterError("Bad key for index");
+  }
+
+  signer_index = index;
+  signature = priv.sign(to_be_signed());
+}
+
+bool
+GroupInfo::verify() const
+{
+  auto cred = tree.get_credential(LeafIndex{ signer_index });
+  return cred.public_key().verify(to_be_signed(), signature);
+}
+
+// EncryptedKeyPackage
+
+EncryptedKeyPackage::EncryptedKeyPackage(CipherSuite suite)
+  : encrypted_key_package(suite)
+{}
+
+EncryptedKeyPackage::EncryptedKeyPackage(const bytes& hash,
+                                         const HPKECiphertext& package)
+  : client_init_key_hash(hash)
+  , encrypted_key_package(package)
+{}
+
+// Welcome2
+
+Welcome2::Welcome2(CipherSuite suite,
+                   const bytes& epoch_secret,
+                   const GroupInfo& group_info)
+  : version(ProtocolVersion::mls10)
+  , cipher_suite(suite)
+  , _epoch_secret(epoch_secret)
+{
+  auto [key, nonce] = derive(suite, epoch_secret);
+  auto group_info_data = tls::marshal(group_info);
+  encrypted_group_info = AESGCM(key, nonce).encrypt(group_info_data);
+}
+
+std::tuple<bytes, bytes>
+Welcome2::derive(CipherSuite suite, const bytes& epoch_secret) const
+{
+  auto secret_size = Digest(cipher_suite).output_size();
+  auto key_size = AESGCM::key_size(cipher_suite);
+  auto nonce_size = AESGCM::nonce_size;
+
+  auto secret =
+    hkdf_expand_label(suite, epoch_secret, "group info", {}, secret_size);
+  auto key = hkdf_expand_label(suite, secret, "key", {}, key_size);
+  auto nonce = hkdf_expand_label(suite, secret, "nonce", {}, nonce_size);
+  return std::make_tuple(key, nonce);
+}
+
+void
+Welcome2::encrypt(const ClientInitKey& cik, const bytes& path_secret)
+{
+  auto key_pkg = KeyPackage{ _epoch_secret, path_secret };
+  auto key_pkg_data = tls::marshal(key_pkg);
+  auto enc_pkg = cik.init_key.encrypt(key_pkg_data);
+  key_packages.emplace_back(cik.hash(), enc_pkg);
+}
+
+std::tuple<size_t, bytes, bytes, GroupInfo>
+Welcome2::decrypt(const std::vector<ClientInitKey>& ciks) const
+{
+  // Find the right key package
+  size_t i = 0;
+  bool found = false;
+  const EncryptedKeyPackage* pkg_ptr = nullptr;
+  for (; i < ciks.size() && !found; i += 1) {
+    auto hash = ciks[i].hash();
+    for (const auto& pkg : key_packages) {
+      if (pkg.client_init_key_hash == hash) {
+        found = true;
+        pkg_ptr = &pkg;
+        break;
+      }
+    }
+  }
+
+  if (!found) {
+    throw InvalidParameterError("Key package not found");
+  }
+
+  // Decrypt the key package
+  const auto& cik = ciks[i];
+  if (!cik.private_key().has_value()) {
+    throw InvalidParameterError("CIK private key not found");
+  }
+
+  auto key_pkg_data =
+    cik.private_key().value().decrypt(pkg_ptr->encrypted_key_package);
+  KeyPackage key_pkg;
+  tls::unmarshal(key_pkg_data, key_pkg);
+
+  // Decrypt the GroupInfo
+  auto [key, nonce] = derive(cipher_suite, key_pkg.epoch_secret);
+  auto group_info_data = AESGCM(key, nonce).decrypt(encrypted_group_info);
+  GroupInfo group_info(cipher_suite);
+  tls::unmarshal(group_info_data, group_info);
+
+  return std::make_tuple(
+    i, key_pkg.epoch_secret, key_pkg.path_secret, group_info);
+}
+
 // WelcomeInfo
 
 WelcomeInfo::WelcomeInfo(CipherSuite suite)
