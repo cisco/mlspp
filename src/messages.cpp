@@ -29,79 +29,38 @@ DirectPath::DirectPath(CipherSuite suite)
 // ClientInitKey
 
 ClientInitKey::ClientInitKey()
-  : supported_versions(1, ProtocolVersion::mls10)
+  : version(ProtocolVersion::mls10)
+  , cipher_suite(DUMMY_CIPHERSUITE)
+  , init_key(DUMMY_CIPHERSUITE)
 {}
 
-ClientInitKey::ClientInitKey(
-  bytes client_init_key_id_in,
-  const std::vector<CipherSuite>& supported_ciphersuites,
-  const bytes& init_secret,
-  const Credential& credential_in)
-  : client_init_key_id(std::move(client_init_key_id_in))
-  , supported_versions(1, ProtocolVersion::mls10)
+ClientInitKey::ClientInitKey(const HPKEPrivateKey& init_key_in,
+                             const Credential& credential_in)
+  : version(ProtocolVersion::mls10)
+  , cipher_suite(init_key_in.cipher_suite())
+  , init_key(init_key_in.public_key())
+  , credential(credential_in)
+  , _private_key(init_key_in)
 {
-  // XXX(rlb@ipv.sx) - It's probably not OK to derive all the keys
-  // from the same secret.  Maybe we should include the ciphersuite
-  // in the key derivation...
-  //
-  // Note, though, that since ClientInitKey objects track private
-  // keys, it would be safe to just generate keys here, if we were
-  // OK having internal keygen.
-  for (const auto suite : supported_ciphersuites) {
-    auto init_priv = DHPrivateKey::derive(suite, init_secret);
-    add_init_key(init_priv);
-  }
-
-  sign(credential_in);
-}
-
-void
-ClientInitKey::add_init_key(const DHPrivateKey& priv)
-{
-  auto suite = priv.cipher_suite();
-  cipher_suites.push_back(suite);
-  init_keys.push_back(priv.public_key().to_bytes());
-  _private_keys.emplace(suite, priv);
-}
-
-std::optional<DHPublicKey>
-ClientInitKey::find_init_key(CipherSuite suite) const
-{
-  for (size_t i = 0; i < cipher_suites.size(); ++i) {
-    if (cipher_suites[i] == suite) {
-      return DHPublicKey{ suite, init_keys[i] };
-    }
-  }
-
-  return std::nullopt;
-}
-
-std::optional<DHPrivateKey>
-ClientInitKey::find_private_key(CipherSuite suite) const
-{
-  if (_private_keys.count(suite) == 0) {
-    return std::nullopt;
-  }
-
-  return _private_keys.at(suite);
-}
-
-void
-ClientInitKey::sign(const Credential& credential_in)
-{
-  if (!credential_in.private_key().has_value()) {
+  if (!credential.private_key().has_value()) {
     throw InvalidParameterError("Credential must have a private key");
   }
-  auto identity_priv = credential_in.private_key().value();
-
-  if (cipher_suites.size() != init_keys.size()) {
-    throw InvalidParameterError("Mal-formed ClientInitKey");
-  }
-
-  credential = credential_in;
 
   auto tbs = to_be_signed();
-  signature = identity_priv.sign(tbs);
+  signature = credential.private_key().value().sign(tbs);
+}
+
+const std::optional<HPKEPrivateKey>&
+ClientInitKey::private_key() const
+{
+  return _private_key;
+}
+
+bytes
+ClientInitKey::hash() const
+{
+  auto marshaled = tls::marshal(*this);
+  return Digest(cipher_suite).write(marshaled).digest();
 }
 
 bool
@@ -116,8 +75,39 @@ bytes
 ClientInitKey::to_be_signed() const
 {
   tls::ostream out;
-  out << cipher_suites << init_keys << credential;
+  out << version << cipher_suite << init_key << credential;
   return out.bytes();
+}
+
+bool
+operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
+{
+  return (lhs.version == rhs.version) &&
+         (lhs.cipher_suite == rhs.cipher_suite) &&
+         (lhs.init_key == rhs.init_key) && (lhs.credential == rhs.credential) &&
+         (lhs.signature == rhs.signature);
+}
+
+bool
+operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
+{
+  return !(lhs == rhs);
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const ClientInitKey& obj)
+{
+  return str << obj.version << obj.cipher_suite << obj.init_key
+             << obj.credential << obj.signature;
+}
+
+tls::istream&
+operator>>(tls::istream& str, ClientInitKey& obj)
+{
+  str >> obj.version >> obj.cipher_suite;
+  obj.init_key = HPKEPublicKey(obj.cipher_suite);
+  str >> obj.init_key >> obj.credential >> obj.signature;
+  return str;
 }
 
 // WelcomeInfo

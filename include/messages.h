@@ -46,11 +46,11 @@ struct DirectPath : public CipherAware
 };
 
 // struct {
-//     opaque client_init_key_id<0..255>;
-//     ProtocolVersion supported_versions<0..255>;
-//     CipherSuite cipher_suites<0..255>;
-//     HPKEPublicKey init_keys<1..2^16-1>;
+//     ProtocolVersion version;
+//     CipherSuite cipher_suite;
+//     HPKEPublicKey init_key;
 //     Credential credential;
+//     Extension extensions<0..2^16-1>;
 //     opaque signature<0..2^16-1>;
 // } ClientInitKey;
 //
@@ -59,34 +59,38 @@ struct DirectPath : public CipherAware
 // version (with private keys).  This results in some ugly checking
 // code when private keys are needed, so it might be nice to split
 // these two cases in the type system.
+
+// TODO: Actually rename
+using HPKEPublicKey = DHPublicKey;
+using HPKEPrivateKey = DHPrivateKey;
+
 struct ClientInitKey
 {
-  tls::opaque<1> client_init_key_id;
-  tls::vector<ProtocolVersion, 1> supported_versions;
-  tls::vector<CipherSuite, 1> cipher_suites;
-  tls::vector<tls::opaque<2>, 2> init_keys; // Postpone crypto parsing
+  ProtocolVersion version;
+  CipherSuite cipher_suite;
+  HPKEPublicKey init_key;
   Credential credential;
+  // TODO Extensions
   tls::opaque<2> signature;
 
   ClientInitKey();
-  ClientInitKey(bytes client_init_key_id,
-                const std::vector<CipherSuite>& supported_ciphersuites,
-                const bytes& init_secret,
-                const Credential& credential);
+  ClientInitKey(const HPKEPrivateKey& init_key_in,
+                const Credential& credential_in);
 
-  void add_init_key(const DHPrivateKey& priv);
-  std::optional<DHPublicKey> find_init_key(CipherSuite suite) const;
-  std::optional<DHPrivateKey> find_private_key(CipherSuite suite) const;
-  void sign(const Credential& credential);
+  const std::optional<HPKEPrivateKey>& private_key() const;
+  bytes hash() const;
+
   bool verify() const;
-  bytes to_be_signed() const;
-
-  TLS_SERIALIZABLE(client_init_key_id, supported_versions, cipher_suites,
-                   init_keys, credential, signature)
 
   private:
-  std::map<CipherSuite, DHPrivateKey> _private_keys;
+  bytes to_be_signed() const;
+  std::optional<HPKEPrivateKey> _private_key;
 };
+
+bool operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
+bool operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
+tls::ostream& operator<<(tls::ostream& str, const ClientInitKey& obj);
+tls::istream& operator>>(tls::istream& str, ClientInitKey& obj);
 
 // struct {
 //   ProtocolVersion version;

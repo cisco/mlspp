@@ -191,6 +191,7 @@ struct State {
 
   State(const ClientInitKey& client_init_key,
         const Welcome& welcome)
+    : tree(client_init_key.cipher_suite)
   {
     /* TODO */
   }

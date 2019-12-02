@@ -1,5 +1,7 @@
 #include "state.h"
 
+#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
+
 namespace mls {
 
 ///
@@ -81,14 +83,30 @@ State::State(bytes group_id,
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(const ClientInitKey& my_client_init_key,
+State::State(const std::vector<ClientInitKey>& my_client_init_keys,
              const Welcome& welcome,
              const MLSPlaintext& handshake)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
-  , _identity_priv(my_client_init_key.credential.private_key().value())
+  // XXX: The following line does a bogus key generation
+  , _identity_priv(SignaturePrivateKey::generate(DUMMY_SIG_SCHEME))
 {
+  // Identify which CIK we should be using
+  const ClientInitKey* my_cik_ptr = nullptr;
+  for (const auto& cik : my_client_init_keys) {
+    if (cik.hash() == welcome.client_init_key_id) {
+      my_cik_ptr = &cik;
+      break;
+    }
+  }
+
+  if (my_cik_ptr == nullptr) {
+    throw InvalidParameterError("Welcome for unknown CIK");
+  }
+  const ClientInitKey& my_cik = *my_cik_ptr;
+  _identity_priv = my_cik.credential.private_key().value();
+
   // Verify that we have an add and it is for us
   const auto& operation = std::get<HandshakeData>(handshake.content).operation;
   if (operation.type() != GroupOperationType::add) {
@@ -96,20 +114,23 @@ State::State(const ClientInitKey& my_client_init_key,
   }
 
   const auto& add = std::get<Add>(operation);
-  if (my_client_init_key != add.init_key) {
+  if (my_cik != add.init_key) {
     throw InvalidParameterError("Add not targeted for this node");
+  }
+
+  // Make sure the group and the CIK are for the same ciphersuite
+  if (my_cik.cipher_suite != welcome.cipher_suite) {
+    throw InvalidParameterError("Ciphersuite mismatch");
   }
 
   // Make sure that the init key for the chosen ciphersuite is the
   // one we sent
-  auto maybe_init_pub = add.init_key.find_init_key(_suite);
-  auto maybe_init_priv = my_client_init_key.find_private_key(_suite);
-  if (!maybe_init_pub.has_value() || !maybe_init_priv.has_value()) {
-    throw ProtocolError("Selected cipher suite not supported");
+  if (!my_cik.private_key().has_value()) {
+    throw InvalidParameterError("No private key for init key");
   }
 
-  auto& init_pub = maybe_init_pub.value();
-  auto& init_priv = maybe_init_priv.value();
+  const auto& init_pub = add.init_key.init_key;
+  auto init_priv = my_cik.private_key().value();
 
   if (init_priv.public_key() != init_pub) {
     throw ProtocolError("Incorrect init key");
@@ -137,7 +158,7 @@ State::State(const ClientInitKey& my_client_init_key,
 
   // Add to the tree
   _index = add.index;
-  _tree.add_leaf(_index, init_priv, my_client_init_key.credential);
+  _tree.add_leaf(_index, init_priv, my_cik.credential);
 
   // Ratchet forward into shared state
   update_epoch_secrets(_zero);
@@ -149,17 +170,19 @@ State::State(const ClientInitKey& my_client_init_key,
 
 std::tuple<Welcome, MLSPlaintext, State>
 State::negotiate(const bytes& group_id,
-                 const ClientInitKey& my_client_init_key,
-                 const ClientInitKey& client_init_key)
+                 const std::vector<ClientInitKey>& my_client_init_keys,
+                 const std::vector<ClientInitKey>& client_init_keys)
 {
   // Negotiate a ciphersuite with the other party
-  CipherSuite suite;
   auto selected = false;
-  for (auto my_suite : my_client_init_key.cipher_suites) {
-    for (auto other_suite : client_init_key.cipher_suites) {
-      if (my_suite == other_suite) {
+  const ClientInitKey* my_selected_cik = nullptr;
+  const ClientInitKey* other_selected_cik = nullptr;
+  for (const auto& my_cik : my_client_init_keys) {
+    for (const auto& other_cik : client_init_keys) {
+      if (my_cik.cipher_suite == other_cik.cipher_suite) {
         selected = true;
-        suite = my_suite;
+        my_selected_cik = &my_cik;
+        other_selected_cik = &other_cik;
         break;
       }
     }
@@ -173,16 +196,11 @@ State::negotiate(const bytes& group_id,
     throw ProtocolError("Negotiation failure");
   }
 
-  auto leaf_priv = my_client_init_key.find_private_key(suite);
-  if (!leaf_priv.has_value()) {
-    throw ProtocolError("No private key for negotiated suite");
-  }
-
-  // We have manually guaranteed that `suite` is always initialized
-  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-  auto state =
-    State{ group_id, suite, leaf_priv.value(), my_client_init_key.credential };
-  return state.add(client_init_key);
+  auto& suite = my_selected_cik->cipher_suite;
+  auto& leaf_priv = my_selected_cik->private_key().value();
+  auto& cred = my_selected_cik->credential;
+  auto state = State{ group_id, suite, leaf_priv, cred };
+  return state.add(*other_selected_cik);
 }
 
 ///
@@ -199,14 +217,14 @@ std::tuple<Welcome, MLSPlaintext, State>
 State::add(LeafIndex index, const ClientInitKey& client_init_key) const
 {
   if (!client_init_key.verify()) {
-    throw InvalidParameterError("bad signature on user init key");
+    throw InvalidParameterError("Bad signature on user init key");
   }
 
-  auto maybe_pub = client_init_key.find_init_key(_suite);
-  if (!maybe_pub.has_value()) {
-    throw ProtocolError("New member does not support the group's ciphersuite");
+  if (client_init_key.cipher_suite != _suite) {
+    throw InvalidParameterError("Ciphersuite mismatch");
   }
-  auto pub = maybe_pub.value();
+
+  const auto& pub = client_init_key.init_key;
 
   // Add to the tree
   auto next = *this;
@@ -214,8 +232,7 @@ State::add(LeafIndex index, const ClientInitKey& client_init_key) const
 
   // Construct the welcome message
   auto welcome_info_str = welcome_info();
-  auto welcome =
-    Welcome{ client_init_key.client_init_key_id, pub, welcome_info_str };
+  auto welcome = Welcome{ client_init_key.hash(), pub, welcome_info_str };
   auto welcome_tuple = std::make_tuple(welcome);
 
   auto welcome_info_hash = welcome_info_str.hash(_suite);
@@ -373,11 +390,7 @@ State::handle(const Add& add)
   }
 
   // Add to the tree
-  auto init_key = add.init_key.find_init_key(_suite);
-  if (!init_key) {
-    throw ProtocolError("New node does not support group's cipher suite");
-  }
-  _tree.add_leaf(add.index, *init_key, add.init_key.credential);
+  _tree.add_leaf(add.index, add.init_key.init_key, add.init_key.credential);
 
   return _zero;
 }

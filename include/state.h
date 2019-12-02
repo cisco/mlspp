@@ -83,7 +83,7 @@ public:
         const Credential& credential);
 
   // Initialize a group from a Add (for group-initiated join)
-  State(const ClientInitKey& my_client_init_key,
+  State(const std::vector<ClientInitKey>& my_client_init_keys,
         const Welcome& welcome_info,
         const MLSPlaintext& handshake);
 
@@ -91,8 +91,8 @@ public:
   // ClientInitKey
   static std::tuple<Welcome, MLSPlaintext, State> negotiate(
     const bytes& group_id,
-    const ClientInitKey& my_client_init_key,
-    const ClientInitKey& client_init_key);
+    const std::vector<ClientInitKey>& my_client_init_keys,
+    const std::vector<ClientInitKey>& client_init_keys);
 
   ///
   /// Message factories

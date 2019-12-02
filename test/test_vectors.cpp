@@ -253,8 +253,7 @@ operator>>(tls::istream& str, MessagesTestVectors& obj)
 {
   return str >> obj.epoch >> obj.signer_index >> obj.removed >> obj.user_id >>
          obj.group_id >> obj.client_init_key_id >> obj.dh_seed >>
-         obj.sig_seed >> obj.random >> obj.cik_all_scheme >>
-         obj.client_init_key_all >> obj.case_p256_p256 >>
+         obj.sig_seed >> obj.random >> obj.case_p256_p256 >>
          obj.case_x25519_ed25519;
 }
 
@@ -263,8 +262,7 @@ operator<<(tls::ostream& str, const MessagesTestVectors& obj)
 {
   return str << obj.epoch << obj.signer_index << obj.removed << obj.user_id
              << obj.group_id << obj.client_init_key_id << obj.dh_seed
-             << obj.sig_seed << obj.random << obj.cik_all_scheme
-             << obj.client_init_key_all << obj.case_p256_p256
+             << obj.sig_seed << obj.random << obj.case_p256_p256
              << obj.case_x25519_ed25519;
 }
 

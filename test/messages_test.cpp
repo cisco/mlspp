@@ -13,6 +13,10 @@ tls_round_trip(const bytes& vector,
                bool reproducible)
 {
   auto marshaled = tls::marshal(constructed);
+
+  std::cout << "vec " << vector << std::endl;
+  std::cout << "mar " << marshaled << std::endl;
+
   if (reproducible) {
     ASSERT_EQ(vector, marshaled);
   }
@@ -56,7 +60,7 @@ protected:
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_key);
+    auto cred = Credential::basic(tv.user_id, sig_priv);
 
     DeterministicHPKE lock;
     auto ratchet_tree =
@@ -71,10 +75,7 @@ protected:
       ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // ClientInitKey
-    ClientInitKey client_init_key_c;
-    client_init_key_c.client_init_key_id = tv.client_init_key_id;
-    client_init_key_c.add_init_key(dh_priv);
-    client_init_key_c.credential = cred;
+    ClientInitKey client_init_key_c{ dh_priv, cred };
     client_init_key_c.signature = tv.random;
 
     ClientInitKey client_init_key;
@@ -85,7 +86,7 @@ protected:
     WelcomeInfo welcome_info_c{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
-    Welcome welcome_c{ tv.client_init_key_id, dh_key, welcome_info_c };
+    Welcome welcome_c{ client_init_key.hash(), dh_key, welcome_info_c };
 
     WelcomeInfo welcome_info{ tc.cipher_suite };
     tls_round_trip(tc.welcome_info, welcome_info_c, welcome_info, true);
@@ -125,30 +126,6 @@ protected:
     tls_round_trip(tc.ciphertext, ciphertext_c, ciphertext, true);
   }
 };
-
-TEST_F(MessagesTest, ClientInitKey)
-{
-  std::vector<CipherSuite> suites{
-    CipherSuite::P256_SHA256_AES128GCM,
-    CipherSuite::X25519_SHA256_AES128GCM,
-  };
-
-  ClientInitKey constructed;
-  constructed.client_init_key_id = tv.client_init_key_id;
-  for (const auto& suite : suites) {
-    auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    constructed.add_init_key(priv);
-  }
-
-  auto identity_priv =
-    SignaturePrivateKey::derive(tv.cik_all_scheme, tv.sig_seed);
-  constructed.credential = Credential::basic(tv.user_id, identity_priv);
-  constructed.signature = tv.random;
-
-  ClientInitKey after;
-  auto reproducible = deterministic_signature_scheme(tv.cik_all_scheme);
-  tls_round_trip(tv.client_init_key_all, constructed, after, reproducible);
-}
 
 TEST_F(MessagesTest, Suite_P256_P256)
 {

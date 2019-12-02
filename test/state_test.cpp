@@ -53,7 +53,7 @@ protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
   std::vector<DHPrivateKey> init_privs;
-  std::vector<ClientInitKey> user_init_keys;
+  std::vector<ClientInitKey> client_init_keys;
   std::vector<State> states;
 
   const bytes test_message = from_hex("01020304");
@@ -65,14 +65,12 @@ protected:
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_priv = DHPrivateKey::generate(suite);
 
-      auto user_init_key = ClientInitKey{};
-      user_init_key.add_init_key(init_priv);
-      user_init_key.sign(credential);
+      auto client_init_key = ClientInitKey{ init_priv, credential };
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
       init_privs.push_back(init_priv);
-      user_init_keys.push_back(user_init_key);
+      client_init_keys.push_back(client_init_key);
     }
   }
 };
@@ -83,13 +81,13 @@ TEST_F(GroupCreationTest, TwoPerson)
   auto first = State{ group_id, suite, init_privs[0], credentials[0] };
 
   // Create a Add for the new participant
-  auto welcome_add_state = first.add(user_init_keys[1]);
+  auto welcome_add_state = first.add(client_init_keys[1]);
   auto welcome = std::get<0>(welcome_add_state);
   auto add = std::get<1>(welcome_add_state);
 
   // Process the Add
   first = std::get<2>(welcome_add_state);
-  auto second = State{ user_init_keys[1], welcome, add };
+  auto second = State{ { client_init_keys[1] }, welcome, add };
 
   ASSERT_EQ(first, second);
 
@@ -107,7 +105,7 @@ TEST_F(GroupCreationTest, FullSize)
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
     auto sender = i - 1;
-    auto welcome_add_state = states[sender].add(user_init_keys[i]);
+    auto welcome_add_state = states[sender].add(client_init_keys[i]);
     auto welcome = std::get<0>(welcome_add_state);
     auto add = std::get<1>(welcome_add_state);
 
@@ -119,7 +117,8 @@ TEST_F(GroupCreationTest, FullSize)
       }
     }
 
-    states.emplace_back(user_init_keys[i], welcome, add);
+    states.emplace_back(
+      std::vector<ClientInitKey>{ client_init_keys[i] }, welcome, add);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -157,10 +156,7 @@ protected:
       auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
-
-      ClientInitKey cik;
-      cik.add_init_key(init_priv);
-      cik.sign(credential);
+      ClientInitKey cik{ init_priv, credential };
 
       auto welcome_add_state = states[0].add(cik);
       auto&& welcome = std::get<0>(welcome_add_state);
@@ -174,7 +170,7 @@ protected:
         }
       }
 
-      states.emplace_back(cik, welcome, add);
+      states.emplace_back(std::vector<ClientInitKey>{ cik }, welcome, add);
     }
   }
 
@@ -232,19 +228,18 @@ TEST_F(RunningGroupTest, Remove)
 
 TEST(OtherStateTest, CipherNegotiation)
 {
+  auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
+
   // Alice supports P-256 and X25519
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
-  auto insA = bytes{ 0, 1, 2, 3 };
-  auto inkA1 =
-    DHPrivateKey::node_derive(CipherSuite::P256_SHA256_AES128GCM, insA);
-  auto inkA2 =
-    DHPrivateKey::node_derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
-
-  auto cikA = ClientInitKey{};
-  cikA.add_init_key(inkA1);
-  cikA.add_init_key(inkA2);
-  cikA.sign(credA);
+  std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksA;
+  for (auto suite : ciphersA) {
+    auto init_key = HPKEPrivateKey::generate(suite);
+    ciksA.emplace_back(init_key, credA);
+  }
 
   // Bob spuports P-256 and P-521
   auto supported_ciphers =
@@ -252,24 +247,23 @@ TEST(OtherStateTest, CipherNegotiation)
                               CipherSuite::P521_SHA512_AES256GCM };
   auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
-  auto insB = bytes{ 4, 5, 6, 7 };
-  auto inkB =
-    DHPrivateKey::node_derive(CipherSuite::P256_SHA256_AES128GCM, insB);
-  auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
-
-  auto cikB = ClientInitKey{};
-  cikB.add_init_key(inkB);
-  cikB.sign(credB);
+  std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksB;
+  for (auto suite : ciphersB) {
+    auto init_key = HPKEPrivateKey::generate(suite);
+    ciksB.emplace_back(init_key, credB);
+  }
 
   // Bob should choose P-256
-  auto initialB = State::negotiate(group_id, cikB, cikA);
+  auto initialB = State::negotiate(group_id, ciksB, ciksA);
   auto stateB = std::get<2>(initialB);
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
   auto welcome = std::get<0>(initialB);
   auto add = std::get<1>(initialB);
-  auto stateA = State(cikA, welcome, add);
+  auto stateA = State(ciksA, welcome, add);
   ASSERT_EQ(stateA, stateB);
 }
 

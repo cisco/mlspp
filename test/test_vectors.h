@@ -230,9 +230,6 @@ struct MessagesTestVectors
   tls::opaque<1> sig_seed;
   tls::opaque<1> random;
 
-  SignatureScheme cik_all_scheme;
-  tls::opaque<4> client_init_key_all;
-
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
 };

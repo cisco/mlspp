@@ -7,14 +7,12 @@ using namespace mls;
 class SessionTest : public ::testing::Test
 {
 protected:
-  const std::vector<CipherSuite> suites{ CipherSuite::P256_SHA256_AES128GCM,
-                                         CipherSuite::X25519_SHA256_AES128GCM };
+  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   const int group_size = 5;
   const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
-  const bytes client_init_key_id = { 8, 9, 0xA, 0xB };
 
   static const uint32_t no_except = 0xffffffff;
 
@@ -52,24 +50,24 @@ protected:
   {
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
+    auto init_key = HPKEPrivateKey::derive(suite, init_secret);
     auto cred = Credential::basic(user_id, id_priv);
-    auto client_init_key =
-      ClientInitKey{ client_init_key_id, suites, init_secret, cred };
+    auto client_init_key = ClientInitKey{ init_key, cred };
 
     // Initial add is different
     if (sessions.size() == 0) {
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
+      auto my_init_key = HPKEPrivateKey::derive(suite, my_init_secret);
       auto my_cred = Credential::basic(user_id, id_priv);
-      auto my_client_init_key =
-        ClientInitKey{ client_init_key_id, suites, my_init_secret, my_cred };
+      auto my_client_init_key = ClientInitKey{ my_init_key, my_cred };
 
       auto session_welcome_add =
-        Session::start(group_id, my_client_init_key, client_init_key);
+        Session::start(group_id, { my_client_init_key }, { client_init_key });
       auto creator = std::get<0>(session_welcome_add);
       auto welcome = std::get<1>(session_welcome_add);
       auto add = std::get<2>(session_welcome_add);
-      auto joiner = Session::join(client_init_key, welcome, add);
+      auto joiner = Session::join({ client_init_key }, welcome, add);
       sessions.push_back(creator);
       sessions.push_back(joiner);
       return;
@@ -80,7 +78,7 @@ protected:
     Welcome welcome;
     bytes add;
     std::tie(welcome, add) = sessions[from].add(client_init_key);
-    auto next = Session::join(client_init_key, welcome, add);
+    auto next = Session::join({ client_init_key }, welcome, add);
     broadcast(add, index);
 
     // Add-in-place vs. add-at-edge
@@ -146,28 +144,30 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
-  auto initA = fresh_secret();
   auto credA = Credential::basic(user_id, idA);
-  auto cikA = ClientInitKey{ client_init_key_id,
-                             { CipherSuite::P256_SHA256_AES128GCM,
-                               CipherSuite::X25519_SHA256_AES128GCM },
-                             initA,
-                             credA };
+  std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksA;
+  for (auto suite : ciphersA) {
+    auto init_key = HPKEPrivateKey::generate(suite);
+    ciksA.emplace_back(init_key, credA);
+  }
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
-  auto initB = fresh_secret();
   auto credB = Credential::basic(user_id, idB);
-  auto cikB = ClientInitKey{ client_init_key_id,
-                             { CipherSuite::P256_SHA256_AES128GCM,
-                               CipherSuite::X25519_SHA256_AES128GCM },
-                             initB,
-                             credB };
+  std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksB;
+  for (auto suite : ciphersB) {
+    auto init_key = HPKEPrivateKey::generate(suite);
+    ciksB.emplace_back(init_key, credB);
+  }
 
-  auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, cikA, cikB);
+  auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, ciksA, ciksB);
   TestSession alice = std::get<0>(session_welcome_add);
   TestSession bob = Session::join(
-    cikB, std::get<1>(session_welcome_add), std::get<2>(session_welcome_add));
+    ciksB, std::get<1>(session_welcome_add), std::get<2>(session_welcome_add));
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
@@ -277,14 +277,14 @@ protected:
     if (index == 0) {
       // Member 0 creates the group
       auto swa = Session::start(
-        basic_tv.group_id, my_client_init_key, tc.client_init_keys[1]);
+        basic_tv.group_id, { my_client_init_key }, { tc.client_init_keys[1] });
       session = std::get<0>(swa);
       curr = 1;
     } else {
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript[index - 1];
       session = Session::join(
-        my_client_init_key, epoch.welcome.value(), epoch.handshake);
+        { my_client_init_key }, epoch.welcome.value(), epoch.handshake);
       assert_consistency(*session, epoch);
       curr = index;
     }
@@ -337,14 +337,12 @@ protected:
                   const SessionTestVectors::TestCase& tc)
   {
     DeterministicHPKE lock;
-    const bytes client_init_key_id = { 0, 1, 2, 3 };
-    std::vector<CipherSuite> ciphers{ suite };
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };
+      auto init_priv = HPKEPrivateKey::derive(suite, seed);
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
-      auto my_client_init_key =
-        ClientInitKey{ client_init_key_id, ciphers, seed, cred };
+      auto my_client_init_key = ClientInitKey{ init_priv, cred };
       follow_basic(i, my_client_init_key, tc);
     }
   }

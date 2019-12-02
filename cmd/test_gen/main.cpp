@@ -314,22 +314,6 @@ generate_messages()
   tv.dh_seed = bytes(32, 0xD4);
   tv.sig_seed = bytes(32, 0xD5);
   tv.random = bytes(32, 0xD6);
-  tv.cik_all_scheme = SignatureScheme::Ed25519;
-
-  // Construct a CIK with all the ciphersuites
-  auto cik_all = ClientInitKey{};
-  cik_all.client_init_key_id = tv.client_init_key_id;
-  for (const auto& suite : suites) {
-    auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    cik_all.add_init_key(priv);
-  }
-
-  auto identity_priv =
-    SignaturePrivateKey::derive(tv.cik_all_scheme, tv.sig_seed);
-  cik_all.credential = Credential::basic(tv.user_id, identity_priv);
-  cik_all.signature = tv.random;
-
-  tv.client_init_key_all = tls::marshal(cik_all);
 
   // Construct a test case for each suite
   DeterministicHPKE lock;
@@ -342,7 +326,7 @@ generate_messages()
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_key);
+    auto cred = Credential::basic(tv.user_id, sig_priv);
 
     auto ratchet_tree =
       RatchetTree{ suite,
@@ -356,17 +340,14 @@ generate_messages()
       ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // Construct CIK
-    auto client_init_key = ClientInitKey{};
-    client_init_key.client_init_key_id = tv.client_init_key_id;
-    client_init_key.add_init_key(dh_priv);
-    client_init_key.credential = cred;
+    auto client_init_key = ClientInitKey{ dh_priv, cred };
     client_init_key.signature = tv.random;
 
     // Construct WelcomeInfo and Welcome
     auto welcome_info = WelcomeInfo{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
-    auto welcome = Welcome{ tv.client_init_key_id, dh_key, welcome_info };
+    auto welcome = Welcome{ client_init_key.hash(), dh_key, welcome_info };
 
     // Construct handshake messages
     auto add_op = Add{ tv.removed, client_init_key, tv.random };
@@ -446,11 +427,12 @@ generate_basic_session()
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
       bytes seed = { uint8_t(j), 0 };
+      seeds.push_back(seed);
+
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
-      seeds.push_back(seed);
-      client_init_keys.emplace_back(
-        client_init_key_id, ciphersuites, seed, cred);
+      auto init = HPKEPrivateKey::derive(suite, seed);
+      client_init_keys.emplace_back(init, cred);
     }
 
     // Add everyone
@@ -458,8 +440,8 @@ generate_basic_session()
       Welcome welcome;
       bytes add;
       if (j == 1) {
-        auto session_welcome_add =
-          Session::start(tv.group_id, client_init_keys[0], client_init_keys[1]);
+        auto session_welcome_add = Session::start(
+          tv.group_id, { client_init_keys[0] }, { client_init_keys[1] });
         sessions.push_back(std::get<0>(session_welcome_add));
         welcome = std::get<1>(session_welcome_add);
         add = std::get<2>(session_welcome_add);
@@ -470,7 +452,7 @@ generate_basic_session()
         }
       }
 
-      auto joiner = Session::join(client_init_keys[j], welcome, add);
+      auto joiner = Session::join({ client_init_keys[j] }, welcome, add);
       sessions.push_back(joiner);
 
       transcript.emplace_back(welcome, add, sessions[0]);

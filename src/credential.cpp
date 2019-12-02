@@ -76,25 +76,17 @@ Credential::valid_for(const SignaturePrivateKey& priv) const
 Credential
 Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 {
-  return Credential{ BasicCredential{ identity, public_key } };
+  Credential cred;
+  cred._cred = BasicCredential{ identity, public_key };
+  return cred;
 }
 
 Credential
 Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
 {
-  const auto& pub = private_key.public_key();
-  return Credential{ BasicCredential{ identity, pub }, private_key };
+  auto cred = basic(identity, private_key.public_key());
+  cred._priv = private_key;
+  return cred;
 }
-
-template<typename Tc>
-Credential::Credential(const Tc& cred)
-  : _cred(cred)
-{}
-
-template<typename Tc>
-Credential::Credential(const Tc& cred, const SignaturePrivateKey& priv)
-  : _cred(cred)
-  , _priv(priv)
-{}
 
 } // namespace mls

@@ -6,11 +6,11 @@ namespace mls {
 
 std::tuple<Session, Welcome, bytes>
 Session::start(const bytes& group_id,
-               const ClientInitKey& my_client_init_key,
-               const ClientInitKey& client_init_key)
+               const std::vector<ClientInitKey>& my_client_init_keys,
+               const std::vector<ClientInitKey>& client_init_keys)
 {
   auto welcome_add_state =
-    State::negotiate(group_id, my_client_init_key, client_init_key);
+    State::negotiate(group_id, my_client_init_keys, client_init_keys);
 
   Session session;
   session.add_state(0, std::get<2>(welcome_add_state));
@@ -20,7 +20,7 @@ Session::start(const bytes& group_id,
 }
 
 Session
-Session::join(const ClientInitKey& client_init_key,
+Session::join(const std::vector<ClientInitKey>& client_init_keys,
               const Welcome& welcome,
               const bytes& add_data)
 {
@@ -28,7 +28,7 @@ Session::join(const ClientInitKey& client_init_key,
   tls::unmarshal(add_data, add);
 
   Session session;
-  State next(client_init_key, welcome, add);
+  State next(client_init_keys, welcome, add);
   session.add_state(add.epoch, next);
   return session;
 }

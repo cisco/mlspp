@@ -14,9 +14,9 @@ public:
 
   static std::tuple<Session, Welcome, bytes>
     start(const bytes& group_id,
-          const ClientInitKey& my_client_init_key,
-          const ClientInitKey& client_init_key);
-  static Session join(const ClientInitKey& client_init_key,
+          const std::vector<ClientInitKey>& my_client_init_keys,
+          const std::vector<ClientInitKey>& client_init_keys);
+  static Session join(const std::vector<ClientInitKey>& client_init_keys,
                       const Welcome& welcome,
                       const bytes& add);
 

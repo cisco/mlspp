@@ -59,11 +59,6 @@ operator==(const BasicCredential& lhs, const BasicCredential& rhs);
 class Credential
 {
 public:
-  Credential()
-    : _cred()
-    , _priv()
-  {}
-
   bytes identity() const;
   SignaturePublicKey public_key() const;
   std::optional<SignaturePrivateKey> private_key() const;
@@ -77,12 +72,6 @@ public:
   TLS_SERIALIZABLE(_cred)
 
 private:
-  template<typename Tc>
-  Credential(const Tc& cred);
-
-  template<typename Tc>
-  Credential(const Tc& cred, const SignaturePrivateKey& priv);
-
   tls::variant<CredentialType, BasicCredential> _cred;
   std::optional<SignaturePrivateKey> _priv;
 };
