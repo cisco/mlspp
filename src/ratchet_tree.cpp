@@ -437,6 +437,48 @@ RatchetTree::blank_path(LeafIndex index)
   set_hash_path(index);
 }
 
+LeafIndex
+RatchetTree::leftmost_free() const
+{
+  auto curr = LeafIndex{ 0 };
+  while (!occupied(curr) && curr.val < size()) {
+    curr.val += 1;
+  }
+
+  return curr;
+}
+
+void
+RatchetTree::set_leaf(LeafIndex index,
+                      const DHPublicKey& leaf_key,
+                      const Credential& credential)
+{
+  if (index.val == size()) {
+    if (!_nodes.empty()) {
+      _nodes.emplace_back(std::nullopt);
+    }
+    _nodes.emplace_back(std::nullopt);
+  }
+
+  auto node = NodeIndex{ index };
+  auto node_val = RatchetTreeNode(leaf_key);
+  node_val.set_credential(credential);
+
+  _nodes[node] = node_val;
+  set_hash_path(index);
+}
+
+void
+RatchetTree::set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key)
+{
+  auto curr = NodeIndex{ index };
+  if (!_nodes[curr].has_value()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+  _nodes[curr].value().merge(leaf_key);
+  set_hash_path(index);
+}
+
 bytes
 RatchetTree::set_path(LeafIndex index, const bytes& leaf)
 {

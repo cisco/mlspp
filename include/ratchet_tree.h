@@ -108,6 +108,10 @@ public:
   void blank_path(LeafIndex index);
   bytes set_path(LeafIndex index, const bytes& leaf);
 
+  LeafIndex leftmost_free() const;
+  void set_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
+  void set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key);
+
   const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;

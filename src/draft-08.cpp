@@ -21,4 +21,8 @@ operator>>(tls::istream& str, Welcome& obj)
   return str;
 }
 
+ProposalType Add::type = ProposalType::add;
+ProposalType Update::type = ProposalType::update;
+ProposalType Remove::type = ProposalType::remove;
+
 } // namespace draft08
