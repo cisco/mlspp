@@ -168,11 +168,11 @@ EncryptedKeyPackage::EncryptedKeyPackage(const bytes& hash,
   , encrypted_key_package(package)
 {}
 
-// Welcome2
+// Welcome
 
-Welcome2::Welcome2(CipherSuite suite,
-                   const bytes& epoch_secret,
-                   const GroupInfo& group_info)
+Welcome::Welcome(CipherSuite suite,
+                 const bytes& epoch_secret,
+                 const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
   , key_packages(suite)
@@ -184,7 +184,7 @@ Welcome2::Welcome2(CipherSuite suite,
 }
 
 std::tuple<bytes, bytes>
-Welcome2::group_info_keymat(const bytes& epoch_secret) const
+Welcome::group_info_keymat(const bytes& epoch_secret) const
 {
   auto secret_size = Digest(cipher_suite).output_size();
   auto key_size = AESGCM::key_size(cipher_suite);
@@ -198,7 +198,7 @@ Welcome2::group_info_keymat(const bytes& epoch_secret) const
 }
 
 void
-Welcome2::encrypt(const ClientInitKey& cik)
+Welcome::encrypt(const ClientInitKey& cik)
 {
   auto key_pkg = KeyPackage{ _epoch_secret };
   auto key_pkg_data = tls::marshal(key_pkg);
@@ -207,7 +207,7 @@ Welcome2::encrypt(const ClientInitKey& cik)
 }
 
 bool
-operator==(const Welcome2& lhs, const Welcome2& rhs)
+operator==(const Welcome& lhs, const Welcome& rhs)
 {
   return (lhs.version == rhs.version) &&
          (lhs.cipher_suite == rhs.cipher_suite) &&
@@ -216,14 +216,14 @@ operator==(const Welcome2& lhs, const Welcome2& rhs)
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const Welcome2& obj)
+operator<<(tls::ostream& str, const Welcome& obj)
 {
   return str << obj.version << obj.cipher_suite << obj.key_packages
              << obj.encrypted_group_info;
 }
 
 tls::istream&
-operator>>(tls::istream& str, Welcome2& obj)
+operator>>(tls::istream& str, Welcome& obj)
 {
   str >> obj.version >> obj.cipher_suite;
   obj.key_packages.set_arg(obj.cipher_suite);
@@ -231,93 +231,11 @@ operator>>(tls::istream& str, Welcome2& obj)
   return str;
 }
 
-// WelcomeInfo
-
-WelcomeInfo::WelcomeInfo(CipherSuite suite)
-  : CipherAware(suite)
-  , version(ProtocolVersion::mls10)
-  , epoch(0)
-  , tree(suite)
-{}
-
-WelcomeInfo::WelcomeInfo(tls::opaque<2> group_id_in,
-                         epoch_t epoch_in,
-                         RatchetTree tree_in,
-                         const tls::opaque<1>& interim_transcript_hash_in,
-                         const tls::opaque<1>& init_secret_in)
-  : CipherAware(tree_in.cipher_suite())
-  , version(ProtocolVersion::mls10)
-  , group_id(std::move(group_id_in))
-  , epoch(epoch_in)
-  , tree(std::move(tree_in))
-  , interim_transcript_hash(interim_transcript_hash_in)
-  , init_secret(init_secret_in)
-{}
-
-bytes
-WelcomeInfo::hash(CipherSuite suite) const
-{
-  auto marshaled = tls::marshal(*this);
-  return Digest(suite).write(marshaled).digest();
-}
-
-// Welcome
-
-Welcome::Welcome()
-  : cipher_suite(DUMMY_CIPHERSUITE)
-  , encrypted_welcome_info(DUMMY_CIPHERSUITE)
-{}
-
-Welcome::Welcome(const bytes& id,
-                 const DHPublicKey& pub,
-                 const WelcomeInfo& info)
-  : client_init_key_id(id)
-  , cipher_suite(pub.cipher_suite())
-  , encrypted_welcome_info(pub.encrypt(tls::marshal(info)))
-{}
-
-WelcomeInfo
-Welcome::decrypt(const DHPrivateKey& priv) const
-{
-  auto welcome_info_data = priv.decrypt(encrypted_welcome_info);
-  auto welcome_info =
-    tls::get<WelcomeInfo>(welcome_info_data, priv.cipher_suite());
-  return welcome_info;
-}
-
-bool
-operator==(const Welcome& lhs, const Welcome& rhs)
-{
-  return (lhs.client_init_key_id == rhs.client_init_key_id) &&
-         (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.encrypted_welcome_info == rhs.encrypted_welcome_info);
-}
-
-tls::ostream&
-operator<<(tls::ostream& out, const Welcome& obj)
-{
-  return out << obj.client_init_key_id << obj.cipher_suite
-             << obj.encrypted_welcome_info;
-}
-
-tls::istream&
-operator>>(tls::istream& in, Welcome& obj)
-{
-  in >> obj.client_init_key_id >> obj.cipher_suite;
-
-  obj.encrypted_welcome_info = HPKECiphertext{ obj.cipher_suite };
-  in >> obj.encrypted_welcome_info;
-  return in;
-}
-
 // Add
 
-Add::Add(LeafIndex index_in,
-         ClientInitKey init_key_in,
-         bytes welcome_info_hash_in)
+Add::Add(LeafIndex index_in, ClientInitKey init_key_in)
   : index(index_in)
   , init_key(std::move(init_key_in))
-  , welcome_info_hash(std::move(welcome_info_hash_in))
 {}
 
 const GroupOperationType Add::type = GroupOperationType::add;

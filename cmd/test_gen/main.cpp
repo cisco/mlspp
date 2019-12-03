@@ -345,7 +345,7 @@ generate_messages()
     auto client_init_key = ClientInitKey{ dh_priv, cred };
     client_init_key.signature = tv.random;
 
-    // Construct Welcome2
+    // Construct Welcome
     auto group_info = GroupInfo{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
@@ -356,20 +356,14 @@ generate_messages()
     auto encrypted_key_package =
       EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
 
-    Welcome2 welcome2;
-    welcome2.version = ProtocolVersion::mls10;
-    welcome2.cipher_suite = suite;
-    welcome2.key_packages = { encrypted_key_package, encrypted_key_package };
-    welcome2.encrypted_group_info = tv.random;
-
-    // Construct WelcomeInfo and Welcome
-    auto welcome_info = WelcomeInfo{
-      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
-    };
-    auto welcome = Welcome{ client_init_key.hash(), dh_key, welcome_info };
+    Welcome welcome;
+    welcome.version = ProtocolVersion::mls10;
+    welcome.cipher_suite = suite;
+    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.encrypted_group_info = tv.random;
 
     // Construct handshake messages
-    auto add_op = Add{ tv.removed, client_init_key, tv.random };
+    auto add_op = Add{ tv.removed, client_init_key };
     auto update_op = Update{ direct_path };
     auto remove_op = Remove{ tv.removed, direct_path };
 
@@ -399,8 +393,6 @@ generate_messages()
       tls::marshal(group_info),
       tls::marshal(key_package),
       tls::marshal(encrypted_key_package),
-      tls::marshal(welcome2),
-      tls::marshal(welcome_info),
       tls::marshal(welcome),
       tls::marshal(add),
       tls::marshal(update),
@@ -475,7 +467,7 @@ generate_basic_session()
         }
       }
 
-      auto joiner = Session::join({ client_init_keys[j] }, welcome, add);
+      auto joiner = Session::join({ client_init_keys[j] }, welcome);
       sessions.push_back(joiner);
 
       transcript.emplace_back(welcome, add, sessions[0]);

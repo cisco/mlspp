@@ -82,14 +82,9 @@ public:
         const DHPrivateKey& leaf_priv,
         const Credential& credential);
 
-  // Initialize a group from a Add (for group-initiated join)
-  State(const std::vector<ClientInitKey>& my_client_init_keys,
-        const Welcome& welcome,
-        const MLSPlaintext& handshake);
-
   // Initialize a group from a Welcome
   State(const std::vector<ClientInitKey>& my_client_init_keys,
-        const Welcome2& welcome);
+        const Welcome& welcome);
 
   // Negotiate an initial state with another peer based on their
   // ClientInitKey
@@ -110,15 +105,6 @@ public:
   std::tuple<Welcome, MLSPlaintext, State> add(
     LeafIndex index,
     const ClientInitKey& client_init_key) const;
-
-  // Generate a Add message
-  std::tuple<Welcome2, MLSPlaintext, State> add2(
-    const ClientInitKey& client_init_key) const;
-
-  // Generate an Add message at a specific location
-  std::tuple<Welcome2, MLSPlaintext, State> add2(
-      LeafIndex index,
-      const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret) const;
@@ -215,9 +201,6 @@ private:
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
-
-  // Generate a WelcomeInfo object describing this state
-  WelcomeInfo welcome_info() const;
 
   // Generate a GroupInfo object describing this state
   GroupInfo group_info() const;

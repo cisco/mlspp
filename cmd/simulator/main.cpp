@@ -169,14 +169,14 @@ public:
     auto cik1 = fresh_client_init_key();
     auto [session0, welcome1, add1] =
       mls::Session::start(group_id, { cik0 }, { cik1 });
-    auto session1 = mls::Session::join({ cik1 }, welcome1, add1);
+    auto session1 = mls::Session::join({ cik1 }, welcome1);
 
     sessions = { session0, session1 };
     while (sessions.size() < initial_size) {
       auto cik = fresh_client_init_key();
       auto [welcome, add] = sessions[0].value().add(cik);
       broadcast(add);
-      sessions.emplace_back(mls::Session::join({ cik }, welcome, add));
+      sessions.emplace_back(mls::Session::join({ cik }, welcome));
     }
 
     std::cout << "Created a group with " << initial_size << " members"
@@ -195,7 +195,7 @@ public:
     report.receivers = broadcast(add);
 
     mls::CryptoMetrics::reset();
-    auto new_session = mls::Session::join({ cik }, welcome, add);
+    auto new_session = mls::Session::join({ cik }, welcome);
     report.receivers.push_back(mls::CryptoMetrics::snapshot());
     sessions.emplace_back(new_session);
 

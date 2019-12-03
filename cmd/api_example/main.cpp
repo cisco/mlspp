@@ -88,7 +88,7 @@ main()
 
   // Bob looks up her CIK based on the welcome, and initializes
   // her session
-  auto sessionB = Session::join(bob.ciks(), welcome, add);
+  auto sessionB = Session::join(bob.ciks(), welcome);
 
   // Alice and Bob should now be on the same page
   verify("create", sessionA, sessionB);
@@ -102,7 +102,7 @@ main()
   std::tie(welcome, add) = sessionA.add(cikC1);
 
   // Charlie initializes his session
-  auto sessionC = Session::join(charlie.ciks(), welcome, add);
+  auto sessionC = Session::join(charlie.ciks(), welcome);
 
   // Alice and Bob updates their sessions to reflect Charlie's addition
   sessionA.handle(add);

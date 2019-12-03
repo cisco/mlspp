@@ -67,7 +67,7 @@ protected:
       auto creator = std::get<0>(session_welcome_add);
       auto welcome = std::get<1>(session_welcome_add);
       auto add = std::get<2>(session_welcome_add);
-      auto joiner = Session::join({ client_init_key }, welcome, add);
+      auto joiner = Session::join({ client_init_key }, welcome);
       sessions.push_back(creator);
       sessions.push_back(joiner);
       return;
@@ -78,7 +78,7 @@ protected:
     Welcome welcome;
     bytes add;
     std::tie(welcome, add) = sessions[from].add(client_init_key);
-    auto next = Session::join({ client_init_key }, welcome, add);
+    auto next = Session::join({ client_init_key }, welcome);
     broadcast(add, index);
 
     // Add-in-place vs. add-at-edge
@@ -166,8 +166,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 
   auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, ciksA, ciksB);
   TestSession alice = std::get<0>(session_welcome_add);
-  TestSession bob = Session::join(
-    ciksB, std::get<1>(session_welcome_add), std::get<2>(session_welcome_add));
+  TestSession bob = Session::join(ciksB, std::get<1>(session_welcome_add));
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
@@ -283,8 +282,7 @@ protected:
     } else {
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript[index - 1];
-      session = Session::join(
-        { my_client_init_key }, epoch.welcome.value(), epoch.handshake);
+      session = Session::join({ my_client_init_key }, epoch.welcome.value());
       assert_consistency(*session, epoch);
       curr = index;
     }

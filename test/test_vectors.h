@@ -231,8 +231,6 @@ struct MessagesTestVectors
     tls::opaque<4> group_info;
     tls::opaque<4> key_package;
     tls::opaque<4> encrypted_key_package;
-    tls::opaque<4> welcome2;
-    tls::opaque<4> welcome_info;
     tls::opaque<4> welcome;
     tls::opaque<4> add;
     tls::opaque<4> update;
@@ -245,8 +243,6 @@ struct MessagesTestVectors
                      group_info,
                      key_package,
                      encrypted_key_package,
-                     welcome2,
-                     welcome_info,
                      welcome,
                      add,
                      update,

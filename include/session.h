@@ -17,8 +17,7 @@ public:
           const std::vector<ClientInitKey>& my_client_init_keys,
           const std::vector<ClientInitKey>& client_init_keys);
   static Session join(const std::vector<ClientInitKey>& client_init_keys,
-                      const Welcome& welcome,
-                      const bytes& add);
+                      const Welcome& welcome);
 
   std::pair<Welcome, bytes> add(const ClientInitKey& client_init_key);
   bytes update(const bytes& leaf_secret);

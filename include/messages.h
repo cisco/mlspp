@@ -175,14 +175,14 @@ struct EncryptedKeyPackage {
 //   EncryptedKeyPackage key_packages<1..2^32-1>;
 //   opaque encrypted_group_info<1..2^32-1>;
 // } Welcome;
-struct Welcome2 {
+struct Welcome {
   ProtocolVersion version;
   CipherSuite cipher_suite;
   tls::variant_vector<EncryptedKeyPackage, CipherSuite, 4> key_packages;
   tls::opaque<4> encrypted_group_info;
 
-  Welcome2() = default;
-  Welcome2(CipherSuite suite,
+  Welcome() = default;
+  Welcome(CipherSuite suite,
            const bytes& epoch_secret,
            const GroupInfo& group_info);
 
@@ -193,62 +193,9 @@ struct Welcome2 {
   bytes _epoch_secret;
 };
 
-bool operator==(const Welcome2& lhs, const Welcome2& rhs);
-tls::ostream& operator<<(tls::ostream& str, const Welcome2& obj);
-tls::istream& operator>>(tls::istream& str, Welcome2& obj);
-
-// struct {
-//   ProtocolVersion version;
-//   opaque group_id<0..255>;
-//   uint32 epoch;
-//   optional<Credential> roster<1..2^32-1>;
-//   optional<HPKEPublicKey> tree<1..2^32-1>;
-//   opaque interim_transcript_hash<0..255>;
-//   opaque init_secret<0..255>;
-// } WelcomeInfo;
-struct WelcomeInfo : public CipherAware
-{
-  ProtocolVersion version;
-  tls::opaque<1> group_id;
-  epoch_t epoch;
-  RatchetTree tree;
-  tls::opaque<1> interim_transcript_hash;
-  tls::opaque<1> init_secret;
-
-  WelcomeInfo(CipherSuite suite);
-  WelcomeInfo(tls::opaque<2> group_id,
-              epoch_t epoch,
-              RatchetTree tree,
-              const tls::opaque<1>& interim_transcript_hash,
-              const tls::opaque<1>& init_secret);
-
-  bytes hash(CipherSuite suite) const;
-
-  TLS_SERIALIZABLE(version, group_id, epoch, tree, interim_transcript_hash, init_secret);
-};
-
-// struct {
-//   opaque client_init_key_id<0..255>;
-//   CipherSuite cipher_suite;
-//   HPKECiphertext encrypted_welcome_info;
-// } Welcome;
-struct Welcome
-{
-  tls::opaque<1> client_init_key_id;
-  CipherSuite cipher_suite;
-  HPKECiphertext encrypted_welcome_info;
-
-  Welcome();
-  Welcome(const bytes& id, const DHPublicKey& pub, const WelcomeInfo& info);
-  WelcomeInfo decrypt(const DHPrivateKey& priv) const;
-};
-
-bool
-operator==(const Welcome& lhs, const Welcome& rhs);
-tls::ostream&
-operator<<(tls::ostream& out, const Welcome& obj);
-tls::istream&
-operator>>(tls::istream& in, Welcome& obj);
+bool operator==(const Welcome& lhs, const Welcome& rhs);
+tls::ostream& operator<<(tls::ostream& str, const Welcome& obj);
+tls::istream& operator>>(tls::istream& str, Welcome& obj);
 
 // enum { ... } GroupOperationType;
 enum class GroupOperationType : uint8_t
@@ -269,14 +216,13 @@ struct Add
 public:
   LeafIndex index;
   ClientInitKey init_key;
-  tls::opaque<1> welcome_info_hash;
 
   Add() = default;
   Add(CipherSuite suite) {}
-  Add(LeafIndex index, ClientInitKey init_key, bytes welcome_info_hash);
+  Add(LeafIndex index, ClientInitKey init_key);
 
   static const GroupOperationType type;
-  TLS_SERIALIZABLE(index, init_key, welcome_info_hash)
+  TLS_SERIALIZABLE(index, init_key)
 };
 
 // struct {

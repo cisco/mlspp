@@ -21,14 +21,11 @@ Session::start(const bytes& group_id,
 
 Session
 Session::join(const std::vector<ClientInitKey>& client_init_keys,
-              const Welcome& welcome,
-              const bytes& add_data)
+              const Welcome& welcome)
 {
-  auto add = tls::get<MLSPlaintext>(add_data, welcome.cipher_suite);
-
   Session session;
-  State next(client_init_keys, welcome, add);
-  session.add_state(add.epoch, next);
+  State next(client_init_keys, welcome);
+  session.add_state(0, next);
   return session;
 }
 

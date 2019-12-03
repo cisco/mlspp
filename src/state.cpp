@@ -83,94 +83,9 @@ State::State(bytes group_id,
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(const std::vector<ClientInitKey>& my_client_init_keys,
-             const Welcome& welcome,
-             const MLSPlaintext& handshake)
-  : _suite(welcome.cipher_suite)
-  , _tree(welcome.cipher_suite)
-  , _application_keys(welcome.cipher_suite)
-  // XXX: The following line does a bogus key generation
-  , _identity_priv(SignaturePrivateKey::generate(DUMMY_SIG_SCHEME))
-{
-  // Identify which CIK we should be using
-  const ClientInitKey* my_cik_ptr = nullptr;
-  for (const auto& cik : my_client_init_keys) {
-    if (cik.hash() == welcome.client_init_key_id) {
-      my_cik_ptr = &cik;
-      break;
-    }
-  }
-
-  if (my_cik_ptr == nullptr) {
-    throw InvalidParameterError("Welcome for unknown CIK");
-  }
-  const ClientInitKey& my_cik = *my_cik_ptr;
-  _identity_priv = my_cik.credential.private_key().value();
-
-  // Verify that we have an add and it is for us
-  const auto& operation = std::get<HandshakeData>(handshake.content).operation;
-  if (operation.type() != GroupOperationType::add) {
-    throw InvalidParameterError("Incorrect handshake type");
-  }
-
-  const auto& add = std::get<Add>(operation);
-  if (my_cik != add.init_key) {
-    throw InvalidParameterError("Add not targeted for this node");
-  }
-
-  // Make sure the group and the CIK are for the same ciphersuite
-  if (my_cik.cipher_suite != welcome.cipher_suite) {
-    throw InvalidParameterError("Ciphersuite mismatch");
-  }
-
-  // Make sure that the init key for the chosen ciphersuite is the
-  // one we sent
-  if (!my_cik.private_key().has_value()) {
-    throw InvalidParameterError("No private key for init key");
-  }
-
-  const auto& init_pub = add.init_key.init_key;
-  auto init_priv = my_cik.private_key().value();
-
-  if (init_priv.public_key() != init_pub) {
-    throw ProtocolError("Incorrect init key");
-  }
-
-  // Decrypt the Welcome
-  auto welcome_info = welcome.decrypt(init_priv);
-
-  // Make sure the WelcomeInfo matches the Add
-  if (add.welcome_info_hash != welcome_info.hash(_suite)) {
-    throw ProtocolError("Mismatch in welcome info hash");
-  }
-
-  // Ingest the WelcomeInfo
-  _epoch = welcome_info.epoch + 1;
-  _group_id = welcome_info.group_id;
-  _tree = welcome_info.tree;
-  _interim_transcript_hash = welcome_info.interim_transcript_hash;
-
-  _init_secret = welcome_info.init_secret;
-  _zero = bytes(Digest(_suite).output_size(), 0);
-
-  // Add to the transcript hash
-  update_transcript_hash(handshake);
-
-  // Add to the tree
-  _index = add.index;
-  _tree.add_leaf(_index, init_priv, my_cik.credential);
-
-  // Ratchet forward into shared state
-  update_epoch_secrets(_zero);
-
-  if (!verify(handshake)) {
-    throw InvalidParameterError("Handshake signature failed to verify");
-  }
-}
-
 // Initialize a group from a Welcome
 State::State(const std::vector<ClientInitKey>& my_client_init_keys,
-             const Welcome2& welcome)
+             const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
@@ -287,7 +202,7 @@ State::negotiate(const bytes& group_id,
 std::tuple<Welcome, MLSPlaintext, State>
 State::add(const ClientInitKey& client_init_key) const
 {
-  return add(LeafIndex{ _tree.size() }, client_init_key);
+  return add(_tree.leftmost_free(), client_init_key);
 }
 
 std::tuple<Welcome, MLSPlaintext, State>
@@ -307,47 +222,12 @@ State::add(LeafIndex index, const ClientInitKey& client_init_key) const
   auto next = *this;
   next._tree.add_leaf(index, pub, client_init_key.credential);
 
-  // Construct the welcome message
-  auto welcome_info_str = welcome_info();
-  auto welcome = Welcome{ client_init_key.hash(), pub, welcome_info_str };
-  auto welcome_tuple = std::make_tuple(welcome);
-
-  auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add = Add{ LeafIndex{ index }, client_init_key, welcome_info_hash };
-  auto handshake = next.ratchet_and_sign(add, _zero);
-  return std::make_tuple(welcome, handshake, next);
-}
-
-std::tuple<Welcome2, MLSPlaintext, State>
-State::add2(const ClientInitKey& client_init_key) const
-{
-  return add2(_tree.leftmost_free(), client_init_key);
-}
-
-std::tuple<Welcome2, MLSPlaintext, State>
-State::add2(LeafIndex index, const ClientInitKey& client_init_key) const
-{
-  if (!client_init_key.verify()) {
-    throw InvalidParameterError("Bad signature on user init key");
-  }
-
-  if (client_init_key.cipher_suite != _suite) {
-    throw InvalidParameterError("Ciphersuite mismatch");
-  }
-
-  const auto& pub = client_init_key.init_key;
-
-  // Add to the tree
-  auto next = *this;
-  next._tree.add_leaf(index, pub, client_init_key.credential);
-
   // Construct the Add message
-  auto welcome_info_hash = welcome_info().hash(_suite);
-  auto add = Add{ LeafIndex{ index }, client_init_key, welcome_info_hash };
+  auto add = Add{ LeafIndex{ index }, client_init_key };
   auto handshake = next.ratchet_and_sign(add, _zero);
 
   // Construct the welcome message
-  auto welcome = Welcome2{ _suite, next._epoch_secret, next.group_info() };
+  auto welcome = Welcome{ _suite, next._epoch_secret, next.group_info() };
   welcome.encrypt(client_init_key);
 
   return std::make_tuple(welcome, handshake, next);
@@ -496,11 +376,6 @@ State::handle(const Add& add)
     throw InvalidParameterError("Leaf is not available for add");
   }
 
-  // Verify the WelcomeInfo hash
-  if (add.welcome_info_hash != welcome_info().hash(_suite)) {
-    throw ProtocolError("Mismatch in welcome info hash");
-  }
-
   // Add to the tree
   _tree.add_leaf(add.index, add.init_key.init_key, add.init_key.credential);
 
@@ -608,12 +483,6 @@ bool
 operator!=(const State& lhs, const State& rhs)
 {
   return !(lhs == rhs);
-}
-
-WelcomeInfo
-State::welcome_info() const
-{
-  return { _group_id, _epoch, _tree, _interim_transcript_hash, _init_secret };
 }
 
 GroupInfo

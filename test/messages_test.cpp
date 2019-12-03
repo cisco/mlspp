@@ -75,7 +75,7 @@ protected:
     client_init_key.signature = tv.random;
     tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
-    // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome2
+    // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome
     auto group_info = GroupInfo{
       tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
     };
@@ -91,24 +91,15 @@ protected:
     tls_round_trip(
       tc.encrypted_key_package, encrypted_key_package, true, tc.cipher_suite);
 
-    Welcome2 welcome2;
-    welcome2.version = ProtocolVersion::mls10;
-    welcome2.cipher_suite = tc.cipher_suite;
-    welcome2.key_packages = { encrypted_key_package, encrypted_key_package };
-    welcome2.encrypted_group_info = tv.random;
-    tls_round_trip(tc.welcome2, welcome2, true);
-
-    // WelcomeInfo and Welcome
-    WelcomeInfo welcome_info{
-      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
-    };
-    tls_round_trip(tc.welcome_info, welcome_info, true, tc.cipher_suite);
-
-    Welcome welcome{ client_init_key.hash(), dh_key, welcome_info };
+    Welcome welcome;
+    welcome.version = ProtocolVersion::mls10;
+    welcome.cipher_suite = tc.cipher_suite;
+    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.encrypted_group_info = tv.random;
     tls_round_trip(tc.welcome, welcome, true);
 
     // Handshake messages
-    auto add_op = Add{ tv.removed, client_init_key, tv.random };
+    auto add_op = Add{ tv.removed, client_init_key };
     auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
     add.signature = tv.random;
     tls_round_trip(tc.add, add, reproducible, tc.cipher_suite);
