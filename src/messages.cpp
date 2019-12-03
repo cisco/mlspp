@@ -292,10 +292,62 @@ GroupOperation::GroupOperation(const Remove& remove)
   , InnerOp(remove.cipher_suite(), remove)
 {}
 
+// Proposals
+
+AddProposal::AddProposal(CipherSuite suite) {}
+
+AddProposal::AddProposal(const ClientInitKey& client_init_key_in)
+  : client_init_key(client_init_key_in)
+{}
+
+const ProposalType AddProposal::type = ProposalType::add;
+
+UpdateProposal::UpdateProposal(CipherSuite suite)
+  : leaf_key(suite)
+{}
+
+UpdateProposal::UpdateProposal(const HPKEPublicKey& leaf_key_in)
+  : leaf_key(leaf_key_in)
+{}
+
+const ProposalType UpdateProposal::type = ProposalType::update;
+
+RemoveProposal::RemoveProposal(CipherSuite suite) {}
+
+RemoveProposal::RemoveProposal(LeafIndex removed_in)
+  : removed(removed_in)
+{}
+
+const ProposalType RemoveProposal::type = ProposalType::remove;
+
+Proposal::Proposal(CipherSuite suite)
+  : parent(suite, RemoveProposal{ LeafIndex{ 0 } })
+{}
+
+// Commit
+
+Commit::Commit(CipherSuite suite)
+  : path(suite)
+{}
+
+Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
+               const tls::vector<ProposalID, 2>& removes_in,
+               const tls::vector<ProposalID, 2>& adds_in,
+               const tls::vector<ProposalID, 2>& ignored_in,
+               const DirectPath& path_in)
+  : updates(updates_in)
+  , removes(removes_in)
+  , adds(adds_in)
+  , ignored(ignored_in)
+  , path(path_in)
+{}
+
 // MLSPlaintext
 
 const ContentType HandshakeData::type = ContentType::handshake;
 const ContentType ApplicationData::type = ContentType::application;
+const ContentType Proposal::type = ContentType::proposal;
+const ContentType Commit::type = ContentType::commit;
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite)
   : CipherAware(suite)
@@ -373,6 +425,28 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(sender_in)
   , content(DUMMY_CIPHERSUITE, application_data_in)
+{}
+
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           const Proposal& proposal)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
+  , content(DUMMY_CIPHERSUITE, proposal)
+{}
+
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
+                           epoch_t epoch_in,
+                           LeafIndex sender_in,
+                           const Commit& commit)
+  : CipherAware(DUMMY_CIPHERSUITE)
+  , group_id(std::move(group_id_in))
+  , epoch(epoch_in)
+  , sender(sender_in)
+  , content(DUMMY_CIPHERSUITE, commit)
 {}
 
 // struct {

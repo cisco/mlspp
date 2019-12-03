@@ -278,6 +278,47 @@ struct GroupOperation : public CipherAware,
   GroupOperation(const Remove& remove);
 };
 
+///
+/// Proposals & Commit
+///
+
+enum struct ProposalType : uint8_t {
+  invalid = 0,
+  add = 1,
+  update = 2,
+  remove = 3,
+};
+
+struct AddProposal {
+  ClientInitKey client_init_key;
+
+  AddProposal(CipherSuite suite);
+  AddProposal(const ClientInitKey& client_init_key_in);
+
+  static const ProposalType type;
+  TLS_SERIALIZABLE(client_init_key)
+};
+
+struct UpdateProposal {
+  HPKEPublicKey leaf_key;
+
+  UpdateProposal(CipherSuite suite);
+  UpdateProposal(const HPKEPublicKey& leaf_key_in);
+
+  static const ProposalType type;
+  TLS_SERIALIZABLE(leaf_key)
+};
+
+struct RemoveProposal {
+  LeafIndex removed;
+
+  RemoveProposal(CipherSuite suite);
+  RemoveProposal(LeafIndex removed_in);
+
+  static const ProposalType type;
+  TLS_SERIALIZABLE(removed)
+};
+
 // enum {
 //     invalid(0),
 //     handshake(1),
@@ -289,6 +330,44 @@ enum struct ContentType : uint8_t
   invalid = 0,
   handshake = 1,
   application = 2,
+  proposal = 3,
+  commit = 4,
+};
+
+struct Proposal : public tls::variant_variant<ProposalType, CipherSuite, AddProposal, UpdateProposal, RemoveProposal>
+{
+  using parent = tls::variant_variant<ProposalType, CipherSuite, AddProposal, UpdateProposal, RemoveProposal>;
+  using parent::parent;
+
+  Proposal(CipherSuite suite);
+
+  static const ContentType type;
+};
+
+// struct {
+//     ProposalID updates<0..2^16-1>;
+//     ProposalID removes<0..2^16-1>;
+//     ProposalID adds<0..2^16-1>;
+//     ProposalID ignored<0..2^16-1>;
+//     DirectPath path;
+// } Commit;
+using ProposalID = tls::opaque<1>;
+struct Commit {
+  tls::vector<ProposalID, 2> updates;
+  tls::vector<ProposalID, 2> removes;
+  tls::vector<ProposalID, 2> adds;
+  tls::vector<ProposalID, 2> ignored;
+  DirectPath path;
+
+  Commit(CipherSuite suite);
+  Commit(const tls::vector<ProposalID, 2>& updates_in,
+         const tls::vector<ProposalID, 2>& removes_in,
+         const tls::vector<ProposalID, 2>& adds_in,
+         const tls::vector<ProposalID, 2>& ignored_in,
+         const DirectPath& path_in);
+
+  TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
+  static const ContentType type;
 };
 
 // struct {
@@ -343,7 +422,7 @@ struct MLSPlaintext : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
-  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData> content;
+  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData, Proposal, Commit> content;
   tls::opaque<2> signature;
 
   // Constructor for unmarshaling directly
@@ -366,6 +445,14 @@ struct MLSPlaintext : public CipherAware
                epoch_t epoch,
                LeafIndex sender,
                const ApplicationData& application_data);
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               const Proposal& proposal);
+  MLSPlaintext(bytes group_id,
+               epoch_t epoch,
+               LeafIndex sender,
+               const Commit& commit);
 
   bytes to_be_signed() const;
   void sign(const SignaturePrivateKey& priv);

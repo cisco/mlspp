@@ -362,6 +362,31 @@ generate_messages()
     welcome.key_packages = { encrypted_key_package, encrypted_key_package };
     welcome.encrypted_group_info = tv.random;
 
+    // Construct Proposals
+    auto add_prop = Proposal{ AddProposal{ client_init_key } };
+    auto add_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
+    add_hs.signature = tv.random;
+
+    auto update_prop = Proposal{ UpdateProposal{ dh_key } };
+    auto update_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
+    update_hs.signature = tv.random;
+
+    auto remove_prop = Proposal{ RemoveProposal{ tv.signer_index } };
+    auto remove_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
+    remove_hs.signature = tv.random;
+
+    // Construct Commit
+    auto commit = Commit{
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      direct_path,
+    };
+
     // Construct handshake messages
     auto add_op = Add{ tv.removed, client_init_key };
     auto update_op = Update{ direct_path };
@@ -397,6 +422,10 @@ generate_messages()
       tls::marshal(add),
       tls::marshal(update),
       tls::marshal(remove),
+      tls::marshal(add_hs),
+      tls::marshal(update_hs),
+      tls::marshal(remove_hs),
+      tls::marshal(commit),
       tls::marshal(ciphertext),
     };
   }

@@ -235,6 +235,10 @@ struct MessagesTestVectors
     tls::opaque<4> add;
     tls::opaque<4> update;
     tls::opaque<4> remove;
+    tls::opaque<4> add_proposal;
+    tls::opaque<4> update_proposal;
+    tls::opaque<4> remove_proposal;
+    tls::opaque<4> commit;
     tls::opaque<4> ciphertext;
 
     TLS_SERIALIZABLE(cipher_suite,
@@ -247,6 +251,10 @@ struct MessagesTestVectors
                      add,
                      update,
                      remove,
+                     add_proposal,
+                     update_proposal,
+                     remove_proposal,
+                     commit,
                      ciphertext);
   };
 

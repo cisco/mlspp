@@ -13,6 +13,10 @@ tls_round_trip(const bytes& vector,
                Tp... args)
 {
   auto marshaled = tls::marshal(constructed);
+
+  std::cout << "mar " << marshaled << std::endl;
+  std::cout << "vec " << vector << std::endl;
+
   if (reproducible) {
     ASSERT_EQ(vector, marshaled);
   }
@@ -97,6 +101,35 @@ protected:
     welcome.key_packages = { encrypted_key_package, encrypted_key_package };
     welcome.encrypted_group_info = tv.random;
     tls_round_trip(tc.welcome, welcome, true);
+
+    // Proposals
+    auto add_prop = Proposal{ AddProposal{ client_init_key } };
+    auto add_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
+    add_hs.signature = tv.random;
+    tls_round_trip(tc.add_proposal, add_hs, true, tc.cipher_suite);
+
+    auto update_prop = Proposal{ UpdateProposal{ dh_key } };
+    auto update_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
+    update_hs.signature = tv.random;
+    tls_round_trip(tc.update_proposal, update_hs, true, tc.cipher_suite);
+
+    auto remove_prop = Proposal{ RemoveProposal{ tv.signer_index } };
+    auto remove_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
+    remove_hs.signature = tv.random;
+    tls_round_trip(tc.remove_proposal, remove_hs, true, tc.cipher_suite);
+
+    // Commit
+    auto commit = Commit{
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      direct_path,
+    };
+    tls_round_trip(tc.commit, commit, true, tc.cipher_suite);
 
     // Handshake messages
     auto add_op = Add{ tv.removed, client_init_key };
