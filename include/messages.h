@@ -117,6 +117,7 @@ struct GroupInfo {
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
+  // TODO confirmation
 
   LeafIndex signer_index;
   tls::opaque<2> signature;
@@ -148,9 +149,9 @@ struct GroupInfo {
 // } KeyPackage;
 struct KeyPackage {
   tls::opaque<1> epoch_secret;
-  tls::opaque<1> path_secret;
+  // TODO path_secret
 
-  TLS_SERIALIZABLE(epoch_secret, path_secret);
+  TLS_SERIALIZABLE(epoch_secret);
 };
 
 // struct {
@@ -185,11 +186,10 @@ struct Welcome2 {
            const bytes& epoch_secret,
            const GroupInfo& group_info);
 
-  void encrypt(const ClientInitKey& cik, const bytes& path_secret);
-  std::tuple<size_t, bytes, bytes, GroupInfo> decrypt(const std::vector<ClientInitKey>& ciks) const;
+  std::tuple<bytes, bytes> group_info_keymat(const bytes& epoch_secret) const;
+  void encrypt(const ClientInitKey& cik);
 
   private:
-  std::tuple<bytes, bytes> derive(CipherSuite suite, const bytes& epoch_secret) const;
   bytes _epoch_secret;
 };
 

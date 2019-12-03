@@ -136,6 +136,67 @@ TEST_F(GroupCreationTest, FullSize)
   }
 }
 
+TEST_F(GroupCreationTest, TwoPerson2)
+{
+  // Initialize the creator's state
+  auto first = State{ group_id, suite, init_privs[0], credentials[0] };
+
+  // Create a Add for the new participant
+  auto welcome_add_state = first.add2(client_init_keys[1]);
+  auto welcome = std::get<0>(welcome_add_state);
+  auto add = std::get<1>(welcome_add_state);
+
+  // Process the Add
+  first = std::get<2>(welcome_add_state);
+  auto second = State{ { client_init_keys[1] }, welcome };
+
+  ASSERT_EQ(first, second);
+
+  // Verify that they can exchange protected messages
+  auto encrypted = first.protect(test_message);
+  auto decrypted = second.unprotect(encrypted);
+  ASSERT_EQ(decrypted, test_message);
+}
+
+TEST_F(GroupCreationTest, FullSize2)
+{
+  // Initialize the creator's state
+  states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+
+  // Each participant invites the next
+  for (size_t i = 1; i < group_size; i += 1) {
+    auto sender = i - 1;
+    auto welcome_add_state = states[sender].add2(client_init_keys[i]);
+    auto welcome = std::get<0>(welcome_add_state);
+    auto add = std::get<1>(welcome_add_state);
+
+    for (size_t j = 0; j < states.size(); j += 1) {
+      if (j == sender) {
+        states[j] = std::get<2>(welcome_add_state);
+      } else {
+        states[j] = states[j].handle(add);
+      }
+    }
+
+    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                        welcome);
+
+    // Check that everyone ended up in the same place
+    for (const auto& state : states) {
+      ASSERT_EQ(state, states[0]);
+    }
+
+    // Check that everyone can send and be received
+    for (auto& state : states) {
+      auto encrypted = state.protect(test_message);
+      for (auto& other : states) {
+        auto decrypted = other.unprotect(encrypted);
+        ASSERT_EQ(decrypted, test_message);
+      }
+    }
+  }
+}
+
 class RunningGroupTest : public StateTest
 {
 protected:
@@ -285,9 +346,10 @@ protected:
     auto group_context = tls::get<GroupContext>(tv.base_group_context);
 
     for (const auto& epoch : test_case.epochs) {
-      auto group_context_bytes = tls::marshal(group_context);
-      auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, epoch.update_secret, group_context_bytes);
+      auto epoch_secret =
+        State::next_epoch_secret(suite, init_secret, epoch.update_secret);
+      auto secrets =
+        State::derive_epoch_secrets(suite, epoch_secret, group_context);
       ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
       ASSERT_EQ(epoch.application_secret, secrets.application_secret);
       ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);

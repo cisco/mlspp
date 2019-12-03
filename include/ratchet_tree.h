@@ -9,6 +9,8 @@
 
 namespace mls {
 
+struct ClientInitKey;
+
 class RatchetTreeNode : public CipherAware
 {
 public:
@@ -112,6 +114,7 @@ public:
   void set_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
   void set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key);
 
+  std::optional<LeafIndex> find(const ClientInitKey& cik) const;
   const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;

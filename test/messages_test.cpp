@@ -8,9 +8,9 @@ using namespace mls;
 template<typename T, typename... Tp>
 void
 tls_round_trip(const bytes& vector,
-                 T& constructed,
-                 bool reproducible,
-                 Tp... args)
+               T& constructed,
+               bool reproducible,
+               Tp... args)
 {
   auto marshaled = tls::marshal(constructed);
   if (reproducible) {
@@ -83,7 +83,7 @@ protected:
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
 
-    auto key_package = KeyPackage{ tv.random, tv.random };
+    auto key_package = KeyPackage{ tv.random };
     tls_round_trip(tc.key_package, key_package, true);
 
     auto encrypted_key_package =

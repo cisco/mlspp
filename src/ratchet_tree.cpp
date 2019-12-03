@@ -441,7 +441,7 @@ LeafIndex
 RatchetTree::leftmost_free() const
 {
   auto curr = LeafIndex{ 0 };
-  while (!occupied(curr) && curr.val < size()) {
+  while (occupied(curr) && curr.val < size()) {
     curr.val += 1;
   }
 
@@ -510,6 +510,26 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
 
   set_hash_path(index);
   return path_secret;
+}
+
+std::optional<LeafIndex>
+RatchetTree::find(const ClientInitKey& cik) const
+{
+  for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
+    auto& node = _nodes[NodeIndex(i)];
+
+    if (!node.has_value() || !node.value().credential().has_value()) {
+      continue;
+    }
+
+    auto hpke_match = (cik.init_key == node.value().public_key());
+    auto sig_match = (cik.credential == node.value().credential().value());
+    if (hpke_match && sig_match) {
+      return i;
+    }
+  }
+
+  return std::nullopt;
 }
 
 const Credential&

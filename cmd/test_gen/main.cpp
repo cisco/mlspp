@@ -155,8 +155,10 @@ generate_key_schedule()
 
     for (size_t j = 0; j < tv.n_epochs; ++j) {
       auto group_context_bytes = tls::marshal(group_context);
-      auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, update_secret, group_context_bytes);
+      auto epoch_secret =
+        State::next_epoch_secret(suite, init_secret, update_secret);
+      auto secrets =
+        State::derive_epoch_secrets(suite, epoch_secret, group_context);
 
       test_case->epochs.push_back({
         update_secret,
@@ -350,7 +352,7 @@ generate_messages()
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
-    auto key_package = KeyPackage{ tv.random, tv.random };
+    auto key_package = KeyPackage{ tv.random };
     auto encrypted_key_package =
       EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
 

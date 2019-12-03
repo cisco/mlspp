@@ -84,8 +84,12 @@ public:
 
   // Initialize a group from a Add (for group-initiated join)
   State(const std::vector<ClientInitKey>& my_client_init_keys,
-        const Welcome& welcome_info,
+        const Welcome& welcome,
         const MLSPlaintext& handshake);
+
+  // Initialize a group from a Welcome
+  State(const std::vector<ClientInitKey>& my_client_init_keys,
+        const Welcome2& welcome);
 
   // Negotiate an initial state with another peer based on their
   // ClientInitKey
@@ -106,6 +110,15 @@ public:
   std::tuple<Welcome, MLSPlaintext, State> add(
     LeafIndex index,
     const ClientInitKey& client_init_key) const;
+
+  // Generate a Add message
+  std::tuple<Welcome2, MLSPlaintext, State> add2(
+    const ClientInitKey& client_init_key) const;
+
+  // Generate an Add message at a specific location
+  std::tuple<Welcome2, MLSPlaintext, State> add2(
+      LeafIndex index,
+      const ClientInitKey& client_init_key) const;
 
   // Generate an Update message (for post-compromise security)
   std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret) const;
@@ -148,10 +161,12 @@ public:
     bytes confirmation_key;
     bytes init_secret;
   };
+  static bytes next_epoch_secret(CipherSuite suite,
+                                 const bytes& init_secret,
+                                 const bytes& update_secret);
   static EpochSecrets derive_epoch_secrets(CipherSuite suite,
-                                           const bytes& init_secret,
-                                           const bytes& update_secret,
-                                           const bytes& group_context);
+                                           const bytes& epoch_secret,
+                                           const GroupContext& group_context);
 
 private:
   // Shared confirmed state
@@ -162,7 +177,6 @@ private:
   RatchetTree _tree;
   bytes _confirmed_transcript_hash;
   bytes _interim_transcript_hash;
-  bytes _group_context;
 
   // Shared secret state
   tls::opaque<1> _epoch_secret;
@@ -205,6 +219,12 @@ private:
   // Generate a WelcomeInfo object describing this state
   WelcomeInfo welcome_info() const;
 
+  // Generate a GroupInfo object describing this state
+  GroupInfo group_info() const;
+
+  // Construct the group context
+  GroupContext group_context() const;
+
   // Add a new group operation into the transcript hash
   void update_transcript_hash(const MLSPlaintext& plaintext);
 
@@ -213,8 +233,11 @@ private:
                     const DirectPath& path,
                     const std::optional<bytes>& leaf_secret);
 
-  // Derive the secrets for an epoch, given some new entropy
+  // Derive and set the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);
+
+  // Set the secrets for an epoch from the epoch's secret
+  void set_epoch_secrets(const bytes& epoch_secret);
 
   // Signature verification over a handshake message
   bool verify(const MLSPlaintext& pt) const;
