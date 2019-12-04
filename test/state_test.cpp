@@ -45,20 +45,15 @@ protected:
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
-};
+  const bytes test_message = from_hex("01020304");
 
-class GroupCreationTest : public StateTest
-{
-protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
   std::vector<DHPrivateKey> init_privs;
   std::vector<ClientInitKey> client_init_keys;
   std::vector<State> states;
 
-  const bytes test_message = from_hex("01020304");
-
-  GroupCreationTest()
+  StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
       auto identity_priv = SignaturePrivateKey::generate(scheme);
@@ -73,31 +68,67 @@ protected:
       client_init_keys.push_back(client_init_key);
     }
   }
+
+  bytes fresh_secret() const
+  {
+    return random_bytes(Digest(suite).output_size());
+  }
 };
 
-TEST_F(GroupCreationTest, TwoPerson)
+TEST_F(StateTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto first = State{ group_id, suite, init_privs[0], credentials[0] };
+  auto first0 = State{ group_id, suite, init_privs[0], credentials[0] };
 
-  // Create a Add for the new participant
-  auto welcome_add_state = first.add(client_init_keys[1]);
-  auto welcome = std::get<0>(welcome_add_state);
-  auto add = std::get<1>(welcome_add_state);
+  // Create an Add proposal for the new participant
+  auto add = first0.propose_add(client_init_keys[1]);
 
-  // Process the Add
-  first = std::get<2>(welcome_add_state);
-  auto second = State{ { client_init_keys[1] }, welcome };
+  // Handle the Add proposal and create a Commit
+  first0.handle(add);
+  auto [commit, welcome, first1] = first0.commit(fresh_secret());
 
-  ASSERT_EQ(first, second);
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ { client_init_keys[1] }, welcome };
+  ASSERT_EQ(first1, second0);
 
-  // Verify that they can exchange protected messages
-  auto encrypted = first.protect(test_message);
-  auto decrypted = second.unprotect(encrypted);
+  /// Verify that they can exchange protected messages
+  auto encrypted = first1.protect(test_message);
+  auto decrypted = second0.unprotect(encrypted);
   ASSERT_EQ(decrypted, test_message);
 }
 
-TEST_F(GroupCreationTest, FullSize)
+TEST_F(StateTest, Multi)
+{
+  // Initialize the creator's state
+  states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+
+  // Create and process an Add proposal for each new participant
+  for (size_t i = 1; i < group_size; i += 1) {
+    auto add = states[0].propose_add(client_init_keys[i]);
+    states[0].handle(add);
+  }
+
+  // Create a Commit that adds everybody
+  auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+  states[0] = new_state;
+
+  // Initialize the new joiners from the welcome
+  for (size_t i = 1; i < group_size; i += 1) {
+    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                        welcome);
+  }
+
+  // Verify that everyone can send and be received
+  for (auto& state : states) {
+    auto encrypted = state.protect(test_message);
+    for (auto& other : states) {
+      auto decrypted = other.unprotect(encrypted);
+      ASSERT_EQ(decrypted, test_message);
+    }
+  }
+}
+
+TEST_F(StateTest, FullSize)
 {
   // Initialize the creator's state
   states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
@@ -105,15 +136,17 @@ TEST_F(GroupCreationTest, FullSize)
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
     auto sender = i - 1;
-    auto welcome_add_state = states[sender].add(client_init_keys[i]);
-    auto welcome = std::get<0>(welcome_add_state);
-    auto add = std::get<1>(welcome_add_state);
 
+    auto add = states[sender].propose_add(client_init_keys[i]);
+    states[sender].handle(add);
+
+    auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
-        states[j] = std::get<2>(welcome_add_state);
+        states[j] = new_state;
       } else {
-        states[j] = states[j].handle(add);
+        states[j].handle(add);
+        states[j] = states[j].handle(commit).value();
       }
     }
 
@@ -142,35 +175,20 @@ protected:
   std::vector<State> states;
 
   RunningGroupTest()
+    : StateTest()
   {
-    states.reserve(group_size);
-
-    auto init_secret_0 = random_bytes(32);
-    auto init_priv_0 = DHPrivateKey::derive(suite, init_secret_0);
-    auto identity_priv_0 = SignaturePrivateKey::generate(scheme);
-    auto credential_0 = Credential::basic(user_id, identity_priv_0);
-    states.emplace_back(group_id, suite, init_priv_0, credential_0);
+    states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
-      auto init_secret = random_bytes(32);
-      auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
-      auto identity_priv = SignaturePrivateKey::generate(scheme);
-      auto credential = Credential::basic(user_id, identity_priv);
-      ClientInitKey cik{ init_priv, credential };
+      auto add = states[0].propose_add(client_init_keys[i]);
+      states[0].handle(add);
+    }
 
-      auto welcome_add_state = states[0].add(cik);
-      auto&& welcome = std::get<0>(welcome_add_state);
-      auto&& add = std::get<1>(welcome_add_state);
-      auto&& next = std::get<2>(welcome_add_state);
-      for (auto& state : states) {
-        if (state.index().val == 0) {
-          state = next;
-        } else {
-          state = state.handle(add);
-        }
-      }
-
-      states.emplace_back(std::vector<ClientInitKey>{ cik }, welcome);
+    auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+    states[0] = new_state;
+    for (size_t i = 1; i < group_size; i += 1) {
+      states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                          welcome);
     }
   }
 
@@ -187,16 +205,17 @@ protected:
 TEST_F(RunningGroupTest, Update)
 {
   for (size_t i = 0; i < group_size; i += 1) {
-    auto new_leaf = random_bytes(32);
-    auto message_next = states[i].update(new_leaf);
-    auto&& message = std::get<0>(message_next);
-    auto&& next = std::get<1>(message_next);
+    auto new_leaf = fresh_secret();
+    auto update = states[i].propose_update(new_leaf);
+    states[i].handle(update);
+    auto [commit, welcome, new_state] = states[i].commit(new_leaf);
 
     for (auto& state : states) {
       if (state.index().val == i) {
-        state = next;
+        state = new_state;
       } else {
-        state = state.handle(message);
+        state.handle(update);
+        state = state.handle(commit).value();
       }
     }
 
@@ -207,18 +226,17 @@ TEST_F(RunningGroupTest, Update)
 TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
-    auto evict_secret = random_bytes(32);
-    auto message_next =
-      states[i].remove(evict_secret, LeafIndex{ uint32_t(i + 1) });
-    auto&& message = std::get<0>(message_next);
-    auto&& next = std::get<1>(message_next);
-    states.pop_back();
+    auto remove = states[i].propose_remove(LeafIndex{ uint32_t(i + 1) });
+    states[i].handle(remove);
+    auto [commit, welcome, new_state] = states[i].commit(fresh_secret());
 
+    states.pop_back();
     for (auto& state : states) {
       if (state.index().val == size_t(i)) {
-        state = next;
+        state = new_state;
       } else {
-        state = state.handle(message);
+        state.handle(remove);
+        state = state.handle(commit).value();
       }
     }
 

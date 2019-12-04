@@ -346,9 +346,9 @@ generate_messages()
     client_init_key.signature = tv.random;
 
     // Construct Welcome
-    auto group_info = GroupInfo{
-      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
-    };
+    auto group_info =
+      GroupInfo{ tv.group_id, tv.epoch,    ratchet_tree, tv.random,
+                 tv.random,   direct_path, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 

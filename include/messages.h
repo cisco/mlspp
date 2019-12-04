@@ -92,10 +92,6 @@ bool operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
 tls::ostream& operator<<(tls::ostream& str, const ClientInitKey& obj);
 tls::istream& operator>>(tls::istream& str, ClientInitKey& obj);
 
-// TODO:
-// * Test GroupInfo marshal/unmarshal
-// * Test GroupInfo sign/verify
-
 // struct {
 //   // GroupContext inputs
 //   opaque group_id<0..255>;
@@ -117,7 +113,8 @@ struct GroupInfo {
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
-  // TODO confirmation
+  DirectPath path;
+  tls::opaque<1> confirmation;
 
   LeafIndex signer_index;
   tls::opaque<2> signature;
@@ -127,7 +124,9 @@ struct GroupInfo {
             epoch_t epoch_in,
             const RatchetTree tree_in,
             const bytes& confirmed_transcript_hash_in,
-            const bytes& interim_transcript_hash_in);
+            const bytes& interim_transcript_hash_in,
+            const DirectPath& path_in,
+            const bytes& confirmation_in);
 
   bytes to_be_signed() const;
   void sign(LeafIndex index, const SignaturePrivateKey& priv);
@@ -138,6 +137,8 @@ struct GroupInfo {
                    tree,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
+                   path,
+                   confirmation,
                    signer_index,
                    signature);
 };
@@ -148,10 +149,9 @@ struct GroupInfo {
 //   opaque path_secret<1..255>;
 // } KeyPackage;
 struct KeyPackage {
-  tls::opaque<1> epoch_secret;
-  // TODO path_secret
+  tls::opaque<1> init_secret;
 
-  TLS_SERIALIZABLE(epoch_secret);
+  TLS_SERIALIZABLE(init_secret);
 };
 
 // struct {
@@ -181,16 +181,16 @@ struct Welcome {
   tls::variant_vector<EncryptedKeyPackage, CipherSuite, 4> key_packages;
   tls::opaque<4> encrypted_group_info;
 
-  Welcome() = default;
+  Welcome();
   Welcome(CipherSuite suite,
-           const bytes& epoch_secret,
-           const GroupInfo& group_info);
+          const bytes& init_secret,
+          const GroupInfo& group_info);
 
   std::tuple<bytes, bytes> group_info_keymat(const bytes& epoch_secret) const;
   void encrypt(const ClientInitKey& cik);
 
   private:
-  bytes _epoch_secret;
+  bytes _init_secret;
 };
 
 bool operator==(const Welcome& lhs, const Welcome& rhs);
@@ -367,7 +367,6 @@ struct Commit {
          const DirectPath& path_in);
 
   TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
-  static const ContentType type;
 };
 
 // struct {
@@ -417,12 +416,30 @@ struct ApplicationData : tls::opaque<4>
   static const ContentType type;
 };
 
+struct CommitData
+{
+  Commit commit;
+  tls::opaque<1> confirmation;
+
+  CommitData(CipherSuite suite)
+    : commit(suite)
+  {}
+
+  CommitData(const Commit& commit_in, const bytes& confirmation_in)
+    : commit(commit_in)
+    , confirmation(confirmation_in)
+  {}
+
+  static const ContentType type;
+  TLS_SERIALIZABLE(commit, confirmation);
+};
+
 struct MLSPlaintext : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
-  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData, Proposal, Commit> content;
+  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData, Proposal, CommitData> content;
   tls::opaque<2> signature;
 
   // Constructor for unmarshaling directly
@@ -461,7 +478,9 @@ struct MLSPlaintext : public CipherAware
   bytes marshal_content(size_t padding_size) const;
 
   bytes op_content() const;
+  bytes commit_content() const;
   bytes auth_data() const;
+  bytes commit_auth_data() const;
 
   TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);
 };

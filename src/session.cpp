@@ -90,7 +90,9 @@ Session::handle(const bytes& handshake_data)
   }
 
   auto next = current_state().handle(handshake);
-  add_state(handshake.epoch, next);
+  if (next.has_value()) {
+    add_state(handshake.epoch, next.value());
+  }
 }
 
 bytes

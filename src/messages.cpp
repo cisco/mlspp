@@ -114,18 +114,23 @@ operator>>(tls::istream& str, ClientInitKey& obj)
 
 GroupInfo::GroupInfo(CipherSuite suite)
   : tree(suite)
+  , path(suite)
 {}
 
 GroupInfo::GroupInfo(const bytes& group_id_in,
                      epoch_t epoch_in,
                      const RatchetTree tree_in,
                      const bytes& confirmed_transcript_hash_in,
-                     const bytes& interim_transcript_hash_in)
+                     const bytes& interim_transcript_hash_in,
+                     const DirectPath& path_in,
+                     const bytes& confirmation_in)
   : group_id(group_id_in)
   , epoch(epoch_in)
   , tree(tree_in)
   , confirmed_transcript_hash(confirmed_transcript_hash_in)
   , interim_transcript_hash(interim_transcript_hash_in)
+  , path(path_in)
+  , confirmation(confirmation_in)
 {}
 
 bytes
@@ -133,7 +138,7 @@ GroupInfo::to_be_signed() const
 {
   tls::ostream w;
   w << group_id << epoch << tree << confirmed_transcript_hash
-    << interim_transcript_hash << signer_index;
+    << interim_transcript_hash << path << confirmation << signer_index;
   return w.bytes();
 }
 
@@ -170,28 +175,32 @@ EncryptedKeyPackage::EncryptedKeyPackage(const bytes& hash,
 
 // Welcome
 
+Welcome::Welcome()
+  : key_packages(DUMMY_CIPHERSUITE)
+{}
+
 Welcome::Welcome(CipherSuite suite,
-                 const bytes& epoch_secret,
+                 const bytes& init_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
   , key_packages(suite)
-  , _epoch_secret(epoch_secret)
+  , _init_secret(init_secret)
 {
-  auto [key, nonce] = group_info_keymat(_epoch_secret);
+  auto [key, nonce] = group_info_keymat(_init_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info = AESGCM(key, nonce).encrypt(group_info_data);
 }
 
 std::tuple<bytes, bytes>
-Welcome::group_info_keymat(const bytes& epoch_secret) const
+Welcome::group_info_keymat(const bytes& init_secret) const
 {
   auto secret_size = Digest(cipher_suite).output_size();
   auto key_size = AESGCM::key_size(cipher_suite);
   auto nonce_size = AESGCM::nonce_size;
 
-  auto secret = hkdf_expand_label(
-    cipher_suite, epoch_secret, "group info", {}, secret_size);
+  auto secret =
+    hkdf_expand_label(cipher_suite, init_secret, "group info", {}, secret_size);
   auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
   auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
   return std::make_tuple(key, nonce);
@@ -200,7 +209,7 @@ Welcome::group_info_keymat(const bytes& epoch_secret) const
 void
 Welcome::encrypt(const ClientInitKey& cik)
 {
-  auto key_pkg = KeyPackage{ _epoch_secret };
+  auto key_pkg = KeyPackage{ _init_secret };
   auto key_pkg_data = tls::marshal(key_pkg);
   auto enc_pkg = cik.init_key.encrypt(key_pkg_data);
   key_packages.emplace_back(cik.hash(), enc_pkg);
@@ -347,7 +356,7 @@ Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
 const ContentType HandshakeData::type = ContentType::handshake;
 const ContentType ApplicationData::type = ContentType::application;
 const ContentType Proposal::type = ContentType::proposal;
-const ContentType Commit::type = ContentType::commit;
+const ContentType CommitData::type = ContentType::commit;
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite)
   : CipherAware(suite)
@@ -446,7 +455,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content(DUMMY_CIPHERSUITE, commit)
+  , content(DUMMY_CIPHERSUITE, CommitData{ commit, {} })
 {}
 
 // struct {
@@ -460,9 +469,9 @@ bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   bytes marshaled;
-  if (content.type() == ContentType::handshake) {
+  if (content.inner_type() == ContentType::handshake) {
     marshaled = tls::marshal(std::get<HandshakeData>(content));
-  } else if (content.type() == ContentType::application) {
+  } else if (content.inner_type() == ContentType::application) {
     marshaled = tls::marshal(std::get<ApplicationData>(content));
   } else {
     throw InvalidParameterError("Unknown content type");
@@ -487,8 +496,17 @@ MLSPlaintext::op_content() const
 {
   auto& handshake_data = std::get<HandshakeData>(content);
   tls::ostream w;
-  w << group_id << epoch << sender << content.type()
+  w << group_id << epoch << sender << content.inner_type()
     << handshake_data.operation;
+  return w.bytes();
+}
+
+bytes
+MLSPlaintext::commit_content() const
+{
+  auto& commit_data = std::get<CommitData>(content);
+  tls::ostream w;
+  w << group_id << epoch << sender << commit_data.commit;
   return w.bytes();
 }
 
@@ -502,6 +520,19 @@ MLSPlaintext::auth_data() const
   auto& handshake_data = std::get<HandshakeData>(content);
   tls::ostream w;
   w << handshake_data.confirmation << signature;
+  return w.bytes();
+}
+
+// struct {
+//   opaque confirmation<0..255>;
+//   opaque signature<0..2^16-1>;
+// } MLSPlaintextOpAuthData;
+bytes
+MLSPlaintext::commit_auth_data() const
+{
+  auto& commit_data = std::get<CommitData>(content);
+  tls::ostream w;
+  w << commit_data.confirmation << signature;
   return w.bytes();
 }
 

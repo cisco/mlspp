@@ -6,6 +6,7 @@
 #include <optional>
 #include <set>
 #include <vector>
+#include <list>
 
 namespace mls {
 
@@ -113,10 +114,22 @@ public:
   std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
                                          LeafIndex index) const;
 
+  // Generate an Add proposal
+  MLSPlaintext propose_add(const ClientInitKey& client_init_key) const;
+
+  // Generate an Update proposal
+  MLSPlaintext propose_update(const bytes& leaf_secret);
+
+  // Generate a Remove proposal
+  MLSPlaintext propose_remove(LeafIndex removed) const;
+
+  // Generate a Commit
+  std::tuple<MLSPlaintext, Welcome, State> commit(const bytes& leaf_secret) const;
+
   ///
   /// Generic handshake message handler
   ///
-  State handle(const MLSPlaintext& handshake) const;
+  std::optional<State> handle(const MLSPlaintext& pt);
 
   ///
   /// Accessors
@@ -181,16 +194,28 @@ private:
   LeafIndex _index;
   SignaturePrivateKey _identity_priv;
 
+  // Cache of Proposals and update secrets
+  std::list<MLSPlaintext> _pending_proposals;
+  std::map<ProposalID, bytes> _update_secrets;
+
   // A zero vector, for convenience
   bytes _zero;
+
+  // Ratchet the key schedule forward and sign the commit that caused the
+  // transition
+  MLSPlaintext
+  ratchet_and_sign_commit(const Commit& op, const bytes& update_secret);
 
   // Ratchet the key schedule forward and sign the operation that
   // caused the transition
   MLSPlaintext ratchet_and_sign(const GroupOperation& op,
                                 const bytes& update_secret);
 
+  // Create an MLSPlaintext with a signature over some content
+  MLSPlaintext sign_proposal(const Proposal& proposal) const;
+
   // Handle an Add (for existing participants only)
-  bytes handle(const Add& add);
+  bytes handle(LeafIndex sender, const Add& add);
 
   // Handle an Update (for the participant that sent the update)
   bytes handle(LeafIndex sender, const Update& update);
@@ -198,12 +223,36 @@ private:
   // Handle a Remove (for the remaining participants, obviously)
   bytes handle(LeafIndex sender, const Remove& remove);
 
+  // Handle a Handshake message
+  State handle_handshake(const MLSPlaintext& handshake) const;
+
+  // Apply an Add
+  void apply(const AddProposal& add);
+
+  // Apply an Update
+  void apply(LeafIndex target, const UpdateProposal& update);
+
+  // Apply a self-Update
+  void apply(LeafIndex target, const bytes& leaf_secret);
+
+  // Apply a Remove
+  void apply(const RemoveProposal& remove);
+
+  // Compute a proposal ID
+  bytes proposal_id(const MLSPlaintext& pt) const;
+
+  // Extract a proposal from the cache
+  std::optional<MLSPlaintext> find_proposal(const ProposalID& id);
+
+  // Apply a list of proposals, by ID
+  void apply(const std::vector<ProposalID>& ids);
+
+  // Apply a Commit
+  void apply(const Commit& commit);
+
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
-
-  // Generate a GroupInfo object describing this state
-  GroupInfo group_info() const;
 
   // Construct the group context
   GroupContext group_context() const;
@@ -218,9 +267,6 @@ private:
 
   // Derive and set the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);
-
-  // Set the secrets for an epoch from the epoch's secret
-  void set_epoch_secrets(const bytes& epoch_secret);
 
   // Signature verification over a handshake message
   bool verify(const MLSPlaintext& pt) const;

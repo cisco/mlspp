@@ -80,9 +80,9 @@ protected:
     tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
     // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome
-    auto group_info = GroupInfo{
-      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
-    };
+    auto group_info =
+      GroupInfo{ tv.group_id, tv.epoch,    ratchet_tree, tv.random,
+                 tv.random,   direct_path, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);

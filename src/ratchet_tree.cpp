@@ -424,10 +424,22 @@ RatchetTree::blank_path(LeafIndex index)
     return;
   }
 
+  _nodes[NodeIndex{ index }] = std::nullopt;
+  blank_path_above(index);
+}
+
+void
+RatchetTree::blank_path_above(LeafIndex index)
+{
+  if (_nodes.empty()) {
+    return;
+  }
+
   const auto node_count = node_size();
   const auto root = root_index();
 
   auto curr = NodeIndex{ index };
+  curr = tree_math::parent(curr, node_count);
   while (curr != root) {
     _nodes[curr] = std::nullopt;
     curr = tree_math::parent(curr, node_count);
@@ -476,6 +488,18 @@ RatchetTree::set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key)
     throw InvalidParameterError("Cannot update a blank leaf");
   }
   _nodes[curr].value().merge(leaf_key);
+  set_hash_path(index);
+}
+
+void
+RatchetTree::set_leaf_secret(LeafIndex index, const bytes& leaf_secret)
+{
+  auto curr = NodeIndex{ index };
+  if (!_nodes[curr].has_value()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+
+  _nodes[curr].value().merge({ _suite, leaf_secret });
   set_hash_path(index);
 }
 
@@ -738,6 +762,22 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   return true;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const RatchetTree obj)
+{
+  out << "=== tree ===" << std::endl;
+  for (uint32_t i = 0; i < obj._nodes.size(); ++i) {
+    out << "    " << i << " ";
+    if (!obj._nodes[i].has_value()) {
+      out << "_";
+    } else {
+      out << obj._nodes[i].value().public_key().to_bytes();
+    }
+    out << " " << obj._nodes[i].hash() << std::endl;
+  }
+  return out;
 }
 
 tls::ostream&

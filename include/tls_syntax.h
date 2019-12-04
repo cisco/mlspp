@@ -45,17 +45,17 @@ class variant : public std::variant<Tp...>
   using type_enum = Te;
 
   template<size_t I = 0>
-  inline typename std::enable_if_t<I < sizeof...(Tp), Te> type() const {
+  inline typename std::enable_if_t<I < sizeof...(Tp), Te> inner_type() const {
     using curr_type = std::variant_alternative_t<I, parent>;
     if (std::holds_alternative<curr_type>(*this)) {
       return curr_type::type;
     }
 
-    return type<I+1>();
+    return inner_type<I+1>();
   }
 
   template<size_t I = 0>
-  inline typename std::enable_if_t<I == sizeof...(Tp), Te> type() const {
+  inline typename std::enable_if_t<I == sizeof...(Tp), Te> inner_type() const {
     throw std::bad_variant_access();
   }
 };
