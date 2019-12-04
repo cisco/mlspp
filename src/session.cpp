@@ -4,19 +4,18 @@
 
 namespace mls {
 
-std::tuple<Session, Welcome, bytes>
+std::tuple<Session, Welcome>
 Session::start(const bytes& group_id,
                const std::vector<ClientInitKey>& my_client_init_keys,
-               const std::vector<ClientInitKey>& client_init_keys)
+               const std::vector<ClientInitKey>& client_init_keys,
+               const bytes& initial_secret)
 {
-  auto welcome_add_state =
-    State::negotiate(group_id, my_client_init_keys, client_init_keys);
+  auto [welcome, state] = State::negotiate(
+    group_id, my_client_init_keys, client_init_keys, initial_secret);
 
   Session session;
-  session.add_state(0, std::get<2>(welcome_add_state));
-  auto welcome = std::get<0>(welcome_add_state);
-  auto add = tls::marshal(std::get<1>(welcome_add_state));
-  return std::make_tuple(session, welcome, add);
+  session.add_state(0, state);
+  return std::make_tuple(session, welcome);
 }
 
 Session
@@ -30,49 +29,50 @@ Session::join(const std::vector<ClientInitKey>& client_init_keys,
 }
 
 std::pair<Welcome, bytes>
-Session::add(const ClientInitKey& client_init_key)
+Session::add(const bytes& add_secret, const ClientInitKey& client_init_key)
 {
-  auto welcome_add_state = current_state().add(client_init_key);
-  auto welcome = std::get<0>(welcome_add_state);
-  auto add = tls::marshal(std::get<1>(welcome_add_state));
-  auto state = std::get<2>(welcome_add_state);
-
-  _outbound_cache = std::make_tuple(add, state);
-
-  return std::make_pair(welcome, add);
+  auto proposal = current_state().add(client_init_key);
+  return commit_and_cache(add_secret, proposal);
 }
 
 bytes
 Session::update(const bytes& leaf_secret)
 {
-  auto update_state = current_state().update(leaf_secret);
-  auto update = tls::marshal(std::get<0>(update_state));
-  auto state = std::get<1>(update_state);
-
-  _outbound_cache = std::make_tuple(update, state);
-
-  return update;
+  auto proposal = current_state().update(leaf_secret);
+  return std::get<1>(commit_and_cache(leaf_secret, proposal));
 }
 
 bytes
 Session::remove(const bytes& evict_secret, uint32_t index)
 {
-  auto remove_state = current_state().remove(evict_secret, LeafIndex{ index });
-  auto remove = tls::marshal(std::get<0>(remove_state));
-  auto state = std::get<1>(remove_state);
+  auto proposal = current_state().remove(LeafIndex{ index });
+  return std::get<1>(commit_and_cache(evict_secret, proposal));
+}
 
-  _outbound_cache = std::make_tuple(remove, state);
+std::tuple<Welcome, bytes>
+Session::commit_and_cache(const bytes& secret, const MLSPlaintext& proposal)
+{
+  auto state = current_state();
+  state.handle(proposal);
+  auto [commit, welcome, new_state] = state.commit(secret);
 
-  return remove;
+  tls::ostream w;
+  w << proposal << commit;
+  auto msg = w.bytes();
+
+  _outbound_cache = std::make_tuple(msg, new_state);
+  return std::make_tuple(welcome, msg);
 }
 
 void
 Session::handle(const bytes& handshake_data)
 {
-  auto handshake =
-    tls::get<MLSPlaintext>(handshake_data, current_state().cipher_suite());
+  auto suite = current_state().cipher_suite();
+  MLSPlaintext proposal(suite), commit(suite);
+  tls::istream r(handshake_data);
+  r >> proposal >> commit;
 
-  if (handshake.sender == current_state().index()) {
+  if (proposal.sender == current_state().index()) {
     if (!_outbound_cache.has_value()) {
       throw ProtocolError("Received from self without sending");
     }
@@ -84,15 +84,19 @@ Session::handle(const bytes& handshake_data)
       throw ProtocolError("Received different own message");
     }
 
-    add_state(handshake.epoch, state);
+    add_state(proposal.epoch, state);
     _outbound_cache = std::nullopt;
     return;
   }
 
-  auto next = current_state().handle(handshake);
-  if (next.has_value()) {
-    add_state(handshake.epoch, next.value());
+  auto state = current_state();
+  state.handle(proposal);
+  auto next = state.handle(commit);
+  if (!next.has_value()) {
+    throw ProtocolError("Commit failed to produce a new state");
   }
+
+  add_state(commit.epoch, next.value());
 }
 
 bytes

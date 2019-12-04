@@ -232,9 +232,6 @@ struct MessagesTestVectors
     tls::opaque<4> key_package;
     tls::opaque<4> encrypted_key_package;
     tls::opaque<4> welcome;
-    tls::opaque<4> add;
-    tls::opaque<4> update;
-    tls::opaque<4> remove;
     tls::opaque<4> add_proposal;
     tls::opaque<4> update_proposal;
     tls::opaque<4> remove_proposal;
@@ -248,9 +245,6 @@ struct MessagesTestVectors
                      key_package,
                      encrypted_key_package,
                      welcome,
-                     add,
-                     update,
-                     remove,
                      add_proposal,
                      update_proposal,
                      remove_proposal,
@@ -328,6 +322,7 @@ struct SessionTestVectors
   {
     tls::optional<Welcome> welcome;
     tls::opaque<4> handshake;
+    tls::opaque<1> commit_secret;
 
     epoch_t epoch;
     tls::opaque<1> epoch_secret;
@@ -339,9 +334,11 @@ struct SessionTestVectors
 
     Epoch(const tls::optional<Welcome>& welcome_in,
           const bytes& handshake_in,
+          const bytes& commit_secret_in,
           const TestSession& session)
       : welcome(welcome_in)
       , handshake(handshake_in)
+      , commit_secret(commit_secret_in)
       , epoch(session.current_epoch())
       , epoch_secret(session.current_epoch_secret())
       , application_secret(session.current_application_secret())

@@ -240,97 +240,36 @@ operator>>(tls::istream& str, Welcome& obj)
   return str;
 }
 
-// Add
-
-Add::Add(LeafIndex index_in, ClientInitKey init_key_in)
-  : index(index_in)
-  , init_key(std::move(init_key_in))
-{}
-
-const GroupOperationType Add::type = GroupOperationType::add;
-
-// Update
-
-Update::Update(CipherSuite suite)
-  : CipherAware(suite)
-  , path(suite)
-{}
-
-Update::Update(const DirectPath& path_in)
-  : CipherAware(path_in.cipher_suite())
-  , path(path_in)
-{}
-
-const GroupOperationType Update::type = GroupOperationType::update;
-
-// Remove
-
-Remove::Remove(CipherSuite suite)
-  : CipherAware(suite)
-  , path(suite)
-{}
-
-Remove::Remove(LeafIndex removed_in, const DirectPath& path_in)
-  : CipherAware(path_in.cipher_suite())
-  , removed(removed_in)
-  , path(path_in)
-{}
-
-const GroupOperationType Remove::type = GroupOperationType::remove;
-
-// GroupOperation
-
-GroupOperation::GroupOperation(CipherSuite suite)
-  : CipherAware(suite)
-  , InnerOp(suite, Add{})
-{}
-
-GroupOperation::GroupOperation(const Add& add)
-  : CipherAware(DUMMY_CIPHERSUITE)
-  , InnerOp(DUMMY_CIPHERSUITE, add)
-{}
-
-GroupOperation::GroupOperation(const Update& update)
-  : CipherAware(update.cipher_suite())
-  , InnerOp(update.cipher_suite(), update)
-
-{}
-
-GroupOperation::GroupOperation(const Remove& remove)
-  : CipherAware(remove.cipher_suite())
-  , InnerOp(remove.cipher_suite(), remove)
-{}
-
 // Proposals
 
-AddProposal::AddProposal(CipherSuite suite) {}
+Add::Add(CipherSuite suite) {}
 
-AddProposal::AddProposal(const ClientInitKey& client_init_key_in)
+Add::Add(const ClientInitKey& client_init_key_in)
   : client_init_key(client_init_key_in)
 {}
 
-const ProposalType AddProposal::type = ProposalType::add;
+const ProposalType Add::type = ProposalType::add;
 
-UpdateProposal::UpdateProposal(CipherSuite suite)
+Update::Update(CipherSuite suite)
   : leaf_key(suite)
 {}
 
-UpdateProposal::UpdateProposal(const HPKEPublicKey& leaf_key_in)
+Update::Update(const HPKEPublicKey& leaf_key_in)
   : leaf_key(leaf_key_in)
 {}
 
-const ProposalType UpdateProposal::type = ProposalType::update;
+const ProposalType Update::type = ProposalType::update;
 
-RemoveProposal::RemoveProposal(CipherSuite suite) {}
+Remove::Remove(CipherSuite suite) {}
 
-RemoveProposal::RemoveProposal(LeafIndex removed_in)
+Remove::Remove(LeafIndex removed_in)
   : removed(removed_in)
 {}
 
-const ProposalType RemoveProposal::type = ProposalType::remove;
+const ProposalType Remove::type = ProposalType::remove;
 
 Proposal::Proposal(CipherSuite suite)
-  : parent(suite, RemoveProposal{ LeafIndex{ 0 } })
+  : parent(suite, Remove{ LeafIndex{ 0 } })
 {}
 
 // Commit
@@ -353,7 +292,6 @@ Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
 
 // MLSPlaintext
 
-const ContentType HandshakeData::type = ContentType::handshake;
 const ContentType ApplicationData::type = ContentType::application;
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
@@ -397,33 +335,18 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite,
   auto content_data = bytes(start, start + cut - sig_len);
 
   switch (content_type_in) {
-    case ContentType::handshake: {
-      auto& operation = content.emplace<HandshakeData>(suite);
-      tls::unmarshal(content_data, operation);
-      break;
-    }
-
     case ContentType::application: {
       auto& application_data = content.emplace<ApplicationData>();
       tls::unmarshal(content_data, application_data);
       break;
     }
 
+      // TODO decode content for Proposal and Commit
+
     default:
       throw InvalidParameterError("Unknown content type");
   }
 }
-
-MLSPlaintext::MLSPlaintext(bytes group_id_in,
-                           epoch_t epoch_in,
-                           LeafIndex sender_in,
-                           const GroupOperation& operation_in)
-  : CipherAware(operation_in.cipher_suite())
-  , group_id(std::move(group_id_in))
-  , epoch(epoch_in)
-  , sender(sender_in)
-  , content(operation_in.cipher_suite(), HandshakeData{ operation_in, {} })
-{}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -469,11 +392,10 @@ bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   bytes marshaled;
-  if (content.inner_type() == ContentType::handshake) {
-    marshaled = tls::marshal(std::get<HandshakeData>(content));
-  } else if (content.inner_type() == ContentType::application) {
+  if (content.inner_type() == ContentType::application) {
     marshaled = tls::marshal(std::get<ApplicationData>(content));
   } else {
+    // TODO Marshal content for proposal / commit
     throw InvalidParameterError("Unknown content type");
   }
 
@@ -484,42 +406,12 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   return marshaled;
 }
 
-// struct {
-//   opaque group_id<0..255>;
-//   uint32 epoch;
-//   uint32 sender;
-//   ContentType content_type = handshake;
-//   GroupOperation operation;
-// } MLSPlaintextOpContent;
-bytes
-MLSPlaintext::op_content() const
-{
-  auto& handshake_data = std::get<HandshakeData>(content);
-  tls::ostream w;
-  w << group_id << epoch << sender << content.inner_type()
-    << handshake_data.operation;
-  return w.bytes();
-}
-
 bytes
 MLSPlaintext::commit_content() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
   w << group_id << epoch << sender << commit_data.commit;
-  return w.bytes();
-}
-
-// struct {
-//   opaque confirmation<0..255>;
-//   opaque signature<0..2^16-1>;
-// } MLSPlaintextOpAuthData;
-bytes
-MLSPlaintext::auth_data() const
-{
-  auto& handshake_data = std::get<HandshakeData>(content);
-  tls::ostream w;
-  w << handshake_data.confirmation << signature;
   return w.bytes();
 }
 

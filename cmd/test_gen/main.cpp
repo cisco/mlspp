@@ -363,17 +363,17 @@ generate_messages()
     welcome.encrypted_group_info = tv.random;
 
     // Construct Proposals
-    auto add_prop = Proposal{ AddProposal{ client_init_key } };
+    auto add_prop = Proposal{ Add{ client_init_key } };
     auto add_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
 
-    auto update_prop = Proposal{ UpdateProposal{ dh_key } };
+    auto update_prop = Proposal{ Update{ dh_key } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
 
-    auto remove_prop = Proposal{ RemoveProposal{ tv.signer_index } };
+    auto remove_prop = Proposal{ Remove{ tv.signer_index } };
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
     remove_hs.signature = tv.random;
@@ -387,28 +387,10 @@ generate_messages()
       direct_path,
     };
 
-    // Construct handshake messages
-    auto add_op = Add{ tv.removed, client_init_key };
-    auto update_op = Update{ direct_path };
-    auto remove_op = Remove{ tv.removed, direct_path };
-
-    auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
-    auto update =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
-    auto remove =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
-    add.signature = tv.random;
-    update.signature = tv.random;
-    remove.signature = tv.random;
-
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
-      tv.group_id,
-      tv.epoch,
-      ContentType::handshake, // XXX(rlb@ipv.sx): Make a parameter
-      tv.random,
-      tv.random,
-      tv.random,
+      tv.group_id, tv.epoch,  ContentType::application,
+      tv.random,   tv.random, tv.random,
     };
 
     *cases[i] = {
@@ -419,9 +401,6 @@ generate_messages()
       tls::marshal(key_package),
       tls::marshal(encrypted_key_package),
       tls::marshal(welcome),
-      tls::marshal(add),
-      tls::marshal(update),
-      tls::marshal(remove),
       tls::marshal(add_hs),
       tls::marshal(update_hs),
       tls::marshal(remove_hs),
@@ -431,6 +410,13 @@ generate_messages()
   }
 
   return tv;
+}
+
+bytes
+pseudo_random(CipherSuite suite, int seq)
+{
+  auto seq_data = tls::marshal(uint32_t(seq));
+  return Digest(suite).write(seq_data).digest();
 }
 
 BasicSessionTestVectors
@@ -461,18 +447,16 @@ generate_basic_session()
     auto suite = suites[i];
     auto scheme = schemes[i];
     const bytes client_init_key_id = { 0, 1, 2, 3 };
+    const bytes group_init_secret = { 4, 5, 6, 7 };
 
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
     std::vector<ClientInitKey> client_init_keys;
     std::vector<TestSession> sessions;
-    std::vector<bytes> seeds;
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
-      bytes seed = { uint8_t(j), 0 };
-      seeds.push_back(seed);
-
+      auto seed = bytes{ uint8_t(j), 0 };
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       auto init = HPKEPrivateKey::derive(suite, seed);
@@ -481,16 +465,20 @@ generate_basic_session()
 
     // Add everyone
     for (size_t j = 1; j < tv.group_size; ++j) {
+      auto commit_secret = pseudo_random(suite, transcript.size());
+
       Welcome welcome;
       bytes add;
       if (j == 1) {
-        auto session_welcome_add = Session::start(
-          tv.group_id, { client_init_keys[0] }, { client_init_keys[1] });
-        sessions.push_back(std::get<0>(session_welcome_add));
-        welcome = std::get<1>(session_welcome_add);
-        add = std::get<2>(session_welcome_add);
+        auto [session, welcome_new] = Session::start(tv.group_id,
+                                                     { client_init_keys[0] },
+                                                     { client_init_keys[1] },
+                                                     commit_secret);
+        sessions.push_back(session);
+        welcome = welcome_new;
       } else {
-        std::tie(welcome, add) = sessions[j - 1].add(client_init_keys[j]);
+        std::tie(welcome, add) =
+          sessions[j - 1].add(commit_secret, client_init_keys[j]);
         for (size_t k = 0; k < j; ++k) {
           sessions[k].handle(add);
         }
@@ -499,24 +487,24 @@ generate_basic_session()
       auto joiner = Session::join({ client_init_keys[j] }, welcome);
       sessions.push_back(joiner);
 
-      transcript.emplace_back(welcome, add, sessions[0]);
+      transcript.emplace_back(welcome, add, commit_secret, sessions[0]);
     }
 
     // Update everyone (L->R)
     for (size_t j = 0; j < tv.group_size; ++j) {
-      seeds[j][1] += 1;
-      auto update = sessions[j].update(seeds[j]);
+      auto commit_secret = pseudo_random(suite, transcript.size());
+      auto update = sessions[j].update(commit_secret);
       for (auto& session : sessions) {
         session.handle(update);
       }
 
-      transcript.emplace_back(std::nullopt, update, sessions[0]);
+      transcript.emplace_back(std::nullopt, update, commit_secret, sessions[0]);
     }
 
     // Remove everyone (R->L)
     for (int j = tv.group_size - 2; j >= 0; --j) {
-      seeds[j][1] += 1;
-      auto remove = sessions[j].remove(seeds[j], j + 1);
+      auto commit_secret = pseudo_random(suite, transcript.size());
+      auto remove = sessions[j].remove(commit_secret, j + 1);
       for (int k = 0; k <= j; ++k) {
         sessions[k].handle(remove);
       }
@@ -527,7 +515,7 @@ generate_basic_session()
         }
       }
 
-      transcript.emplace_back(std::nullopt, remove, sessions[0]);
+      transcript.emplace_back(std::nullopt, remove, commit_secret, sessions[0]);
     }
 
     // Construct the test case

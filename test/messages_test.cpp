@@ -103,19 +103,19 @@ protected:
     tls_round_trip(tc.welcome, welcome, true);
 
     // Proposals
-    auto add_prop = Proposal{ AddProposal{ client_init_key } };
+    auto add_prop = Proposal{ Add{ client_init_key } };
     auto add_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
     tls_round_trip(tc.add_proposal, add_hs, true, tc.cipher_suite);
 
-    auto update_prop = Proposal{ UpdateProposal{ dh_key } };
+    auto update_prop = Proposal{ Update{ dh_key } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
     tls_round_trip(tc.update_proposal, update_hs, true, tc.cipher_suite);
 
-    auto remove_prop = Proposal{ RemoveProposal{ tv.signer_index } };
+    auto remove_prop = Proposal{ Remove{ tv.signer_index } };
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
     remove_hs.signature = tv.random;
@@ -131,27 +131,9 @@ protected:
     };
     tls_round_trip(tc.commit, commit, true, tc.cipher_suite);
 
-    // Handshake messages
-    auto add_op = Add{ tv.removed, client_init_key };
-    auto add = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
-    add.signature = tv.random;
-    tls_round_trip(tc.add, add, reproducible, tc.cipher_suite);
-
-    auto update_op = Update{ direct_path };
-    auto update =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
-    update.signature = tv.random;
-    tls_round_trip(tc.update, update, reproducible, tc.cipher_suite);
-
-    Remove remove_op{ tv.removed, direct_path };
-    auto remove =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
-    remove.signature = tv.random;
-    tls_round_trip(tc.remove, remove, reproducible, tc.cipher_suite);
-
     // MLSCiphertext
     MLSCiphertext ciphertext{
-      tv.group_id, tv.epoch,  ContentType::handshake,
+      tv.group_id, tv.epoch,  ContentType::application,
       tv.random,   tv.random, tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);

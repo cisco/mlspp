@@ -81,10 +81,8 @@ main()
   // Alice starts a session with Bob
   auto cikA = alice.temp_cik();
   auto group_id = bytes{ 0, 1, 2, 3 };
-  auto session_welcome_add = Session::start(group_id, { cikA }, { cikB });
-  auto sessionA = std::get<0>(session_welcome_add);
-  auto welcome = std::get<1>(session_welcome_add);
-  auto add = std::get<2>(session_welcome_add);
+  auto [sessionA, welcome] =
+    Session::start(group_id, { cikA }, { cikB }, random_bytes(32));
 
   // Bob looks up her CIK based on the welcome, and initializes
   // her session
@@ -99,7 +97,8 @@ main()
   auto cikC1 = charlie.fresh_cik();
 
   // Alice adds Charlie to the session
-  std::tie(welcome, add) = sessionA.add(cikC1);
+  bytes add;
+  std::tie(welcome, add) = sessionA.add(random_bytes(32), cikC1);
 
   // Charlie initializes his session
   auto sessionC = Session::join(charlie.ciks(), welcome);

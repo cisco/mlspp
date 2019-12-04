@@ -89,41 +89,20 @@ public:
 
   // Negotiate an initial state with another peer based on their
   // ClientInitKey
-  static std::tuple<Welcome, MLSPlaintext, State> negotiate(
+  static std::tuple<Welcome, State> negotiate(
     const bytes& group_id,
     const std::vector<ClientInitKey>& my_client_init_keys,
-    const std::vector<ClientInitKey>& client_init_keys);
+    const std::vector<ClientInitKey>& client_init_keys,
+    const bytes& commit_secret);
 
   ///
   /// Message factories
   ///
 
-  // Generate a Add message
-  std::tuple<Welcome, MLSPlaintext, State> add(
-    const ClientInitKey& client_init_key) const;
+  MLSPlaintext add(const ClientInitKey& client_init_key) const;
+  MLSPlaintext update(const bytes& leaf_secret);
+  MLSPlaintext remove(LeafIndex removed) const;
 
-  // Generate an Add message at a specific location
-  std::tuple<Welcome, MLSPlaintext, State> add(
-    LeafIndex index,
-    const ClientInitKey& client_init_key) const;
-
-  // Generate an Update message (for post-compromise security)
-  std::tuple<MLSPlaintext, State> update(const bytes& leaf_secret) const;
-
-  // Generate a Remove message (to remove another participant)
-  std::tuple<MLSPlaintext, State> remove(const bytes& leaf_secret,
-                                         LeafIndex index) const;
-
-  // Generate an Add proposal
-  MLSPlaintext propose_add(const ClientInitKey& client_init_key) const;
-
-  // Generate an Update proposal
-  MLSPlaintext propose_update(const bytes& leaf_secret);
-
-  // Generate a Remove proposal
-  MLSPlaintext propose_remove(LeafIndex removed) const;
-
-  // Generate a Commit
   std::tuple<MLSPlaintext, Welcome, State> commit(const bytes& leaf_secret) const;
 
   ///
@@ -204,39 +183,18 @@ private:
   // Ratchet the key schedule forward and sign the commit that caused the
   // transition
   MLSPlaintext
-  ratchet_and_sign_commit(const Commit& op, const bytes& update_secret);
-
-  // Ratchet the key schedule forward and sign the operation that
-  // caused the transition
-  MLSPlaintext ratchet_and_sign(const GroupOperation& op,
-                                const bytes& update_secret);
+  ratchet_and_sign(const Commit& op, const bytes& update_secret);
 
   // Create an MLSPlaintext with a signature over some content
-  MLSPlaintext sign_proposal(const Proposal& proposal) const;
+  MLSPlaintext sign(const Proposal& proposal) const;
 
-  // Handle an Add (for existing participants only)
-  bytes handle(LeafIndex sender, const Add& add);
-
-  // Handle an Update (for the participant that sent the update)
-  bytes handle(LeafIndex sender, const Update& update);
-
-  // Handle a Remove (for the remaining participants, obviously)
-  bytes handle(LeafIndex sender, const Remove& remove);
-
-  // Handle a Handshake message
-  State handle_handshake(const MLSPlaintext& handshake) const;
-
-  // Apply an Add
-  void apply(const AddProposal& add);
-
-  // Apply an Update
-  void apply(LeafIndex target, const UpdateProposal& update);
-
-  // Apply a self-Update
+  // Apply the changes requested by various messages
+  void apply(const Add& add);
+  void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const bytes& leaf_secret);
-
-  // Apply a Remove
-  void apply(const RemoveProposal& remove);
+  void apply(const Remove& remove);
+  void apply(const std::vector<ProposalID>& ids);
+  void apply(const Commit& commit);
 
   // Compute a proposal ID
   bytes proposal_id(const MLSPlaintext& pt) const;
@@ -244,26 +202,9 @@ private:
   // Extract a proposal from the cache
   std::optional<MLSPlaintext> find_proposal(const ProposalID& id);
 
-  // Apply a list of proposals, by ID
-  void apply(const std::vector<ProposalID>& ids);
-
-  // Apply a Commit
-  void apply(const Commit& commit);
-
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
-
-  // Construct the group context
-  GroupContext group_context() const;
-
-  // Add a new group operation into the transcript hash
-  void update_transcript_hash(const MLSPlaintext& plaintext);
-
-  // Inner logic shared by Update, self-Update, and Remove handlers
-  bytes update_leaf(LeafIndex index,
-                    const DirectPath& path,
-                    const std::optional<bytes>& leaf_secret);
 
   // Derive and set the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& update_secret);

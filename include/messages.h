@@ -197,87 +197,6 @@ bool operator==(const Welcome& lhs, const Welcome& rhs);
 tls::ostream& operator<<(tls::ostream& str, const Welcome& obj);
 tls::istream& operator>>(tls::istream& str, Welcome& obj);
 
-// enum { ... } GroupOperationType;
-enum class GroupOperationType : uint8_t
-{
-  none = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
-};
-
-// struct {
-//     uint32 index;
-//     ClientInitKey init_key;
-//     opaque welcome_info_hash<0..255>;
-// } Add;
-struct Add
-{
-public:
-  LeafIndex index;
-  ClientInitKey init_key;
-
-  Add() = default;
-  Add(CipherSuite suite) {}
-  Add(LeafIndex index, ClientInitKey init_key);
-
-  static const GroupOperationType type;
-  TLS_SERIALIZABLE(index, init_key)
-};
-
-// struct {
-//     DirectPath path;
-// } Update;
-struct Update : public CipherAware
-{
-public:
-  DirectPath path;
-
-  Update(CipherSuite suite);
-  Update(const DirectPath& path);
-
-  static const GroupOperationType type;
-  TLS_SERIALIZABLE(path);
-};
-
-// struct {
-//     uint32 removed;
-//     DirectPath path;
-// } Remove;
-struct Remove : public CipherAware
-{
-public:
-  LeafIndex removed;
-  DirectPath path;
-
-  Remove(CipherSuite suite);
-  Remove(LeafIndex removed, const DirectPath& path);
-
-  static const GroupOperationType type;
-  TLS_SERIALIZABLE(removed, path);
-};
-
-// Container class for all operations
-//
-// struct {
-//     GroupOperationType msg_type;
-//     select (GroupOperation.msg_type) {
-//         case init:      Init;
-//         case add:       Add;
-//         case update:    Update;
-//         case remove:    Remove;
-//     };
-// } GroupOperation;
-struct GroupOperation : public CipherAware,
-                        public tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>
-{
-  using InnerOp = tls::variant_variant<GroupOperationType, CipherSuite, Add, Update, Remove>;
-  GroupOperation(CipherSuite suite);
-  GroupOperation(const Add& add);
-  GroupOperation(const Update& update);
-  GroupOperation(const Remove& remove);
-};
-
 ///
 /// Proposals & Commit
 ///
@@ -289,31 +208,31 @@ enum struct ProposalType : uint8_t {
   remove = 3,
 };
 
-struct AddProposal {
+struct Add {
   ClientInitKey client_init_key;
 
-  AddProposal(CipherSuite suite);
-  AddProposal(const ClientInitKey& client_init_key_in);
+  Add(CipherSuite suite);
+  Add(const ClientInitKey& client_init_key_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(client_init_key)
 };
 
-struct UpdateProposal {
+struct Update {
   HPKEPublicKey leaf_key;
 
-  UpdateProposal(CipherSuite suite);
-  UpdateProposal(const HPKEPublicKey& leaf_key_in);
+  Update(CipherSuite suite);
+  Update(const HPKEPublicKey& leaf_key_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(leaf_key)
 };
 
-struct RemoveProposal {
+struct Remove {
   LeafIndex removed;
 
-  RemoveProposal(CipherSuite suite);
-  RemoveProposal(LeafIndex removed_in);
+  Remove(CipherSuite suite);
+  Remove(LeafIndex removed_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(removed)
@@ -328,15 +247,14 @@ struct RemoveProposal {
 enum struct ContentType : uint8_t
 {
   invalid = 0,
-  handshake = 1,
-  application = 2,
-  proposal = 3,
-  commit = 4,
+  application = 1,
+  proposal = 2,
+  commit = 3,
 };
 
-struct Proposal : public tls::variant_variant<ProposalType, CipherSuite, AddProposal, UpdateProposal, RemoveProposal>
+struct Proposal : public tls::variant_variant<ProposalType, CipherSuite, Add, Update, Remove>
 {
-  using parent = tls::variant_variant<ProposalType, CipherSuite, AddProposal, UpdateProposal, RemoveProposal>;
+  using parent = tls::variant_variant<ProposalType, CipherSuite, Add, Update, Remove>;
   using parent::parent;
 
   Proposal(CipherSuite suite);
@@ -386,25 +304,6 @@ struct Commit {
 //
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
-struct HandshakeData
-{
-  GroupOperation operation;
-  tls::opaque<1> confirmation;
-
-  HandshakeData(CipherSuite suite)
-    : operation(suite)
-  {}
-
-  HandshakeData(const GroupOperation& operation_in,
-                const bytes& confirmation_in)
-    : operation(operation_in)
-    , confirmation(confirmation_in)
-  {}
-
-  static const ContentType type;
-  TLS_SERIALIZABLE(operation, confirmation);
-};
-
 struct ApplicationData : tls::opaque<4>
 {
   using parent = tls::opaque<4>;
@@ -439,7 +338,7 @@ struct MLSPlaintext : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
-  tls::variant_variant<ContentType, CipherSuite, HandshakeData, ApplicationData, Proposal, CommitData> content;
+  tls::variant_variant<ContentType, CipherSuite, ApplicationData, Proposal, CommitData> content;
   tls::opaque<2> signature;
 
   // Constructor for unmarshaling directly
@@ -454,10 +353,6 @@ struct MLSPlaintext : public CipherAware
                bytes content);
 
   // Constructors for encrypting
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               LeafIndex sender,
-               const GroupOperation& operation);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
@@ -477,9 +372,7 @@ struct MLSPlaintext : public CipherAware
 
   bytes marshal_content(size_t padding_size) const;
 
-  bytes op_content() const;
   bytes commit_content() const;
-  bytes auth_data() const;
   bytes commit_auth_data() const;
 
   TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);

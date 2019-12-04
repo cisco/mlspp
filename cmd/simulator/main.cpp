@@ -167,14 +167,14 @@ public:
     auto group_id = random();
     auto cik0 = fresh_client_init_key();
     auto cik1 = fresh_client_init_key();
-    auto [session0, welcome1, add1] =
-      mls::Session::start(group_id, { cik0 }, { cik1 });
+    auto [session0, welcome1] =
+      mls::Session::start(group_id, { cik0 }, { cik1 }, random());
     auto session1 = mls::Session::join({ cik1 }, welcome1);
 
     sessions = { session0, session1 };
     while (sessions.size() < initial_size) {
       auto cik = fresh_client_init_key();
-      auto [welcome, add] = sessions[0].value().add(cik);
+      auto [welcome, add] = sessions[0].value().add(random(), cik);
       broadcast(add);
       sessions.emplace_back(mls::Session::join({ cik }, welcome));
     }
@@ -190,7 +190,7 @@ public:
     auto cik = fresh_client_init_key();
 
     mls::CryptoMetrics::reset();
-    auto [welcome, add] = sessions[by].value().add(cik);
+    auto [welcome, add] = sessions[by].value().add(random(), cik);
     report.sender = mls::CryptoMetrics::snapshot();
     report.receivers = broadcast(add);
 

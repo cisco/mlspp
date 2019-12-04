@@ -81,7 +81,7 @@ TEST_F(StateTest, TwoPerson)
   auto first0 = State{ group_id, suite, init_privs[0], credentials[0] };
 
   // Create an Add proposal for the new participant
-  auto add = first0.propose_add(client_init_keys[1]);
+  auto add = first0.add(client_init_keys[1]);
 
   // Handle the Add proposal and create a Commit
   first0.handle(add);
@@ -104,7 +104,7 @@ TEST_F(StateTest, Multi)
 
   // Create and process an Add proposal for each new participant
   for (size_t i = 1; i < group_size; i += 1) {
-    auto add = states[0].propose_add(client_init_keys[i]);
+    auto add = states[0].add(client_init_keys[i]);
     states[0].handle(add);
   }
 
@@ -137,7 +137,7 @@ TEST_F(StateTest, FullSize)
   for (size_t i = 1; i < group_size; i += 1) {
     auto sender = i - 1;
 
-    auto add = states[sender].propose_add(client_init_keys[i]);
+    auto add = states[sender].add(client_init_keys[i]);
     states[sender].handle(add);
 
     auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
@@ -180,7 +180,7 @@ protected:
     states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
-      auto add = states[0].propose_add(client_init_keys[i]);
+      auto add = states[0].add(client_init_keys[i]);
       states[0].handle(add);
     }
 
@@ -206,7 +206,7 @@ TEST_F(RunningGroupTest, Update)
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = fresh_secret();
-    auto update = states[i].propose_update(new_leaf);
+    auto update = states[i].update(new_leaf);
     states[i].handle(update);
     auto [commit, welcome, new_state] = states[i].commit(new_leaf);
 
@@ -226,7 +226,7 @@ TEST_F(RunningGroupTest, Update)
 TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
-    auto remove = states[i].propose_remove(LeafIndex{ uint32_t(i + 1) });
+    auto remove = states[i].remove(LeafIndex{ uint32_t(i + 1) });
     states[i].handle(remove);
     auto [commit, welcome, new_state] = states[i].commit(fresh_secret());
 
@@ -244,7 +244,7 @@ TEST_F(RunningGroupTest, Remove)
   }
 }
 
-TEST(OtherStateTest, CipherNegotiation)
+TEST_F(StateTest, CipherNegotiation)
 {
   auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
 
@@ -274,13 +274,11 @@ TEST(OtherStateTest, CipherNegotiation)
   }
 
   // Bob should choose P-256
-  auto initialB = State::negotiate(group_id, ciksB, ciksA);
-  auto stateB = std::get<2>(initialB);
+  auto [welcome, stateB] =
+    State::negotiate(group_id, ciksB, ciksA, fresh_secret());
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
-  auto welcome = std::get<0>(initialB);
-  auto add = std::get<1>(initialB);
   auto stateA = State(ciksA, welcome);
   ASSERT_EQ(stateA, stateB);
 }
