@@ -84,8 +84,8 @@ main()
   auto [sessionA, welcome] =
     Session::start(group_id, { cikA }, { cikB }, random_bytes(32));
 
-  // Bob looks up her CIK based on the welcome, and initializes
-  // her session
+  // Bob looks up his CIK based on the welcome, and initializes
+  // his session
   auto sessionB = Session::join(bob.ciks(), welcome);
 
   // Alice and Bob should now be on the same page
