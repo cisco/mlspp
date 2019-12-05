@@ -278,10 +278,10 @@ struct Commit {
   DirectPath path;
 
   Commit(CipherSuite suite);
-  Commit(tls::vector<ProposalID, 2> updates_in,
-         tls::vector<ProposalID, 2> removes_in,
-         tls::vector<ProposalID, 2> adds_in,
-         tls::vector<ProposalID, 2> ignored_in,
+  Commit(const tls::vector<ProposalID, 2>& updates_in,
+         const tls::vector<ProposalID, 2>& removes_in,
+         const tls::vector<ProposalID, 2>& adds_in,
+         const tls::vector<ProposalID, 2>& ignored_in,
          DirectPath path_in);
 
   TLS_SERIALIZABLE(updates, removes, adds, ignored, path);

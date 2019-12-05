@@ -213,6 +213,7 @@ State::negotiate(const bytes& group_id,
   auto add = state.add(*other_selected_cik);
   state.handle(add);
   auto [commit, welcome, new_state] = state.commit(commit_secret);
+  commit; // To silence -Werror=unused-variable
 
   return std::make_tuple(welcome, new_state);
 }
@@ -279,7 +280,7 @@ State::commit(const bytes& leaf_secret) const
         break;
 
       default:
-        // TODO ignore some proposals:
+        // TODO(rlb) ignore some proposals:
         // * Update after Update
         // * Update after Remove
         // * Remove after Remove
@@ -293,7 +294,7 @@ State::commit(const bytes& leaf_secret) const
   next._pending_proposals.clear();
 
   // Start a GroupInfo with the prepared state
-  auto prev_init_secret = next._init_secret;
+  auto prev_init_secret = bytes(next._init_secret);
   auto group_info = GroupInfo(_suite);
   group_info.group_id = next._group_id;
   group_info.epoch = next._epoch + 1;
@@ -556,7 +557,7 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Unprotect of non-application message");
   }
 
-  return std::get<ApplicationData>(pt.content);
+  return bytes(std::get<ApplicationData>(pt.content));
 }
 
 ///
@@ -704,7 +705,7 @@ State::encrypt(const MLSPlaintext& pt)
   // Pull from the key schedule
   KeyChain::Generation keys;
   switch (pt.content.inner_type()) {
-    // TODO: Enable encryption of Proposal / Commit messages
+    // TODO(rlb) Enable encryption of Proposal / Commit messages
     case ContentType::application:
       keys = _application_keys.next();
       break;
@@ -782,7 +783,7 @@ State::decrypt(const MLSCiphertext& ct)
   // Pull from the key schedule
   KeyChain::Generation keys;
   switch (ct.content_type) {
-    // TODO: Enable decryption of proposal / commit
+    // TODO(rlb) Enable decryption of proposal / commit
     case ContentType::application:
       keys = _application_keys.get(sender, generation);
       break;

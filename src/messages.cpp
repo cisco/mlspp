@@ -282,15 +282,15 @@ Commit::Commit(CipherSuite suite)
   : path(suite)
 {}
 
-Commit::Commit(tls::vector<ProposalID, 2> updates_in,
-               tls::vector<ProposalID, 2> removes_in,
-               tls::vector<ProposalID, 2> adds_in,
-               tls::vector<ProposalID, 2> ignored_in,
+Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
+               const tls::vector<ProposalID, 2>& removes_in,
+               const tls::vector<ProposalID, 2>& adds_in,
+               const tls::vector<ProposalID, 2>& ignored_in,
                DirectPath path_in)
-  : updates(std::move(updates_in))
-  , removes(std::move(removes_in))
-  , adds(std::move(adds_in))
-  , ignored(std::move(ignored_in))
+  : updates(updates_in)
+  , removes(removes_in)
+  , adds(adds_in)
+  , ignored(ignored_in)
   , path(std::move(path_in))
 {}
 
