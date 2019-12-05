@@ -249,11 +249,6 @@ TEST_F(RunningSessionTest, FullLifeCycle)
   }
 }
 
-/*
-
-// XXX: This test is currently disabled so that we can make progress on other
-// things.
-
 class SessionInteropTest : public ::testing::Test
 {
 protected:
@@ -285,12 +280,12 @@ protected:
         Session::start(basic_tv.group_id,
                        { my_client_init_key },
                        { tc.client_init_keys[1] },
-                       tc.transcript[0].commit_secret);
+                       tc.transcript.at(0).commit_secret);
       session = session_init;
       curr = 1;
     } else {
       // Member i>0 is initialized with a welcome on step i-1
-      auto& epoch = tc.transcript[index - 1];
+      auto& epoch = tc.transcript.at(index - 1);
       session = Session::join({ my_client_init_key }, epoch.welcome.value());
       assert_consistency(*session, epoch);
       curr = index;
@@ -298,16 +293,13 @@ protected:
 
     // Process the adds after join
     for (; curr < basic_tv.group_size - 1; curr += 1) {
-      auto& epoch = tc.transcript[curr];
+      auto& epoch = tc.transcript.at(curr);
 
       // Generate an add to cache the next state
       if (curr == index) {
         auto [welcome, add] =
           session->add(epoch.commit_secret, tc.client_init_keys[curr + 1]);
-        std::cout << "comp " << add << std::endl;
       }
-
-      std::cout << "vec  " << epoch.handshake;
 
       session->handle(epoch.handshake);
       assert_consistency(*session, epoch);
@@ -315,7 +307,7 @@ protected:
 
     // Process updates
     for (size_t i = 0; i < basic_tv.group_size; ++i, ++curr) {
-      auto& epoch = tc.transcript[curr];
+      auto& epoch = tc.transcript.at(curr);
 
       // Generate an update to cache next state
       if (i == index) {
@@ -328,7 +320,7 @@ protected:
 
     // Process removes until this member has been removed
     for (int sender = basic_tv.group_size - 2; sender >= 0; --sender, ++curr) {
-      auto& epoch = tc.transcript[curr];
+      auto& epoch = tc.transcript.at(curr);
       if (int(index) > sender) {
         break;
       }
@@ -377,4 +369,3 @@ TEST_F(SessionInteropTest, BasicX25519)
              SignatureScheme::Ed25519,
              basic_tv.case_x25519_ed25519);
 }
-*/

@@ -348,6 +348,7 @@ struct SessionTestVectors
 
     TLS_SERIALIZABLE(welcome,
                      handshake,
+                     commit_secret,
                      epoch,
                      epoch_secret,
                      application_secret,

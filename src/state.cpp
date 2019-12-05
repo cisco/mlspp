@@ -1,7 +1,5 @@
 #include "state.h"
 
-#include <iostream>
-
 #define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
 
 namespace mls {
