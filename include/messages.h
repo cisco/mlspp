@@ -75,7 +75,7 @@ struct ClientInitKey
 
   ClientInitKey();
   ClientInitKey(const HPKEPrivateKey& init_key_in,
-                const Credential& credential_in);
+                Credential credential_in);
 
   const std::optional<HPKEPrivateKey>& private_key() const;
   bytes hash() const;
@@ -120,13 +120,13 @@ struct GroupInfo {
   tls::opaque<2> signature;
 
   GroupInfo(CipherSuite suite);
-  GroupInfo(const bytes& group_id_in,
+  GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
-            const RatchetTree tree_in,
-            const bytes& confirmed_transcript_hash_in,
-            const bytes& interim_transcript_hash_in,
-            const DirectPath& path_in,
-            const bytes& confirmation_in);
+            RatchetTree tree_in,
+            bytes confirmed_transcript_hash_in,
+            bytes interim_transcript_hash_in,
+            DirectPath path_in,
+            bytes confirmation_in);
 
   bytes to_be_signed() const;
   void sign(LeafIndex index, const SignaturePrivateKey& priv);
@@ -163,7 +163,7 @@ struct EncryptedKeyPackage {
   HPKECiphertext encrypted_key_package;
 
   EncryptedKeyPackage(CipherSuite suite);
-  EncryptedKeyPackage(const bytes& hash, const HPKECiphertext& package);
+  EncryptedKeyPackage(bytes hash, HPKECiphertext package);
 
   TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
 };
@@ -183,10 +183,10 @@ struct Welcome {
 
   Welcome();
   Welcome(CipherSuite suite,
-          const bytes& init_secret,
+          bytes init_secret,
           const GroupInfo& group_info);
 
-  std::tuple<bytes, bytes> group_info_keymat(const bytes& epoch_secret) const;
+  std::tuple<bytes, bytes> group_info_keymat(const bytes& init_secret) const;
   void encrypt(const ClientInitKey& cik);
 
   private:
@@ -212,7 +212,7 @@ struct Add {
   ClientInitKey client_init_key;
 
   Add(CipherSuite suite);
-  Add(const ClientInitKey& client_init_key_in);
+  Add(ClientInitKey client_init_key_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(client_init_key)
@@ -222,7 +222,7 @@ struct Update {
   HPKEPublicKey leaf_key;
 
   Update(CipherSuite suite);
-  Update(const HPKEPublicKey& leaf_key_in);
+  Update(HPKEPublicKey leaf_key_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(leaf_key)
@@ -278,11 +278,11 @@ struct Commit {
   DirectPath path;
 
   Commit(CipherSuite suite);
-  Commit(const tls::vector<ProposalID, 2>& updates_in,
-         const tls::vector<ProposalID, 2>& removes_in,
-         const tls::vector<ProposalID, 2>& adds_in,
-         const tls::vector<ProposalID, 2>& ignored_in,
-         const DirectPath& path_in);
+  Commit(tls::vector<ProposalID, 2> updates_in,
+         tls::vector<ProposalID, 2> removes_in,
+         tls::vector<ProposalID, 2> adds_in,
+         tls::vector<ProposalID, 2> ignored_in,
+         DirectPath path_in);
 
   TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
 };

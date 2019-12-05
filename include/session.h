@@ -20,7 +20,7 @@ public:
   static Session join(const std::vector<ClientInitKey>& client_init_keys,
                       const Welcome& welcome);
 
-  std::pair<Welcome, bytes> add(const bytes& add_secret, const ClientInitKey& client_init_key);
+  std::tuple<Welcome, bytes> add(const bytes& add_secret, const ClientInitKey& client_init_key);
   bytes update(const bytes& leaf_secret);
   bytes remove(const bytes& evict_secret, uint32_t index);
 

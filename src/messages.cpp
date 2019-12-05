@@ -35,11 +35,11 @@ ClientInitKey::ClientInitKey()
 {}
 
 ClientInitKey::ClientInitKey(const HPKEPrivateKey& init_key_in,
-                             const Credential& credential_in)
+                             Credential credential_in)
   : version(ProtocolVersion::mls10)
   , cipher_suite(init_key_in.cipher_suite())
   , init_key(init_key_in.public_key())
-  , credential(credential_in)
+  , credential(std::move(credential_in))
   , _private_key(init_key_in)
 {
   if (!credential.private_key().has_value()) {
@@ -113,24 +113,25 @@ operator>>(tls::istream& str, ClientInitKey& obj)
 // GroupInfo
 
 GroupInfo::GroupInfo(CipherSuite suite)
-  : tree(suite)
+  : epoch(0)
+  , tree(suite)
   , path(suite)
 {}
 
-GroupInfo::GroupInfo(const bytes& group_id_in,
+GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
-                     const RatchetTree tree_in,
-                     const bytes& confirmed_transcript_hash_in,
-                     const bytes& interim_transcript_hash_in,
-                     const DirectPath& path_in,
-                     const bytes& confirmation_in)
-  : group_id(group_id_in)
+                     RatchetTree tree_in,
+                     bytes confirmed_transcript_hash_in,
+                     bytes interim_transcript_hash_in,
+                     DirectPath path_in,
+                     bytes confirmation_in)
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , tree(tree_in)
-  , confirmed_transcript_hash(confirmed_transcript_hash_in)
-  , interim_transcript_hash(interim_transcript_hash_in)
-  , path(path_in)
-  , confirmation(confirmation_in)
+  , tree(std::move(tree_in))
+  , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
+  , interim_transcript_hash(std::move(interim_transcript_hash_in))
+  , path(std::move(path_in))
+  , confirmation(std::move(confirmation_in))
 {}
 
 bytes
@@ -167,25 +168,26 @@ EncryptedKeyPackage::EncryptedKeyPackage(CipherSuite suite)
   : encrypted_key_package(suite)
 {}
 
-EncryptedKeyPackage::EncryptedKeyPackage(const bytes& hash,
-                                         const HPKECiphertext& package)
-  : client_init_key_hash(hash)
-  , encrypted_key_package(package)
+EncryptedKeyPackage::EncryptedKeyPackage(bytes hash, HPKECiphertext package)
+  : client_init_key_hash(std::move(hash))
+  , encrypted_key_package(std::move(package))
 {}
 
 // Welcome
 
 Welcome::Welcome()
-  : key_packages(DUMMY_CIPHERSUITE)
+  : version(ProtocolVersion::mls10)
+  , cipher_suite(DUMMY_CIPHERSUITE)
+  , key_packages(DUMMY_CIPHERSUITE)
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 const bytes& init_secret,
+                 bytes init_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
   , key_packages(suite)
-  , _init_secret(init_secret)
+  , _init_secret(std::move(init_secret))
 {
   auto [key, nonce] = group_info_keymat(_init_secret);
   auto group_info_data = tls::marshal(group_info);
@@ -242,10 +244,11 @@ operator>>(tls::istream& str, Welcome& obj)
 
 // Proposals
 
+// NOLINTNEXTLINE(misc-unused-parameters)
 Add::Add(CipherSuite suite) {}
 
-Add::Add(const ClientInitKey& client_init_key_in)
-  : client_init_key(client_init_key_in)
+Add::Add(ClientInitKey client_init_key_in)
+  : client_init_key(std::move(client_init_key_in))
 {}
 
 const ProposalType Add::type = ProposalType::add;
@@ -254,12 +257,13 @@ Update::Update(CipherSuite suite)
   : leaf_key(suite)
 {}
 
-Update::Update(const HPKEPublicKey& leaf_key_in)
-  : leaf_key(leaf_key_in)
+Update::Update(HPKEPublicKey leaf_key_in)
+  : leaf_key(std::move(leaf_key_in))
 {}
 
 const ProposalType Update::type = ProposalType::update;
 
+// NOLINTNEXTLINE(misc-unused-parameters)
 Remove::Remove(CipherSuite suite) {}
 
 Remove::Remove(LeafIndex removed_in)
@@ -278,16 +282,16 @@ Commit::Commit(CipherSuite suite)
   : path(suite)
 {}
 
-Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
-               const tls::vector<ProposalID, 2>& removes_in,
-               const tls::vector<ProposalID, 2>& adds_in,
-               const tls::vector<ProposalID, 2>& ignored_in,
-               const DirectPath& path_in)
-  : updates(updates_in)
-  , removes(removes_in)
-  , adds(adds_in)
-  , ignored(ignored_in)
-  , path(path_in)
+Commit::Commit(tls::vector<ProposalID, 2> updates_in,
+               tls::vector<ProposalID, 2> removes_in,
+               tls::vector<ProposalID, 2> adds_in,
+               tls::vector<ProposalID, 2> ignored_in,
+               DirectPath path_in)
+  : updates(std::move(updates_in))
+  , removes(std::move(removes_in))
+  , adds(std::move(adds_in))
+  , ignored(std::move(ignored_in))
+  , path(std::move(path_in))
 {}
 
 // MLSPlaintext
@@ -341,7 +345,7 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite,
       break;
     }
 
-      // TODO decode content for Proposal and Commit
+      // TODO(rlb) decode content for Proposal and Commit
 
     default:
       throw InvalidParameterError("Unknown content type");
@@ -395,7 +399,7 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   if (content.inner_type() == ContentType::application) {
     marshaled = tls::marshal(std::get<ApplicationData>(content));
   } else {
-    // TODO Marshal content for proposal / commit
+    // TODO(398) Marshal content for proposal / commit
     throw InvalidParameterError("Unknown content type");
   }
 

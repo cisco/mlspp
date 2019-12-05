@@ -28,7 +28,7 @@ Session::join(const std::vector<ClientInitKey>& client_init_keys,
   return session;
 }
 
-std::pair<Welcome, bytes>
+std::tuple<Welcome, bytes>
 Session::add(const bytes& add_secret, const ClientInitKey& client_init_key)
 {
   auto proposal = current_state().add(client_init_key);
