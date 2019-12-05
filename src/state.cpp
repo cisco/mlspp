@@ -213,7 +213,7 @@ State::negotiate(const bytes& group_id,
   auto add = state.add(*other_selected_cik);
   state.handle(add);
   auto [commit, welcome, new_state] = state.commit(commit_secret);
-  commit; // To silence -Werror=unused-variable
+  (void)commit; // To silence -Werror=unused-variable
 
   return std::make_tuple(welcome, new_state);
 }
@@ -557,7 +557,7 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Unprotect of non-application message");
   }
 
-  return bytes(std::get<ApplicationData>(pt.content));
+  return static_cast<bytes>(std::get<ApplicationData>(pt.content));
 }
 
 ///
