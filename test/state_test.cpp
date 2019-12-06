@@ -86,6 +86,7 @@ TEST_F(StateTest, TwoPerson)
   // Handle the Add proposal and create a Commit
   first0.handle(add);
   auto [commit, welcome, first1] = first0.commit(fresh_secret());
+  silence_unused(commit);
 
   // Initialize the second participant from the Welcome
   auto second0 = State{ { client_init_keys[1] }, welcome };
@@ -110,6 +111,7 @@ TEST_F(StateTest, Multi)
 
   // Create a Commit that adds everybody
   auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+  silence_unused(commit);
   states[0] = new_state;
 
   // Initialize the new joiners from the welcome
@@ -185,6 +187,7 @@ protected:
     }
 
     auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+    silence_unused(welcome);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
@@ -229,6 +232,7 @@ TEST_F(RunningGroupTest, Remove)
     auto remove = states[i].remove(LeafIndex{ uint32_t(i + 1) });
     states[i].handle(remove);
     auto [commit, welcome, new_state] = states[i].commit(fresh_secret());
+    silence_unused(welcome);
 
     states.pop_back();
     for (auto& state : states) {
@@ -246,16 +250,14 @@ TEST_F(RunningGroupTest, Remove)
 
 TEST_F(StateTest, CipherNegotiation)
 {
-  auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
-
   // Alice supports P-256 and X25519
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
   std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<ClientInitKey> ciksA;
-  for (auto suite : ciphersA) {
-    auto init_key = HPKEPrivateKey::generate(suite);
+  for (auto suiteA : ciphersA) {
+    auto init_key = HPKEPrivateKey::generate(suiteA);
     ciksA.emplace_back(init_key, credA);
   }
 
@@ -268,8 +270,8 @@ TEST_F(StateTest, CipherNegotiation)
   std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<ClientInitKey> ciksB;
-  for (auto suite : ciphersB) {
-    auto init_key = HPKEPrivateKey::generate(suite);
+  for (auto suiteB : ciphersB) {
+    auto init_key = HPKEPrivateKey::generate(suiteB);
     ciksB.emplace_back(init_key, credB);
   }
 
