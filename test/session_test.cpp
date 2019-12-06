@@ -62,9 +62,9 @@ protected:
       auto my_cred = Credential::basic(user_id, id_priv);
       auto my_client_init_key = ClientInitKey{ my_init_key, my_cred };
 
-      auto init_secret = fresh_secret();
+      auto commit_secret = fresh_secret();
       auto [creator, welcome] = Session::start(
-        group_id, { my_client_init_key }, { client_init_key }, init_secret);
+        group_id, { my_client_init_key }, { client_init_key }, commit_secret);
       auto joiner = Session::join({ client_init_key }, welcome);
       sessions.push_back(creator);
       sessions.push_back(joiner);
@@ -147,8 +147,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<ClientInitKey> ciksA;
-  for (auto suite : ciphersA) {
-    auto init_key = HPKEPrivateKey::generate(suite);
+  for (auto suiteA : ciphersA) {
+    auto init_key = HPKEPrivateKey::generate(suiteA);
     ciksA.emplace_back(init_key, credA);
   }
 
@@ -158,8 +158,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<ClientInitKey> ciksB;
-  for (auto suite : ciphersB) {
-    auto init_key = HPKEPrivateKey::generate(suite);
+  for (auto suiteB : ciphersB) {
+    auto init_key = HPKEPrivateKey::generate(suiteB);
     ciksB.emplace_back(init_key, credB);
   }
 
@@ -276,11 +276,12 @@ protected:
     std::optional<Session> session;
     if (index == 0) {
       // Member 0 creates the group
-      auto [session_init, welcome] =
+      auto [session_init, unused_welcome] =
         Session::start(basic_tv.group_id,
                        { my_client_init_key },
                        { tc.client_init_keys[1] },
                        tc.transcript.at(0).commit_secret);
+      silence_unused(unused_welcome);
       session = session_init;
       curr = 1;
     } else {
@@ -297,6 +298,7 @@ protected:
 
       // Generate an add to cache the next state
       if (curr == index) {
+        silence_unused(unused_welcome);
         auto [welcome, add] =
           session->add(epoch.commit_secret, tc.client_init_keys[curr + 1]);
       }

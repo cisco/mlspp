@@ -212,8 +212,8 @@ State::negotiate(const bytes& group_id,
   auto state = State{ group_id, suite, leaf_priv, cred };
   auto add = state.add(*other_selected_cik);
   state.handle(add);
-  auto [commit, welcome, new_state] = state.commit(commit_secret);
-  (void)commit; // To silence -Werror=unused-variable
+  auto [unused_commit, welcome, new_state] = state.commit(commit_secret);
+  silence_unused(unused_commit);
 
   return std::make_tuple(welcome, new_state);
 }
@@ -557,6 +557,7 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Unprotect of non-application message");
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-slicing)
   return static_cast<bytes>(std::get<ApplicationData>(pt.content));
 }
 
