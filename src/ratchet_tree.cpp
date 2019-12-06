@@ -424,16 +424,82 @@ RatchetTree::blank_path(LeafIndex index)
     return;
   }
 
+  _nodes[NodeIndex{ index }] = std::nullopt;
+  blank_path_above(index);
+}
+
+void
+RatchetTree::blank_path_above(LeafIndex index)
+{
+  if (_nodes.empty()) {
+    return;
+  }
+
   const auto node_count = node_size();
   const auto root = root_index();
 
   auto curr = NodeIndex{ index };
+  curr = tree_math::parent(curr, node_count);
   while (curr != root) {
     _nodes[curr] = std::nullopt;
     curr = tree_math::parent(curr, node_count);
   }
 
   _nodes[root] = std::nullopt;
+  set_hash_path(index);
+}
+
+LeafIndex
+RatchetTree::leftmost_free() const
+{
+  auto curr = LeafIndex{ 0 };
+  while (occupied(curr) && curr.val < size()) {
+    curr.val += 1;
+  }
+
+  return curr;
+}
+
+void
+RatchetTree::set_leaf(LeafIndex index,
+                      const DHPublicKey& leaf_key,
+                      const Credential& credential)
+{
+  if (index.val == size()) {
+    if (!_nodes.empty()) {
+      _nodes.emplace_back(std::nullopt);
+    }
+    _nodes.emplace_back(std::nullopt);
+  }
+
+  auto node = NodeIndex{ index };
+  auto node_val = RatchetTreeNode(leaf_key);
+  node_val.set_credential(credential);
+
+  _nodes[node] = node_val;
+  set_hash_path(index);
+}
+
+void
+RatchetTree::set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key)
+{
+  auto curr = NodeIndex{ index };
+  if (!_nodes[curr].has_value()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+  _nodes[curr].value().merge(leaf_key);
+  set_hash_path(index);
+}
+
+void
+RatchetTree::set_leaf_secret(LeafIndex index, const bytes& leaf_secret)
+{
+  auto curr = NodeIndex{ index };
+  if (!_nodes[curr].has_value()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+
+  _nodes[curr].value().merge({ _suite, leaf_secret });
   set_hash_path(index);
 }
 
@@ -468,6 +534,26 @@ RatchetTree::set_path(LeafIndex index, const bytes& leaf)
 
   set_hash_path(index);
   return path_secret;
+}
+
+std::optional<LeafIndex>
+RatchetTree::find(const ClientInitKey& cik) const
+{
+  for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
+    auto& node = _nodes[NodeIndex(i)];
+
+    if (!node.has_value() || !node.value().credential().has_value()) {
+      continue;
+    }
+
+    auto hpke_match = (cik.init_key == node.value().public_key());
+    auto sig_match = (cik.credential == node.value().credential().value());
+    if (hpke_match && sig_match) {
+      return i;
+    }
+  }
+
+  return std::nullopt;
 }
 
 const Credential&
@@ -676,6 +762,22 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
   }
 
   return true;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const RatchetTree obj)
+{
+  out << "=== tree ===" << std::endl;
+  for (uint32_t i = 0; i < obj._nodes.size(); ++i) {
+    out << "    " << i << " ";
+    if (!obj._nodes[i].has_value()) {
+      out << "_";
+    } else {
+      out << obj._nodes[i].value().public_key().to_bytes();
+    }
+    out << " " << obj._nodes[i].hash() << std::endl;
+  }
+  return out;
 }
 
 tls::ostream&

@@ -123,4 +123,10 @@ public:
   using parent::parent;
 };
 
+// A slightly more elegant way to silence -Werror=unused-variable
+template<typename T>
+void silence_unused(const T& val) {
+  (void)val;
+}
+
 } // namespace mls

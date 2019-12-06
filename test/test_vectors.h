@@ -20,12 +20,9 @@ struct TreeMathTestVectors
   tls::vector<NodeIndex, 4> right;
   tls::vector<NodeIndex, 4> parent;
   tls::vector<NodeIndex, 4> sibling;
-};
 
-tls::istream&
-operator>>(tls::istream& str, TreeMathTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const TreeMathTestVectors& tv);
+  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling)
+};
 
 /////
 
@@ -41,12 +38,9 @@ struct ResolutionTestVectors
 
   LeafCount n_leaves;
   tls::vector<ResolutionCase, 4> cases;
-};
 
-tls::istream&
-operator>>(tls::istream& str, ResolutionTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const ResolutionTestVectors& tv);
+  TLS_SERIALIZABLE(n_leaves, cases)
+};
 
 /////
 
@@ -83,6 +77,11 @@ struct CryptoTestVectors
       : derive_key_pair_pub(suite)
       , ecies_out(suite)
     {}
+
+    TLS_SERIALIZABLE(hkdf_extract_out,
+                     derive_secret_out,
+                     derive_key_pair_pub,
+                     ecies_out)
   };
 
   CryptoTestVectors()
@@ -92,12 +91,17 @@ struct CryptoTestVectors
 
   TestCase case_p256;
   TestCase case_x25519;
-};
 
-tls::istream&
-operator>>(tls::istream& str, CryptoTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const CryptoTestVectors& tv);
+  TLS_SERIALIZABLE(hkdf_extract_salt,
+                   hkdf_extract_ikm,
+                   derive_secret_secret,
+                   derive_secret_label,
+                   derive_secret_context,
+                   derive_key_pair_seed,
+                   ecies_plaintext,
+                   case_p256,
+                   case_x25519)
+};
 
 /////
 
@@ -113,12 +117,20 @@ struct KeyScheduleTestVectors
     tls::opaque<1> application_secret;
     tls::opaque<1> confirmation_key;
     tls::opaque<1> init_secret;
+
+    TLS_SERIALIZABLE(update_secret,
+                     epoch_secret,
+                     application_secret,
+                     confirmation_key,
+                     init_secret);
   };
 
   struct TestCase
   {
     CipherSuite suite;
     tls::vector<Epoch, 2> epochs;
+
+    TLS_SERIALIZABLE(suite, epochs);
   };
 
   uint32_t n_epochs;
@@ -126,12 +138,9 @@ struct KeyScheduleTestVectors
 
   TestCase case_p256;
   TestCase case_x25519;
-};
 
-tls::istream&
-operator>>(tls::istream& str, KeyScheduleTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const KeyScheduleTestVectors& tv);
+  TLS_SERIALIZABLE(n_epochs, base_group_context, case_p256, case_x25519);
+};
 
 /////
 
@@ -144,6 +153,8 @@ struct AppKeyScheduleTestVectors
     tls::opaque<1> secret;
     tls::opaque<1> key;
     tls::opaque<1> nonce;
+
+    TLS_SERIALIZABLE(secret, key, nonce);
   };
 
   typedef tls::vector<Step, 4> KeySequence;
@@ -155,12 +166,13 @@ struct AppKeyScheduleTestVectors
 
   TestCase case_p256;
   TestCase case_x25519;
-};
 
-tls::istream&
-operator>>(tls::istream& str, AppKeyScheduleTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const AppKeyScheduleTestVectors& tv);
+  TLS_SERIALIZABLE(n_members,
+                   n_generations,
+                   application_secret,
+                   case_p256,
+                   case_x25519);
+};
 
 /////
 
@@ -179,6 +191,8 @@ struct TreeTestVectors
   {
     tls::optional<tls::opaque<1>> public_key;
     tls::opaque<1> hash;
+
+    TLS_SERIALIZABLE(public_key, hash);
   };
 
   typedef tls::vector<TreeNode, 4> TreeCase;
@@ -187,18 +201,20 @@ struct TreeTestVectors
   {
     tls::vector<Credential, 4> credentials;
     tls::vector<TreeCase, 4> trees;
+
+    TLS_SERIALIZABLE(credentials, trees);
   };
 
   tls::vector<tls::opaque<1>, 4> leaf_secrets;
   tls::vector<Credential, 4> credentials;
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
-};
 
-tls::istream&
-operator>>(tls::istream& str, TreeTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const TreeTestVectors& tv);
+  TLS_SERIALIZABLE(leaf_secrets,
+                   credentials,
+                   case_p256_p256,
+                   case_x25519_ed25519);
+};
 
 /////
 
@@ -212,12 +228,28 @@ struct MessagesTestVectors
     SignatureScheme sig_scheme;
 
     tls::opaque<4> client_init_key;
-    tls::opaque<4> welcome_info;
+    tls::opaque<4> group_info;
+    tls::opaque<4> key_package;
+    tls::opaque<4> encrypted_key_package;
     tls::opaque<4> welcome;
-    tls::opaque<4> add;
-    tls::opaque<4> update;
-    tls::opaque<4> remove;
+    tls::opaque<4> add_proposal;
+    tls::opaque<4> update_proposal;
+    tls::opaque<4> remove_proposal;
+    tls::opaque<4> commit;
     tls::opaque<4> ciphertext;
+
+    TLS_SERIALIZABLE(cipher_suite,
+                     sig_scheme,
+                     client_init_key,
+                     group_info,
+                     key_package,
+                     encrypted_key_package,
+                     welcome,
+                     add_proposal,
+                     update_proposal,
+                     remove_proposal,
+                     commit,
+                     ciphertext);
   };
 
   epoch_t epoch;
@@ -230,22 +262,21 @@ struct MessagesTestVectors
   tls::opaque<1> sig_seed;
   tls::opaque<1> random;
 
-  SignatureScheme cik_all_scheme;
-  tls::opaque<4> client_init_key_all;
-
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
+
+  TLS_SERIALIZABLE(epoch,
+                   signer_index,
+                   removed,
+                   user_id,
+                   group_id,
+                   client_init_key_id,
+                   dh_seed,
+                   sig_seed,
+                   random,
+                   case_p256_p256,
+                   case_x25519_ed25519);
 };
-
-tls::istream&
-operator>>(tls::istream& str, MessagesTestVectors::TestCase& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const MessagesTestVectors::TestCase& tc);
-
-tls::istream&
-operator>>(tls::istream& str, MessagesTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const MessagesTestVectors& tv);
 
 /////
 
@@ -291,6 +322,7 @@ struct SessionTestVectors
   {
     tls::optional<Welcome> welcome;
     tls::opaque<4> handshake;
+    tls::opaque<1> commit_secret;
 
     epoch_t epoch;
     tls::opaque<1> epoch_secret;
@@ -302,15 +334,26 @@ struct SessionTestVectors
 
     Epoch(const tls::optional<Welcome>& welcome_in,
           const bytes& handshake_in,
+          const bytes& commit_secret_in,
           const TestSession& session)
       : welcome(welcome_in)
       , handshake(handshake_in)
+      , commit_secret(commit_secret_in)
       , epoch(session.current_epoch())
       , epoch_secret(session.current_epoch_secret())
       , application_secret(session.current_application_secret())
       , confirmation_key(session.current_confirmation_key())
       , init_secret(session.current_init_secret())
     {}
+
+    TLS_SERIALIZABLE(welcome,
+                     handshake,
+                     commit_secret,
+                     epoch,
+                     epoch_secret,
+                     application_secret,
+                     confirmation_key,
+                     init_secret);
   };
 
   struct TestCase
@@ -319,6 +362,8 @@ struct SessionTestVectors
     SignatureScheme sig_scheme;
     tls::vector<ClientInitKey, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
+
+    TLS_SERIALIZABLE(cipher_suite, sig_scheme, client_init_keys, transcript);
   };
 
   uint32_t group_size;
@@ -326,17 +371,9 @@ struct SessionTestVectors
 
   TestCase case_p256_p256;
   TestCase case_x25519_ed25519;
+
+  TLS_SERIALIZABLE(group_size, group_id, case_p256_p256, case_x25519_ed25519);
 };
-
-tls::istream&
-operator>>(tls::istream& str, SessionTestVectors::TestCase& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const SessionTestVectors::TestCase& tv);
-
-tls::istream&
-operator>>(tls::istream& str, SessionTestVectors& tv);
-tls::ostream&
-operator<<(tls::ostream& str, const SessionTestVectors& tv);
 
 struct BasicSessionTestVectors : SessionTestVectors
 {

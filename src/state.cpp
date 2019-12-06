@@ -1,5 +1,7 @@
 #include "state.h"
 
+#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
+
 namespace mls {
 
 ///
@@ -81,85 +83,115 @@ State::State(bytes group_id,
   , _zero(Digest(suite).output_size(), 0)
 {}
 
-State::State(const ClientInitKey& my_client_init_key,
-             const Welcome& welcome,
-             const MLSPlaintext& handshake)
+// Initialize a group from a Welcome
+State::State(const std::vector<ClientInitKey>& my_client_init_keys,
+             const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _application_keys(welcome.cipher_suite)
-  , _identity_priv(my_client_init_key.credential.private_key().value())
+  // XXX: The following line does a bogus key generation
+  , _identity_priv(SignaturePrivateKey::generate(DUMMY_SIG_SCHEME))
 {
-  // Verify that we have an add and it is for us
-  const auto& operation = std::get<HandshakeData>(handshake.content).operation;
-  if (operation.type() != GroupOperationType::add) {
-    throw InvalidParameterError("Incorrect handshake type");
+  // Identify and decrypt a KeyPackage
+  bool found = false;
+  ClientInitKey my_cik;
+  KeyPackage key_pkg;
+  for (const auto& cik : my_client_init_keys) {
+    auto hash = cik.hash();
+    for (const auto& enc_pkg : welcome.key_packages) {
+      found = (hash == enc_pkg.client_init_key_hash);
+      if (!found) {
+        continue;
+      }
+
+      if (cik.cipher_suite != welcome.cipher_suite) {
+        throw InvalidParameterError("Ciphersuite mismatch");
+      }
+
+      if (!cik.private_key().has_value()) {
+        throw InvalidParameterError("No private key for init key");
+      }
+
+      if (!cik.credential.private_key().has_value()) {
+        throw InvalidParameterError("No signing key for init key");
+      }
+      _identity_priv = cik.credential.private_key().value();
+
+      auto key_pkg_data =
+        cik.private_key().value().decrypt(enc_pkg.encrypted_key_package);
+      key_pkg = tls::get<KeyPackage>(key_pkg_data);
+      my_cik = cik;
+      break;
+    }
+
+    if (found) {
+      break;
+    }
   }
 
-  const auto& add = std::get<Add>(operation);
-  if (my_client_init_key != add.init_key) {
-    throw InvalidParameterError("Add not targeted for this node");
+  if (!found) {
+    throw InvalidParameterError("Unable to decrypt Welcome message");
   }
 
-  // Make sure that the init key for the chosen ciphersuite is the
-  // one we sent
-  auto maybe_init_pub = add.init_key.find_init_key(_suite);
-  auto maybe_init_priv = my_client_init_key.find_private_key(_suite);
-  if (!maybe_init_pub.has_value() || !maybe_init_priv.has_value()) {
-    throw ProtocolError("Selected cipher suite not supported");
+  // Decrypt the GroupInfo
+  auto [key, nonce] = welcome.group_info_keymat(key_pkg.init_secret);
+  auto group_info_data =
+    AESGCM(key, nonce).decrypt(welcome.encrypted_group_info);
+  auto group_info = tls::get<GroupInfo>(group_info_data, _suite);
+
+  // Verify the singature on the GroupInfo
+  if (!group_info.verify()) {
+    throw InvalidParameterError("Invalid GroupInfo");
   }
 
-  auto& init_pub = maybe_init_pub.value();
-  auto& init_priv = maybe_init_priv.value();
-
-  if (init_priv.public_key() != init_pub) {
-    throw ProtocolError("Incorrect init key");
-  }
-
-  // Decrypt the Welcome
-  auto welcome_info = welcome.decrypt(init_priv);
-
-  // Make sure the WelcomeInfo matches the Add
-  if (add.welcome_info_hash != welcome_info.hash(_suite)) {
-    throw ProtocolError("Mismatch in welcome info hash");
-  }
-
-  // Ingest the WelcomeInfo
-  _epoch = welcome_info.epoch + 1;
-  _group_id = welcome_info.group_id;
-  _tree = welcome_info.tree;
-  _interim_transcript_hash = welcome_info.interim_transcript_hash;
-
-  _init_secret = welcome_info.init_secret;
+  // Ingest the KeyPackage and GroupInfo
+  _init_secret = key_pkg.init_secret;
+  _epoch = group_info.epoch;
+  _group_id = group_info.group_id;
+  _tree = group_info.tree;
+  _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
+  _interim_transcript_hash = group_info.interim_transcript_hash;
   _zero = bytes(Digest(_suite).output_size(), 0);
 
-  // Add to the transcript hash
-  update_transcript_hash(handshake);
+  // Add self to tree
+  auto maybe_index = _tree.find(my_cik);
+  if (!maybe_index.has_value()) {
+    throw InvalidParameterError("New joiner not in tree");
+  }
 
-  // Add to the tree
-  _index = add.index;
-  _tree.add_leaf(_index, init_priv, my_client_init_key.credential);
+  _index = maybe_index.value();
+  _tree.add_leaf(_index, my_cik.private_key().value(), my_cik.credential);
 
-  // Ratchet forward into shared state
-  update_epoch_secrets(_zero);
+  // Decrypt the direct path
+  auto merge_path = _tree.decrypt(group_info.signer_index, group_info.path);
+  auto update_secret = merge_path.root_path_secret;
+  _tree.merge_path(group_info.signer_index, merge_path);
 
-  if (!verify(handshake)) {
-    throw InvalidParameterError("Handshake signature failed to verify");
+  // Ratchet forward into the current epoch
+  update_epoch_secrets(update_secret);
+
+  // Verify the confirmation
+  if (!verify_confirmation(group_info.confirmation)) {
+    throw ProtocolError("Confirmation failed to verify");
   }
 }
 
-std::tuple<Welcome, MLSPlaintext, State>
+std::tuple<Welcome, State>
 State::negotiate(const bytes& group_id,
-                 const ClientInitKey& my_client_init_key,
-                 const ClientInitKey& client_init_key)
+                 const std::vector<ClientInitKey>& my_client_init_keys,
+                 const std::vector<ClientInitKey>& client_init_keys,
+                 const bytes& commit_secret)
 {
   // Negotiate a ciphersuite with the other party
-  CipherSuite suite;
   auto selected = false;
-  for (auto my_suite : my_client_init_key.cipher_suites) {
-    for (auto other_suite : client_init_key.cipher_suites) {
-      if (my_suite == other_suite) {
+  const ClientInitKey* my_selected_cik = nullptr;
+  const ClientInitKey* other_selected_cik = nullptr;
+  for (const auto& my_cik : my_client_init_keys) {
+    for (const auto& other_cik : client_init_keys) {
+      if (my_cik.cipher_suite == other_cik.cipher_suite) {
         selected = true;
-        suite = my_suite;
+        my_selected_cik = &my_cik;
+        other_selected_cik = &other_cik;
         break;
       }
     }
@@ -173,93 +205,121 @@ State::negotiate(const bytes& group_id,
     throw ProtocolError("Negotiation failure");
   }
 
-  auto leaf_priv = my_client_init_key.find_private_key(suite);
-  if (!leaf_priv.has_value()) {
-    throw ProtocolError("No private key for negotiated suite");
-  }
+  auto& suite = my_selected_cik->cipher_suite;
+  auto& leaf_priv = my_selected_cik->private_key().value();
+  auto& cred = my_selected_cik->credential;
 
-  // We have manually guaranteed that `suite` is always initialized
-  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-  auto state =
-    State{ group_id, suite, leaf_priv.value(), my_client_init_key.credential };
-  return state.add(client_init_key);
+  auto state = State{ group_id, suite, leaf_priv, cred };
+  auto add = state.add(*other_selected_cik);
+  state.handle(add);
+  auto [unused_commit, welcome, new_state] = state.commit(commit_secret);
+  silence_unused(unused_commit);
+
+  return std::make_tuple(welcome, new_state);
 }
 
 ///
-/// Message factories
+/// Proposal and commit factories
 ///
 
-std::tuple<Welcome, MLSPlaintext, State>
+MLSPlaintext
+State::sign(const Proposal& proposal) const
+{
+  auto pt = MLSPlaintext{ _group_id, _epoch, _index, proposal };
+  pt.sign(_identity_priv);
+  return pt;
+}
+
+MLSPlaintext
 State::add(const ClientInitKey& client_init_key) const
 {
-  return add(LeafIndex{ _tree.size() }, client_init_key);
+  return sign(Add{ client_init_key });
 }
 
-std::tuple<Welcome, MLSPlaintext, State>
-State::add(LeafIndex index, const ClientInitKey& client_init_key) const
+MLSPlaintext
+State::update(const bytes& leaf_secret)
 {
-  if (!client_init_key.verify()) {
-    throw InvalidParameterError("bad signature on user init key");
-  }
+  auto key = HPKEPrivateKey::derive(_suite, leaf_secret);
+  auto pt = sign(Update{ key.public_key() });
 
-  auto maybe_pub = client_init_key.find_init_key(_suite);
-  if (!maybe_pub.has_value()) {
-    throw ProtocolError("New member does not support the group's ciphersuite");
-  }
-  auto pub = maybe_pub.value();
+  auto id = proposal_id(pt);
+  _update_secrets[id] = leaf_secret;
 
-  // Add to the tree
-  auto next = *this;
-  next._tree.add_leaf(index, pub, client_init_key.credential);
-
-  // Construct the welcome message
-  auto welcome_info_str = welcome_info();
-  auto welcome =
-    Welcome{ client_init_key.client_init_key_id, pub, welcome_info_str };
-  auto welcome_tuple = std::make_tuple(welcome);
-
-  auto welcome_info_hash = welcome_info_str.hash(_suite);
-  auto add = Add{ LeafIndex{ index }, client_init_key, welcome_info_hash };
-  auto handshake = next.ratchet_and_sign(add, _zero);
-  return std::make_tuple(welcome, handshake, next);
+  return pt;
 }
 
-std::tuple<MLSPlaintext, State>
-State::update(const bytes& leaf_secret) const
+MLSPlaintext
+State::remove(LeafIndex removed) const
 {
-  auto next = *this;
-  DirectPath path(_suite);
-  bytes update_secret;
-  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
-
-  auto update = Update{ path };
-  auto handshake = next.ratchet_and_sign(update, update_secret);
-  return std::make_tuple(handshake, next);
+  return sign(Remove{ removed });
 }
 
-std::tuple<MLSPlaintext, State>
-State::remove(const bytes& leaf_secret, LeafIndex index) const
+std::tuple<MLSPlaintext, Welcome, State>
+State::commit(const bytes& leaf_secret) const
 {
-  if (index.val >= _tree.size()) {
-    throw InvalidParameterError("Index too large for tree");
+  // Construct a commit from cached proposals
+  auto commit = Commit{ _suite };
+  auto joiners = std::vector<ClientInitKey>{};
+  for (const auto& pt : _pending_proposals) {
+    auto id = proposal_id(pt);
+    auto proposal = std::get<Proposal>(pt.content);
+    switch (proposal.inner_type()) {
+      case ProposalType::add: {
+        commit.adds.push_back(id);
+        auto add = std::get<Add>(proposal);
+        joiners.push_back(add.client_init_key);
+        break;
+      }
+
+      case ProposalType::update:
+        commit.updates.push_back(id);
+        break;
+
+      case ProposalType::remove:
+        commit.removes.push_back(id);
+        break;
+
+      default:
+        // TODO(rlb) ignore some proposals:
+        // * Update after Update
+        // * Update after Remove
+        // * Remove after Remove
+        break;
+    }
   }
 
-  if (index == _index) {
-    throw InvalidParameterError("Cannot self-remove");
+  // Apply proposals
+  State next = *this;
+  next.apply(commit);
+  next._pending_proposals.clear();
+
+  // Start a GroupInfo with the prepared state
+  auto prev_init_secret = bytes(next._init_secret);
+  auto group_info = GroupInfo(_suite);
+  group_info.group_id = next._group_id;
+  group_info.epoch = next._epoch + 1;
+  group_info.tree = next._tree;
+
+  // Encrypt new entropy to the group and the new joiners
+  auto [path, update_secret] = next._tree.encrypt(_index, leaf_secret);
+  commit.path = path;
+
+  // Create the Commit message and advance the transcripts / key schedule
+  auto pt = next.ratchet_and_sign(commit, update_secret);
+
+  // Complete the GroupInfo and form the Welcome
+  group_info.confirmed_transcript_hash = next._confirmed_transcript_hash;
+  group_info.interim_transcript_hash = next._interim_transcript_hash;
+  group_info.path = path;
+  group_info.confirmation = std::get<CommitData>(pt.content).confirmation;
+  group_info.sign(_index, _identity_priv);
+
+  auto welcome = Welcome{ _suite, prev_init_secret, group_info };
+  for (const auto& joiner : joiners) {
+    welcome.encrypt(joiner);
   }
 
-  auto next = *this;
-  next._tree.blank_path(LeafIndex{ index });
-  auto cut = next._tree.leaf_span();
-  next._tree.truncate(cut);
-
-  DirectPath path(_suite);
-  bytes update_secret;
-  std::tie(path, update_secret) = next._tree.encrypt(_index, leaf_secret);
-
-  auto remove = Remove{ LeafIndex{ index }, path };
-  auto handshake = next.ratchet_and_sign(remove, update_secret);
-  return std::make_tuple(handshake, next);
+  return std::make_tuple(pt, welcome, next);
 }
 
 ///
@@ -267,153 +327,208 @@ State::remove(const bytes& leaf_secret, LeafIndex index) const
 ///
 
 MLSPlaintext
-State::ratchet_and_sign(const GroupOperation& op, const bytes& update_secret)
+State::ratchet_and_sign(const Commit& op, const bytes& update_secret)
 {
-  auto handshake = MLSPlaintext{ _group_id, _epoch, _index, op };
+  auto pt = MLSPlaintext{ _group_id, _epoch, _index, op };
 
   _confirmed_transcript_hash = Digest(_suite)
                                  .write(_interim_transcript_hash)
-                                 .write(handshake.op_content())
+                                 .write(pt.commit_content())
                                  .digest();
 
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto& handshake_data = std::get<HandshakeData>(handshake.content);
-  handshake_data.confirmation =
+  auto& commit_data = std::get<CommitData>(pt.content);
+  commit_data.confirmation =
     hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
-  handshake.sign(_identity_priv);
+  pt.sign(_identity_priv);
 
   _interim_transcript_hash = Digest(_suite)
                                .write(_confirmed_transcript_hash)
-                               .write(handshake.auth_data())
+                               .write(pt.commit_auth_data())
                                .digest();
 
-  return handshake;
+  return pt;
 }
 
-State
-State::handle(const MLSPlaintext& handshake) const
+std::optional<State>
+State::handle(const MLSPlaintext& pt)
 {
   // Pre-validate the MLSPlaintext
-  if (handshake.group_id != _group_id) {
+  if (pt.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
   }
 
-  if (handshake.epoch != _epoch) {
+  if (pt.epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
   }
 
-  if (handshake.content.type() != ContentType::handshake) {
-    throw InvalidParameterError("Incorrect content type");
-  }
-
-  if (handshake.sender == _index) {
-    throw InvalidParameterError("Handle own messages with caching");
-  }
-
-  if (!verify(handshake)) {
+  if (!verify(pt)) {
     throw ProtocolError("Invalid handshake message signature");
   }
 
-  // Apply the operation
-  const auto& operation = std::get<HandshakeData>(handshake.content).operation;
-  auto next = *this;
-
-  bytes update_secret;
-  switch (operation.type()) {
-    case GroupOperationType::none:
-      throw InvalidParameterError("Uninitialized group operation");
-    case GroupOperationType::add:
-      update_secret = next.handle(std::get<Add>(operation));
-      break;
-    case GroupOperationType::update:
-      update_secret =
-        next.handle(handshake.sender, std::get<Update>(operation));
-      break;
-    case GroupOperationType::remove:
-      update_secret =
-        next.handle(handshake.sender, std::get<Remove>(operation));
-      break;
+  // Proposals get queued, do not result in a state transition
+  auto content_type = pt.content.inner_type();
+  if (content_type == ContentType::proposal) {
+    _pending_proposals.push_back(pt);
+    return std::nullopt;
   }
 
-  next.update_transcript_hash(handshake);
+  if (content_type != ContentType::commit) {
+    throw InvalidParameterError("Incorrect content type");
+  }
+
+  if (pt.sender == _index) {
+    throw InvalidParameterError("Handle own commits with caching");
+  }
+
+  // Apply the commit
+  auto& commit_data = std::get<CommitData>(pt.content);
+  State next = *this;
+  next.apply(commit_data.commit);
+
+  // Decrypt and apply the DirectPath
+  auto merge_path = next._tree.decrypt(pt.sender, commit_data.commit.path);
+  auto update_secret = merge_path.root_path_secret;
+  next._tree.merge_path(pt.sender, merge_path);
+
+  // Update the transcripts and advance the key schedule
+  next._confirmed_transcript_hash = Digest(_suite)
+                                      .write(next._interim_transcript_hash)
+                                      .write(pt.commit_content())
+                                      .digest();
+  next._interim_transcript_hash = Digest(_suite)
+                                    .write(next._confirmed_transcript_hash)
+                                    .write(pt.commit_auth_data())
+                                    .digest();
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
 
-  // Verify the  confirmation MAC
-  const auto& confirmation =
-    std::get<HandshakeData>(handshake.content).confirmation;
-  if (!next.verify_confirmation(confirmation)) {
-    throw InvalidParameterError("Invalid confirmation MAC");
+  // Verify the confirmation MAC
+  if (!next.verify_confirmation(commit_data.confirmation)) {
+    throw ProtocolError("Confirmation failed to verify");
   }
 
   return next;
 }
 
-bytes
-State::handle(const Add& add)
+void
+State::apply(const Add& add)
 {
-  // Verify the ClientInitKey in the Add message
-  if (!add.init_key.verify()) {
-    throw InvalidParameterError("Invalid signature on init key in group add");
-  }
-
-  // Verify the index in the Add message
-  if (add.index.val > _tree.size()) {
-    throw InvalidParameterError("Invalid leaf index");
-  }
-  if (add.index.val < _tree.size() && _tree.occupied(add.index)) {
-    throw InvalidParameterError("Leaf is not available for add");
-  }
-
-  // Verify the WelcomeInfo hash
-  if (add.welcome_info_hash != welcome_info().hash(_suite)) {
-    throw ProtocolError("Mismatch in welcome info hash");
-  }
-
-  // Add to the tree
-  auto init_key = add.init_key.find_init_key(_suite);
-  if (!init_key) {
-    throw ProtocolError("New node does not support group's cipher suite");
-  }
-  _tree.add_leaf(add.index, *init_key, add.init_key.credential);
-
-  return _zero;
+  auto target = _tree.leftmost_free();
+  _tree.set_leaf(
+    target, add.client_init_key.init_key, add.client_init_key.credential);
 }
 
-bytes
-State::handle(LeafIndex sender, const Update& update)
+void
+State::apply(LeafIndex target, const Update& update)
 {
-  std::optional<bytes> leaf_secret = std::nullopt;
-  return update_leaf(sender, update.path, leaf_secret);
+  _tree.blank_path_above(target);
+  _tree.set_leaf_key(target, update.leaf_key);
 }
 
-bytes
-State::handle(LeafIndex sender, const Remove& remove)
+void
+State::apply(LeafIndex target, const bytes& leaf_secret)
+{
+  _tree.blank_path_above(target);
+  _tree.set_leaf_secret(target, leaf_secret);
+}
+
+void
+State::apply(const Remove& remove)
 {
   _tree.blank_path(remove.removed);
-  auto cut = _tree.leaf_span();
-  _tree.truncate(cut);
+}
 
-  std::optional<bytes> leaf_secret = std::nullopt;
-  return update_leaf(sender, remove.path, leaf_secret);
+bytes
+State::proposal_id(const MLSPlaintext& pt) const
+{
+  return Digest(_suite).write(tls::marshal(pt)).digest();
+}
+
+std::optional<MLSPlaintext>
+State::find_proposal(const ProposalID& id)
+{
+  for (auto i = _pending_proposals.begin(); i != _pending_proposals.end();
+       i++) {
+    auto other_id = proposal_id(*i);
+    if (id == other_id) {
+      auto pt = *i;
+      _pending_proposals.erase(i);
+      return pt;
+    }
+  }
+
+  return std::nullopt;
+}
+
+void
+State::apply(const std::vector<ProposalID>& ids)
+{
+  for (const auto& id : ids) {
+    auto maybe_pt = find_proposal(id);
+    if (!maybe_pt.has_value()) {
+      throw ProtocolError("Commit of unknown proposal");
+    }
+
+    auto pt = maybe_pt.value();
+    auto proposal = std::get<Proposal>(pt.content);
+    switch (proposal.inner_type()) {
+      case ProposalType::add:
+        apply(std::get<Add>(proposal));
+        break;
+      case ProposalType::update:
+        if (pt.sender != _index) {
+          apply(pt.sender, std::get<Update>(proposal));
+          break;
+        }
+
+        if (_update_secrets.count(id) == 0) {
+          throw ProtocolError("Self-update with no cached secret");
+        }
+
+        apply(pt.sender, _update_secrets[id]);
+        break;
+      case ProposalType::remove:
+        apply(std::get<Remove>(proposal));
+        break;
+      default:
+        throw InvalidParameterError("Invalid proposal type");
+        break;
+    }
+  }
+}
+
+void
+State::apply(const Commit& commit)
+{
+  apply(commit.updates);
+  apply(commit.removes);
+  apply(commit.adds);
+}
+
+bytes
+State::next_epoch_secret(CipherSuite suite,
+                         const bytes& init_secret,
+                         const bytes& update_secret)
+{
+  return hkdf_extract(suite, init_secret, update_secret);
 }
 
 State::EpochSecrets
 State::derive_epoch_secrets(CipherSuite suite,
-                            const bytes& init_secret,
-                            const bytes& update_secret,
-                            const bytes& group_context)
+                            const bytes& epoch_secret,
+                            const GroupContext& group_context)
 {
-  auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
+  auto ctx = tls::marshal(group_context);
   return {
     epoch_secret,
-    derive_secret(suite, epoch_secret, "app", group_context),
-    derive_secret(suite, epoch_secret, "handshake", group_context),
-    derive_secret(suite, epoch_secret, "sender data", group_context),
-    derive_secret(suite, epoch_secret, "confirm", group_context),
-    derive_secret(suite, epoch_secret, "init", group_context),
+    derive_secret(suite, epoch_secret, "app", ctx),
+    derive_secret(suite, epoch_secret, "handshake", ctx),
+    derive_secret(suite, epoch_secret, "sender data", ctx),
+    derive_secret(suite, epoch_secret, "confirm", ctx),
+    derive_secret(suite, epoch_secret, "init", ctx),
   };
 }
 
@@ -438,11 +553,12 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Invalid message signature");
   }
 
-  if (pt.content.type() != ContentType::application) {
+  if (pt.content.inner_type() != ContentType::application) {
     throw ProtocolError("Unprotect of non-application message");
   }
 
-  return std::get<ApplicationData>(pt.content);
+  // NOLINTNEXTLINE(cppcoreguidelines-slicing)
+  return static_cast<bytes>(std::get<ApplicationData>(pt.content));
 }
 
 ///
@@ -460,7 +576,6 @@ operator==(const State& lhs, const State& rhs)
     (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
   auto interim_transcript_hash =
     (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
-  auto group_context = (lhs._group_context == rhs._group_context);
 
   auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
   auto application_secret =
@@ -469,8 +584,8 @@ operator==(const State& lhs, const State& rhs)
   auto init_secret = (lhs._init_secret == rhs._init_secret);
 
   return suite && group_id && epoch && tree && confirmed_transcript_hash &&
-         interim_transcript_hash && group_context && epoch_secret &&
-         application_secret && confirmation_key && init_secret;
+         interim_transcript_hash && epoch_secret && application_secret &&
+         confirmation_key && init_secret;
 }
 
 bool
@@ -479,58 +594,18 @@ operator!=(const State& lhs, const State& rhs)
   return !(lhs == rhs);
 }
 
-WelcomeInfo
-State::welcome_info() const
-{
-  return { _group_id, _epoch, _tree, _interim_transcript_hash, _init_secret };
-}
-
-void
-State::update_transcript_hash(const MLSPlaintext& plaintext)
-{
-  // Transcript hash for use in this epoch
-  _confirmed_transcript_hash = Digest(_suite)
-                                 .write(_interim_transcript_hash)
-                                 .write(plaintext.op_content())
-                                 .digest();
-
-  // Transcript hash input for the next epoch
-  _interim_transcript_hash = Digest(_suite)
-                               .write(_confirmed_transcript_hash)
-                               .write(plaintext.auth_data())
-                               .digest();
-}
-
-bytes
-State::update_leaf(LeafIndex index,
-                   const DirectPath& path,
-                   const std::optional<bytes>& leaf_secret)
-{
-  bytes update_secret;
-  if (leaf_secret.has_value()) {
-    update_secret = _tree.set_path(index, *leaf_secret);
-  } else {
-    auto merge_path = _tree.decrypt(index, path);
-    update_secret = merge_path.root_path_secret;
-    _tree.merge_path(index, merge_path);
-  }
-
-  return update_secret;
-}
-
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
-  auto group_context_str = GroupContext{
+  auto epoch_secret = next_epoch_secret(_suite, _init_secret, update_secret);
+  auto ctx = GroupContext{
     _group_id,
     _epoch,
     _tree.root_hash(),
     _confirmed_transcript_hash,
   };
-  _group_context = tls::marshal(group_context_str);
+  auto secrets = derive_epoch_secrets(_suite, epoch_secret, ctx);
 
-  auto secrets =
-    derive_epoch_secrets(_suite, _init_secret, update_secret, _group_context);
   _epoch_secret = secrets.epoch_secret;
   _application_secret = secrets.application_secret;
   _handshake_secret = secrets.handshake_secret;
@@ -630,11 +705,8 @@ State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
   KeyChain::Generation keys;
-  switch (pt.content.type()) {
-    case ContentType::handshake:
-      keys = generate_handshake_keys(_index, true);
-      break;
-
+  switch (pt.content.inner_type()) {
+    // TODO(rlb) Enable encryption of Proposal / Commit messages
     case ContentType::application:
       keys = _application_keys.next();
       break;
@@ -648,8 +720,8 @@ State::encrypt(const MLSPlaintext& pt)
   sender_data << _index << keys.generation;
 
   auto sender_data_nonce = random_bytes(AESGCM::nonce_size);
-  auto sender_data_aad_val =
-    sender_data_aad(_group_id, _epoch, pt.content.type(), sender_data_nonce);
+  auto sender_data_aad_val = sender_data_aad(
+    _group_id, _epoch, pt.content.inner_type(), sender_data_nonce);
 
   auto sender_data_gcm = AESGCM(_sender_data_key, sender_data_nonce);
   sender_data_gcm.set_aad(sender_data_aad_val);
@@ -660,7 +732,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto content = pt.marshal_content(0);
   auto aad = content_aad(_group_id,
                          _epoch,
-                         pt.content.type(),
+                         pt.content.inner_type(),
                          sender_data_nonce,
                          encrypted_sender_data);
 
@@ -673,7 +745,7 @@ State::encrypt(const MLSPlaintext& pt)
   MLSCiphertext ct;
   ct.group_id = _group_id;
   ct.epoch = _epoch;
-  ct.content_type = pt.content.type();
+  ct.content_type = pt.content.inner_type();
   ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.ciphertext = ciphertext;
@@ -712,10 +784,7 @@ State::decrypt(const MLSCiphertext& ct)
   // Pull from the key schedule
   KeyChain::Generation keys;
   switch (ct.content_type) {
-    case ContentType::handshake:
-      keys = generate_handshake_keys(_index, false);
-      break;
-
+    // TODO(rlb) Enable decryption of proposal / commit
     case ContentType::application:
       keys = _application_keys.get(sender, generation);
       break;

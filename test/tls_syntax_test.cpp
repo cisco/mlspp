@@ -223,4 +223,21 @@ TEST_F(TLSSyntaxTest, IStream)
   istream_test(val_var_variant, data_var_variant, enc_var_variant);
 }
 
+TEST_F(TLSSyntaxTest, Abbreviations)
+{
+  MustInitialize val_in{ 0, 1 };
+  tls::ostream w;
+  w << val_in;
+  auto streamed = w.bytes();
+  auto marshaled = tls::marshal(val_in);
+  ASSERT_EQ(streamed, marshaled);
+
+  MustInitialize val_out1{ 0 };
+  tls::unmarshal(marshaled, val_out1);
+  ASSERT_EQ(val_in, val_out1);
+
+  auto val_out2 = tls::get<MustInitialize>(marshaled, 0);
+  ASSERT_EQ(val_in, val_out2);
+}
+
 // TODO(rlb@ipv.sx) Test failure cases

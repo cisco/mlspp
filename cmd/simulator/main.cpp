@@ -122,14 +122,13 @@ struct StepMetrics
 class Simulation
 {
 private:
-  std::vector<mls::CipherSuite> suites;
+  mls::CipherSuite suite;
   mls::SignatureScheme scheme;
   std::vector<std::optional<mls::Session>> sessions;
 
 public:
-  Simulation(std::vector<mls::CipherSuite> suites_in,
-             mls::SignatureScheme scheme_in)
-    : suites(suites_in)
+  Simulation(mls::CipherSuite suite_in, mls::SignatureScheme scheme_in)
+    : suite(suite_in)
     , scheme(scheme_in)
   {}
 
@@ -137,11 +136,11 @@ public:
 
   mls::ClientInitKey fresh_client_init_key() const
   {
+    auto init = mls::HPKEPrivateKey::generate(suite);
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv);
-    auto init = random();
-    return mls::ClientInitKey{ id, suites, init, cred };
+    return mls::ClientInitKey{ init, cred };
   }
 
   std::vector<mls::CryptoMetrics::Report> broadcast(const mls::bytes& message)
@@ -168,15 +167,16 @@ public:
     auto group_id = random();
     auto cik0 = fresh_client_init_key();
     auto cik1 = fresh_client_init_key();
-    auto [session0, welcome1, add1] = mls::Session::start(group_id, cik0, cik1);
-    auto session1 = mls::Session::join(cik1, welcome1, add1);
+    auto [session0, welcome1] =
+      mls::Session::start(group_id, { cik0 }, { cik1 }, random());
+    auto session1 = mls::Session::join({ cik1 }, welcome1);
 
     sessions = { session0, session1 };
     while (sessions.size() < initial_size) {
       auto cik = fresh_client_init_key();
-      auto [welcome, add] = sessions[0].value().add(cik);
+      auto [welcome, add] = sessions[0].value().add(random(), cik);
       broadcast(add);
-      sessions.emplace_back(mls::Session::join(cik, welcome, add));
+      sessions.emplace_back(mls::Session::join({ cik }, welcome));
     }
 
     std::cout << "Created a group with " << initial_size << " members"
@@ -190,12 +190,12 @@ public:
     auto cik = fresh_client_init_key();
 
     mls::CryptoMetrics::reset();
-    auto [welcome, add] = sessions[by].value().add(cik);
+    auto [welcome, add] = sessions[by].value().add(random(), cik);
     report.sender = mls::CryptoMetrics::snapshot();
     report.receivers = broadcast(add);
 
     mls::CryptoMetrics::reset();
-    auto new_session = mls::Session::join(cik, welcome, add);
+    auto new_session = mls::Session::join({ cik }, welcome);
     report.receivers.push_back(mls::CryptoMetrics::snapshot());
     sessions.emplace_back(new_session);
 
@@ -227,8 +227,7 @@ public:
 int
 main(int argc, char** argv)
 {
-  const auto suites =
-    std::vector<mls::CipherSuite>{ mls::CipherSuite::X25519_SHA256_AES128GCM };
+  const auto suite = mls::CipherSuite::X25519_SHA256_AES128GCM;
   const auto scheme = mls::SignatureScheme::Ed25519;
 
   if (argc < 2) {
@@ -240,7 +239,7 @@ main(int argc, char** argv)
   auto script = json::parse(script_json).get<Script>();
 
   // Initialize a set of sessions
-  Simulation sim(suites, scheme);
+  Simulation sim(suite, scheme);
   sim.init(script.initial_size);
 
   // Follow the steps in the script

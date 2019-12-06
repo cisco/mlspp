@@ -45,61 +45,92 @@ protected:
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
-};
+  const bytes test_message = from_hex("01020304");
 
-class GroupCreationTest : public StateTest
-{
-protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
   std::vector<DHPrivateKey> init_privs;
-  std::vector<ClientInitKey> user_init_keys;
+  std::vector<ClientInitKey> client_init_keys;
   std::vector<State> states;
 
-  const bytes test_message = from_hex("01020304");
-
-  GroupCreationTest()
+  StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_priv = DHPrivateKey::generate(suite);
 
-      auto user_init_key = ClientInitKey{};
-      user_init_key.add_init_key(init_priv);
-      user_init_key.sign(credential);
+      auto client_init_key = ClientInitKey{ init_priv, credential };
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
       init_privs.push_back(init_priv);
-      user_init_keys.push_back(user_init_key);
+      client_init_keys.push_back(client_init_key);
     }
+  }
+
+  bytes fresh_secret() const
+  {
+    return random_bytes(Digest(suite).output_size());
   }
 };
 
-TEST_F(GroupCreationTest, TwoPerson)
+TEST_F(StateTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto first = State{ group_id, suite, init_privs[0], credentials[0] };
+  auto first0 = State{ group_id, suite, init_privs[0], credentials[0] };
 
-  // Create a Add for the new participant
-  auto welcome_add_state = first.add(user_init_keys[1]);
-  auto welcome = std::get<0>(welcome_add_state);
-  auto add = std::get<1>(welcome_add_state);
+  // Create an Add proposal for the new participant
+  auto add = first0.add(client_init_keys[1]);
 
-  // Process the Add
-  first = std::get<2>(welcome_add_state);
-  auto second = State{ user_init_keys[1], welcome, add };
+  // Handle the Add proposal and create a Commit
+  first0.handle(add);
+  auto [commit, welcome, first1] = first0.commit(fresh_secret());
+  silence_unused(commit);
 
-  ASSERT_EQ(first, second);
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ { client_init_keys[1] }, welcome };
+  ASSERT_EQ(first1, second0);
 
-  // Verify that they can exchange protected messages
-  auto encrypted = first.protect(test_message);
-  auto decrypted = second.unprotect(encrypted);
+  /// Verify that they can exchange protected messages
+  auto encrypted = first1.protect(test_message);
+  auto decrypted = second0.unprotect(encrypted);
   ASSERT_EQ(decrypted, test_message);
 }
 
-TEST_F(GroupCreationTest, FullSize)
+TEST_F(StateTest, Multi)
+{
+  // Initialize the creator's state
+  states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+
+  // Create and process an Add proposal for each new participant
+  for (size_t i = 1; i < group_size; i += 1) {
+    auto add = states[0].add(client_init_keys[i]);
+    states[0].handle(add);
+  }
+
+  // Create a Commit that adds everybody
+  auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+  silence_unused(commit);
+  states[0] = new_state;
+
+  // Initialize the new joiners from the welcome
+  for (size_t i = 1; i < group_size; i += 1) {
+    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                        welcome);
+  }
+
+  // Verify that everyone can send and be received
+  for (auto& state : states) {
+    auto encrypted = state.protect(test_message);
+    for (auto& other : states) {
+      auto decrypted = other.unprotect(encrypted);
+      ASSERT_EQ(decrypted, test_message);
+    }
+  }
+}
+
+TEST_F(StateTest, FullSize)
 {
   // Initialize the creator's state
   states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
@@ -107,19 +138,22 @@ TEST_F(GroupCreationTest, FullSize)
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
     auto sender = i - 1;
-    auto welcome_add_state = states[sender].add(user_init_keys[i]);
-    auto welcome = std::get<0>(welcome_add_state);
-    auto add = std::get<1>(welcome_add_state);
 
+    auto add = states[sender].add(client_init_keys[i]);
+    states[sender].handle(add);
+
+    auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
-        states[j] = std::get<2>(welcome_add_state);
+        states[j] = new_state;
       } else {
-        states[j] = states[j].handle(add);
+        states[j].handle(add);
+        states[j] = states[j].handle(commit).value();
       }
     }
 
-    states.emplace_back(user_init_keys[i], welcome, add);
+    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                        welcome);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -143,38 +177,21 @@ protected:
   std::vector<State> states;
 
   RunningGroupTest()
+    : StateTest()
   {
-    states.reserve(group_size);
-
-    auto init_secret_0 = random_bytes(32);
-    auto init_priv_0 = DHPrivateKey::derive(suite, init_secret_0);
-    auto identity_priv_0 = SignaturePrivateKey::generate(scheme);
-    auto credential_0 = Credential::basic(user_id, identity_priv_0);
-    states.emplace_back(group_id, suite, init_priv_0, credential_0);
+    states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
-      auto init_secret = random_bytes(32);
-      auto init_priv = DHPrivateKey::node_derive(suite, init_secret);
-      auto identity_priv = SignaturePrivateKey::generate(scheme);
-      auto credential = Credential::basic(user_id, identity_priv);
+      auto add = states[0].add(client_init_keys[i]);
+      states[0].handle(add);
+    }
 
-      ClientInitKey cik;
-      cik.add_init_key(init_priv);
-      cik.sign(credential);
-
-      auto welcome_add_state = states[0].add(cik);
-      auto&& welcome = std::get<0>(welcome_add_state);
-      auto&& add = std::get<1>(welcome_add_state);
-      auto&& next = std::get<2>(welcome_add_state);
-      for (auto& state : states) {
-        if (state.index().val == 0) {
-          state = next;
-        } else {
-          state = state.handle(add);
-        }
-      }
-
-      states.emplace_back(cik, welcome, add);
+    auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+    silence_unused(commit);
+    states[0] = new_state;
+    for (size_t i = 1; i < group_size; i += 1) {
+      states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
+                          welcome);
     }
   }
 
@@ -191,16 +208,18 @@ protected:
 TEST_F(RunningGroupTest, Update)
 {
   for (size_t i = 0; i < group_size; i += 1) {
-    auto new_leaf = random_bytes(32);
-    auto message_next = states[i].update(new_leaf);
-    auto&& message = std::get<0>(message_next);
-    auto&& next = std::get<1>(message_next);
+    auto new_leaf = fresh_secret();
+    auto update = states[i].update(new_leaf);
+    states[i].handle(update);
+    auto [commit, welcome, new_state] = states[i].commit(new_leaf);
+    silence_unused(welcome);
 
     for (auto& state : states) {
       if (state.index().val == i) {
-        state = next;
+        state = new_state;
       } else {
-        state = state.handle(message);
+        state.handle(update);
+        state = state.handle(commit).value();
       }
     }
 
@@ -211,18 +230,18 @@ TEST_F(RunningGroupTest, Update)
 TEST_F(RunningGroupTest, Remove)
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
-    auto evict_secret = random_bytes(32);
-    auto message_next =
-      states[i].remove(evict_secret, LeafIndex{ uint32_t(i + 1) });
-    auto&& message = std::get<0>(message_next);
-    auto&& next = std::get<1>(message_next);
-    states.pop_back();
+    auto remove = states[i].remove(LeafIndex{ uint32_t(i + 1) });
+    states[i].handle(remove);
+    auto [commit, welcome, new_state] = states[i].commit(fresh_secret());
+    silence_unused(welcome);
 
+    states.pop_back();
     for (auto& state : states) {
       if (state.index().val == size_t(i)) {
-        state = next;
+        state = new_state;
       } else {
-        state = state.handle(message);
+        state.handle(remove);
+        state = state.handle(commit).value();
       }
     }
 
@@ -230,21 +249,18 @@ TEST_F(RunningGroupTest, Remove)
   }
 }
 
-TEST(OtherStateTest, CipherNegotiation)
+TEST_F(StateTest, CipherNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
-  auto insA = bytes{ 0, 1, 2, 3 };
-  auto inkA1 =
-    DHPrivateKey::node_derive(CipherSuite::P256_SHA256_AES128GCM, insA);
-  auto inkA2 =
-    DHPrivateKey::node_derive(CipherSuite::X25519_SHA256_AES128GCM, insA);
-
-  auto cikA = ClientInitKey{};
-  cikA.add_init_key(inkA1);
-  cikA.add_init_key(inkA2);
-  cikA.sign(credA);
+  std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksA;
+  for (auto suiteA : ciphersA) {
+    auto init_key = HPKEPrivateKey::generate(suiteA);
+    ciksA.emplace_back(init_key, credA);
+  }
 
   // Bob spuports P-256 and P-521
   auto supported_ciphers =
@@ -252,24 +268,21 @@ TEST(OtherStateTest, CipherNegotiation)
                               CipherSuite::P521_SHA512_AES256GCM };
   auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
   auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
-  auto insB = bytes{ 4, 5, 6, 7 };
-  auto inkB =
-    DHPrivateKey::node_derive(CipherSuite::P256_SHA256_AES128GCM, insB);
-  auto group_id = bytes{ 0, 1, 2, 3, 4, 5, 6, 7 };
-
-  auto cikB = ClientInitKey{};
-  cikB.add_init_key(inkB);
-  cikB.sign(credB);
+  std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
+                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<ClientInitKey> ciksB;
+  for (auto suiteB : ciphersB) {
+    auto init_key = HPKEPrivateKey::generate(suiteB);
+    ciksB.emplace_back(init_key, credB);
+  }
 
   // Bob should choose P-256
-  auto initialB = State::negotiate(group_id, cikB, cikA);
-  auto stateB = std::get<2>(initialB);
+  auto [welcome, stateB] =
+    State::negotiate(group_id, ciksB, ciksA, fresh_secret());
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
-  auto welcome = std::get<0>(initialB);
-  auto add = std::get<1>(initialB);
-  auto stateA = State(cikA, welcome, add);
+  auto stateA = State(ciksA, welcome);
   ASSERT_EQ(stateA, stateB);
 }
 
@@ -288,13 +301,13 @@ protected:
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
-    GroupContext group_context;
-    tls::unmarshal(tv.base_group_context, group_context);
+    auto group_context = tls::get<GroupContext>(tv.base_group_context);
 
     for (const auto& epoch : test_case.epochs) {
-      auto group_context_bytes = tls::marshal(group_context);
-      auto secrets = State::derive_epoch_secrets(
-        suite, init_secret, epoch.update_secret, group_context_bytes);
+      auto epoch_secret =
+        State::next_epoch_secret(suite, init_secret, epoch.update_secret);
+      auto secrets =
+        State::derive_epoch_secrets(suite, epoch_secret, group_context);
       ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
       ASSERT_EQ(epoch.application_secret, secrets.application_secret);
       ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);

@@ -9,8 +9,7 @@
 
 using namespace mls;
 
-const auto suites =
-  std::vector<CipherSuite>{ CipherSuite::X25519_SHA256_AES128GCM };
+const auto suite = CipherSuite::X25519_SHA256_AES128GCM;
 const auto scheme = SignatureScheme::Ed25519;
 
 class User
@@ -25,30 +24,22 @@ public:
 
   ClientInitKey temp_cik()
   {
-    auto cikID = random_bytes(16);
-    auto init = random_bytes(32);
-    return ClientInitKey{ cikID, suites, init, _cred };
+    auto init_key = HPKEPrivateKey::generate(suite);
+    return ClientInitKey{ init_key, _cred };
   }
 
   ClientInitKey fresh_cik()
   {
     auto cik = temp_cik();
-    _ciks.emplace(cik.client_init_key_id, cik);
+    _ciks.push_back(cik);
     return cik;
   }
 
-  ClientInitKey find_cik(const bytes& cik_id)
-  {
-    if (_ciks.count(cik_id) == 0) {
-      throw std::runtime_error("Unkown CIK");
-    }
-
-    return _ciks.at(cik_id);
-  }
+  const std::vector<ClientInitKey>& ciks() { return _ciks; }
 
 private:
   Credential _cred;
-  std::map<bytes, ClientInitKey> _ciks;
+  std::vector<ClientInitKey> _ciks;
 };
 
 void
@@ -85,20 +76,17 @@ main()
   ////////// ACT I: CREATION ///////////
 
   // Bob posts a ClientInitKey
-  auto cikB1 = bob.fresh_cik();
+  auto cikB = bob.fresh_cik();
 
   // Alice starts a session with Bob
   auto cikA = alice.temp_cik();
   auto group_id = bytes{ 0, 1, 2, 3 };
-  auto session_welcome_add = Session::start(group_id, cikA, cikB1);
-  auto sessionA = std::get<0>(session_welcome_add);
-  auto welcome = std::get<1>(session_welcome_add);
-  auto add = std::get<2>(session_welcome_add);
+  auto [sessionA, welcome] =
+    Session::start(group_id, { cikA }, { cikB }, random_bytes(32));
 
   // Bob looks up his CIK based on the welcome, and initializes
   // his session
-  auto cikB2 = bob.find_cik(welcome.client_init_key_id);
-  auto sessionB = Session::join(cikB2, welcome, add);
+  auto sessionB = Session::join(bob.ciks(), welcome);
 
   // Alice and Bob should now be on the same page
   verify("create", sessionA, sessionB);
@@ -109,11 +97,11 @@ main()
   auto cikC1 = charlie.fresh_cik();
 
   // Alice adds Charlie to the session
-  std::tie(welcome, add) = sessionA.add(cikC1);
+  bytes add;
+  std::tie(welcome, add) = sessionA.add(random_bytes(32), cikC1);
 
   // Charlie initializes his session
-  auto cikC2 = charlie.find_cik(welcome.client_init_key_id);
-  auto sessionC = Session::join(cikC2, welcome, add);
+  auto sessionC = Session::join(charlie.ciks(), welcome);
 
   // Alice and Bob updates their sessions to reflect Charlie's addition
   sessionA.handle(add);

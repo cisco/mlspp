@@ -5,19 +5,23 @@
 
 using namespace mls;
 
-template<typename T>
+template<typename T, typename... Tp>
 void
 tls_round_trip(const bytes& vector,
                T& constructed,
-               T& unmarshaled,
-               bool reproducible)
+               bool reproducible,
+               Tp... args)
 {
   auto marshaled = tls::marshal(constructed);
+
+  std::cout << "mar " << marshaled << std::endl;
+  std::cout << "vec " << vector << std::endl;
+
   if (reproducible) {
     ASSERT_EQ(vector, marshaled);
   }
 
-  tls::unmarshal(vector, unmarshaled);
+  auto unmarshaled = tls::get<T>(vector, args...);
   ASSERT_EQ(constructed, unmarshaled);
   ASSERT_EQ(tls::marshal(unmarshaled), vector);
 }
@@ -56,7 +60,7 @@ protected:
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_key);
+    auto cred = Credential::basic(tv.user_id, sig_priv);
 
     DeterministicHPKE lock;
     auto ratchet_tree =
@@ -71,84 +75,70 @@ protected:
       ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
 
     // ClientInitKey
-    ClientInitKey client_init_key_c;
-    client_init_key_c.client_init_key_id = tv.client_init_key_id;
-    client_init_key_c.add_init_key(dh_priv);
-    client_init_key_c.credential = cred;
-    client_init_key_c.signature = tv.random;
+    ClientInitKey client_init_key{ dh_priv, cred };
+    client_init_key.signature = tv.random;
+    tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
-    ClientInitKey client_init_key;
+    // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome
+    auto group_info =
+      GroupInfo{ tv.group_id, tv.epoch,    ratchet_tree, tv.random,
+                 tv.random,   direct_path, tv.random };
+    group_info.signer_index = tv.signer_index;
+    group_info.signature = tv.random;
+    tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
+
+    auto key_package = KeyPackage{ tv.random };
+    tls_round_trip(tc.key_package, key_package, true);
+
+    auto encrypted_key_package =
+      EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
     tls_round_trip(
-      tc.client_init_key, client_init_key_c, client_init_key, reproducible);
-
-    // WelcomeInfo and Welcome
-    WelcomeInfo welcome_info_c{
-      tv.group_id, tv.epoch, ratchet_tree, tv.random, tv.random,
-    };
-    Welcome welcome_c{ tv.client_init_key_id, dh_key, welcome_info_c };
-
-    WelcomeInfo welcome_info{ tc.cipher_suite };
-    tls_round_trip(tc.welcome_info, welcome_info_c, welcome_info, true);
+      tc.encrypted_key_package, encrypted_key_package, true, tc.cipher_suite);
 
     Welcome welcome;
-    tls_round_trip(tc.welcome, welcome_c, welcome, true);
+    welcome.version = ProtocolVersion::mls10;
+    welcome.cipher_suite = tc.cipher_suite;
+    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.encrypted_group_info = tv.random;
+    tls_round_trip(tc.welcome, welcome, true);
 
-    // Handshake messages
-    Add add_op{ tv.removed, client_init_key_c, tv.random };
-    Update update_op{ direct_path };
-    Remove remove_op{ tv.removed, direct_path };
+    // Proposals
+    auto add_prop = Proposal{ Add{ client_init_key } };
+    auto add_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
+    add_hs.signature = tv.random;
+    tls_round_trip(tc.add_proposal, add_hs, true, tc.cipher_suite);
 
-    auto add_c = MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_op };
-    auto update_c =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_op };
-    auto remove_c =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_op };
-    add_c.signature = tv.random;
-    update_c.signature = tv.random;
-    remove_c.signature = tv.random;
+    auto update_prop = Proposal{ Update{ dh_key } };
+    auto update_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
+    update_hs.signature = tv.random;
+    tls_round_trip(tc.update_proposal, update_hs, true, tc.cipher_suite);
 
-    MLSPlaintext add{ tc.cipher_suite };
-    tls_round_trip(tc.add, add_c, add, reproducible);
+    auto remove_prop = Proposal{ Remove{ tv.signer_index } };
+    auto remove_hs =
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
+    remove_hs.signature = tv.random;
+    tls_round_trip(tc.remove_proposal, remove_hs, true, tc.cipher_suite);
 
-    MLSPlaintext update{ tc.cipher_suite };
-    tls_round_trip(tc.update, update_c, update, true);
-
-    MLSPlaintext remove{ tc.cipher_suite };
-    tls_round_trip(tc.remove, remove_c, remove, true);
+    // Commit
+    auto commit = Commit{
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      { tv.random, tv.random },
+      direct_path,
+    };
+    tls_round_trip(tc.commit, commit, true, tc.cipher_suite);
 
     // MLSCiphertext
-    MLSCiphertext ciphertext_c{
-      tv.group_id, tv.epoch,  ContentType::handshake,
+    MLSCiphertext ciphertext{
+      tv.group_id, tv.epoch,  ContentType::application,
       tv.random,   tv.random, tv.random,
     };
-    MLSCiphertext ciphertext{};
-    tls_round_trip(tc.ciphertext, ciphertext_c, ciphertext, true);
+    tls_round_trip(tc.ciphertext, ciphertext, true);
   }
 };
-
-TEST_F(MessagesTest, ClientInitKey)
-{
-  std::vector<CipherSuite> suites{
-    CipherSuite::P256_SHA256_AES128GCM,
-    CipherSuite::X25519_SHA256_AES128GCM,
-  };
-
-  ClientInitKey constructed;
-  constructed.client_init_key_id = tv.client_init_key_id;
-  for (const auto& suite : suites) {
-    auto priv = DHPrivateKey::derive(suite, tv.dh_seed);
-    constructed.add_init_key(priv);
-  }
-
-  auto identity_priv =
-    SignaturePrivateKey::derive(tv.cik_all_scheme, tv.sig_seed);
-  constructed.credential = Credential::basic(tv.user_id, identity_priv);
-  constructed.signature = tv.random;
-
-  ClientInitKey after;
-  auto reproducible = deterministic_signature_scheme(tv.cik_all_scheme);
-  tls_round_trip(tv.client_init_key_all, constructed, after, reproducible);
-}
 
 TEST_F(MessagesTest, Suite_P256_P256)
 {

@@ -6,8 +6,11 @@
 #include "tls_syntax.h"
 #include "tree_math.h"
 #include <optional>
+#include <iostream>
 
 namespace mls {
+
+struct ClientInitKey;
 
 class RatchetTreeNode : public CipherAware
 {
@@ -106,8 +109,15 @@ public:
                 const bytes& leaf_secret,
                 const Credential& cred);
   void blank_path(LeafIndex index);
+  void blank_path_above(LeafIndex index);
   bytes set_path(LeafIndex index, const bytes& leaf);
 
+  LeafIndex leftmost_free() const;
+  void set_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
+  void set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key);
+  void set_leaf_secret(LeafIndex index, const bytes& leaf_secret);
+
+  std::optional<LeafIndex> find(const ClientInitKey& cik) const;
   const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;
@@ -139,6 +149,7 @@ protected:
   // XXX(rlb): These are still necessary because operator>> triggers the
   // computation of the tree hash
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
+  friend std::ostream& operator<<(std::ostream& out, const RatchetTree obj);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
