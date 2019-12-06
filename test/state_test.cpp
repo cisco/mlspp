@@ -187,7 +187,7 @@ protected:
     }
 
     auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
-    silence_unused(welcome);
+    silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
@@ -212,6 +212,7 @@ TEST_F(RunningGroupTest, Update)
     auto update = states[i].update(new_leaf);
     states[i].handle(update);
     auto [commit, welcome, new_state] = states[i].commit(new_leaf);
+    silence_unused(welcome);
 
     for (auto& state : states) {
       if (state.index().val == i) {
