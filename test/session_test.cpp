@@ -298,9 +298,10 @@ protected:
 
       // Generate an add to cache the next state
       if (curr == index) {
-        silence_unused(unused_welcome);
-        auto [welcome, add] =
+        auto [unused_welcome, unused_add] =
           session->add(epoch.commit_secret, tc.client_init_keys[curr + 1]);
+        silence_unused(unused_welcome);
+        silence_unused(unused_add);
       }
 
       session->handle(epoch.handshake);
