@@ -343,6 +343,7 @@ struct MLSPlaintext : public CipherAware
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
+  tls::opaque<4> authenticated_data;
   tls::variant_variant<ContentType, CipherSuite, ApplicationData, Proposal, CommitData> content;
   tls::opaque<2> signature;
 
@@ -355,6 +356,7 @@ struct MLSPlaintext : public CipherAware
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,
+               bytes authenticated_data,
                bytes content);
 
   // Constructors for encrypting
@@ -380,7 +382,7 @@ struct MLSPlaintext : public CipherAware
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);
+  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature);
 };
 
 // struct {
@@ -398,10 +400,11 @@ struct MLSCiphertext
   ContentType content_type;
   tls::opaque<1> sender_data_nonce;
   tls::opaque<1> encrypted_sender_data;
+  tls::opaque<4> authenticated_data;
   tls::opaque<4> ciphertext;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
-                   encrypted_sender_data, ciphertext);
+                   encrypted_sender_data, authenticated_data, ciphertext);
 };
 
 } // namespace mls

@@ -666,12 +666,13 @@ static bytes
 content_aad(const tls::opaque<1>& group_id,
             uint32_t epoch,
             ContentType content_type,
+            const tls::opaque<4>& authenticated_data,
             const tls::opaque<1>& sender_data_nonce,
             const tls::opaque<1>& encrypted_sender_data)
 {
   tls::ostream w;
-  w << group_id << epoch << content_type << sender_data_nonce
-    << encrypted_sender_data;
+  w << group_id << epoch << content_type << authenticated_data
+    << sender_data_nonce << encrypted_sender_data;
   return w.bytes();
 }
 
@@ -763,6 +764,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto aad = content_aad(_group_id,
                          _epoch,
                          pt.content.inner_type(),
+                         pt.authenticated_data,
                          sender_data_nonce,
                          encrypted_sender_data);
 
@@ -778,6 +780,7 @@ State::encrypt(const MLSPlaintext& pt)
   ct.content_type = pt.content.inner_type();
   ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
+  ct.authenticated_data = pt.authenticated_data;
   ct.ciphertext = ciphertext;
   return ct;
 }
@@ -827,6 +830,7 @@ State::decrypt(const MLSCiphertext& ct)
   auto aad = content_aad(ct.group_id,
                          ct.epoch,
                          ct.content_type,
+                         ct.authenticated_data,
                          ct.sender_data_nonce,
                          ct.encrypted_sender_data);
   auto gcm = AESGCM(keys.key, keys.nonce);
@@ -835,7 +839,8 @@ State::decrypt(const MLSCiphertext& ct)
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{ _suite, _group_id,       _epoch,
-                       sender, ct.content_type, content };
+                       sender, ct.content_type, ct.authenticated_data,
+                       content };
 }
 
 } // namespace mls

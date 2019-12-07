@@ -316,44 +316,41 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            ContentType content_type_in,
+                           bytes authenticated_data_in,
                            bytes content_in)
   : CipherAware(suite)
   , group_id(group_id_in)
   , epoch(epoch_in)
   , sender(sender_in)
+  , authenticated_data(authenticated_data_in)
   , content(suite, ApplicationData{ suite })
 {
-  int cut = content_in.size() - 1;
-  for (; content_in[cut] == 0 && cut >= 0; cut -= 1) {
-  }
-  if (content_in[cut] != 0x01) {
-    throw ProtocolError("Invalid marker byte");
-  }
-
-  auto start = content_in.begin();
-  auto sig_len_bytes = bytes(start + cut - 2, start + cut);
-  auto sig_len = tls::get<uint16_t>(sig_len_bytes);
-
-  cut -= 2;
-  if (sig_len > cut) {
-    throw ProtocolError("Invalid signature size");
-  }
-
-  signature = bytes(start + cut - sig_len, start + cut);
-  auto content_data = bytes(start, start + cut - sig_len);
-
+  tls::istream r(content_in);
   switch (content_type_in) {
     case ContentType::application: {
       auto& application_data = content.emplace<ApplicationData>();
-      tls::unmarshal(content_data, application_data);
+      r >> application_data;
       break;
     }
 
-      // TODO(rlb) decode content for Proposal and Commit
+    case ContentType::proposal: {
+      auto& proposal = content.emplace<Proposal>(suite);
+      r >> proposal;
+      break;
+    }
+
+    case ContentType::commit: {
+      auto& commit_data = content.emplace<CommitData>(suite);
+      r >> commit_data;
+      break;
+    }
 
     default:
       throw InvalidParameterError("Unknown content type");
   }
+
+  tls::opaque<2> padding;
+  r >> signature >> padding;
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -399,19 +396,26 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
-  bytes marshaled;
-  if (content.inner_type() == ContentType::application) {
-    marshaled = tls::marshal(std::get<ApplicationData>(content));
-  } else {
-    // TODO(398) Marshal content for proposal / commit
-    throw InvalidParameterError("Unknown content type");
+  tls::ostream w;
+  switch (content.inner_type()) {
+    case ContentType::application:
+      w << std::get<ApplicationData>(content);
+      break;
+
+    case ContentType::proposal:
+      w << std::get<Proposal>(content);
+      break;
+
+    case ContentType::commit:
+      w << std::get<CommitData>(content);
+      break;
+
+    default:
+      throw InvalidParameterError("Unknown content type");
   }
 
-  uint16_t sig_len = signature.size();
-  auto marker = bytes{ 0x01 };
-  auto pad = zero_bytes(padding_size);
-  marshaled = marshaled + signature + tls::marshal(sig_len) + marker + pad;
-  return marshaled;
+  w << signature << tls::opaque<2>(padding_size, 0);
+  return w.bytes();
 }
 
 bytes
@@ -440,7 +444,7 @@ bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
-  w << context << group_id << epoch << sender << content;
+  w << context << group_id << epoch << sender << authenticated_data << content;
   return w.bytes();
 }
 
