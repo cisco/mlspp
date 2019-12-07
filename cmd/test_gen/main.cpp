@@ -271,14 +271,16 @@ generate_tree()
       auto cred = Credential::basic(id, sig);
       test_case->credentials.push_back(cred);
 
-      tree.add_leaf(LeafIndex{ j }, tv.leaf_secrets[j], cred);
-      tree.set_path(LeafIndex{ j }, tv.leaf_secrets[j]);
+      auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j]);
+      tree.add_leaf(
+        LeafIndex{ j }, priv.public_key(), test_case->credentials[j]);
+      tree.encap(LeafIndex{ j }, tv.leaf_secrets[j]);
       test_case->trees.push_back(tree_to_case(tree));
     }
 
     // Blank out even-numbered leaves
     for (uint32_t j = 0; j < n_leaves; j += 2) {
-      tree.blank_path(LeafIndex{ j });
+      tree.blank_path(LeafIndex{ j }, true);
       test_case->trees.push_back(tree_to_case(tree));
     }
   }
@@ -331,15 +333,15 @@ generate_messages()
     auto cred = Credential::basic(tv.user_id, sig_priv);
 
     auto ratchet_tree =
-      RatchetTree{ suite,
-                   { tv.random, tv.random, tv.random, tv.random },
-                   { cred, cred, cred, cred } };
-    ratchet_tree.blank_path(LeafIndex{ 2 });
+      TestRatchetTree{ suite,
+                       { tv.random, tv.random, tv.random, tv.random },
+                       { cred, cred, cred, cred } };
+    ratchet_tree.blank_path(LeafIndex{ 2 }, true);
 
     DirectPath direct_path(ratchet_tree.cipher_suite());
     bytes dummy;
     std::tie(direct_path, dummy) =
-      ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
+      ratchet_tree.encap(LeafIndex{ 0 }, tv.random);
 
     // Construct CIK
     auto client_init_key = ClientInitKey{ dh_priv, cred };

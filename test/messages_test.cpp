@@ -64,15 +64,15 @@ protected:
 
     DeterministicHPKE lock;
     auto ratchet_tree =
-      RatchetTree{ tc.cipher_suite,
-                   { tv.random, tv.random, tv.random, tv.random },
-                   { cred, cred, cred, cred } };
-    ratchet_tree.blank_path(LeafIndex{ 2 });
+      TestRatchetTree{ tc.cipher_suite,
+                       { tv.random, tv.random, tv.random, tv.random },
+                       { cred, cred, cred, cred } };
+    ratchet_tree.blank_path(LeafIndex{ 2 }, true);
 
     DirectPath direct_path(ratchet_tree.cipher_suite());
     bytes dummy;
     std::tie(direct_path, dummy) =
-      ratchet_tree.encrypt(LeafIndex{ 0 }, tv.random);
+      ratchet_tree.encap(LeafIndex{ 0 }, tv.random);
 
     // ClientInitKey
     ClientInitKey client_init_key{ dh_priv, cred };
