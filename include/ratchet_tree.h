@@ -97,7 +97,7 @@ public:
 
   // Merge a new key into a leaf (without affecting its credential)
   void merge(LeafIndex index, const DHPublicKey& leaf_key);
-  void merge(LeafIndex index, const DHPrivateKey& priv_key);
+  void merge(LeafIndex index, const DHPrivateKey& leaf_priv);
   void merge(LeafIndex index, const bytes& leaf_secret);
 
   bool occupied(LeafIndex index) const;

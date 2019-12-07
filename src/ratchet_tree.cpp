@@ -257,8 +257,6 @@ RatchetTree::encap(LeafIndex from, const bytes& leaf_secret)
 bytes
 RatchetTree::decap(LeafIndex from, const DirectPath& path)
 {
-  MergePath merge_path;
-
   auto copath = tree_math::copath(NodeIndex{ from }, node_size());
   if (path.nodes.size() != copath.size() + 1) {
     throw ProtocolError("Malformed DirectPath");
