@@ -333,6 +333,8 @@ struct CommitData
   TLS_SERIALIZABLE(commit, confirmation);
 };
 
+struct GroupContext;
+
 struct MLSPlaintext : public CipherAware
 {
   tls::opaque<1> group_id;
@@ -366,9 +368,9 @@ struct MLSPlaintext : public CipherAware
                LeafIndex sender,
                const Commit& commit);
 
-  bytes to_be_signed() const;
-  void sign(const SignaturePrivateKey& priv);
-  bool verify(const SignaturePublicKey& pub) const;
+  bytes to_be_signed(const GroupContext& context) const;
+  void sign(const GroupContext& context, const SignaturePrivateKey& priv);
+  bool verify(const GroupContext& context, const SignaturePublicKey& pub) const;
 
   bytes marshal_content(size_t padding_size) const;
 

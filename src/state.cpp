@@ -80,7 +80,6 @@ State::State(bytes group_id,
   , _application_keys(suite)
   , _index(0)
   , _identity_priv(credential.private_key().value())
-  , _zero(Digest(suite).output_size(), 0)
 {}
 
 // Initialize a group from a Welcome
@@ -151,7 +150,6 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _tree = group_info.tree;
   _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
   _interim_transcript_hash = group_info.interim_transcript_hash;
-  _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add self to tree
   auto maybe_index = _tree.find(my_cik);
@@ -224,7 +222,7 @@ MLSPlaintext
 State::sign(const Proposal& proposal) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, proposal };
-  pt.sign(_identity_priv);
+  pt.sign(group_context(), _identity_priv);
   return pt;
 }
 
@@ -303,7 +301,7 @@ State::commit(const bytes& leaf_secret) const
   commit.path = path;
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt = next.ratchet_and_sign(commit, update_secret);
+  auto pt = next.ratchet_and_sign(commit, update_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
   group_info.confirmed_transcript_hash = next._confirmed_transcript_hash;
@@ -324,8 +322,21 @@ State::commit(const bytes& leaf_secret) const
 /// Message handlers
 ///
 
+GroupContext
+State::group_context() const
+{
+  return GroupContext{
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _confirmed_transcript_hash,
+  };
+}
+
 MLSPlaintext
-State::ratchet_and_sign(const Commit& op, const bytes& update_secret)
+State::ratchet_and_sign(const Commit& op,
+                        const bytes& update_secret,
+                        const GroupContext& prev_ctx)
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, op };
 
@@ -340,7 +351,7 @@ State::ratchet_and_sign(const Commit& op, const bytes& update_secret)
   auto& commit_data = std::get<CommitData>(pt.content);
   commit_data.confirmation =
     hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
-  pt.sign(_identity_priv);
+  pt.sign(prev_ctx, _identity_priv);
 
   _interim_transcript_hash = Digest(_suite)
                                .write(_confirmed_transcript_hash)
@@ -538,7 +549,7 @@ MLSCiphertext
 State::protect(const bytes& pt)
 {
   MLSPlaintext mpt{ _group_id, _epoch, _index, pt };
-  mpt.sign(_identity_priv);
+  mpt.sign(group_context(), _identity_priv);
   return encrypt(mpt);
 }
 
@@ -664,7 +675,7 @@ bool
 State::verify(const MLSPlaintext& pt) const
 {
   auto pub = _tree.get_credential(pt.sender).public_key();
-  return pt.verify(pub);
+  return pt.verify(group_context(), pub);
 }
 
 bool

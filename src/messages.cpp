@@ -1,4 +1,5 @@
 #include "messages.h"
+#include "state.h"
 
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
 
@@ -433,24 +434,25 @@ MLSPlaintext::commit_auth_data() const
 }
 
 bytes
-MLSPlaintext::to_be_signed() const
+MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
-  w << group_id << epoch << sender << content;
+  w << context << group_id << epoch << sender << content;
   return w.bytes();
 }
 
 void
-MLSPlaintext::sign(const SignaturePrivateKey& priv)
+MLSPlaintext::sign(const GroupContext& context, const SignaturePrivateKey& priv)
 {
-  auto tbs = to_be_signed();
+  auto tbs = to_be_signed(context);
   signature = priv.sign(tbs);
 }
 
 bool
-MLSPlaintext::verify(const SignaturePublicKey& pub) const
+MLSPlaintext::verify(const GroupContext& context,
+                     const SignaturePublicKey& pub) const
 {
-  auto tbs = to_be_signed();
+  auto tbs = to_be_signed(context);
   return pub.verify(tbs, signature);
 }
 
