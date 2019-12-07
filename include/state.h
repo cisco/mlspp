@@ -21,9 +21,9 @@ struct GroupContext
   tls::opaque<1> group_id;
   epoch_t epoch;
   tls::opaque<1> tree_hash;
-  tls::opaque<1> transcript_hash;
+  tls::opaque<1> confirmed_transcript_hash;
 
-  TLS_SERIALIZABLE(group_id, epoch, tree_hash, transcript_hash)
+  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
 };
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we

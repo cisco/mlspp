@@ -110,6 +110,7 @@ struct GroupInfo {
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
+  tls::opaque<1> prior_confirmed_transcript_hash;
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
@@ -123,6 +124,7 @@ struct GroupInfo {
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
             RatchetTree tree_in,
+            bytes prior_confirmed_transcript_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
             DirectPath path_in,
@@ -135,6 +137,7 @@ struct GroupInfo {
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    tree,
+                   prior_confirmed_transcript_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
                    path,

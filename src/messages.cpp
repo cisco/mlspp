@@ -122,6 +122,7 @@ GroupInfo::GroupInfo(CipherSuite suite)
 GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
                      RatchetTree tree_in,
+                     bytes prior_confirmed_transcript_hash_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
                      DirectPath path_in,
@@ -129,6 +130,8 @@ GroupInfo::GroupInfo(bytes group_id_in,
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))
+  , prior_confirmed_transcript_hash(
+      std::move(prior_confirmed_transcript_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
   , path(std::move(path_in))
@@ -214,7 +217,7 @@ Welcome::encrypt(const ClientInitKey& cik)
 {
   auto key_pkg = KeyPackage{ _init_secret };
   auto key_pkg_data = tls::marshal(key_pkg);
-  auto enc_pkg = cik.init_key.encrypt(key_pkg_data);
+  auto enc_pkg = cik.init_key.encrypt({}, key_pkg_data);
   key_packages.emplace_back(cik.hash(), enc_pkg);
 }
 

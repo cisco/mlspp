@@ -1430,7 +1430,7 @@ setup_base(CipherSuite suite,
 }
 
 HPKECiphertext
-DHPublicKey::encrypt(const bytes& plaintext) const
+DHPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
 {
   // SetupBaseI
   auto ephemeral = DHPrivateKey::generate(_suite);
@@ -1448,6 +1448,7 @@ DHPublicKey::encrypt(const bytes& plaintext) const
 
   // Context.Encrypt
   AESGCM gcm(key, nonce);
+  gcm.set_aad(aad);
   auto content = gcm.encrypt(plaintext);
   return HPKECiphertext{ ephemeral.public_key(), content };
 }
@@ -1492,7 +1493,7 @@ DHPrivateKey::derive(const DHPublicKey& pub) const
 }
 
 bytes
-DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
+DHPrivateKey::decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const
 {
   // SetupBaseR
   auto enc = ciphertext.ephemeral.to_bytes();
@@ -1503,6 +1504,7 @@ DHPrivateKey::decrypt(const HPKECiphertext& ciphertext) const
   std::tie(key, nonce) = setup_base(_suite, public_key(), zz, enc, info);
 
   AESGCM gcm(key, nonce);
+  gcm.set_aad(aad);
   return gcm.decrypt(ciphertext.content);
 }
 

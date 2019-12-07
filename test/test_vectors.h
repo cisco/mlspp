@@ -57,6 +57,7 @@ struct CryptoTestVectors
 
   tls::opaque<1> derive_key_pair_seed;
 
+  tls::opaque<1> ecies_aad;
   tls::opaque<1> ecies_plaintext;
 
   struct TestCase
@@ -98,6 +99,7 @@ struct CryptoTestVectors
                    derive_secret_label,
                    derive_secret_context,
                    derive_key_pair_seed,
+                   ecies_aad,
                    ecies_plaintext,
                    case_p256,
                    case_x25519)
@@ -195,7 +197,7 @@ public:
       auto priv = HPKEPrivateKey::derive(suite, secrets[i]);
       add_leaf(ix, priv.public_key(), creds[i]);
       merge(ix, priv);
-      encap(ix, secrets[i]);
+      encap(ix, {}, secrets[i]);
     }
   }
 

@@ -117,7 +117,7 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
       _identity_priv = cik.credential.private_key().value();
 
       auto key_pkg_data =
-        cik.private_key().value().decrypt(enc_pkg.encrypted_key_package);
+        cik.private_key().value().decrypt({}, enc_pkg.encrypted_key_package);
       key_pkg = tls::get<KeyPackage>(key_pkg_data);
       my_cik = cik;
       break;
@@ -161,7 +161,14 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _tree.merge(_index, my_cik.private_key().value());
 
   // Decapsulate the direct path
-  auto update_secret = _tree.decap(group_info.signer_index, group_info.path);
+  auto ctx = tls::marshal(GroupContext{
+    group_info.group_id,
+    group_info.epoch,
+    group_info.tree.root_hash(),
+    group_info.prior_confirmed_transcript_hash,
+  });
+  auto update_secret =
+    _tree.decap(group_info.signer_index, ctx, group_info.path);
 
   // Ratchet forward into the current epoch
   update_epoch_secrets(update_secret);
@@ -295,9 +302,16 @@ State::commit(const bytes& leaf_secret) const
   group_info.group_id = next._group_id;
   group_info.epoch = next._epoch + 1;
   group_info.tree = next._tree;
+  group_info.prior_confirmed_transcript_hash = _confirmed_transcript_hash;
 
   // KEM new entropy to the group and the new joiners
-  auto [path, update_secret] = next._tree.encap(_index, leaf_secret);
+  auto ctx = tls::marshal(GroupContext{
+    group_info.group_id,
+    group_info.epoch,
+    group_info.tree.root_hash(),
+    group_info.prior_confirmed_transcript_hash,
+  });
+  auto [path, update_secret] = next._tree.encap(_index, ctx, leaf_secret);
   commit.path = path;
 
   // Create the Commit message and advance the transcripts / key schedule
@@ -398,7 +412,14 @@ State::handle(const MLSPlaintext& pt)
   next.apply(commit_data.commit);
 
   // Decapsulate and apply the DirectPath
-  auto update_secret = next._tree.decap(pt.sender, commit_data.commit.path);
+  auto ctx = tls::marshal(GroupContext{
+    next._group_id,
+    next._epoch + 1,
+    next._tree.root_hash(),
+    next._confirmed_transcript_hash,
+  });
+  auto update_secret =
+    next._tree.decap(pt.sender, ctx, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = Digest(_suite)

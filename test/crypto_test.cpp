@@ -213,7 +213,8 @@ protected:
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
     DeterministicHPKE lock;
-    auto ecies_out = derive_key_pair_pub.encrypt(tv.ecies_plaintext);
+    auto ecies_out =
+      derive_key_pair_pub.encrypt(tv.ecies_aad, tv.ecies_plaintext);
     ASSERT_EQ(ecies_out, test_case.ecies_out);
   }
 };
@@ -414,9 +415,10 @@ TEST_F(CryptoTest, HPKE)
     auto x = DHPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
+    auto aad = random_bytes(100);
     auto original = random_bytes(100);
-    auto encrypted = gX.encrypt(original);
-    auto decrypted = x.decrypt(encrypted);
+    auto encrypted = gX.encrypt(aad, original);
+    auto decrypted = x.decrypt(aad, encrypted);
 
     ASSERT_EQ(original, decrypted);
   }

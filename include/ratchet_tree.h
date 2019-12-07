@@ -86,8 +86,8 @@ public:
   RatchetTree(const DHPrivateKey& priv, const Credential& cred);
 
   // KEM encap/decap, including updates to the tree
-  std::tuple<DirectPath, bytes> encap(LeafIndex from, const bytes& leaf);
-  bytes decap(LeafIndex from, const DirectPath& path);
+  std::tuple<DirectPath, bytes> encap(LeafIndex from, const bytes& context, const bytes& leaf);
+  bytes decap(LeafIndex from, const bytes& context, const DirectPath& path);
 
   // Blank a path through the tree
   void blank_path(LeafIndex index, bool include_leaf);
