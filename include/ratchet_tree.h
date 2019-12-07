@@ -83,40 +83,25 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(CipherSuite suite, const bytes& secret, const Credential& cred); // XXX dele?
   RatchetTree(const DHPrivateKey& priv, const Credential& cred);
-  RatchetTree(CipherSuite suite,
-              const std::vector<bytes>& secrets,
-              const std::vector<Credential>& creds);
 
-  struct MergePath
-  {
-    bytes root_path_secret;
-    std::vector<RatchetTreeNode> nodes;
-  };
+  // KEM encap/decap, including updates to the tree
+  std::tuple<DirectPath, bytes> encap(LeafIndex from, const bytes& leaf);
+  bytes decap(LeafIndex from, const DirectPath& path);
 
-  std::tuple<DirectPath, bytes> encrypt(LeafIndex from, const bytes& leaf);
-  MergePath decrypt(LeafIndex from, const DirectPath& path) const;
-  void merge_path(LeafIndex from, const MergePath& path);
+  // Blank a path through the tree
+  void blank_path(LeafIndex index, bool include_leaf);
 
-  void add_leaf(LeafIndex index,
-                const DHPublicKey& pub,
-                const Credential& cred);
-  void add_leaf(LeafIndex index,
-                const DHPrivateKey& priv,
-                const Credential& cred);
-  void add_leaf(LeafIndex index,
-                const bytes& leaf_secret,
-                const Credential& cred);
-  void blank_path(LeafIndex index);
-  void blank_path_above(LeafIndex index);
-  bytes set_path(LeafIndex index, const bytes& leaf);
+  // Add a leaf node to the tree (without affecting its parents)
+  void add_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
 
+  // Merge a new key into a leaf (without affecting its credential)
+  void merge(LeafIndex index, const DHPublicKey& leaf_key);
+  void merge(LeafIndex index, const DHPrivateKey& leaf_priv);
+  void merge(LeafIndex index, const bytes& leaf_secret);
+
+  bool occupied(LeafIndex index) const;
   LeafIndex leftmost_free() const;
-  void set_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
-  void set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key);
-  void set_leaf_secret(LeafIndex index, const bytes& leaf_secret);
-
   std::optional<LeafIndex> find(const ClientInitKey& cik) const;
   const Credential& get_credential(LeafIndex index) const;
 
@@ -124,12 +109,7 @@ public:
   void truncate(LeafCount leaves);
 
   uint32_t size() const;
-  bool occupied(LeafIndex index) const;
   bytes root_hash() const;
-  bool check_credentials() const;
-  bool check_invariant(LeafIndex from) const;
-
-  TLS_SERIALIZABLE(_nodes)
 
 protected:
   RatchetTreeNodeVector _nodes;
@@ -141,7 +121,6 @@ protected:
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
 
-  void add_leaf_inner(LeafIndex index, const RatchetTreeNode& node_val);
   void set_hash(NodeIndex index);
   void set_hash_path(LeafIndex index);
   void set_hash_all(NodeIndex index);

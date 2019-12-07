@@ -160,12 +160,10 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   }
 
   _index = maybe_index.value();
-  _tree.add_leaf(_index, my_cik.private_key().value(), my_cik.credential);
+  _tree.merge(_index, my_cik.private_key().value());
 
-  // Decrypt the direct path
-  auto merge_path = _tree.decrypt(group_info.signer_index, group_info.path);
-  auto update_secret = merge_path.root_path_secret;
-  _tree.merge_path(group_info.signer_index, merge_path);
+  // Decapsulate the direct path
+  auto update_secret = _tree.decap(group_info.signer_index, group_info.path);
 
   // Ratchet forward into the current epoch
   update_epoch_secrets(update_secret);
@@ -300,8 +298,8 @@ State::commit(const bytes& leaf_secret) const
   group_info.epoch = next._epoch + 1;
   group_info.tree = next._tree;
 
-  // Encrypt new entropy to the group and the new joiners
-  auto [path, update_secret] = next._tree.encrypt(_index, leaf_secret);
+  // KEM new entropy to the group and the new joiners
+  auto [path, update_secret] = next._tree.encap(_index, leaf_secret);
   commit.path = path;
 
   // Create the Commit message and advance the transcripts / key schedule
@@ -388,10 +386,8 @@ State::handle(const MLSPlaintext& pt)
   State next = *this;
   next.apply(commit_data.commit);
 
-  // Decrypt and apply the DirectPath
-  auto merge_path = next._tree.decrypt(pt.sender, commit_data.commit.path);
-  auto update_secret = merge_path.root_path_secret;
-  next._tree.merge_path(pt.sender, merge_path);
+  // Decapsulate and apply the DirectPath
+  auto update_secret = next._tree.decap(pt.sender, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = Digest(_suite)
@@ -417,28 +413,28 @@ void
 State::apply(const Add& add)
 {
   auto target = _tree.leftmost_free();
-  _tree.set_leaf(
+  _tree.add_leaf(
     target, add.client_init_key.init_key, add.client_init_key.credential);
 }
 
 void
 State::apply(LeafIndex target, const Update& update)
 {
-  _tree.blank_path_above(target);
-  _tree.set_leaf_key(target, update.leaf_key);
+  _tree.blank_path(target, false);
+  _tree.merge(target, update.leaf_key);
 }
 
 void
 State::apply(LeafIndex target, const bytes& leaf_secret)
 {
-  _tree.blank_path_above(target);
-  _tree.set_leaf_secret(target, leaf_secret);
+  _tree.blank_path(target, false);
+  _tree.merge(target, leaf_secret);
 }
 
 void
 State::apply(const Remove& remove)
 {
-  _tree.blank_path(remove.removed);
+  _tree.blank_path(remove.removed, true);
 }
 
 bytes
@@ -506,6 +502,8 @@ State::apply(const Commit& commit)
   apply(commit.updates);
   apply(commit.removes);
   apply(commit.adds);
+
+  _tree.truncate(_tree.leaf_span());
 }
 
 bytes

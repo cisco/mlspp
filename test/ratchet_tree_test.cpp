@@ -89,14 +89,15 @@ protected:
     // Add the leaves
     int tci = 0;
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
-      tree.add_leaf(LeafIndex{ i }, tv.leaf_secrets[i], tc.credentials[i]);
-      tree.set_path(LeafIndex{ i }, tv.leaf_secrets[i]);
+      auto priv = HPKEPrivateKey::derive(test_suite, tv.leaf_secrets[i]);
+      tree.add_leaf(LeafIndex{ i }, priv.public_key(), tc.credentials[i]);
+      tree.encap(LeafIndex{ i }, tv.leaf_secrets[i]);
       assert_tree_eq(tc.trees[tci], tree);
     }
 
     // Blank even-numbered leaves
     for (uint32_t j = 0; j < tv.leaf_secrets.size(); j += 2, ++tci) {
-      tree.blank_path(LeafIndex{ j });
+      tree.blank_path(LeafIndex{ j }, true);
       assert_tree_eq(tc.trees[tci], tree);
     }
   }
@@ -114,16 +115,16 @@ TEST_F(RatchetTreeTest, Interop)
 
 TEST_F(RatchetTreeTest, OneMember)
 {
-  RatchetTree tree{ suite, secretA, credA };
+  TestRatchetTree tree{ suite, { secretA }, { credA } };
   ASSERT_EQ(tree.size(), 1);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
 }
 
 TEST_F(RatchetTreeTest, MultipleMembers)
 {
-  RatchetTree tree{ suite,
-                    { secretA, secretB, secretC, secretD },
-                    { credA, credB, credC, credD } };
+  TestRatchetTree tree{ suite,
+                        { secretA, secretB, secretC, secretD },
+                        { credA, credB, credC, credD } };
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
@@ -134,67 +135,75 @@ TEST_F(RatchetTreeTest, MultipleMembers)
 TEST_F(RatchetTreeTest, ByExtension)
 {
   RatchetTree tree{ suite };
-  bytes root_secret;
 
   // Add A
-  tree.add_leaf(LeafIndex{ 0 }, secretA, credA);
-  root_secret = tree.set_path(LeafIndex{ 0 }, secretA);
+  auto privA = HPKEPrivateKey::derive(suite, secretA);
+  tree.add_leaf(LeafIndex{ 0 }, privA.public_key(), credA);
+  auto [pathA, rootA] = tree.encap(LeafIndex{ 0 }, secretA);
+  silence_unused(pathA);
+
+  ASSERT_EQ(rootA, secretA);
   ASSERT_EQ(tree.root_hash(), hashA);
-  ASSERT_EQ(root_secret, secretA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
 
   // Add B
-  tree.add_leaf(LeafIndex{ 1 }, secretB, credB);
-  root_secret = tree.set_path(LeafIndex{ 1 }, secretB);
+  auto privB = HPKEPrivateKey::derive(suite, secretB);
+  tree.add_leaf(LeafIndex{ 1 }, privB.public_key(), credB);
+  auto [pathB, rootB] = tree.encap(LeafIndex{ 1 }, secretB);
+  silence_unused(pathB);
 
   ASSERT_EQ(tree.size(), 2);
-  ASSERT_EQ(root_secret, secretAB);
+  ASSERT_EQ(rootB, secretAB);
   ASSERT_EQ(tree.root_hash(), hashAB);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
 
-  RatchetTree directAB{ suite, { secretA, secretB }, { credA, credB } };
+  TestRatchetTree directAB{ suite, { secretA, secretB }, { credA, credB } };
   ASSERT_EQ(tree, directAB);
 
   // Add C
-  tree.add_leaf(LeafIndex{ 2 }, secretC, credC);
-  root_secret = tree.set_path(LeafIndex{ 2 }, secretC);
+  auto privC = HPKEPrivateKey::derive(suite, secretC);
+  tree.add_leaf(LeafIndex{ 2 }, privC.public_key(), credC);
+  auto [pathC, rootC] = tree.encap(LeafIndex{ 2 }, secretC);
+  silence_unused(pathC);
 
   ASSERT_EQ(tree.size(), 3);
-  ASSERT_EQ(root_secret, secretABC);
+  ASSERT_EQ(rootC, secretABC);
   ASSERT_EQ(tree.root_hash(), hashABC);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 2 }), credC);
 
-  RatchetTree directABC{ suite,
-                         { secretA, secretB, secretC },
-                         { credA, credB, credC } };
+  TestRatchetTree directABC{ suite,
+                             { secretA, secretB, secretC },
+                             { credA, credB, credC } };
   ASSERT_EQ(tree, directABC);
 
   // Add D
-  tree.add_leaf(LeafIndex{ 3 }, secretD, credD);
-  root_secret = tree.set_path(LeafIndex{ 3 }, secretD);
+  auto privD = HPKEPrivateKey::derive(suite, secretD);
+  tree.add_leaf(LeafIndex{ 3 }, privD.public_key(), credD);
+  auto [pathD, rootD] = tree.encap(LeafIndex{ 3 }, secretD);
+  silence_unused(pathD);
 
   ASSERT_EQ(tree.size(), 4);
-  ASSERT_EQ(root_secret, secretABCD);
+  ASSERT_EQ(rootD, secretABCD);
   ASSERT_EQ(tree.root_hash(), hashABCD);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 0 }), credA);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 1 }), credB);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 2 }), credC);
   ASSERT_EQ(tree.get_credential(LeafIndex{ 3 }), credD);
 
-  RatchetTree direct{ suite,
-                      { secretA, secretB, secretC, secretD },
-                      { credA, credB, credC, credD } };
+  TestRatchetTree direct{ suite,
+                          { secretA, secretB, secretC, secretD },
+                          { credA, credB, credC, credD } };
   ASSERT_EQ(tree, direct);
 }
 
 TEST_F(RatchetTreeTest, BySerialization)
 {
-  RatchetTree before{ suite,
-                      { secretA, secretB, secretC, secretD },
-                      { credA, credB, credC, credD } };
+  TestRatchetTree before{ suite,
+                          { secretA, secretB, secretC, secretD },
+                          { credA, credB, credC, credD } };
   RatchetTree after{ suite };
 
   tls::unmarshal(tls::marshal(before), after);
@@ -203,12 +212,12 @@ TEST_F(RatchetTreeTest, BySerialization)
 
 TEST_F(RatchetTreeTest, BySerializationWithBlanks)
 {
-  RatchetTree before{ suite,
-                      { secretA, secretB, secretC, secretD },
-                      { credA, credB, credC, credD } };
+  TestRatchetTree before{ suite,
+                          { secretA, secretB, secretC, secretD },
+                          { credA, credB, credC, credD } };
   RatchetTree after{ suite };
 
-  before.blank_path(LeafIndex{ 1 });
+  before.blank_path(LeafIndex{ 1 }, true);
   tls::unmarshal(tls::marshal(before), after);
   ASSERT_EQ(before, after);
 }
@@ -218,19 +227,18 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   size_t size = 5;
 
   // trees[i] represents a tree with a private key for only leaf i
-  std::vector<RatchetTree> trees(size, { suite });
+  std::vector<TestRatchetTree> trees(size, { suite });
   for (LeafIndex i{ 0 }; i.val < size; i.val += 1) {
     auto secret = random_bytes(32);
-    auto priv = DHPrivateKey::node_derive(suite, secret);
+    auto priv = DHPrivateKey::derive(suite, secret);
     auto pub = priv.public_key();
     auto sig = SignaturePrivateKey::derive(scheme, secret);
     auto cred = Credential::basic({ uint8_t(i.val) }, sig.public_key());
 
     for (uint32_t j = 0; j < size; j += 1) {
+      trees[j].add_leaf(i, pub, cred);
       if (i.val == j) {
-        trees[j].add_leaf(i, secret, cred);
-      } else {
-        trees[j].add_leaf(i, pub, cred);
+        trees[j].merge(i, secret);
       }
     }
   }
@@ -249,17 +257,15 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
 
     DirectPath path(trees[i.val].cipher_suite());
     bytes root_path_secret;
-    std::tie(path, root_path_secret) = trees[i.val].encrypt(i, secret);
+    std::tie(path, root_path_secret) = trees[i.val].encap(i, secret);
 
     for (size_t j = 0; j < size; ++j) {
       if (i.val == j) {
-        auto update_secret = trees[j].set_path(i, secret);
-        ASSERT_EQ(update_secret, root_path_secret);
-      } else {
-        auto info = trees[j].decrypt(i, path);
-        ASSERT_EQ(info.root_path_secret, root_path_secret);
-        trees[j].merge_path(i, info);
+        continue;
       }
+
+      auto decrypted_secret = trees[j].decap(i, path);
+      ASSERT_EQ(decrypted_secret, root_path_secret);
     }
 
     for (uint32_t j = 0; j < size; ++j) {

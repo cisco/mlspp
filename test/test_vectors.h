@@ -180,7 +180,67 @@ class TestRatchetTree : public RatchetTree
 {
 public:
   using RatchetTree::RatchetTree;
+
+  TestRatchetTree(CipherSuite suite,
+                  const std::vector<bytes>& secrets,
+                  const std::vector<Credential>& creds)
+    : RatchetTree(suite)
+  {
+    if (secrets.size() != creds.size()) {
+      throw InvalidParameterError("Incorrect tree initialization data");
+    }
+
+    for (uint32_t i = 0; i < secrets.size(); i += 1) {
+      auto ix = LeafIndex{ i };
+      auto priv = HPKEPrivateKey::derive(suite, secrets[i]);
+      add_leaf(ix, priv.public_key(), creds[i]);
+      merge(ix, priv);
+      encap(ix, secrets[i]);
+    }
+  }
+
   const RatchetTreeNodeVector& nodes() const { return _nodes; }
+
+  bool check_credentials() const
+  {
+    for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
+      auto& node = _nodes[NodeIndex{ i }];
+      if (node.has_value() && !node.value().credential().has_value()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool check_invariant(LeafIndex from) const
+  {
+    std::vector<bool> in_dirpath(_nodes.size(), false);
+
+    // Ensure that we have private keys for everything in the direct
+    // path...
+    auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
+    dirpath.push_back(root_index());
+    for (const auto& node : dirpath) {
+      in_dirpath[node.val] = true;
+      if (_nodes[node].has_value() && !_nodes[node].has_private()) {
+        return false;
+      }
+    }
+
+    // ... and nothing else
+    for (size_t i = 0; i < _nodes.size(); ++i) {
+      if (in_dirpath[i]) {
+        continue;
+      }
+
+      if (_nodes[i].has_private()) {
+        throw std::runtime_error("unexpected private key");
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 struct TreeTestVectors

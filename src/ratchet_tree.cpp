@@ -210,16 +210,6 @@ RatchetTree::RatchetTree(CipherSuite suite)
   , _secret_size(Digest(suite).output_size())
 {}
 
-RatchetTree::RatchetTree(CipherSuite suite,
-                         const bytes& secret,
-                         const Credential& cred)
-  : CipherAware(suite)
-  , _nodes(suite)
-  , _secret_size(Digest(suite).output_size())
-{
-  add_leaf(LeafIndex{ 0 }, secret, cred);
-}
-
 RatchetTree::RatchetTree(const DHPrivateKey& priv, const Credential& cred)
   : CipherAware(priv.cipher_suite())
   , _nodes(priv.cipher_suite())
@@ -230,25 +220,8 @@ RatchetTree::RatchetTree(const DHPrivateKey& priv, const Credential& cred)
   set_hash(NodeIndex{ 0 });
 }
 
-RatchetTree::RatchetTree(CipherSuite suite,
-                         const std::vector<bytes>& secrets,
-                         const std::vector<Credential>& creds)
-  : CipherAware(suite)
-  , _nodes(suite)
-  , _secret_size(Digest(suite).output_size())
-{
-  if (secrets.size() != creds.size()) {
-    throw InvalidParameterError("Incorrect tree initialization data");
-  }
-
-  for (uint32_t i = 0; i < secrets.size(); i += 1) {
-    add_leaf(LeafIndex{ i }, secrets[i], creds[i]);
-    set_path(LeafIndex{ i }, secrets[i]);
-  }
-}
-
 std::tuple<DirectPath, bytes>
-RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret)
+RatchetTree::encap(LeafIndex from, const bytes& leaf_secret)
 {
   DirectPath path{ _suite };
 
@@ -281,21 +254,22 @@ RatchetTree::encrypt(LeafIndex from, const bytes& leaf_secret)
   return std::make_tuple(path, path_secret);
 }
 
-RatchetTree::MergePath
-RatchetTree::decrypt(LeafIndex from, const DirectPath& path) const
+bytes
+RatchetTree::decap(LeafIndex from, const DirectPath& path)
 {
-  MergePath merge_path;
-
   auto copath = tree_math::copath(NodeIndex{ from }, node_size());
   if (path.nodes.size() != copath.size() + 1) {
     throw ProtocolError("Malformed DirectPath");
   }
 
+  auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
+  dirpath.push_back(root_index());
+
   // Handle the leaf node
   if (!path.nodes[0].node_secrets.empty()) {
     throw ProtocolError("Malformed initial node");
   }
-  merge_path.nodes.emplace_back(path.nodes[0].public_key);
+  _nodes[NodeIndex{ from }].merge(path.nodes[0].public_key);
 
   // Handle the remainder of the path
   bytes path_secret;
@@ -304,6 +278,7 @@ RatchetTree::decrypt(LeafIndex from, const DirectPath& path) const
     const auto curr = copath[i];
     const auto& path_node = path.nodes[i + 1];
 
+    // Decrypt or update the path secret
     if (!have_secret) {
       auto res = tree_math::resolve(_nodes, curr);
       if (path_node.node_secrets.size() != res.size()) {
@@ -325,111 +300,25 @@ RatchetTree::decrypt(LeafIndex from, const DirectPath& path) const
       path_secret = path_step(path_secret);
     }
 
+    // Update the current direct path node as appropriate
     if (have_secret) {
       auto temp = new_node(path_secret);
       if (temp.public_key() != path_node.public_key) {
         throw InvalidParameterError("Incorrect node public key");
       }
 
-      merge_path.nodes.push_back(temp);
+      _nodes[dirpath[i + 1]].merge(temp);
     } else {
-      merge_path.nodes.emplace_back(path_node.public_key);
+      _nodes[dirpath[i + 1]].merge(path_node.public_key);
     }
-  }
-
-  merge_path.root_path_secret = path_secret;
-  return merge_path;
-}
-
-void
-RatchetTree::merge_path(LeafIndex from, const RatchetTree::MergePath& path)
-{
-  auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-  dirpath.push_back(root_index());
-  if (dirpath.size() != path.nodes.size()) {
-    throw InvalidParameterError("Malformed MergePath");
-  }
-
-  for (size_t i = 0; i < dirpath.size(); ++i) {
-    auto curr = dirpath[i];
-    _nodes[curr].merge(path.nodes[i]);
   }
 
   set_hash_path(from);
+  return path_secret;
 }
 
 void
-RatchetTree::add_leaf(LeafIndex index,
-                      const DHPublicKey& pub,
-                      const Credential& cred)
-{
-  if (_suite != pub.cipher_suite()) {
-    throw InvalidParameterError("Incorrect ciphersuite");
-  }
-
-  auto node = RatchetTreeNode(pub);
-  node.set_credential(cred);
-
-  add_leaf_inner(index, node);
-}
-
-void
-RatchetTree::add_leaf(LeafIndex index,
-                      const DHPrivateKey& priv,
-                      const Credential& cred)
-{
-  if (_suite != priv.cipher_suite()) {
-    throw InvalidParameterError("Incorrect ciphersuite");
-  }
-
-  auto node = RatchetTreeNode(priv);
-  node.set_credential(cred);
-
-  add_leaf_inner(index, node);
-}
-
-void
-RatchetTree::add_leaf(LeafIndex index,
-                      const bytes& leaf_secret,
-                      const Credential& cred)
-{
-  auto node = new_node(leaf_secret);
-  node.set_credential(cred);
-
-  add_leaf_inner(index, node);
-}
-
-void
-RatchetTree::add_leaf_inner(LeafIndex index, const RatchetTreeNode& node_val)
-{
-  if (index.val == size()) {
-    if (!_nodes.empty()) {
-      _nodes.emplace_back(std::nullopt);
-    }
-    _nodes.emplace_back(std::nullopt);
-  }
-
-  blank_path(index);
-
-  auto node = NodeIndex{ index };
-  _nodes[node] = node_val;
-
-  set_hash_path(index);
-}
-
-void
-RatchetTree::blank_path(LeafIndex index)
-{
-  if (_nodes.empty()) {
-    return;
-  }
-
-  _nodes[NodeIndex{ index }] = std::nullopt;
-  blank_path_above(index);
-}
-
-void
-RatchetTree::blank_path_above(LeafIndex index)
+RatchetTree::blank_path(LeafIndex index, bool include_leaf)
 {
   if (_nodes.empty()) {
     return;
@@ -438,10 +327,16 @@ RatchetTree::blank_path_above(LeafIndex index)
   const auto node_count = node_size();
   const auto root = root_index();
 
+  auto first = true;
   auto curr = NodeIndex{ index };
-  curr = tree_math::parent(curr, node_count);
   while (curr != root) {
-    _nodes[curr] = std::nullopt;
+    auto skip = first && !include_leaf;
+    first = false;
+
+    if (!skip) {
+      _nodes[curr] = std::nullopt;
+    }
+
     curr = tree_math::parent(curr, node_count);
   }
 
@@ -449,19 +344,8 @@ RatchetTree::blank_path_above(LeafIndex index)
   set_hash_path(index);
 }
 
-LeafIndex
-RatchetTree::leftmost_free() const
-{
-  auto curr = LeafIndex{ 0 };
-  while (occupied(curr) && curr.val < size()) {
-    curr.val += 1;
-  }
-
-  return curr;
-}
-
 void
-RatchetTree::set_leaf(LeafIndex index,
+RatchetTree::add_leaf(LeafIndex index,
                       const DHPublicKey& leaf_key,
                       const Credential& credential)
 {
@@ -481,7 +365,7 @@ RatchetTree::set_leaf(LeafIndex index,
 }
 
 void
-RatchetTree::set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key)
+RatchetTree::merge(LeafIndex index, const DHPublicKey& leaf_key)
 {
   auto curr = NodeIndex{ index };
   if (!_nodes[curr].has_value()) {
@@ -492,7 +376,18 @@ RatchetTree::set_leaf_key(LeafIndex index, const DHPublicKey& leaf_key)
 }
 
 void
-RatchetTree::set_leaf_secret(LeafIndex index, const bytes& leaf_secret)
+RatchetTree::merge(LeafIndex index, const DHPrivateKey& leaf_priv)
+{
+  auto curr = NodeIndex{ index };
+  if (!_nodes[curr].has_value()) {
+    throw InvalidParameterError("Cannot update a blank leaf");
+  }
+  _nodes[curr].value().merge(leaf_priv);
+  set_hash_path(index);
+}
+
+void
+RatchetTree::merge(LeafIndex index, const bytes& leaf_secret)
 {
   auto curr = NodeIndex{ index };
   if (!_nodes[curr].has_value()) {
@@ -503,37 +398,26 @@ RatchetTree::set_leaf_secret(LeafIndex index, const bytes& leaf_secret)
   set_hash_path(index);
 }
 
-bytes
-RatchetTree::set_path(LeafIndex index, const bytes& leaf)
+bool
+RatchetTree::occupied(LeafIndex index) const
 {
-  const auto node_count = node_size();
-  const auto root = root_index();
-
-  auto curr = NodeIndex{ index };
-  if (!_nodes[curr].has_value()) {
-    throw InvalidParameterError("Cannot update a blank leaf");
-  }
-  _nodes[curr].value().merge(new_node(leaf));
-
-  auto path_secret = path_step(leaf);
-  curr = tree_math::parent(curr, node_count);
-  while (curr != root) {
-    _nodes[curr] = new_node(path_secret);
-
-    path_secret = path_step(path_secret);
-    curr = tree_math::parent(curr, node_count);
+  auto node = NodeIndex{ index };
+  if (node.val >= _nodes.size()) {
+    return false;
   }
 
-  // If there is only one member, then leaf == root == 0
-  // and some special considerations apply
-  if (root != NodeIndex{ index }) {
-    _nodes[root] = new_node(path_secret);
-  } else {
-    path_secret = leaf;
+  return _nodes[node].has_value();
+}
+
+LeafIndex
+RatchetTree::leftmost_free() const
+{
+  auto curr = LeafIndex{ 0 };
+  while (occupied(curr) && curr.val < size()) {
+    curr.val += 1;
   }
 
-  set_hash_path(index);
-  return path_secret;
+  return curr;
 }
 
 std::optional<LeafIndex>
@@ -597,64 +481,10 @@ RatchetTree::size() const
   return LeafCount{ node_size() }.val;
 }
 
-bool
-RatchetTree::occupied(LeafIndex index) const
-{
-  auto node = NodeIndex{ index };
-  if (node.val >= _nodes.size()) {
-    return false;
-  }
-
-  return _nodes[node].has_value();
-}
-
 bytes
 RatchetTree::root_hash() const
 {
   return _nodes[root_index()].hash();
-}
-
-bool
-RatchetTree::check_credentials() const
-{
-  for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
-    auto& node = _nodes[NodeIndex{ i }];
-    if (node.has_value() && !node.value().credential().has_value()) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool
-RatchetTree::check_invariant(LeafIndex from) const
-{
-  std::vector<bool> in_dirpath(_nodes.size(), false);
-
-  // Ensure that we have private keys for everything in the direct
-  // path...
-  auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-  dirpath.push_back(root_index());
-  for (const auto& node : dirpath) {
-    in_dirpath[node.val] = true;
-    if (_nodes[node].has_value() && !_nodes[node].has_private()) {
-      return false;
-    }
-  }
-
-  // ... and nothing else
-  for (size_t i = 0; i < _nodes.size(); ++i) {
-    if (in_dirpath[i]) {
-      continue;
-    }
-
-    if (_nodes[i].has_private()) {
-      throw std::runtime_error("unexpected private key");
-      return false;
-    }
-  }
-
-  return true;
 }
 
 NodeIndex
