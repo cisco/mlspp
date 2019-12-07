@@ -140,6 +140,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   auto privA = HPKEPrivateKey::derive(suite, secretA);
   tree.add_leaf(LeafIndex{ 0 }, privA.public_key(), credA);
   auto [pathA, rootA] = tree.encap(LeafIndex{ 0 }, secretA);
+  silence_unused(pathA);
 
   ASSERT_EQ(rootA, secretA);
   ASSERT_EQ(tree.root_hash(), hashA);
@@ -149,6 +150,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   auto privB = HPKEPrivateKey::derive(suite, secretB);
   tree.add_leaf(LeafIndex{ 1 }, privB.public_key(), credB);
   auto [pathB, rootB] = tree.encap(LeafIndex{ 1 }, secretB);
+  silence_unused(pathB);
 
   ASSERT_EQ(tree.size(), 2);
   ASSERT_EQ(rootB, secretAB);
@@ -163,6 +165,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   auto privC = HPKEPrivateKey::derive(suite, secretC);
   tree.add_leaf(LeafIndex{ 2 }, privC.public_key(), credC);
   auto [pathC, rootC] = tree.encap(LeafIndex{ 2 }, secretC);
+  silence_unused(pathC);
 
   ASSERT_EQ(tree.size(), 3);
   ASSERT_EQ(rootC, secretABC);
@@ -180,6 +183,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   auto privD = HPKEPrivateKey::derive(suite, secretD);
   tree.add_leaf(LeafIndex{ 3 }, privD.public_key(), credD);
   auto [pathD, rootD] = tree.encap(LeafIndex{ 3 }, secretD);
+  silence_unused(pathD);
 
   ASSERT_EQ(tree.size(), 4);
   ASSERT_EQ(rootD, secretABCD);
