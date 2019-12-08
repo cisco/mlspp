@@ -72,7 +72,7 @@ protected:
     DirectPath direct_path(ratchet_tree.cipher_suite());
     bytes dummy;
     std::tie(direct_path, dummy) =
-      ratchet_tree.encap(LeafIndex{ 0 }, tv.random);
+      ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
 
     // ClientInitKey
     ClientInitKey client_init_key{ dh_priv, cred };
@@ -81,8 +81,8 @@ protected:
 
     // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome
     auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch,    ratchet_tree, tv.random,
-                 tv.random,   direct_path, tv.random };
+      GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree, tv.random,
+                 tv.random,   tv.random, direct_path,  tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
@@ -91,7 +91,7 @@ protected:
     tls_round_trip(tc.key_package, key_package, true);
 
     auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
+      EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
     tls_round_trip(
       tc.encrypted_key_package, encrypted_key_package, true, tc.cipher_suite);
 

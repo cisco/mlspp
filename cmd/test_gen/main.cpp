@@ -84,7 +84,8 @@ generate_crypto()
 
   tv.derive_key_pair_seed = { 0, 1, 2, 3 };
 
-  tv.ecies_plaintext = bytes(128, 0xB1);
+  tv.ecies_aad = bytes(128, 0xB1);
+  tv.ecies_plaintext = bytes(128, 0xB2);
 
   // Construct a test case for each suite
   for (size_t i = 0; i < suites.size(); ++i) {
@@ -108,7 +109,7 @@ generate_crypto()
 
     // HPKE
     DeterministicHPKE lock;
-    test_case->ecies_out = pub.encrypt(tv.ecies_plaintext);
+    test_case->ecies_out = pub.encrypt(tv.ecies_aad, tv.ecies_plaintext);
   }
 
   return tv;
@@ -274,7 +275,7 @@ generate_tree()
       auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j]);
       tree.add_leaf(
         LeafIndex{ j }, priv.public_key(), test_case->credentials[j]);
-      tree.encap(LeafIndex{ j }, tv.leaf_secrets[j]);
+      tree.encap(LeafIndex{ j }, {}, tv.leaf_secrets[j]);
       test_case->trees.push_back(tree_to_case(tree));
     }
 
@@ -341,7 +342,7 @@ generate_messages()
     DirectPath direct_path(ratchet_tree.cipher_suite());
     bytes dummy;
     std::tie(direct_path, dummy) =
-      ratchet_tree.encap(LeafIndex{ 0 }, tv.random);
+      ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
 
     // Construct CIK
     auto client_init_key = ClientInitKey{ dh_priv, cred };
@@ -349,14 +350,14 @@ generate_messages()
 
     // Construct Welcome
     auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch,    ratchet_tree, tv.random,
-                 tv.random,   direct_path, tv.random };
+      GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree, tv.random,
+                 tv.random,   tv.random, direct_path,  tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
     auto key_package = KeyPackage{ tv.random };
     auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt(tv.random) };
+      EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;

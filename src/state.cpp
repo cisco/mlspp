@@ -80,7 +80,6 @@ State::State(bytes group_id,
   , _application_keys(suite)
   , _index(0)
   , _identity_priv(credential.private_key().value())
-  , _zero(Digest(suite).output_size(), 0)
 {}
 
 // Initialize a group from a Welcome
@@ -118,7 +117,7 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
       _identity_priv = cik.credential.private_key().value();
 
       auto key_pkg_data =
-        cik.private_key().value().decrypt(enc_pkg.encrypted_key_package);
+        cik.private_key().value().decrypt({}, enc_pkg.encrypted_key_package);
       key_pkg = tls::get<KeyPackage>(key_pkg_data);
       my_cik = cik;
       break;
@@ -151,7 +150,6 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _tree = group_info.tree;
   _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
   _interim_transcript_hash = group_info.interim_transcript_hash;
-  _zero = bytes(Digest(_suite).output_size(), 0);
 
   // Add self to tree
   auto maybe_index = _tree.find(my_cik);
@@ -163,7 +161,14 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _tree.merge(_index, my_cik.private_key().value());
 
   // Decapsulate the direct path
-  auto update_secret = _tree.decap(group_info.signer_index, group_info.path);
+  auto ctx = tls::marshal(GroupContext{
+    group_info.group_id,
+    group_info.epoch,
+    group_info.tree.root_hash(),
+    group_info.prior_confirmed_transcript_hash,
+  });
+  auto update_secret =
+    _tree.decap(group_info.signer_index, ctx, group_info.path);
 
   // Ratchet forward into the current epoch
   update_epoch_secrets(update_secret);
@@ -224,7 +229,7 @@ MLSPlaintext
 State::sign(const Proposal& proposal) const
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, proposal };
-  pt.sign(_identity_priv);
+  pt.sign(group_context(), _identity_priv);
   return pt;
 }
 
@@ -297,13 +302,20 @@ State::commit(const bytes& leaf_secret) const
   group_info.group_id = next._group_id;
   group_info.epoch = next._epoch + 1;
   group_info.tree = next._tree;
+  group_info.prior_confirmed_transcript_hash = _confirmed_transcript_hash;
 
   // KEM new entropy to the group and the new joiners
-  auto [path, update_secret] = next._tree.encap(_index, leaf_secret);
+  auto ctx = tls::marshal(GroupContext{
+    group_info.group_id,
+    group_info.epoch,
+    group_info.tree.root_hash(),
+    group_info.prior_confirmed_transcript_hash,
+  });
+  auto [path, update_secret] = next._tree.encap(_index, ctx, leaf_secret);
   commit.path = path;
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt = next.ratchet_and_sign(commit, update_secret);
+  auto pt = next.ratchet_and_sign(commit, update_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
   group_info.confirmed_transcript_hash = next._confirmed_transcript_hash;
@@ -324,8 +336,21 @@ State::commit(const bytes& leaf_secret) const
 /// Message handlers
 ///
 
+GroupContext
+State::group_context() const
+{
+  return GroupContext{
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _confirmed_transcript_hash,
+  };
+}
+
 MLSPlaintext
-State::ratchet_and_sign(const Commit& op, const bytes& update_secret)
+State::ratchet_and_sign(const Commit& op,
+                        const bytes& update_secret,
+                        const GroupContext& prev_ctx)
 {
   auto pt = MLSPlaintext{ _group_id, _epoch, _index, op };
 
@@ -340,7 +365,7 @@ State::ratchet_and_sign(const Commit& op, const bytes& update_secret)
   auto& commit_data = std::get<CommitData>(pt.content);
   commit_data.confirmation =
     hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
-  pt.sign(_identity_priv);
+  pt.sign(prev_ctx, _identity_priv);
 
   _interim_transcript_hash = Digest(_suite)
                                .write(_confirmed_transcript_hash)
@@ -387,7 +412,14 @@ State::handle(const MLSPlaintext& pt)
   next.apply(commit_data.commit);
 
   // Decapsulate and apply the DirectPath
-  auto update_secret = next._tree.decap(pt.sender, commit_data.commit.path);
+  auto ctx = tls::marshal(GroupContext{
+    next._group_id,
+    next._epoch + 1,
+    next._tree.root_hash(),
+    next._confirmed_transcript_hash,
+  });
+  auto update_secret =
+    next._tree.decap(pt.sender, ctx, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = Digest(_suite)
@@ -538,7 +570,7 @@ MLSCiphertext
 State::protect(const bytes& pt)
 {
   MLSPlaintext mpt{ _group_id, _epoch, _index, pt };
-  mpt.sign(_identity_priv);
+  mpt.sign(group_context(), _identity_priv);
   return encrypt(mpt);
 }
 
@@ -634,12 +666,13 @@ static bytes
 content_aad(const tls::opaque<1>& group_id,
             uint32_t epoch,
             ContentType content_type,
+            const tls::opaque<4>& authenticated_data,
             const tls::opaque<1>& sender_data_nonce,
             const tls::opaque<1>& encrypted_sender_data)
 {
   tls::ostream w;
-  w << group_id << epoch << content_type << sender_data_nonce
-    << encrypted_sender_data;
+  w << group_id << epoch << content_type << authenticated_data
+    << sender_data_nonce << encrypted_sender_data;
   return w.bytes();
 }
 
@@ -664,7 +697,7 @@ bool
 State::verify(const MLSPlaintext& pt) const
 {
   auto pub = _tree.get_credential(pt.sender).public_key();
-  return pt.verify(pub);
+  return pt.verify(group_context(), pub);
 }
 
 bool
@@ -731,6 +764,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto aad = content_aad(_group_id,
                          _epoch,
                          pt.content.inner_type(),
+                         pt.authenticated_data,
                          sender_data_nonce,
                          encrypted_sender_data);
 
@@ -746,6 +780,7 @@ State::encrypt(const MLSPlaintext& pt)
   ct.content_type = pt.content.inner_type();
   ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
+  ct.authenticated_data = pt.authenticated_data;
   ct.ciphertext = ciphertext;
   return ct;
 }
@@ -795,6 +830,7 @@ State::decrypt(const MLSCiphertext& ct)
   auto aad = content_aad(ct.group_id,
                          ct.epoch,
                          ct.content_type,
+                         ct.authenticated_data,
                          ct.sender_data_nonce,
                          ct.encrypted_sender_data);
   auto gcm = AESGCM(keys.key, keys.nonce);
@@ -803,7 +839,8 @@ State::decrypt(const MLSCiphertext& ct)
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{ _suite, _group_id,       _epoch,
-                       sender, ct.content_type, content };
+                       sender, ct.content_type, ct.authenticated_data,
+                       content };
 }
 
 } // namespace mls

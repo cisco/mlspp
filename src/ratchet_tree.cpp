@@ -221,7 +221,9 @@ RatchetTree::RatchetTree(const DHPrivateKey& priv, const Credential& cred)
 }
 
 std::tuple<DirectPath, bytes>
-RatchetTree::encap(LeafIndex from, const bytes& leaf_secret)
+RatchetTree::encap(LeafIndex from,
+                   const bytes& context,
+                   const bytes& leaf_secret)
 {
   DirectPath path{ _suite };
 
@@ -242,7 +244,7 @@ RatchetTree::encap(LeafIndex from, const bytes& leaf_secret)
 
     for (const auto& res_node : tree_math::resolve(_nodes, node)) {
       auto& pub = _nodes[res_node].value().public_key();
-      auto ciphertext = pub.encrypt(path_secret);
+      auto ciphertext = pub.encrypt(context, path_secret);
       path_node.node_secrets.push_back(ciphertext);
     }
 
@@ -255,7 +257,7 @@ RatchetTree::encap(LeafIndex from, const bytes& leaf_secret)
 }
 
 bytes
-RatchetTree::decap(LeafIndex from, const DirectPath& path)
+RatchetTree::decap(LeafIndex from, const bytes& context, const DirectPath& path)
 {
   auto copath = tree_math::copath(NodeIndex{ from }, node_size());
   if (path.nodes.size() != copath.size() + 1) {
@@ -293,7 +295,7 @@ RatchetTree::decap(LeafIndex from, const DirectPath& path)
 
         auto encrypted_secret = path_node.node_secrets[j];
         auto& priv = tree_node.value().private_key().value();
-        path_secret = priv.decrypt(encrypted_secret);
+        path_secret = priv.decrypt(context, encrypted_secret);
         have_secret = true;
       }
     } else {

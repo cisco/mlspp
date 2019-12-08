@@ -21,9 +21,9 @@ struct GroupContext
   tls::opaque<1> group_id;
   epoch_t epoch;
   tls::opaque<1> tree_hash;
-  tls::opaque<1> transcript_hash;
+  tls::opaque<1> confirmed_transcript_hash;
 
-  TLS_SERIALIZABLE(group_id, epoch, tree_hash, transcript_hash)
+  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
 };
 
 // XXX(rlb@ipv.sx): This is implemented in "const mode", where we
@@ -177,13 +177,13 @@ private:
   std::list<MLSPlaintext> _pending_proposals;
   std::map<ProposalID, bytes> _update_secrets;
 
-  // A zero vector, for convenience
-  bytes _zero;
+  // Assemble a group context for this state
+  GroupContext group_context() const;
 
   // Ratchet the key schedule forward and sign the commit that caused the
   // transition
   MLSPlaintext
-  ratchet_and_sign(const Commit& op, const bytes& update_secret);
+  ratchet_and_sign(const Commit& op, const bytes& update_secret, const GroupContext& prev_ctx);
 
   // Create an MLSPlaintext with a signature over some content
   MLSPlaintext sign(const Proposal& proposal) const;

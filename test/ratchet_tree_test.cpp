@@ -91,7 +91,7 @@ protected:
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
       auto priv = HPKEPrivateKey::derive(test_suite, tv.leaf_secrets[i]);
       tree.add_leaf(LeafIndex{ i }, priv.public_key(), tc.credentials[i]);
-      tree.encap(LeafIndex{ i }, tv.leaf_secrets[i]);
+      tree.encap(LeafIndex{ i }, {}, tv.leaf_secrets[i]);
       assert_tree_eq(tc.trees[tci], tree);
     }
 
@@ -139,7 +139,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   // Add A
   auto privA = HPKEPrivateKey::derive(suite, secretA);
   tree.add_leaf(LeafIndex{ 0 }, privA.public_key(), credA);
-  auto [pathA, rootA] = tree.encap(LeafIndex{ 0 }, secretA);
+  auto [pathA, rootA] = tree.encap(LeafIndex{ 0 }, {}, secretA);
   silence_unused(pathA);
 
   ASSERT_EQ(rootA, secretA);
@@ -149,7 +149,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   // Add B
   auto privB = HPKEPrivateKey::derive(suite, secretB);
   tree.add_leaf(LeafIndex{ 1 }, privB.public_key(), credB);
-  auto [pathB, rootB] = tree.encap(LeafIndex{ 1 }, secretB);
+  auto [pathB, rootB] = tree.encap(LeafIndex{ 1 }, {}, secretB);
   silence_unused(pathB);
 
   ASSERT_EQ(tree.size(), 2);
@@ -164,7 +164,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   // Add C
   auto privC = HPKEPrivateKey::derive(suite, secretC);
   tree.add_leaf(LeafIndex{ 2 }, privC.public_key(), credC);
-  auto [pathC, rootC] = tree.encap(LeafIndex{ 2 }, secretC);
+  auto [pathC, rootC] = tree.encap(LeafIndex{ 2 }, {}, secretC);
   silence_unused(pathC);
 
   ASSERT_EQ(tree.size(), 3);
@@ -182,7 +182,7 @@ TEST_F(RatchetTreeTest, ByExtension)
   // Add D
   auto privD = HPKEPrivateKey::derive(suite, secretD);
   tree.add_leaf(LeafIndex{ 3 }, privD.public_key(), credD);
-  auto [pathD, rootD] = tree.encap(LeafIndex{ 3 }, secretD);
+  auto [pathD, rootD] = tree.encap(LeafIndex{ 3 }, {}, secretD);
   silence_unused(pathD);
 
   ASSERT_EQ(tree.size(), 4);
@@ -257,14 +257,14 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
 
     DirectPath path(trees[i.val].cipher_suite());
     bytes root_path_secret;
-    std::tie(path, root_path_secret) = trees[i.val].encap(i, secret);
+    std::tie(path, root_path_secret) = trees[i.val].encap(i, {}, secret);
 
     for (size_t j = 0; j < size; ++j) {
       if (i.val == j) {
         continue;
       }
 
-      auto decrypted_secret = trees[j].decap(i, path);
+      auto decrypted_secret = trees[j].decap(i, {}, path);
       ASSERT_EQ(decrypted_secret, root_path_secret);
     }
 

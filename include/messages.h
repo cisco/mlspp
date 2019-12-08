@@ -110,6 +110,7 @@ struct GroupInfo {
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
+  tls::opaque<1> prior_confirmed_transcript_hash;
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
@@ -123,6 +124,7 @@ struct GroupInfo {
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
             RatchetTree tree_in,
+            bytes prior_confirmed_transcript_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
             DirectPath path_in,
@@ -135,6 +137,7 @@ struct GroupInfo {
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    tree,
+                   prior_confirmed_transcript_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
                    path,
@@ -333,11 +336,14 @@ struct CommitData
   TLS_SERIALIZABLE(commit, confirmation);
 };
 
+struct GroupContext;
+
 struct MLSPlaintext : public CipherAware
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
+  tls::opaque<4> authenticated_data;
   tls::variant_variant<ContentType, CipherSuite, ApplicationData, Proposal, CommitData> content;
   tls::opaque<2> signature;
 
@@ -350,6 +356,7 @@ struct MLSPlaintext : public CipherAware
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,
+               bytes authenticated_data,
                bytes content);
 
   // Constructors for encrypting
@@ -366,16 +373,16 @@ struct MLSPlaintext : public CipherAware
                LeafIndex sender,
                const Commit& commit);
 
-  bytes to_be_signed() const;
-  void sign(const SignaturePrivateKey& priv);
-  bool verify(const SignaturePublicKey& pub) const;
+  bytes to_be_signed(const GroupContext& context) const;
+  void sign(const GroupContext& context, const SignaturePrivateKey& priv);
+  bool verify(const GroupContext& context, const SignaturePublicKey& pub) const;
 
   bytes marshal_content(size_t padding_size) const;
 
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id, epoch, sender, content, signature);
+  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature);
 };
 
 // struct {
@@ -393,10 +400,11 @@ struct MLSCiphertext
   ContentType content_type;
   tls::opaque<1> sender_data_nonce;
   tls::opaque<1> encrypted_sender_data;
+  tls::opaque<4> authenticated_data;
   tls::opaque<4> ciphertext;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
-                   encrypted_sender_data, ciphertext);
+                   encrypted_sender_data, authenticated_data, ciphertext);
 };
 
 } // namespace mls

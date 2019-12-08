@@ -290,7 +290,7 @@ class DHPublicKey : public PublicKey
 public:
   using PublicKey::PublicKey;
   DHPublicKey();
-  HPKECiphertext encrypt(const bytes& plaintext) const;
+  HPKECiphertext encrypt(const bytes& aad, const bytes& plaintext) const;
 
 private:
   friend class DHPrivateKey;
@@ -307,7 +307,7 @@ public:
   static DHPrivateKey node_derive(CipherSuite suite, const bytes& secret);
 
   bytes derive(const DHPublicKey& pub) const;
-  bytes decrypt(const HPKECiphertext& ciphertext) const;
+  bytes decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const;
 
   const DHPublicKey& public_key() const;
 
