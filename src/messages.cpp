@@ -1,4 +1,5 @@
 #include "messages.h"
+#include "key_schedule.h"
 #include "state.h"
 
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
@@ -193,23 +194,11 @@ Welcome::Welcome(CipherSuite suite,
   , key_packages(suite)
   , _init_secret(std::move(init_secret))
 {
-  auto [key, nonce] = group_info_keymat(_init_secret);
+  auto first_epoch = FirstEpoch::create(cipher_suite, _init_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info = AESGCM(key, nonce).encrypt(group_info_data);
-}
-
-std::tuple<bytes, bytes>
-Welcome::group_info_keymat(const bytes& init_secret) const
-{
-  auto secret_size = Digest(cipher_suite).output_size();
-  auto key_size = AESGCM::key_size(cipher_suite);
-  auto nonce_size = AESGCM::nonce_size;
-
-  auto secret =
-    hkdf_expand_label(cipher_suite, init_secret, "group info", {}, secret_size);
-  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
-  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
-  return std::make_tuple(key, nonce);
+  encrypted_group_info =
+    AESGCM(first_epoch.group_info_key, first_epoch.group_info_nonce)
+      .encrypt(group_info_data);
 }
 
 void

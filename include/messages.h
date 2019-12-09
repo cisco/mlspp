@@ -189,7 +189,6 @@ struct Welcome {
           bytes init_secret,
           const GroupInfo& group_info);
 
-  std::tuple<bytes, bytes> group_info_keymat(const bytes& init_secret) const;
   void encrypt(const ClientInitKey& cik);
 
   private:

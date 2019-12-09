@@ -51,38 +51,28 @@ struct CryptoTestVectors
   tls::opaque<1> hkdf_extract_salt;
   tls::opaque<1> hkdf_extract_ikm;
 
-  tls::opaque<1> derive_secret_secret;
-  tls::opaque<1> derive_secret_label;
-  tls::opaque<1> derive_secret_context;
-
   tls::opaque<1> derive_key_pair_seed;
 
-  tls::opaque<1> ecies_aad;
-  tls::opaque<1> ecies_plaintext;
+  tls::opaque<1> hpke_aad;
+  tls::opaque<1> hpke_plaintext;
 
   struct TestCase
   {
     // HKDF-Extract
     tls::opaque<1> hkdf_extract_out;
 
-    // Derive-Secret
-    tls::opaque<1> derive_secret_out;
-
     // Derive-Key-Pair
     DHPublicKey derive_key_pair_pub;
 
     // HPKE
-    HPKECiphertext ecies_out;
+    HPKECiphertext hpke_out;
 
     TestCase(CipherSuite suite)
       : derive_key_pair_pub(suite)
-      , ecies_out(suite)
+      , hpke_out(suite)
     {}
 
-    TLS_SERIALIZABLE(hkdf_extract_out,
-                     derive_secret_out,
-                     derive_key_pair_pub,
-                     ecies_out)
+    TLS_SERIALIZABLE(hkdf_extract_out, derive_key_pair_pub, hpke_out)
   };
 
   CryptoTestVectors()
@@ -95,12 +85,9 @@ struct CryptoTestVectors
 
   TLS_SERIALIZABLE(hkdf_extract_salt,
                    hkdf_extract_ikm,
-                   derive_secret_secret,
-                   derive_secret_label,
-                   derive_secret_context,
                    derive_key_pair_seed,
-                   ecies_aad,
-                   ecies_plaintext,
+                   hpke_aad,
+                   hpke_plaintext,
                    case_p256,
                    case_x25519)
 };
@@ -344,6 +331,16 @@ struct MessagesTestVectors
 
 namespace mls {
 
+class TestState : public State
+{
+public:
+  TestState(const State& other)
+    : State(other)
+  {}
+
+  KeyScheduleEpoch keys() const { return _keys; }
+};
+
 class TestSession : public Session
 {
 public:
@@ -358,19 +355,25 @@ public:
 
   CipherSuite cipher_suite() const { return current_state().cipher_suite(); }
 
-  bytes current_epoch_secret() const { return current_state().epoch_secret(); }
+  bytes current_epoch_secret() const
+  {
+    return TestState(current_state()).keys().epoch_secret;
+  }
 
   bytes current_application_secret() const
   {
-    return current_state().application_secret();
+    return TestState(current_state()).keys().application_secret;
   }
 
   bytes current_confirmation_key() const
   {
-    return current_state().confirmation_key();
+    return TestState(current_state()).keys().confirmation_key;
   }
 
-  bytes current_init_secret() const { return current_state().init_secret(); }
+  bytes current_init_secret() const
+  {
+    return TestState(current_state()).keys().init_secret;
+  }
 };
 
 } // namespace mls

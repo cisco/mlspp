@@ -76,16 +76,10 @@ generate_crypto()
   tv.hkdf_extract_salt = { 0, 1, 2, 3 };
   tv.hkdf_extract_ikm = { 4, 5, 6, 7 };
 
-  std::string derive_secret_label_string = "test";
-  tv.derive_secret_secret = bytes(32, 0xA0);
-  tv.derive_secret_label =
-    bytes(derive_secret_label_string.begin(), derive_secret_label_string.end());
-  tv.derive_secret_context = bytes(32, 0xB0);
-
   tv.derive_key_pair_seed = { 0, 1, 2, 3 };
 
-  tv.ecies_aad = bytes(128, 0xB1);
-  tv.ecies_plaintext = bytes(128, 0xB2);
+  tv.hpke_aad = bytes(128, 0xB1);
+  tv.hpke_plaintext = bytes(128, 0xB2);
 
   // Construct a test case for each suite
   for (size_t i = 0; i < suites.size(); ++i) {
@@ -96,12 +90,6 @@ generate_crypto()
     test_case->hkdf_extract_out =
       hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
 
-    // Derive-Secret
-    test_case->derive_secret_out = derive_secret(suite,
-                                                 tv.derive_secret_secret,
-                                                 derive_secret_label_string,
-                                                 tv.derive_secret_context);
-
     // Derive-Key-Pair
     auto priv = DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
     auto pub = priv.public_key();
@@ -109,12 +97,13 @@ generate_crypto()
 
     // HPKE
     DeterministicHPKE lock;
-    test_case->ecies_out = pub.encrypt(tv.ecies_aad, tv.ecies_plaintext);
+    test_case->hpke_out = pub.encrypt(tv.hpke_aad, tv.hpke_plaintext);
   }
 
   return tv;
 }
 
+/*TODO(rlb) re-enable
 KeyScheduleTestVectors
 generate_key_schedule()
 {
@@ -217,6 +206,7 @@ generate_app_key_schedule()
 
   return tv;
 }
+*/
 
 TreeTestVectors::TreeCase
 tree_to_case(const TestRatchetTree& tree)
@@ -594,11 +584,13 @@ main()
   CryptoTestVectors crypto = generate_crypto();
   write_test_vectors(crypto);
 
+  /*
   KeyScheduleTestVectors key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
   AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
   write_test_vectors(app_key_schedule);
+  */
 
   TreeTestVectors tree = generate_tree();
   write_test_vectors(tree);
@@ -614,8 +606,8 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
-  verify_reproducible(generate_key_schedule);
-  verify_reproducible(generate_app_key_schedule);
+  // verify_reproducible(generate_key_schedule);
+  // verify_reproducible(generate_app_key_schedule);
   verify_reproducible(generate_tree);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
@@ -625,8 +617,8 @@ main()
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
-    TestLoader<KeyScheduleTestVectors>::get();
-    TestLoader<AppKeyScheduleTestVectors>::get();
+    // TestLoader<KeyScheduleTestVectors>::get();
+    // TestLoader<AppKeyScheduleTestVectors>::get();
     TestLoader<TreeTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();

@@ -4,6 +4,7 @@
 
 using namespace mls;
 
+/* TODO(rlb): Re-instantiate as test of HashRatchet
 class AppKeyScheduleTest : public ::testing::Test
 {
 protected:
@@ -35,6 +36,7 @@ TEST_F(AppKeyScheduleTest, Interop)
   interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
   interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
 }
+*/
 
 class StateTest : public ::testing::Test
 {
@@ -286,6 +288,7 @@ TEST_F(StateTest, CipherNegotiation)
   ASSERT_EQ(stateA, stateB);
 }
 
+/* TODO(rlb): re-instantiate as a test of KeyScheduleEpoch
 class KeyScheduleTest : public ::testing::Test
 {
 protected:
@@ -324,3 +327,4 @@ TEST_F(KeyScheduleTest, Interop)
   interop(tv.case_p256);
   interop(tv.case_x25519);
 }
+*/
