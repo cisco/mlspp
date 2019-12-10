@@ -7,7 +7,7 @@
 namespace mls {
 
 static void
-zeroize(bytes& data)
+zeroize(bytes& data) // NOLINT(google-runtime-references)
 {
   for (auto& val : data) {
     val = 0;
@@ -34,6 +34,12 @@ struct ApplicationContext
 {
   NodeIndex node;
   uint32_t generation;
+
+  ApplicationContext(NodeIndex node_in, uint32_t generation_in)
+    : node(node_in)
+    , generation(generation_in)
+  {}
+
   TLS_SERIALIZABLE(node, generation);
 };
 
@@ -102,8 +108,7 @@ HashRatchet::get(uint32_t generation)
   }
 
   while (next_generation < generation) {
-    auto [gen, key_nonce] = next();
-    silence_unused(gen);
+    next();
   }
 
   auto [gen, key_nonce] = next();
@@ -136,8 +141,6 @@ struct NoFSBaseKeySource : public BaseKeySource
 {
   bytes root_secret;
 
-  NoFSBaseKeySource(const NoFSBaseKeySource& other) = default;
-
   NoFSBaseKeySource(CipherSuite suite_in, bytes root_secret_in)
     : BaseKeySource(suite_in)
     , root_secret(std::move(root_secret_in))
@@ -159,8 +162,6 @@ struct TreeBaseKeySource : public BaseKeySource
   std::vector<bytes> secrets;
   size_t secret_size;
 
-  TreeBaseKeySource(const TreeBaseKeySource& other) = default;
-
   TreeBaseKeySource(CipherSuite suite_in,
                     LeafCount group_size,
                     bytes application_secret_in)
@@ -170,7 +171,7 @@ struct TreeBaseKeySource : public BaseKeySource
     , secrets(NodeCount{ group_size }.val)
     , secret_size(Digest(suite_in).output_size())
   {
-    secrets[root.val] = application_secret_in;
+    secrets[root.val] = std::move(application_secret_in);
   }
 
   BaseKeySource* dup() const override { return new TreeBaseKeySource(*this); }
@@ -180,7 +181,7 @@ struct TreeBaseKeySource : public BaseKeySource
     // Find an ancestor that is populated
     auto dirpath = tree_math::dirpath(NodeIndex{ sender }, width);
     dirpath.push_back(tree_math::root(width));
-    int curr = 0;
+    uint32_t curr = 0;
     for (; curr < dirpath.size(); ++curr) {
       if (!secrets[dirpath[curr].val].empty()) {
         break;
