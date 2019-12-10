@@ -103,7 +103,43 @@ generate_crypto()
   return tv;
 }
 
-/*TODO(rlb) re-enable
+HashRatchetTestVectors
+generate_hash_ratchet()
+{
+  HashRatchetTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<HashRatchetTestVectors::TestCase*> cases{
+    &tv.case_p256,
+    &tv.case_x25519,
+  };
+
+  tv.n_members = 16;
+  tv.n_generations = 16;
+  tv.base_secret = bytes(32, 0xA0);
+
+  for (size_t i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto test_case = cases[i];
+
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      test_case->emplace_back();
+
+      HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
+        auto key_nonce = ratchet.get(k);
+        test_case->at(j).push_back({ key_nonce.key, key_nonce.nonce });
+      }
+    }
+  }
+
+  return tv;
+}
+
 KeyScheduleTestVectors
 generate_key_schedule()
 {
@@ -119,8 +155,6 @@ generate_key_schedule()
     &tv.case_x25519,
   };
 
-  auto base_suite = CipherSuite::P256_SHA256_AES128GCM;
-  auto zero = bytes(Digest(base_suite).output_size(), 0x00);
   GroupContext base_group_context{
     { 0xA0, 0xA0, 0xA0, 0xA0 },
     0,
@@ -128,7 +162,9 @@ generate_key_schedule()
     bytes(32, 0xA2),
   };
 
-  tv.n_epochs = 100;
+  tv.n_epochs = 50;
+  tv.target_generation = 3;
+  tv.base_init_secret = bytes(32, 0xA3);
   tv.base_group_context = tls::marshal(base_group_context);
 
   // Construct a test case for each suite
@@ -140,73 +176,56 @@ generate_key_schedule()
     test_case->suite = suite;
 
     auto group_context = base_group_context;
-    bytes init_secret(secret_size, 0);
-    bytes update_secret(secret_size, 0);
+    auto update_secret = bytes(secret_size, 0);
+    uint32_t min_members = 5;
+    uint32_t max_members = 20;
+    auto n_members = min_members;
+
+    KeyScheduleEpoch epoch;
+    epoch.suite = suite;
+    epoch.init_secret = tv.base_init_secret;
 
     for (size_t j = 0; j < tv.n_epochs; ++j) {
-      auto group_context_bytes = tls::marshal(group_context);
-      auto epoch_secret =
-        State::next_epoch_secret(suite, init_secret, update_secret);
-      auto secrets =
-        State::derive_epoch_secrets(suite, epoch_secret, group_context);
+      auto ctx = tls::marshal(group_context);
+      epoch = epoch.next(LeafCount{ n_members }, update_secret, ctx);
+
+      auto handshake_keys =
+        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+      auto application_keys =
+        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+      for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
+        auto hs = epoch.handshake_keys.get(k, tv.target_generation);
+        handshake_keys.push_back({ hs.key, hs.nonce });
+
+        auto app = epoch.application_keys.get(k, tv.target_generation);
+        application_keys.push_back({ app.key, app.nonce });
+      }
 
       test_case->epochs.push_back({
+        LeafCount{ n_members },
         update_secret,
-        secrets.epoch_secret,
-        secrets.application_secret,
-        secrets.confirmation_key,
-        secrets.init_secret,
+        epoch.epoch_secret,
+        epoch.sender_data_secret,
+        epoch.sender_data_key,
+        epoch.handshake_secret,
+        handshake_keys,
+        epoch.application_secret,
+        application_keys,
+        epoch.confirmation_key,
+        epoch.init_secret,
       });
 
-      init_secret = secrets.init_secret;
       for (auto& val : update_secret) {
         val += 1;
       }
       group_context.epoch += 1;
+      n_members =
+        ((n_members - min_members) % (max_members - min_members)) + min_members;
     }
   }
 
   return tv;
 }
-
-AppKeyScheduleTestVectors
-generate_app_key_schedule()
-{
-  AppKeyScheduleTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    CipherSuite::P256_SHA256_AES128GCM,
-    CipherSuite::X25519_SHA256_AES128GCM,
-  };
-
-  std::vector<AppKeyScheduleTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
-  };
-
-  tv.n_members = 16;
-  tv.n_generations = 16;
-  tv.application_secret = bytes(32, 0xA0);
-
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto test_case = cases[i];
-
-    KeyChain chain(suite);
-    chain.start(LeafIndex{ 0 }, tv.application_secret);
-    for (uint32_t j = 0; j < tv.n_members; ++j) {
-      test_case->emplace_back();
-
-      for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(LeafIndex{ j }, k);
-        test_case->at(j).push_back({ kn.secret, kn.key, kn.nonce });
-      }
-    }
-  }
-
-  return tv;
-}
-*/
 
 TreeTestVectors::TreeCase
 tree_to_case(const TestRatchetTree& tree)
@@ -584,14 +603,13 @@ main()
   CryptoTestVectors crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  /*
+  HashRatchetTestVectors hash_ratchet = generate_hash_ratchet();
+  write_test_vectors(hash_ratchet);
+
   KeyScheduleTestVectors key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
-  AppKeyScheduleTestVectors app_key_schedule = generate_app_key_schedule();
-  write_test_vectors(app_key_schedule);
-  */
-
+  /*
   TreeTestVectors tree = generate_tree();
   write_test_vectors(tree);
 
@@ -606,8 +624,8 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
-  // verify_reproducible(generate_key_schedule);
-  // verify_reproducible(generate_app_key_schedule);
+  verify_reproducible(generate_hash_ratchet);
+  verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_tree);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
@@ -617,14 +635,15 @@ main()
     TestLoader<TreeMathTestVectors>::get();
     TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
-    // TestLoader<KeyScheduleTestVectors>::get();
-    // TestLoader<AppKeyScheduleTestVectors>::get();
+    TestLoader<HashRatchetTestVectors>::get();
+    TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<TreeTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }
+  */
 
   return 0;
 }

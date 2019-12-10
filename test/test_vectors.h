@@ -94,22 +94,77 @@ struct CryptoTestVectors
 
 /////
 
+struct HashRatchetTestVectors
+{
+  static const std::string file_name;
+
+  struct Step
+  {
+    tls::opaque<1> key;
+    tls::opaque<1> nonce;
+
+    TLS_SERIALIZABLE(key, nonce);
+  };
+
+  typedef tls::vector<Step, 4> KeySequence;
+  typedef tls::vector<KeySequence, 4> TestCase;
+
+  uint32_t n_members;
+  uint32_t n_generations;
+  tls::opaque<1> base_secret;
+
+  TestCase case_p256;
+  TestCase case_x25519;
+
+  TLS_SERIALIZABLE(n_members,
+                   n_generations,
+                   base_secret,
+                   case_p256,
+                   case_x25519);
+};
+
+/////
+
 struct KeyScheduleTestVectors
 {
   static const std::string file_name;
 
+  struct KeyAndNonce
+  {
+    tls::opaque<1> key;
+    tls::opaque<1> nonce;
+
+    TLS_SERIALIZABLE(key, nonce);
+  };
+
   struct Epoch
   {
+    LeafCount n_members;
     tls::opaque<1> update_secret;
 
     tls::opaque<1> epoch_secret;
+
+    tls::opaque<1> sender_data_secret;
+    tls::opaque<1> sender_data_key;
+
+    tls::opaque<1> handshake_secret;
+    tls::vector<KeyAndNonce, 4> handshake_keys;
+
     tls::opaque<1> application_secret;
+    tls::vector<KeyAndNonce, 4> application_keys;
+
     tls::opaque<1> confirmation_key;
     tls::opaque<1> init_secret;
 
-    TLS_SERIALIZABLE(update_secret,
+    TLS_SERIALIZABLE(n_members,
+                     update_secret,
                      epoch_secret,
+                     sender_data_secret,
+                     sender_data_key,
+                     handshake_secret,
+                     handshake_keys,
                      application_secret,
+                     application_keys,
                      confirmation_key,
                      init_secret);
   };
@@ -123,42 +178,17 @@ struct KeyScheduleTestVectors
   };
 
   uint32_t n_epochs;
+  uint32_t target_generation;
+  tls::opaque<1> base_init_secret;
   tls::opaque<4> base_group_context;
 
   TestCase case_p256;
   TestCase case_x25519;
 
-  TLS_SERIALIZABLE(n_epochs, base_group_context, case_p256, case_x25519);
-};
-
-/////
-
-struct AppKeyScheduleTestVectors
-{
-  static const std::string file_name;
-
-  struct Step
-  {
-    tls::opaque<1> secret;
-    tls::opaque<1> key;
-    tls::opaque<1> nonce;
-
-    TLS_SERIALIZABLE(secret, key, nonce);
-  };
-
-  typedef tls::vector<Step, 4> KeySequence;
-  typedef tls::vector<KeySequence, 4> TestCase;
-
-  uint32_t n_members;
-  uint32_t n_generations;
-  tls::opaque<1> application_secret;
-
-  TestCase case_p256;
-  TestCase case_x25519;
-
-  TLS_SERIALIZABLE(n_members,
-                   n_generations,
-                   application_secret,
+  TLS_SERIALIZABLE(n_epochs,
+                   target_generation,
+                   base_init_secret,
+                   base_group_context,
                    case_p256,
                    case_x25519);
 };

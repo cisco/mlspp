@@ -12,9 +12,8 @@ using namespace mls;
 const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
 const std::string ResolutionTestVectors::file_name = "./resolution.bin";
 const std::string CryptoTestVectors::file_name = "./crypto.bin";
+const std::string HashRatchetTestVectors::file_name = "./hash_ratchet.bin";
 const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
-const std::string AppKeyScheduleTestVectors::file_name =
-  "./app_key_schedule.bin";
 const std::string TreeTestVectors::file_name = "./tree.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
@@ -103,8 +102,8 @@ TestLoader<T>::get()
 template struct TestLoader<TreeMathTestVectors>;
 template struct TestLoader<ResolutionTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
+template struct TestLoader<HashRatchetTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
-template struct TestLoader<AppKeyScheduleTestVectors>;
 template struct TestLoader<TreeTestVectors>;
 template struct TestLoader<MessagesTestVectors>;
 template struct TestLoader<BasicSessionTestVectors>;
