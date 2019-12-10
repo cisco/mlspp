@@ -247,37 +247,20 @@ RatchetTree::encap(LeafIndex from,
 
   auto path_secret = leaf_secret;
   auto copath = tree_math::copath(NodeIndex{ from }, node_size());
-  std::cout << "===" << std::endl;
   for (const auto& node : copath) {
     path_secret = path_step(path_secret);
 
     auto parent = tree_math::parent(node, node_size());
-
-    std::cout << "parent before: " << parent.val << " ";
-    if (!_nodes[parent].has_value()) {
-      std::cout << "_" << std::endl;
-    } else {
-      std::cout << _nodes[parent].value().unmerged_leaves().size() << " "
-                << _nodes[parent].value().public_key().to_bytes() << std::endl;
-    }
-
     _nodes[parent] = new_node(path_secret);
-
-    std::cout << "parent after : " << parent.val << " "
-              << _nodes[parent].value().unmerged_leaves().size() << " "
-              << _nodes[parent].value().public_key().to_bytes() << std::endl;
 
     RatchetNode path_node{ _suite };
     path_node.public_key = _nodes[parent].value().public_key();
 
-    std::cout << "enc res: ";
     for (const auto& res_node : resolve(node)) {
-      std::cout << res_node.val << " ";
       auto& pub = _nodes[res_node].value().public_key();
       auto ciphertext = pub.encrypt(context, path_secret);
       path_node.node_secrets.push_back(ciphertext);
     }
-    std::cout << std::endl;
 
     path.nodes.push_back(path_node);
   }
@@ -314,12 +297,6 @@ RatchetTree::decap(LeafIndex from, const bytes& context, const DirectPath& path)
     // Decrypt or update the path secret
     if (!have_secret) {
       auto res = resolve(curr);
-      std::cout << "dec res: ";
-      for (const auto res_node : res) {
-        std::cout << res_node.val << " ";
-      }
-      std::cout << std::endl;
-
       if (path_node.node_secrets.size() != res.size()) {
         throw ProtocolError("Malformed RatchetNode");
       }
@@ -582,7 +559,7 @@ RatchetTree::resolve(NodeIndex index)
   if (_nodes[index].has_value()) {
     std::list<NodeIndex> out{ index };
     for (auto i : _nodes[index].value().unmerged_leaves()) {
-      out.push_back(NodeIndex{ i });
+      out.emplace_back(i);
     }
     return out;
   }
@@ -591,7 +568,6 @@ RatchetTree::resolve(NodeIndex index)
     return {};
   }
 
-  auto n = node_size();
   auto l = resolve(tree_math::left(index));
   auto r = resolve(tree_math::right(index, node_size()));
   l.insert(l.end(), r.begin(), r.end());
@@ -684,8 +660,8 @@ operator<<(std::ostream& out, const RatchetTree obj)
       const auto& node = obj._nodes[i].value();
 
       out << node.public_key().to_bytes() << " (";
-      for (const auto& i : node.unmerged_leaves()) {
-        out << i.val << " ";
+      for (auto j : node.unmerged_leaves()) {
+        out << j.val << " ";
       }
       out << ")";
     }

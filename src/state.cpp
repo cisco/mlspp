@@ -112,7 +112,6 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  std::cout << "1er " << _tree << std::endl;
   _keys = first_epoch.next(LeafCount{ _tree.size() }, update_secret, group_ctx);
 
   // Verify the confirmation
@@ -304,16 +303,10 @@ State::ratchet_and_sign(const Commit& op,
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  std::cout << "sig " << _tree << std::endl;
-
   auto& commit_data = std::get<CommitData>(pt.content);
   commit_data.confirmation =
     hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
   pt.sign(prev_ctx, _identity_priv);
-
-  std::cout << "mmm " << _keys.confirmation_key << std::endl
-            << "    " << _confirmed_transcript_hash << std::endl
-            << "    " << commit_data.confirmation << std::endl;
 
   _interim_transcript_hash = Digest(_suite)
                                .write(_confirmed_transcript_hash)
@@ -608,11 +601,6 @@ State::verify_confirmation(const bytes& confirmation) const
 {
   auto confirm =
     hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
-
-  std::cout << "vvv " << _keys.confirmation_key << std::endl
-            << "    " << _confirmed_transcript_hash << std::endl
-            << "    " << confirm << std::endl;
-
   return constant_time_eq(confirm, confirmation);
 }
 
