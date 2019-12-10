@@ -4,38 +4,6 @@
 
 using namespace mls;
 
-class AppKeyScheduleTest : public ::testing::Test
-{
-protected:
-  const AppKeyScheduleTestVectors& tv;
-
-  AppKeyScheduleTest()
-    : tv(TestLoader<AppKeyScheduleTestVectors>::get())
-  {}
-
-  void interop(CipherSuite suite, const AppKeyScheduleTestVectors::TestCase& tc)
-  {
-    ASSERT_EQ(tc.size(), tv.n_members);
-    KeyChain chain(suite);
-    chain.start(LeafIndex{ 0 }, tv.application_secret);
-    for (uint32_t j = 0; j < tv.n_members; ++j) {
-      ASSERT_EQ(tc[j].size(), tv.n_generations);
-      for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = chain.get(LeafIndex{ j }, k);
-        ASSERT_EQ(tc[j][k].secret, kn.secret);
-        ASSERT_EQ(tc[j][k].key, kn.key);
-        ASSERT_EQ(tc[j][k].nonce, kn.nonce);
-      }
-    }
-  }
-};
-
-TEST_F(AppKeyScheduleTest, Interop)
-{
-  interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
-  interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
-}
-
 class StateTest : public ::testing::Test
 {
 protected:
@@ -284,43 +252,4 @@ TEST_F(StateTest, CipherNegotiation)
   // Alice should also arrive at P-256 when initialized
   auto stateA = State(ciksA, welcome);
   ASSERT_EQ(stateA, stateB);
-}
-
-class KeyScheduleTest : public ::testing::Test
-{
-protected:
-  const KeyScheduleTestVectors& tv;
-
-  KeyScheduleTest()
-    : tv(TestLoader<KeyScheduleTestVectors>::get())
-  {}
-
-  void interop(const KeyScheduleTestVectors::TestCase& test_case)
-  {
-    auto suite = test_case.suite;
-    auto secret_size = Digest(suite).output_size();
-    bytes init_secret(secret_size, 0);
-
-    auto group_context = tls::get<GroupContext>(tv.base_group_context);
-
-    for (const auto& epoch : test_case.epochs) {
-      auto epoch_secret =
-        State::next_epoch_secret(suite, init_secret, epoch.update_secret);
-      auto secrets =
-        State::derive_epoch_secrets(suite, epoch_secret, group_context);
-      ASSERT_EQ(epoch.epoch_secret, secrets.epoch_secret);
-      ASSERT_EQ(epoch.application_secret, secrets.application_secret);
-      ASSERT_EQ(epoch.confirmation_key, secrets.confirmation_key);
-      ASSERT_EQ(epoch.init_secret, secrets.init_secret);
-
-      group_context.epoch += 1;
-      init_secret = secrets.init_secret;
-    }
-  }
-};
-
-TEST_F(KeyScheduleTest, Interop)
-{
-  interop(tv.case_p256);
-  interop(tv.case_x25519);
 }

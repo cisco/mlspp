@@ -189,7 +189,6 @@ struct Welcome {
           bytes init_secret,
           const GroupInfo& group_info);
 
-  std::tuple<bytes, bytes> group_info_keymat(const bytes& init_secret) const;
   void encrypt(const ClientInitKey& cik);
 
   private:
@@ -352,12 +351,12 @@ struct MLSPlaintext : public CipherAware
 
   // Constructor for decrypting
   MLSPlaintext(CipherSuite suite,
-               const bytes& group_id,
+               bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,
                bytes authenticated_data,
-               bytes content);
+               const bytes& content);
 
   // Constructors for encrypting
   MLSPlaintext(bytes group_id,

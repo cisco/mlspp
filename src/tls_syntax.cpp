@@ -21,6 +21,16 @@ ostream::write_uint(uint64_t value, int length)
 }
 
 ostream&
+operator<<(ostream& out, bool data)
+{
+  if (data) {
+    return out << uint8_t(1);
+  }
+
+  return out << uint8_t(0);
+}
+
+ostream&
 operator<<(ostream& out, uint8_t data)
 {
   return out.write_uint(data, 1);
@@ -68,6 +78,22 @@ istream::read_uint(T& data, int length)
   }
   data = value;
   return *this;
+}
+
+istream&
+operator>>(istream& in, bool& data)
+{
+  uint8_t val;
+  in >> val;
+
+  // Linter thinks uint8_t is signed (?)
+  // NOLINTNEXTLINE(hicpp-signed-bitwise)
+  if ((val & 0xFE) != 0) {
+    throw ReadError("Malformed boolean");
+  }
+
+  data = (val == 1);
+  return in;
 }
 
 istream&

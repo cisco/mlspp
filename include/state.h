@@ -2,6 +2,7 @@
 
 #include "crypto.h"
 #include "messages.h"
+#include "key_schedule.h"
 #include "ratchet_tree.h"
 #include <optional>
 #include <set>
@@ -24,50 +25,6 @@ struct GroupContext
   tls::opaque<1> confirmed_transcript_hash;
 
   TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
-};
-
-// XXX(rlb@ipv.sx): This is implemented in "const mode", where we
-// never ratchet forward the base secret.  This allows for maximal
-// out-of-order delivery, but provides no forward secrecy within an
-// epoch.
-class KeyChain
-{
-public:
-  KeyChain(CipherSuite suite);
-
-  struct Generation
-  {
-    uint32_t generation;
-    bytes secret;
-    bytes key;
-    bytes nonce;
-  };
-
-  void start(LeafIndex my_sender, const bytes& root_secret);
-  Generation next();
-  Generation get(LeafIndex sender, uint32_t generation) const;
-
-private:
-  CipherSuite _suite;
-  LeafIndex _my_sender;
-  uint32_t _my_generation;
-  bytes _root_secret;
-
-  size_t _secret_size;
-  size_t _key_size;
-  size_t _nonce_size;
-
-  // XXX(rlb@ipv.sx) Using char* here instead of std::string because
-  // the linter complains about static objects and objects with
-  // global scope.
-  static const char* _secret_label;
-  static const char* _nonce_label;
-  static const char* _key_label;
-
-  bytes derive(const bytes& secret,
-               const std::string& label,
-               const bytes& context,
-               const size_t size) const;
 };
 
 class State
@@ -116,37 +73,20 @@ public:
   epoch_t epoch() const { return _epoch; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
-  bytes epoch_secret() const { return _epoch_secret; }
-  bytes application_secret() const { return _application_secret; }
-  bytes confirmation_key() const { return _confirmation_key; }
-  bytes init_secret() const { return _init_secret; }
 
   ///
-  /// Encryption and decryption
+  /// General encryption and decryption
+  ///
+  MLSCiphertext encrypt(const MLSPlaintext& pt);
+  MLSPlaintext decrypt(const MLSCiphertext& ct);
+
+  ///
+  /// Application encryption and decryption
   ///
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
-  ///
-  /// Static access to the key schedule
-  ///
-  struct EpochSecrets
-  {
-    bytes epoch_secret;
-    bytes application_secret;
-    bytes handshake_secret;
-    bytes sender_data_secret;
-    bytes confirmation_key;
-    bytes init_secret;
-  };
-  static bytes next_epoch_secret(CipherSuite suite,
-                                 const bytes& init_secret,
-                                 const bytes& update_secret);
-  static EpochSecrets derive_epoch_secrets(CipherSuite suite,
-                                           const bytes& epoch_secret,
-                                           const GroupContext& group_context);
-
-private:
+protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
   CipherSuite _suite;
@@ -157,17 +97,7 @@ private:
   bytes _interim_transcript_hash;
 
   // Shared secret state
-  tls::opaque<1> _epoch_secret;
-  tls::opaque<1> _sender_data_secret;
-  tls::opaque<1> _handshake_secret;
-  tls::opaque<1> _application_secret;
-  tls::opaque<1> _confirmation_key;
-  tls::opaque<1> _init_secret;
-
-  // Message protection keys
-  tls::opaque<1> _sender_data_key;
-  std::set<LeafIndex> _handshake_key_used;
-  KeyChain _application_keys;
+  KeyScheduleEpoch _keys;
 
   // Per-participant state
   LeafIndex _index;
@@ -214,14 +144,6 @@ private:
 
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
-
-  // Generate handshake keys
-  KeyChain::Generation generate_handshake_keys(const LeafIndex& sender,
-                                               bool encrypt);
-
-  // Encrypt and decrypt MLS framed objects
-  MLSCiphertext encrypt(const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const MLSCiphertext& ct);
 };
 
 } // namespace mls

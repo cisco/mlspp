@@ -281,6 +281,7 @@ protected:
                        { my_client_init_key },
                        { tc.client_init_keys[1] },
                        tc.transcript.at(0).commit_secret);
+      session_init.encrypt_handshake(tc.encrypt);
       silence_unused(unused_welcome);
       session = session_init;
       curr = 1;
@@ -288,6 +289,7 @@ protected:
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript.at(index - 1);
       session = Session::join({ my_client_init_key }, epoch.welcome.value());
+      session->encrypt_handshake(tc.encrypt);
       assert_consistency(*session, epoch);
       curr = index;
     }
@@ -298,13 +300,14 @@ protected:
 
       // Generate an add to cache the next state
       if (curr == index) {
-        auto [unused_welcome, unused_add] =
+        auto [unused_welcome, add] =
           session->add(epoch.commit_secret, tc.client_init_keys[curr + 1]);
         silence_unused(unused_welcome);
-        silence_unused(unused_add);
+        session->handle(add);
+      } else {
+        session->handle(epoch.handshake);
       }
 
-      session->handle(epoch.handshake);
       assert_consistency(*session, epoch);
     }
 
@@ -314,10 +317,12 @@ protected:
 
       // Generate an update to cache next state
       if (i == index) {
-        session->update(epoch.commit_secret);
+        auto msg = session->update(epoch.commit_secret);
+        session->handle(msg);
+      } else {
+        session->handle(epoch.handshake);
       }
 
-      session->handle(epoch.handshake);
       assert_consistency(*session, epoch);
     }
 
@@ -330,18 +335,20 @@ protected:
 
       // Generate a remove to cache next state
       if (int(index) == sender) {
-        session->remove(epoch.commit_secret, sender + 1);
+        auto msg = session->remove(epoch.commit_secret, sender + 1);
+        session->handle(msg);
+      } else {
+        session->handle(epoch.handshake);
       }
 
-      session->handle(epoch.handshake);
       assert_consistency(*session, epoch);
     }
   }
 
-  void follow_all(CipherSuite suite,
-                  SignatureScheme scheme,
-                  const SessionTestVectors::TestCase& tc)
+  void follow_all(const SessionTestVectors::TestCase& tc)
   {
+    auto suite = tc.cipher_suite;
+    auto scheme = tc.sig_scheme;
     DeterministicHPKE lock;
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };
@@ -361,14 +368,11 @@ TEST_F(SessionInteropTest, BasicP256)
   // it requires signatures to be reproducible.  Otherwise, the
   // following endpoint will generate a different message than the
   // other endpoints have seen.
-  // follow_all(CipherSuite::P256_SHA256_AES128GCM,
-  //            SignatureScheme::P256_SHA256,
-  //            basic_tv.case_p256_p256);
+  // follow_all(basic_tv.case_p256_p256);
 }
 
 TEST_F(SessionInteropTest, BasicX25519)
 {
-  follow_all(CipherSuite::X25519_SHA256_AES128GCM,
-             SignatureScheme::Ed25519,
-             basic_tv.case_x25519_ed25519);
+  follow_all(basic_tv.case_x25519_ed25519);
+  follow_all(basic_tv.case_x25519_ed25519_encrypted);
 }

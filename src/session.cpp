@@ -4,6 +4,11 @@
 
 namespace mls {
 
+Session::Session()
+  : _current_epoch(0)
+  , _encrypt_handshake(false)
+{}
+
 std::tuple<Session, Welcome>
 Session::start(const bytes& group_id,
                const std::vector<ClientInitKey>& my_client_init_keys,
@@ -26,6 +31,12 @@ Session::join(const std::vector<ClientInitKey>& client_init_keys,
   State next(client_init_keys, welcome);
   session.add_state(0, next);
   return session;
+}
+
+void
+Session::encrypt_handshake(bool enabled)
+{
+  _encrypt_handshake = enabled;
 }
 
 std::tuple<Welcome, bytes>
@@ -57,7 +68,13 @@ Session::commit_and_cache(const bytes& secret, const MLSPlaintext& proposal)
   auto [commit, welcome, new_state] = state.commit(secret);
 
   tls::ostream w;
-  w << proposal << commit;
+  if (_encrypt_handshake) {
+    auto enc_proposal = state.encrypt(proposal);
+    auto enc_commit = state.encrypt(commit);
+    w << enc_proposal << enc_commit;
+  } else {
+    w << proposal << commit;
+  }
   auto msg = w.bytes();
 
   _outbound_cache = std::make_tuple(msg, new_state);
@@ -67,10 +84,20 @@ Session::commit_and_cache(const bytes& secret, const MLSPlaintext& proposal)
 void
 Session::handle(const bytes& handshake_data)
 {
-  auto suite = current_state().cipher_suite();
+  auto& state = current_state();
+  auto suite = state.cipher_suite();
   MLSPlaintext proposal(suite), commit(suite);
   tls::istream r(handshake_data);
-  r >> proposal >> commit;
+  if (_encrypt_handshake) {
+    // TODO(rlb): Verify that epoch of the ciphertext matches that of the
+    // current state
+    MLSCiphertext enc_proposal, enc_commit;
+    r >> enc_proposal >> enc_commit;
+    proposal = state.decrypt(enc_proposal);
+    commit = state.decrypt(enc_commit);
+  } else {
+    r >> proposal >> commit;
+  }
 
   if (proposal.sender == current_state().index()) {
     if (!_outbound_cache.has_value()) {
@@ -78,18 +105,17 @@ Session::handle(const bytes& handshake_data)
     }
 
     auto message = std::get<0>(_outbound_cache.value());
-    auto state = std::get<1>(_outbound_cache.value());
+    auto next_state = std::get<1>(_outbound_cache.value());
 
     if (message != handshake_data) {
       throw ProtocolError("Received different own message");
     }
 
-    add_state(proposal.epoch, state);
+    add_state(proposal.epoch, next_state);
     _outbound_cache = std::nullopt;
     return;
   }
 
-  auto state = current_state();
   state.handle(proposal);
   auto next = state.handle(commit);
   if (!next.has_value()) {
@@ -157,6 +183,10 @@ Session::current_state()
 bool
 operator==(const Session& lhs, const Session& rhs)
 {
+  if (lhs._encrypt_handshake != rhs._encrypt_handshake) {
+    return false;
+  }
+
   if (lhs._current_epoch != rhs._current_epoch) {
     return false;
   }

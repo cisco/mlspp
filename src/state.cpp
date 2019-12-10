@@ -5,66 +5,6 @@
 namespace mls {
 
 ///
-/// KeyChain
-///
-
-KeyChain::KeyChain(CipherSuite suite)
-  : _suite(suite)
-  , _my_generation(0)
-  , _secret_size(Digest(suite).output_size())
-  , _key_size(AESGCM::key_size(suite))
-  , _nonce_size(AESGCM::nonce_size)
-{}
-
-const char* KeyChain::_secret_label = "sender";
-const char* KeyChain::_nonce_label = "nonce";
-const char* KeyChain::_key_label = "key";
-
-void
-KeyChain::start(LeafIndex my_sender, const bytes& root_secret)
-{
-  _my_generation = 0;
-  _my_sender = my_sender;
-  _root_secret = root_secret;
-}
-
-KeyChain::Generation
-KeyChain::next()
-{
-  _my_generation += 1;
-  return get(_my_sender, _my_generation);
-}
-
-KeyChain::Generation
-KeyChain::get(LeafIndex sender, uint32_t generation) const
-{
-  auto sender_bytes = tls::marshal(sender.val);
-  auto secret = _root_secret;
-
-  // Split off onto the sender chain
-  secret = derive(secret, _secret_label, sender_bytes, _secret_size);
-
-  // Work down the generations
-  for (uint32_t i = 0; i < generation; ++i) {
-    secret = derive(secret, _secret_label, sender_bytes, _secret_size);
-  }
-
-  auto key = hkdf_expand_label(_suite, secret, _key_label, {}, _key_size);
-  auto nonce = hkdf_expand_label(_suite, secret, _nonce_label, {}, _nonce_size);
-
-  return Generation{ generation, secret, key, nonce };
-}
-
-bytes
-KeyChain::derive(const bytes& secret,
-                 const std::string& label,
-                 const bytes& context,
-                 const size_t size) const
-{
-  return hkdf_expand_label(_suite, secret, label, context, size);
-}
-
-///
 /// Constructors
 ///
 
@@ -76,18 +16,18 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(leaf_priv, credential)
-  , _init_secret(Digest(suite).output_size())
-  , _application_keys(suite)
   , _index(0)
   , _identity_priv(credential.private_key().value())
-{}
+{
+  _keys.suite = suite;
+  _keys.init_secret = zero_bytes(Digest(suite).output_size());
+}
 
 // Initialize a group from a Welcome
 State::State(const std::vector<ClientInitKey>& my_client_init_keys,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
-  , _application_keys(welcome.cipher_suite)
   // XXX: The following line does a bogus key generation
   , _identity_priv(SignaturePrivateKey::generate(DUMMY_SIG_SCHEME))
 {
@@ -133,9 +73,10 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   }
 
   // Decrypt the GroupInfo
-  auto [key, nonce] = welcome.group_info_keymat(key_pkg.init_secret);
+  auto first_epoch = FirstEpoch::create(_suite, key_pkg.init_secret);
   auto group_info_data =
-    AESGCM(key, nonce).decrypt(welcome.encrypted_group_info);
+    AESGCM(first_epoch.group_info_key, first_epoch.group_info_nonce)
+      .decrypt(welcome.encrypted_group_info);
   auto group_info = tls::get<GroupInfo>(group_info_data, _suite);
 
   // Verify the singature on the GroupInfo
@@ -144,7 +85,6 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   }
 
   // Ingest the KeyPackage and GroupInfo
-  _init_secret = key_pkg.init_secret;
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
   _tree = group_info.tree;
@@ -161,17 +101,18 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _tree.merge(_index, my_cik.private_key().value());
 
   // Decapsulate the direct path
-  auto ctx = tls::marshal(GroupContext{
+  auto decap_ctx = tls::marshal(GroupContext{
     group_info.group_id,
     group_info.epoch,
     group_info.tree.root_hash(),
     group_info.prior_confirmed_transcript_hash,
   });
   auto update_secret =
-    _tree.decap(group_info.signer_index, ctx, group_info.path);
+    _tree.decap(group_info.signer_index, decap_ctx, group_info.path);
 
   // Ratchet forward into the current epoch
-  update_epoch_secrets(update_secret);
+  auto group_ctx = tls::marshal(group_context());
+  _keys = first_epoch.next(LeafCount{ _tree.size() }, update_secret, group_ctx);
 
   // Verify the confirmation
   if (!verify_confirmation(group_info.confirmation)) {
@@ -297,7 +238,7 @@ State::commit(const bytes& leaf_secret) const
   next._pending_proposals.clear();
 
   // Start a GroupInfo with the prepared state
-  auto prev_init_secret = bytes(next._init_secret);
+  auto prev_init_secret = bytes(_keys.init_secret);
   auto group_info = GroupInfo(_suite);
   group_info.group_id = next._group_id;
   group_info.epoch = next._epoch + 1;
@@ -364,7 +305,7 @@ State::ratchet_and_sign(const Commit& op,
 
   auto& commit_data = std::get<CommitData>(pt.content);
   commit_data.confirmation =
-    hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
+    hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
   pt.sign(prev_ctx, _identity_priv);
 
   _interim_transcript_hash = Digest(_suite)
@@ -538,30 +479,6 @@ State::apply(const Commit& commit)
   _tree.truncate(_tree.leaf_span());
 }
 
-bytes
-State::next_epoch_secret(CipherSuite suite,
-                         const bytes& init_secret,
-                         const bytes& update_secret)
-{
-  return hkdf_extract(suite, init_secret, update_secret);
-}
-
-State::EpochSecrets
-State::derive_epoch_secrets(CipherSuite suite,
-                            const bytes& epoch_secret,
-                            const GroupContext& group_context)
-{
-  auto ctx = tls::marshal(group_context);
-  return {
-    epoch_secret,
-    derive_secret(suite, epoch_secret, "app", ctx),
-    derive_secret(suite, epoch_secret, "handshake", ctx),
-    derive_secret(suite, epoch_secret, "sender data", ctx),
-    derive_secret(suite, epoch_secret, "confirm", ctx),
-    derive_secret(suite, epoch_secret, "init", ctx),
-  };
-}
-
 ///
 /// Message protection
 ///
@@ -606,16 +523,10 @@ operator==(const State& lhs, const State& rhs)
     (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
   auto interim_transcript_hash =
     (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
-
-  auto epoch_secret = (lhs._epoch_secret == rhs._epoch_secret);
-  auto application_secret =
-    (lhs._application_secret == rhs._application_secret);
-  auto confirmation_key = (lhs._confirmation_key == rhs._confirmation_key);
-  auto init_secret = (lhs._init_secret == rhs._init_secret);
+  auto keys = (lhs._keys == rhs._keys);
 
   return suite && group_id && epoch && tree && confirmed_transcript_hash &&
-         interim_transcript_hash && epoch_secret && application_secret &&
-         confirmation_key && init_secret;
+         interim_transcript_hash && keys;
 }
 
 bool
@@ -627,28 +538,13 @@ operator!=(const State& lhs, const State& rhs)
 void
 State::update_epoch_secrets(const bytes& update_secret)
 {
-  auto epoch_secret = next_epoch_secret(_suite, _init_secret, update_secret);
-  auto ctx = GroupContext{
+  auto ctx = tls::marshal(GroupContext{
     _group_id,
     _epoch,
     _tree.root_hash(),
     _confirmed_transcript_hash,
-  };
-  auto secrets = derive_epoch_secrets(_suite, epoch_secret, ctx);
-
-  _epoch_secret = secrets.epoch_secret;
-  _application_secret = secrets.application_secret;
-  _handshake_secret = secrets.handshake_secret;
-  _sender_data_secret = secrets.sender_data_secret;
-  _confirmation_key = secrets.confirmation_key;
-  _init_secret = secrets.init_secret;
-
-  auto key_size = AESGCM::key_size(_suite);
-  _sender_data_key =
-    hkdf_expand_label(_suite, _sender_data_secret, "sd key", {}, key_size);
-  _handshake_key_used.clear();
-
-  _application_keys.start(_index, _application_secret);
+  });
+  _keys = _keys.next(LeafCount{ _tree.size() }, update_secret, ctx);
 }
 
 ///
@@ -703,43 +599,25 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = hmac(_suite, _confirmation_key, _confirmed_transcript_hash);
+  auto confirm =
+    hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
-}
-
-KeyChain::Generation
-State::generate_handshake_keys(const LeafIndex& sender, bool encrypt)
-{
-  auto context = tls::marshal(sender);
-  auto key_size = AESGCM::key_size(_suite);
-  auto nonce_size = AESGCM::nonce_size;
-
-  if (encrypt && _handshake_key_used.count(sender) > 0) {
-    throw ProtocolError("Attempt to encrypt two handshake messages");
-  }
-
-  if (encrypt) {
-    _handshake_key_used.insert(sender);
-  }
-
-  return KeyChain::Generation{
-    0,
-    _handshake_secret,
-    hkdf_expand_label(_suite, _handshake_secret, "hs key", context, key_size),
-    hkdf_expand_label(
-      _suite, _handshake_secret, "hs nonce", context, nonce_size),
-  };
 }
 
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
-  KeyChain::Generation keys;
+  uint32_t generation;
+  KeyAndNonce keys;
   switch (pt.content.inner_type()) {
-    // TODO(rlb) Enable encryption of Proposal / Commit messages
     case ContentType::application:
-      keys = _application_keys.next();
+      std::tie(generation, keys) = _keys.application_keys.next(_index);
+      break;
+
+    case ContentType::proposal:
+    case ContentType::commit:
+      std::tie(generation, keys) = _keys.handshake_keys.next(_index);
       break;
 
     default:
@@ -748,13 +626,13 @@ State::encrypt(const MLSPlaintext& pt)
 
   // Encrypt the sender data
   tls::ostream sender_data;
-  sender_data << _index << keys.generation;
+  sender_data << _index << generation;
 
   auto sender_data_nonce = random_bytes(AESGCM::nonce_size);
   auto sender_data_aad_val = sender_data_aad(
     _group_id, _epoch, pt.content.inner_type(), sender_data_nonce);
 
-  auto sender_data_gcm = AESGCM(_sender_data_key, sender_data_nonce);
+  auto sender_data_gcm = AESGCM(_keys.sender_data_key, sender_data_nonce);
   sender_data_gcm.set_aad(sender_data_aad_val);
   auto encrypted_sender_data = sender_data_gcm.encrypt(sender_data.bytes());
 
@@ -801,7 +679,7 @@ State::decrypt(const MLSCiphertext& ct)
   auto sender_data_aad_val = sender_data_aad(
     ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
 
-  auto sender_data_gcm = AESGCM(_sender_data_key, ct.sender_data_nonce);
+  auto sender_data_gcm = AESGCM(_keys.sender_data_key, ct.sender_data_nonce);
   sender_data_gcm.set_aad(sender_data_aad_val);
   auto sender_data = sender_data_gcm.decrypt(ct.encrypted_sender_data);
 
@@ -815,11 +693,18 @@ State::decrypt(const MLSCiphertext& ct)
   }
 
   // Pull from the key schedule
-  KeyChain::Generation keys;
+  KeyAndNonce keys;
   switch (ct.content_type) {
     // TODO(rlb) Enable decryption of proposal / commit
     case ContentType::application:
-      keys = _application_keys.get(sender, generation);
+      keys = _keys.application_keys.get(sender, generation);
+      _keys.application_keys.erase(sender, generation);
+      break;
+
+    case ContentType::proposal:
+    case ContentType::commit:
+      keys = _keys.handshake_keys.get(sender, generation);
+      _keys.handshake_keys.erase(sender, generation);
       break;
 
     default:

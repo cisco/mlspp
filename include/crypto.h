@@ -185,12 +185,6 @@ hkdf_expand_label(CipherSuite suite,
                   const bytes& context,
                   const size_t length);
 
-bytes
-derive_secret(CipherSuite suite,
-              const bytes& secret,
-              const std::string& label,
-              const bytes& context);
-
 class AESGCM
 {
 public:

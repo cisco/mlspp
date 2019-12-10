@@ -74,6 +74,9 @@ operator==(const MustInitialize& lhs, const MustInitialize& rhs)
 class TLSSyntaxTest : public ::testing::Test
 {
 protected:
+  const bool val_bool = true;
+  const bytes enc_bool = from_hex("01");
+
   const uint8_t val_uint8{ 0x11 };
   const bytes enc_uint8 = from_hex("11");
 
@@ -153,6 +156,7 @@ TEST_F(TLSSyntaxTest, OStream)
   w.write_raw(answer);
   ASSERT_EQ(w.bytes(), answer);
 
+  ostream_test(val_bool, enc_bool);
   ostream_test(val_uint8, enc_uint8);
   ostream_test(val_uint16, enc_uint16);
   ostream_test(val_uint32, enc_uint32);
@@ -180,6 +184,9 @@ istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 
 TEST_F(TLSSyntaxTest, IStream)
 {
+  bool data_bool;
+  istream_test(val_bool, data_bool, enc_bool);
+
   uint8_t data_uint8;
   istream_test(val_uint8, data_uint8, enc_uint8);
 

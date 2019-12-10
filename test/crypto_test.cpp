@@ -199,23 +199,14 @@ protected:
       hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
     ASSERT_EQ(hkdf_extract_out, test_case.hkdf_extract_out);
 
-    std::string derive_secret_label_string(tv.derive_secret_label.begin(),
-                                           tv.derive_secret_label.end());
-    auto derive_secret_out = derive_secret(suite,
-                                           tv.derive_secret_secret,
-                                           derive_secret_label_string,
-                                           tv.derive_secret_context);
-    ASSERT_EQ(derive_secret_out, test_case.derive_secret_out);
-
     auto derive_key_pair_priv =
       DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
     auto derive_key_pair_pub = derive_key_pair_priv.public_key();
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
     DeterministicHPKE lock;
-    auto ecies_out =
-      derive_key_pair_pub.encrypt(tv.ecies_aad, tv.ecies_plaintext);
-    ASSERT_EQ(ecies_out, test_case.ecies_out);
+    auto hpke_out = derive_key_pair_pub.encrypt(tv.hpke_aad, tv.hpke_plaintext);
+    ASSERT_EQ(hpke_out, test_case.hpke_out);
   }
 };
 

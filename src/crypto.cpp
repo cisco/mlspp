@@ -984,17 +984,6 @@ hkdf_expand_label(CipherSuite suite,
   return hkdf_expand(suite, secret, label_bytes, length);
 }
 
-bytes
-derive_secret(CipherSuite suite,
-              const bytes& secret,
-              const std::string& label,
-              const bytes& context)
-{
-  auto context_hash = Digest(suite).write(context).digest();
-  auto size = Digest(suite).output_size();
-  return hkdf_expand_label(suite, secret, label, context_hash, size);
-}
-
 ///
 /// AESGCM
 ///
