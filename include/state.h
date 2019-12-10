@@ -75,7 +75,13 @@ public:
   CipherSuite cipher_suite() const { return _suite; }
 
   ///
-  /// Encryption and decryption
+  /// General encryption and decryption
+  ///
+  MLSCiphertext encrypt(const MLSPlaintext& pt);
+  MLSPlaintext decrypt(const MLSCiphertext& ct);
+
+  ///
+  /// Application encryption and decryption
   ///
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
@@ -138,10 +144,6 @@ protected:
 
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
-
-  // Encrypt and decrypt MLS framed objects
-  MLSCiphertext encrypt(const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const MLSCiphertext& ct);
 };
 
 } // namespace mls

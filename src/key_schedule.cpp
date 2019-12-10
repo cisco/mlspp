@@ -63,9 +63,7 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , key_size(AESGCM::key_size(suite_in))
   , nonce_size(AESGCM::nonce_size)
   , secret_size(Digest(suite).output_size())
-{
-  std::cout << "init " << node_in.val << " " << next_secret << std::endl;
-}
+{}
 
 std::tuple<uint32_t, KeyAndNonce>
 HashRatchet::next()
@@ -364,9 +362,6 @@ KeyScheduleEpoch::next(LeafCount size,
                        const bytes& context)
 {
   auto new_epoch_secret = hkdf_extract(suite, init_secret, update_secret);
-  std::cout << "epoch " << init_secret << std::endl
-            << "      " << update_secret << std::endl
-            << "      " << new_epoch_secret << std::endl;
   return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
 }
 

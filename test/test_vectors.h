@@ -455,19 +455,31 @@ struct SessionTestVectors
   {
     CipherSuite cipher_suite;
     SignatureScheme sig_scheme;
+    bool encrypt;
     tls::vector<ClientInitKey, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
 
-    TLS_SERIALIZABLE(cipher_suite, sig_scheme, client_init_keys, transcript);
+    TLS_SERIALIZABLE(cipher_suite,
+                     sig_scheme,
+                     encrypt,
+                     client_init_keys,
+                     transcript);
   };
 
   uint32_t group_size;
   tls::opaque<1> group_id;
 
   TestCase case_p256_p256;
+  TestCase case_p256_p256_encrypted;
   TestCase case_x25519_ed25519;
+  TestCase case_x25519_ed25519_encrypted;
 
-  TLS_SERIALIZABLE(group_size, group_id, case_p256_p256, case_x25519_ed25519);
+  TLS_SERIALIZABLE(group_size,
+                   group_id,
+                   case_p256_p256,
+                   case_p256_p256_encrypted,
+                   case_x25519_ed25519,
+                   case_x25519_ed25519_encrypted);
 };
 
 struct BasicSessionTestVectors : SessionTestVectors

@@ -611,9 +611,14 @@ State::encrypt(const MLSPlaintext& pt)
   uint32_t generation;
   KeyAndNonce keys;
   switch (pt.content.inner_type()) {
-    // TODO(rlb) Enable encryption of Proposal / Commit messages
     case ContentType::application:
       std::tie(generation, keys) = _keys.application_keys.next(_index);
+      break;
+
+    case ContentType::proposal:
+    case ContentType::commit:
+      std::cout << "<<< handshake encryption <<<" << std::endl;
+      std::tie(generation, keys) = _keys.handshake_keys.next(_index);
       break;
 
     default:
@@ -695,6 +700,13 @@ State::decrypt(const MLSCiphertext& ct)
     case ContentType::application:
       keys = _keys.application_keys.get(sender, generation);
       _keys.application_keys.erase(sender, generation);
+      break;
+
+    case ContentType::proposal:
+    case ContentType::commit:
+      std::cout << ">>> handshake decryption >>>" << std::endl;
+      keys = _keys.handshake_keys.get(sender, generation);
+      _keys.handshake_keys.erase(sender, generation);
       break;
 
     default:

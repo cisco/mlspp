@@ -218,6 +218,7 @@ private:
   std::vector<uint8_t> _buffer;
   ostream& write_uint(uint64_t value, int length);
 
+  friend ostream& operator<<(ostream& out, bool data);
   friend ostream& operator<<(ostream& out, uint8_t data);
   friend ostream& operator<<(ostream& out, uint16_t data);
   friend ostream& operator<<(ostream& out, uint32_t data);
@@ -385,6 +386,7 @@ private:
   template<typename T>
   istream& read_uint(T& data, int length);
 
+  friend istream& operator>>(istream& in, bool& data);
   friend istream& operator>>(istream& in, uint8_t& data);
   friend istream& operator>>(istream& in, uint16_t& data);
   friend istream& operator>>(istream& in, uint32_t& data);

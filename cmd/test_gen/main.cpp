@@ -438,17 +438,25 @@ generate_basic_session()
 
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
   std::vector<SignatureScheme> schemes{
     SignatureScheme::P256_SHA256,
+    SignatureScheme::P256_SHA256,
+    SignatureScheme::Ed25519,
     SignatureScheme::Ed25519,
   };
 
+  std::vector<bool> encrypts{ false, true, false, true };
+
   std::vector<SessionTestVectors::TestCase*> cases{
     &tv.case_p256_p256,
+    &tv.case_p256_p256_encrypted,
     &tv.case_x25519_ed25519,
+    &tv.case_x25519_ed25519_encrypted,
   };
 
   tv.group_size = 5;
@@ -458,6 +466,7 @@ generate_basic_session()
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
+    auto encrypt = encrypts[i];
     const bytes client_init_key_id = { 0, 1, 2, 3 };
     const bytes group_init_secret = { 4, 5, 6, 7 };
 
@@ -486,6 +495,8 @@ generate_basic_session()
                                                      { client_init_keys[0] },
                                                      { client_init_keys[1] },
                                                      commit_secret);
+        session.encrypt_handshake(encrypt);
+
         sessions.push_back(session);
         welcome = welcome_new;
       } else {
@@ -497,6 +508,7 @@ generate_basic_session()
       }
 
       auto joiner = Session::join({ client_init_keys[j] }, welcome);
+      joiner.encrypt_handshake(encrypt);
       sessions.push_back(joiner);
 
       transcript.emplace_back(welcome, add, commit_secret, sessions[0]);
@@ -531,7 +543,9 @@ generate_basic_session()
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, client_init_keys, transcript };
+    std::cout << "case " << uint16_t(suite) << " " << uint16_t(scheme) << " "
+              << encrypt << std::endl;
+    *cases[i] = { suite, scheme, encrypt, client_init_keys, transcript };
   }
 
   return tv;
@@ -609,7 +623,6 @@ main()
   KeyScheduleTestVectors key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
-  /*
   TreeTestVectors tree = generate_tree();
   write_test_vectors(tree);
 
@@ -643,7 +656,6 @@ main()
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }
-  */
 
   return 0;
 }
