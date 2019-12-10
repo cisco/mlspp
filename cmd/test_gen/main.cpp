@@ -543,8 +543,6 @@ generate_basic_session()
     }
 
     // Construct the test case
-    std::cout << "case " << uint16_t(suite) << " " << uint16_t(scheme) << " "
-              << encrypt << std::endl;
     *cases[i] = { suite, scheme, encrypt, client_init_keys, transcript };
   }
 

@@ -178,9 +178,6 @@ public:
       broadcast(add);
       sessions.emplace_back(mls::Session::join({ cik }, welcome));
     }
-
-    std::cout << "Created a group with " << initial_size << " members"
-              << std::endl;
   }
 
   // TODO Add at the leftmost blank slot instead of at the right edge
