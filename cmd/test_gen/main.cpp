@@ -35,29 +35,6 @@ generate_tree_math()
   return tv;
 }
 
-ResolutionTestVectors
-generate_resolution()
-{
-  ResolutionTestVectors tv;
-  tv.n_leaves = LeafCount{ 7 };
-
-  auto width = NodeCount{ tv.n_leaves };
-  uint32_t n_cases = (1 << width.val);
-
-  tv.cases.resize(n_cases);
-  for (uint32_t t = 0; t < n_cases; ++t) {
-    tv.cases[t].resize(width.val);
-
-    auto nodes = ResolutionTestVectors::make_tree(t, width);
-    for (uint32_t i = 0; i < width.val; ++i) {
-      auto res = tree_math::resolve(nodes, NodeIndex{ i });
-      tv.cases[t][i] = ResolutionTestVectors::compact(res);
-    }
-  }
-
-  return tv;
-}
-
 CryptoTestVectors
 generate_crypto()
 {
@@ -609,9 +586,6 @@ main()
   TreeMathTestVectors tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
-  ResolutionTestVectors resolution = generate_resolution();
-  write_test_vectors(resolution);
-
   CryptoTestVectors crypto = generate_crypto();
   write_test_vectors(crypto);
 
@@ -633,7 +607,6 @@ main()
   // Verify that the test vectors are reproducible (to the extent
   // possible)
   verify_reproducible(generate_tree_math);
-  verify_reproducible(generate_resolution);
   verify_reproducible(generate_crypto);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
@@ -644,7 +617,6 @@ main()
   // Verify that the test vectors load
   try {
     TestLoader<TreeMathTestVectors>::get();
-    TestLoader<ResolutionTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<HashRatchetTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();

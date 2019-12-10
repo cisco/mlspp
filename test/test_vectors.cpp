@@ -10,39 +10,12 @@ using namespace mls;
 ///
 
 const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
-const std::string ResolutionTestVectors::file_name = "./resolution.bin";
 const std::string CryptoTestVectors::file_name = "./crypto.bin";
 const std::string HashRatchetTestVectors::file_name = "./hash_ratchet.bin";
 const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
 const std::string TreeTestVectors::file_name = "./tree.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
-
-///
-/// ResolutionTestVectors
-///
-
-std::vector<bool>
-ResolutionTestVectors::make_tree(uint32_t t, NodeCount w)
-{
-  auto vec = std::vector<bool>(w.val);
-  for (size_t i = 0; i < vec.size(); ++i) {
-    vec[i] = t & 1;
-    t >>= 1;
-  }
-  return vec;
-}
-
-std::vector<uint8_t>
-ResolutionTestVectors::compact(const std::vector<NodeIndex>& res)
-{
-  std::vector<uint8_t> out(res.size());
-  std::transform(res.begin(),
-                 res.end(),
-                 out.begin(),
-                 [](NodeIndex c) -> uint8_t { return c.val; });
-  return out;
-}
 
 ///
 /// File Handling
@@ -100,7 +73,6 @@ TestLoader<T>::get()
 }
 
 template struct TestLoader<TreeMathTestVectors>;
-template struct TestLoader<ResolutionTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
 template struct TestLoader<HashRatchetTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;

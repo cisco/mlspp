@@ -26,24 +26,6 @@ struct TreeMathTestVectors
 
 /////
 
-struct ResolutionTestVectors
-{
-  static const std::string file_name;
-
-  typedef tls::vector<uint8_t, 1> Resolution;
-  typedef tls::vector<Resolution, 2> ResolutionCase;
-
-  static std::vector<bool> make_tree(uint32_t t, NodeCount w);
-  static std::vector<uint8_t> compact(const std::vector<NodeIndex>& res);
-
-  LeafCount n_leaves;
-  tls::vector<ResolutionCase, 4> cases;
-
-  TLS_SERIALIZABLE(n_leaves, cases)
-};
-
-/////
-
 struct CryptoTestVectors
 {
   static const std::string file_name;
