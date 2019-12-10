@@ -6,6 +6,7 @@
 #include "tls_syntax.h"
 #include "tree_math.h"
 #include <optional>
+#include <list>
 #include <iostream>
 
 namespace mls {
@@ -16,9 +17,6 @@ class RatchetTreeNode : public CipherAware
 {
 public:
   RatchetTreeNode(CipherSuite suite);
-  RatchetTreeNode(const RatchetTreeNode& other) = default;
-  RatchetTreeNode& operator=(const RatchetTreeNode& other);
-
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
   RatchetTreeNode(const DHPrivateKey& priv);
   RatchetTreeNode(const DHPublicKey& pub);
@@ -26,16 +24,21 @@ public:
   bool public_equal(const RatchetTreeNode& other) const;
   const std::optional<DHPrivateKey>& private_key() const;
   const DHPublicKey& public_key() const;
+  const std::vector<LeafIndex>& unmerged_leaves() const;
   const std::optional<Credential>& credential() const;
 
   void merge(const RatchetTreeNode& other);
   void set_credential(const Credential& cred);
+  void add_unmerged(LeafIndex index);
 
-  TLS_SERIALIZABLE(_pub, _cred);
+  TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
 
 private:
   std::optional<DHPrivateKey> _priv;
   DHPublicKey _pub;
+
+  // Unmerged leaves to be included in resolution
+  tls::vector<LeafIndex, 4> _unmerged_leaves;
 
   // A credential is populated iff this is a leaf node
   tls::optional<Credential> _cred;
@@ -120,6 +123,7 @@ protected:
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
   bytes node_step(const bytes& path_secret) const;
+  std::list<NodeIndex> resolve(NodeIndex index);
 
   void set_hash(NodeIndex index);
   void set_hash_path(LeafIndex index);

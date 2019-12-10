@@ -314,7 +314,14 @@ FirstEpoch::next(LeafCount size,
                  const bytes& context)
 {
   auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
-  return KeyScheduleEpoch::create(suite, size, epoch_secret, context);
+  auto out = KeyScheduleEpoch::create(suite, size, epoch_secret, context);
+
+  std::cout << "1up " << update_secret << std::endl
+            << "    " << context << std::endl
+            << "    " << epoch_secret << std::endl
+            << "    " << out.confirmation_key << std::endl;
+
+  return out;
 }
 
 ///
@@ -363,7 +370,14 @@ KeyScheduleEpoch::next(LeafCount size,
                        const bytes& context)
 {
   auto new_epoch_secret = hkdf_extract(suite, init_secret, update_secret);
-  return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
+  auto out = KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
+
+  std::cout << "eup " << update_secret << std::endl
+            << "    " << context << std::endl
+            << "    " << new_epoch_secret << std::endl
+            << "    " << out.confirmation_key << std::endl;
+
+  return out;
 }
 
 bool

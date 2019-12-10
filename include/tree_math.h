@@ -105,28 +105,5 @@ dirpath(NodeIndex x, NodeCount w);
 std::vector<NodeIndex>
 copath(NodeIndex x, NodeCount w);
 
-// XXX(rlb@ipv.sx): The templating here is looser than I would like.
-// Really it should be something like vector<optional<T>>
-template<typename T>
-std::vector<NodeIndex>
-resolve(const T& nodes, NodeIndex target)
-{
-  // Resolution of a populated node is the node itself
-  if (nodes[target.val]) {
-    return { target };
-  }
-
-  // Resolution of an empty leaf is the empty list
-  if (level(target) == 0) {
-    return {};
-  }
-
-  auto n = NodeCount{ uint32_t(nodes.size()) };
-  auto l = resolve(nodes, left(target));
-  auto r = resolve(nodes, right(target, n));
-  l.insert(l.end(), r.begin(), r.end());
-  return l;
-}
-
 } // namespace tree_math
 } // namespace mls

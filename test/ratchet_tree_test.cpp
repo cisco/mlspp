@@ -39,13 +39,13 @@ protected:
   const bytes hashD = from_hex(
     "ed1526270fdca2222730bb48c92825c7518399dfb266ecd1c8564e2b36f63d71");
   const bytes hashAB = from_hex(
-    "34c656e7bf8b535f5781e561f3b5115946e373c108ace3cf9bbae09e6963530e");
+    "bff3b7b65c000086a1f6acf98dc33ae26e82544866b5509f6bfd82f5f188fb09");
   const bytes hashCD = from_hex(
-    "775c50add1cf6ab09c84d67c050a97d5290d541453292fe35e033ca3e416bfd5");
+    "307fbcdd6f7bffc3d067de1f547f4219647770bccfe38db664a8ede2554dd2de");
   const bytes hashABC = from_hex(
-    "0107f66c071a4c073af7f42de07f014e386bf9d47bfcabe366985e9d228b8c79");
+    "3f914f333f929c5fe93d33cdf1273b9b23569d16dd21b37b57e4f6f852571d76");
   const bytes hashABCD = from_hex(
-    "0121303fd31ce16c64328e4fea1cdb3232387f7929f4754463484a927363d572");
+    "67035df4b00b923caa2a2d566a825d7af436afc5d21ff3a9ea97bfde448bcc13");
 
   const TreeTestVectors& tv;
 

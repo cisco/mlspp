@@ -65,20 +65,3 @@ TEST_F(TreeMathTest, Sibling)
 {
   vector_test(size_scope(tree_math::sibling), tv.sibling);
 }
-
-TEST(ResolutionTest, Interop)
-{
-  auto tv = TestLoader<ResolutionTestVectors>::get();
-
-  auto width = NodeCount{ tv.n_leaves };
-  uint32_t n_cases = (1 << width.val);
-
-  for (uint32_t t = 0; t < n_cases; ++t) {
-    auto nodes = ResolutionTestVectors::make_tree(t, width);
-    for (uint32_t i = 0; i < width.val; ++i) {
-      auto res = tree_math::resolve(nodes, NodeIndex{ i });
-      auto compact = ResolutionTestVectors::compact(res);
-      ASSERT_EQ(compact, tv.cases[t][i]);
-    }
-  }
-}
