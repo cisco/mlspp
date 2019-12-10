@@ -301,17 +301,17 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite)
 {}
 
 MLSPlaintext::MLSPlaintext(CipherSuite suite,
-                           const bytes& group_id_in,
+                           bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
-                           bytes content_in)
+                           const bytes& content_in)
   : CipherAware(suite)
-  , group_id(group_id_in)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , authenticated_data(authenticated_data_in)
+  , authenticated_data(std::move(authenticated_data_in))
   , content(suite, ApplicationData{ suite })
 {
   tls::istream r(content_in);

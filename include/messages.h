@@ -351,12 +351,12 @@ struct MLSPlaintext : public CipherAware
 
   // Constructor for decrypting
   MLSPlaintext(CipherSuite suite,
-               const bytes& group_id,
+               bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,
                bytes authenticated_data,
-               bytes content);
+               const bytes& content);
 
   // Constructors for encrypting
   MLSPlaintext(bytes group_id,

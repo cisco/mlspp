@@ -105,13 +105,13 @@ Session::handle(const bytes& handshake_data)
     }
 
     auto message = std::get<0>(_outbound_cache.value());
-    auto state = std::get<1>(_outbound_cache.value());
+    auto next_state = std::get<1>(_outbound_cache.value());
 
     if (message != handshake_data) {
       throw ProtocolError("Received different own message");
     }
 
-    add_state(proposal.epoch, state);
+    add_state(proposal.epoch, next_state);
     _outbound_cache = std::nullopt;
     return;
   }
