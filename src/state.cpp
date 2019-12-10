@@ -617,7 +617,6 @@ State::encrypt(const MLSPlaintext& pt)
 
     case ContentType::proposal:
     case ContentType::commit:
-      std::cout << "<<< handshake encryption <<<" << std::endl;
       std::tie(generation, keys) = _keys.handshake_keys.next(_index);
       break;
 
@@ -704,7 +703,6 @@ State::decrypt(const MLSCiphertext& ct)
 
     case ContentType::proposal:
     case ContentType::commit:
-      std::cout << ">>> handshake decryption >>>" << std::endl;
       keys = _keys.handshake_keys.get(sender, generation);
       _keys.handshake_keys.erase(sender, generation);
       break;

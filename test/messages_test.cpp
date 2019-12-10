@@ -13,10 +13,6 @@ tls_round_trip(const bytes& vector,
                Tp... args)
 {
   auto marshaled = tls::marshal(constructed);
-
-  std::cout << "mar " << marshaled << std::endl;
-  std::cout << "vec " << vector << std::endl;
-
   if (reproducible) {
     ASSERT_EQ(vector, marshaled);
   }

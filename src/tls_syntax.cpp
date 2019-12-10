@@ -85,6 +85,9 @@ operator>>(istream& in, bool& data)
 {
   uint8_t val;
   in >> val;
+
+  // Linter thinks uint8_t is signed (?)
+  // NOLINTNEXTLINE(hicpp-signed-bitwise)
   if ((val & 0xFE) != 0) {
     throw ReadError("Malformed boolean");
   }
