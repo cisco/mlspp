@@ -17,19 +17,19 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite)
 
 RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
   : CipherAware(suite)
-  , _priv(DHPrivateKey::derive(suite, secret))
+  , _priv(HPKEPrivateKey::derive(suite, secret))
   , _pub(suite)
 {
   _pub = _priv.value().public_key();
 }
 
-RatchetTreeNode::RatchetTreeNode(const DHPrivateKey& priv)
+RatchetTreeNode::RatchetTreeNode(const HPKEPrivateKey& priv)
   : CipherAware(priv.cipher_suite())
   , _priv(priv)
   , _pub(priv.public_key())
 {}
 
-RatchetTreeNode::RatchetTreeNode(const DHPublicKey& pub)
+RatchetTreeNode::RatchetTreeNode(const HPKEPublicKey& pub)
   : CipherAware(pub.cipher_suite())
   , _priv(std::nullopt)
   , _pub(pub)
@@ -41,13 +41,13 @@ RatchetTreeNode::public_equal(const RatchetTreeNode& other) const
   return _pub == other._pub;
 }
 
-const std::optional<DHPrivateKey>&
+const std::optional<HPKEPrivateKey>&
 RatchetTreeNode::private_key() const
 {
   return _priv;
 }
 
-const DHPublicKey&
+const HPKEPublicKey&
 RatchetTreeNode::public_key() const
 {
   return _pub;
@@ -128,7 +128,7 @@ OptionalRatchetTreeNode::merge(const RatchetTreeNode& other)
 
 struct LeafNodeInfo
 {
-  DHPublicKey public_key;
+  HPKEPublicKey public_key;
   Credential credential;
 
   TLS_SERIALIZABLE(public_key, credential);
@@ -224,7 +224,7 @@ RatchetTree::RatchetTree(CipherSuite suite)
   , _secret_size(Digest(suite).output_size())
 {}
 
-RatchetTree::RatchetTree(const DHPrivateKey& priv, const Credential& cred)
+RatchetTree::RatchetTree(const HPKEPrivateKey& priv, const Credential& cred)
   : CipherAware(priv.cipher_suite())
   , _nodes(priv.cipher_suite())
   , _secret_size(Digest(priv.cipher_suite()).output_size())
@@ -364,7 +364,7 @@ RatchetTree::blank_path(LeafIndex index, bool include_leaf)
 
 void
 RatchetTree::add_leaf(LeafIndex index,
-                      const DHPublicKey& leaf_key,
+                      const HPKEPublicKey& leaf_key,
                       const Credential& credential)
 {
   if (index.val == size()) {
@@ -398,7 +398,7 @@ RatchetTree::add_leaf(LeafIndex index,
 }
 
 void
-RatchetTree::merge(LeafIndex index, const DHPublicKey& leaf_key)
+RatchetTree::merge(LeafIndex index, const HPKEPublicKey& leaf_key)
 {
   auto curr = NodeIndex{ index };
   if (!_nodes[curr].has_value()) {
@@ -409,7 +409,7 @@ RatchetTree::merge(LeafIndex index, const DHPublicKey& leaf_key)
 }
 
 void
-RatchetTree::merge(LeafIndex index, const DHPrivateKey& leaf_priv)
+RatchetTree::merge(LeafIndex index, const HPKEPrivateKey& leaf_priv)
 {
   auto curr = NodeIndex{ index };
   if (!_nodes[curr].has_value()) {

@@ -44,7 +44,7 @@ struct CryptoTestVectors
     tls::opaque<1> hkdf_extract_out;
 
     // Derive-Key-Pair
-    DHPublicKey derive_key_pair_pub;
+    HPKEPublicKey derive_key_pair_pub;
 
     // HPKE
     HPKECiphertext hpke_out;

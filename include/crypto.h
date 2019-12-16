@@ -279,34 +279,34 @@ protected:
 // DH specialization
 struct HPKECiphertext;
 
-class DHPublicKey : public PublicKey
+class HPKEPublicKey : public PublicKey
 {
 public:
   using PublicKey::PublicKey;
-  DHPublicKey();
+  HPKEPublicKey();
   HPKECiphertext encrypt(const bytes& aad, const bytes& plaintext) const;
 
 private:
-  friend class DHPrivateKey;
+  friend class HPKEPrivateKey;
 };
 
-class DHPrivateKey : public PrivateKey
+class HPKEPrivateKey : public PrivateKey
 {
 public:
   using PrivateKey::PrivateKey;
 
-  static DHPrivateKey generate(CipherSuite suite);
-  static DHPrivateKey parse(CipherSuite suite, const bytes& data);
-  static DHPrivateKey derive(CipherSuite suite, const bytes& secret);
-  static DHPrivateKey node_derive(CipherSuite suite, const bytes& secret);
+  static HPKEPrivateKey generate(CipherSuite suite);
+  static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
+  static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
+  static HPKEPrivateKey node_derive(CipherSuite suite, const bytes& secret);
 
-  bytes derive(const DHPublicKey& pub) const;
+  bytes derive(const HPKEPublicKey& pub) const;
   bytes decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const;
 
-  const DHPublicKey& public_key() const;
+  const HPKEPublicKey& public_key() const;
 
 private:
-  DHPrivateKey(CipherSuite suite, OpenSSLKey* key);
+  HPKEPrivateKey(CipherSuite suite, OpenSSLKey* key);
 };
 
 // Signature specialization
@@ -340,7 +340,7 @@ private:
 // A struct for HPKE-encrypted information
 struct HPKECiphertext : public CipherAware
 {
-  DHPublicKey ephemeral;
+  HPKEPublicKey ephemeral;
   tls::opaque<4> content;
 
   HPKECiphertext(CipherSuite suite)
@@ -348,7 +348,7 @@ struct HPKECiphertext : public CipherAware
     , ephemeral(suite)
   {}
 
-  HPKECiphertext(const DHPublicKey& ephemeral_in, const bytes& content_in)
+  HPKECiphertext(const HPKEPublicKey& ephemeral_in, const bytes& content_in)
     : CipherAware(ephemeral_in.cipher_suite())
     , ephemeral(ephemeral_in)
     , content(content_in)

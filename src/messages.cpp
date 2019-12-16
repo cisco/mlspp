@@ -14,7 +14,7 @@ RatchetNode::RatchetNode(CipherSuite suite)
   , node_secrets(suite)
 {}
 
-RatchetNode::RatchetNode(DHPublicKey public_key_in,
+RatchetNode::RatchetNode(HPKEPublicKey public_key_in,
                          const std::vector<HPKECiphertext>& node_secrets_in)
   : CipherAware(public_key_in.cipher_suite())
   , public_key(std::move(public_key_in))

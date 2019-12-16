@@ -68,7 +68,7 @@ generate_crypto()
       hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
 
     // Derive-Key-Pair
-    auto priv = DHPrivateKey::derive(suite, tv.derive_key_pair_seed);
+    auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
     auto pub = priv.public_key();
     test_case->derive_key_pair_pub = pub;
 
@@ -313,7 +313,7 @@ generate_messages()
     auto scheme = schemes[i];
 
     // Miscellaneous data items we need to construct messages
-    auto dh_priv = DHPrivateKey::derive(suite, tv.dh_seed);
+    auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();

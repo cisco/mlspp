@@ -19,16 +19,16 @@ enum class ProtocolVersion : uint8_t
 };
 
 // struct {
-//    DHPublicKey public_key;
+//    HPKEPublicKey public_key;
 //    HPKECiphertext node_secrets<0..2^16-1>;
 // } RatchetNode
 struct RatchetNode : public CipherAware
 {
-  DHPublicKey public_key;
+  HPKEPublicKey public_key;
   tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
 
   RatchetNode(CipherSuite suite);
-  RatchetNode(DHPublicKey public_key,
+  RatchetNode(HPKEPublicKey public_key,
               const std::vector<HPKECiphertext>& node_secrets);
 
   TLS_SERIALIZABLE(public_key, node_secrets);
@@ -59,11 +59,6 @@ struct DirectPath : public CipherAware
 // version (with private keys).  This results in some ugly checking
 // code when private keys are needed, so it might be nice to split
 // these two cases in the type system.
-
-// TODO: Actually rename
-using HPKEPublicKey = DHPublicKey;
-using HPKEPrivateKey = DHPrivateKey;
-
 struct ClientInitKey
 {
   ProtocolVersion version;

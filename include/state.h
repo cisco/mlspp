@@ -37,7 +37,7 @@ public:
   // Initialize an empty group
   State(bytes group_id,
         CipherSuite suite,
-        const DHPrivateKey& leaf_priv,
+        const HPKEPrivateKey& leaf_priv,
         const Credential& credential);
 
   // Initialize a group from a Welcome

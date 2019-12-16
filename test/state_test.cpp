@@ -17,7 +17,7 @@ protected:
 
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
-  std::vector<DHPrivateKey> init_privs;
+  std::vector<HPKEPrivateKey> init_privs;
   std::vector<ClientInitKey> client_init_keys;
   std::vector<State> states;
 
@@ -26,7 +26,7 @@ protected:
     for (size_t i = 0; i < group_size; i += 1) {
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
-      auto init_priv = DHPrivateKey::generate(suite);
+      auto init_priv = HPKEPrivateKey::generate(suite);
 
       auto client_init_key = ClientInitKey{ init_priv, credential };
 
