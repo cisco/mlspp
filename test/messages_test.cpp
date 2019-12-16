@@ -52,7 +52,7 @@ protected:
                           bool reproducible)
   {
     // Miscellaneous data items we need to construct messages
-    auto dh_priv = DHPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
+    auto dh_priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();

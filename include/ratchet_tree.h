@@ -18,12 +18,12 @@ class RatchetTreeNode : public CipherAware
 public:
   RatchetTreeNode(CipherSuite suite);
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
-  RatchetTreeNode(const DHPrivateKey& priv);
-  RatchetTreeNode(const DHPublicKey& pub);
+  RatchetTreeNode(const HPKEPrivateKey& priv);
+  RatchetTreeNode(const HPKEPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
-  const std::optional<DHPrivateKey>& private_key() const;
-  const DHPublicKey& public_key() const;
+  const std::optional<HPKEPrivateKey>& private_key() const;
+  const HPKEPublicKey& public_key() const;
   const std::vector<LeafIndex>& unmerged_leaves() const;
   const std::optional<Credential>& credential() const;
 
@@ -34,8 +34,8 @@ public:
   TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
 
 private:
-  std::optional<DHPrivateKey> _priv;
-  DHPublicKey _pub;
+  std::optional<HPKEPrivateKey> _priv;
+  HPKEPublicKey _pub;
 
   // Unmerged leaves to be included in resolution
   tls::vector<LeafIndex, 4> _unmerged_leaves;
@@ -86,7 +86,7 @@ class RatchetTree : public CipherAware
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(const DHPrivateKey& priv, const Credential& cred);
+  RatchetTree(const HPKEPrivateKey& priv, const Credential& cred);
 
   // KEM encap/decap, including updates to the tree
   std::tuple<DirectPath, bytes> encap(LeafIndex from, const bytes& context, const bytes& leaf);
@@ -96,11 +96,11 @@ public:
   void blank_path(LeafIndex index, bool include_leaf);
 
   // Add a leaf node to the tree (without affecting its parents)
-  void add_leaf(LeafIndex index, const DHPublicKey& leaf_key, const Credential& credential);
+  void add_leaf(LeafIndex index, const HPKEPublicKey& leaf_key, const Credential& credential);
 
   // Merge a new key into a leaf (without affecting its credential)
-  void merge(LeafIndex index, const DHPublicKey& leaf_key);
-  void merge(LeafIndex index, const DHPrivateKey& leaf_priv);
+  void merge(LeafIndex index, const HPKEPublicKey& leaf_key);
+  void merge(LeafIndex index, const HPKEPrivateKey& leaf_priv);
   void merge(LeafIndex index, const bytes& leaf_secret);
 
   bool occupied(LeafIndex index) const;

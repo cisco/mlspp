@@ -1293,11 +1293,11 @@ PrivateKey::operator!=(const PrivateKey& other) const
 std::unique_ptr<PublicKey>
 PrivateKey::type_preserving_dup(const PublicKey* pub) const
 {
-  auto dh = dynamic_cast<const DHPublicKey*>(pub);
+  auto dh = dynamic_cast<const HPKEPublicKey*>(pub);
   auto sig = dynamic_cast<const SignaturePublicKey*>(pub);
 
   if (dh != nullptr) {
-    return std::make_unique<DHPublicKey>(*dh);
+    return std::make_unique<HPKEPublicKey>(*dh);
   }
 
   if (sig != nullptr) {
@@ -1313,7 +1313,7 @@ PrivateKey::PrivateKey(CipherSuite suite, OpenSSLKey* key)
   , _key(key)
   , _pub(nullptr)
 {
-  _pub = std::make_unique<DHPublicKey>(suite, _key->dup_public());
+  _pub = std::make_unique<HPKEPublicKey>(suite, _key->dup_public());
 }
 
 PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
@@ -1326,13 +1326,13 @@ PrivateKey::PrivateKey(SignatureScheme scheme, OpenSSLKey* key)
 }
 
 ///
-/// DHPublicKey and DHPrivateKey
+/// HPKEPublicKey and HPKEPrivateKey
 ///
 
 // XXX(rlb@ipv.sx): This is a bit of a hack, but it means that if
 // we're constructing objects for serialization, then we don't
 // need to do all the variant stuff
-DHPublicKey::DHPublicKey()
+HPKEPublicKey::HPKEPublicKey()
   : PublicKey(CipherSuite::X25519_SHA256_AES128GCM)
 {}
 
@@ -1406,7 +1406,7 @@ setup_core(CipherSuite suite,
 
 static std::pair<bytes, bytes>
 setup_base(CipherSuite suite,
-           const DHPublicKey& pkR,
+           const HPKEPublicKey& pkR,
            const bytes& zz,
            const bytes& enc,
            const bytes& info)
@@ -1419,13 +1419,13 @@ setup_base(CipherSuite suite,
 }
 
 HPKECiphertext
-DHPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
+HPKEPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
 {
   // SetupBaseI
-  auto ephemeral = DHPrivateKey::generate(_suite);
+  auto ephemeral = HPKEPrivateKey::generate(_suite);
   if (DeterministicHPKE::enabled()) {
     auto seed = to_bytes() + plaintext;
-    ephemeral = DHPrivateKey::derive(_suite, seed);
+    ephemeral = HPKEPrivateKey::derive(_suite, seed);
   }
 
   auto enc = ephemeral.public_key().to_bytes();
@@ -1442,47 +1442,48 @@ DHPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
   return HPKECiphertext{ ephemeral.public_key(), content };
 }
 
-DHPrivateKey
-DHPrivateKey::generate(CipherSuite suite)
+HPKEPrivateKey
+HPKEPrivateKey::generate(CipherSuite suite)
 {
   CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::generate(type));
+  return HPKEPrivateKey(suite, OpenSSLKey::generate(type));
 }
 
-DHPrivateKey
-DHPrivateKey::parse(CipherSuite suite, const bytes& data)
+HPKEPrivateKey
+HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::parse_private(type, data));
+  return HPKEPrivateKey(suite, OpenSSLKey::parse_private(type, data));
 }
 
-DHPrivateKey
-DHPrivateKey::derive(CipherSuite suite, const bytes& secret)
+HPKEPrivateKey
+HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   CryptoMetrics::count_fixed_base_dh();
   auto type = ossl_key_type(suite);
-  return DHPrivateKey(suite, OpenSSLKey::derive(type, secret));
+  return HPKEPrivateKey(suite, OpenSSLKey::derive(type, secret));
 }
 
-DHPrivateKey
-DHPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
+HPKEPrivateKey
+HPKEPrivateKey::node_derive(CipherSuite suite, const bytes& path_secret)
 {
   auto secret_size = Digest(suite).output_size();
   auto node_secret =
     hkdf_expand_label(suite, path_secret, "node", {}, secret_size);
-  return DHPrivateKey::derive(suite, node_secret);
+  return HPKEPrivateKey::derive(suite, node_secret);
 }
 
 bytes
-DHPrivateKey::derive(const DHPublicKey& pub) const
+HPKEPrivateKey::derive(const HPKEPublicKey& pub) const
 {
   CryptoMetrics::count_var_base_dh();
   return _key->derive(*pub._key);
 }
 
 bytes
-DHPrivateKey::decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const
+HPKEPrivateKey::decrypt(const bytes& aad,
+                        const HPKECiphertext& ciphertext) const
 {
   // SetupBaseR
   auto enc = ciphertext.ephemeral.to_bytes();
@@ -1497,20 +1498,20 @@ DHPrivateKey::decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const
   return gcm.decrypt(ciphertext.content);
 }
 
-const DHPublicKey&
-DHPrivateKey::public_key() const
+const HPKEPublicKey&
+HPKEPrivateKey::public_key() const
 {
   if (_pub == nullptr) {
     throw InvalidParameterError("No public key available");
   }
 
-  return dynamic_cast<const DHPublicKey&>(*_pub);
+  return dynamic_cast<const HPKEPublicKey&>(*_pub);
 }
 
-DHPrivateKey::DHPrivateKey(CipherSuite suite, OpenSSLKey* key)
+HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, OpenSSLKey* key)
   : PrivateKey(suite, key)
 {
-  _pub = std::make_unique<DHPublicKey>(suite, key->dup_public());
+  _pub = std::make_unique<HPKEPublicKey>(suite, key->dup_public());
 }
 
 ///

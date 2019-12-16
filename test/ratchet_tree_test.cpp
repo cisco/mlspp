@@ -230,7 +230,7 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   std::vector<TestRatchetTree> trees(size, { suite });
   for (LeafIndex i{ 0 }; i.val < size; i.val += 1) {
     auto secret = random_bytes(32);
-    auto priv = DHPrivateKey::derive(suite, secret);
+    auto priv = HPKEPrivateKey::derive(suite, secret);
     auto pub = priv.public_key();
     auto sig = SignaturePrivateKey::derive(scheme, secret);
     auto cred = Credential::basic({ uint8_t(i.val) }, sig.public_key());

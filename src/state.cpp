@@ -10,7 +10,7 @@ namespace mls {
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const DHPrivateKey& leaf_priv,
+             const HPKEPrivateKey& leaf_priv,
              const Credential& credential)
   : _suite(suite)
   , _group_id(std::move(group_id))
