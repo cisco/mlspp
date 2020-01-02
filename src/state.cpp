@@ -1,4 +1,5 @@
 #include "state.h"
+#include "primitives.h"
 
 #define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
 
@@ -74,9 +75,11 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
 
   // Decrypt the GroupInfo
   auto first_epoch = FirstEpoch::create(_suite, key_pkg.init_secret);
-  auto group_info_data =
-    AESGCM(first_epoch.group_info_key, first_epoch.group_info_nonce)
-      .decrypt(welcome.encrypted_group_info);
+  auto group_info_data = primitive::open(_suite,
+                                         first_epoch.group_info_key,
+                                         first_epoch.group_info_nonce,
+                                         {},
+                                         welcome.encrypted_group_info);
   auto group_info = tls::get<GroupInfo>(group_info_data, _suite);
 
   // Verify the singature on the GroupInfo
@@ -628,13 +631,15 @@ State::encrypt(const MLSPlaintext& pt)
   tls::ostream sender_data;
   sender_data << _index << generation;
 
-  auto sender_data_nonce = random_bytes(AESGCM::nonce_size);
+  auto sender_data_nonce = random_bytes(suite_nonce_size(_suite));
   auto sender_data_aad_val = sender_data_aad(
     _group_id, _epoch, pt.content.inner_type(), sender_data_nonce);
 
-  auto sender_data_gcm = AESGCM(_keys.sender_data_key, sender_data_nonce);
-  sender_data_gcm.set_aad(sender_data_aad_val);
-  auto encrypted_sender_data = sender_data_gcm.encrypt(sender_data.bytes());
+  auto encrypted_sender_data = primitive::seal(_suite,
+                                               _keys.sender_data_key,
+                                               sender_data_nonce,
+                                               sender_data_aad_val,
+                                               sender_data.bytes());
 
   // Compute the plaintext input and AAD
   // XXX(rlb@ipv.sx): Apply padding?
@@ -647,9 +652,7 @@ State::encrypt(const MLSPlaintext& pt)
                          encrypted_sender_data);
 
   // Encrypt the plaintext
-  auto gcm = AESGCM(keys.key, keys.nonce);
-  gcm.set_aad(aad);
-  auto ciphertext = gcm.encrypt(content);
+  auto ciphertext = primitive::seal(_suite, keys.key, keys.nonce, aad, content);
 
   // Assemble the MLSCiphertext
   MLSCiphertext ct;
@@ -678,10 +681,11 @@ State::decrypt(const MLSCiphertext& ct)
   // Decrypt and parse the sender data
   auto sender_data_aad_val = sender_data_aad(
     ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
-
-  auto sender_data_gcm = AESGCM(_keys.sender_data_key, ct.sender_data_nonce);
-  sender_data_gcm.set_aad(sender_data_aad_val);
-  auto sender_data = sender_data_gcm.decrypt(ct.encrypted_sender_data);
+  auto sender_data = primitive::open(_suite,
+                                     _keys.sender_data_key,
+                                     ct.sender_data_nonce,
+                                     sender_data_aad_val,
+                                     ct.encrypted_sender_data);
 
   tls::istream r(sender_data);
   LeafIndex sender;
@@ -718,9 +722,8 @@ State::decrypt(const MLSCiphertext& ct)
                          ct.authenticated_data,
                          ct.sender_data_nonce,
                          ct.encrypted_sender_data);
-  auto gcm = AESGCM(keys.key, keys.nonce);
-  gcm.set_aad(aad);
-  auto content = gcm.decrypt(ct.ciphertext);
+  auto content =
+    primitive::open(_suite, keys.key, keys.nonce, aad, ct.ciphertext);
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{ _suite, _group_id,       _epoch,

@@ -1,5 +1,6 @@
 #include "messages.h"
 #include "key_schedule.h"
+#include "primitives.h"
 #include "state.h"
 
 #define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
@@ -196,9 +197,11 @@ Welcome::Welcome(CipherSuite suite,
 {
   auto first_epoch = FirstEpoch::create(cipher_suite, _init_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info =
-    AESGCM(first_epoch.group_info_key, first_epoch.group_info_nonce)
-      .encrypt(group_info_data);
+  encrypted_group_info = primitive::seal(cipher_suite,
+                                         first_epoch.group_info_key,
+                                         first_epoch.group_info_nonce,
+                                         {},
+                                         group_info_data);
 }
 
 void

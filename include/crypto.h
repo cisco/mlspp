@@ -18,6 +18,9 @@ enum struct CipherSuite : uint16_t
   X448_SHA512_AES256GCM = 0x0011
 };
 
+size_t suite_nonce_size(CipherSuite suite);
+size_t suite_key_size(CipherSuite suite);
+
 enum struct SignatureScheme : uint16_t
 {
   P256_SHA256 = 0x0403,
@@ -127,10 +130,23 @@ class typed_unique_ptr : public typed_unique_ptr_base<T>
 {
 public:
   using parent = typed_unique_ptr_base<T>;
-  using parent::parent;
-  typed_unique_ptr();
-  typed_unique_ptr(T* ptr);
+
+  typed_unique_ptr()
+    : parent(nullptr, TypedDelete<T>)
+  {}
+
+  typed_unique_ptr(T* ptr)
+    : parent(ptr, TypedDelete<T>)
+  {}
 };
+
+// This shorthand just saves on explicit template arguments
+template<typename T>
+typed_unique_ptr<T>
+make_typed_unique(T* ptr)
+{
+  return typed_unique_ptr<T>(ptr);
+}
 
 // Interface cleanup wrapper for raw OpenSSL EVP keys
 struct OpenSSLKey;
@@ -184,39 +200,6 @@ hkdf_expand_label(CipherSuite suite,
                   const std::string& label,
                   const bytes& context,
                   const size_t length);
-
-class AESGCM
-{
-public:
-  AESGCM() = delete;
-  AESGCM(const AESGCM& other) = delete;
-  AESGCM(AESGCM&& other) = delete;
-  AESGCM& operator=(const AESGCM& other) = delete;
-  AESGCM& operator=(AESGCM&& other) = delete;
-
-  AESGCM(const bytes& key, const bytes& nonce);
-
-  void set_aad(const bytes& aad);
-  bytes encrypt(const bytes& plaintext) const;
-  bytes decrypt(const bytes& ciphertext) const;
-
-  static size_t key_size(CipherSuite suite);
-
-  static const size_t key_size_128 = 16;
-  static const size_t key_size_192 = 24;
-  static const size_t key_size_256 = 32;
-  static const size_t nonce_size = 12;
-  static const size_t tag_size = 16;
-
-private:
-  bytes _key;
-  bytes _nonce;
-  bytes _aad;
-
-  // This raw pointer only ever references memory managed by
-  // OpenSSL, so it doesn't need to be scoped.
-  const EVP_CIPHER* _cipher;
-};
 
 // Generic PublicKey and PrivateKey structs, which are specialized
 // to DH and Signature below

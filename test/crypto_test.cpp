@@ -231,6 +231,9 @@ TEST_F(CryptoTest, SHA2)
   ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
 }
 
+/*
+
+// TODO: Re-enable tests in terms of primitives
 TEST_F(CryptoTest, AES128GCM)
 {
   AESGCM enc(aes128gcm_key, aes128gcm_nonce);
@@ -274,6 +277,7 @@ TEST_F(CryptoTest, AES256GCM)
   rtt_dec.set_aad(rtt_aad);
   ASSERT_EQ(rtt_dec.decrypt(rtt_dec.encrypt(rtt_pt)), rtt_pt);
 }
+*/
 
 TEST_F(CryptoTest, BasicDH)
 {

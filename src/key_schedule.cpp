@@ -66,8 +66,8 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , node(node_in)
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
-  , key_size(AESGCM::key_size(suite_in))
-  , nonce_size(AESGCM::nonce_size)
+  , key_size(suite_key_size(suite_in))
+  , nonce_size(suite_nonce_size(suite_in))
   , secret_size(Digest(suite).output_size())
 {}
 
@@ -293,8 +293,8 @@ FirstEpoch
 FirstEpoch::create(CipherSuite suite, const bytes& init_secret)
 {
   auto secret_size = Digest(suite).output_size();
-  auto key_size = AESGCM::key_size(suite);
-  auto nonce_size = AESGCM::nonce_size;
+  auto key_size = suite_key_size(suite);
+  auto nonce_size = suite_nonce_size(suite);
 
   auto group_info_secret =
     hkdf_expand_label(suite, init_secret, "group info", {}, secret_size);
@@ -336,7 +336,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
     derive_secret(suite, epoch_secret, "confirm", context);
   auto init_secret = derive_secret(suite, epoch_secret, "init", context);
 
-  auto key_size = AESGCM::key_size(suite);
+  auto key_size = suite_key_size(suite);
   auto sender_data_key =
     hkdf_expand_label(suite, sender_data_secret, "sd key", {}, key_size);
 

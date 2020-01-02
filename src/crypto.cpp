@@ -1,5 +1,7 @@
 #include "crypto.h"
 #include "common.h"
+#include "primitives.h"
+
 #include "openssl/ecdh.h"
 #include "openssl/ecdsa.h"
 #include "openssl/err.h"
@@ -16,6 +18,38 @@ namespace mls {
 static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
 static const SignatureScheme unknown_scheme =
   static_cast<SignatureScheme>(0xFFFF);
+
+size_t
+suite_nonce_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return 12;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
+
+size_t
+suite_key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return 16;
+
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return 32;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
 
 ///
 /// Test mode controls
@@ -84,24 +118,6 @@ CryptoMetrics::count_hmac()
 ///
 /// typed_unique_ptr
 ///
-
-template<typename T>
-typed_unique_ptr<T>::typed_unique_ptr()
-  : typed_unique_ptr_base<T>(nullptr, TypedDelete<T>)
-{}
-
-template<typename T>
-typed_unique_ptr<T>::typed_unique_ptr(T* ptr)
-  : typed_unique_ptr_base<T>(ptr, TypedDelete<T>)
-{}
-
-// This shorthand just saves on explicit template arguments
-template<typename T>
-typed_unique_ptr<T>
-make_typed_unique(T* ptr)
-{
-  return typed_unique_ptr<T>(ptr);
-}
 
 template<>
 void
@@ -985,147 +1001,6 @@ hkdf_expand_label(CipherSuite suite,
 }
 
 ///
-/// AESGCM
-///
-
-AESGCM::AESGCM(const bytes& key, const bytes& nonce)
-{
-  switch (key.size()) {
-    case key_size_128:
-      _cipher = EVP_aes_128_gcm();
-      break;
-    case key_size_192:
-      _cipher = EVP_aes_192_gcm();
-      break;
-    case key_size_256:
-      _cipher = EVP_aes_256_gcm();
-      break;
-    default:
-      throw InvalidParameterError("Invalid AES key size");
-  }
-
-  if (nonce.size() != nonce_size) {
-    throw InvalidParameterError("Invalid AES-GCM nonce size");
-  }
-
-  _key = key;
-  _nonce = nonce;
-}
-
-void
-AESGCM::set_aad(const bytes& aad)
-{
-  _aad = aad;
-}
-
-bytes
-AESGCM::encrypt(const bytes& plaintext) const
-{
-  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
-  if (ctx.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_EncryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
-    throw OpenSSLError::current();
-  }
-
-  int outlen = 0;
-  if (!_aad.empty()) {
-    if (1 != EVP_EncryptUpdate(
-               ctx.get(), nullptr, &outlen, _aad.data(), _aad.size())) {
-      throw OpenSSLError::current();
-    }
-  }
-
-  bytes ciphertext(plaintext.size());
-  if (1 != EVP_EncryptUpdate(ctx.get(),
-                             ciphertext.data(),
-                             &outlen,
-                             plaintext.data(),
-                             plaintext.size())) {
-    throw OpenSSLError::current();
-  }
-
-  // Providing nullptr as an argument is safe here because this
-  // function never writes with GCM; it only computes the tag
-  if (1 != EVP_EncryptFinal(ctx.get(), nullptr, &outlen)) {
-    throw OpenSSLError::current();
-  }
-
-  bytes tag(tag_size);
-  if (1 != EVP_CIPHER_CTX_ctrl(
-             ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, tag.data())) {
-    throw OpenSSLError::current();
-  }
-
-  return ciphertext + tag;
-}
-
-bytes
-AESGCM::decrypt(const bytes& ciphertext) const
-{
-  if (ciphertext.size() < tag_size) {
-    throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
-  }
-
-  auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
-  if (ctx.get() == nullptr) {
-    throw OpenSSLError::current();
-  }
-
-  if (1 != EVP_DecryptInit(ctx.get(), _cipher, _key.data(), _nonce.data())) {
-    throw OpenSSLError::current();
-  }
-
-  bytes tag(ciphertext.end() - tag_size, ciphertext.end());
-  if (1 != EVP_CIPHER_CTX_ctrl(
-             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag.data())) {
-    throw OpenSSLError::current();
-  }
-
-  int out_size;
-  if (!_aad.empty()) {
-    if (1 != EVP_DecryptUpdate(
-               ctx.get(), nullptr, &out_size, _aad.data(), _aad.size())) {
-      throw OpenSSLError::current();
-    }
-  }
-
-  bytes plaintext(ciphertext.size() - tag_size);
-  if (1 != EVP_DecryptUpdate(ctx.get(),
-                             plaintext.data(),
-                             &out_size,
-                             ciphertext.data(),
-                             ciphertext.size() - tag_size)) {
-    throw OpenSSLError::current();
-  }
-
-  // Providing nullptr as an argument is safe here because this
-  // function never writes with GCM; it only verifies the tag
-  if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw InvalidParameterError("AES-GCM authentication failure");
-  }
-
-  return plaintext;
-}
-
-size_t
-AESGCM::key_size(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-      return key_size_128;
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
-      return key_size_256;
-  }
-
-  throw InvalidParameterError("Non-AESGCM ciphersuite");
-}
-
-///
 /// PublicKey
 ///
 
@@ -1393,11 +1268,11 @@ setup_core(CipherSuite suite,
                                   info };
   auto context = tls::marshal(context_str);
 
-  auto Nk = AESGCM::key_size(suite);
+  auto Nk = suite_key_size(suite);
   auto key_label = to_bytes("hpke key") + context;
   auto key = hkdf_expand(suite, secret, key_label, Nk);
 
-  auto Nn = AESGCM::nonce_size;
+  auto Nn = suite_nonce_size(suite);
   auto nonce_label = to_bytes("hpke nonce") + context;
   auto nonce = hkdf_expand(suite, secret, nonce_label, Nn);
 
@@ -1436,9 +1311,7 @@ HPKEPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
   std::tie(key, nonce) = setup_base(_suite, *this, zz, enc, info);
 
   // Context.Encrypt
-  AESGCM gcm(key, nonce);
-  gcm.set_aad(aad);
-  auto content = gcm.encrypt(plaintext);
+  auto content = primitive::seal(_suite, key, nonce, aad, plaintext);
   return HPKECiphertext{ ephemeral.public_key(), content };
 }
 
@@ -1493,9 +1366,7 @@ HPKEPrivateKey::decrypt(const bytes& aad,
   bytes info;
   std::tie(key, nonce) = setup_base(_suite, public_key(), zz, enc, info);
 
-  AESGCM gcm(key, nonce);
-  gcm.set_aad(aad);
-  return gcm.decrypt(ciphertext.content);
+  return primitive::open(_suite, key, nonce, aad, ciphertext.content);
 }
 
 const HPKEPublicKey&
