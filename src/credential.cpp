@@ -22,10 +22,8 @@ tls::istream&
 operator>>(tls::istream& str, BasicCredential& obj)
 {
   SignatureScheme scheme;
-  str >> obj.identity >> scheme;
-
-  obj.public_key = SignaturePublicKey(scheme);
-  str >> obj.public_key;
+  str >> obj.identity >> scheme >> obj.public_key;
+  obj.public_key.set_signature_scheme(scheme);
   return str;
 }
 

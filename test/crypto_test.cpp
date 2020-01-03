@@ -279,6 +279,8 @@ TEST_F(CryptoTest, AES256GCM)
 }
 */
 
+/*
+TODO: Re-instatiate as primitive tests
 TEST_F(CryptoTest, BasicDH)
 {
   std::vector<CipherSuite> suites{ CipherSuite::P256_SHA256_AES128GCM,
@@ -398,6 +400,7 @@ TEST_F(CryptoTest, X448)
   ASSERT_EQ(kAB, x448_K);
   ASSERT_EQ(kBA, x448_K);
 }
+*/
 
 TEST_F(CryptoTest, HPKE)
 {
@@ -461,7 +464,8 @@ TEST_F(CryptoTest, SignatureSerialize)
     SignaturePublicKey parsed(scheme, gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
-    auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX), scheme);
+    auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
+    gX2.set_signature_scheme(scheme);
     ASSERT_EQ(gX2, gX);
   }
 }

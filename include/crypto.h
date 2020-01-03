@@ -201,143 +201,93 @@ hkdf_expand_label(CipherSuite suite,
                   const bytes& context,
                   const size_t length);
 
-// Generic PublicKey and PrivateKey structs, which are specialized
-// to DH and Signature below
-
-class PublicKey
-  : public CipherAware
-  , public SignatureAware
+// HPKE Keys
+struct HPKECiphertext
 {
-public:
-  PublicKey(const PublicKey& other);
-  PublicKey& operator=(const PublicKey& other);
-  PublicKey& operator=(PublicKey&& other) noexcept;
-  virtual ~PublicKey() = default;
+  tls::opaque<2> kem_output;
+  tls::opaque<4> ciphertext;
 
-  explicit PublicKey(CipherSuite suite);
-  PublicKey(CipherSuite suite, const bytes& data);
-  PublicKey(CipherSuite suite, OpenSSLKey* key);
-
-  explicit PublicKey(SignatureScheme scheme);
-  PublicKey(SignatureScheme scheme, const bytes& data);
-  PublicKey(SignatureScheme scheme, OpenSSLKey* key);
-
-  bool operator==(const PublicKey& other) const;
-  bool operator!=(const PublicKey& other) const;
-
-  bytes to_bytes() const;
-  void reset(const bytes& data);
-  void reset(OpenSSLKey* key);
-
-protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-
-  friend tls::ostream& operator<<(tls::ostream& out, const PublicKey& obj);
-  friend tls::istream& operator>>(tls::istream& in, PublicKey& obj);
+  TLS_SERIALIZABLE(kem_output, ciphertext);
 };
 
-class PrivateKey
-  : public CipherAware
-  , public SignatureAware
+class HPKEPublicKey
 {
 public:
-  PrivateKey(const PrivateKey& other);
-  PrivateKey& operator=(const PrivateKey& other);
-  PrivateKey& operator=(PrivateKey&& other) noexcept;
-  virtual ~PrivateKey() = default;
-
-  bool operator==(const PrivateKey& other) const;
-  bool operator!=(const PrivateKey& other) const;
-
-protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-  std::unique_ptr<PublicKey> _pub;
-
-  std::unique_ptr<PublicKey> type_preserving_dup(const PublicKey* pub) const;
-
-  PrivateKey(CipherSuite suite, OpenSSLKey* key);
-  PrivateKey(SignatureScheme scheme, OpenSSLKey* key);
-};
-
-// DH specialization
-struct HPKECiphertext;
-
-class HPKEPublicKey : public PublicKey
-{
-public:
-  using PublicKey::PublicKey;
   HPKEPublicKey();
+  HPKEPublicKey(CipherSuite suite);
+  HPKEPublicKey(CipherSuite suite, bytes data);
+
+  CipherSuite cipher_suite() const;
   HPKECiphertext encrypt(const bytes& aad, const bytes& plaintext) const;
+  bytes to_bytes() const;
+
+  TLS_SERIALIZABLE(_data);
 
 private:
-  friend class HPKEPrivateKey;
+  CipherSuite _suite;
+  tls::opaque<2> _data;
 };
 
-class HPKEPrivateKey : public PrivateKey
+class HPKEPrivateKey
 {
 public:
-  using PrivateKey::PrivateKey;
-
   static HPKEPrivateKey generate(CipherSuite suite);
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
-  static HPKEPrivateKey node_derive(CipherSuite suite, const bytes& secret);
 
-  bytes derive(const HPKEPublicKey& pub) const;
+  CipherSuite cipher_suite() const;
   bytes decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const;
 
-  const HPKEPublicKey& public_key() const;
+  HPKEPublicKey public_key() const;
+
+  TLS_SERIALIZABLE(_suite, _data, _pub_data);
 
 private:
-  HPKEPrivateKey(CipherSuite suite, OpenSSLKey* key);
+  CipherSuite _suite;
+  tls::opaque<2> _data;
+  tls::opaque<2> _pub_data;
+
+  HPKEPrivateKey(CipherSuite suite, bytes data);
 };
 
-// Signature specialization
-class SignaturePublicKey : public PublicKey
+// Signature Keys
+class SignaturePublicKey
 {
 public:
-  using PublicKey::PublicKey;
+  SignaturePublicKey();
+  SignaturePublicKey(SignatureScheme scheme, bytes data);
+
+  void set_signature_scheme(SignatureScheme scheme);
+  SignatureScheme signature_scheme() const;
   bool verify(const bytes& message, const bytes& signature) const;
+  bytes to_bytes() const;
+
+  TLS_SERIALIZABLE(_data);
 
 private:
-  friend class SignaturePrivateKey;
+  SignatureScheme _scheme;
+  tls::opaque<2> _data;
 };
 
-class SignaturePrivateKey : public PrivateKey
+class SignaturePrivateKey
 {
 public:
-  using PrivateKey::PrivateKey;
-
   static SignaturePrivateKey generate(SignatureScheme scheme);
   static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
   static SignaturePrivateKey derive(SignatureScheme scheme,
                                     const bytes& secret);
 
   bytes sign(const bytes& message) const;
-  const SignaturePublicKey& public_key() const;
+  SignaturePublicKey public_key() const;
+
+  TLS_SERIALIZABLE(_scheme, _data, _pub_data);
 
 private:
-  SignaturePrivateKey(SignatureScheme scheme, OpenSSLKey* key);
-};
+  SignatureScheme _scheme;
+  tls::opaque<2> _data;
+  tls::opaque<2> _pub_data;
 
-// A struct for HPKE-encrypted information
-struct HPKECiphertext : public CipherAware
-{
-  HPKEPublicKey ephemeral;
-  tls::opaque<4> content;
-
-  HPKECiphertext(CipherSuite suite)
-    : CipherAware(suite)
-    , ephemeral(suite)
-  {}
-
-  HPKECiphertext(const HPKEPublicKey& ephemeral_in, const bytes& content_in)
-    : CipherAware(ephemeral_in.cipher_suite())
-    , ephemeral(ephemeral_in)
-    , content(content_in)
-  {}
-
-  TLS_SERIALIZABLE(ephemeral, content);
+  SignaturePrivateKey(SignatureScheme scheme, bytes data);
 };
 
 } // namespace mls

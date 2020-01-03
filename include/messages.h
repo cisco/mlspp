@@ -22,14 +22,10 @@ enum class ProtocolVersion : uint8_t
 //    HPKEPublicKey public_key;
 //    HPKECiphertext node_secrets<0..2^16-1>;
 // } RatchetNode
-struct RatchetNode : public CipherAware
+struct RatchetNode
 {
   HPKEPublicKey public_key;
-  tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
-
-  RatchetNode(CipherSuite suite);
-  RatchetNode(HPKEPublicKey public_key,
-              const std::vector<HPKECiphertext>& node_secrets);
+  tls::vector<HPKECiphertext, 2> node_secrets;
 
   TLS_SERIALIZABLE(public_key, node_secrets);
 };
@@ -39,7 +35,7 @@ struct RatchetNode : public CipherAware
 // } DirectPath;
 struct DirectPath : public CipherAware
 {
-  tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
+  tls::vector<RatchetNode, 2> nodes;
   DirectPath(CipherSuite suite);
 
   TLS_SERIALIZABLE(nodes);
@@ -160,9 +156,6 @@ struct EncryptedKeyPackage {
   tls::opaque<1> client_init_key_hash;
   HPKECiphertext encrypted_key_package;
 
-  EncryptedKeyPackage(CipherSuite suite);
-  EncryptedKeyPackage(bytes hash, HPKECiphertext package);
-
   TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
 };
 
@@ -176,7 +169,7 @@ struct EncryptedKeyPackage {
 struct Welcome {
   ProtocolVersion version;
   CipherSuite cipher_suite;
-  tls::variant_vector<EncryptedKeyPackage, CipherSuite, 4> key_packages;
+  tls::vector<EncryptedKeyPackage, 4> key_packages;
   tls::opaque<4> encrypted_group_info;
 
   Welcome();

@@ -7,26 +7,10 @@
 
 namespace mls {
 
-// RatchetNode
-
-RatchetNode::RatchetNode(CipherSuite suite)
-  : CipherAware(suite)
-  , public_key(suite)
-  , node_secrets(suite)
-{}
-
-RatchetNode::RatchetNode(HPKEPublicKey public_key_in,
-                         const std::vector<HPKECiphertext>& node_secrets_in)
-  : CipherAware(public_key_in.cipher_suite())
-  , public_key(std::move(public_key_in))
-  , node_secrets(node_secrets_in)
-{}
-
 // DirectPath
 
 DirectPath::DirectPath(CipherSuite suite)
   : CipherAware(suite)
-  , nodes(suite)
 {}
 
 // ClientInitKey
@@ -168,23 +152,11 @@ GroupInfo::verify() const
   return cred.public_key().verify(to_be_signed(), signature);
 }
 
-// EncryptedKeyPackage
-
-EncryptedKeyPackage::EncryptedKeyPackage(CipherSuite suite)
-  : encrypted_key_package(suite)
-{}
-
-EncryptedKeyPackage::EncryptedKeyPackage(bytes hash, HPKECiphertext package)
-  : client_init_key_hash(std::move(hash))
-  , encrypted_key_package(std::move(package))
-{}
-
 // Welcome
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
   , cipher_suite(DUMMY_CIPHERSUITE)
-  , key_packages(DUMMY_CIPHERSUITE)
 {}
 
 Welcome::Welcome(CipherSuite suite,
@@ -192,7 +164,6 @@ Welcome::Welcome(CipherSuite suite,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
-  , key_packages(suite)
   , _init_secret(std::move(init_secret))
 {
   auto first_epoch = FirstEpoch::create(cipher_suite, _init_secret);
@@ -210,7 +181,7 @@ Welcome::encrypt(const ClientInitKey& cik)
   auto key_pkg = KeyPackage{ _init_secret };
   auto key_pkg_data = tls::marshal(key_pkg);
   auto enc_pkg = cik.init_key.encrypt({}, key_pkg_data);
-  key_packages.emplace_back(cik.hash(), enc_pkg);
+  key_packages.push_back({ cik.hash(), enc_pkg });
 }
 
 bool
@@ -232,9 +203,8 @@ operator<<(tls::ostream& str, const Welcome& obj)
 tls::istream&
 operator>>(tls::istream& str, Welcome& obj)
 {
-  str >> obj.version >> obj.cipher_suite;
-  obj.key_packages.set_arg(obj.cipher_suite);
-  str >> obj.key_packages >> obj.encrypted_group_info;
+  str >> obj.version >> obj.cipher_suite >> obj.key_packages >>
+    obj.encrypted_group_info;
   return str;
 }
 

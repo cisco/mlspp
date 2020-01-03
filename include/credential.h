@@ -24,8 +24,6 @@ enum struct CredentialType : uint8_t
 struct BasicCredential
 {
   BasicCredential()
-    : identity()
-    , public_key(DUMMY_SIGNATURE_SCHEME)
   {}
 
   BasicCredential(tls::opaque<2> identity_in, SignaturePublicKey public_key_in)

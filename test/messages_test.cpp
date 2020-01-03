@@ -88,8 +88,7 @@ protected:
 
     auto encrypted_key_package =
       EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
-    tls_round_trip(
-      tc.encrypted_key_package, encrypted_key_package, true, tc.cipher_suite);
+    tls_round_trip(tc.encrypted_key_package, encrypted_key_package, true);
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
