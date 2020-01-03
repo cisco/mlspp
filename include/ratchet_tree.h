@@ -3,8 +3,8 @@
 #include "common.h"
 #include "credential.h"
 #include "crypto.h"
-#include "tls_syntax.h"
 #include "tree_math.h"
+#include "tls_syntax.h"
 #include <optional>
 #include <list>
 #include <iostream>

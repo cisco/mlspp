@@ -1,5 +1,4 @@
 #include "ratchet_tree.h"
-#include "common.h"
 #include "messages.h"
 #include "tree_math.h"
 
