@@ -101,7 +101,7 @@ struct HPKEPublicKey
   HPKEPublicKey() = default;
   HPKEPublicKey(const bytes& data);
 
-  HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& plaintext) const;
+  HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& pt) const;
   bytes to_bytes() const;
 
   TLS_SERIALIZABLE(data);
@@ -114,7 +114,7 @@ public:
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
 
-  bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ciphertext) const;
+  bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ct) const;
   HPKEPublicKey public_key() const;
 
   TLS_SERIALIZABLE(_data, _pub_data);

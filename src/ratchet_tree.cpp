@@ -14,14 +14,14 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
   _pub = _priv.value().public_key();
 }
 
-RatchetTreeNode::RatchetTreeNode(const HPKEPrivateKey& priv)
-  : _priv(priv)
+RatchetTreeNode::RatchetTreeNode(HPKEPrivateKey priv)
+  : _priv(std::move(priv))
   , _pub(priv.public_key())
 {}
 
-RatchetTreeNode::RatchetTreeNode(const HPKEPublicKey& pub)
+RatchetTreeNode::RatchetTreeNode(HPKEPublicKey pub)
   : _priv(std::nullopt)
-  , _pub(pub)
+  , _pub(std::move(pub))
 {}
 
 bool

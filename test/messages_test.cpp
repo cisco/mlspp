@@ -67,6 +67,7 @@ protected:
 
     auto [direct_path, dummy] =
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    silence_unused(dummy);
 
     // ClientInitKey
     ClientInitKey client_init_key{ tc.cipher_suite, dh_priv, cred };

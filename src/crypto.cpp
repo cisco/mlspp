@@ -199,7 +199,7 @@ to_hpke(CipherSuite suite)
   }
 }
 
-static std::pair<bytes, bytes>
+static std::tuple<bytes, bytes>
 dhkem_encap(CipherSuite suite, const bytes& pub, const bytes& seed)
 {
   bytes ephemeral;
@@ -276,20 +276,20 @@ HPKEPublicKey::HPKEPublicKey(const bytes& data_in)
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
                        const bytes& aad,
-                       const bytes& plaintext) const
+                       const bytes& pt) const
 {
   // SetupBaseI
   bytes seed;
   if (DeterministicHPKE::enabled()) {
-    seed = to_bytes() + plaintext;
+    seed = to_bytes() + pt;
   }
 
   auto [enc, zz] = dhkem_encap(suite, data, seed);
   auto [key, nonce] = setup_base(suite, *this, zz, enc, {});
 
   // Context.Encrypt
-  auto ciphertext = primitive::seal(suite, key, nonce, aad, plaintext);
-  return HPKECiphertext{ enc, ciphertext };
+  auto ct = primitive::seal(suite, key, nonce, aad, pt);
+  return HPKECiphertext{ enc, ct };
 }
 
 bytes
@@ -337,7 +337,7 @@ HPKEPrivateKey::public_key() const
 }
 
 HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
-  : _data(data)
+  : _data(std::move(data))
   , _pub_data(primitive::priv_to_pub(suite, data))
 {}
 
@@ -351,7 +351,7 @@ SignaturePublicKey::SignaturePublicKey()
 
 SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
   : _scheme(scheme)
-  , _data(data)
+  , _data(std::move(data))
 {}
 
 void
@@ -414,7 +414,7 @@ SignaturePrivateKey::public_key() const
 
 SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme, bytes data)
   : _scheme(scheme)
-  , _data(data)
+  , _data(std::move(data))
   , _pub_data(primitive::priv_to_pub(scheme, data))
 {}
 

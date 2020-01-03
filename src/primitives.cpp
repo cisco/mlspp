@@ -43,7 +43,7 @@ public:
     : parent(nullptr, TypedDelete<T>)
   {}
 
-  typed_unique_ptr(T* ptr)
+  explicit typed_unique_ptr(T* ptr)
     : parent(ptr, TypedDelete<T>)
   {}
 };
@@ -157,7 +157,7 @@ struct Digest::Implementation
   size_t size;
   typed_unique_ptr<EVP_MD_CTX> ctx;
 
-  Implementation(CipherSuite suite)
+  explicit Implementation(CipherSuite suite)
     : ctx(EVP_MD_CTX_new())
   {
     auto md = openssl_digest_type(suite);
@@ -248,9 +248,6 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
 ///
 /// Symmetric encryption
 ///
-static const size_t key_size_128 = 16;
-static const size_t key_size_192 = 24;
-static const size_t key_size_256 = 32;
 
 static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
@@ -819,7 +816,7 @@ public:
 
     bytes out(BN_num_bytes(d));
     auto data = out.data();
-    if (BN_bn2bin(d, data) != out.size()) {
+    if (BN_bn2bin(d, data) != int(out.size())) {
       throw openssl_error();
     }
 
@@ -1044,5 +1041,5 @@ verify(SignatureScheme scheme,
   return key->verify(message, signature);
 }
 
-}; // namespace primitive
-}; // namespace mls
+} // namespace primitive
+} // namespace mls

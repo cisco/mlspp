@@ -327,6 +327,7 @@ generate_messages()
 
     auto [direct_path, dummy] =
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    silence_unused(dummy);
 
     // Construct CIK
     auto client_init_key = ClientInitKey{ suite, dh_priv, cred };

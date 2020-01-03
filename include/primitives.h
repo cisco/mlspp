@@ -66,5 +66,5 @@ bool verify(SignatureScheme scheme,
              const bytes& message,
              const bytes& signature);
 
-}; // namespace primitive
-}; // namespace mls
+} // namespace primitive
+} // namespace mls
