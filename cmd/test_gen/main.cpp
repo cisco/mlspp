@@ -325,9 +325,7 @@ generate_messages()
                        { cred, cred, cred, cred } };
     ratchet_tree.blank_path(LeafIndex{ 2 }, true);
 
-    DirectPath direct_path(ratchet_tree.cipher_suite());
-    bytes dummy;
-    std::tie(direct_path, dummy) =
+    auto [direct_path, dummy] =
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
 
     // Construct CIK

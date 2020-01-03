@@ -204,7 +204,7 @@ std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret) const
 {
   // Construct a commit from cached proposals
-  auto commit = Commit{ _suite };
+  Commit commit;
   auto joiners = std::vector<ClientInitKey>{};
   for (const auto& pt : _pending_proposals) {
     auto id = proposal_id(pt);
@@ -724,9 +724,9 @@ State::decrypt(const MLSCiphertext& ct)
   auto content = open(_suite, keys.key, keys.nonce, aad, ct.ciphertext);
 
   // Set up a new plaintext based on the content
-  return MLSPlaintext{ _suite, _group_id,       _epoch,
-                       sender, ct.content_type, ct.authenticated_data,
-                       content };
+  return MLSPlaintext{
+    _group_id, _epoch, sender, ct.content_type, ct.authenticated_data, content
+  };
 }
 
 } // namespace mls

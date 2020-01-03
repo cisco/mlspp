@@ -73,10 +73,8 @@ protected:
 
     auto initial_epoch = sessions[0].current_epoch();
 
-    Welcome welcome;
-    bytes add;
     auto add_secret = fresh_secret();
-    std::tie(welcome, add) = sessions[from].add(add_secret, client_init_key);
+    auto [welcome, add] = sessions[from].add(add_secret, client_init_key);
     auto next = Session::join({ client_init_key }, welcome);
     broadcast(add, index);
 

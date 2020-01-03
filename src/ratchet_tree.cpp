@@ -239,7 +239,7 @@ RatchetTree::encap(LeafIndex from,
                    const bytes& context,
                    const bytes& leaf_secret)
 {
-  DirectPath path{ _suite };
+  DirectPath path;
 
   auto leaf_node = NodeIndex{ from };
   _nodes[leaf_node].merge(new_node(leaf_secret));

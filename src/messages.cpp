@@ -6,12 +6,6 @@
 
 namespace mls {
 
-// DirectPath
-
-DirectPath::DirectPath(CipherSuite suite)
-  : CipherAware(suite)
-{}
-
 // ClientInitKey
 
 ClientInitKey::ClientInitKey()
@@ -65,43 +59,11 @@ ClientInitKey::to_be_signed() const
   return out.bytes();
 }
 
-bool
-operator==(const ClientInitKey& lhs, const ClientInitKey& rhs)
-{
-  return (lhs.version == rhs.version) &&
-         (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.init_key == rhs.init_key) && (lhs.credential == rhs.credential) &&
-         (lhs.signature == rhs.signature);
-}
-
-bool
-operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs)
-{
-  return !(lhs == rhs);
-}
-
-tls::ostream&
-operator<<(tls::ostream& str, const ClientInitKey& obj)
-{
-  return str << obj.version << obj.cipher_suite << obj.init_key
-             << obj.credential << obj.signature;
-}
-
-tls::istream&
-operator>>(tls::istream& str, ClientInitKey& obj)
-{
-  str >> obj.version >> obj.cipher_suite;
-  obj.init_key = HPKEPublicKey(obj.cipher_suite);
-  str >> obj.init_key >> obj.credential >> obj.signature;
-  return str;
-}
-
 // GroupInfo
 
 GroupInfo::GroupInfo(CipherSuite suite)
   : epoch(0)
   , tree(suite)
-  , path(suite)
 {}
 
 GroupInfo::GroupInfo(bytes group_id_in,
@@ -209,55 +171,9 @@ operator>>(tls::istream& str, Welcome& obj)
 
 // Proposals
 
-// NOLINTNEXTLINE(misc-unused-parameters)
-Add::Add(CipherSuite suite) {}
-
-Add::Add(ClientInitKey client_init_key_in)
-  : client_init_key(std::move(client_init_key_in))
-{}
-
 const ProposalType Add::type = ProposalType::add;
-
-Update::Update(CipherSuite suite)
-  : leaf_key(suite)
-{}
-
-Update::Update(HPKEPublicKey leaf_key_in)
-  : leaf_key(std::move(leaf_key_in))
-{}
-
 const ProposalType Update::type = ProposalType::update;
-
-// NOLINTNEXTLINE(misc-unused-parameters)
-Remove::Remove(CipherSuite suite) {}
-
-Remove::Remove(LeafIndex removed_in)
-  : removed(removed_in)
-{}
-
 const ProposalType Remove::type = ProposalType::remove;
-
-Proposal::Proposal(CipherSuite suite)
-  : parent(suite, Remove{ LeafIndex{ 0 } })
-{}
-
-// Commit
-
-Commit::Commit(CipherSuite suite)
-  : path(suite)
-{}
-
-Commit::Commit(const tls::vector<ProposalID, 2>& updates_in,
-               const tls::vector<ProposalID, 2>& removes_in,
-               const tls::vector<ProposalID, 2>& adds_in,
-               const tls::vector<ProposalID, 2>& ignored_in,
-               DirectPath path_in)
-  : updates(updates_in)
-  , removes(removes_in)
-  , adds(adds_in)
-  , ignored(ignored_in)
-  , path(std::move(path_in))
-{}
 
 // MLSPlaintext
 
@@ -265,26 +181,17 @@ const ContentType ApplicationData::type = ContentType::application;
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
 
-MLSPlaintext::MLSPlaintext(CipherSuite suite)
-  : CipherAware(suite)
-  , epoch(0)
-  , sender(0)
-  , content(suite, ApplicationData{ suite })
-{}
-
-MLSPlaintext::MLSPlaintext(CipherSuite suite,
-                           bytes group_id_in,
+MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
-  : CipherAware(suite)
-  , group_id(std::move(group_id_in))
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
-  , content(suite, ApplicationData{ suite })
+  , content(ApplicationData())
 {
   tls::istream r(content_in);
   switch (content_type_in) {
@@ -295,13 +202,13 @@ MLSPlaintext::MLSPlaintext(CipherSuite suite,
     }
 
     case ContentType::proposal: {
-      auto& proposal = content.emplace<Proposal>(suite);
+      auto& proposal = content.emplace<Proposal>();
       r >> proposal;
       break;
     }
 
     case ContentType::commit: {
-      auto& commit_data = content.emplace<CommitData>(suite);
+      auto& commit_data = content.emplace<CommitData>();
       r >> commit_data;
       break;
     }
@@ -318,33 +225,30 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            const ApplicationData& application_data_in)
-  : CipherAware(DUMMY_CIPHERSUITE)
-  , group_id(std::move(group_id_in))
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content(DUMMY_CIPHERSUITE, application_data_in)
+  , content(application_data_in)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            const Proposal& proposal)
-  : CipherAware(DUMMY_CIPHERSUITE)
-  , group_id(std::move(group_id_in))
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content(DUMMY_CIPHERSUITE, proposal)
+  , content(proposal)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            LeafIndex sender_in,
                            const Commit& commit)
-  : CipherAware(DUMMY_CIPHERSUITE)
-  , group_id(std::move(group_id_in))
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
-  , content(DUMMY_CIPHERSUITE, CommitData{ commit, {} })
+  , content(CommitData{ commit, {} })
 {}
 
 // struct {

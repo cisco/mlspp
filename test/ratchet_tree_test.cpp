@@ -254,10 +254,7 @@ TEST_F(RatchetTreeTest, EncryptDecrypt)
   // other members
   for (LeafIndex i{ 0 }; i.val < size; i.val += 1) {
     auto secret = random_bytes(32);
-
-    DirectPath path(trees[i.val].cipher_suite());
-    bytes root_path_secret;
-    std::tie(path, root_path_secret) = trees[i.val].encap(i, {}, secret);
+    auto [path, root_path_secret] = trees[i.val].encap(i, {}, secret);
 
     for (size_t j = 0; j < size; ++j) {
       if (i.val == j) {
