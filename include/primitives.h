@@ -47,12 +47,9 @@ bytes generate(CipherSuite suite);
 bytes derive(CipherSuite suite, const bytes& data);
 bytes priv_to_pub(CipherSuite suite, const bytes& data);
 
-std::tuple<bytes, bytes> encap(CipherSuite suite,
-                               const bytes& pub,
-                               const bytes& seed);
-bytes decap(CipherSuite suite,
-            const bytes& priv,
-            const bytes& enc);
+bytes dh(CipherSuite suite,
+         const bytes& priv,
+         const bytes& pub);
 
 
 // Signing

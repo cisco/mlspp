@@ -39,7 +39,6 @@ public:
     uint32_t fixed_base_dh;
     uint32_t var_base_dh;
     uint32_t digest;
-    uint32_t digest_bytes;
     uint32_t hmac;
   };
 
@@ -49,21 +48,26 @@ public:
   static void count_fixed_base_dh();
   static void count_var_base_dh();
   static void count_digest();
-  static void count_digest_bytes(uint32_t count);
   static void count_hmac();
 
 private:
   static uint32_t fixed_base_dh;
   static uint32_t var_base_dh;
   static uint32_t digest;
-  static uint32_t digest_bytes;
   static uint32_t hmac;
 };
 
-// Pass-throughs from the primitives
+// Pass-throughs from the primitives, some with metrics wrappers
 using primitive::random_bytes;
-using primitive::Digest;
-using primitive::hmac;
+
+class Digest : public primitive::Digest
+{
+public:
+  Digest(CipherSuite suite);
+};
+
+bytes hmac(CipherSuite suite, const bytes& key, const bytes& data);
+
 using primitive::seal;
 using primitive::open;
 

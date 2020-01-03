@@ -17,14 +17,16 @@ int DeterministicHPKE::_refct = 0;
 uint32_t CryptoMetrics::fixed_base_dh = 0;
 uint32_t CryptoMetrics::var_base_dh = 0;
 uint32_t CryptoMetrics::digest = 0;
-uint32_t CryptoMetrics::digest_bytes = 0;
 uint32_t CryptoMetrics::hmac = 0;
 
 CryptoMetrics::Report
 CryptoMetrics::snapshot()
 {
   return {
-    fixed_base_dh, var_base_dh, digest, digest_bytes, hmac,
+    fixed_base_dh,
+    var_base_dh,
+    digest,
+    hmac,
   };
 }
 
@@ -34,7 +36,6 @@ CryptoMetrics::reset()
   fixed_base_dh = 0;
   var_base_dh = 0;
   digest = 0;
-  digest_bytes = 0;
   hmac = 0;
 }
 
@@ -57,15 +58,26 @@ CryptoMetrics::count_digest()
 }
 
 void
-CryptoMetrics::count_digest_bytes(uint32_t count)
-{
-  digest_bytes += count;
-}
-
-void
 CryptoMetrics::count_hmac()
 {
   hmac += 1;
+}
+
+///
+/// Pass-through / metrics wrappers
+///
+
+Digest::Digest(CipherSuite suite)
+  : primitive::Digest(suite)
+{
+  CryptoMetrics::count_digest();
+}
+
+bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data)
+{
+  CryptoMetrics::count_hmac();
+  return primitive::hmac(suite, key, data);
 }
 
 ///
@@ -92,7 +104,7 @@ constant_time_eq(const bytes& lhs, const bytes& rhs)
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  return primitive::hmac(suite, salt, ikm);
+  return hmac(suite, salt, ikm);
 }
 
 bytes
@@ -122,7 +134,7 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  auto mac = primitive::hmac(suite, secret, label);
+  auto mac = hmac(suite, secret, label);
   mac.resize(size);
   return mac;
 }
@@ -187,6 +199,30 @@ to_hpke(CipherSuite suite)
   }
 }
 
+static std::pair<bytes, bytes>
+dhkem_encap(CipherSuite suite, const bytes& pub, const bytes& seed)
+{
+  bytes ephemeral;
+  CryptoMetrics::count_fixed_base_dh();
+  if (seed.empty()) {
+    ephemeral = primitive::generate(suite);
+  } else {
+    ephemeral = primitive::derive(suite, seed);
+  }
+
+  CryptoMetrics::count_var_base_dh();
+  auto enc = primitive::priv_to_pub(suite, ephemeral);
+  auto zz = primitive::dh(suite, ephemeral, pub);
+  return std::make_tuple(enc, zz);
+}
+
+static bytes
+dhkem_decap(CipherSuite suite, const bytes& priv, const bytes& enc)
+{
+  CryptoMetrics::count_var_base_dh();
+  return primitive::dh(suite, priv, enc);
+}
+
 struct HPKEContext
 {
   HPKECipherSuite ciphersuite;
@@ -248,7 +284,7 @@ HPKEPublicKey::encrypt(CipherSuite suite,
     seed = to_bytes() + plaintext;
   }
 
-  auto [enc, zz] = primitive::encap(suite, data, seed);
+  auto [enc, zz] = dhkem_encap(suite, data, seed);
   auto [key, nonce] = setup_base(suite, *this, zz, enc, {});
 
   // Context.Encrypt
@@ -265,6 +301,7 @@ HPKEPublicKey::to_bytes() const
 HPKEPrivateKey
 HPKEPrivateKey::generate(CipherSuite suite)
 {
+  CryptoMetrics::count_fixed_base_dh();
   return HPKEPrivateKey(suite, primitive::generate(suite));
 }
 
@@ -277,6 +314,7 @@ HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 HPKEPrivateKey
 HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
+  CryptoMetrics::count_fixed_base_dh();
   return HPKEPrivateKey(suite, primitive::derive(suite, secret));
 }
 
@@ -286,7 +324,7 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
                         const HPKECiphertext& ct) const
 {
   // SetupBaseR
-  auto zz = primitive::decap(suite, _data, ct.kem_output);
+  auto zz = dhkem_decap(suite, _data, ct.kem_output);
   auto [key, nonce] = setup_base(suite, public_key(), zz, ct.kem_output, {});
 
   return primitive::open(suite, key, nonce, aad, ct.ciphertext);

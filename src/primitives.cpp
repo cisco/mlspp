@@ -987,34 +987,15 @@ priv_to_pub(CipherSuite suite, const bytes& data)
   return key->marshal();
 }
 
-std::tuple<bytes, bytes>
-encap(CipherSuite suite, const bytes& pub, const bytes& seed)
+bytes
+dh(CipherSuite suite, const bytes& priv, const bytes& pub)
 {
   auto type = ossl_key_type(suite);
-  std::unique_ptr<OpenSSLKey> ephemeral(nullptr);
-  if (seed.empty()) {
-    ephemeral.reset(OpenSSLKey::generate(type));
-  } else {
-    ephemeral.reset(OpenSSLKey::derive(type, seed));
-  }
-
   auto pub_key =
     std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_public(type, pub));
-
-  auto enc = ephemeral->marshal();
-  auto zz = ephemeral->derive(*pub_key);
-  return std::make_tuple(enc, zz);
-}
-
-bytes
-decap(CipherSuite suite, const bytes& priv, const bytes& enc)
-{
-  auto type = ossl_key_type(suite);
-  auto ephemeral =
-    std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_public(type, enc));
   auto priv_key =
     std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_private(type, priv));
-  return priv_key->derive(*ephemeral);
+  return priv_key->derive(*pub_key);
 }
 
 ///

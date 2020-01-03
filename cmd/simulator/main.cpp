@@ -104,7 +104,6 @@ struct adl_serializer<mls::CryptoMetrics::Report>
       { "fixed_base_dh", report.fixed_base_dh },
       { "var_base_dh", report.var_base_dh },
       { "digest", report.digest },
-      { "digest_bytes", report.digest_bytes },
       { "hmac", report.hmac },
     };
   }

@@ -71,7 +71,7 @@ std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
   // Adjust this threshold to make output more compact
-  size_t threshold = 0x4;
+  size_t threshold = 0xffff;
   if (data.size() < threshold) {
     return out << to_hex(data);
   }
