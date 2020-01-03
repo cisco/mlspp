@@ -418,9 +418,9 @@ ossl_key_type(CipherSuite suite)
       return OpenSSLKeyType::X25519;
     case CipherSuite::X448_SHA512_AES256GCM:
       return OpenSSLKeyType::X448;
+    default:
+      throw InvalidParameterError("Unknown ciphersuite");
   }
-
-  throw InvalidParameterError("Unknown ciphersuite");
 }
 
 OpenSSLKeyType
@@ -435,9 +435,9 @@ ossl_key_type(SignatureScheme scheme)
       return OpenSSLKeyType::Ed25519;
     case SignatureScheme::Ed448:
       return OpenSSLKeyType::Ed448;
+    default:
+      throw InvalidParameterError("Unknown signature scheme");
   }
-
-  throw InvalidParameterError("Unknown signature scheme");
 }
 
 struct OpenSSLKey

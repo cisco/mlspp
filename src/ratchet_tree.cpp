@@ -9,29 +9,19 @@ namespace mls {
 /// RatchetTreeNode
 ///
 
-RatchetTreeNode::RatchetTreeNode(CipherSuite suite)
-  : CipherAware(suite)
-  , _priv(std::nullopt)
-  , _pub(suite)
-{}
-
 RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
-  : CipherAware(suite)
-  , _priv(HPKEPrivateKey::derive(suite, secret))
-  , _pub(suite)
+  : _priv(HPKEPrivateKey::derive(suite, secret))
 {
   _pub = _priv.value().public_key();
 }
 
 RatchetTreeNode::RatchetTreeNode(const HPKEPrivateKey& priv)
-  : CipherAware(priv.cipher_suite())
-  , _priv(priv)
+  : _priv(priv)
   , _pub(priv.public_key())
 {}
 
 RatchetTreeNode::RatchetTreeNode(const HPKEPublicKey& pub)
-  : CipherAware(pub.cipher_suite())
-  , _priv(std::nullopt)
+  : _priv(std::nullopt)
   , _pub(pub)
 {}
 
@@ -99,11 +89,6 @@ RatchetTreeNode::add_unmerged(LeafIndex index)
 /// OptionalRatchetTreeNode
 ///
 
-OptionalRatchetTreeNode::OptionalRatchetTreeNode(CipherSuite suite,
-                                                 const bytes& secret)
-  : parent(RatchetTreeNode(suite, secret))
-{}
-
 bool
 OptionalRatchetTreeNode::has_private() const
 {
@@ -121,9 +106,10 @@ OptionalRatchetTreeNode::merge(const RatchetTreeNode& other)
 {
   if (!has_value()) {
     *this = other;
-  } else {
-    value().merge(other);
+    return;
   }
+
+  value().merge(other);
 }
 
 struct LeafNodeInfo
@@ -219,15 +205,15 @@ const OptionalRatchetTreeNode& RatchetTreeNodeVector::operator[](
 ///
 
 RatchetTree::RatchetTree(CipherSuite suite)
-  : CipherAware(suite)
-  , _nodes(suite)
+  : _suite(suite)
   , _secret_size(Digest(suite).output_size())
 {}
 
-RatchetTree::RatchetTree(const HPKEPrivateKey& priv, const Credential& cred)
-  : CipherAware(priv.cipher_suite())
-  , _nodes(priv.cipher_suite())
-  , _secret_size(Digest(priv.cipher_suite()).output_size())
+RatchetTree::RatchetTree(CipherSuite suite,
+                         const HPKEPrivateKey& priv,
+                         const Credential& cred)
+  : _suite(suite)
+  , _secret_size(Digest(suite).output_size())
 {
   _nodes.emplace_back(priv);
   _nodes[0].value().set_credential(cred);
@@ -253,12 +239,12 @@ RatchetTree::encap(LeafIndex from,
     auto parent = tree_math::parent(node, node_size());
     _nodes[parent] = new_node(path_secret);
 
-    RatchetNode path_node{ _suite };
+    RatchetNode path_node;
     path_node.public_key = _nodes[parent].value().public_key();
 
     for (const auto& res_node : resolve(node)) {
       auto& pub = _nodes[res_node].value().public_key();
-      auto ciphertext = pub.encrypt(context, path_secret);
+      auto ciphertext = pub.encrypt(_suite, context, path_secret);
       path_node.node_secrets.push_back(ciphertext);
     }
 
@@ -311,7 +297,7 @@ RatchetTree::decap(LeafIndex from, const bytes& context, const DirectPath& path)
 
         auto& encrypted_secret = *si;
         auto& priv = tree_node.value().private_key().value();
-        path_secret = priv.decrypt(context, encrypted_secret);
+        path_secret = priv.decrypt(_suite, context, encrypted_secret);
         have_secret = true;
       }
     } else {
@@ -680,6 +666,7 @@ tls::istream&
 operator>>(tls::istream& in, RatchetTree& obj)
 {
   in >> obj._nodes;
+
   obj.set_hash_all(obj.root_index());
   return in;
 }

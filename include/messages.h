@@ -64,7 +64,8 @@ struct ClientInitKey
   tls::opaque<2> signature;
 
   ClientInitKey();
-  ClientInitKey(const HPKEPrivateKey& init_key_in,
+  ClientInitKey(CipherSuite suite_in,
+                const HPKEPrivateKey& init_key_in,
                 Credential credential_in);
 
   const std::optional<HPKEPrivateKey>& private_key() const;

@@ -1,7 +1,5 @@
 #include "state.h"
 
-#define DUMMY_SIG_SCHEME SignatureScheme::P256_SHA256
-
 namespace mls {
 
 ///
@@ -15,7 +13,7 @@ State::State(bytes group_id,
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
-  , _tree(leaf_priv, credential)
+  , _tree(suite, leaf_priv, credential)
   , _index(0)
   , _identity_priv(credential.private_key().value())
 {
@@ -28,8 +26,6 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
-  // XXX: The following line does a bogus key generation
-  , _identity_priv(SignaturePrivateKey::generate(DUMMY_SIG_SCHEME))
 {
   // Identify and decrypt a KeyPackage
   bool found = false;
@@ -56,8 +52,8 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
       }
       _identity_priv = cik.credential.private_key().value();
 
-      auto key_pkg_data =
-        cik.private_key().value().decrypt({}, enc_pkg.encrypted_key_package);
+      auto key_pkg_data = cik.private_key().value().decrypt(
+        cik.cipher_suite, {}, enc_pkg.encrypted_key_package);
       key_pkg = tls::get<KeyPackage>(key_pkg_data);
       my_cik = cik;
       break;
@@ -727,6 +723,12 @@ State::decrypt(const MLSCiphertext& ct)
   return MLSPlaintext{
     _group_id, _epoch, sender, ct.content_type, ct.authenticated_data, content
   };
+}
+
+void
+State::dump_tree() const
+{
+  std::cout << _tree << std::endl;
 }
 
 } // namespace mls

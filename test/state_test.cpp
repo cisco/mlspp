@@ -28,7 +28,7 @@ protected:
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_priv = HPKEPrivateKey::generate(suite);
 
-      auto client_init_key = ClientInitKey{ init_priv, credential };
+      auto client_init_key = ClientInitKey{ suite, init_priv, credential };
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
@@ -160,6 +160,7 @@ protected:
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
                           welcome);
+      states[i].dump_tree();
     }
   }
 
@@ -227,7 +228,7 @@ TEST_F(StateTest, CipherNegotiation)
   std::vector<ClientInitKey> ciksA;
   for (auto suiteA : ciphersA) {
     auto init_key = HPKEPrivateKey::generate(suiteA);
-    ciksA.emplace_back(init_key, credA);
+    ciksA.emplace_back(suiteA, init_key, credA);
   }
 
   // Bob spuports P-256 and P-521
@@ -241,7 +242,7 @@ TEST_F(StateTest, CipherNegotiation)
   std::vector<ClientInitKey> ciksB;
   for (auto suiteB : ciphersB) {
     auto init_key = HPKEPrivateKey::generate(suiteB);
-    ciksB.emplace_back(init_key, credB);
+    ciksB.emplace_back(suiteB, init_key, credB);
   }
 
   // Bob should choose P-256

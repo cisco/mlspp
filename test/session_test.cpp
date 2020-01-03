@@ -52,7 +52,7 @@ protected:
     auto id_priv = new_identity_key();
     auto init_key = HPKEPrivateKey::derive(suite, init_secret);
     auto cred = Credential::basic(user_id, id_priv);
-    auto client_init_key = ClientInitKey{ init_key, cred };
+    auto client_init_key = ClientInitKey{ suite, init_key, cred };
 
     // Initial add is different
     if (sessions.size() == 0) {
@@ -60,7 +60,7 @@ protected:
       auto my_id_priv = new_identity_key();
       auto my_init_key = HPKEPrivateKey::derive(suite, my_init_secret);
       auto my_cred = Credential::basic(user_id, id_priv);
-      auto my_client_init_key = ClientInitKey{ my_init_key, my_cred };
+      auto my_client_init_key = ClientInitKey{ suite, my_init_key, my_cred };
 
       auto commit_secret = fresh_secret();
       auto [creator, welcome] = Session::start(
@@ -147,7 +147,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<ClientInitKey> ciksA;
   for (auto suiteA : ciphersA) {
     auto init_key = HPKEPrivateKey::generate(suiteA);
-    ciksA.emplace_back(init_key, credA);
+    ciksA.emplace_back(suiteA, init_key, credA);
   }
 
   // Bob supports P-256 and P-521
@@ -158,7 +158,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<ClientInitKey> ciksB;
   for (auto suiteB : ciphersB) {
     auto init_key = HPKEPrivateKey::generate(suiteB);
-    ciksB.emplace_back(init_key, credB);
+    ciksB.emplace_back(suiteB, init_key, credB);
   }
 
   auto init_secret = fresh_secret();
@@ -353,7 +353,7 @@ protected:
       auto init_priv = HPKEPrivateKey::derive(suite, seed);
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
-      auto my_client_init_key = ClientInitKey{ init_priv, cred };
+      auto my_client_init_key = ClientInitKey{ suite, init_priv, cred };
       ASSERT_EQ(my_client_init_key, tc.client_init_keys[i]);
       follow_basic(i, my_client_init_key, tc);
     }

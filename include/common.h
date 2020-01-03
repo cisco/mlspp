@@ -62,7 +62,8 @@ enum struct CipherSuite : uint16_t
   P256_SHA256_AES128GCM = 0x0000,
   P521_SHA512_AES256GCM = 0x0010,
   X25519_SHA256_AES128GCM = 0x0001,
-  X448_SHA512_AES256GCM = 0x0011
+  X448_SHA512_AES256GCM = 0x0011,
+  unknown = 0xffff,
 };
 
 size_t suite_nonce_size(CipherSuite suite);
@@ -73,7 +74,8 @@ enum struct SignatureScheme : uint16_t
   P256_SHA256 = 0x0403,
   P521_SHA512 = 0x0603,
   Ed25519 = 0x0807,
-  Ed448 = 0x0808
+  Ed448 = 0x0808,
+  unknown = 0xffff,
 };
 
 ///

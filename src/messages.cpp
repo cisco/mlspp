@@ -2,22 +2,20 @@
 #include "key_schedule.h"
 #include "state.h"
 
-#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
-
 namespace mls {
 
 // ClientInitKey
 
 ClientInitKey::ClientInitKey()
   : version(ProtocolVersion::mls10)
-  , cipher_suite(DUMMY_CIPHERSUITE)
-  , init_key(DUMMY_CIPHERSUITE)
+  , cipher_suite(CipherSuite::unknown)
 {}
 
-ClientInitKey::ClientInitKey(const HPKEPrivateKey& init_key_in,
+ClientInitKey::ClientInitKey(CipherSuite suite_in,
+                             const HPKEPrivateKey& init_key_in,
                              Credential credential_in)
   : version(ProtocolVersion::mls10)
-  , cipher_suite(init_key_in.cipher_suite())
+  , cipher_suite(suite_in)
   , init_key(init_key_in.public_key())
   , credential(std::move(credential_in))
   , _private_key(init_key_in)
@@ -117,7 +115,7 @@ GroupInfo::verify() const
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
-  , cipher_suite(DUMMY_CIPHERSUITE)
+  , cipher_suite(CipherSuite::unknown)
 {}
 
 Welcome::Welcome(CipherSuite suite,
@@ -141,7 +139,7 @@ Welcome::encrypt(const ClientInitKey& cik)
 {
   auto key_pkg = KeyPackage{ _init_secret };
   auto key_pkg_data = tls::marshal(key_pkg);
-  auto enc_pkg = cik.init_key.encrypt({}, key_pkg_data);
+  auto enc_pkg = cik.init_key.encrypt(cik.cipher_suite, {}, key_pkg_data);
   key_packages.push_back({ cik.hash(), enc_pkg });
 }
 

@@ -1,7 +1,5 @@
 #include "key_schedule.h"
 
-#define DUMMY_CIPHERSUITE CipherSuite::P256_SHA256_AES128GCM
-
 #include <iostream>
 
 namespace mls {
@@ -222,7 +220,7 @@ struct TreeBaseKeySource : public BaseKeySource
 ///
 
 GroupKeySource::GroupKeySource()
-  : suite(DUMMY_CIPHERSUITE)
+  : suite(CipherSuite::unknown)
   , base_source(nullptr)
 {}
 

@@ -10,35 +10,6 @@
 
 namespace mls {
 
-#define DUMMY_SIGNATURE_SCHEME SignatureScheme::P256_SHA256
-
-// Utility classes to avoid a bit of boilerplate
-class CipherAware
-{
-public:
-  CipherAware(CipherSuite suite)
-    : _suite(suite)
-  {}
-
-  CipherSuite cipher_suite() const { return _suite; }
-
-protected:
-  CipherSuite _suite;
-};
-
-class SignatureAware
-{
-public:
-  SignatureAware(SignatureScheme scheme)
-    : _scheme(scheme)
-  {}
-
-  SignatureScheme signature_scheme() const { return _scheme; }
-
-protected:
-  SignatureScheme _scheme;
-};
-
 // DeterministicHPKE enables RAII-based requests for HPKE to be
 // done deterministically.  The RAII pattern is used here to ensure
 // that the determinism always gets turned off.  To avoid conflicts
@@ -121,22 +92,17 @@ struct HPKECiphertext
   TLS_SERIALIZABLE(kem_output, ciphertext);
 };
 
-class HPKEPublicKey
+struct HPKEPublicKey
 {
-public:
-  HPKEPublicKey();
-  HPKEPublicKey(CipherSuite suite);
-  HPKEPublicKey(CipherSuite suite, bytes data);
+  tls::opaque<2> data;
 
-  CipherSuite cipher_suite() const;
-  HPKECiphertext encrypt(const bytes& aad, const bytes& plaintext) const;
+  HPKEPublicKey() = default;
+  HPKEPublicKey(const bytes& data);
+
+  HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& plaintext) const;
   bytes to_bytes() const;
 
-  TLS_SERIALIZABLE(_data);
-
-private:
-  CipherSuite _suite;
-  tls::opaque<2> _data;
+  TLS_SERIALIZABLE(data);
 };
 
 class HPKEPrivateKey
@@ -146,15 +112,12 @@ public:
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
 
-  CipherSuite cipher_suite() const;
-  bytes decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const;
-
+  bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ciphertext) const;
   HPKEPublicKey public_key() const;
 
-  TLS_SERIALIZABLE(_suite, _data, _pub_data);
+  TLS_SERIALIZABLE(_data, _pub_data);
 
 private:
-  CipherSuite _suite;
   tls::opaque<2> _data;
   tls::opaque<2> _pub_data;
 
@@ -183,6 +146,8 @@ private:
 class SignaturePrivateKey
 {
 public:
+  SignaturePrivateKey();
+
   static SignaturePrivateKey generate(SignatureScheme scheme);
   static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
   static SignaturePrivateKey derive(SignatureScheme scheme,

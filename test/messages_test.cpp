@@ -34,9 +34,9 @@ deterministic_signature_scheme(SignatureScheme scheme)
       return true;
     case SignatureScheme::Ed448:
       return true;
+    default:
+      return false;
   }
-
-  return false;
 }
 
 class MessagesTest : public ::testing::Test
@@ -69,7 +69,7 @@ protected:
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
 
     // ClientInitKey
-    ClientInitKey client_init_key{ dh_priv, cred };
+    ClientInitKey client_init_key{ tc.cipher_suite, dh_priv, cred };
     client_init_key.signature = tv.random;
     tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
@@ -85,7 +85,8 @@ protected:
     tls_round_trip(tc.key_package, key_package, true);
 
     auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
+      EncryptedKeyPackage{ tv.random,
+                           dh_key.encrypt(tc.cipher_suite, {}, tv.random) };
     tls_round_trip(tc.encrypted_key_package, encrypted_key_package, true);
 
     Welcome welcome;

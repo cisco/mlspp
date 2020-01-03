@@ -4,10 +4,6 @@
 
 namespace mls {
 
-static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
-static const SignatureScheme unknown_scheme =
-  static_cast<SignatureScheme>(0xFFFF);
-
 ///
 /// Test mode controls
 ///
@@ -158,25 +154,6 @@ hkdf_expand_label(CipherSuite suite,
 /// HPKEPublicKey and HPKEPrivateKey
 ///
 
-HPKEPublicKey::HPKEPublicKey()
-  : _suite(unknown_suite)
-{}
-
-HPKEPublicKey::HPKEPublicKey(CipherSuite suite)
-  : _suite(suite)
-{}
-
-HPKEPublicKey::HPKEPublicKey(CipherSuite suite, bytes data)
-  : _suite(suite)
-  , _data(data)
-{}
-
-CipherSuite
-HPKEPublicKey::cipher_suite() const
-{
-  return _suite;
-}
-
 enum struct HPKEMode : uint8_t
 {
   base = 0x00,
@@ -256,8 +233,14 @@ setup_base(CipherSuite suite,
   return setup_core(suite, HPKEMode::base, secret, kem_context, info);
 }
 
+HPKEPublicKey::HPKEPublicKey(const bytes& data_in)
+  : data(data_in)
+{}
+
 HPKECiphertext
-HPKEPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
+HPKEPublicKey::encrypt(CipherSuite suite,
+                       const bytes& aad,
+                       const bytes& plaintext) const
 {
   // SetupBaseI
   bytes seed;
@@ -265,18 +248,18 @@ HPKEPublicKey::encrypt(const bytes& aad, const bytes& plaintext) const
     seed = to_bytes() + plaintext;
   }
 
-  auto [enc, zz] = primitive::encap(_suite, _data, seed);
-  auto [key, nonce] = setup_base(_suite, *this, zz, enc, {});
+  auto [enc, zz] = primitive::encap(suite, data, seed);
+  auto [key, nonce] = setup_base(suite, *this, zz, enc, {});
 
   // Context.Encrypt
-  auto ciphertext = primitive::seal(_suite, key, nonce, aad, plaintext);
+  auto ciphertext = primitive::seal(suite, key, nonce, aad, plaintext);
   return HPKECiphertext{ enc, ciphertext };
 }
 
 bytes
 HPKEPublicKey::to_bytes() const
 {
-  return _data;
+  return data;
 }
 
 HPKEPrivateKey
@@ -297,31 +280,26 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
   return HPKEPrivateKey(suite, primitive::derive(suite, secret));
 }
 
-CipherSuite
-HPKEPrivateKey::cipher_suite() const
-{
-  return _suite;
-}
-
 bytes
-HPKEPrivateKey::decrypt(const bytes& aad, const HPKECiphertext& ct) const
+HPKEPrivateKey::decrypt(CipherSuite suite,
+                        const bytes& aad,
+                        const HPKECiphertext& ct) const
 {
   // SetupBaseR
-  auto zz = primitive::decap(_suite, _data, ct.kem_output);
-  auto [key, nonce] = setup_base(_suite, public_key(), zz, ct.kem_output, {});
+  auto zz = primitive::decap(suite, _data, ct.kem_output);
+  auto [key, nonce] = setup_base(suite, public_key(), zz, ct.kem_output, {});
 
-  return primitive::open(_suite, key, nonce, aad, ct.ciphertext);
+  return primitive::open(suite, key, nonce, aad, ct.ciphertext);
 }
 
 HPKEPublicKey
 HPKEPrivateKey::public_key() const
 {
-  return HPKEPublicKey(_suite, _pub_data);
+  return HPKEPublicKey(_pub_data);
 }
 
 HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
-  : _suite(suite)
-  , _data(data)
+  : _data(data)
   , _pub_data(primitive::priv_to_pub(suite, data))
 {}
 
@@ -330,7 +308,7 @@ HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
 ///
 
 SignaturePublicKey::SignaturePublicKey()
-  : _scheme(unknown_scheme)
+  : _scheme(SignatureScheme::unknown)
 {}
 
 SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
@@ -361,6 +339,10 @@ SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 {
   return primitive::verify(_scheme, _data, message, signature);
 }
+
+SignaturePrivateKey::SignaturePrivateKey()
+  : _scheme(SignatureScheme::unknown)
+{}
 
 SignaturePrivateKey
 SignaturePrivateKey::generate(SignatureScheme scheme)
