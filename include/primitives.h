@@ -1,8 +1,33 @@
+#pragma once
+
 #include "common.h"
-#include "crypto.h"
 
 namespace mls {
 namespace primitive {
+
+// Randomness
+bytes
+random_bytes(size_t size);
+
+// Digest and HMAC
+class Digest
+{
+public:
+  Digest(CipherSuite suite);
+  ~Digest();
+  Digest& write(uint8_t byte);
+  Digest& write(const bytes& data);
+  bytes digest();
+
+  size_t output_size() const;
+
+private:
+  struct Implementation;
+  std::unique_ptr<Implementation> _impl;
+};
+
+bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
 // Symmetric encryption
 bytes seal(CipherSuite suite,

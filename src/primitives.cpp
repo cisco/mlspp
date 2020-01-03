@@ -1,13 +1,112 @@
 #include "primitives.h"
 
+#include "openssl/ecdh.h"
+#include "openssl/ecdsa.h"
 #include "openssl/err.h"
 #include "openssl/evp.h"
+#include "openssl/hmac.h"
+#include "openssl/obj_mac.h"
+#include "openssl/rand.h"
+#include "openssl/sha.h"
 
 #include <stdexcept>
 
 namespace mls {
 
 namespace primitive {
+
+///
+/// Smarter smart pointers
+///
+template<typename T>
+void
+TypedDelete(T* ptr);
+
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr);
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr);
+
+template<typename T>
+using typed_unique_ptr_base = std::unique_ptr<T, decltype(&TypedDelete<T>)>;
+
+template<typename T>
+class typed_unique_ptr : public typed_unique_ptr_base<T>
+{
+public:
+  using parent = typed_unique_ptr_base<T>;
+
+  typed_unique_ptr()
+    : parent(nullptr, TypedDelete<T>)
+  {}
+
+  typed_unique_ptr(T* ptr)
+    : parent(ptr, TypedDelete<T>)
+  {}
+};
+
+// This shorthand just saves on explicit template arguments
+template<typename T>
+typed_unique_ptr<T>
+make_typed_unique(T* ptr)
+{
+  return typed_unique_ptr<T>(ptr);
+}
+
+///
+/// And supporting delete methods
+///
+template<>
+void
+TypedDelete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY_CTX* ptr)
+{
+  EVP_PKEY_CTX_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_PKEY* ptr)
+{
+  EVP_PKEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(BIGNUM* ptr)
+{
+  BN_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_KEY* ptr)
+{
+  EC_KEY_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EC_POINT* ptr)
+{
+  EC_POINT_free(ptr);
+}
+
+template<>
+void
+TypedDelete(EVP_CIPHER_CTX* ptr)
+{
+  EVP_CIPHER_CTX_free(ptr);
+}
 
 ///
 /// Errors
@@ -17,6 +116,133 @@ openssl_error()
 {
   uint64_t code = ERR_get_error();
   return std::runtime_error(ERR_error_string(code, nullptr));
+}
+
+///
+/// Randomness
+///
+bytes
+random_bytes(size_t size)
+{
+  bytes out(size);
+  if (1 != RAND_bytes(out.data(), out.size())) {
+    throw openssl_error();
+  }
+  return out;
+}
+
+///
+/// Digest and HMAC
+///
+
+static const EVP_MD*
+openssl_digest_type(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return EVP_sha256();
+
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return EVP_sha512();
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
+
+struct Digest::Implementation
+{
+  size_t size;
+  typed_unique_ptr<EVP_MD_CTX> ctx;
+
+  Implementation(CipherSuite suite)
+    : ctx(EVP_MD_CTX_new())
+  {
+    auto md = openssl_digest_type(suite);
+    size = EVP_MD_size(md);
+    if (EVP_DigestInit(ctx.get(), md) != 1) {
+      throw openssl_error();
+    }
+  }
+
+  void write(uint8_t byte)
+  {
+    if (EVP_DigestUpdate(ctx.get(), &byte, 1) != 1) {
+      throw openssl_error();
+    }
+  }
+
+  void write(const bytes& data)
+  {
+    if (EVP_DigestUpdate(ctx.get(), data.data(), data.size()) != 1) {
+      throw openssl_error();
+    }
+  }
+
+  bytes digest()
+  {
+    unsigned int outlen = size;
+    auto out = bytes(outlen);
+    auto ptr = out.data();
+    if (EVP_DigestFinal(ctx.get(), ptr, &outlen) != 1) {
+      throw openssl_error();
+    }
+    return out;
+  }
+};
+
+Digest::~Digest() = default;
+
+Digest::Digest(CipherSuite suite)
+  : _impl(new Implementation(suite))
+{}
+
+Digest&
+Digest::write(uint8_t byte)
+{
+  _impl->write(byte);
+  return *this;
+}
+
+Digest&
+Digest::write(const bytes& data)
+{
+  _impl->write(data);
+  return *this;
+}
+
+bytes
+Digest::digest()
+{
+  return _impl->digest();
+}
+
+size_t
+Digest::output_size() const
+{
+  return _impl->size;
+}
+
+bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data)
+{
+  unsigned int size = 0;
+  auto type = openssl_digest_type(suite);
+  bytes md(EVP_MAX_MD_SIZE);
+  if (nullptr == HMAC(type,
+                      key.data(),
+                      key.size(),
+                      data.data(),
+                      data.size(),
+                      md.data(),
+                      &size)) {
+    throw openssl_error();
+  }
+
+  md.resize(size);
+  return md;
 }
 
 ///
@@ -244,8 +470,6 @@ struct OpenSSLKey
   virtual void set_public(const bytes& data) = 0;
   virtual void set_private(const bytes& data) = 0;
   virtual void set_secret(const bytes& data) = 0;
-  virtual OpenSSLKey* dup() const = 0;
-  virtual OpenSSLKey* dup_public() const = 0;
 
   // Defined below to make it easier to refer to the more specific
   // key types.
@@ -508,73 +732,23 @@ public:
 
   void set_secret(const bytes& data) override
   {
-    DigestType digest_type;
+    CipherSuite ersatz_suite;
     switch (static_cast<RawKeyType>(_type)) {
       case RawKeyType::X25519:
       case RawKeyType::Ed25519:
-        digest_type = DigestType::SHA256;
+        ersatz_suite = CipherSuite::P256_SHA256_AES128GCM;
         break;
       case RawKeyType::X448:
       case RawKeyType::Ed448:
-        digest_type = DigestType::SHA512;
+        ersatz_suite = CipherSuite::P521_SHA512_AES256GCM;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");
     }
 
-    bytes digest = Digest(digest_type).write(data).digest();
+    bytes digest = Digest(ersatz_suite).write(data).digest();
     digest.resize(secret_size());
     set_private(digest);
-  }
-
-  OpenSSLKey* dup() const override
-  {
-    if (!_key || (_key.get() == nullptr)) {
-      return new RawKey(_type, nullptr);
-    }
-
-    size_t raw_len = 0;
-    if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
-      throw openssl_error();
-    }
-
-    // The actual key fetch will fail if `_key` represents a public key
-    bytes raw(raw_len);
-    auto data_ptr = raw.data();
-    auto rv = EVP_PKEY_get_raw_private_key(_key.get(), data_ptr, &raw_len);
-    if (rv == 1) {
-      auto pkey =
-        EVP_PKEY_new_raw_private_key(_type, nullptr, raw.data(), raw.size());
-      if (pkey == nullptr) {
-        throw openssl_error();
-      }
-
-      return new RawKey(_type, pkey);
-    }
-
-    return dup_public();
-  }
-
-  OpenSSLKey* dup_public() const override
-  {
-    size_t raw_len = 0;
-    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
-      throw openssl_error();
-    }
-
-    bytes raw(raw_len);
-    auto data_ptr = raw.data();
-    if (1 != EVP_PKEY_get_raw_public_key(_key.get(), data_ptr, &raw_len)) {
-      throw openssl_error();
-    }
-
-    auto pkey =
-      EVP_PKEY_new_raw_public_key(_type, nullptr, raw.data(), raw.size());
-    if (pkey == nullptr) {
-      throw openssl_error();
-    }
-
-    return new RawKey(_type, pkey);
   }
 
 private:
@@ -692,40 +866,20 @@ public:
 
   void set_secret(const bytes& data) override
   {
-    DigestType digest_type;
+    CipherSuite ersatz_suite;
     switch (static_cast<ECKeyType>(_curve_nid)) {
       case ECKeyType::P256:
-        digest_type = DigestType::SHA256;
+        ersatz_suite = CipherSuite::P256_SHA256_AES128GCM;
         break;
       case ECKeyType::P521:
-        digest_type = DigestType::SHA512;
+        ersatz_suite = CipherSuite::P521_SHA512_AES256GCM;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");
     }
 
-    bytes digest = Digest(digest_type).write(data).digest();
+    bytes digest = Digest(ersatz_suite).write(data).digest();
     set_private(digest);
-  }
-
-  OpenSSLKey* dup() const override
-  {
-    if (!_key || (_key.get() == nullptr)) {
-      return new ECKey(_curve_nid, static_cast<EVP_PKEY*>(nullptr));
-    }
-
-    auto eckey_out = EC_KEY_dup(my_ec_key());
-    return new ECKey(_curve_nid, eckey_out);
-  }
-
-  OpenSSLKey* dup_public() const override
-  {
-    auto eckey = my_ec_key();
-    auto point = EC_KEY_get0_public_key(eckey);
-
-    auto eckey_out = new_ec_key();
-    EC_KEY_set_public_key(eckey_out, point);
-    return new ECKey(_curve_nid, eckey_out);
   }
 
 private:
@@ -777,7 +931,7 @@ OpenSSLKey::create(OpenSSLKeyType type)
 OpenSSLKey*
 OpenSSLKey::generate(OpenSSLKeyType type)
 {
-  auto key = make_typed_unique(create(type));
+  auto key = std::unique_ptr<OpenSSLKey>(create(type));
   key->generate();
   return key.release();
 }
@@ -785,7 +939,7 @@ OpenSSLKey::generate(OpenSSLKeyType type)
 OpenSSLKey*
 OpenSSLKey::parse_private(OpenSSLKeyType type, const bytes& data)
 {
-  auto key = make_typed_unique(create(type));
+  auto key = std::unique_ptr<OpenSSLKey>(create(type));
   key->set_private(data);
   return key.release();
 }
@@ -793,7 +947,7 @@ OpenSSLKey::parse_private(OpenSSLKeyType type, const bytes& data)
 OpenSSLKey*
 OpenSSLKey::parse_public(OpenSSLKeyType type, const bytes& data)
 {
-  auto key = make_typed_unique(create(type));
+  auto key = std::unique_ptr<OpenSSLKey>(create(type));
   key->set_public(data);
   return key.release();
 }
@@ -801,7 +955,7 @@ OpenSSLKey::parse_public(OpenSSLKeyType type, const bytes& data)
 OpenSSLKey*
 OpenSSLKey::derive(OpenSSLKeyType type, const bytes& data)
 {
-  auto key = make_typed_unique(create(type));
+  auto key = std::unique_ptr<OpenSSLKey>(create(type));
   key->set_secret(data);
   return key.release();
 }
@@ -813,7 +967,7 @@ bytes
 generate(CipherSuite suite)
 {
   auto type = ossl_key_type(suite);
-  auto key = make_typed_unique(OpenSSLKey::generate(type));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::generate(type));
   return key->marshal_private();
 }
 
@@ -821,7 +975,7 @@ bytes
 derive(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  auto key = make_typed_unique(OpenSSLKey::derive(type, data));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::derive(type, data));
   return key->marshal_private();
 }
 
@@ -829,7 +983,7 @@ bytes
 priv_to_pub(CipherSuite suite, const bytes& data)
 {
   auto type = ossl_key_type(suite);
-  auto key = make_typed_unique(OpenSSLKey::parse_private(type, data));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_private(type, data));
   return key->marshal();
 }
 
@@ -837,14 +991,15 @@ std::tuple<bytes, bytes>
 encap(CipherSuite suite, const bytes& pub, const bytes& seed)
 {
   auto type = ossl_key_type(suite);
-  typed_unique_ptr<OpenSSLKey> ephemeral;
+  std::unique_ptr<OpenSSLKey> ephemeral(nullptr);
   if (seed.empty()) {
-    ephemeral = OpenSSLKey::generate(type);
+    ephemeral.reset(OpenSSLKey::generate(type));
   } else {
-    ephemeral = OpenSSLKey::derive(type, seed);
+    ephemeral.reset(OpenSSLKey::derive(type, seed));
   }
 
-  auto pub_key = make_typed_unique(OpenSSLKey::parse_public(type, pub));
+  auto pub_key =
+    std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_public(type, pub));
 
   auto enc = ephemeral->marshal();
   auto zz = ephemeral->derive(*pub_key);
@@ -855,8 +1010,10 @@ bytes
 decap(CipherSuite suite, const bytes& priv, const bytes& enc)
 {
   auto type = ossl_key_type(suite);
-  auto ephemeral = make_typed_unique(OpenSSLKey::parse_public(type, enc));
-  auto priv_key = make_typed_unique(OpenSSLKey::parse_private(type, priv));
+  auto ephemeral =
+    std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_public(type, enc));
+  auto priv_key =
+    std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_private(type, priv));
   return priv_key->derive(*ephemeral);
 }
 
@@ -867,7 +1024,7 @@ bytes
 generate(SignatureScheme scheme)
 {
   auto type = ossl_key_type(scheme);
-  auto key = make_typed_unique(OpenSSLKey::generate(type));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::generate(type));
   return key->marshal_private();
 }
 
@@ -875,7 +1032,7 @@ bytes
 derive(SignatureScheme scheme, const bytes& data)
 {
   auto type = ossl_key_type(scheme);
-  auto key = make_typed_unique(OpenSSLKey::derive(type, data));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::derive(type, data));
   return key->marshal_private();
 }
 
@@ -883,7 +1040,7 @@ bytes
 priv_to_pub(SignatureScheme scheme, const bytes& data)
 {
   auto type = ossl_key_type(scheme);
-  auto key = make_typed_unique(OpenSSLKey::parse_private(type, data));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_private(type, data));
   return key->marshal();
 }
 
@@ -891,7 +1048,7 @@ bytes
 sign(SignatureScheme scheme, const bytes& priv, const bytes& message)
 {
   auto type = ossl_key_type(scheme);
-  auto key = make_typed_unique(OpenSSLKey::parse_private(type, priv));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_private(type, priv));
   return key->sign(message);
 }
 
@@ -902,23 +1059,9 @@ verify(SignatureScheme scheme,
        const bytes& signature)
 {
   auto type = ossl_key_type(scheme);
-  auto key = make_typed_unique(OpenSSLKey::parse_public(type, pub));
+  auto key = std::unique_ptr<OpenSSLKey>(OpenSSLKey::parse_public(type, pub));
   return key->verify(message, signature);
 }
 
 }; // namespace primitive
-
-template<>
-void
-TypedDelete(primitive::OpenSSLKey* ptr)
-{
-  // XXX(rlb@ipv.sx): We need to use this custom deleter because
-  // unique_ptr can't be used with forward-declared types, and I
-  // don't want to pull OpenSSLKey up into the header file.
-  //
-  // We are using a smart pointer here, just in a special way.
-  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-  delete ptr;
-}
-
 }; // namespace mls

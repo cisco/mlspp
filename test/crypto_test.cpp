@@ -218,14 +218,17 @@ TEST_F(CryptoTest, Interop)
 
 TEST_F(CryptoTest, SHA2)
 {
+  auto suite256 = CipherSuite::P256_SHA256_AES128GCM;
+  auto suite512 = CipherSuite::P521_SHA512_AES256GCM;
+
   CryptoMetrics::reset();
-  ASSERT_EQ(Digest(DigestType::SHA256).write(sha2_in).digest(), sha256_out);
+  ASSERT_EQ(Digest(suite256).write(sha2_in).digest(), sha256_out);
   auto metrics = CryptoMetrics::snapshot();
   ASSERT_EQ(metrics.digest, 1);
   ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
 
   CryptoMetrics::reset();
-  ASSERT_EQ(Digest(DigestType::SHA512).write(sha2_in).digest(), sha512_out);
+  ASSERT_EQ(Digest(suite512).write(sha2_in).digest(), sha512_out);
   metrics = CryptoMetrics::snapshot();
   ASSERT_EQ(metrics.digest, 1);
   ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
@@ -409,12 +412,13 @@ TEST_F(CryptoTest, HPKE)
                                    CipherSuite::X25519_SHA256_AES128GCM,
                                    CipherSuite::X448_SHA512_AES256GCM };
 
+  auto aad = random_bytes(100);
+  auto original = random_bytes(100);
+
   for (auto suite : suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
-    auto aad = random_bytes(100);
-    auto original = random_bytes(100);
     auto encrypted = gX.encrypt(aad, original);
     auto decrypted = x.decrypt(aad, encrypted);
 

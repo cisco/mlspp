@@ -3,31 +3,12 @@
 #include "common.h"
 #include "openssl/ec.h"
 #include "openssl/evp.h"
+#include "primitives.h"
 #include "tls_syntax.h"
 #include <stdexcept>
 #include <vector>
 
 namespace mls {
-
-// Algorithm selectors
-enum struct CipherSuite : uint16_t
-{
-  P256_SHA256_AES128GCM = 0x0000,
-  P521_SHA512_AES256GCM = 0x0010,
-  X25519_SHA256_AES128GCM = 0x0001,
-  X448_SHA512_AES256GCM = 0x0011
-};
-
-size_t suite_nonce_size(CipherSuite suite);
-size_t suite_key_size(CipherSuite suite);
-
-enum struct SignatureScheme : uint16_t
-{
-  P256_SHA256 = 0x0403,
-  P521_SHA512 = 0x0603,
-  Ed25519 = 0x0807,
-  Ed448 = 0x0808
-};
 
 #define DUMMY_SIGNATURE_SCHEME SignatureScheme::P256_SHA256
 
@@ -108,85 +89,15 @@ private:
   static uint32_t hmac;
 };
 
-// Adapt standard pointers so that they can be "typed" to handle
-// custom deleters more easily.
-template<typename T>
-void
-TypedDelete(T* ptr);
-
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr);
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr);
-
-template<typename T>
-using typed_unique_ptr_base = std::unique_ptr<T, decltype(&TypedDelete<T>)>;
-
-template<typename T>
-class typed_unique_ptr : public typed_unique_ptr_base<T>
-{
-public:
-  using parent = typed_unique_ptr_base<T>;
-
-  typed_unique_ptr()
-    : parent(nullptr, TypedDelete<T>)
-  {}
-
-  typed_unique_ptr(T* ptr)
-    : parent(ptr, TypedDelete<T>)
-  {}
-};
-
-// This shorthand just saves on explicit template arguments
-template<typename T>
-typed_unique_ptr<T>
-make_typed_unique(T* ptr)
-{
-  return typed_unique_ptr<T>(ptr);
-}
-
-// Interface cleanup wrapper for raw OpenSSL EVP keys
-struct OpenSSLKey;
-enum struct OpenSSLKeyType;
-
-template<>
-void
-TypedDelete(OpenSSLKey* ptr);
-
-// Digests
-enum struct DigestType
-{
-  SHA256,
-  SHA512
-};
-
-class Digest
-{
-public:
-  Digest(DigestType type); // XXX(rlb@ipv.sx) delete?
-  Digest(CipherSuite suite);
-  Digest& write(uint8_t byte);
-  Digest& write(const bytes& data);
-  bytes digest();
-
-  size_t output_size() const;
-
-private:
-  size_t _size;
-  typed_unique_ptr<EVP_MD_CTX> _ctx;
-};
+// Pass-throughs from the primitives
+using primitive::random_bytes;
+using primitive::Digest;
+using primitive::hmac;
+using primitive::seal;
+using primitive::open;
 
 bytes
 zero_bytes(size_t size);
-
-bytes
-random_bytes(size_t size);
-
-bytes
-hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs);

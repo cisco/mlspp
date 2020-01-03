@@ -1,15 +1,4 @@
 #include "crypto.h"
-#include "common.h"
-#include "primitives.h"
-
-#include "openssl/ecdh.h"
-#include "openssl/ecdsa.h"
-#include "openssl/err.h"
-#include "openssl/evp.h"
-#include "openssl/hmac.h"
-#include "openssl/obj_mac.h"
-#include "openssl/rand.h"
-#include "openssl/sha.h"
 
 #include <string>
 
@@ -18,38 +7,6 @@ namespace mls {
 static const CipherSuite unknown_suite = static_cast<CipherSuite>(0xFFFF);
 static const SignatureScheme unknown_scheme =
   static_cast<SignatureScheme>(0xFFFF);
-
-size_t
-suite_nonce_size(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
-      return 12;
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite");
-  }
-}
-
-size_t
-suite_key_size(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-      return 16;
-
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
-      return 32;
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite");
-  }
-}
 
 ///
 /// Test mode controls
@@ -116,188 +73,8 @@ CryptoMetrics::count_hmac()
 }
 
 ///
-/// typed_unique_ptr
-///
-
-template<>
-void
-TypedDelete(BIGNUM* ptr)
-{
-  BN_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_KEY* ptr)
-{
-  EC_KEY_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EC_POINT* ptr)
-{
-  EC_POINT_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_CIPHER_CTX* ptr)
-{
-  EVP_CIPHER_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr)
-{
-  EVP_MD_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY_CTX* ptr)
-{
-  EVP_PKEY_CTX_free(ptr);
-}
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr)
-{
-  EVP_PKEY_free(ptr);
-}
-
-///
-/// OpenSSLError
-///
-
-// Wrapper for OpenSSL errors
-class OpenSSLError : public std::runtime_error
-{
-public:
-  using parent = std::runtime_error;
-  using parent::parent;
-
-  static OpenSSLError current();
-};
-
-OpenSSLError
-OpenSSLError::current()
-{
-  uint64_t code = ERR_get_error();
-  return OpenSSLError(ERR_error_string(code, nullptr));
-}
-
-///
-/// Digest
-///
-
-static DigestType
-digest_type(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-      return DigestType::SHA256;
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
-      return DigestType::SHA512;
-  }
-
-  throw InvalidParameterError("Unknown ciphersuite");
-}
-
-static const EVP_MD*
-ossl_digest_type(DigestType type)
-{
-  switch (type) {
-    case DigestType::SHA256:
-      return EVP_sha256();
-    case DigestType::SHA512:
-      return EVP_sha512();
-  }
-
-  throw InvalidParameterError("Unknown digest type");
-}
-
-Digest::Digest(DigestType type)
-  : _ctx(EVP_MD_CTX_new())
-{
-  auto md = ossl_digest_type(type);
-  _size = EVP_MD_size(md);
-  if (EVP_DigestInit(_ctx.get(), md) != 1) {
-    throw OpenSSLError::current();
-  }
-}
-
-Digest::Digest(CipherSuite suite)
-  : Digest(digest_type(suite))
-{}
-
-Digest&
-Digest::write(uint8_t byte)
-{
-  CryptoMetrics::count_digest_bytes(1);
-  if (EVP_DigestUpdate(_ctx.get(), &byte, 1) != 1) {
-    throw OpenSSLError::current();
-  }
-  return *this;
-}
-
-Digest&
-Digest::write(const bytes& data)
-{
-  CryptoMetrics::count_digest_bytes(data.size());
-  if (EVP_DigestUpdate(_ctx.get(), data.data(), data.size()) != 1) {
-    throw OpenSSLError::current();
-  }
-  return *this;
-}
-
-bytes
-Digest::digest()
-{
-  CryptoMetrics::count_digest();
-  unsigned int outlen = output_size();
-  auto out = bytes(outlen);
-  auto ptr = out.data();
-  if (EVP_DigestFinal(_ctx.get(), ptr, &outlen) != 1) {
-    throw OpenSSLError::current();
-  }
-  return out;
-}
-
-size_t
-Digest::output_size() const
-{
-  return _size;
-}
-
-///
 /// HKDF and DeriveSecret
 ///
-
-bytes
-hmac(CipherSuite suite, const bytes& key, const bytes& data)
-{
-  CryptoMetrics::count_hmac();
-  unsigned int size = 0;
-  auto type = ossl_digest_type(digest_type(suite));
-  bytes md(EVP_MAX_MD_SIZE);
-  if (nullptr == HMAC(type,
-                      key.data(),
-                      key.size(),
-                      data.data(),
-                      data.size(),
-                      md.data(),
-                      &size)) {
-    throw OpenSSLError::current();
-  }
-
-  md.resize(size);
-  return md;
-}
 
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs)
@@ -319,7 +96,7 @@ constant_time_eq(const bytes& lhs, const bytes& rhs)
 bytes
 hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
 {
-  return hmac(suite, salt, ikm);
+  return primitive::hmac(suite, salt, ikm);
 }
 
 bytes
@@ -328,16 +105,6 @@ zero_bytes(size_t size)
   bytes out(size);
   for (auto& b : out) {
     b = 0;
-  }
-  return out;
-}
-
-bytes
-random_bytes(size_t size)
-{
-  bytes out(size);
-  if (1 != RAND_bytes(out.data(), out.size())) {
-    throw OpenSSLError::current();
   }
   return out;
 }
@@ -359,7 +126,7 @@ hkdf_expand(CipherSuite suite,
 
   auto label = info;
   label.push_back(0x01);
-  auto mac = hmac(suite, secret, label);
+  auto mac = primitive::hmac(suite, secret, label);
   mac.resize(size);
   return mac;
 }
