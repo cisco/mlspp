@@ -82,20 +82,22 @@ struct HashRatchetTestVectors
   };
 
   typedef tls::vector<Step, 4> KeySequence;
-  typedef tls::vector<KeySequence, 4> TestCase;
+
+  struct TestCase
+  {
+    CipherSuite cipher_suite;
+    tls::vector<KeySequence, 4> key_sequences;
+
+    TLS_SERIALIZABLE(cipher_suite, key_sequences);
+  };
 
   uint32_t n_members;
   uint32_t n_generations;
   tls::opaque<1> base_secret;
 
-  TestCase case_p256;
-  TestCase case_x25519;
+  tls::vector<TestCase, 4> cases;
 
-  TLS_SERIALIZABLE(n_members,
-                   n_generations,
-                   base_secret,
-                   case_p256,
-                   case_x25519);
+  TLS_SERIALIZABLE(n_members, n_generations, base_secret, cases);
 };
 
 /////
@@ -146,10 +148,10 @@ struct KeyScheduleTestVectors
 
   struct TestCase
   {
-    CipherSuite suite;
+    CipherSuite cipher_suite;
     tls::vector<Epoch, 2> epochs;
 
-    TLS_SERIALIZABLE(suite, epochs);
+    TLS_SERIALIZABLE(cipher_suite, epochs);
   };
 
   uint32_t n_epochs;
@@ -157,15 +159,13 @@ struct KeyScheduleTestVectors
   tls::opaque<1> base_init_secret;
   tls::opaque<4> base_group_context;
 
-  TestCase case_p256;
-  TestCase case_x25519;
+  tls::vector<TestCase, 4> cases;
 
   TLS_SERIALIZABLE(n_epochs,
                    target_generation,
                    base_init_secret,
                    base_group_context,
-                   case_p256,
-                   case_x25519);
+                   cases);
 };
 
 /////
@@ -253,24 +253,25 @@ struct TreeTestVectors
 
   struct TestCase
   {
+    CipherSuite cipher_suite;
+    SignatureScheme signature_scheme;
     tls::vector<Credential, 4> credentials;
     tls::vector<TreeCase, 4> trees;
 
-    TLS_SERIALIZABLE(credentials, trees);
+    TLS_SERIALIZABLE(cipher_suite, signature_scheme, credentials, trees);
   };
 
   tls::vector<tls::opaque<1>, 4> leaf_secrets;
   tls::vector<Credential, 4> credentials;
-  TestCase case_p256_p256;
-  TestCase case_x25519_ed25519;
+  tls::vector<TestCase, 4> cases;
 
-  TLS_SERIALIZABLE(leaf_secrets,
-                   credentials,
-                   case_p256_p256,
-                   case_x25519_ed25519);
+  TLS_SERIALIZABLE(leaf_secrets, credentials, cases);
 };
 
 /////
+
+bool
+deterministic_signature_scheme(SignatureScheme scheme);
 
 struct MessagesTestVectors
 {
@@ -279,7 +280,7 @@ struct MessagesTestVectors
   struct TestCase
   {
     CipherSuite cipher_suite;
-    SignatureScheme sig_scheme;
+    SignatureScheme signature_scheme;
 
     tls::opaque<4> client_init_key;
     tls::opaque<4> group_info;
@@ -293,7 +294,7 @@ struct MessagesTestVectors
     tls::opaque<4> ciphertext;
 
     TLS_SERIALIZABLE(cipher_suite,
-                     sig_scheme,
+                     signature_scheme,
                      client_init_key,
                      group_info,
                      key_package,
@@ -316,8 +317,7 @@ struct MessagesTestVectors
   tls::opaque<1> sig_seed;
   tls::opaque<1> random;
 
-  TestCase case_p256_p256;
-  TestCase case_x25519_ed25519;
+  tls::vector<TestCase, 4> cases;
 
   TLS_SERIALIZABLE(epoch,
                    signer_index,
@@ -328,8 +328,7 @@ struct MessagesTestVectors
                    dh_seed,
                    sig_seed,
                    random,
-                   case_p256_p256,
-                   case_x25519_ed25519);
+                   cases);
 };
 
 /////
@@ -429,13 +428,13 @@ struct SessionTestVectors
   struct TestCase
   {
     CipherSuite cipher_suite;
-    SignatureScheme sig_scheme;
+    SignatureScheme signature_scheme;
     bool encrypt;
     tls::vector<ClientInitKey, 4> client_init_keys;
     tls::vector<Epoch, 4> transcript;
 
     TLS_SERIALIZABLE(cipher_suite,
-                     sig_scheme,
+                     signature_scheme,
                      encrypt,
                      client_init_keys,
                      transcript);
@@ -444,17 +443,9 @@ struct SessionTestVectors
   uint32_t group_size;
   tls::opaque<1> group_id;
 
-  TestCase case_p256_p256;
-  TestCase case_p256_p256_encrypted;
-  TestCase case_x25519_ed25519;
-  TestCase case_x25519_ed25519_encrypted;
+  tls::vector<TestCase, 4> cases;
 
-  TLS_SERIALIZABLE(group_size,
-                   group_id,
-                   case_p256_p256,
-                   case_p256_p256_encrypted,
-                   case_x25519_ed25519,
-                   case_x25519_ed25519_encrypted);
+  TLS_SERIALIZABLE(group_size, group_id, cases);
 };
 
 struct BasicSessionTestVectors : SessionTestVectors

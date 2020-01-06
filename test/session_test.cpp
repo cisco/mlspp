@@ -346,7 +346,7 @@ protected:
   void follow_all(const SessionTestVectors::TestCase& tc)
   {
     auto suite = tc.cipher_suite;
-    auto scheme = tc.sig_scheme;
+    auto scheme = tc.signature_scheme;
     DeterministicHPKE lock;
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes seed = { uint8_t(i), 0 };
@@ -360,17 +360,21 @@ protected:
   }
 };
 
-TEST_F(SessionInteropTest, BasicP256)
+TEST_F(SessionInteropTest, Basic)
 {
-  // XXX(rlb@ipv.sx): This test is disabled for the moment becuase
-  // it requires signatures to be reproducible.  Otherwise, the
-  // following endpoint will generate a different message than the
-  // other endpoints have seen.
-  // follow_all(basic_tv.case_p256_p256);
-}
+  for (const auto& tc : basic_tv.cases) {
+    // XXX(rlb@ipv.sx): Tests with randomized signature schemes are disabled for
+    // the moment because the testing scheme here requires signatures to be
+    // reprodudible.  Otherwise, the following endpoint will generate a
+    // different message than the other endpoints have seen.
+    //
+    // Note that encrypted tests are still OK (with deterministic signatures),
+    // since the transcript doesn't cover the MLSCiphertext, in particular, the
+    // sender data nonce and encrypted sender data.
+    if (!deterministic_signature_scheme(tc.signature_scheme)) {
+      continue;
+    }
 
-TEST_F(SessionInteropTest, BasicX25519)
-{
-  follow_all(basic_tv.case_x25519_ed25519);
-  follow_all(basic_tv.case_x25519_ed25519_encrypted);
+    follow_all(tc);
+  }
 }

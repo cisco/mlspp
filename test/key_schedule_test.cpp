@@ -12,26 +12,23 @@ protected:
   HashRatchetTest()
     : tv(TestLoader<HashRatchetTestVectors>::get())
   {}
-
-  void interop(CipherSuite suite, const HashRatchetTestVectors::TestCase& tc)
-  {
-    ASSERT_EQ(tc.size(), tv.n_members);
-    for (uint32_t j = 0; j < tv.n_members; ++j) {
-      HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
-      ASSERT_EQ(tc[j].size(), tv.n_generations);
-      for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = ratchet.get(k);
-        ASSERT_EQ(tc[j][k].key, kn.key);
-        ASSERT_EQ(tc[j][k].nonce, kn.nonce);
-      }
-    }
-  }
 };
 
 TEST_F(HashRatchetTest, Interop)
 {
-  interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
-  interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
+  for (const auto& tc : tv.cases) {
+    auto suite = tc.cipher_suite;
+    ASSERT_EQ(tc.key_sequences.size(), tv.n_members);
+    for (uint32_t j = 0; j < tv.n_members; ++j) {
+      HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
+      ASSERT_EQ(tc.key_sequences[j].size(), tv.n_generations);
+      for (uint32_t k = 0; k < tv.n_generations; ++k) {
+        auto kn = ratchet.get(k);
+        ASSERT_EQ(tc.key_sequences[j][k].key, kn.key);
+        ASSERT_EQ(tc.key_sequences[j][k].nonce, kn.nonce);
+      }
+    }
+  }
 }
 
 class KeyScheduleTest : public ::testing::Test
@@ -42,10 +39,12 @@ protected:
   KeyScheduleTest()
     : tv(TestLoader<KeyScheduleTestVectors>::get())
   {}
+};
 
-  void interop(const KeyScheduleTestVectors::TestCase& test_case)
-  {
-    auto suite = test_case.suite;
+TEST_F(KeyScheduleTest, Interop)
+{
+  for (const auto& tc : tv.cases) {
+    auto suite = tc.cipher_suite;
     auto secret_size = Digest(suite).output_size();
     bytes init_secret(secret_size, 0);
 
@@ -55,7 +54,7 @@ protected:
     my_epoch.suite = suite;
     my_epoch.init_secret = tv.base_init_secret;
 
-    for (const auto& epoch : test_case.epochs) {
+    for (const auto& epoch : tc.epochs) {
       auto ctx = tls::marshal(group_context);
       my_epoch = my_epoch.next(epoch.n_members, epoch.update_secret, ctx);
 
@@ -84,10 +83,4 @@ protected:
       group_context.epoch += 1;
     }
   }
-};
-
-TEST_F(KeyScheduleTest, Interop)
-{
-  interop(tv.case_p256);
-  interop(tv.case_x25519);
 }
