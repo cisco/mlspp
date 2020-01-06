@@ -49,18 +49,8 @@ struct CryptoTestVectors
     // HPKE
     HPKECiphertext hpke_out;
 
-    TestCase(CipherSuite suite)
-      : derive_key_pair_pub(suite)
-      , hpke_out(suite)
-    {}
-
     TLS_SERIALIZABLE(hkdf_extract_out, derive_key_pair_pub, hpke_out)
   };
-
-  CryptoTestVectors()
-    : case_p256(CipherSuite::P256_SHA256_AES128GCM)
-    , case_x25519(CipherSuite::X25519_SHA256_AES128GCM)
-  {}
 
   TestCase case_p256;
   TestCase case_x25519;

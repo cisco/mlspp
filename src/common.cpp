@@ -80,4 +80,36 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(abbrev) << "...";
 }
 
+size_t
+suite_nonce_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return 12;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
+
+size_t
+suite_key_size(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::X25519_SHA256_AES128GCM:
+      return 16;
+
+    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::X448_SHA512_AES256GCM:
+      return 32;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
+
 } // namespace mls

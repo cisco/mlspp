@@ -1,59 +1,12 @@
 #pragma once
 
 #include "common.h"
-#include "openssl/ec.h"
 #include "openssl/evp.h"
+#include "primitives.h"
 #include "tls_syntax.h"
-#include <stdexcept>
 #include <vector>
 
 namespace mls {
-
-// Algorithm selectors
-enum struct CipherSuite : uint16_t
-{
-  P256_SHA256_AES128GCM = 0x0000,
-  P521_SHA512_AES256GCM = 0x0010,
-  X25519_SHA256_AES128GCM = 0x0001,
-  X448_SHA512_AES256GCM = 0x0011
-};
-
-enum struct SignatureScheme : uint16_t
-{
-  P256_SHA256 = 0x0403,
-  P521_SHA512 = 0x0603,
-  Ed25519 = 0x0807,
-  Ed448 = 0x0808
-};
-
-#define DUMMY_SIGNATURE_SCHEME SignatureScheme::P256_SHA256
-
-// Utility classes to avoid a bit of boilerplate
-class CipherAware
-{
-public:
-  CipherAware(CipherSuite suite)
-    : _suite(suite)
-  {}
-
-  CipherSuite cipher_suite() const { return _suite; }
-
-protected:
-  CipherSuite _suite;
-};
-
-class SignatureAware
-{
-public:
-  SignatureAware(SignatureScheme scheme)
-    : _scheme(scheme)
-  {}
-
-  SignatureScheme signature_scheme() const { return _scheme; }
-
-protected:
-  SignatureScheme _scheme;
-};
 
 // DeterministicHPKE enables RAII-based requests for HPKE to be
 // done deterministically.  The RAII pattern is used here to ensure
@@ -84,7 +37,6 @@ public:
     uint32_t fixed_base_dh;
     uint32_t var_base_dh;
     uint32_t digest;
-    uint32_t digest_bytes;
     uint32_t hmac;
   };
 
@@ -94,83 +46,31 @@ public:
   static void count_fixed_base_dh();
   static void count_var_base_dh();
   static void count_digest();
-  static void count_digest_bytes(uint32_t count);
   static void count_hmac();
 
 private:
   static uint32_t fixed_base_dh;
   static uint32_t var_base_dh;
   static uint32_t digest;
-  static uint32_t digest_bytes;
   static uint32_t hmac;
 };
 
-// Adapt standard pointers so that they can be "typed" to handle
-// custom deleters more easily.
-template<typename T>
-void
-TypedDelete(T* ptr);
+// Pass-throughs from the primitives, some with metrics wrappers
+using primitive::random_bytes;
 
-template<>
-void
-TypedDelete(EVP_MD_CTX* ptr);
-
-template<>
-void
-TypedDelete(EVP_PKEY* ptr);
-
-template<typename T>
-using typed_unique_ptr_base = std::unique_ptr<T, decltype(&TypedDelete<T>)>;
-
-template<typename T>
-class typed_unique_ptr : public typed_unique_ptr_base<T>
+class Digest : public primitive::Digest
 {
 public:
-  using parent = typed_unique_ptr_base<T>;
-  using parent::parent;
-  typed_unique_ptr();
-  typed_unique_ptr(T* ptr);
-};
-
-// Interface cleanup wrapper for raw OpenSSL EVP keys
-struct OpenSSLKey;
-enum struct OpenSSLKeyType;
-
-template<>
-void
-TypedDelete(OpenSSLKey* ptr);
-
-// Digests
-enum struct DigestType
-{
-  SHA256,
-  SHA512
-};
-
-class Digest
-{
-public:
-  Digest(DigestType type); // XXX(rlb@ipv.sx) delete?
   Digest(CipherSuite suite);
-  Digest& write(uint8_t byte);
-  Digest& write(const bytes& data);
-  bytes digest();
-
-  size_t output_size() const;
-
-private:
-  size_t _size;
-  typed_unique_ptr<EVP_MD_CTX> _ctx;
 };
+
+bytes hmac(CipherSuite suite, const bytes& key, const bytes& data);
+
+using primitive::seal;
+using primitive::open;
 
 bytes
 zero_bytes(size_t size);
-
-bytes
-random_bytes(size_t size);
-
-bytes
-hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs);
@@ -185,145 +85,70 @@ hkdf_expand_label(CipherSuite suite,
                   const bytes& context,
                   const size_t length);
 
-class AESGCM
+// HPKE Keys
+struct HPKECiphertext
 {
-public:
-  AESGCM() = delete;
-  AESGCM(const AESGCM& other) = delete;
-  AESGCM(AESGCM&& other) = delete;
-  AESGCM& operator=(const AESGCM& other) = delete;
-  AESGCM& operator=(AESGCM&& other) = delete;
+  tls::opaque<2> kem_output;
+  tls::opaque<4> ciphertext;
 
-  AESGCM(const bytes& key, const bytes& nonce);
-
-  void set_aad(const bytes& aad);
-  bytes encrypt(const bytes& plaintext) const;
-  bytes decrypt(const bytes& ciphertext) const;
-
-  static size_t key_size(CipherSuite suite);
-
-  static const size_t key_size_128 = 16;
-  static const size_t key_size_192 = 24;
-  static const size_t key_size_256 = 32;
-  static const size_t nonce_size = 12;
-  static const size_t tag_size = 16;
-
-private:
-  bytes _key;
-  bytes _nonce;
-  bytes _aad;
-
-  // This raw pointer only ever references memory managed by
-  // OpenSSL, so it doesn't need to be scoped.
-  const EVP_CIPHER* _cipher;
+  TLS_SERIALIZABLE(kem_output, ciphertext);
 };
 
-// Generic PublicKey and PrivateKey structs, which are specialized
-// to DH and Signature below
-
-class PublicKey
-  : public CipherAware
-  , public SignatureAware
+struct HPKEPublicKey
 {
-public:
-  PublicKey(const PublicKey& other);
-  PublicKey& operator=(const PublicKey& other);
-  PublicKey& operator=(PublicKey&& other) noexcept;
-  virtual ~PublicKey() = default;
+  tls::opaque<2> data;
 
-  explicit PublicKey(CipherSuite suite);
-  PublicKey(CipherSuite suite, const bytes& data);
-  PublicKey(CipherSuite suite, OpenSSLKey* key);
+  HPKEPublicKey() = default;
+  HPKEPublicKey(const bytes& data);
 
-  explicit PublicKey(SignatureScheme scheme);
-  PublicKey(SignatureScheme scheme, const bytes& data);
-  PublicKey(SignatureScheme scheme, OpenSSLKey* key);
-
-  bool operator==(const PublicKey& other) const;
-  bool operator!=(const PublicKey& other) const;
-
+  HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& pt) const;
   bytes to_bytes() const;
-  void reset(const bytes& data);
-  void reset(OpenSSLKey* key);
 
-protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-
-  friend tls::ostream& operator<<(tls::ostream& out, const PublicKey& obj);
-  friend tls::istream& operator>>(tls::istream& in, PublicKey& obj);
+  TLS_SERIALIZABLE(data);
 };
 
-class PrivateKey
-  : public CipherAware
-  , public SignatureAware
+class HPKEPrivateKey
 {
 public:
-  PrivateKey(const PrivateKey& other);
-  PrivateKey& operator=(const PrivateKey& other);
-  PrivateKey& operator=(PrivateKey&& other) noexcept;
-  virtual ~PrivateKey() = default;
-
-  bool operator==(const PrivateKey& other) const;
-  bool operator!=(const PrivateKey& other) const;
-
-protected:
-  typed_unique_ptr<OpenSSLKey> _key;
-  std::unique_ptr<PublicKey> _pub;
-
-  std::unique_ptr<PublicKey> type_preserving_dup(const PublicKey* pub) const;
-
-  PrivateKey(CipherSuite suite, OpenSSLKey* key);
-  PrivateKey(SignatureScheme scheme, OpenSSLKey* key);
-};
-
-// DH specialization
-struct HPKECiphertext;
-
-class HPKEPublicKey : public PublicKey
-{
-public:
-  using PublicKey::PublicKey;
-  HPKEPublicKey();
-  HPKECiphertext encrypt(const bytes& aad, const bytes& plaintext) const;
-
-private:
-  friend class HPKEPrivateKey;
-};
-
-class HPKEPrivateKey : public PrivateKey
-{
-public:
-  using PrivateKey::PrivateKey;
-
   static HPKEPrivateKey generate(CipherSuite suite);
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
-  static HPKEPrivateKey node_derive(CipherSuite suite, const bytes& secret);
 
-  bytes derive(const HPKEPublicKey& pub) const;
-  bytes decrypt(const bytes& aad, const HPKECiphertext& ciphertext) const;
+  bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ct) const;
+  HPKEPublicKey public_key() const;
 
-  const HPKEPublicKey& public_key() const;
+  TLS_SERIALIZABLE(_data, _pub_data);
 
 private:
-  HPKEPrivateKey(CipherSuite suite, OpenSSLKey* key);
+  tls::opaque<2> _data;
+  tls::opaque<2> _pub_data;
+
+  HPKEPrivateKey(CipherSuite suite, bytes data);
 };
 
-// Signature specialization
-class SignaturePublicKey : public PublicKey
+// Signature Keys
+class SignaturePublicKey
 {
 public:
-  using PublicKey::PublicKey;
+  SignaturePublicKey();
+  SignaturePublicKey(SignatureScheme scheme, bytes data);
+
+  void set_signature_scheme(SignatureScheme scheme);
+  SignatureScheme signature_scheme() const;
   bool verify(const bytes& message, const bytes& signature) const;
+  bytes to_bytes() const;
+
+  TLS_SERIALIZABLE(_data);
 
 private:
-  friend class SignaturePrivateKey;
+  SignatureScheme _scheme;
+  tls::opaque<2> _data;
 };
 
-class SignaturePrivateKey : public PrivateKey
+class SignaturePrivateKey
 {
 public:
-  using PrivateKey::PrivateKey;
+  SignaturePrivateKey();
 
   static SignaturePrivateKey generate(SignatureScheme scheme);
   static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
@@ -331,30 +156,16 @@ public:
                                     const bytes& secret);
 
   bytes sign(const bytes& message) const;
-  const SignaturePublicKey& public_key() const;
+  SignaturePublicKey public_key() const;
+
+  TLS_SERIALIZABLE(_scheme, _data, _pub_data);
 
 private:
-  SignaturePrivateKey(SignatureScheme scheme, OpenSSLKey* key);
-};
+  SignatureScheme _scheme;
+  tls::opaque<2> _data;
+  tls::opaque<2> _pub_data;
 
-// A struct for HPKE-encrypted information
-struct HPKECiphertext : public CipherAware
-{
-  HPKEPublicKey ephemeral;
-  tls::opaque<4> content;
-
-  HPKECiphertext(CipherSuite suite)
-    : CipherAware(suite)
-    , ephemeral(suite)
-  {}
-
-  HPKECiphertext(const HPKEPublicKey& ephemeral_in, const bytes& content_in)
-    : CipherAware(ephemeral_in.cipher_suite())
-    , ephemeral(ephemeral_in)
-    , content(content_in)
-  {}
-
-  TLS_SERIALIZABLE(ephemeral, content);
+  SignaturePrivateKey(SignatureScheme scheme, bytes data);
 };
 
 } // namespace mls

@@ -22,14 +22,10 @@ enum class ProtocolVersion : uint8_t
 //    HPKEPublicKey public_key;
 //    HPKECiphertext node_secrets<0..2^16-1>;
 // } RatchetNode
-struct RatchetNode : public CipherAware
+struct RatchetNode
 {
   HPKEPublicKey public_key;
-  tls::variant_vector<HPKECiphertext, CipherSuite, 2> node_secrets;
-
-  RatchetNode(CipherSuite suite);
-  RatchetNode(HPKEPublicKey public_key,
-              const std::vector<HPKECiphertext>& node_secrets);
+  tls::vector<HPKECiphertext, 2> node_secrets;
 
   TLS_SERIALIZABLE(public_key, node_secrets);
 };
@@ -37,10 +33,9 @@ struct RatchetNode : public CipherAware
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
 // } DirectPath;
-struct DirectPath : public CipherAware
+struct DirectPath
 {
-  tls::variant_vector<RatchetNode, CipherSuite, 2> nodes;
-  DirectPath(CipherSuite suite);
+  tls::vector<RatchetNode, 2> nodes;
 
   TLS_SERIALIZABLE(nodes);
 };
@@ -69,7 +64,8 @@ struct ClientInitKey
   tls::opaque<2> signature;
 
   ClientInitKey();
-  ClientInitKey(const HPKEPrivateKey& init_key_in,
+  ClientInitKey(CipherSuite suite_in,
+                const HPKEPrivateKey& init_key_in,
                 Credential credential_in);
 
   const std::optional<HPKEPrivateKey>& private_key() const;
@@ -77,15 +73,12 @@ struct ClientInitKey
 
   bool verify() const;
 
+  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature);
+
   private:
   bytes to_be_signed() const;
   std::optional<HPKEPrivateKey> _private_key;
 };
-
-bool operator==(const ClientInitKey& lhs, const ClientInitKey& rhs);
-bool operator!=(const ClientInitKey& lhs, const ClientInitKey& rhs);
-tls::ostream& operator<<(tls::ostream& str, const ClientInitKey& obj);
-tls::istream& operator>>(tls::istream& str, ClientInitKey& obj);
 
 // struct {
 //   // GroupContext inputs
@@ -160,9 +153,6 @@ struct EncryptedKeyPackage {
   tls::opaque<1> client_init_key_hash;
   HPKECiphertext encrypted_key_package;
 
-  EncryptedKeyPackage(CipherSuite suite);
-  EncryptedKeyPackage(bytes hash, HPKECiphertext package);
-
   TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
 };
 
@@ -176,7 +166,7 @@ struct EncryptedKeyPackage {
 struct Welcome {
   ProtocolVersion version;
   CipherSuite cipher_suite;
-  tls::variant_vector<EncryptedKeyPackage, CipherSuite, 4> key_packages;
+  tls::vector<EncryptedKeyPackage, 4> key_packages;
   tls::opaque<4> encrypted_group_info;
 
   Welcome();
@@ -208,9 +198,6 @@ enum struct ProposalType : uint8_t {
 struct Add {
   ClientInitKey client_init_key;
 
-  Add(CipherSuite suite);
-  Add(ClientInitKey client_init_key_in);
-
   static const ProposalType type;
   TLS_SERIALIZABLE(client_init_key)
 };
@@ -218,18 +205,12 @@ struct Add {
 struct Update {
   HPKEPublicKey leaf_key;
 
-  Update(CipherSuite suite);
-  Update(HPKEPublicKey leaf_key_in);
-
   static const ProposalType type;
   TLS_SERIALIZABLE(leaf_key)
 };
 
 struct Remove {
   LeafIndex removed;
-
-  Remove(CipherSuite suite);
-  Remove(LeafIndex removed_in);
 
   static const ProposalType type;
   TLS_SERIALIZABLE(removed)
@@ -249,12 +230,10 @@ enum struct ContentType : uint8_t
   commit = 3,
 };
 
-struct Proposal : public tls::variant_variant<ProposalType, CipherSuite, Add, Update, Remove>
+struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
 {
-  using parent = tls::variant_variant<ProposalType, CipherSuite, Add, Update, Remove>;
+  using parent = tls::variant<ProposalType, Add, Update, Remove>;
   using parent::parent;
-
-  Proposal(CipherSuite suite);
 
   static const ContentType type;
 };
@@ -273,13 +252,6 @@ struct Commit {
   tls::vector<ProposalID, 2> adds;
   tls::vector<ProposalID, 2> ignored;
   DirectPath path;
-
-  Commit(CipherSuite suite);
-  Commit(const tls::vector<ProposalID, 2>& updates_in,
-         const tls::vector<ProposalID, 2>& removes_in,
-         const tls::vector<ProposalID, 2>& adds_in,
-         const tls::vector<ProposalID, 2>& ignored_in,
-         DirectPath path_in);
 
   TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
 };
@@ -306,9 +278,6 @@ struct ApplicationData : tls::opaque<4>
   using parent = tls::opaque<4>;
   using parent::parent;
 
-  ApplicationData(CipherSuite suite)
-  {}
-
   static const ContentType type;
 };
 
@@ -317,36 +286,26 @@ struct CommitData
   Commit commit;
   tls::opaque<1> confirmation;
 
-  CommitData(CipherSuite suite)
-    : commit(suite)
-  {}
-
-  CommitData(const Commit& commit_in, const bytes& confirmation_in)
-    : commit(commit_in)
-    , confirmation(confirmation_in)
-  {}
-
   static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation);
 };
 
 struct GroupContext;
 
-struct MLSPlaintext : public CipherAware
+struct MLSPlaintext
 {
   tls::opaque<1> group_id;
   epoch_t epoch;
   LeafIndex sender;
   tls::opaque<4> authenticated_data;
-  tls::variant_variant<ContentType, CipherSuite, ApplicationData, Proposal, CommitData> content;
+  tls::variant<ContentType, ApplicationData, Proposal, CommitData> content;
   tls::opaque<2> signature;
 
   // Constructor for unmarshaling directly
-  MLSPlaintext(CipherSuite suite);
+  MLSPlaintext() = default;
 
   // Constructor for decrypting
-  MLSPlaintext(CipherSuite suite,
-               bytes group_id,
+  MLSPlaintext(bytes group_id,
                epoch_t epoch,
                LeafIndex sender,
                ContentType content_type,

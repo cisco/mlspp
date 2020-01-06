@@ -3,8 +3,8 @@
 #include "common.h"
 #include "credential.h"
 #include "crypto.h"
-#include "tls_syntax.h"
 #include "tree_math.h"
+#include "tls_syntax.h"
 #include <optional>
 #include <list>
 #include <iostream>
@@ -13,13 +13,13 @@ namespace mls {
 
 struct ClientInitKey;
 
-class RatchetTreeNode : public CipherAware
+class RatchetTreeNode
 {
 public:
-  RatchetTreeNode(CipherSuite suite);
+  RatchetTreeNode() = default;
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
-  RatchetTreeNode(const HPKEPrivateKey& priv);
-  RatchetTreeNode(const HPKEPublicKey& pub);
+  RatchetTreeNode(HPKEPrivateKey priv);
+  RatchetTreeNode(HPKEPublicKey pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
   const std::optional<HPKEPrivateKey>& private_key() const;
@@ -29,6 +29,7 @@ public:
 
   void merge(const RatchetTreeNode& other);
   void set_credential(const Credential& cred);
+  void set_cipher_suite();
   void add_unmerged(LeafIndex index);
 
   TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
@@ -48,12 +49,10 @@ private:
 // ensure that nodes are populated with blank values on unmarshal.
 // Otherwise, `*opt` will access uninitialized memory.
 struct OptionalRatchetTreeNode
-  : public tls::variant_optional<RatchetTreeNode, CipherSuite>
+  : public tls::optional<RatchetTreeNode>
 {
-  using parent = tls::variant_optional<RatchetTreeNode, CipherSuite>;
+  using parent = tls::optional<RatchetTreeNode>;
   using parent::parent;
-
-  OptionalRatchetTreeNode(CipherSuite suite, const bytes& secret);
 
   bool has_private() const;
   const bytes& hash() const;
@@ -65,13 +64,14 @@ struct OptionalRatchetTreeNode
                 const OptionalRatchetTreeNode& right);
 
 private:
+  CipherSuite _suite;
   bytes _hash;
 };
 
 struct RatchetTreeNodeVector
-  : public tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>
+  : public tls::vector<OptionalRatchetTreeNode, 4>
 {
-  using parent = tls::variant_vector<OptionalRatchetTreeNode, CipherSuite, 4>;
+  using parent = tls::vector<OptionalRatchetTreeNode, 4>;
   using parent::parent;
   using parent::operator[];
 
@@ -82,11 +82,11 @@ struct RatchetTreeNodeVector
 struct RatchetNode;
 struct DirectPath;
 
-class RatchetTree : public CipherAware
+class RatchetTree
 {
 public:
   RatchetTree(CipherSuite suite);
-  RatchetTree(const HPKEPrivateKey& priv, const Credential& cred);
+  RatchetTree(CipherSuite suite, const HPKEPrivateKey& priv, const Credential& cred);
 
   // KEM encap/decap, including updates to the tree
   std::tuple<DirectPath, bytes> encap(LeafIndex from, const bytes& context, const bytes& leaf);
@@ -116,6 +116,7 @@ public:
 
 protected:
   RatchetTreeNodeVector _nodes;
+  CipherSuite _suite;
   size_t _secret_size;
 
   NodeIndex root_index() const;

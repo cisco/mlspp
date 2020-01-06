@@ -104,7 +104,6 @@ struct adl_serializer<mls::CryptoMetrics::Report>
       { "fixed_base_dh", report.fixed_base_dh },
       { "var_base_dh", report.var_base_dh },
       { "digest", report.digest },
-      { "digest_bytes", report.digest_bytes },
       { "hmac", report.hmac },
     };
   }
@@ -140,7 +139,7 @@ public:
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv);
-    return mls::ClientInitKey{ init, cred };
+    return mls::ClientInitKey{ suite, init, cred };
   }
 
   std::vector<mls::CryptoMetrics::Report> broadcast(const mls::bytes& message)

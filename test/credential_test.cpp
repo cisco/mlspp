@@ -7,7 +7,7 @@ TEST(CredentialTest, Basic)
 {
   auto scheme = SignatureScheme::P256_SHA256;
 
-  auto user_id = random_bytes(4);
+  auto user_id = bytes{ 0x00, 0x01, 0x02, 0x03 };
   auto priv = SignaturePrivateKey::generate(scheme);
   auto pub = priv.public_key();
 

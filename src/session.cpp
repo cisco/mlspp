@@ -85,8 +85,7 @@ void
 Session::handle(const bytes& handshake_data)
 {
   auto& state = current_state();
-  auto suite = state.cipher_suite();
-  MLSPlaintext proposal(suite), commit(suite);
+  MLSPlaintext proposal, commit;
   tls::istream r(handshake_data);
   if (_encrypt_handshake) {
     // TODO(rlb): Verify that epoch of the ciphertext matches that of the

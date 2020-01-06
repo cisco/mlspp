@@ -205,7 +205,8 @@ protected:
     ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
 
     DeterministicHPKE lock;
-    auto hpke_out = derive_key_pair_pub.encrypt(tv.hpke_aad, tv.hpke_plaintext);
+    auto hpke_out =
+      derive_key_pair_pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
     ASSERT_EQ(hpke_out, test_case.hpke_out);
   }
 };
@@ -218,61 +219,66 @@ TEST_F(CryptoTest, Interop)
 
 TEST_F(CryptoTest, SHA2)
 {
-  CryptoMetrics::reset();
-  ASSERT_EQ(Digest(DigestType::SHA256).write(sha2_in).digest(), sha256_out);
-  auto metrics = CryptoMetrics::snapshot();
-  ASSERT_EQ(metrics.digest, 1);
-  ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
+  auto suite256 = CipherSuite::P256_SHA256_AES128GCM;
+  auto suite512 = CipherSuite::P521_SHA512_AES256GCM;
 
   CryptoMetrics::reset();
-  ASSERT_EQ(Digest(DigestType::SHA512).write(sha2_in).digest(), sha512_out);
+  ASSERT_EQ(Digest(suite256).write(sha2_in).digest(), sha256_out);
+  auto metrics = CryptoMetrics::snapshot();
+  ASSERT_EQ(metrics.digest, 1);
+
+  CryptoMetrics::reset();
+  ASSERT_EQ(Digest(suite512).write(sha2_in).digest(), sha512_out);
   metrics = CryptoMetrics::snapshot();
   ASSERT_EQ(metrics.digest, 1);
-  ASSERT_EQ(metrics.digest_bytes, sha2_in.size());
 }
 
 TEST_F(CryptoTest, AES128GCM)
 {
-  AESGCM enc(aes128gcm_key, aes128gcm_nonce);
-  enc.set_aad(aes128gcm_aad);
-  ASSERT_EQ(enc.encrypt(aes128gcm_pt), aes128gcm_ct);
+  auto suite = CipherSuite::P256_SHA256_AES128GCM;
 
-  AESGCM dec(aes128gcm_key, aes128gcm_nonce);
-  dec.set_aad(aes128gcm_aad);
-  ASSERT_EQ(dec.decrypt(aes128gcm_ct), aes128gcm_pt);
+  auto encrypted = primitive::seal(
+    suite, aes128gcm_key, aes128gcm_nonce, aes128gcm_aad, aes128gcm_pt);
+  ASSERT_EQ(encrypted, aes128gcm_ct);
 
-  auto rtt_key = random_bytes(AESGCM::key_size_128);
-  auto rtt_nonce = random_bytes(AESGCM::nonce_size);
+  auto decrypted = primitive::open(
+    suite, aes128gcm_key, aes128gcm_nonce, aes128gcm_aad, aes128gcm_ct);
+  ASSERT_EQ(decrypted, aes128gcm_pt);
+
+  auto rtt_key = random_bytes(suite_key_size(suite));
+  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
   auto rtt_aad = random_bytes(100);
-  auto rtt_pt = random_bytes(100);
+  auto rtt_pt = random_bytes(50);
 
-  AESGCM rtt_enc(rtt_key, rtt_nonce);
-  AESGCM rtt_dec(rtt_key, rtt_nonce);
-  rtt_enc.set_aad(rtt_aad);
-  rtt_dec.set_aad(rtt_aad);
-  ASSERT_EQ(rtt_dec.decrypt(rtt_dec.encrypt(rtt_pt)), rtt_pt);
+  auto rtt_encrypted =
+    primitive::seal(suite, rtt_key, rtt_nonce, rtt_aad, rtt_pt);
+  auto rtt_decrypted =
+    primitive::open(suite, rtt_key, rtt_nonce, rtt_aad, rtt_encrypted);
+  ASSERT_EQ(rtt_decrypted, rtt_pt);
 }
 
 TEST_F(CryptoTest, AES256GCM)
 {
-  AESGCM enc(aes256gcm_key, aes256gcm_nonce);
-  enc.set_aad(aes256gcm_aad);
-  ASSERT_EQ(enc.encrypt(aes256gcm_pt), aes256gcm_ct);
+  auto suite = CipherSuite::P521_SHA512_AES256GCM;
 
-  AESGCM dec(aes256gcm_key, aes256gcm_nonce);
-  dec.set_aad(aes256gcm_aad);
-  ASSERT_EQ(dec.decrypt(aes256gcm_ct), aes256gcm_pt);
+  auto encrypted = primitive::seal(
+    suite, aes256gcm_key, aes256gcm_nonce, aes256gcm_aad, aes256gcm_pt);
+  ASSERT_EQ(encrypted, aes256gcm_ct);
 
-  auto rtt_key = random_bytes(AESGCM::key_size_256);
-  auto rtt_nonce = random_bytes(AESGCM::nonce_size);
+  auto decrypted = primitive::open(
+    suite, aes256gcm_key, aes256gcm_nonce, aes256gcm_aad, aes256gcm_ct);
+  ASSERT_EQ(decrypted, aes256gcm_pt);
+
+  auto rtt_key = random_bytes(suite_key_size(suite));
+  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
   auto rtt_aad = random_bytes(100);
-  auto rtt_pt = random_bytes(100);
+  auto rtt_pt = random_bytes(50);
 
-  AESGCM rtt_enc(rtt_key, rtt_nonce);
-  AESGCM rtt_dec(rtt_key, rtt_nonce);
-  rtt_enc.set_aad(rtt_aad);
-  rtt_dec.set_aad(rtt_aad);
-  ASSERT_EQ(rtt_dec.decrypt(rtt_dec.encrypt(rtt_pt)), rtt_pt);
+  auto rtt_encrypted =
+    primitive::seal(suite, rtt_key, rtt_nonce, rtt_aad, rtt_pt);
+  auto rtt_decrypted =
+    primitive::open(suite, rtt_key, rtt_nonce, rtt_aad, rtt_encrypted);
+  ASSERT_EQ(rtt_decrypted, rtt_pt);
 }
 
 TEST_F(CryptoTest, BasicDH)
@@ -304,17 +310,15 @@ TEST_F(CryptoTest, BasicDH)
     ASSERT_NE(gX, gY);
 
     CryptoMetrics::reset();
-    auto gXY = x.derive(gY);
-    auto gYX = y.derive(gX);
-    ASSERT_EQ(gXY, gYX);
-    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 0);
-    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 2);
+    auto se = gX.encrypt(suite, {}, s);
+    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
+    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 1);
 
-    auto nh = Digest(suite).output_size();
-    auto ns = hkdf_expand_label(suite, s, "node", {}, nh);
-    auto ny = HPKEPrivateKey::derive(suite, ns);
-    auto nz = HPKEPrivateKey::node_derive(suite, s);
-    ASSERT_EQ(ny, nz);
+    CryptoMetrics::reset();
+    auto sd = x.decrypt(suite, {}, se);
+    ASSERT_EQ(sd, s);
+    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 0);
+    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 1);
   }
 }
 
@@ -329,10 +333,10 @@ TEST_F(CryptoTest, DHSerialize)
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
-    HPKEPublicKey parsed(suite, gX.to_bytes());
+    HPKEPublicKey parsed(gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
-    auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX), suite);
+    auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX));
     ASSERT_EQ(gX2, gX);
   }
 }
@@ -340,40 +344,36 @@ TEST_F(CryptoTest, DHSerialize)
 TEST_F(CryptoTest, P256DH)
 {
   auto suite = CipherSuite::P256_SHA256_AES128GCM;
-  auto skA = HPKEPrivateKey::parse(suite, p256dh_skA);
-  auto pkA = HPKEPublicKey(suite, p256dh_pkA);
-  ASSERT_EQ(pkA, skA.public_key());
 
-  auto pkB = HPKEPublicKey(suite, p256dh_pkB);
-  auto kAB = skA.derive(pkB);
+  auto pkA = primitive::priv_to_pub(suite, p256dh_skA);
+  ASSERT_EQ(pkA, p256dh_pkA);
+
+  auto kAB = primitive::dh(suite, p256dh_skA, p256dh_pkB);
   ASSERT_EQ(kAB, p256dh_K);
 }
 
 TEST_F(CryptoTest, P521DH)
 {
   auto suite = CipherSuite::P521_SHA512_AES256GCM;
-  auto skA = HPKEPrivateKey::parse(suite, p521dh_skA);
-  auto pkA = HPKEPublicKey(suite, p521dh_pkA);
-  ASSERT_EQ(pkA, skA.public_key());
 
-  auto pkB = HPKEPublicKey(suite, p521dh_pkB);
-  auto kAB = skA.derive(pkB);
+  auto pkA = primitive::priv_to_pub(suite, p521dh_skA);
+  ASSERT_EQ(pkA, p521dh_pkA);
+
+  auto kAB = primitive::dh(suite, p521dh_skA, p521dh_pkB);
   ASSERT_EQ(kAB, p521dh_K);
 }
 
 TEST_F(CryptoTest, X25519)
 {
   auto suite = CipherSuite::X25519_SHA256_AES128GCM;
-  auto skA = HPKEPrivateKey::parse(suite, x25519_skA);
-  auto skB = HPKEPrivateKey::parse(suite, x25519_skB);
 
-  auto pkA = HPKEPublicKey(suite, x25519_pkA);
-  auto pkB = HPKEPublicKey(suite, x25519_pkB);
-  ASSERT_EQ(pkA, skA.public_key());
-  ASSERT_EQ(pkB, skB.public_key());
+  auto pkA = primitive::priv_to_pub(suite, x25519_skA);
+  auto pkB = primitive::priv_to_pub(suite, x25519_skB);
+  ASSERT_EQ(pkA, x25519_pkA);
+  ASSERT_EQ(pkB, x25519_pkB);
 
-  auto kAB = skA.derive(pkB);
-  auto kBA = skB.derive(pkA);
+  auto kAB = primitive::dh(suite, x25519_skA, pkB);
+  auto kBA = primitive::dh(suite, x25519_skB, pkA);
   ASSERT_EQ(kAB, x25519_K);
   ASSERT_EQ(kBA, x25519_K);
 }
@@ -381,16 +381,14 @@ TEST_F(CryptoTest, X25519)
 TEST_F(CryptoTest, X448)
 {
   auto suite = CipherSuite::X448_SHA512_AES256GCM;
-  auto skA = HPKEPrivateKey::parse(suite, x448_skA);
-  auto skB = HPKEPrivateKey::parse(suite, x448_skB);
 
-  auto pkA = HPKEPublicKey(suite, x448_pkA);
-  auto pkB = HPKEPublicKey(suite, x448_pkB);
-  ASSERT_EQ(pkA, skA.public_key());
-  ASSERT_EQ(pkB, skB.public_key());
+  auto pkA = primitive::priv_to_pub(suite, x448_skA);
+  auto pkB = primitive::priv_to_pub(suite, x448_skB);
+  ASSERT_EQ(pkA, x448_pkA);
+  ASSERT_EQ(pkB, x448_pkB);
 
-  auto kAB = skA.derive(pkB);
-  auto kBA = skB.derive(pkA);
+  auto kAB = primitive::dh(suite, x448_skA, pkB);
+  auto kBA = primitive::dh(suite, x448_skB, pkA);
   ASSERT_EQ(kAB, x448_K);
   ASSERT_EQ(kBA, x448_K);
 }
@@ -402,14 +400,15 @@ TEST_F(CryptoTest, HPKE)
                                    CipherSuite::X25519_SHA256_AES128GCM,
                                    CipherSuite::X448_SHA512_AES256GCM };
 
+  auto aad = random_bytes(100);
+  auto original = random_bytes(100);
+
   for (auto suite : suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
-    auto aad = random_bytes(100);
-    auto original = random_bytes(100);
-    auto encrypted = gX.encrypt(aad, original);
-    auto decrypted = x.decrypt(aad, encrypted);
+    auto encrypted = gX.encrypt(suite, aad, original);
+    auto decrypted = x.decrypt(suite, aad, encrypted);
 
     ASSERT_EQ(original, decrypted);
   }
@@ -457,7 +456,8 @@ TEST_F(CryptoTest, SignatureSerialize)
     SignaturePublicKey parsed(scheme, gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
-    auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX), scheme);
+    auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
+    gX2.set_signature_scheme(scheme);
     ASSERT_EQ(gX2, gX);
   }
 }

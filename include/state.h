@@ -86,6 +86,9 @@ public:
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
+  // XXX
+  void dump_tree() const;
+
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?

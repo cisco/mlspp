@@ -34,9 +34,9 @@ deterministic_signature_scheme(SignatureScheme scheme)
       return true;
     case SignatureScheme::Ed448:
       return true;
+    default:
+      return false;
   }
-
-  return false;
 }
 
 class MessagesTest : public ::testing::Test
@@ -65,13 +65,12 @@ protected:
                        { cred, cred, cred, cred } };
     ratchet_tree.blank_path(LeafIndex{ 2 }, true);
 
-    DirectPath direct_path(ratchet_tree.cipher_suite());
-    bytes dummy;
-    std::tie(direct_path, dummy) =
+    auto [direct_path, dummy] =
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    silence_unused(dummy);
 
     // ClientInitKey
-    ClientInitKey client_init_key{ dh_priv, cred };
+    ClientInitKey client_init_key{ tc.cipher_suite, dh_priv, cred };
     client_init_key.signature = tv.random;
     tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
@@ -87,9 +86,9 @@ protected:
     tls_round_trip(tc.key_package, key_package, true);
 
     auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
-    tls_round_trip(
-      tc.encrypted_key_package, encrypted_key_package, true, tc.cipher_suite);
+      EncryptedKeyPackage{ tv.random,
+                           dh_key.encrypt(tc.cipher_suite, {}, tv.random) };
+    tls_round_trip(tc.encrypted_key_package, encrypted_key_package, true);
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
@@ -103,19 +102,19 @@ protected:
     auto add_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
-    tls_round_trip(tc.add_proposal, add_hs, true, tc.cipher_suite);
+    tls_round_trip(tc.add_proposal, add_hs, true);
 
     auto update_prop = Proposal{ Update{ dh_key } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
-    tls_round_trip(tc.update_proposal, update_hs, true, tc.cipher_suite);
+    tls_round_trip(tc.update_proposal, update_hs, true);
 
     auto remove_prop = Proposal{ Remove{ tv.signer_index } };
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
     remove_hs.signature = tv.random;
-    tls_round_trip(tc.remove_proposal, remove_hs, true, tc.cipher_suite);
+    tls_round_trip(tc.remove_proposal, remove_hs, true);
 
     // Commit
     auto commit = Commit{
@@ -125,7 +124,7 @@ protected:
       { tv.random, tv.random },
       direct_path,
     };
-    tls_round_trip(tc.commit, commit, true, tc.cipher_suite);
+    tls_round_trip(tc.commit, commit, true);
 
     // MLSCiphertext
     MLSCiphertext ciphertext{

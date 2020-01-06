@@ -74,7 +74,7 @@ generate_crypto()
 
     // HPKE
     DeterministicHPKE lock;
-    test_case->hpke_out = pub.encrypt(tv.hpke_aad, tv.hpke_plaintext);
+    test_case->hpke_out = pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
   }
 
   return tv;
@@ -325,13 +325,12 @@ generate_messages()
                        { cred, cred, cred, cred } };
     ratchet_tree.blank_path(LeafIndex{ 2 }, true);
 
-    DirectPath direct_path(ratchet_tree.cipher_suite());
-    bytes dummy;
-    std::tie(direct_path, dummy) =
+    auto [direct_path, dummy] =
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    silence_unused(dummy);
 
     // Construct CIK
-    auto client_init_key = ClientInitKey{ dh_priv, cred };
+    auto client_init_key = ClientInitKey{ suite, dh_priv, cred };
     client_init_key.signature = tv.random;
 
     // Construct Welcome
@@ -343,7 +342,7 @@ generate_messages()
 
     auto key_package = KeyPackage{ tv.random };
     auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt({}, tv.random) };
+      EncryptedKeyPackage{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
@@ -458,7 +457,7 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       auto init = HPKEPrivateKey::derive(suite, seed);
-      client_init_keys.emplace_back(init, cred);
+      client_init_keys.emplace_back(suite, init, cred);
     }
 
     // Add everyone

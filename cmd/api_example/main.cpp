@@ -25,7 +25,7 @@ public:
   ClientInitKey temp_cik()
   {
     auto init_key = HPKEPrivateKey::generate(suite);
-    return ClientInitKey{ init_key, _cred };
+    return ClientInitKey{ suite, init_key, _cred };
   }
 
   ClientInitKey fresh_cik()
