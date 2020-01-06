@@ -45,11 +45,6 @@ generate_crypto()
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
-  std::vector<CryptoTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
-  };
-
   tv.hkdf_extract_salt = { 0, 1, 2, 3 };
   tv.hkdf_extract_ikm = { 4, 5, 6, 7 };
 
@@ -59,22 +54,21 @@ generate_crypto()
   tv.hpke_plaintext = bytes(128, 0xB2);
 
   // Construct a test case for each suite
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto test_case = cases[i];
-
+  for (auto suite : suites) {
     // HKDF-Extract
-    test_case->hkdf_extract_out =
+    auto hkdf_extract_out =
       hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto pub = priv.public_key();
-    test_case->derive_key_pair_pub = pub;
+    auto derive_key_pair_pub = priv.public_key();
 
     // HPKE
-    DeterministicHPKE lock;
-    test_case->hpke_out = pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
+    auto hpke_out =
+      derive_key_pair_pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
+
+    tv.cases.push_back(
+      { suite, hkdf_extract_out, derive_key_pair_pub, hpke_out });
   }
 
   return tv;
@@ -606,7 +600,6 @@ main()
   // Verify that the test vectors are reproducible (to the extent
   // possible)
   verify_reproducible(generate_tree_math);
-  verify_reproducible(generate_crypto);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
   verify_reproducible(generate_tree);
