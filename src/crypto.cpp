@@ -193,6 +193,8 @@ hpke_npk(HPKEKEMID kem)
       return 133;
     case HPKEKEMID::DHKEM_X448:
       return 56;
+    default:
+      throw InvalidParameterError("Unknown HPKE KEM ID");
   }
 }
 
