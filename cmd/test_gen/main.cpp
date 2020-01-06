@@ -84,28 +84,24 @@ generate_hash_ratchet()
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
-  std::vector<HashRatchetTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
-  };
-
   tv.n_members = 16;
   tv.n_generations = 16;
   tv.base_secret = bytes(32, 0xA0);
 
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto test_case = cases[i];
+  for (auto suite : suites) {
+    HashRatchetTestVectors::TestCase tc;
+    tc.cipher_suite = suite;
+    tc.key_sequences.resize(tv.n_members);
 
     for (uint32_t j = 0; j < tv.n_members; ++j) {
-      test_case->emplace_back();
-
       HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto key_nonce = ratchet.get(k);
-        test_case->at(j).push_back({ key_nonce.key, key_nonce.nonce });
+        tc.key_sequences.at(j).push_back({ key_nonce.key, key_nonce.nonce });
       }
     }
+
+    tv.cases.push_back(tc);
   }
 
   return tv;
@@ -121,11 +117,6 @@ generate_key_schedule()
     CipherSuite::X25519_SHA256_AES128GCM,
   };
 
-  std::vector<KeyScheduleTestVectors::TestCase*> cases{
-    &tv.case_p256,
-    &tv.case_x25519,
-  };
-
   GroupContext base_group_context{
     { 0xA0, 0xA0, 0xA0, 0xA0 },
     0,
@@ -139,12 +130,11 @@ generate_key_schedule()
   tv.base_group_context = tls::marshal(base_group_context);
 
   // Construct a test case for each suite
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto test_case = cases[i];
-    auto secret_size = Digest(suite).output_size();
+  for (auto suite : suites) {
+    KeyScheduleTestVectors::TestCase tc;
+    tc.cipher_suite = suite;
 
-    test_case->suite = suite;
+    auto secret_size = Digest(suite).output_size();
 
     auto group_context = base_group_context;
     auto update_secret = bytes(secret_size, 0);
@@ -172,7 +162,7 @@ generate_key_schedule()
         application_keys.push_back({ app.key, app.nonce });
       }
 
-      test_case->epochs.push_back({
+      tc.epochs.push_back({
         LeafCount{ n_members },
         update_secret,
         epoch.epoch_secret,
@@ -193,6 +183,8 @@ generate_key_schedule()
       n_members =
         ((n_members - min_members) % (max_members - min_members)) + min_members;
     }
+
+    tv.cases.push_back(tc);
   }
 
   return tv;
@@ -227,11 +219,6 @@ generate_tree()
     SignatureScheme::Ed25519,
   };
 
-  std::vector<TreeTestVectors::TestCase*> cases{
-    &tv.case_p256_p256,
-    &tv.case_x25519_ed25519,
-  };
-
   size_t n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
   for (size_t i = 0; i < n_leaves; ++i) {
@@ -241,7 +228,10 @@ generate_tree()
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
-    auto test_case = cases[i];
+
+    TreeTestVectors::TestCase tc;
+    tc.cipher_suite = suite;
+    tc.signature_scheme = scheme;
 
     TestRatchetTree tree{ suite };
 
@@ -250,20 +240,21 @@ generate_tree()
       auto id = bytes(1, uint8_t(j));
       auto sig = SignaturePrivateKey::derive(scheme, id);
       auto cred = Credential::basic(id, sig);
-      test_case->credentials.push_back(cred);
+      tc.credentials.push_back(cred);
 
       auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j]);
-      tree.add_leaf(
-        LeafIndex{ j }, priv.public_key(), test_case->credentials[j]);
+      tree.add_leaf(LeafIndex{ j }, priv.public_key(), tc.credentials[j]);
       tree.encap(LeafIndex{ j }, {}, tv.leaf_secrets[j]);
-      test_case->trees.push_back(tree_to_case(tree));
+      tc.trees.push_back(tree_to_case(tree));
     }
 
     // Blank out even-numbered leaves
     for (uint32_t j = 0; j < n_leaves; j += 2) {
       tree.blank_path(LeafIndex{ j }, true);
-      test_case->trees.push_back(tree_to_case(tree));
+      tc.trees.push_back(tree_to_case(tree));
     }
+
+    tv.cases.push_back(tc);
   }
 
   return tv;
@@ -282,11 +273,6 @@ generate_messages()
   std::vector<SignatureScheme> schemes{
     SignatureScheme::P256_SHA256,
     SignatureScheme::Ed25519,
-  };
-
-  std::vector<MessagesTestVectors::TestCase*> cases{
-    &tv.case_p256_p256,
-    &tv.case_x25519_ed25519,
   };
 
   // Set the inputs
@@ -375,20 +361,18 @@ generate_messages()
       tv.random,   tv.random, tv.random,
     };
 
-    *cases[i] = {
-      suite,
-      scheme,
-      tls::marshal(client_init_key),
-      tls::marshal(group_info),
-      tls::marshal(key_package),
-      tls::marshal(encrypted_key_package),
-      tls::marshal(welcome),
-      tls::marshal(add_hs),
-      tls::marshal(update_hs),
-      tls::marshal(remove_hs),
-      tls::marshal(commit),
-      tls::marshal(ciphertext),
-    };
+    tv.cases.push_back({ suite,
+                         scheme,
+                         tls::marshal(client_init_key),
+                         tls::marshal(group_info),
+                         tls::marshal(key_package),
+                         tls::marshal(encrypted_key_package),
+                         tls::marshal(welcome),
+                         tls::marshal(add_hs),
+                         tls::marshal(update_hs),
+                         tls::marshal(remove_hs),
+                         tls::marshal(commit),
+                         tls::marshal(ciphertext) });
   }
 
   return tv;
@@ -421,13 +405,6 @@ generate_basic_session()
   };
 
   std::vector<bool> encrypts{ false, true, false, true };
-
-  std::vector<SessionTestVectors::TestCase*> cases{
-    &tv.case_p256_p256,
-    &tv.case_p256_p256_encrypted,
-    &tv.case_x25519_ed25519,
-    &tv.case_x25519_ed25519_encrypted,
-  };
 
   tv.group_size = 5;
   tv.group_id = bytes(16, 0xA0);
@@ -513,7 +490,8 @@ generate_basic_session()
     }
 
     // Construct the test case
-    *cases[i] = { suite, scheme, encrypt, client_init_keys, transcript };
+    tv.cases.push_back(
+      { suite, scheme, encrypt, client_init_keys, transcript });
   }
 
   return tv;
@@ -566,8 +544,20 @@ verify_session_repro(const F& generator)
   verify_equal_marshaled(v0.group_size, v1.group_size);
   verify_equal_marshaled(v0.group_id, v1.group_id);
 
-  // EdDSA-based cases should repro
-  verify_equal_marshaled(v0.case_x25519_ed25519, v1.case_x25519_ed25519);
+  for (int i = 0; i < v0.cases.size(); ++i) {
+    // Randomized signatures break reproducibility
+    if (!deterministic_signature_scheme(v0.cases[i].signature_scheme)) {
+      continue;
+    }
+
+    // Encrypted handshakes break reproducibility (because of random sender data
+    // nonces)
+    if (v0.cases[i].encrypt) {
+      continue;
+    }
+
+    verify_equal_marshaled(v0.cases[i], v1.cases[i]);
+  }
 
   // TODO(rlb@ipv.sx): Verify that the parts of the non-EdDSA cases
   // that should reproduce actually do.

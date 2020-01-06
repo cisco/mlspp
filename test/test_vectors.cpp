@@ -18,6 +18,27 @@ const std::string MessagesTestVectors::file_name = "./messages.bin";
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
 
 ///
+/// Test for deterministic signatures
+///
+
+bool
+deterministic_signature_scheme(SignatureScheme scheme)
+{
+  switch (scheme) {
+    case SignatureScheme::P256_SHA256:
+      return false;
+    case SignatureScheme::P521_SHA512:
+      return false;
+    case SignatureScheme::Ed25519:
+      return true;
+    case SignatureScheme::Ed448:
+      return true;
+    default:
+      return false;
+  }
+}
+
+///
 /// File Handling
 ///
 

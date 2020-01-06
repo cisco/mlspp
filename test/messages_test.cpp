@@ -22,23 +22,6 @@ tls_round_trip(const bytes& vector,
   ASSERT_EQ(tls::marshal(unmarshaled), vector);
 }
 
-bool
-deterministic_signature_scheme(SignatureScheme scheme)
-{
-  switch (scheme) {
-    case SignatureScheme::P256_SHA256:
-      return false;
-    case SignatureScheme::P521_SHA512:
-      return false;
-    case SignatureScheme::Ed25519:
-      return true;
-    case SignatureScheme::Ed448:
-      return true;
-    default:
-      return false;
-  }
-}
-
 class MessagesTest : public ::testing::Test
 {
 protected:
@@ -47,14 +30,18 @@ protected:
   MessagesTest()
     : tv(TestLoader<MessagesTestVectors>::get())
   {}
+};
 
-  void tls_round_trip_all(const MessagesTestVectors::TestCase& tc,
-                          bool reproducible)
-  {
+TEST_F(MessagesTest, Interop)
+{
+  for (const auto& tc : tv.cases) {
+    auto reproducible = deterministic_signature_scheme(tc.signature_scheme);
+
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
-    auto sig_priv = SignaturePrivateKey::derive(tc.sig_scheme, tv.sig_seed);
+    auto sig_priv =
+      SignaturePrivateKey::derive(tc.signature_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv);
 
@@ -133,14 +120,4 @@ protected:
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }
-};
-
-TEST_F(MessagesTest, Suite_P256_P256)
-{
-  tls_round_trip_all(tv.case_p256_p256, false);
-}
-
-TEST_F(MessagesTest, Suite_X25519_Ed25519)
-{
-  tls_round_trip_all(tv.case_x25519_ed25519, true);
 }
