@@ -544,7 +544,7 @@ verify_session_repro(const F& generator)
   verify_equal_marshaled(v0.group_size, v1.group_size);
   verify_equal_marshaled(v0.group_id, v1.group_id);
 
-  for (int i = 0; i < v0.cases.size(); ++i) {
+  for (size_t i = 0; i < v0.cases.size(); ++i) {
     // Randomized signatures break reproducibility
     if (!deterministic_signature_scheme(v0.cases[i].signature_scheme)) {
       continue;

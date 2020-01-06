@@ -84,14 +84,12 @@ protected:
 TEST_F(RatchetTreeTest, Interop)
 {
   for (const auto& tc : tv.cases) {
-    auto suite = tc.cipher_suite;
-
-    TestRatchetTree tree{ suite };
+    TestRatchetTree tree{ tc.cipher_suite };
 
     // Add the leaves
     int tci = 0;
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
-      auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[i]);
+      auto priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.leaf_secrets[i]);
       tree.add_leaf(LeafIndex{ i }, priv.public_key(), tc.credentials[i]);
       tree.encap(LeafIndex{ i }, {}, tv.leaf_secrets[i]);
       assert_tree_eq(tc.trees[tci], tree);
