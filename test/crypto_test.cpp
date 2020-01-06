@@ -192,29 +192,26 @@ protected:
   CryptoTest()
     : tv(TestLoader<CryptoTestVectors>::get())
   {}
-
-  void interop(CipherSuite suite, const CryptoTestVectors::TestCase& test_case)
-  {
-    auto hkdf_extract_out =
-      hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
-    ASSERT_EQ(hkdf_extract_out, test_case.hkdf_extract_out);
-
-    auto derive_key_pair_priv =
-      HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto derive_key_pair_pub = derive_key_pair_priv.public_key();
-    ASSERT_EQ(derive_key_pair_pub, test_case.derive_key_pair_pub);
-
-    DeterministicHPKE lock;
-    auto hpke_out =
-      derive_key_pair_pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
-    ASSERT_EQ(hpke_out, test_case.hpke_out);
-  }
 };
 
 TEST_F(CryptoTest, Interop)
 {
-  interop(CipherSuite::P256_SHA256_AES128GCM, tv.case_p256);
-  interop(CipherSuite::X25519_SHA256_AES128GCM, tv.case_x25519);
+  for (const auto& tc : tv.cases) {
+    auto suite = tc.cipher_suite;
+
+    auto hkdf_extract_out =
+      hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
+    ASSERT_EQ(hkdf_extract_out, tc.hkdf_extract_out);
+
+    auto derive_key_pair_priv =
+      HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
+    auto derive_key_pair_pub = derive_key_pair_priv.public_key();
+    ASSERT_EQ(derive_key_pair_pub, tc.derive_key_pair_pub);
+
+    auto hpke_plaintext =
+      derive_key_pair_priv.decrypt(suite, tv.hpke_aad, tc.hpke_out);
+    ASSERT_EQ(hpke_plaintext, tv.hpke_plaintext);
+  }
 }
 
 TEST_F(CryptoTest, SHA2)

@@ -250,6 +250,14 @@ template<typename T, size_t head, size_t min, size_t max>
 ostream&
 operator<<(ostream& out, const vector_base<T, head, min, max>& data)
 {
+  // Vectors with no header are written directly
+  if (head == 0) {
+    for (const auto& item : data) {
+      out << item;
+    }
+    return out;
+  }
+
   uint64_t head_max = 0;
   switch (head) {
     case 1:
@@ -270,10 +278,8 @@ operator<<(ostream& out, const vector_base<T, head, min, max>& data)
 
   // Pre-encode contents
   ostream temp;
-  size_t i = 0;
   for (const auto& item : data) {
     temp << item;
-    i += 1;
   }
 
   // Check that the encoded length is OK
@@ -418,6 +424,7 @@ istream&
 operator>>(istream& in, vector_base<T, head, min, max>& data)
 {
   switch (head) {
+    case 0: // fallthrough
     case 1: // fallthrough
     case 2: // fallthrough
     case 3: // fallthrough
@@ -427,10 +434,14 @@ operator>>(istream& in, vector_base<T, head, min, max>& data)
       throw ReadError("Invalid header size");
   }
 
-  // Read the size of the vector and check it against the
-  // declared constraints
-  uint64_t size = 0;
-  in.read_uint(size, head);
+  // Read the size of the vector, if provided; otherwise consume all remaining
+  // data in the buffer
+  uint64_t size = in._buffer.size();
+  if (head > 0) {
+    in.read_uint(size, head);
+  }
+
+  // Check the size against the declared constraints
   if (size > in._buffer.size()) {
     throw ReadError("Declared size exceeds available data size");
   } else if ((max != none) && (size > max)) {

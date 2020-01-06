@@ -40,6 +40,8 @@ struct CryptoTestVectors
 
   struct TestCase
   {
+    CipherSuite cipher_suite;
+
     // HKDF-Extract
     tls::opaque<1> hkdf_extract_out;
 
@@ -49,19 +51,20 @@ struct CryptoTestVectors
     // HPKE
     HPKECiphertext hpke_out;
 
-    TLS_SERIALIZABLE(hkdf_extract_out, derive_key_pair_pub, hpke_out)
+    TLS_SERIALIZABLE(cipher_suite,
+                     hkdf_extract_out,
+                     derive_key_pair_pub,
+                     hpke_out)
   };
 
-  TestCase case_p256;
-  TestCase case_x25519;
+  tls::vector<TestCase, 4> cases;
 
   TLS_SERIALIZABLE(hkdf_extract_salt,
                    hkdf_extract_ikm,
                    derive_key_pair_seed,
                    hpke_aad,
                    hpke_plaintext,
-                   case_p256,
-                   case_x25519)
+                   cases)
 };
 
 /////

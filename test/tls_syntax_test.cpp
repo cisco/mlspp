@@ -95,6 +95,9 @@ protected:
   const tls::vector<uint32_t, 3> val_vector{ 5, 6 };
   const bytes enc_vector = from_hex("0000080000000500000006");
 
+  const tls::vector<uint32_t, 0> val_vector_raw{ 7, 8 };
+  const bytes enc_vector_raw = from_hex("0000000700000008");
+
   const ExampleStruct val_struct{
     0x1111,
     { 0x22, 0x22 },
@@ -163,6 +166,7 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_uint64, enc_uint64);
   ostream_test(val_array, enc_array);
   ostream_test(val_vector, enc_vector);
+  ostream_test(val_vector_raw, enc_vector_raw);
   ostream_test(val_struct, enc_struct);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
@@ -204,6 +208,9 @@ TEST_F(TLSSyntaxTest, IStream)
 
   tls::vector<uint32_t, 3> data_vector;
   istream_test(val_vector, data_vector, enc_vector);
+
+  tls::vector<uint32_t, 0> data_vector_raw;
+  istream_test(val_vector_raw, data_vector_raw, enc_vector_raw);
 
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);

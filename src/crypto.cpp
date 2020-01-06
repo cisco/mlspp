@@ -173,26 +173,63 @@ enum struct HPKEMode : uint8_t
   auth = 0x02,
 };
 
-enum struct HPKECipherSuite : uint16_t
+enum struct HPKEKEMID : uint16_t
 {
-  P256_SHA256_AES128GCM = 0x0001,
-  P521_SHA512_AES256GCM = 0x0002,
-  X25519_SHA256_AES128GCM = 0x003,
-  X448_SHA512_AES256GCM = 0x0004,
+  DHKEM_P256 = 0x0001,
+  DHKEM_X25519 = 0x0002,
+  DHKEM_P521 = 0x0003,
+  DHKEM_X448 = 0x0004,
 };
 
-static HPKECipherSuite
-to_hpke(CipherSuite suite)
+static size_t
+hpke_npk(HPKEKEMID kem)
+{
+  switch (kem) {
+    case HPKEKEMID::DHKEM_P256:
+      return 65;
+    case HPKEKEMID::DHKEM_X25519:
+      return 32;
+    case HPKEKEMID::DHKEM_P521:
+      return 133;
+    case HPKEKEMID::DHKEM_X448:
+      return 56;
+    default:
+      throw InvalidParameterError("Unknown HPKE KEM ID");
+  }
+}
+
+enum struct HPKEKDFID : uint16_t
+{
+  HKDF_SHA256 = 0x0001,
+  HKDF_SHA512 = 0x0002,
+};
+
+enum struct HPKEAEADID : uint16_t
+{
+  AES_GCM_128 = 0x0001,
+  AES_GCM_256 = 0x0002,
+};
+
+static std::tuple<HPKEKEMID, HPKEKDFID, HPKEAEADID>
+hpke_suite(CipherSuite suite)
 {
   switch (suite) {
     case CipherSuite::P256_SHA256_AES128GCM:
-      return HPKECipherSuite::P256_SHA256_AES128GCM;
+      return std::make_tuple(
+        HPKEKEMID::DHKEM_P256, HPKEKDFID::HKDF_SHA256, HPKEAEADID::AES_GCM_128);
+
     case CipherSuite::P521_SHA512_AES256GCM:
-      return HPKECipherSuite::P521_SHA512_AES256GCM;
+      return std::make_tuple(
+        HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
+
     case CipherSuite::X25519_SHA256_AES128GCM:
-      return HPKECipherSuite::X25519_SHA256_AES128GCM;
+      return std::make_tuple(HPKEKEMID::DHKEM_X25519,
+                             HPKEKDFID::HKDF_SHA256,
+                             HPKEAEADID::AES_GCM_128);
+
     case CipherSuite::X448_SHA512_AES256GCM:
-      return HPKECipherSuite::X448_SHA512_AES256GCM;
+      return std::make_tuple(
+        HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
     default:
       throw InvalidParameterError("Unsupported ciphersuite for HPKE");
@@ -225,48 +262,68 @@ dhkem_decap(CipherSuite suite, const bytes& priv, const bytes& enc)
 
 struct HPKEContext
 {
-  HPKECipherSuite ciphersuite;
   HPKEMode mode;
-  tls::opaque<2> kem_context;
-  tls::opaque<2> info;
+  HPKEKEMID kem;
+  HPKEKDFID kdf;
+  HPKEAEADID aead;
+  tls::opaque<0> enc;
+  tls::opaque<0> pkRm;
+  tls::opaque<0> pkIm;
+  tls::opaque<0> psk_id_hash;
+  tls::opaque<0> info_hash;
 
-  TLS_SERIALIZABLE(ciphersuite, mode, kem_context, info)
+  TLS_SERIALIZABLE(mode,
+                   kem,
+                   kdf,
+                   aead,
+                   enc,
+                   pkRm,
+                   pkIm,
+                   psk_id_hash,
+                   info_hash)
 };
 
-static std::pair<bytes, bytes>
-setup_core(CipherSuite suite,
-           HPKEMode mode,
-           const bytes& secret,
-           const bytes& kem_context,
-           const bytes& info)
+static std::tuple<bytes, bytes>
+hpke_key_schedule(CipherSuite suite,
+                  const HPKEPublicKey& pkR,
+                  const bytes& enc,
+                  const bytes& zz)
 {
-  auto hpke_suite = to_hpke(suite);
-  auto context =
-    tls::marshal(HPKEContext{ hpke_suite, mode, kem_context, info });
-
-  auto Nk = suite_key_size(suite);
-  auto key_label = to_bytes("hpke key") + context;
-  auto key = hkdf_expand(suite, secret, key_label, Nk);
-
-  auto Nn = suite_nonce_size(suite);
-  auto nonce_label = to_bytes("hpke nonce") + context;
-  auto nonce = hkdf_expand(suite, secret, nonce_label, Nn);
-
-  return std::pair<bytes, bytes>(key, nonce);
-}
-
-static std::pair<bytes, bytes>
-setup_base(CipherSuite suite,
-           const HPKEPublicKey& pkR,
-           const bytes& zz,
-           const bytes& enc,
-           const bytes& info)
-{
+  auto [kem, kdf, aead] = hpke_suite(suite);
+  auto Npk = hpke_npk(kem);
   auto Nh = Digest(suite).output_size();
-  bytes zero(Nh, 0);
-  auto secret = hkdf_extract(suite, zero, zz);
-  auto kem_context = enc + pkR.to_bytes();
-  return setup_core(suite, HPKEMode::base, secret, kem_context, info);
+  auto Nk = suite_key_size(suite);
+  auto Nn = suite_nonce_size(suite);
+
+  // We only support base and no-info.  So we can hard-wire these inputs, and
+  // skip VerifyMode().  We will need to generalize if we support other modes or
+  // non-empty info later.
+  auto mode = HPKEMode::base;
+  auto info = bytes{};
+  auto pkIm = bytes(Npk, 0);
+  auto psk = bytes(Nh, 0);
+  auto psk_id = bytes{};
+
+  auto ctx = tls::marshal(HPKEContext{
+    mode,
+    kem,
+    kdf,
+    aead,
+    enc,
+    pkR.to_bytes(),
+    pkIm,
+    Digest(suite).write(psk_id).digest(),
+    Digest(suite).write(info).digest(),
+  });
+
+  auto key_ctx = to_bytes("hpke key") + ctx;
+  auto nonce_ctx = to_bytes("hpke nonce") + ctx;
+
+  auto secret = hkdf_extract(suite, psk, zz);
+  auto key = hkdf_expand(suite, secret, key_ctx, Nk);
+  auto nonce = hkdf_expand(suite, secret, nonce_ctx, Nn);
+
+  return std::make_tuple(key, nonce);
 }
 
 HPKEPublicKey::HPKEPublicKey(const bytes& data_in)
@@ -285,7 +342,7 @@ HPKEPublicKey::encrypt(CipherSuite suite,
   }
 
   auto [enc, zz] = dhkem_encap(suite, data, seed);
-  auto [key, nonce] = setup_base(suite, *this, zz, enc, {});
+  auto [key, nonce] = hpke_key_schedule(suite, *this, enc, zz);
 
   // Context.Encrypt
   auto ct = primitive::seal(suite, key, nonce, aad, pt);
@@ -325,7 +382,7 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
 {
   // SetupBaseR
   auto zz = dhkem_decap(suite, _data, ct.kem_output);
-  auto [key, nonce] = setup_base(suite, public_key(), zz, ct.kem_output, {});
+  auto [key, nonce] = hpke_key_schedule(suite, public_key(), ct.kem_output, zz);
 
   return primitive::open(suite, key, nonce, aad, ct.ciphertext);
 }
