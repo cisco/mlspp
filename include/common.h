@@ -35,7 +35,7 @@ operator^(const bytes& lhs, const bytes& rhs);
 std::ostream&
 operator<<(std::ostream& out, const bytes& data);
 
-using epoch_t = uint32_t;
+using epoch_t = uint64_t;
 
 ///
 /// Auto-generate equality and inequality operators for TLS-serializable things

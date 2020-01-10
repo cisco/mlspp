@@ -349,7 +349,7 @@ struct MLSPlaintext
 struct MLSCiphertext
 {
   tls::opaque<1> group_id;
-  uint32_t epoch;
+  epoch_t epoch;
   ContentType content_type;
   tls::opaque<1> sender_data_nonce;
   tls::opaque<1> encrypted_sender_data;
