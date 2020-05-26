@@ -11,7 +11,7 @@
 
 namespace mls {
 
-struct ClientInitKey;
+struct KeyPackage;
 
 class RatchetTreeNode
 {
@@ -105,7 +105,7 @@ public:
 
   bool occupied(LeafIndex index) const;
   LeafIndex leftmost_free() const;
-  std::optional<LeafIndex> find(const ClientInitKey& cik) const;
+  std::optional<LeafIndex> find(const KeyPackage& kp) const;
   const Credential& get_credential(LeafIndex index) const;
 
   LeafCount leaf_span() const;

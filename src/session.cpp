@@ -11,12 +11,12 @@ Session::Session()
 
 std::tuple<Session, Welcome>
 Session::start(const bytes& group_id,
-               const std::vector<ClientInitKey>& my_client_init_keys,
-               const std::vector<ClientInitKey>& client_init_keys,
+               const std::vector<KeyPackage>& my_key_packages,
+               const std::vector<KeyPackage>& key_packages,
                const bytes& initial_secret)
 {
-  auto [welcome, state] = State::negotiate(
-    group_id, my_client_init_keys, client_init_keys, initial_secret);
+  auto [welcome, state] =
+    State::negotiate(group_id, my_key_packages, key_packages, initial_secret);
 
   Session session;
   session.add_state(0, state);
@@ -24,11 +24,11 @@ Session::start(const bytes& group_id,
 }
 
 Session
-Session::join(const std::vector<ClientInitKey>& client_init_keys,
+Session::join(const std::vector<KeyPackage>& key_packages,
               const Welcome& welcome)
 {
   Session session;
-  State next(client_init_keys, welcome);
+  State next(key_packages, welcome);
   session.add_state(0, next);
   return session;
 }
@@ -40,9 +40,9 @@ Session::encrypt_handshake(bool enabled)
 }
 
 std::tuple<Welcome, bytes>
-Session::add(const bytes& add_secret, const ClientInitKey& client_init_key)
+Session::add(const bytes& add_secret, const KeyPackage& key_package)
 {
-  auto proposal = current_state().add(client_init_key);
+  auto proposal = current_state().add(key_package);
   return commit_and_cache(add_secret, proposal);
 }
 

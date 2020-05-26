@@ -439,7 +439,7 @@ RatchetTree::leftmost_free() const
 }
 
 std::optional<LeafIndex>
-RatchetTree::find(const ClientInitKey& cik) const
+RatchetTree::find(const KeyPackage& kp) const
 {
   for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
     auto& node = _nodes[NodeIndex(i)];
@@ -448,8 +448,8 @@ RatchetTree::find(const ClientInitKey& cik) const
       continue;
     }
 
-    auto hpke_match = (cik.init_key == node.value().public_key());
-    auto sig_match = (cik.credential == node.value().credential().value());
+    auto hpke_match = (kp.init_key == node.value().public_key());
+    auto sig_match = (kp.credential == node.value().credential().value());
     if (hpke_match && sig_match) {
       return i;
     }

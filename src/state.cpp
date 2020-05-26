@@ -22,40 +22,40 @@ State::State(bytes group_id,
 }
 
 // Initialize a group from a Welcome
-State::State(const std::vector<ClientInitKey>& my_client_init_keys,
+State::State(const std::vector<KeyPackage>& my_key_packages,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
 {
   // Identify and decrypt a GroupSecrets
   bool found = false;
-  ClientInitKey my_cik;
+  KeyPackage my_kp;
   GroupSecrets secrets;
-  for (const auto& cik : my_client_init_keys) {
-    auto hash = cik.hash();
+  for (const auto& kp : my_key_packages) {
+    auto hash = kp.hash();
     for (const auto& enc_secrets : welcome.secrets) {
-      found = (hash == enc_secrets.client_init_key_hash);
+      found = (hash == enc_secrets.key_package_hash);
       if (!found) {
         continue;
       }
 
-      if (cik.cipher_suite != welcome.cipher_suite) {
+      if (kp.cipher_suite != welcome.cipher_suite) {
         throw InvalidParameterError("Ciphersuite mismatch");
       }
 
-      if (!cik.private_key().has_value()) {
+      if (!kp.private_key().has_value()) {
         throw InvalidParameterError("No private key for init key");
       }
 
-      if (!cik.credential.private_key().has_value()) {
+      if (!kp.credential.private_key().has_value()) {
         throw InvalidParameterError("No signing key for init key");
       }
-      _identity_priv = cik.credential.private_key().value();
+      _identity_priv = kp.credential.private_key().value();
 
-      auto secrets_data = cik.private_key().value().decrypt(
-        cik.cipher_suite, {}, enc_secrets.encrypted_group_secrets);
+      auto secrets_data = kp.private_key().value().decrypt(
+        kp.cipher_suite, {}, enc_secrets.encrypted_group_secrets);
       secrets = tls::get<GroupSecrets>(secrets_data);
-      my_cik = cik;
+      my_kp = kp;
       break;
     }
 
@@ -90,13 +90,13 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   _interim_transcript_hash = group_info.interim_transcript_hash;
 
   // Add self to tree
-  auto maybe_index = _tree.find(my_cik);
+  auto maybe_index = _tree.find(my_kp);
   if (!maybe_index.has_value()) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
   _index = maybe_index.value();
-  _tree.merge(_index, my_cik.private_key().value());
+  _tree.merge(_index, my_kp.private_key().value());
 
   // Decapsulate the direct path
   auto decap_ctx = tls::marshal(GroupContext{
@@ -120,20 +120,20 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
 
 std::tuple<Welcome, State>
 State::negotiate(const bytes& group_id,
-                 const std::vector<ClientInitKey>& my_client_init_keys,
-                 const std::vector<ClientInitKey>& client_init_keys,
+                 const std::vector<KeyPackage>& my_key_packages,
+                 const std::vector<KeyPackage>& key_packages,
                  const bytes& commit_secret)
 {
   // Negotiate a ciphersuite with the other party
   auto selected = false;
-  const ClientInitKey* my_selected_cik = nullptr;
-  const ClientInitKey* other_selected_cik = nullptr;
-  for (const auto& my_cik : my_client_init_keys) {
-    for (const auto& other_cik : client_init_keys) {
-      if (my_cik.cipher_suite == other_cik.cipher_suite) {
+  const KeyPackage* my_selected_kp = nullptr;
+  const KeyPackage* other_selected_kp = nullptr;
+  for (const auto& my_kp : my_key_packages) {
+    for (const auto& other_kp : key_packages) {
+      if (my_kp.cipher_suite == other_kp.cipher_suite) {
         selected = true;
-        my_selected_cik = &my_cik;
-        other_selected_cik = &other_cik;
+        my_selected_kp = &my_kp;
+        other_selected_kp = &other_kp;
         break;
       }
     }
@@ -147,12 +147,12 @@ State::negotiate(const bytes& group_id,
     throw ProtocolError("Negotiation failure");
   }
 
-  auto& suite = my_selected_cik->cipher_suite;
-  auto& leaf_priv = my_selected_cik->private_key().value();
-  auto& cred = my_selected_cik->credential;
+  auto& suite = my_selected_kp->cipher_suite;
+  auto& leaf_priv = my_selected_kp->private_key().value();
+  auto& cred = my_selected_kp->credential;
 
   auto state = State{ group_id, suite, leaf_priv, cred };
-  auto add = state.add(*other_selected_cik);
+  auto add = state.add(*other_selected_kp);
   state.handle(add);
   auto [unused_commit, welcome, new_state] = state.commit(commit_secret);
   silence_unused(unused_commit);
@@ -173,9 +173,9 @@ State::sign(const Proposal& proposal) const
 }
 
 MLSPlaintext
-State::add(const ClientInitKey& client_init_key) const
+State::add(const KeyPackage& key_package) const
 {
-  return sign(Add{ client_init_key });
+  return sign(Add{ key_package });
 }
 
 MLSPlaintext
@@ -201,7 +201,7 @@ State::commit(const bytes& leaf_secret) const
 {
   // Construct a commit from cached proposals
   Commit commit;
-  auto joiners = std::vector<ClientInitKey>{};
+  auto joiners = std::vector<KeyPackage>{};
   for (const auto& pt : _pending_proposals) {
     auto id = proposal_id(pt);
     auto proposal = std::get<Proposal>(pt.content);
@@ -209,7 +209,7 @@ State::commit(const bytes& leaf_secret) const
       case ProposalType::add: {
         commit.adds.push_back(id);
         auto add = std::get<Add>(proposal);
-        joiners.push_back(add.client_init_key);
+        joiners.push_back(add.key_package);
         break;
       }
 
@@ -384,8 +384,7 @@ void
 State::apply(const Add& add)
 {
   auto target = _tree.leftmost_free();
-  _tree.add_leaf(
-    target, add.client_init_key.init_key, add.client_init_key.credential);
+  _tree.add_leaf(target, add.key_package.init_key, add.key_package.credential);
 }
 
 void

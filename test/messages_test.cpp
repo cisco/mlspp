@@ -56,10 +56,10 @@ TEST_F(MessagesTest, Interop)
       ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
     silence_unused(dummy);
 
-    // ClientInitKey
-    ClientInitKey client_init_key{ tc.cipher_suite, dh_priv, cred };
-    client_init_key.signature = tv.random;
-    tls_round_trip(tc.client_init_key, client_init_key, reproducible);
+    // KeyPackage
+    KeyPackage key_package{ tc.cipher_suite, dh_priv, cred };
+    key_package.signature = tv.random;
+    tls_round_trip(tc.key_package, key_package, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info =
@@ -85,7 +85,7 @@ TEST_F(MessagesTest, Interop)
     tls_round_trip(tc.welcome, welcome, true);
 
     // Proposals
-    auto add_prop = Proposal{ Add{ client_init_key } };
+    auto add_prop = Proposal{ Add{ key_package } };
     auto add_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
