@@ -61,7 +61,7 @@ TEST_F(MessagesTest, Interop)
     client_init_key.signature = tv.random;
     tls_round_trip(tc.client_init_key, client_init_key, reproducible);
 
-    // GroupInfo, KeyPackage, EncryptedKeyPackage, and Welcome
+    // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info =
       GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree, tv.random,
                  tv.random,   tv.random, direct_path,  tv.random };
@@ -69,18 +69,18 @@ TEST_F(MessagesTest, Interop)
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
 
-    auto key_package = KeyPackage{ tv.random };
-    tls_round_trip(tc.key_package, key_package, true);
+    auto group_secrets = GroupSecrets{ tv.random };
+    tls_round_trip(tc.group_secrets, group_secrets, true);
 
-    auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random,
-                           dh_key.encrypt(tc.cipher_suite, {}, tv.random) };
-    tls_round_trip(tc.encrypted_key_package, encrypted_key_package, true);
+    auto encrypted_group_secrets =
+      EncryptedGroupSecrets{ tv.random,
+                             dh_key.encrypt(tc.cipher_suite, {}, tv.random) };
+    tls_round_trip(tc.encrypted_group_secrets, encrypted_group_secrets, true);
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
     welcome.cipher_suite = tc.cipher_suite;
-    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.secrets = { encrypted_group_secrets, encrypted_group_secrets };
     welcome.encrypted_group_info = tv.random;
     tls_round_trip(tc.welcome, welcome, true);
 

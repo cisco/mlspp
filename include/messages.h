@@ -138,8 +138,8 @@ struct GroupInfo {
 //   opaque group_info_key<1..255>;
 //   opaque group_info_nonce<1..255>;
 //   opaque path_secret<1..255>;
-// } KeyPackage;
-struct KeyPackage {
+// } GroupSecrets;
+struct GroupSecrets {
   tls::opaque<1> init_secret;
 
   TLS_SERIALIZABLE(init_secret);
@@ -147,26 +147,26 @@ struct KeyPackage {
 
 // struct {
 //   opaque client_init_key_hash<1..255>;
-//   HPKECiphertext encrypted_key_package;
-// } EncryptedKeyPackage;
-struct EncryptedKeyPackage {
+//   HPKECiphertext encrypted_group_secrets;
+// } EncryptedGroupSecrets;
+struct EncryptedGroupSecrets {
   tls::opaque<1> client_init_key_hash;
-  HPKECiphertext encrypted_key_package;
+  HPKECiphertext encrypted_group_secrets;
 
-  TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
+  TLS_SERIALIZABLE(client_init_key_hash, encrypted_group_secrets);
 };
 
 
 // struct {
 //   ProtocolVersion version = mls10;
 //   CipherSuite cipher_suite;
-//   EncryptedKeyPackage key_packages<1..2^32-1>;
+//   EncryptedGroupSecrets group_secretss<1..2^32-1>;
 //   opaque encrypted_group_info<1..2^32-1>;
 // } Welcome;
 struct Welcome {
   ProtocolVersion version;
   CipherSuite cipher_suite;
-  tls::vector<EncryptedKeyPackage, 4> key_packages;
+  tls::vector<EncryptedGroupSecrets, 4> secrets;
   tls::opaque<4> encrypted_group_info;
 
   Welcome();

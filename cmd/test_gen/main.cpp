@@ -320,14 +320,14 @@ generate_messages()
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
-    auto key_package = KeyPackage{ tv.random };
-    auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
+    auto group_secrets = GroupSecrets{ tv.random };
+    auto encrypted_group_secrets =
+      EncryptedGroupSecrets{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
     welcome.cipher_suite = suite;
-    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.secrets = { encrypted_group_secrets, encrypted_group_secrets };
     welcome.encrypted_group_info = tv.random;
 
     // Construct Proposals
@@ -365,8 +365,8 @@ generate_messages()
                          scheme,
                          tls::marshal(client_init_key),
                          tls::marshal(group_info),
-                         tls::marshal(key_package),
-                         tls::marshal(encrypted_key_package),
+                         tls::marshal(group_secrets),
+                         tls::marshal(encrypted_group_secrets),
                          tls::marshal(welcome),
                          tls::marshal(add_hs),
                          tls::marshal(update_hs),

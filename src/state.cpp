@@ -27,14 +27,14 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
 {
-  // Identify and decrypt a KeyPackage
+  // Identify and decrypt a GroupSecrets
   bool found = false;
   ClientInitKey my_cik;
-  KeyPackage key_pkg;
+  GroupSecrets secrets;
   for (const auto& cik : my_client_init_keys) {
     auto hash = cik.hash();
-    for (const auto& enc_pkg : welcome.key_packages) {
-      found = (hash == enc_pkg.client_init_key_hash);
+    for (const auto& enc_secrets : welcome.secrets) {
+      found = (hash == enc_secrets.client_init_key_hash);
       if (!found) {
         continue;
       }
@@ -52,9 +52,9 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
       }
       _identity_priv = cik.credential.private_key().value();
 
-      auto key_pkg_data = cik.private_key().value().decrypt(
-        cik.cipher_suite, {}, enc_pkg.encrypted_key_package);
-      key_pkg = tls::get<KeyPackage>(key_pkg_data);
+      auto secrets_data = cik.private_key().value().decrypt(
+        cik.cipher_suite, {}, enc_secrets.encrypted_group_secrets);
+      secrets = tls::get<GroupSecrets>(secrets_data);
       my_cik = cik;
       break;
     }
@@ -69,7 +69,7 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
   }
 
   // Decrypt the GroupInfo
-  auto first_epoch = FirstEpoch::create(_suite, key_pkg.init_secret);
+  auto first_epoch = FirstEpoch::create(_suite, secrets.init_secret);
   auto group_info_data = open(_suite,
                               first_epoch.group_info_key,
                               first_epoch.group_info_nonce,
@@ -82,7 +82,7 @@ State::State(const std::vector<ClientInitKey>& my_client_init_keys,
     throw InvalidParameterError("Invalid GroupInfo");
   }
 
-  // Ingest the KeyPackage and GroupInfo
+  // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
   _tree = group_info.tree;

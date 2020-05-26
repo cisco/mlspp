@@ -284,8 +284,8 @@ struct MessagesTestVectors
 
     tls::opaque<4> client_init_key;
     tls::opaque<4> group_info;
-    tls::opaque<4> key_package;
-    tls::opaque<4> encrypted_key_package;
+    tls::opaque<4> group_secrets;
+    tls::opaque<4> encrypted_group_secrets;
     tls::opaque<4> welcome;
     tls::opaque<4> add_proposal;
     tls::opaque<4> update_proposal;
@@ -297,8 +297,8 @@ struct MessagesTestVectors
                      signature_scheme,
                      client_init_key,
                      group_info,
-                     key_package,
-                     encrypted_key_package,
+                     group_secrets,
+                     encrypted_group_secrets,
                      welcome,
                      add_proposal,
                      update_proposal,
