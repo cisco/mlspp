@@ -242,7 +242,6 @@ struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
 //     ProposalID updates<0..2^16-1>;
 //     ProposalID removes<0..2^16-1>;
 //     ProposalID adds<0..2^16-1>;
-//     ProposalID ignored<0..2^16-1>;
 //     DirectPath path;
 // } Commit;
 using ProposalID = tls::opaque<1>;
@@ -250,10 +249,9 @@ struct Commit {
   tls::vector<ProposalID, 2> updates;
   tls::vector<ProposalID, 2> removes;
   tls::vector<ProposalID, 2> adds;
-  tls::vector<ProposalID, 2> ignored;
   DirectPath path;
 
-  TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
+  TLS_SERIALIZABLE(updates, removes, adds, path);
 };
 
 // struct {
