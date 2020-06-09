@@ -20,8 +20,11 @@ struct TreeMathTestVectors
   tls::vector<NodeIndex, 4> right;
   tls::vector<NodeIndex, 4> parent;
   tls::vector<NodeIndex, 4> sibling;
+  tls::vector<tls::vector<NodeIndex, 4>, 4> dirpath;
+  tls::vector<tls::vector<NodeIndex, 4>, 4> copath;
+  tls::vector<tls::vector<NodeIndex, 4>, 4> ancestor;
 
-  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling)
+  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling, dirpath, copath, ancestor)
 };
 
 /////
