@@ -216,7 +216,8 @@ public:
     // Ensure that we have private keys for everything in the direct
     // path...
     auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-    dirpath.push_back(root_index());
+    dirpath.insert(dirpath.begin(), NodeIndex{from});
+
     for (const auto& node : dirpath) {
       in_dirpath[node.val] = true;
       if (_nodes[node].has_value() && !_nodes[node].has_private()) {
