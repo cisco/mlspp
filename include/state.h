@@ -41,22 +41,22 @@ public:
         const Credential& credential);
 
   // Initialize a group from a Welcome
-  State(const std::vector<ClientInitKey>& my_client_init_keys,
+  State(const std::vector<KeyPackage>& my_key_packages,
         const Welcome& welcome);
 
   // Negotiate an initial state with another peer based on their
-  // ClientInitKey
+  // KeyPackage
   static std::tuple<Welcome, State> negotiate(
     const bytes& group_id,
-    const std::vector<ClientInitKey>& my_client_init_keys,
-    const std::vector<ClientInitKey>& client_init_keys,
+    const std::vector<KeyPackage>& my_key_packages,
+    const std::vector<KeyPackage>& key_packages,
     const bytes& commit_secret);
 
   ///
   /// Message factories
   ///
 
-  MLSPlaintext add(const ClientInitKey& client_init_key) const;
+  MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
   MLSPlaintext remove(LeafIndex removed) const;
 

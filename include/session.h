@@ -14,15 +14,15 @@ public:
 
   static std::tuple<Session, Welcome>
     start(const bytes& group_id,
-          const std::vector<ClientInitKey>& my_client_init_keys,
-          const std::vector<ClientInitKey>& client_init_keys,
+          const std::vector<KeyPackage>& my_key_packages,
+          const std::vector<KeyPackage>& key_packages,
           const bytes& initial_secret);
-  static Session join(const std::vector<ClientInitKey>& client_init_keys,
+  static Session join(const std::vector<KeyPackage>& key_packages,
                       const Welcome& welcome);
 
   void encrypt_handshake(bool enabled);
 
-  std::tuple<Welcome, bytes> add(const bytes& add_secret, const ClientInitKey& client_init_key);
+  std::tuple<Welcome, bytes> add(const bytes& add_secret, const KeyPackage& key_package);
   bytes update(const bytes& leaf_secret);
   bytes remove(const bytes& evict_secret, uint32_t index);
 

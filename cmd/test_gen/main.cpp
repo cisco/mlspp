@@ -9,7 +9,7 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
-  tv.n_leaves = LeafCount{ 255 };
+  tv.n_leaves = LeafCount{ 63 };
 
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
     auto w = NodeCount{ LeafCount{ n } };
@@ -30,6 +30,21 @@ generate_tree_math()
 
     auto sibling = tree_math::sibling(NodeIndex{ x }, w);
     tv.sibling.push_back(sibling);
+
+    auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
+    tv.dirpath.push_back(dirpath);
+
+    auto copath = tree_math::copath(NodeIndex{ x }, w);
+    tv.copath.push_back(copath);
+
+    for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
+      auto ancestors = std::vector<NodeIndex>();
+      for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
+        auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
+        ancestors.push_back(a);
+      }
+      tv.ancestor.push_back(ancestors);
+    }
   }
 
   return tv;
@@ -281,7 +296,7 @@ generate_messages()
   tv.removed = LeafIndex{ 0xC0C1C2C3 };
   tv.user_id = bytes(16, 0xD1);
   tv.group_id = bytes(16, 0xD2);
-  tv.client_init_key_id = bytes(16, 0xD3);
+  tv.key_package_id = bytes(16, 0xD3);
   tv.dh_seed = bytes(32, 0xD4);
   tv.sig_seed = bytes(32, 0xD5);
   tv.random = bytes(32, 0xD6);
@@ -310,8 +325,8 @@ generate_messages()
     silence_unused(dummy);
 
     // Construct CIK
-    auto client_init_key = ClientInitKey{ suite, dh_priv, cred };
-    client_init_key.signature = tv.random;
+    auto key_package = KeyPackage{ suite, dh_priv, cred };
+    key_package.signature = tv.random;
 
     // Construct Welcome
     auto group_info =
@@ -320,18 +335,18 @@ generate_messages()
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
-    auto key_package = KeyPackage{ tv.random };
-    auto encrypted_key_package =
-      EncryptedKeyPackage{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
+    auto group_secrets = GroupSecrets{ tv.random };
+    auto encrypted_group_secrets =
+      EncryptedGroupSecrets{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
     welcome.cipher_suite = suite;
-    welcome.key_packages = { encrypted_key_package, encrypted_key_package };
+    welcome.secrets = { encrypted_group_secrets, encrypted_group_secrets };
     welcome.encrypted_group_info = tv.random;
 
     // Construct Proposals
-    auto add_prop = Proposal{ Add{ client_init_key } };
+    auto add_prop = Proposal{ Add{ key_package } };
     auto add_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
@@ -363,10 +378,10 @@ generate_messages()
 
     tv.cases.push_back({ suite,
                          scheme,
-                         tls::marshal(client_init_key),
-                         tls::marshal(group_info),
                          tls::marshal(key_package),
-                         tls::marshal(encrypted_key_package),
+                         tls::marshal(group_info),
+                         tls::marshal(group_secrets),
+                         tls::marshal(encrypted_group_secrets),
                          tls::marshal(welcome),
                          tls::marshal(add_hs),
                          tls::marshal(update_hs),
@@ -414,13 +429,13 @@ generate_basic_session()
     auto suite = suites[i];
     auto scheme = schemes[i];
     auto encrypt = encrypts[i];
-    const bytes client_init_key_id = { 0, 1, 2, 3 };
+    const bytes key_package_id = { 0, 1, 2, 3 };
     const bytes group_init_secret = { 4, 5, 6, 7 };
 
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
-    std::vector<ClientInitKey> client_init_keys;
+    std::vector<KeyPackage> key_packages;
     std::vector<TestSession> sessions;
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
@@ -428,7 +443,7 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       auto init = HPKEPrivateKey::derive(suite, seed);
-      client_init_keys.emplace_back(suite, init, cred);
+      key_packages.emplace_back(suite, init, cred);
     }
 
     // Add everyone
@@ -438,23 +453,21 @@ generate_basic_session()
       Welcome welcome;
       bytes add;
       if (j == 1) {
-        auto [session, welcome_new] = Session::start(tv.group_id,
-                                                     { client_init_keys[0] },
-                                                     { client_init_keys[1] },
-                                                     commit_secret);
+        auto [session, welcome_new] = Session::start(
+          tv.group_id, { key_packages[0] }, { key_packages[1] }, commit_secret);
         session.encrypt_handshake(encrypt);
 
         sessions.push_back(session);
         welcome = welcome_new;
       } else {
         std::tie(welcome, add) =
-          sessions[j - 1].add(commit_secret, client_init_keys[j]);
+          sessions[j - 1].add(commit_secret, key_packages[j]);
         for (size_t k = 0; k < j; ++k) {
           sessions[k].handle(add);
         }
       }
 
-      auto joiner = Session::join({ client_init_keys[j] }, welcome);
+      auto joiner = Session::join({ key_packages[j] }, welcome);
       joiner.encrypt_handshake(encrypt);
       sessions.push_back(joiner);
 
@@ -490,8 +503,7 @@ generate_basic_session()
     }
 
     // Construct the test case
-    tv.cases.push_back(
-      { suite, scheme, encrypt, client_init_keys, transcript });
+    tv.cases.push_back({ suite, scheme, encrypt, key_packages, transcript });
   }
 
   return tv;

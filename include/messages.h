@@ -47,14 +47,16 @@ struct DirectPath
 //     Credential credential;
 //     Extension extensions<0..2^16-1>;
 //     opaque signature<0..2^16-1>;
-// } ClientInitKey;
+// } KeyPackage;
 //
 // XXX(rlb@ipv.sx): Right now, we use this to represent both the
 // public version of a client's capabilities, and the private
 // version (with private keys).  This results in some ugly checking
 // code when private keys are needed, so it might be nice to split
 // these two cases in the type system.
-struct ClientInitKey
+enum class NodeType : uint8_t;
+
+struct KeyPackage
 {
   ProtocolVersion version;
   CipherSuite cipher_suite;
@@ -63,8 +65,8 @@ struct ClientInitKey
   // TODO Extensions
   tls::opaque<2> signature;
 
-  ClientInitKey();
-  ClientInitKey(CipherSuite suite_in,
+  KeyPackage();
+  KeyPackage(CipherSuite suite_in,
                 const HPKEPrivateKey& init_key_in,
                 Credential credential_in);
 
@@ -73,6 +75,7 @@ struct ClientInitKey
 
   bool verify() const;
 
+  static const NodeType type;
   TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature);
 
   private:
@@ -140,35 +143,35 @@ enum class NodeType : uint8_t;
 //   opaque group_info_key<1..255>;
 //   opaque group_info_nonce<1..255>;
 //   opaque path_secret<1..255>;
-// } KeyPackage;
-struct KeyPackage {
+// } GroupSecrets;
+struct GroupSecrets {
   tls::opaque<1> init_secret;
 
   TLS_SERIALIZABLE(init_secret);
 };
 
 // struct {
-//   opaque client_init_key_hash<1..255>;
-//   HPKECiphertext encrypted_key_package;
-// } EncryptedKeyPackage;
-struct EncryptedKeyPackage {
-  tls::opaque<1> client_init_key_hash;
-  HPKECiphertext encrypted_key_package;
+//   opaque key_package_hash<1..255>;
+//   HPKECiphertext encrypted_group_secrets;
+// } EncryptedGroupSecrets;
+struct EncryptedGroupSecrets {
+  tls::opaque<1> key_package_hash;
+  HPKECiphertext encrypted_group_secrets;
 
-  TLS_SERIALIZABLE(client_init_key_hash, encrypted_key_package);
+  TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets);
 };
 
 
 // struct {
 //   ProtocolVersion version = mls10;
 //   CipherSuite cipher_suite;
-//   EncryptedKeyPackage key_packages<1..2^32-1>;
+//   EncryptedGroupSecrets group_secretss<1..2^32-1>;
 //   opaque encrypted_group_info<1..2^32-1>;
 // } Welcome;
 struct Welcome {
   ProtocolVersion version;
   CipherSuite cipher_suite;
-  tls::vector<EncryptedKeyPackage, 4> key_packages;
+  tls::vector<EncryptedGroupSecrets, 4> secrets;
   tls::opaque<4> encrypted_group_info;
 
   Welcome();
@@ -176,7 +179,7 @@ struct Welcome {
           bytes init_secret,
           const GroupInfo& group_info);
 
-  void encrypt(const ClientInitKey& cik);
+  void encrypt(const KeyPackage& kp);
 
   private:
   bytes _init_secret;
@@ -198,10 +201,10 @@ enum struct ProposalType : uint8_t {
 };
 
 struct Add {
-  ClientInitKey client_init_key;
+  KeyPackage key_package;
 
   static const ProposalType type;
-  TLS_SERIALIZABLE(client_init_key)
+  TLS_SERIALIZABLE(key_package)
 };
 
 struct Update {

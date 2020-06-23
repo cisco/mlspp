@@ -65,3 +65,24 @@ TEST_F(TreeMathTest, Sibling)
 {
   vector_test(size_scope(tree_math::sibling), tv.sibling);
 }
+
+TEST_F(TreeMathTest, Dirpath)
+{
+  vector_test(size_scope(tree_math::dirpath), tv.dirpath);
+}
+
+TEST_F(TreeMathTest, Copath)
+{
+  vector_test(size_scope(tree_math::copath), tv.copath);
+}
+
+TEST_F(TreeMathTest, Ancestor)
+{
+  for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
+    auto ancestors = std::vector<NodeIndex>();
+    for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
+      ancestors.push_back(tree_math::ancestor(LeafIndex(l), LeafIndex(r)));
+    }
+    ASSERT_EQ(ancestors, tv.ancestor[l]);
+  }
+}

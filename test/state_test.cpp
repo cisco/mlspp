@@ -18,7 +18,7 @@ protected:
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<Credential> credentials;
   std::vector<HPKEPrivateKey> init_privs;
-  std::vector<ClientInitKey> client_init_keys;
+  std::vector<KeyPackage> key_packages;
   std::vector<State> states;
 
   StateTest()
@@ -28,12 +28,12 @@ protected:
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_priv = HPKEPrivateKey::generate(suite);
 
-      auto client_init_key = ClientInitKey{ suite, init_priv, credential };
+      auto key_package = KeyPackage{ suite, init_priv, credential };
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
       init_privs.push_back(init_priv);
-      client_init_keys.push_back(client_init_key);
+      key_packages.push_back(key_package);
     }
   }
 
@@ -49,7 +49,7 @@ TEST_F(StateTest, TwoPerson)
   auto first0 = State{ group_id, suite, init_privs[0], credentials[0] };
 
   // Create an Add proposal for the new participant
-  auto add = first0.add(client_init_keys[1]);
+  auto add = first0.add(key_packages[1]);
 
   // Handle the Add proposal and create a Commit
   first0.handle(add);
@@ -57,7 +57,7 @@ TEST_F(StateTest, TwoPerson)
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ { client_init_keys[1] }, welcome };
+  auto second0 = State{ { key_packages[1] }, welcome };
   ASSERT_EQ(first1, second0);
 
   /// Verify that they can exchange protected messages
@@ -73,7 +73,7 @@ TEST_F(StateTest, Multi)
 
   // Create and process an Add proposal for each new participant
   for (size_t i = 1; i < group_size; i += 1) {
-    auto add = states[0].add(client_init_keys[i]);
+    auto add = states[0].add(key_packages[i]);
     states[0].handle(add);
   }
 
@@ -84,8 +84,7 @@ TEST_F(StateTest, Multi)
 
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
-    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
-                        welcome);
+    states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
   }
 
   // Verify that everyone can send and be received
@@ -107,7 +106,7 @@ TEST_F(StateTest, FullSize)
   for (size_t i = 1; i < group_size; i += 1) {
     auto sender = i - 1;
 
-    auto add = states[sender].add(client_init_keys[i]);
+    auto add = states[sender].add(key_packages[i]);
     states[sender].handle(add);
 
     auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
@@ -120,8 +119,7 @@ TEST_F(StateTest, FullSize)
       }
     }
 
-    states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
-                        welcome);
+    states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -150,7 +148,7 @@ protected:
     states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
-      auto add = states[0].add(client_init_keys[i]);
+      auto add = states[0].add(key_packages[i]);
       states[0].handle(add);
     }
 
@@ -158,8 +156,7 @@ protected:
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
-      states.emplace_back(std::vector<ClientInitKey>{ client_init_keys[i] },
-                          welcome);
+      states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
       states[i].dump_tree();
     }
   }
@@ -225,10 +222,10 @@ TEST_F(StateTest, CipherNegotiation)
   auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
   std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
-  std::vector<ClientInitKey> ciksA;
+  std::vector<KeyPackage> kpsA;
   for (auto suiteA : ciphersA) {
     auto init_key = HPKEPrivateKey::generate(suiteA);
-    ciksA.emplace_back(suiteA, init_key, credA);
+    kpsA.emplace_back(suiteA, init_key, credA);
   }
 
   // Bob spuports P-256 and P-521
@@ -239,18 +236,18 @@ TEST_F(StateTest, CipherNegotiation)
   auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
   std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
-  std::vector<ClientInitKey> ciksB;
+  std::vector<KeyPackage> kpsB;
   for (auto suiteB : ciphersB) {
     auto init_key = HPKEPrivateKey::generate(suiteB);
-    ciksB.emplace_back(suiteB, init_key, credB);
+    kpsB.emplace_back(suiteB, init_key, credB);
   }
 
   // Bob should choose P-256
   auto [welcome, stateB] =
-    State::negotiate(group_id, ciksB, ciksA, fresh_secret());
+    State::negotiate(group_id, kpsB, kpsA, fresh_secret());
   ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 
   // Alice should also arrive at P-256 when initialized
-  auto stateA = State(ciksA, welcome);
+  auto stateA = State(kpsA, welcome);
   ASSERT_EQ(stateA, stateB);
 }

@@ -22,24 +22,24 @@ public:
     _cred = Credential::basic(id, priv);
   }
 
-  ClientInitKey temp_cik()
+  KeyPackage temp_kp()
   {
     auto init_key = HPKEPrivateKey::generate(suite);
-    return ClientInitKey{ suite, init_key, _cred };
+    return KeyPackage{ suite, init_key, _cred };
   }
 
-  ClientInitKey fresh_cik()
+  KeyPackage fresh_kp()
   {
-    auto cik = temp_cik();
-    _ciks.push_back(cik);
-    return cik;
+    auto kp = temp_kp();
+    _kps.push_back(kp);
+    return kp;
   }
 
-  const std::vector<ClientInitKey>& ciks() { return _ciks; }
+  const std::vector<KeyPackage>& kps() { return _kps; }
 
 private:
   Credential _cred;
-  std::vector<ClientInitKey> _ciks;
+  std::vector<KeyPackage> _kps;
 };
 
 void
@@ -75,33 +75,33 @@ main()
 
   ////////// ACT I: CREATION ///////////
 
-  // Bob posts a ClientInitKey
-  auto cikB = bob.fresh_cik();
+  // Bob posts a KeyPackage
+  auto kpB = bob.fresh_kp();
 
   // Alice starts a session with Bob
-  auto cikA = alice.temp_cik();
+  auto kpA = alice.temp_kp();
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto [sessionA, welcome] =
-    Session::start(group_id, { cikA }, { cikB }, random_bytes(32));
+    Session::start(group_id, { kpA }, { kpB }, random_bytes(32));
 
   // Bob looks up his CIK based on the welcome, and initializes
   // his session
-  auto sessionB = Session::join(bob.ciks(), welcome);
+  auto sessionB = Session::join(bob.kps(), welcome);
 
   // Alice and Bob should now be on the same page
   verify("create", sessionA, sessionB);
 
   ////////// ACT II: ADDITION ///////////
 
-  // Charlie posts a ClientInitKey
-  auto cikC1 = charlie.fresh_cik();
+  // Charlie posts a KeyPackage
+  auto kpC1 = charlie.fresh_kp();
 
   // Alice adds Charlie to the session
   bytes add;
-  std::tie(welcome, add) = sessionA.add(random_bytes(32), cikC1);
+  std::tie(welcome, add) = sessionA.add(random_bytes(32), kpC1);
 
   // Charlie initializes his session
-  auto sessionC = Session::join(charlie.ciks(), welcome);
+  auto sessionC = Session::join(charlie.kps(), welcome);
 
   // Alice and Bob updates their sessions to reflect Charlie's addition
   sessionA.handle(add);

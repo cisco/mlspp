@@ -23,12 +23,22 @@ TEST(TreeKEMTest, ParentNodeEquals)
 
 TEST(TreeKEMTest, NodePublicKey)
 {
-  // TODO make a leaf node and access its public key
-  // TODO mkae a parent node and access its public key
+  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
+  auto initA = HPKEPrivateKey::generate(suite);
+  auto initB = HPKEPrivateKey::generate(suite);
+
+  auto parent = Node{ ParentNode{ initA.public_key(), {}, {} } };
+  ASSERT_EQ(parent.public_key(), initA.public_key());
+
+  const SignatureScheme scheme = SignatureScheme::Ed25519;
+  auto identity_priv = SignaturePrivateKey::generate(scheme);
+  auto cred = Credential::basic({ 0, 1, 2, 3 }, identity_priv);
+  auto leaf = Node{ KeyPackage{ suite, initB, cred } };
+  ASSERT_EQ(leaf.public_key(), initB.public_key());
 }
 
 TEST(TreeKEMTest, OptionalNodeHashes)
 {
-  // TODO make a leaf node and access its public key
-  // TODO mkae a parent node and access its public key
+  // Hash a leaf node
+  // Hash a parent node
 }

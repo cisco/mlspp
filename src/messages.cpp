@@ -1,19 +1,22 @@
 #include "messages.h"
 #include "key_schedule.h"
 #include "state.h"
+#include "treekem.h"
 
 namespace mls {
 
-// ClientInitKey
+// KeyPackage
 
-ClientInitKey::ClientInitKey()
+const NodeType KeyPackage::type = NodeType::leaf;
+
+KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
   , cipher_suite(CipherSuite::unknown)
 {}
 
-ClientInitKey::ClientInitKey(CipherSuite suite_in,
-                             const HPKEPrivateKey& init_key_in,
-                             Credential credential_in)
+KeyPackage::KeyPackage(CipherSuite suite_in,
+                       const HPKEPrivateKey& init_key_in,
+                       Credential credential_in)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
   , init_key(init_key_in.public_key())
@@ -29,20 +32,20 @@ ClientInitKey::ClientInitKey(CipherSuite suite_in,
 }
 
 const std::optional<HPKEPrivateKey>&
-ClientInitKey::private_key() const
+KeyPackage::private_key() const
 {
   return _private_key;
 }
 
 bytes
-ClientInitKey::hash() const
+KeyPackage::hash() const
 {
   auto marshaled = tls::marshal(*this);
   return Digest(cipher_suite).write(marshaled).digest();
 }
 
 bool
-ClientInitKey::verify() const
+KeyPackage::verify() const
 {
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
@@ -50,7 +53,7 @@ ClientInitKey::verify() const
 }
 
 bytes
-ClientInitKey::to_be_signed() const
+KeyPackage::to_be_signed() const
 {
   tls::ostream out;
   out << version << cipher_suite << init_key << credential;
@@ -135,12 +138,12 @@ Welcome::Welcome(CipherSuite suite,
 }
 
 void
-Welcome::encrypt(const ClientInitKey& cik)
+Welcome::encrypt(const KeyPackage& kp)
 {
-  auto key_pkg = KeyPackage{ _init_secret };
-  auto key_pkg_data = tls::marshal(key_pkg);
-  auto enc_pkg = cik.init_key.encrypt(cik.cipher_suite, {}, key_pkg_data);
-  key_packages.push_back({ cik.hash(), enc_pkg });
+  auto gs = GroupSecrets{ _init_secret };
+  auto gs_data = tls::marshal(gs);
+  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
+  secrets.push_back({ kp.hash(), enc_gs });
 }
 
 bool
@@ -148,21 +151,21 @@ operator==(const Welcome& lhs, const Welcome& rhs)
 {
   return (lhs.version == rhs.version) &&
          (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.key_packages == rhs.key_packages) &&
+         (lhs.secrets == rhs.secrets) &&
          (lhs.encrypted_group_info == rhs.encrypted_group_info);
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const Welcome& obj)
 {
-  return str << obj.version << obj.cipher_suite << obj.key_packages
+  return str << obj.version << obj.cipher_suite << obj.secrets
              << obj.encrypted_group_info;
 }
 
 tls::istream&
 operator>>(tls::istream& str, Welcome& obj)
 {
-  str >> obj.version >> obj.cipher_suite >> obj.key_packages >>
+  str >> obj.version >> obj.cipher_suite >> obj.secrets >>
     obj.encrypted_group_info;
   return str;
 }
