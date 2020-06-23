@@ -264,7 +264,7 @@ RatchetTree::decap(LeafIndex from, const bytes& context, const DirectPath& path)
   }
 
   auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-  dirpath.push_back(root_index());
+  dirpath.insert(dirpath.begin(), NodeIndex{from});
 
   // Handle the leaf node
   if (!path.nodes[0].node_secrets.empty()) {

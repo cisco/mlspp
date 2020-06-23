@@ -105,5 +105,8 @@ dirpath(NodeIndex x, NodeCount w);
 std::vector<NodeIndex>
 copath(NodeIndex x, NodeCount w);
 
+NodeIndex
+ancestor(LeafIndex l, LeafIndex r);
+
 } // namespace tree_math
 } // namespace mls
