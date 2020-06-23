@@ -282,10 +282,10 @@ struct MessagesTestVectors
     CipherSuite cipher_suite;
     SignatureScheme signature_scheme;
 
-    tls::opaque<4> client_init_key;
-    tls::opaque<4> group_info;
     tls::opaque<4> key_package;
-    tls::opaque<4> encrypted_key_package;
+    tls::opaque<4> group_info;
+    tls::opaque<4> group_secrets;
+    tls::opaque<4> encrypted_group_secrets;
     tls::opaque<4> welcome;
     tls::opaque<4> add_proposal;
     tls::opaque<4> update_proposal;
@@ -295,10 +295,10 @@ struct MessagesTestVectors
 
     TLS_SERIALIZABLE(cipher_suite,
                      signature_scheme,
-                     client_init_key,
-                     group_info,
                      key_package,
-                     encrypted_key_package,
+                     group_info,
+                     group_secrets,
+                     encrypted_group_secrets,
                      welcome,
                      add_proposal,
                      update_proposal,
@@ -312,7 +312,7 @@ struct MessagesTestVectors
   LeafIndex removed;
   tls::opaque<1> user_id;
   tls::opaque<1> group_id;
-  tls::opaque<1> client_init_key_id;
+  tls::opaque<1> key_package_id;
   tls::opaque<1> dh_seed;
   tls::opaque<1> sig_seed;
   tls::opaque<1> random;
@@ -324,7 +324,7 @@ struct MessagesTestVectors
                    removed,
                    user_id,
                    group_id,
-                   client_init_key_id,
+                   key_package_id,
                    dh_seed,
                    sig_seed,
                    random,
@@ -430,13 +430,13 @@ struct SessionTestVectors
     CipherSuite cipher_suite;
     SignatureScheme signature_scheme;
     bool encrypt;
-    tls::vector<ClientInitKey, 4> client_init_keys;
+    tls::vector<KeyPackage, 4> key_packages;
     tls::vector<Epoch, 4> transcript;
 
     TLS_SERIALIZABLE(cipher_suite,
                      signature_scheme,
                      encrypt,
-                     client_init_keys,
+                     key_packages,
                      transcript);
   };
 
