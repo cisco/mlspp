@@ -134,6 +134,8 @@ struct GroupInfo {
                    signature);
 };
 
+enum class NodeType : uint8_t;
+
 // struct {
 //   opaque group_info_key<1..255>;
 //   opaque group_info_nonce<1..255>;
