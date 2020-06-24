@@ -43,7 +43,7 @@ Session::start(const bytes& group_id,
   auto& sig_priv = my_selected_info->sig_priv;
   auto& cred = my_selected_info->key_package.credential;
 
-  auto init_state = State{ group_id, suite, init_priv, cred };
+  auto init_state = State{ group_id, suite, init_priv, sig_priv, cred };
   auto add = init_state.add(*other_selected_kp);
   init_state.handle(add);
   auto [unused_commit, welcome, state] = init_state.commit(initial_secret);

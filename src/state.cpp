@@ -9,13 +9,14 @@ namespace mls {
 State::State(bytes group_id,
              CipherSuite suite,
              const HPKEPrivateKey& leaf_priv,
+             const SignaturePrivateKey& sig_priv,
              const Credential& credential)
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite, leaf_priv, credential)
   , _index(0)
-  , _identity_priv(credential.private_key().value())
+  , _identity_priv(sig_priv)
 {
   _keys.suite = suite;
   _keys.init_secret = zero_bytes(Digest(suite).output_size());

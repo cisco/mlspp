@@ -51,7 +51,7 @@ protected:
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-    auto cred = Credential::basic(user_id, id_priv);
+    auto cred = Credential::basic(user_id, id_priv.public_key());
     auto key_package =
       KeyPackage{ suite, init_priv.public_key(), id_priv, cred };
     auto init_info = Session::InitInfo{ init_priv, id_priv, key_package };
@@ -61,7 +61,7 @@ protected:
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
       auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
-      auto my_cred = Credential::basic(user_id, id_priv);
+      auto my_cred = Credential::basic(user_id, id_priv.public_key());
       auto my_key_package =
         KeyPackage{ suite, my_init_priv.public_key(), my_id_priv, my_cred };
       auto my_info =
@@ -146,7 +146,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
-  auto credA = Credential::basic(user_id, idA);
+  auto credA = Credential::basic(user_id, idA.public_key());
   std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<KeyPackage> kpsA;
@@ -162,7 +162,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
-  auto credB = Credential::basic(user_id, idB);
+  auto credB = Credential::basic(user_id, idB.public_key());
   std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<KeyPackage> kpsB;
@@ -367,7 +367,7 @@ protected:
       bytes seed = { uint8_t(i), 0 };
       auto init_priv = HPKEPrivateKey::derive(suite, seed);
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
-      auto cred = Credential::basic(seed, identity_priv);
+      auto cred = Credential::basic(seed, identity_priv.public_key());
       auto key_package =
         KeyPackage{ suite, init_priv.public_key(), identity_priv, cred };
       auto init_info =

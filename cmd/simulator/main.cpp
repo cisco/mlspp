@@ -138,7 +138,7 @@ public:
     auto init = mls::HPKEPrivateKey::generate(suite);
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
-    auto cred = mls::Credential::basic(id, priv);
+    auto cred = mls::Credential::basic(id, priv.public_key());
     auto kp = mls::KeyPackage{ suite, init.public_key(), priv, cred };
     return { init, priv, kp };
   }

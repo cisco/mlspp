@@ -59,19 +59,15 @@ class Credential
 public:
   bytes identity() const;
   SignaturePublicKey public_key() const;
-  std::optional<SignaturePrivateKey> private_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
-  static Credential basic(const bytes& identity,
-                          const SignaturePrivateKey& private_key);
 
   TLS_SERIALIZABLE(_cred)
 
 private:
   tls::variant<CredentialType, BasicCredential> _cred;
-  std::optional<SignaturePrivateKey> _priv;
 };
 
 } // namespace mls

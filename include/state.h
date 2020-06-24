@@ -38,6 +38,7 @@ public:
   State(bytes group_id,
         CipherSuite suite,
         const HPKEPrivateKey& leaf_priv,
+        const SignaturePrivateKey& sig_priv,
         const Credential& credential);
 
   // Initialize a group from a Welcome

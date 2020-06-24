@@ -43,7 +43,7 @@ TEST_F(MessagesTest, Interop)
     auto sig_priv =
       SignaturePrivateKey::derive(tc.signature_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv);
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
     DeterministicHPKE lock;
     auto ratchet_tree =

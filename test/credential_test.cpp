@@ -11,11 +11,7 @@ TEST(CredentialTest, Basic)
   auto priv = SignaturePrivateKey::generate(scheme);
   auto pub = priv.public_key();
 
-  auto cred = Credential::basic(user_id, priv);
+  auto cred = Credential::basic(user_id, pub);
   ASSERT_EQ(cred.identity(), user_id);
   ASSERT_EQ(cred.public_key(), pub);
-
-  auto maybe_priv = cred.private_key();
-  ASSERT_TRUE(maybe_priv.has_value());
-  ASSERT_EQ(maybe_priv.value(), priv);
 }

@@ -25,7 +25,7 @@ protected:
   {
     for (size_t i = 0; i < group_size; i += 1) {
       auto identity_priv = SignaturePrivateKey::generate(scheme);
-      auto credential = Credential::basic(user_id, identity_priv);
+      auto credential = Credential::basic(user_id, identity_priv.public_key());
       auto init_priv = HPKEPrivateKey::generate(suite);
       auto key_package =
         KeyPackage{ suite, init_priv.public_key(), identity_priv, credential };
@@ -46,7 +46,8 @@ protected:
 TEST_F(StateTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto first0 = State{ group_id, suite, init_privs[0], credentials[0] };
+  auto first0 =
+    State{ group_id, suite, init_privs[0], identity_privs[0], credentials[0] };
 
   // Create an Add proposal for the new participant
   auto add = first0.add(key_packages[1]);
@@ -70,7 +71,8 @@ TEST_F(StateTest, TwoPerson)
 TEST_F(StateTest, Multi)
 {
   // Initialize the creator's state
-  states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+  states.emplace_back(
+    group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
 
   // Create and process an Add proposal for each new participant
   for (size_t i = 1; i < group_size; i += 1) {
@@ -102,7 +104,8 @@ TEST_F(StateTest, Multi)
 TEST_F(StateTest, FullSize)
 {
   // Initialize the creator's state
-  states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+  states.emplace_back(
+    group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -148,7 +151,8 @@ protected:
   RunningGroupTest()
     : StateTest()
   {
-    states.emplace_back(group_id, suite, init_privs[0], credentials[0]);
+    states.emplace_back(
+      group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto add = states[0].add(key_packages[i]);
