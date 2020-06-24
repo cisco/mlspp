@@ -178,7 +178,7 @@ struct TreeBaseKeySource : public BaseKeySource
   {
     // Find an ancestor that is populated
     auto dirpath = tree_math::dirpath(NodeIndex{ sender }, width);
-    dirpath.insert(dirpath.begin(), NodeIndex{sender});
+    dirpath.insert(dirpath.begin(), NodeIndex{ sender });
     dirpath.push_back(tree_math::root(width));
     uint32_t curr = 0;
     for (; curr < dirpath.size(); ++curr) {
