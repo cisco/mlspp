@@ -4,6 +4,22 @@
 
 namespace mls {
 
+Session::InitInfo::InitInfo(const HPKEPrivateKey& init_priv_in,
+                            const SignaturePrivateKey& sig_priv_in,
+                            const KeyPackage& key_package_in)
+  : init_priv(init_priv_in)
+  , sig_priv(sig_priv_in)
+  , key_package(key_package_in)
+{
+  if (init_priv_in.public_key() != key_package_in.init_key) {
+    throw InvalidParameterError("Init key mismatch");
+  }
+
+  if (sig_priv_in.public_key() != key_package_in.credential.public_key()) {
+    throw InvalidParameterError("Signature key mismatch");
+  }
+}
+
 Session::Session()
   : _current_epoch(0)
   , _encrypt_handshake(false)

@@ -61,7 +61,7 @@ protected:
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
       auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
-      auto my_cred = Credential::basic(user_id, id_priv.public_key());
+      auto my_cred = Credential::basic(user_id, my_id_priv.public_key());
       auto my_key_package =
         KeyPackage{ suite, my_init_priv.public_key(), my_id_priv, my_cred };
       auto my_info =
@@ -155,9 +155,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
     auto init_priv = HPKEPrivateKey::generate(suiteA);
     auto kp = KeyPackage{ suiteA, init_priv.public_key(), idA, credA };
     auto info = Session::InitInfo{ init_priv, idA, kp };
-
-    kpsA.push_back(kp);
-    infosA.push_back(info);
+    kpsA.emplace_back(suiteA, init_priv.public_key(), idA, credA);
+    infosA.emplace_back(init_priv, idA, kpsA.back());
   }
 
   // Bob supports P-256 and P-521
@@ -171,9 +170,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
     auto init_priv = HPKEPrivateKey::generate(suiteB);
     auto kp = KeyPackage{ suiteB, init_priv.public_key(), idB, credB };
     auto info = Session::InitInfo{ init_priv, idB, kp };
-
-    kpsB.push_back(kp);
-    infosB.push_back(info);
+    kpsB.emplace_back(suiteB, init_priv.public_key(), idB, credB);
+    infosB.emplace_back(init_priv, idB, kpsB.back());
   }
 
   auto init_secret = fresh_secret();

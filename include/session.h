@@ -14,6 +14,10 @@ public:
     HPKEPrivateKey init_priv;
     SignaturePrivateKey sig_priv;
     KeyPackage key_package;
+
+    InitInfo(const HPKEPrivateKey& init_priv_in,
+    const SignaturePrivateKey& sig_priv_in,
+    const KeyPackage& key_package);
   };
 
   Session(const Session& other) = default;
