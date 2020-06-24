@@ -9,7 +9,7 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
-  tv.n_leaves = LeafCount{ 255 };
+  tv.n_leaves = LeafCount{ 63 };
 
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
     auto w = NodeCount{ LeafCount{ n } };
