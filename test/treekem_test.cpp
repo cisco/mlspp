@@ -32,8 +32,9 @@ TEST(TreeKEMTest, NodePublicKey)
 
   const SignatureScheme scheme = SignatureScheme::Ed25519;
   auto identity_priv = SignaturePrivateKey::generate(scheme);
-  auto cred = Credential::basic({ 0, 1, 2, 3 }, identity_priv);
-  auto leaf = Node{ KeyPackage{ suite, initB, cred } };
+  auto cred = Credential::basic({ 0, 1, 2, 3 }, identity_priv.public_key());
+  auto leaf =
+    Node{ KeyPackage{ suite, initB.public_key(), identity_priv, cred } };
   ASSERT_EQ(leaf.public_key(), initB.public_key());
 }
 

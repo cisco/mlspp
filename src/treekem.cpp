@@ -25,7 +25,7 @@ Node::public_key() const
 {
   switch (inner_type()) {
     case NodeType::leaf:
-      return std::get<ParentNode>(*this).public_key;
+      return std::get<KeyPackage>(*this).init_key;
 
     case NodeType::parent:
       return std::get<ParentNode>(*this).public_key;

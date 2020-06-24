@@ -17,29 +17,31 @@ class User
 public:
   User(const std::string& name)
   {
-    auto priv = SignaturePrivateKey::generate(scheme);
+    _identity_priv = SignaturePrivateKey::generate(scheme);
     auto id = bytes(name.begin(), name.end());
-    _cred = Credential::basic(id, priv);
+    _cred = Credential::basic(id, _identity_priv.public_key());
   }
 
-  KeyPackage temp_kp()
+  Session::InitInfo temp_init_info()
   {
     auto init_key = HPKEPrivateKey::generate(suite);
-    return KeyPackage{ suite, init_key, _cred };
+    auto kp = KeyPackage{ suite, init_key.public_key(), _identity_priv, _cred };
+    return { init_key, _identity_priv, kp };
   }
 
-  KeyPackage fresh_kp()
+  KeyPackage fresh_key_package()
   {
-    auto kp = temp_kp();
-    _kps.push_back(kp);
-    return kp;
+    auto info = temp_init_info();
+    _infos.push_back(info);
+    return info.key_package;
   }
 
-  const std::vector<KeyPackage>& kps() { return _kps; }
+  const std::vector<Session::InitInfo>& infos() const { return _infos; }
 
 private:
+  SignaturePrivateKey _identity_priv;
   Credential _cred;
-  std::vector<KeyPackage> _kps;
+  std::vector<Session::InitInfo> _infos;
 };
 
 void
@@ -76,17 +78,17 @@ main()
   ////////// ACT I: CREATION ///////////
 
   // Bob posts a KeyPackage
-  auto kpB = bob.fresh_kp();
+  auto kpB = bob.fresh_key_package();
 
   // Alice starts a session with Bob
-  auto kpA = alice.temp_kp();
+  auto infoA = alice.temp_init_info();
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto [sessionA, welcome] =
-    Session::start(group_id, { kpA }, { kpB }, random_bytes(32));
+    Session::start(group_id, { infoA }, { kpB }, random_bytes(32));
 
   // Bob looks up his CIK based on the welcome, and initializes
   // his session
-  auto sessionB = Session::join(bob.kps(), welcome);
+  auto sessionB = Session::join(bob.infos(), welcome);
 
   // Alice and Bob should now be on the same page
   verify("create", sessionA, sessionB);
@@ -94,14 +96,14 @@ main()
   ////////// ACT II: ADDITION ///////////
 
   // Charlie posts a KeyPackage
-  auto kpC1 = charlie.fresh_kp();
+  auto kpC1 = charlie.fresh_key_package();
 
   // Alice adds Charlie to the session
   bytes add;
   std::tie(welcome, add) = sessionA.add(random_bytes(32), kpC1);
 
   // Charlie initializes his session
-  auto sessionC = Session::join(charlie.kps(), welcome);
+  auto sessionC = Session::join(charlie.infos(), welcome);
 
   // Alice and Bob updates their sessions to reflect Charlie's addition
   sessionA.handle(add);

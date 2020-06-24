@@ -4,6 +4,22 @@
 
 namespace mls {
 
+Session::InitInfo::InitInfo(const HPKEPrivateKey& init_priv_in,
+                            const SignaturePrivateKey& sig_priv_in,
+                            const KeyPackage& key_package_in)
+  : init_priv(init_priv_in)
+  , sig_priv(sig_priv_in)
+  , key_package(key_package_in)
+{
+  if (init_priv_in.public_key() != key_package_in.init_key) {
+    throw InvalidParameterError("Init key mismatch");
+  }
+
+  if (sig_priv_in.public_key() != key_package_in.credential.public_key()) {
+    throw InvalidParameterError("Signature key mismatch");
+  }
+}
+
 Session::Session()
   : _current_epoch(0)
   , _encrypt_handshake(false)
@@ -11,12 +27,43 @@ Session::Session()
 
 std::tuple<Session, Welcome>
 Session::start(const bytes& group_id,
-               const std::vector<KeyPackage>& my_key_packages,
+               const std::vector<InitInfo>& my_info,
                const std::vector<KeyPackage>& key_packages,
                const bytes& initial_secret)
 {
-  auto [welcome, state] =
-    State::negotiate(group_id, my_key_packages, key_packages, initial_secret);
+  // Negotiate a ciphersuite with the other party
+  auto selected = false;
+  const InitInfo* my_selected_info = nullptr;
+  const KeyPackage* other_selected_kp = nullptr;
+  for (const auto& info : my_info) {
+    for (const auto& other_kp : key_packages) {
+      if (info.key_package.cipher_suite == other_kp.cipher_suite) {
+        selected = true;
+        my_selected_info = &info;
+        other_selected_kp = &other_kp;
+        break;
+      }
+    }
+
+    if (selected) {
+      break;
+    }
+  }
+
+  if (!selected) {
+    throw ProtocolError("Negotiation failure");
+  }
+
+  auto& suite = my_selected_info->key_package.cipher_suite;
+  auto& init_priv = my_selected_info->init_priv;
+  auto& sig_priv = my_selected_info->sig_priv;
+  auto& cred = my_selected_info->key_package.credential;
+
+  auto init_state = State{ group_id, suite, init_priv, sig_priv, cred };
+  auto add = init_state.add(*other_selected_kp);
+  init_state.handle(add);
+  auto [unused_commit, welcome, state] = init_state.commit(initial_secret);
+  silence_unused(unused_commit);
 
   Session session;
   session.add_state(0, state);
@@ -24,13 +71,21 @@ Session::start(const bytes& group_id,
 }
 
 Session
-Session::join(const std::vector<KeyPackage>& key_packages,
-              const Welcome& welcome)
+Session::join(const std::vector<InitInfo>& my_info, const Welcome& welcome)
 {
   Session session;
-  State next(key_packages, welcome);
-  session.add_state(0, next);
-  return session;
+  for (const auto& info : my_info) {
+    auto maybe_kpi = welcome.find(info.key_package);
+    if (!maybe_kpi.has_value()) {
+      continue;
+    }
+
+    session.add_state(
+      0, { info.init_priv, info.sig_priv, info.key_package, welcome });
+    return session;
+  }
+
+  throw InvalidParameterError("No matching KeyPackage found");
 }
 
 void
