@@ -16,7 +16,7 @@ ${TEST_VECTOR_DIR}:
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
 
-lint: ${BUILD_DIR}
+lint:
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=ON -DCMAKE_BUILD_TYPE=Debug
 
 test: all ${TEST_VECTOR_DIR}

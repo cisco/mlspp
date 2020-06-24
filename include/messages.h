@@ -59,8 +59,8 @@ struct KeyPackage
 
   KeyPackage();
   KeyPackage(CipherSuite suite_in,
-             const HPKEPublicKey& init_key_in,
-             const SignaturePrivateKey& sig_priv_in,
+             const HPKEPublicKey& init_key_in, // NOLINT(modernize-pass-by-value)
+             const SignaturePrivateKey& sig_priv_in, // NOLINT(modernize-pass-by-value)
              const Credential& credential_in);
 
   bytes hash() const;

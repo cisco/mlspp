@@ -137,7 +137,7 @@ std::optional<int>
 Welcome::find(const KeyPackage& kp) const
 {
   auto hash = kp.hash();
-  for (int i = 0; i < secrets.size(); i++) {
+  for (size_t i = 0; i < secrets.size(); i++) {
     if (hash == secrets[i].key_package_hash) {
       return i;
     }
