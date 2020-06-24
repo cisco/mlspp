@@ -35,7 +35,10 @@ struct Node : public tls::variant<NodeType, KeyPackage, ParentNode> {
   const HPKEPublicKey& public_key() const;
 };
 
-struct OptionalNode : public tls::optional<RatchetTreeNode> {
+struct OptionalNode : public tls::optional<Node> {
+  using parent = tls::optional<Node>;
+  using parent::parent;
+
   bytes hash;
 
   void set_leaf_hash(CipherSuite suite, LeafIndex index);
