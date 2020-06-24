@@ -9,7 +9,7 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
-  tv.n_leaves = LeafCount{ 255 };
+  tv.n_leaves = LeafCount{ 63 };
 
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
     auto w = NodeCount{ LeafCount{ n } };
@@ -31,15 +31,15 @@ generate_tree_math()
     auto sibling = tree_math::sibling(NodeIndex{ x }, w);
     tv.sibling.push_back(sibling);
 
-    auto dirpath = tree_math::dirpath(NodeIndex{ x },  w);
+    auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
     tv.dirpath.push_back(dirpath);
 
-    auto copath = tree_math::copath(NodeIndex{ x },  w);
+    auto copath = tree_math::copath(NodeIndex{ x }, w);
     tv.copath.push_back(copath);
 
-    for (uint32_t l = 0; l < tv.n_leaves.val-1; ++l) {
+    for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
       auto ancestors = std::vector<NodeIndex>();
-      for (uint32_t r = l+1; r < tv.n_leaves.val; ++r) {
+      for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
         auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
         ancestors.push_back(a);
       }
