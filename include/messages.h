@@ -48,12 +48,6 @@ struct DirectPath
 //     Extension extensions<0..2^16-1>;
 //     opaque signature<0..2^16-1>;
 // } KeyPackage;
-//
-// XXX(rlb@ipv.sx): Right now, we use this to represent both the
-// public version of a client's capabilities, and the private
-// version (with private keys).  This results in some ugly checking
-// code when private keys are needed, so it might be nice to split
-// these two cases in the type system.
 struct KeyPackage
 {
   ProtocolVersion version;
@@ -65,19 +59,17 @@ struct KeyPackage
 
   KeyPackage();
   KeyPackage(CipherSuite suite_in,
-                const HPKEPrivateKey& init_key_in,
-                Credential credential_in);
+             const HPKEPublicKey& init_key_in,
+             const SignaturePrivateKey& sig_priv_in,
+             const Credential& credential_in);
 
-  const std::optional<HPKEPrivateKey>& private_key() const;
   bytes hash() const;
-
   bool verify() const;
 
   TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature);
 
   private:
   bytes to_be_signed() const;
-  std::optional<HPKEPrivateKey> _private_key;
 };
 
 // struct {
@@ -175,6 +167,7 @@ struct Welcome {
           const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp);
+  std::optional<int> find(const KeyPackage& kp) const;
 
   private:
   bytes _init_secret;

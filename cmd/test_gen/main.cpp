@@ -31,15 +31,15 @@ generate_tree_math()
     auto sibling = tree_math::sibling(NodeIndex{ x }, w);
     tv.sibling.push_back(sibling);
 
-    auto dirpath = tree_math::dirpath(NodeIndex{ x },  w);
+    auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
     tv.dirpath.push_back(dirpath);
 
-    auto copath = tree_math::copath(NodeIndex{ x },  w);
+    auto copath = tree_math::copath(NodeIndex{ x }, w);
     tv.copath.push_back(copath);
 
-    for (uint32_t l = 0; l < tv.n_leaves.val-1; ++l) {
+    for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
       auto ancestors = std::vector<NodeIndex>();
-      for (uint32_t r = l+1; r < tv.n_leaves.val; ++r) {
+      for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
         auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
         ancestors.push_back(a);
       }
@@ -325,7 +325,8 @@ generate_messages()
     silence_unused(dummy);
 
     // Construct CIK
-    auto key_package = KeyPackage{ suite, dh_priv, cred };
+    auto key_package =
+      KeyPackage{ suite, dh_priv.public_key(), sig_priv, cred };
     key_package.signature = tv.random;
 
     // Construct Welcome
@@ -435,6 +436,7 @@ generate_basic_session()
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
+    std::vector<Session::InitInfo> init_infos;
     std::vector<KeyPackage> key_packages;
     std::vector<TestSession> sessions;
     auto ciphersuites = std::vector<CipherSuite>{ suite };
@@ -443,7 +445,10 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
       auto cred = Credential::basic(seed, identity_priv);
       auto init = HPKEPrivateKey::derive(suite, seed);
-      key_packages.emplace_back(suite, init, cred);
+      auto kp = KeyPackage{ suite, init.public_key(), identity_priv, cred };
+      auto info = Session::InitInfo{ init, identity_priv, kp };
+      key_packages.push_back(kp);
+      init_infos.emplace_back(info);
     }
 
     // Add everyone
@@ -454,7 +459,7 @@ generate_basic_session()
       bytes add;
       if (j == 1) {
         auto [session, welcome_new] = Session::start(
-          tv.group_id, { key_packages[0] }, { key_packages[1] }, commit_secret);
+          tv.group_id, { init_infos[0] }, { key_packages[1] }, commit_secret);
         session.encrypt_handshake(encrypt);
 
         sessions.push_back(session);
@@ -467,7 +472,7 @@ generate_basic_session()
         }
       }
 
-      auto joiner = Session::join({ key_packages[j] }, welcome);
+      auto joiner = Session::join({ init_infos[j] }, welcome);
       joiner.encrypt_handshake(encrypt);
       sessions.push_back(joiner);
 

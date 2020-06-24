@@ -22,51 +22,27 @@ State::State(bytes group_id,
 }
 
 // Initialize a group from a Welcome
-State::State(const std::vector<KeyPackage>& my_key_packages,
+State::State(const HPKEPrivateKey& init_priv,
+             const SignaturePrivateKey& sig_priv,
+             const KeyPackage& kp,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
 {
-  // Identify and decrypt a GroupSecrets
-  bool found = false;
-  KeyPackage my_kp;
-  GroupSecrets secrets;
-  for (const auto& kp : my_key_packages) {
-    auto hash = kp.hash();
-    for (const auto& enc_secrets : welcome.secrets) {
-      found = (hash == enc_secrets.key_package_hash);
-      if (!found) {
-        continue;
-      }
+  auto maybe_kpi = welcome.find(kp);
+  if (!maybe_kpi.has_value()) {
+    throw InvalidParameterError("Welcome not intended for key package");
+  }
+  auto kpi = maybe_kpi.value();
 
-      if (kp.cipher_suite != welcome.cipher_suite) {
-        throw InvalidParameterError("Ciphersuite mismatch");
-      }
-
-      if (!kp.private_key().has_value()) {
-        throw InvalidParameterError("No private key for init key");
-      }
-
-      if (!kp.credential.private_key().has_value()) {
-        throw InvalidParameterError("No signing key for init key");
-      }
-      _identity_priv = kp.credential.private_key().value();
-
-      auto secrets_data = kp.private_key().value().decrypt(
-        kp.cipher_suite, {}, enc_secrets.encrypted_group_secrets);
-      secrets = tls::get<GroupSecrets>(secrets_data);
-      my_kp = kp;
-      break;
-    }
-
-    if (found) {
-      break;
-    }
+  if (kp.cipher_suite != welcome.cipher_suite) {
+    throw InvalidParameterError("Ciphersuite mismatch");
   }
 
-  if (!found) {
-    throw InvalidParameterError("Unable to decrypt Welcome message");
-  }
+  // Decrypt the GroupSecrets
+  auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
+  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
+  auto secrets = tls::get<GroupSecrets>(secrets_data);
 
   // Decrypt the GroupInfo
   auto first_epoch = FirstEpoch::create(_suite, secrets.init_secret);
@@ -90,13 +66,14 @@ State::State(const std::vector<KeyPackage>& my_key_packages,
   _interim_transcript_hash = group_info.interim_transcript_hash;
 
   // Add self to tree
-  auto maybe_index = _tree.find(my_kp);
+  auto maybe_index = _tree.find(kp);
   if (!maybe_index.has_value()) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
   _index = maybe_index.value();
-  _tree.merge(_index, my_kp.private_key().value());
+  _tree.merge(_index, init_priv);
+  _identity_priv = sig_priv;
 
   // Decapsulate the direct path
   auto decap_ctx = tls::marshal(GroupContext{
@@ -116,48 +93,6 @@ State::State(const std::vector<KeyPackage>& my_key_packages,
   if (!verify_confirmation(group_info.confirmation)) {
     throw ProtocolError("Confirmation failed to verify");
   }
-}
-
-std::tuple<Welcome, State>
-State::negotiate(const bytes& group_id,
-                 const std::vector<KeyPackage>& my_key_packages,
-                 const std::vector<KeyPackage>& key_packages,
-                 const bytes& commit_secret)
-{
-  // Negotiate a ciphersuite with the other party
-  auto selected = false;
-  const KeyPackage* my_selected_kp = nullptr;
-  const KeyPackage* other_selected_kp = nullptr;
-  for (const auto& my_kp : my_key_packages) {
-    for (const auto& other_kp : key_packages) {
-      if (my_kp.cipher_suite == other_kp.cipher_suite) {
-        selected = true;
-        my_selected_kp = &my_kp;
-        other_selected_kp = &other_kp;
-        break;
-      }
-    }
-
-    if (selected) {
-      break;
-    }
-  }
-
-  if (!selected) {
-    throw ProtocolError("Negotiation failure");
-  }
-
-  auto& suite = my_selected_kp->cipher_suite;
-  auto& leaf_priv = my_selected_kp->private_key().value();
-  auto& cred = my_selected_kp->credential;
-
-  auto state = State{ group_id, suite, leaf_priv, cred };
-  auto add = state.add(*other_selected_kp);
-  state.handle(add);
-  auto [unused_commit, welcome, new_state] = state.commit(commit_secret);
-  silence_unused(unused_commit);
-
-  return std::make_tuple(welcome, new_state);
 }
 
 ///

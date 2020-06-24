@@ -57,7 +57,9 @@ TEST_F(MessagesTest, Interop)
     silence_unused(dummy);
 
     // KeyPackage
-    KeyPackage key_package{ tc.cipher_suite, dh_priv, cred };
+    KeyPackage key_package{
+      tc.cipher_suite, dh_priv.public_key(), sig_priv, cred
+    };
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 

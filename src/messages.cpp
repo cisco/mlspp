@@ -12,26 +12,16 @@ KeyPackage::KeyPackage()
 {}
 
 KeyPackage::KeyPackage(CipherSuite suite_in,
-                       const HPKEPrivateKey& init_key_in,
-                       Credential credential_in)
+                       const HPKEPublicKey& init_key_in,
+                       const SignaturePrivateKey& sig_priv_in,
+                       const Credential& credential_in)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
-  , init_key(init_key_in.public_key())
-  , credential(std::move(credential_in))
-  , _private_key(init_key_in)
+  , init_key(init_key_in)
+  , credential(credential_in)
 {
-  if (!credential.private_key().has_value()) {
-    throw InvalidParameterError("Credential must have a private key");
-  }
-
   auto tbs = to_be_signed();
-  signature = credential.private_key().value().sign(tbs);
-}
-
-const std::optional<HPKEPrivateKey>&
-KeyPackage::private_key() const
-{
-  return _private_key;
+  signature = sig_priv_in.sign(tbs);
 }
 
 bytes
@@ -141,6 +131,18 @@ Welcome::encrypt(const KeyPackage& kp)
   auto gs_data = tls::marshal(gs);
   auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
   secrets.push_back({ kp.hash(), enc_gs });
+}
+
+std::optional<int>
+Welcome::find(const KeyPackage& kp) const
+{
+  auto hash = kp.hash();
+  for (int i = 0; i < secrets.size(); i++) {
+    if (hash == secrets[i].key_package_hash) {
+      return i;
+    }
+  }
+  return std::nullopt;
 }
 
 bool

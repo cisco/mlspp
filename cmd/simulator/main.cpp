@@ -133,13 +133,14 @@ public:
 
   mls::bytes random() const { return mls::random_bytes(32); }
 
-  mls::KeyPackage fresh_key_package() const
+  mls::Session::InitInfo fresh_init_info() const
   {
     auto init = mls::HPKEPrivateKey::generate(suite);
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv);
-    return mls::KeyPackage{ suite, init, cred };
+    auto kp = mls::KeyPackage{ suite, init.public_key(), priv, cred };
+    return { init, priv, kp };
   }
 
   std::vector<mls::CryptoMetrics::Report> broadcast(const mls::bytes& message)
@@ -164,18 +165,18 @@ public:
   void init(size_t initial_size)
   {
     auto group_id = random();
-    auto kp0 = fresh_key_package();
-    auto kp1 = fresh_key_package();
+    auto info0 = fresh_init_info();
+    auto info1 = fresh_init_info();
     auto [session0, welcome1] =
-      mls::Session::start(group_id, { kp0 }, { kp1 }, random());
-    auto session1 = mls::Session::join({ kp1 }, welcome1);
+      mls::Session::start(group_id, { info0 }, { info1.key_package }, random());
+    auto session1 = mls::Session::join({ info1 }, welcome1);
 
     sessions = { session0, session1 };
     while (sessions.size() < initial_size) {
-      auto kp = fresh_key_package();
-      auto [welcome, add] = sessions[0].value().add(random(), kp);
+      auto info = fresh_init_info();
+      auto [welcome, add] = sessions[0].value().add(random(), info.key_package);
       broadcast(add);
-      sessions.emplace_back(mls::Session::join({ kp }, welcome));
+      sessions.emplace_back(mls::Session::join({ info }, welcome));
     }
   }
 
@@ -183,15 +184,15 @@ public:
   StepMetrics add(uint32_t by)
   {
     StepMetrics report{};
-    auto kp = fresh_key_package();
+    auto info = fresh_init_info();
 
     mls::CryptoMetrics::reset();
-    auto [welcome, add] = sessions[by].value().add(random(), kp);
+    auto [welcome, add] = sessions[by].value().add(random(), info.key_package);
     report.sender = mls::CryptoMetrics::snapshot();
     report.receivers = broadcast(add);
 
     mls::CryptoMetrics::reset();
-    auto new_session = mls::Session::join({ kp }, welcome);
+    auto new_session = mls::Session::join({ info }, welcome);
     report.receivers.push_back(mls::CryptoMetrics::snapshot());
     sessions.emplace_back(new_session);
 

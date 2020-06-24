@@ -27,8 +27,8 @@ protected:
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv);
       auto init_priv = HPKEPrivateKey::generate(suite);
-
-      auto key_package = KeyPackage{ suite, init_priv, credential };
+      auto key_package =
+        KeyPackage{ suite, init_priv.public_key(), identity_priv, credential };
 
       identity_privs.push_back(identity_priv);
       credentials.push_back(credential);
@@ -57,7 +57,8 @@ TEST_F(StateTest, TwoPerson)
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ { key_packages[1] }, welcome };
+  auto second0 =
+    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
   ASSERT_EQ(first1, second0);
 
   /// Verify that they can exchange protected messages
@@ -84,7 +85,8 @@ TEST_F(StateTest, Multi)
 
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
-    states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
+    states.emplace_back(
+      init_privs[i], identity_privs[i], key_packages[i], welcome);
   }
 
   // Verify that everyone can send and be received
@@ -119,7 +121,8 @@ TEST_F(StateTest, FullSize)
       }
     }
 
-    states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
+    states.emplace_back(
+      init_privs[i], identity_privs[i], key_packages[i], welcome);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -156,7 +159,8 @@ protected:
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
-      states.emplace_back(std::vector<KeyPackage>{ key_packages[i] }, welcome);
+      states.emplace_back(
+        init_privs[i], identity_privs[i], key_packages[i], welcome);
       states[i].dump_tree();
     }
   }
@@ -213,41 +217,4 @@ TEST_F(RunningGroupTest, Remove)
 
     check_consistency();
   }
-}
-
-TEST_F(StateTest, CipherNegotiation)
-{
-  // Alice supports P-256 and X25519
-  auto idkA = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
-  auto credA = Credential::basic({ 0, 1, 2, 3 }, idkA);
-  std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
-                                     CipherSuite::X25519_SHA256_AES128GCM };
-  std::vector<KeyPackage> kpsA;
-  for (auto suiteA : ciphersA) {
-    auto init_key = HPKEPrivateKey::generate(suiteA);
-    kpsA.emplace_back(suiteA, init_key, credA);
-  }
-
-  // Bob spuports P-256 and P-521
-  auto supported_ciphers =
-    std::vector<CipherSuite>{ CipherSuite::P256_SHA256_AES128GCM,
-                              CipherSuite::P521_SHA512_AES256GCM };
-  auto idkB = SignaturePrivateKey::generate(SignatureScheme::Ed25519);
-  auto credB = Credential::basic({ 4, 5, 6, 7 }, idkB);
-  std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
-                                     CipherSuite::X25519_SHA256_AES128GCM };
-  std::vector<KeyPackage> kpsB;
-  for (auto suiteB : ciphersB) {
-    auto init_key = HPKEPrivateKey::generate(suiteB);
-    kpsB.emplace_back(suiteB, init_key, credB);
-  }
-
-  // Bob should choose P-256
-  auto [welcome, stateB] =
-    State::negotiate(group_id, kpsB, kpsA, fresh_secret());
-  ASSERT_EQ(stateB.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
-
-  // Alice should also arrive at P-256 when initialized
-  auto stateA = State(kpsA, welcome);
-  ASSERT_EQ(stateA, stateB);
 }

@@ -153,7 +153,7 @@ copath(NodeIndex x, NodeCount w)
   std::vector<NodeIndex> path;
   path.push_back(x);
   // exclude root
-  for (size_t i = 0; i < d.size()-1; ++i){
+  for (size_t i = 0; i < d.size() - 1; ++i) {
     path.push_back(d[i]);
   }
 
@@ -166,7 +166,9 @@ copath(NodeIndex x, NodeCount w)
 }
 
 // Common ancestor of two leaves
-NodeIndex ancestor(LeafIndex l, LeafIndex r) {
+NodeIndex
+ancestor(LeafIndex l, LeafIndex r)
+{
   auto ln = NodeIndex(l);
   auto rn = NodeIndex(r);
 
@@ -177,7 +179,7 @@ NodeIndex ancestor(LeafIndex l, LeafIndex r) {
     k += 1;
   }
 
-  return NodeIndex((ln.val << k) + (1 << (k-1)) - 1);
+  return NodeIndex((ln.val << k) + (1 << (k - 1)) - 1);
 }
 
 } // namespace tree_math

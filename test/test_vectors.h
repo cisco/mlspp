@@ -24,7 +24,15 @@ struct TreeMathTestVectors
   tls::vector<tls::vector<NodeIndex, 4>, 4> copath;
   tls::vector<tls::vector<NodeIndex, 4>, 4> ancestor;
 
-  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling, dirpath, copath, ancestor)
+  TLS_SERIALIZABLE(n_leaves,
+                   root,
+                   left,
+                   right,
+                   parent,
+                   sibling,
+                   dirpath,
+                   copath,
+                   ancestor)
 };
 
 /////
@@ -216,7 +224,7 @@ public:
     // Ensure that we have private keys for everything in the direct
     // path...
     auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-    dirpath.insert(dirpath.begin(), NodeIndex{from});
+    dirpath.insert(dirpath.begin(), NodeIndex{ from });
 
     for (const auto& node : dirpath) {
       in_dirpath[node.val] = true;

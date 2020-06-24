@@ -78,10 +78,10 @@ TEST_F(TreeMathTest, Copath)
 
 TEST_F(TreeMathTest, Ancestor)
 {
-  for (uint32_t l = 0; l < tv.n_leaves.val-1; ++l) {
+  for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
     auto ancestors = std::vector<NodeIndex>();
-    for (uint32_t r = l+1; r < tv.n_leaves.val; ++r) {
-      ancestors.push_back(tree_math::ancestor(LeafIndex(l),LeafIndex(r)));
+    for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
+      ancestors.push_back(tree_math::ancestor(LeafIndex(l), LeafIndex(r)));
     }
     ASSERT_EQ(ancestors, tv.ancestor[l]);
   }
