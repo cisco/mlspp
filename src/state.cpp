@@ -69,15 +69,9 @@ State::State(const std::vector<KeyPackage>& my_key_packages,
   }
 
   // Decrypt the GroupInfo
-  auto first_epoch = FirstEpoch::create(_suite, secrets.init_secret);
-  auto group_info_data = open(_suite,
-                              first_epoch.group_info_key,
-                              first_epoch.group_info_nonce,
-                              {},
-                              welcome.encrypted_group_info);
-  auto group_info = tls::get<GroupInfo>(group_info_data, _suite);
+  auto group_info = welcome.decrypt(secrets.epoch_secret);
 
-  // Verify the singature on the GroupInfo
+  // Verify the signature on the GroupInfo
   if (!group_info.verify()) {
     throw InvalidParameterError("Invalid GroupInfo");
   }
@@ -98,19 +92,16 @@ State::State(const std::vector<KeyPackage>& my_key_packages,
   _index = maybe_index.value();
   _tree.merge(_index, my_kp.private_key().value());
 
-  // Decapsulate the direct path
-  auto decap_ctx = tls::marshal(GroupContext{
-    group_info.group_id,
-    group_info.epoch,
-    group_info.tree.root_hash(),
-    group_info.prior_confirmed_transcript_hash,
-  });
-  auto update_secret =
-    _tree.decap(group_info.signer_index, decap_ctx, group_info.path);
+  auto update_secret = bytes{};
+  if (secrets.path_secret.has_value()) {
+    auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
+    update_secret = _tree.implant(ancestor, secrets.path_secret.value());
+  }
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _keys = first_epoch.next(LeafCount{ _tree.size() }, update_secret, group_ctx);
+  _keys = KeyScheduleEpoch::create(
+    _suite, LeafCount(_tree.size()), secrets.epoch_secret, group_ctx);
 
   // Verify the confirmation
   if (!verify_confirmation(group_info.confirmation)) {
@@ -232,23 +223,15 @@ State::commit(const bytes& leaf_secret) const
 
   // Apply proposals
   State next = *this;
-  next.apply(commit);
+  auto joiner_locations = next.apply(commit);
   next._pending_proposals.clear();
-
-  // Start a GroupInfo with the prepared state
-  auto prev_init_secret = bytes(_keys.init_secret);
-  auto group_info = GroupInfo(_suite);
-  group_info.group_id = next._group_id;
-  group_info.epoch = next._epoch + 1;
-  group_info.tree = next._tree;
-  group_info.prior_confirmed_transcript_hash = _confirmed_transcript_hash;
 
   // KEM new entropy to the group and the new joiners
   auto ctx = tls::marshal(GroupContext{
-    group_info.group_id,
-    group_info.epoch,
-    group_info.tree.root_hash(),
-    group_info.prior_confirmed_transcript_hash,
+    next._group_id,
+    next._epoch + 1,
+    next._tree.root_hash(),
+    next._confirmed_transcript_hash,
   });
   auto [path, update_secret] = next._tree.encap(_index, ctx, leaf_secret);
   commit.path = path;
@@ -257,15 +240,20 @@ State::commit(const bytes& leaf_secret) const
   auto pt = next.ratchet_and_sign(commit, update_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
-  group_info.confirmed_transcript_hash = next._confirmed_transcript_hash;
-  group_info.interim_transcript_hash = next._interim_transcript_hash;
-  group_info.path = path;
-  group_info.confirmation = std::get<CommitData>(pt.content).confirmation;
+  auto group_info = GroupInfo{
+    next._group_id,
+    next._epoch,
+    next._tree,
+    next._confirmed_transcript_hash,
+    next._interim_transcript_hash,
+    std::get<CommitData>(pt.content).confirmation,
+  };
   group_info.sign(_index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, prev_init_secret, group_info };
-  for (const auto& joiner : joiners) {
-    welcome.encrypt(joiner);
+  auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
+  for (size_t i = 0; i < joiners.size(); i++) {
+    auto path_secret = next._tree.ancestor_secret(_index, joiner_locations[i]);
+    welcome.encrypt(joiners[i], path_secret);
   }
 
   return std::make_tuple(pt, welcome, next);
@@ -380,11 +368,12 @@ State::handle(const MLSPlaintext& pt)
   return next;
 }
 
-void
+LeafIndex
 State::apply(const Add& add)
 {
   auto target = _tree.leftmost_free();
   _tree.add_leaf(target, add.key_package.init_key, add.key_package.credential);
+  return target;
 }
 
 void
@@ -429,9 +418,10 @@ State::find_proposal(const ProposalID& id)
   return std::nullopt;
 }
 
-void
+std::vector<LeafIndex>
 State::apply(const std::vector<ProposalID>& ids)
 {
+  auto joiner_locations = std::vector<LeafIndex>{};
   for (const auto& id : ids) {
     auto maybe_pt = find_proposal(id);
     if (!maybe_pt.has_value()) {
@@ -442,7 +432,7 @@ State::apply(const std::vector<ProposalID>& ids)
     auto proposal = std::get<Proposal>(pt.content);
     switch (proposal.inner_type()) {
       case ProposalType::add:
-        apply(std::get<Add>(proposal));
+        joiner_locations.push_back(apply(std::get<Add>(proposal)));
         break;
       case ProposalType::update:
         if (pt.sender != _index) {
@@ -464,16 +454,19 @@ State::apply(const std::vector<ProposalID>& ids)
         break;
     }
   }
+
+  return joiner_locations;
 }
 
-void
+std::vector<LeafIndex>
 State::apply(const Commit& commit)
 {
   apply(commit.updates);
   apply(commit.removes);
-  apply(commit.adds);
+  auto joiner_locations = apply(commit.adds);
 
   _tree.truncate(_tree.leaf_span());
+  return joiner_locations;
 }
 
 ///

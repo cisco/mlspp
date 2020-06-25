@@ -71,17 +71,6 @@ struct GroupKeySource
 
 struct KeyScheduleEpoch;
 
-struct FirstEpoch {
-  CipherSuite suite;
-  bytes init_secret;
-  bytes group_info_secret;
-  bytes group_info_key;
-  bytes group_info_nonce;
-
-  static FirstEpoch create(CipherSuite suite, const bytes& init_secret);
-  KeyScheduleEpoch next(LeafCount size, const bytes& update_secret, const bytes& context);
-};
-
 struct KeyScheduleEpoch {
   CipherSuite suite;
   bytes epoch_secret;

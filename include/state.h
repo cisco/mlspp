@@ -122,12 +122,12 @@ protected:
   MLSPlaintext sign(const Proposal& proposal) const;
 
   // Apply the changes requested by various messages
-  void apply(const Add& add);
+  LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const bytes& leaf_secret);
   void apply(const Remove& remove);
-  void apply(const std::vector<ProposalID>& ids);
-  void apply(const Commit& commit);
+  std::vector<LeafIndex> apply(const std::vector<ProposalID>& ids);
+  std::vector<LeafIndex> apply(const Commit& commit);
 
   // Compute a proposal ID
   bytes proposal_id(const MLSPlaintext& pt) const;

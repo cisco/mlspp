@@ -22,6 +22,7 @@ public:
   RatchetTreeNode(HPKEPublicKey pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
+  const std::optional<bytes>& secret() const;
   const std::optional<HPKEPrivateKey>& private_key() const;
   const HPKEPublicKey& public_key() const;
   const std::vector<LeafIndex>& unmerged_leaves() const;
@@ -35,6 +36,7 @@ public:
   TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
 
 private:
+  std::optional<bytes> _secret;
   std::optional<HPKEPrivateKey> _priv;
   HPKEPublicKey _pub;
 
@@ -108,6 +110,9 @@ public:
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
   const Credential& get_credential(LeafIndex index) const;
 
+  std::optional<bytes> ancestor_secret(LeafIndex from, LeafIndex to) const;
+  bytes implant(NodeIndex index, const bytes& path_secret);
+
   LeafCount leaf_span() const;
   void truncate(LeafCount leaves);
 
@@ -123,7 +128,6 @@ protected:
   NodeCount node_size() const;
   RatchetTreeNode new_node(const bytes& path_secret) const;
   bytes path_step(const bytes& path_secret) const;
-  bytes node_step(const bytes& path_secret) const;
   std::list<NodeIndex> resolve(NodeIndex index);
 
   void set_hash(NodeIndex index);

@@ -98,11 +98,9 @@ struct GroupInfo {
   tls::opaque<1> group_id;
   epoch_t epoch;
   RatchetTree tree;
-  tls::opaque<1> prior_confirmed_transcript_hash;
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
-  DirectPath path;
   tls::opaque<1> confirmation;
 
   LeafIndex signer_index;
@@ -112,10 +110,8 @@ struct GroupInfo {
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
             RatchetTree tree_in,
-            bytes prior_confirmed_transcript_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
-            DirectPath path_in,
             bytes confirmation_in);
 
   bytes to_be_signed() const;
@@ -125,24 +121,22 @@ struct GroupInfo {
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    tree,
-                   prior_confirmed_transcript_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
-                   path,
                    confirmation,
                    signer_index,
                    signature);
 };
 
 // struct {
-//   opaque group_info_key<1..255>;
-//   opaque group_info_nonce<1..255>;
+//   opaque epoch_secret<1..255>;
 //   opaque path_secret<1..255>;
 // } GroupSecrets;
 struct GroupSecrets {
-  tls::opaque<1> init_secret;
+  tls::opaque<1> epoch_secret;
+  tls::optional<tls::opaque<1>> path_secret;
 
-  TLS_SERIALIZABLE(init_secret);
+  TLS_SERIALIZABLE(epoch_secret, path_secret);
 };
 
 // struct {
@@ -171,13 +165,15 @@ struct Welcome {
 
   Welcome();
   Welcome(CipherSuite suite,
-          bytes init_secret,
+          const bytes& epoch_secret,
           const GroupInfo& group_info);
 
-  void encrypt(const KeyPackage& kp);
+  void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
+  GroupInfo decrypt(const bytes& epoch_secret) const;
 
   private:
-  bytes _init_secret;
+  bytes _epoch_secret;
+  std::tuple<bytes, bytes> group_info_key_nonce(const bytes& epoch_secret) const;
 };
 
 bool operator==(const Welcome& lhs, const Welcome& rhs);
