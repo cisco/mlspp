@@ -662,7 +662,7 @@ operator==(const RatchetTree& lhs, const RatchetTree& rhs)
 }
 
 std::ostream&
-operator<<(std::ostream& out, const RatchetTree obj)
+operator<<(std::ostream& out, const RatchetTree& obj)
 {
   out << "=== tree ===" << std::endl;
   for (uint32_t i = 0; i < obj._nodes.size(); ++i) {

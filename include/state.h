@@ -38,19 +38,14 @@ public:
   State(bytes group_id,
         CipherSuite suite,
         const HPKEPrivateKey& leaf_priv,
+        const SignaturePrivateKey& sig_priv,
         const Credential& credential);
 
   // Initialize a group from a Welcome
-  State(const std::vector<KeyPackage>& my_key_packages,
+  State(const HPKEPrivateKey& init_priv,
+        const SignaturePrivateKey& sig_priv,
+        const KeyPackage& kp,
         const Welcome& welcome);
-
-  // Negotiate an initial state with another peer based on their
-  // KeyPackage
-  static std::tuple<Welcome, State> negotiate(
-    const bytes& group_id,
-    const std::vector<KeyPackage>& my_key_packages,
-    const std::vector<KeyPackage>& key_packages,
-    const bytes& commit_secret);
 
   ///
   /// Message factories

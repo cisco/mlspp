@@ -66,7 +66,6 @@ struct OptionalRatchetTreeNode
                 const OptionalRatchetTreeNode& right);
 
 private:
-  CipherSuite _suite;
   bytes _hash;
 };
 
@@ -137,7 +136,7 @@ protected:
   // XXX(rlb): These are still necessary because operator>> triggers the
   // computation of the tree hash
   friend bool operator==(const RatchetTree& lhs, const RatchetTree& rhs);
-  friend std::ostream& operator<<(std::ostream& out, const RatchetTree obj);
+  friend std::ostream& operator<<(std::ostream& out, const RatchetTree& obj);
   friend tls::ostream& operator<<(tls::ostream& out, const RatchetTree& obj);
   friend tls::istream& operator>>(tls::istream& in, RatchetTree& obj);
 };
