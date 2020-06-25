@@ -43,7 +43,7 @@ TEST_F(MessagesTest, Interop)
     auto sig_priv =
       SignaturePrivateKey::derive(tc.signature_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv);
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
     DeterministicHPKE lock;
     auto ratchet_tree =
@@ -57,7 +57,9 @@ TEST_F(MessagesTest, Interop)
     silence_unused(dummy);
 
     // KeyPackage
-    KeyPackage key_package{ tc.cipher_suite, dh_priv, cred };
+    KeyPackage key_package{
+      tc.cipher_suite, dh_priv.public_key(), sig_priv, cred
+    };
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 

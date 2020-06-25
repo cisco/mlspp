@@ -57,12 +57,6 @@ Credential::public_key() const
   throw std::bad_variant_access();
 }
 
-std::optional<SignaturePrivateKey>
-Credential::private_key() const
-{
-  return _priv;
-}
-
 bool
 Credential::valid_for(const SignaturePrivateKey& priv) const
 {
@@ -74,14 +68,6 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 {
   Credential cred;
   cred._cred = BasicCredential{ identity, public_key };
-  return cred;
-}
-
-Credential
-Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
-{
-  auto cred = basic(identity, private_key.public_key());
-  cred._priv = private_key;
   return cred;
 }
 

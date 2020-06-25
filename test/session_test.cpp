@@ -50,22 +50,27 @@ protected:
   {
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
-    auto init_key = HPKEPrivateKey::derive(suite, init_secret);
-    auto cred = Credential::basic(user_id, id_priv);
-    auto key_package = KeyPackage{ suite, init_key, cred };
+    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto cred = Credential::basic(user_id, id_priv.public_key());
+    auto key_package =
+      KeyPackage{ suite, init_priv.public_key(), id_priv, cred };
+    auto init_info = Session::InitInfo{ init_priv, id_priv, key_package };
 
     // Initial add is different
     if (sessions.size() == 0) {
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
-      auto my_init_key = HPKEPrivateKey::derive(suite, my_init_secret);
-      auto my_cred = Credential::basic(user_id, id_priv);
-      auto my_key_package = KeyPackage{ suite, my_init_key, my_cred };
+      auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
+      auto my_cred = Credential::basic(user_id, my_id_priv.public_key());
+      auto my_key_package =
+        KeyPackage{ suite, my_init_priv.public_key(), my_id_priv, my_cred };
+      auto my_info =
+        Session::InitInfo{ my_init_priv, my_id_priv, my_key_package };
 
       auto commit_secret = fresh_secret();
-      auto [creator, welcome] = Session::start(
-        group_id, { my_key_package }, { key_package }, commit_secret);
-      auto joiner = Session::join({ key_package }, welcome);
+      auto [creator, welcome] =
+        Session::start(group_id, { my_info }, { key_package }, commit_secret);
+      auto joiner = Session::join({ init_info }, welcome);
       sessions.push_back(creator);
       sessions.push_back(joiner);
       return;
@@ -75,7 +80,7 @@ protected:
 
     auto add_secret = fresh_secret();
     auto [welcome, add] = sessions[from].add(add_secret, key_package);
-    auto next = Session::join({ key_package }, welcome);
+    auto next = Session::join({ init_info }, welcome);
     broadcast(add, index);
 
     // Add-in-place vs. add-at-edge
@@ -141,31 +146,39 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
-  auto credA = Credential::basic(user_id, idA);
+  auto credA = Credential::basic(user_id, idA.public_key());
   std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<KeyPackage> kpsA;
+  std::vector<Session::InitInfo> infosA;
   for (auto suiteA : ciphersA) {
-    auto init_key = HPKEPrivateKey::generate(suiteA);
-    kpsA.emplace_back(suiteA, init_key, credA);
+    auto init_priv = HPKEPrivateKey::generate(suiteA);
+    auto kp = KeyPackage{ suiteA, init_priv.public_key(), idA, credA };
+    auto info = Session::InitInfo{ init_priv, idA, kp };
+    kpsA.emplace_back(suiteA, init_priv.public_key(), idA, credA);
+    infosA.emplace_back(init_priv, idA, kpsA.back());
   }
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
-  auto credB = Credential::basic(user_id, idB);
+  auto credB = Credential::basic(user_id, idB.public_key());
   std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
                                      CipherSuite::X25519_SHA256_AES128GCM };
   std::vector<KeyPackage> kpsB;
+  std::vector<Session::InitInfo> infosB;
   for (auto suiteB : ciphersB) {
-    auto init_key = HPKEPrivateKey::generate(suiteB);
-    kpsB.emplace_back(suiteB, init_key, credB);
+    auto init_priv = HPKEPrivateKey::generate(suiteB);
+    auto kp = KeyPackage{ suiteB, init_priv.public_key(), idB, credB };
+    auto info = Session::InitInfo{ init_priv, idB, kp };
+    kpsB.emplace_back(suiteB, init_priv.public_key(), idB, credB);
+    infosB.emplace_back(init_priv, idB, kpsB.back());
   }
 
   auto init_secret = fresh_secret();
   auto session_welcome_add =
-    Session::start({ 0, 1, 2, 3 }, kpsA, kpsB, init_secret);
+    Session::start({ 0, 1, 2, 3 }, infosA, kpsB, init_secret);
   TestSession alice = std::get<0>(session_welcome_add);
-  TestSession bob = Session::join(kpsB, std::get<1>(session_welcome_add));
+  TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
   ASSERT_EQ(alice, bob);
   ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
 }
@@ -267,7 +280,7 @@ protected:
   }
 
   void follow_basic(uint32_t index,
-                    const KeyPackage& my_key_package,
+                    const Session::InitInfo& my_init_info,
                     const SessionTestVectors::TestCase& tc)
   {
     size_t curr = 0;
@@ -276,7 +289,7 @@ protected:
       // Member 0 creates the group
       auto [session_init, unused_welcome] =
         Session::start(basic_tv.group_id,
-                       { my_key_package },
+                       { my_init_info },
                        { tc.key_packages[1] },
                        tc.transcript.at(0).commit_secret);
       session_init.encrypt_handshake(tc.encrypt);
@@ -286,7 +299,7 @@ protected:
     } else {
       // Member i>0 is initialized with a welcome on step i-1
       auto& epoch = tc.transcript.at(index - 1);
-      session = Session::join({ my_key_package }, epoch.welcome.value());
+      session = Session::join({ my_init_info }, epoch.welcome.value());
       session->encrypt_handshake(tc.encrypt);
       assert_consistency(*session, epoch);
       curr = index;
@@ -352,10 +365,13 @@ protected:
       bytes seed = { uint8_t(i), 0 };
       auto init_priv = HPKEPrivateKey::derive(suite, seed);
       auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
-      auto cred = Credential::basic(seed, identity_priv);
-      auto my_key_package = KeyPackage{ suite, init_priv, cred };
-      ASSERT_EQ(my_key_package, tc.key_packages[i]);
-      follow_basic(i, my_key_package, tc);
+      auto cred = Credential::basic(seed, identity_priv.public_key());
+      auto key_package =
+        KeyPackage{ suite, init_priv.public_key(), identity_priv, cred };
+      auto init_info =
+        Session::InitInfo{ init_priv, identity_priv, key_package };
+      ASSERT_EQ(key_package, tc.key_packages[i]);
+      follow_basic(i, init_info, tc);
     }
   }
 };
