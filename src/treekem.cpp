@@ -47,11 +47,12 @@ struct LeafNodeHashInput
 void
 OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 {
-  auto hash_input_str = LeafNodeHashInput{ index, std::nullopt };
+  auto leaf = tls::optional<KeyPackage>{};
   if (has_value()) {
-    hash_input_str.key_package = std::get<KeyPackage>(value());
+    leaf = std::get<KeyPackage>(value());
   }
 
+  auto hash_input_str = LeafNodeHashInput{ index, leaf };
   auto hash_input = tls::marshal(hash_input_str);
   hash = Digest(suite).write(hash_input).digest();
 }
@@ -72,11 +73,12 @@ OptionalNode::set_parent_hash(CipherSuite suite,
                               const bytes& left,
                               const bytes& right)
 {
-  auto hash_input_str = ParentNodeHashInput{ index, std::nullopt, left, right };
+  auto parent = tls::optional<ParentNode>{};
   if (has_value()) {
-    hash_input_str.parent_node = std::get<ParentNode>(value());
+    parent = std::get<ParentNode>(value());
   }
 
+  auto hash_input_str = ParentNodeHashInput{ index, parent, left, right };
   auto hash_input = tls::marshal(hash_input_str);
   hash = Digest(suite).write(hash_input).digest();
 }
