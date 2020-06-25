@@ -9,7 +9,6 @@
 namespace mls {
 
 struct KeyPackage;
-struct KeyPackageOpts;
 struct DirectPath;
 
 enum class NodeType : uint8_t {
@@ -41,7 +40,7 @@ struct OptionalNode : public tls::optional<Node> {
 
   bytes hash;
 
-  void set_leaf_hash(CipherSuite suite, LeafIndex index);
+  void set_leaf_hash(CipherSuite suite, NodeIndex index);
   void set_parent_hash(CipherSuite suite, NodeIndex index, const bytes& left, const bytes& right);
 };
 
@@ -67,6 +66,7 @@ struct TreeKEMPrivateKey {
 
   void set_leaf_secret(const bytes& secret);
   std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
+  std::optional<HPKEPrivateKey> private_key(NodeIndex n);
 
   void decap(LeafIndex from, const TreeKEMPublicKey& pub, const bytes& context, const DirectPath& path);
 
@@ -74,7 +74,6 @@ struct TreeKEMPrivateKey {
   private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   bytes path_step(const bytes& path_secret) const;
-  std::optional<HPKEPrivateKey> private_key(NodeIndex n);
 };
 
 struct TreeKEMPublicKey {
@@ -82,26 +81,30 @@ struct TreeKEMPublicKey {
   tls::vector<OptionalNode, 4> nodes;
 
   TreeKEMPublicKey(CipherSuite suite);
-  TreeKEMPublicKey(const TreeKEMPublicKey& other);
-  // TODO other ctors
 
   LeafIndex add_leaf(const KeyPackage& kp);
   void update_leaf(LeafIndex index, const KeyPackage& kp);
   void blank_path(LeafIndex index);
 
-  std::tuple<TreeKEMPrivateKey, DirectPath> encap(LeafIndex from,
-                                                  const bytes& context,
-                                                  const bytes& leaf_secret,
-                                                  const SignaturePrivateKey& leafSigPriv,
-                                                  std::optional<KeyPackageOpts> opts) const;
   void merge(LeafIndex from, const DirectPath& path);
   void set_hash_all();
-  bytes root_hash() const;
+  bytes root_hash();
   LeafCount size() const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
   std::optional<KeyPackage> key_package(LeafIndex index) const;
+
+  std::tuple<TreeKEMPrivateKey, DirectPath> encap(LeafIndex from,
+                                                  const bytes& context,
+                                                  const bytes& leaf_secret,
+                                                  const SignaturePrivateKey& sig_priv,
+                                                  std::optional<KeyPackageOpts> opts);
+
+  private:
+  void clear_hash_all();
+  void clear_hash_path(LeafIndex index);
+  bytes get_hash(NodeIndex index);
 };
 
 bool operator==(const TreeKEMPublicKey& lhs, const TreeKEMPublicKey& rhs);

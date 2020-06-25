@@ -23,8 +23,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , init_key(init_key_in)
   , credential(credential_in)
 {
-  auto tbs = to_be_signed();
-  signature = sig_priv_in.sign(tbs);
+  sign(sig_priv_in, std::nullopt);
 }
 
 bytes
@@ -32,6 +31,15 @@ KeyPackage::hash() const
 {
   auto marshaled = tls::marshal(*this);
   return Digest(cipher_suite).write(marshaled).digest();
+}
+
+void
+KeyPackage::sign(const SignaturePrivateKey& sig_priv,
+                 std::optional<KeyPackageOpts> opts)
+{
+  // TODO(RLB): Apply opts
+  auto tbs = to_be_signed();
+  signature = sig_priv.sign(tbs);
 }
 
 bool
@@ -175,6 +183,19 @@ operator>>(tls::istream& str, Welcome& obj)
 const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
 const ProposalType Remove::type = ProposalType::remove;
+
+// DirectPath
+
+void
+DirectPath::sign(CipherSuite suite,
+                 const HPKEPublicKey& init_pub,
+                 const SignaturePrivateKey& sig_priv,
+                 std::optional<KeyPackageOpts> opts)
+{
+  // TODO set parent hash extension
+  leaf_key_package.init_key = init_pub;
+  leaf_key_package.sign(sig_priv, opts);
+}
 
 // MLSPlaintext
 

@@ -46,13 +46,12 @@ TEST(TreeKEMTest, OptionalNodeHashes)
   auto sig_priv = SignaturePrivateKey::generate(scheme);
   auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
 
-  auto leaf_index = LeafIndex(45);
   auto node_index = NodeIndex(7);
   auto hash = bytes{ 0, 1, 2, 3, 4 };
 
   auto parent = ParentNode{ init_priv.public_key(), {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent } };
-  ASSERT_THROW(opt_parent.set_leaf_hash(suite, leaf_index),
+  ASSERT_THROW(opt_parent.set_leaf_hash(suite, node_index),
                std::bad_variant_access);
 
   opt_parent.set_parent_hash(suite, node_index, hash, hash);
@@ -63,6 +62,6 @@ TEST(TreeKEMTest, OptionalNodeHashes)
   ASSERT_THROW(opt_leaf.set_parent_hash(suite, node_index, hash, hash),
                std::bad_variant_access);
 
-  opt_leaf.set_leaf_hash(suite, LeafIndex(45));
+  opt_leaf.set_leaf_hash(suite, node_index);
   ASSERT_FALSE(opt_leaf.hash.empty());
 }

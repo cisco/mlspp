@@ -28,6 +28,10 @@ enum class ProtocolVersion : uint8_t
 // } KeyPackage;
 enum class NodeType : uint8_t;
 
+struct KeyPackageOpts {
+  // TODO: Things to change in a KeyPackage
+};
+
 struct KeyPackage
 {
   ProtocolVersion version;
@@ -39,11 +43,14 @@ struct KeyPackage
 
   KeyPackage();
   KeyPackage(CipherSuite suite_in,
-             const HPKEPublicKey& init_key_in, // NOLINT(modernize-pass-by-value)
-             const SignaturePrivateKey& sig_priv_in, // NOLINT(modernize-pass-by-value)
+             const HPKEPublicKey& init_key_in,
+             const SignaturePrivateKey& sig_priv_in,
              const Credential& credential_in);
 
   bytes hash() const;
+
+  void sign(const SignaturePrivateKey& sig_priv,
+            std::optional<KeyPackageOpts> opts);
   bool verify() const;
 
   static const NodeType type;
@@ -230,6 +237,11 @@ struct DirectPath
 {
   KeyPackage leaf_key_package;
   tls::vector<RatchetNode, 2> nodes;
+
+  void sign(CipherSuite suite,
+            const HPKEPublicKey& init_pub,
+            const SignaturePrivateKey& sig_priv,
+            std::optional<KeyPackageOpts> opts);
 
   TLS_SERIALIZABLE(leaf_key_package, nodes);
 };

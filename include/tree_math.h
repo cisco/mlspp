@@ -67,6 +67,7 @@ struct LeafIndex : public UInt32
 {
   using UInt32::UInt32;
   bool operator<(const LeafIndex other) const { return val < other.val; }
+  bool operator<(const LeafCount other) const { return val < other.val; }
 };
 
 struct NodeIndex : public UInt32
