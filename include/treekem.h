@@ -52,16 +52,29 @@ struct TreeKEMPrivateKey {
   LeafIndex index;
   tls::opaque<1> update_secret;
   std::map<NodeIndex, tls::opaque<1>> path_secrets;
+  std::map<NodeIndex, HPKEPrivateKey> private_key_cache;
 
-  TreeKEMPrivateKey(CipherSuite suite, LeafCount size, LeafIndex index, const bytes& leaf_secret);
-  TreeKEMPrivateKey(const TreeKEMPrivateKey& other);
-  // TODO: Other ctors
+  static TreeKEMPrivateKey create(CipherSuite suite,
+                                  LeafCount size,
+                                  LeafIndex index,
+                                  const bytes& leaf_secret);
+  static TreeKEMPrivateKey joiner(CipherSuite suite,
+                                  LeafCount size,
+                                  LeafIndex index,
+                                  const bytes& leaf_secret,
+                                  NodeIndex intersect,
+                                  const bytes& path_secret);
 
-  void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   void set_leaf_secret(const bytes& secret);
-  std::tuple<NodeIndex, bytes> shared_path_secret(LeafIndex to) const;
+  std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
 
   void decap(LeafIndex from, const TreeKEMPublicKey& pub, const bytes& context, const DirectPath& path);
+
+
+  private:
+  void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
+  bytes path_step(const bytes& path_secret) const;
+  std::optional<HPKEPrivateKey> private_key(NodeIndex n);
 };
 
 struct TreeKEMPublicKey {
@@ -84,6 +97,8 @@ struct TreeKEMPublicKey {
   void merge(LeafIndex from, const DirectPath& path);
   void set_hash_all();
   bytes root_hash() const;
+  LeafCount size() const;
+  std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
   std::optional<KeyPackage> key_package(LeafIndex index) const;
