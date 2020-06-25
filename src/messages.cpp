@@ -63,7 +63,6 @@ GroupInfo::GroupInfo(bytes group_id_in,
                      bytes prior_confirmed_transcript_hash_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
-                     DirectPath path_in,
                      bytes confirmation_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
@@ -72,7 +71,6 @@ GroupInfo::GroupInfo(bytes group_id_in,
       std::move(prior_confirmed_transcript_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
-  , path(std::move(path_in))
   , confirmation(std::move(confirmation_in))
 {}
 
@@ -81,7 +79,7 @@ GroupInfo::to_be_signed() const
 {
   tls::ostream w;
   w << group_id << epoch << tree << confirmed_transcript_hash
-    << interim_transcript_hash << path << confirmation << signer_index;
+    << interim_transcript_hash << confirmation << signer_index;
   return w.bytes();
 }
 

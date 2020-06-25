@@ -83,8 +83,10 @@ State::State(const HPKEPrivateKey& init_priv,
     group_info.tree.root_hash(),
     group_info.prior_confirmed_transcript_hash,
   });
-  auto update_secret =
-    _tree.decap(group_info.signer_index, decap_ctx, group_info.path);
+
+  // TODO(RLB): Implement new Welcome processing
+  auto update_secret = bytes{};
+  //    _tree.decap(group_info.signer_index, decap_ctx, group_info.path);
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
@@ -195,7 +197,6 @@ State::commit(const bytes& leaf_secret) const
   // Complete the GroupInfo and form the Welcome
   group_info.confirmed_transcript_hash = next._confirmed_transcript_hash;
   group_info.interim_transcript_hash = next._interim_transcript_hash;
-  group_info.path = path;
   group_info.confirmation = std::get<CommitData>(pt.content).confirmation;
   group_info.sign(_index, _identity_priv);
 

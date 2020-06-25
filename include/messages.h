@@ -19,28 +19,6 @@ enum class ProtocolVersion : uint8_t
 };
 
 // struct {
-//    HPKEPublicKey public_key;
-//    HPKECiphertext node_secrets<0..2^16-1>;
-// } RatchetNode
-struct RatchetNode
-{
-  HPKEPublicKey public_key;
-  tls::vector<HPKECiphertext, 2> node_secrets;
-
-  TLS_SERIALIZABLE(public_key, node_secrets);
-};
-
-// struct {
-//    RatchetNode nodes<0..2^16-1>;
-// } DirectPath;
-struct DirectPath
-{
-  tls::vector<RatchetNode, 2> nodes;
-
-  TLS_SERIALIZABLE(nodes);
-};
-
-// struct {
 //     ProtocolVersion version;
 //     CipherSuite cipher_suite;
 //     HPKEPublicKey init_key;
@@ -49,7 +27,7 @@ struct DirectPath
 //     opaque signature<0..2^16-1>;
 // } KeyPackage;
 enum class NodeType : uint8_t;
-    
+
 struct KeyPackage
 {
   ProtocolVersion version;
@@ -97,7 +75,6 @@ struct GroupInfo {
 
   tls::opaque<1> confirmed_transcript_hash;
   tls::opaque<1> interim_transcript_hash;
-  DirectPath path;
   tls::opaque<1> confirmation;
 
   LeafIndex signer_index;
@@ -110,7 +87,6 @@ struct GroupInfo {
             bytes prior_confirmed_transcript_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
-            DirectPath path_in,
             bytes confirmation_in);
 
   bytes to_be_signed() const;
@@ -123,7 +99,6 @@ struct GroupInfo {
                    prior_confirmed_transcript_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
-                   path,
                    confirmation,
                    signer_index,
                    signature);
@@ -234,6 +209,29 @@ struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
   using parent::parent;
 
   static const ContentType type;
+};
+
+// struct {
+//    HPKEPublicKey public_key;
+//    HPKECiphertext node_secrets<0..2^16-1>;
+// } RatchetNode
+struct RatchetNode
+{
+  HPKEPublicKey public_key;
+  tls::vector<HPKECiphertext, 2> node_secrets;
+
+  TLS_SERIALIZABLE(public_key, node_secrets);
+};
+
+// struct {
+//    RatchetNode nodes<0..2^16-1>;
+// } DirectPath;
+struct DirectPath
+{
+  KeyPackage leaf_key_package;
+  tls::vector<RatchetNode, 2> nodes;
+
+  TLS_SERIALIZABLE(leaf_key_package, nodes);
 };
 
 // struct {
