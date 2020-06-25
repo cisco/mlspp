@@ -68,15 +68,12 @@ GroupInfo::GroupInfo(CipherSuite suite)
 GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
                      RatchetTree tree_in,
-                     bytes prior_confirmed_transcript_hash_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
                      bytes confirmation_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))
-  , prior_confirmed_transcript_hash(
-      std::move(prior_confirmed_transcript_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
   , confirmation(std::move(confirmation_in))
@@ -118,25 +115,26 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 bytes init_secret,
+                 const bytes& epoch_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
-  , _init_secret(std::move(init_secret))
+  , _epoch_secret(std::move(epoch_secret))
 {
-  auto first_epoch = FirstEpoch::create(cipher_suite, _init_secret);
+  bytes key, nonce;
+  std::tie(key, nonce) = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info = seal(cipher_suite,
-                              first_epoch.group_info_key,
-                              first_epoch.group_info_nonce,
-                              {},
-                              group_info_data);
+  encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
 }
 
 void
-Welcome::encrypt(const KeyPackage& kp)
+Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _init_secret };
+  auto gs = GroupSecrets{ _epoch_secret, std::nullopt };
+  if (path_secret.has_value()) {
+    gs.path_secret = path_secret.value();
+  }
+
   auto gs_data = tls::marshal(gs);
   auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
   secrets.push_back({ kp.hash(), enc_gs });
@@ -152,6 +150,31 @@ Welcome::find(const KeyPackage& kp) const
     }
   }
   return std::nullopt;
+}
+
+GroupInfo
+Welcome::decrypt(const bytes& epoch_secret) const
+{
+  bytes key, nonce;
+  std::tie(key, nonce) = group_info_key_nonce(epoch_secret);
+  auto group_info_data =
+    open(cipher_suite, key, nonce, {}, encrypted_group_info);
+  return tls::get<GroupInfo>(group_info_data, cipher_suite);
+}
+
+std::tuple<bytes, bytes>
+Welcome::group_info_key_nonce(const bytes& epoch_secret) const
+{
+  auto key_size = suite_key_size(cipher_suite);
+  auto nonce_size = suite_nonce_size(cipher_suite);
+  auto secret_size = Digest(cipher_suite).output_size();
+
+  auto secret = hkdf_expand_label(
+    cipher_suite, epoch_secret, "group info", {}, secret_size);
+  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
+  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
+
+  return std::make_tuple(key, nonce);
 }
 
 bool

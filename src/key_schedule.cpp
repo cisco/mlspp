@@ -285,38 +285,6 @@ GroupKeySource::erase(LeafIndex sender, uint32_t generation)
 }
 
 ///
-/// FirstEpoch
-///
-
-FirstEpoch
-FirstEpoch::create(CipherSuite suite, const bytes& init_secret)
-{
-  auto secret_size = Digest(suite).output_size();
-  auto key_size = suite_key_size(suite);
-  auto nonce_size = suite_nonce_size(suite);
-
-  auto group_info_secret =
-    hkdf_expand_label(suite, init_secret, "group info", {}, secret_size);
-  auto group_info_key =
-    hkdf_expand_label(suite, group_info_secret, "key", {}, key_size);
-  auto group_info_nonce =
-    hkdf_expand_label(suite, group_info_secret, "nonce", {}, nonce_size);
-
-  return FirstEpoch{
-    suite, init_secret, group_info_secret, group_info_key, group_info_nonce
-  };
-}
-
-KeyScheduleEpoch
-FirstEpoch::next(LeafCount size,
-                 const bytes& update_secret,
-                 const bytes& context)
-{
-  auto epoch_secret = hkdf_extract(suite, init_secret, update_secret);
-  return KeyScheduleEpoch::create(suite, size, epoch_secret, context);
-}
-
-///
 /// KeyScheduleEpoch
 ///
 
