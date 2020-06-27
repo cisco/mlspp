@@ -70,7 +70,6 @@ struct TreeKEMPrivateKey {
 
   void decap(LeafIndex from, const TreeKEMPublicKey& pub, const bytes& context, const DirectPath& path);
 
-
   private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   bytes path_step(const bytes& path_secret) const;
@@ -107,6 +106,6 @@ struct TreeKEMPublicKey {
   bytes get_hash(NodeIndex index);
 };
 
-bool operator==(const TreeKEMPublicKey& lhs, const TreeKEMPublicKey& rhs);
+std::ostream& operator<<(std::ostream& str, const TreeKEMPublicKey& obj);
 
 } // namespace mls

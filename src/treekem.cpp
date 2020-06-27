@@ -232,18 +232,24 @@ TreeKEMPrivateKey::decap(LeafIndex from,
 /// TreeKEMPublicKey
 ///
 
+TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
+  : suite(suite_in)
+{}
+
 LeafIndex
 TreeKEMPublicKey::add_leaf(const KeyPackage& kp)
 {
   // Find the leftmost free leaf
   auto index = LeafIndex(0);
-  while (index.val < size().val && !nodes.at(index.val).has_value()) {
+  while (index.val < size().val && nodes.at(NodeIndex(index).val).has_value()) {
     index.val++;
   }
 
   // Extend the tree if necessary
   auto ni = NodeIndex(index);
-  nodes.resize(ni.val + 1);
+  if (index.val >= size().val) {
+    nodes.resize(ni.val + 1);
+  }
 
   // Set the leaf
   nodes.at(ni.val) = Node{ kp };
@@ -451,12 +457,34 @@ TreeKEMPublicKey::get_hash(NodeIndex index)
 
   if (tree_math::level(index) == 0) {
     nodes.at(index.val).set_leaf_hash(suite, index);
+    return nodes.at(index.val).hash;
   }
 
   auto lh = get_hash(tree_math::left(index));
   auto rh = get_hash(tree_math::right(index, NodeCount(size())));
   nodes.at(index.val).set_parent_hash(suite, index, lh, rh);
   return nodes.at(index.val).hash;
+}
+
+std::ostream&
+operator<<(std::ostream& str, const TreeKEMPublicKey& obj)
+{
+  auto suite = obj.suite;
+  auto size = obj.nodes.size();
+
+  str << "=== TreeKEMPublicKey ===" << std::endl;
+  str << "suite=" << 0 << " nodes=" << size << std::endl;
+  for (size_t i = 0; i < size; i++) {
+    str << "  " << i << " ";
+    if (!obj.nodes[i].has_value()) {
+      str << "-" << std::endl;
+      continue;
+    }
+
+    str << obj.nodes[i].value().public_key().data << std::endl;
+  }
+
+  return str;
 }
 
 } // namespace mls
