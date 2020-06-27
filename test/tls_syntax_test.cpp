@@ -30,6 +30,21 @@ operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
   return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
 }
 
+struct StructWithTraits
+{
+  uint16_t a;
+  std::vector<uint8_t> b;
+
+  TLS_SERIALIZABLE(a, b);
+  TLS_TRAITS(tls::pass{}, tls::vector_trait<2>{});
+};
+
+bool
+operator==(const StructWithTraits& lhs, const StructWithTraits& rhs)
+{
+  return (lhs.a == rhs.a) && (lhs.b == rhs.b);
+}
+
 struct MustInitialize
 {
   uint8_t offset;
@@ -106,6 +121,12 @@ protected:
   const bytes enc_struct =
     from_hex("11110002222233333333444444445555555566666666");
 
+  const StructWithTraits val_struct_traits{
+    0x1111,
+    { 0x02, 0x03, 0x04 },
+  };
+  const bytes enc_struct_traits = from_hex("11110003020304");
+
   const tls::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
 
@@ -168,6 +189,7 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_vector, enc_vector);
   ostream_test(val_vector_raw, enc_vector_raw);
   ostream_test(val_struct, enc_struct);
+  ostream_test(val_struct_traits, enc_struct_traits);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_var_vector, enc_var_vector);
@@ -214,6 +236,9 @@ TEST_F(TLSSyntaxTest, IStream)
 
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);
+
+  StructWithTraits data_struct_traits;
+  istream_test(val_struct_traits, data_struct_traits, enc_struct_traits);
 
   tls::optional<ExampleStruct> data_optional;
   istream_test(val_optional, data_optional, enc_optional);

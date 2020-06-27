@@ -12,12 +12,6 @@
 // in the global namespace, e.g., vector, istream, ostream.
 namespace tls {
 
-// Use this macro to define struct serialization with minimal boilerplate
-#define TLS_SERIALIZABLE(...) \
-  static const bool _tls_serializable = true; \
-  auto _tls_fields_r() { return std::tie(__VA_ARGS__); } \
-  auto _tls_fields_w() const { return std::make_tuple(__VA_ARGS__); }
-
 // For indicating no min or max in vector definitions
 const size_t none = -1;
 
@@ -230,6 +224,9 @@ private:
   template<typename T, size_t head, size_t min, size_t max>
   friend ostream& operator<<(ostream& out,
                              const vector_base<T, head, min, max>& data);
+
+  template<size_t head, size_t min, size_t max>
+  friend struct vector_trait;
 };
 
 // Primitive writers defined in .cpp file
@@ -349,27 +346,6 @@ operator<<(tls::ostream& str, const variant<Te, Tp...>& v)
   return str;
 }
 
-// Struct writer (enabled by macro)
-template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I == sizeof...(Tp), void>::type
-write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
-{ }
-
-template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
-{
-  str << std::get<I>(t);
-  write_tuple<I + 1, Tp...>(str, t);
-}
-
-template<typename T>
-inline typename std::enable_if<T::_tls_serializable, tls::ostream&>::type
-operator<<(tls::ostream& str, const T& obj) {
-  write_tuple(str, obj._tls_fields_w());
-  return str;
-}
-
 ///
 /// istream
 ///
@@ -403,6 +379,9 @@ private:
 
   template<typename T, size_t head, size_t min, size_t max>
   friend istream& operator>>(istream& in, vector_base<T, head, min, max>& data);
+
+  template<size_t head, size_t min, size_t max>
+  friend struct vector_trait;
 };
 
 // Primitive type readers defined in .cpp file
@@ -550,27 +529,6 @@ operator>>(tls::istream& str, variant_variant<Te, Tc, Tp...>& v)
   return str;
 }
 
-// Struct reader (enabled by macro)
-template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I == sizeof...(Tp), void>::type
-read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
-{ }
-
-template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
-{
-  str >> std::get<I>(t);
-  read_tuple<I + 1, Tp...>(str, t);
-}
-
-template<typename T>
-inline typename std::enable_if<T::_tls_serializable, tls::istream&>::type
-operator>>(tls::istream& str, T& obj) {
-  read_tuple(str, obj._tls_fields_r());
-  return str;
-}
-
 // Abbreviations
 template<typename T>
 std::vector<uint8_t>
@@ -596,6 +554,257 @@ get(const std::vector<uint8_t>& data, Tp... args)
   T value(args...);
   tls::unmarshal(data, value);
   return value;
+}
+
+// Use this macro to define struct serialization with minimal boilerplate
+#define TLS_SERIALIZABLE(...) \
+  static const bool _tls_serializable = true; \
+  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); } \
+  auto _tls_fields_w() const { return std::forward_as_tuple(__VA_ARGS__); }
+
+// If your struct contains nontrivial members (e.g., vectors), use this to
+// define traits for them.
+#define TLS_TRAITS(...) \
+  static const bool _tls_has_traits = true; \
+  auto _tls_traits() const { return std::forward_as_tuple(__VA_ARGS__); }
+
+template<typename T>
+struct is_serializable {
+  template<typename U>
+  static std::true_type test(decltype(U::_tls_serializable));
+
+  template<typename U>
+  static std::false_type test(...);
+
+  static const bool value = decltype(test<T>(true))::value;
+};
+
+template<typename T>
+struct has_traits {
+  template<typename U>
+  static std::true_type test(decltype(U::_tls_has_traits));
+
+  template<typename U>
+  static std::false_type test(...);
+
+  static const bool value = decltype(test<T>(true))::value;
+};
+
+// Each trait must have an encode and decode method, of the following form:
+//
+//     ostream& encode(ostream& str, const T& val);
+//     istream& decode(istream& str, const T& val);
+//
+// The value arguments to encode and decode can be as strict or as loose as
+// desired.
+//
+// Ultimately, all interesting encoding should be done through traits.
+//
+// * vectors
+// * variants
+// * varints
+
+// Pass-through (normal encoding/decoding)
+struct pass {
+  template<typename T>
+  ostream& encode(ostream& str, const T& val) {
+    return str << val;
+  }
+
+  template<typename T>
+  istream& decode(istream& str, T& val) {
+    return str >> val;
+  }
+};
+
+// Vector encoding
+template<size_t head, size_t min=none, size_t max=none>
+struct vector_trait {
+  template<typename T>
+  ostream& encode(ostream& str, const std::vector<T>& data) {
+    // Vectors with no header are written directly
+    if (head == 0) {
+      for (const auto& item : data) {
+        str << item;
+      }
+      return str;
+    }
+
+    uint64_t head_max = 0;
+    switch (head) {
+      case 1:
+        head_max = 0xff;
+        break;
+      case 2:
+        head_max = 0xffff;
+        break;
+      case 3:
+        head_max = 0xffffff;
+        break;
+      case 4:
+        head_max = 0xffffffff;
+        break;
+      default:
+        throw WriteError("Invalid header size");
+    }
+
+    // Pre-encode contents
+    ostream temp;
+    for (const auto& item : data) {
+      temp << item;
+    }
+
+    // Check that the encoded length is OK
+    uint64_t size = temp._buffer.size();
+    if (size > head_max) {
+      throw WriteError("Data too large for header size");
+    } else if ((max != none) && (size > max)) {
+      throw WriteError("Data too large for declared max");
+    } else if ((min != none) && (size < min)) {
+      throw WriteError("Data too small for declared min");
+    }
+
+    // Write the encoded length, then the pre-encoded data
+    str.write_uint(size, head);
+    str.write_raw(temp.bytes());
+
+    return str;
+  }
+
+  template<typename T>
+  istream& decode(istream& str, std::vector<T>& data) {
+    switch (head) {
+      case 0: // fallthrough
+      case 1: // fallthrough
+      case 2: // fallthrough
+      case 3: // fallthrough
+      case 4:
+        break;
+      default:
+        throw ReadError("Invalid header size");
+    }
+
+    // Read the size of the vector, if provided; otherwise consume all remaining
+    // data in the buffer
+    uint64_t size = str._buffer.size();
+    if (head > 0) {
+      str.read_uint(size, head);
+    }
+
+    // Check the size against the declared constraints
+    if (size > str._buffer.size()) {
+      throw ReadError("Declared size exceeds available data size");
+    } else if ((max != none) && (size > max)) {
+      throw ReadError("Data too large for declared max");
+    } else if ((min != none) && (size < min)) {
+      throw ReadError("Data too small for declared min");
+    }
+
+    // Truncate the data buffer
+    data.clear();
+
+    // Truncate the buffer to the declared length and wrap it in a
+    // new reader, then read items from it
+    // NB: Remember that we store the vector in reverse order
+    // NB: This requires that T be default-constructible
+    std::vector<uint8_t> trunc(str._buffer.end() - size, str._buffer.end());
+    istream r;
+    r._buffer = trunc;
+    while (r._buffer.size() > 0) {
+      data.emplace_back();
+      r >> data.back();
+    }
+
+    // Truncate the primary buffer
+    str._buffer.erase(str._buffer.end() - size, str._buffer.end());
+
+    return str;
+  }
+};
+
+
+// Struct writer without traits (enabled by macro)
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+{ }
+
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+{
+  str << std::get<I>(t);
+  write_tuple<I + 1, Tp...>(str, t);
+}
+
+template<typename T>
+inline typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value, tls::ostream&>::type
+operator<<(tls::ostream& str, const T& obj) {
+  write_tuple(str, obj._tls_fields_w());
+  return str;
+}
+
+// Struct writer with traits (enabled by macro)
+template<size_t I = 0, typename... Tp, typename... Tr>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t, const std::tuple<Tr...>& tr)
+{ }
+
+template<size_t I = 0, typename... Tp, typename... Tr>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+write_tuple(tls::ostream& str, const std::tuple<Tp...>& t, const std::tuple<Tr...>& tr)
+{
+  std::get<I>(tr).encode(str, std::get<I>(t));
+  write_tuple<I + 1, Tp...>(str, t, tr);
+}
+
+template<typename T>
+inline typename std::enable_if<is_serializable<T>::value && has_traits<T>::value, tls::ostream&>::type
+operator<<(tls::ostream& str, const T& obj) {
+  write_tuple(str, obj._tls_fields_w(), obj._tls_traits());
+  return str;
+}
+
+// Struct reader without traits (enabled by macro)
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+{ }
+
+template<size_t I = 0, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+{
+  str >> std::get<I>(t);
+  read_tuple<I + 1, Tp...>(str, t);
+}
+
+template<typename T>
+inline typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value, tls::istream&>::type
+operator>>(tls::istream& str, T& obj) {
+  read_tuple(str, obj._tls_fields_r());
+  return str;
+}
+
+// Struct reader with traits (enabled by macro)
+template<size_t I = 0, typename... Tp, typename... Tr>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t, const std::tuple<Tr...>& tr)
+{ }
+
+template<size_t I = 0, typename... Tp, typename... Tr>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+read_tuple(tls::istream& str, const std::tuple<Tp...>& t, const std::tuple<Tr...>& tr)
+{
+  std::get<I>(tr).decode(str, std::get<I>(t));
+  read_tuple<I + 1, Tp...>(str, t, tr);
+}
+
+template<typename T>
+inline typename std::enable_if<is_serializable<T>::value && has_traits<T>::value, tls::istream&>::type
+operator>>(tls::istream& str, T& obj) {
+  read_tuple(str, obj._tls_fields_r(), obj._tls_traits());
+  return str;
 }
 
 } // namespace tls
