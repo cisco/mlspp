@@ -36,7 +36,7 @@ struct StructWithTraits
   std::vector<uint8_t> b;
 
   TLS_SERIALIZABLE(a, b);
-  TLS_TRAITS(tls::pass{}, tls::vector_trait<2>{});
+  TLS_TRAITS(tls::pass, tls::vector_trait<2>);
 };
 
 bool
