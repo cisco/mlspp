@@ -482,6 +482,66 @@ struct vector {
   }
 };
 
+// Variant encoding
+template<typename Te>
+struct variant_trait {
+  template<typename Tv>
+  static Te value_for();
+
+  template<size_t I = 0, typename... Tp>
+  static inline typename std::enable_if<I == sizeof...(Tp), void>::type
+  write_variant(tls::ostream& str, const std::variant<Tp...>& t)
+  {
+    throw WriteError("Empty variant");
+  }
+
+  template<size_t I = 0, typename... Tp>
+  static inline typename std::enable_if<I < sizeof...(Tp), void>::type
+  write_variant(tls::ostream& str, const std::variant<Tp...>& v)
+  {
+    using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
+    if (std::holds_alternative<curr_type>(v)) {
+      str << value_for<curr_type>() << std::get<I>(v);
+      return;
+    }
+
+    write_variant<I + 1, Tp...>(str, v);
+  }
+
+  template<typename... Tp>
+  static ostream& encode(ostream& str, const std::variant<Tp...>& data) {
+    write_variant(str, data);
+  }
+
+  template<size_t I = 0, typename... Tp, typename... Tc>
+  static inline typename std::enable_if<I == sizeof...(Tp), void>::type
+  read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& t, Tc... context)
+  {
+    throw ReadError("Invalid variant type label");
+  }
+
+  template<size_t I = 0, typename... Tp, typename... Tc>
+  static inline typename std::enable_if<I < sizeof...(Tp), void>::type
+  read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v, Tc... context)
+  {
+    using curr_type = std::variant_alternative_t<I, std::variant<Tp...>>;
+    if (value_for<curr_type>() == target_type) {
+      str >> v.template emplace<I>(context...);
+      return;
+    }
+
+    read_variant<I + 1>(str, target_type, v, context...);
+  }
+
+  template<typename... Tp>
+  static istream& decode(istream& str, std::variant<Tp...>& data)
+  {
+    Te target_type;
+    str >> target_type;
+    read_variant(str, target_type, data);
+    return str;
+  }
+};
 
 // Struct writer without traits (enabled by macro)
 template<size_t I = 0, typename... Tp>
@@ -514,7 +574,7 @@ template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I < sizeof...(Tp), void>::type
 write_tuple_traits(tls::ostream& str, const std::tuple<Tp...>& t)
 {
-  std::tuple_element<I, Tr>::type::encode(str, std::get<I>(t));
+  std::tuple_element_t<I, Tr>::encode(str, std::get<I>(t));
   write_tuple_traits<Tr, I + 1, Tp...>(str, t);
 }
 
@@ -556,7 +616,7 @@ template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I < sizeof...(Tp), void>::type
 read_tuple_traits(tls::istream& str, const std::tuple<Tp...>& t)
 {
-  std::tuple_element<I, Tr>::type::decode(str, std::get<I>(t));
+  std::tuple_element_t<I, Tr>::decode(str, std::get<I>(t));
   read_tuple_traits<Tr, I + 1, Tp...>(str, t);
 }
 
