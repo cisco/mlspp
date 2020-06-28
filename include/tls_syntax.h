@@ -70,72 +70,6 @@ class variant_variant : public variant<Te, Tp...>
   Tc _context;
 };
 
-template<typename T, size_t head, size_t min = none, size_t max = none>
-class vector_base : public std::vector<T>
-{
-public:
-  // Explicitly import constructors
-  using parent = std::vector<T>;
-  using parent::parent;
-
-  vector_base(const parent& other)
-    : parent(other)
-  {}
-  vector_base(parent&& other)
-    : parent(other)
-  {}
-  vector_base()
-    : parent()
-  {}
-
-  virtual T new_element() const = 0;
-};
-
-// A vector type that knows the length of its header and optionally
-// min and max lengths.  Otherwise identical to std::vector<T>.
-//
-// Tagging the type with head/min/max ensures symmetry in
-// encode/decode, with a simple API.  The cost is that new code gets
-// generated for every head/min/max combination.
-template<typename T, size_t head, size_t min = none, size_t max = none>
-class vector : public vector_base<T, head, min, max>
-{
-public:
-  // Explicitly import constructors
-  using parent = vector_base<T, head, min, max>;
-  using parent::parent;
-  virtual ~vector() = default;
-
-  virtual T new_element() const { return T{}; }
-};
-
-// An extension of the above vector type that can be used to handle
-// types with runtime variants.  This works the same as `vector`
-// except that it passes a single argument to the constructor for
-// new elements.
-template<typename T,
-         typename C,
-         size_t head,
-         size_t min = none,
-         size_t max = none>
-class variant_vector : public vector_base<T, head, min, max>
-{
-public:
-  // Explicitly import constructors
-  using parent = vector_base<T, head, min, max>;
-  using parent::parent;
-
-  variant_vector(C ctor_arg)
-    : _ctor_arg(ctor_arg)
-  {}
-
-  void set_arg(C ctor_arg) { _ctor_arg = ctor_arg; }
-  virtual T new_element() const { return T{ _ctor_arg }; }
-
-private:
-  C _ctor_arg;
-};
-
 template<typename T>
 class optional_base : public std::optional<T>
 {
@@ -192,9 +126,6 @@ operator==(const variant_optional<T, C>& lhs, const variant_optional<T, C>& rhs)
   return (both_blank || (both_occupied && (lhs.value() == rhs.value())));
 }
 
-template<size_t head, size_t min = tls::none, size_t max = tls::none>
-using opaque = vector<uint8_t, head, min, max>;
-
 ///
 /// ostream
 ///
@@ -221,10 +152,6 @@ private:
   template<typename T, size_t N>
   friend ostream& operator<<(ostream& out, const std::array<T, N>& data);
 
-  template<typename T, size_t head, size_t min, size_t max>
-  friend ostream& operator<<(ostream& out,
-                             const vector_base<T, head, min, max>& data);
-
   template<size_t head, size_t min, size_t max>
   friend struct vector_trait;
 };
@@ -239,61 +166,6 @@ operator<<(ostream& out, const std::array<T, N>& data)
   for (const auto& item : data) {
     out << item;
   }
-  return out;
-}
-
-// Vector writer
-template<typename T, size_t head, size_t min, size_t max>
-ostream&
-operator<<(ostream& out, const vector_base<T, head, min, max>& data)
-{
-  // Vectors with no header are written directly
-  if (head == 0) {
-    for (const auto& item : data) {
-      out << item;
-    }
-    return out;
-  }
-
-  uint64_t head_max = 0;
-  switch (head) {
-    case 1:
-      head_max = 0xff;
-      break;
-    case 2:
-      head_max = 0xffff;
-      break;
-    case 3:
-      head_max = 0xffffff;
-      break;
-    case 4:
-      head_max = 0xffffffff;
-      break;
-    default:
-      throw WriteError("Invalid header size");
-  }
-
-  // Pre-encode contents
-  ostream temp;
-  for (const auto& item : data) {
-    temp << item;
-  }
-
-  // Check that the encoded length is OK
-  uint64_t size = temp._buffer.size();
-  if (size > head_max) {
-    throw WriteError("Data too large for header size");
-  } else if ((max != none) && (size > max)) {
-    throw WriteError("Data too large for declared max");
-  } else if ((min != none) && (size < min)) {
-    throw WriteError("Data too small for declared min");
-  }
-
-  // Write the encoded length, then the pre-encoded data
-  out.write_uint(size, head);
-  out._buffer.insert(
-    out._buffer.end(), temp._buffer.begin(), temp._buffer.end());
-
   return out;
 }
 
@@ -377,9 +249,6 @@ private:
   template<typename T, size_t N>
   friend istream& operator>>(istream& in, std::array<T, N>& data);
 
-  template<typename T, size_t head, size_t min, size_t max>
-  friend istream& operator>>(istream& in, vector_base<T, head, min, max>& data);
-
   template<size_t head, size_t min, size_t max>
   friend struct vector_trait;
 };
@@ -394,60 +263,6 @@ operator>>(istream& in, std::array<T, N>& data)
   for (auto& item : data) {
     in >> item;
   }
-  return in;
-}
-
-// Vector reader
-template<typename T, size_t head, size_t min, size_t max>
-istream&
-operator>>(istream& in, vector_base<T, head, min, max>& data)
-{
-  switch (head) {
-    case 0: // fallthrough
-    case 1: // fallthrough
-    case 2: // fallthrough
-    case 3: // fallthrough
-    case 4:
-      break;
-    default:
-      throw ReadError("Invalid header size");
-  }
-
-  // Read the size of the vector, if provided; otherwise consume all remaining
-  // data in the buffer
-  uint64_t size = in._buffer.size();
-  if (head > 0) {
-    in.read_uint(size, head);
-  }
-
-  // Check the size against the declared constraints
-  if (size > in._buffer.size()) {
-    throw ReadError("Declared size exceeds available data size");
-  } else if ((max != none) && (size > max)) {
-    throw ReadError("Data too large for declared max");
-  } else if ((min != none) && (size < min)) {
-    throw ReadError("Data too small for declared min");
-  }
-
-  // Truncate the data buffer
-  data.clear();
-
-  // Truncate the buffer to the declared length and wrap it in a
-  // new reader, then read items from it
-  // NB: Remember that we store the vector in reverse order
-  // NB: This requires that T be default-constructible
-  std::vector<uint8_t> trunc(in._buffer.end() - size, in._buffer.end());
-  istream r;
-  r._buffer = trunc;
-  while (r._buffer.size() > 0) {
-    auto temp = data.new_element();
-    r >> temp;
-    data.push_back(temp);
-  }
-
-  // Truncate the primary buffer
-  in._buffer.erase(in._buffer.end() - size, in._buffer.end());
-
   return in;
 }
 
