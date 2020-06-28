@@ -149,9 +149,10 @@ OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
 struct ParentNodeInfo
 {
   HPKEPublicKey public_key;
-  tls::vector<LeafIndex, 4> unmerged_leaves;
+  std::vector<LeafIndex> unmerged_leaves;
 
   TLS_SERIALIZABLE(public_key, unmerged_leaves);
+  TLS_TRAITS(tls::pass{}, tls::vector_trait<4>{});
 };
 
 struct ParentNodeHashInput
@@ -658,14 +659,13 @@ operator<<(std::ostream& out, const RatchetTree& obj)
 tls::ostream&
 operator<<(tls::ostream& out, const RatchetTree& obj)
 {
-  return out << obj._nodes;
+  return tls::vector_trait<4>{}.encode(out, obj._nodes);
 }
 
 tls::istream&
 operator>>(tls::istream& in, RatchetTree& obj)
 {
-  in >> obj._nodes;
-
+  tls::vector_trait<4>{}.decode(in, obj._nodes);
   obj.set_hash_all(obj.root_index());
   return in;
 }
