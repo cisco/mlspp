@@ -107,10 +107,10 @@ TEST_F(MessagesTest, Interop)
 
     // Commit
     auto commit = Commit{
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
       direct_path,
     };
     tls_round_trip(tc.commit, commit, true);

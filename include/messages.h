@@ -145,7 +145,7 @@ struct GroupInfo {
 //   opaque path_secret<1..255>;
 // } GroupSecrets;
 struct GroupSecrets {
-  tls::opaque<1> init_secret;
+  bytes init_secret;
 
   TLS_SERIALIZABLE(init_secret);
   TLS_TRAITS(tls::vector_trait<1>);
@@ -245,6 +245,12 @@ struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
   static const ContentType type;
 };
 
+struct ProposalID {
+  bytes id;
+  TLS_SERIALIZABLE(id);
+  TLS_TRAITS(tls::vector_trait<1>);
+};
+
 // struct {
 //     ProposalID updates<0..2^16-1>;
 //     ProposalID removes<0..2^16-1>;
@@ -252,7 +258,6 @@ struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
 //     ProposalID ignored<0..2^16-1>;
 //     DirectPath path;
 // } Commit;
-using ProposalID = tls::opaque<1>;
 struct Commit {
   std::vector<ProposalID> updates;
   std::vector<ProposalID> removes;
@@ -285,10 +290,12 @@ struct Commit {
 //
 //     opaque signature<0..2^16-1>;
 // } MLSPlaintext;
-struct ApplicationData : tls::opaque<4>
+struct ApplicationData
 {
-  using parent = tls::opaque<4>;
-  using parent::parent;
+  bytes data;
+
+  TLS_SERIALIZABLE(data);
+  TLS_TRAITS(tls::vector_trait<4>);
 
   static const ContentType type;
 };

@@ -26,12 +26,12 @@ struct BasicCredential
   BasicCredential()
   {}
 
-  BasicCredential(tls::opaque<2> identity_in, SignaturePublicKey public_key_in)
+  BasicCredential(bytes identity_in, SignaturePublicKey public_key_in)
     : identity(std::move(identity_in))
     , public_key(std::move(public_key_in))
   {}
 
-  tls::opaque<2> identity;
+  bytes identity;
   SignaturePublicKey public_key;
 
   static const CredentialType type;

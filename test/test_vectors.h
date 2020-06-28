@@ -14,15 +14,22 @@ struct TreeMathTestVectors
 {
   static const std::string file_name;
 
+  struct NodeVector
+  {
+    std::vector<NodeIndex> nodes;
+    TLS_SERIALIZABLE(nodes);
+    TLS_TRAITS(tls::vector_trait<4>);
+  };
+
   LeafCount n_leaves{ 255 };
   std::vector<NodeIndex> root;
   std::vector<NodeIndex> left;
   std::vector<NodeIndex> right;
   std::vector<NodeIndex> parent;
   std::vector<NodeIndex> sibling;
-  std::vector<tls::vector<NodeIndex, 4>> dirpath;
-  std::vector<tls::vector<NodeIndex, 4>> copath;
-  std::vector<tls::vector<NodeIndex, 4>> ancestor;
+  std::vector<NodeVector> dirpath;
+  std::vector<NodeVector> copath;
+  std::vector<NodeVector> ancestor;
 
   TLS_SERIALIZABLE(n_leaves,
                    root,
@@ -109,7 +116,12 @@ struct HashRatchetTestVectors
     TLS_TRAITS(tls::vector_trait<1>, tls::vector_trait<1>);
   };
 
-  typedef tls::vector<Step, 4> KeySequence;
+  struct KeySequence
+  {
+    std::vector<Step> steps;
+    TLS_SERIALIZABLE(steps);
+    TLS_TRAITS(tls::vector_trait<4>);
+  };
 
   struct TestCase
   {
@@ -290,16 +302,28 @@ struct TreeTestVectors
 {
   static const std::string file_name;
 
+  struct Bytes1
+  {
+    bytes data;
+    TLS_SERIALIZABLE(data);
+    TLS_TRAITS(tls::vector_trait<1>);
+  };
+
   struct TreeNode
   {
-    tls::optional<tls::opaque<1>> public_key;
+    tls::optional<Bytes1> public_key;
     bytes hash;
 
     TLS_SERIALIZABLE(public_key, hash);
     TLS_TRAITS(tls::pass, tls::vector_trait<1>);
   };
 
-  typedef tls::vector<TreeNode, 4> TreeCase;
+  struct TreeCase
+  {
+    std::vector<TreeNode> nodes;
+    TLS_SERIALIZABLE(nodes);
+    TLS_TRAITS(tls::vector_trait<4>);
+  };
 
   struct TestCase
   {
@@ -312,7 +336,7 @@ struct TreeTestVectors
     TLS_TRAITS(tls::pass, tls::pass, tls::vector_trait<4>, tls::vector_trait<4>)
   };
 
-  std::vector<tls::opaque<1>> leaf_secrets;
+  std::vector<Bytes1> leaf_secrets;
   std::vector<Credential> credentials;
   std::vector<TestCase> cases;
 

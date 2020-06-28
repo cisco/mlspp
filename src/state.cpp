@@ -121,7 +121,7 @@ State::update(const bytes& leaf_secret)
   auto pt = sign(Update{ key.public_key() });
 
   auto id = proposal_id(pt);
-  _update_secrets[id] = leaf_secret;
+  _update_secrets[id.id] = leaf_secret;
 
   return pt;
 }
@@ -343,10 +343,10 @@ State::apply(const Remove& remove)
   _tree.blank_path(remove.removed, true);
 }
 
-bytes
+ProposalID
 State::proposal_id(const MLSPlaintext& pt) const
 {
-  return Digest(_suite).write(tls::marshal(pt)).digest();
+  return ProposalID{ Digest(_suite).write(tls::marshal(pt)).digest() };
 }
 
 std::optional<MLSPlaintext>
@@ -386,11 +386,11 @@ State::apply(const std::vector<ProposalID>& ids)
           break;
         }
 
-        if (_update_secrets.count(id) == 0) {
+        if (_update_secrets.count(id.id) == 0) {
           throw ProtocolError("Self-update with no cached secret");
         }
 
-        apply(pt.sender, _update_secrets[id]);
+        apply(pt.sender, _update_secrets[id.id]);
         break;
       case ProposalType::remove:
         apply(std::get<Remove>(proposal));
@@ -419,7 +419,7 @@ State::apply(const Commit& commit)
 MLSCiphertext
 State::protect(const bytes& pt)
 {
-  MLSPlaintext mpt{ _group_id, _epoch, _index, pt };
+  MLSPlaintext mpt{ _group_id, _epoch, _index, ApplicationData{ pt } };
   mpt.sign(group_context(), _identity_priv);
   return encrypt(mpt);
 }
@@ -438,7 +438,7 @@ State::unprotect(const MLSCiphertext& ct)
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-slicing)
-  return static_cast<bytes>(std::get<ApplicationData>(pt.content));
+  return std::get<ApplicationData>(pt.content).data;
 }
 
 ///
@@ -492,16 +492,19 @@ State::update_epoch_secrets(const bytes& update_secret)
 //     opaque encrypted_sender_data<0..255>;
 // } MLSCiphertextContentAAD;
 static bytes
-content_aad(const tls::opaque<1>& group_id,
+content_aad(const bytes& group_id,
             uint32_t epoch,
             ContentType content_type,
-            const tls::opaque<4>& authenticated_data,
-            const tls::opaque<1>& sender_data_nonce,
-            const tls::opaque<1>& encrypted_sender_data)
+            const bytes& authenticated_data,
+            const bytes& sender_data_nonce,
+            const bytes& encrypted_sender_data)
 {
   tls::ostream w;
-  w << group_id << epoch << content_type << authenticated_data
-    << sender_data_nonce << encrypted_sender_data;
+  tls::vector_trait<1>::encode(w, group_id);
+  w << epoch << content_type;
+  tls::vector_trait<4>::encode(w, authenticated_data);
+  tls::vector_trait<1>::encode(w, sender_data_nonce);
+  tls::vector_trait<1>::encode(w, encrypted_sender_data);
   return w.bytes();
 }
 
@@ -512,13 +515,15 @@ content_aad(const tls::opaque<1>& group_id,
 //     opaque sender_data_nonce<0..255>;
 // } MLSCiphertextSenderDataAAD;
 static bytes
-sender_data_aad(const tls::opaque<1>& group_id,
+sender_data_aad(const bytes& group_id,
                 uint32_t epoch,
                 ContentType content_type,
-                const tls::opaque<1>& sender_data_nonce)
+                const bytes& sender_data_nonce)
 {
   tls::ostream w;
-  w << group_id << epoch << content_type << sender_data_nonce;
+  tls::vector_trait<1>::encode(w, group_id);
+  w << epoch << content_type;
+  tls::vector_trait<1>::encode(w, sender_data_nonce);
   return w.bytes();
 }
 

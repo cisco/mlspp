@@ -18,8 +18,8 @@ class RatchetTreeNode
 public:
   RatchetTreeNode() = default;
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
-  RatchetTreeNode(HPKEPrivateKey priv);
-  RatchetTreeNode(HPKEPublicKey pub);
+  RatchetTreeNode(const HPKEPrivateKey& priv);
+  RatchetTreeNode(const HPKEPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
   const std::optional<HPKEPrivateKey>& private_key() const;

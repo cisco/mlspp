@@ -14,14 +14,14 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
   _pub = _priv.value().public_key();
 }
 
-RatchetTreeNode::RatchetTreeNode(HPKEPrivateKey priv)
-  : _priv(std::move(priv))
+RatchetTreeNode::RatchetTreeNode(const HPKEPrivateKey& priv)
+  : _priv(priv)
   , _pub(priv.public_key())
 {}
 
-RatchetTreeNode::RatchetTreeNode(HPKEPublicKey pub)
+RatchetTreeNode::RatchetTreeNode(const HPKEPublicKey& pub)
   : _priv(std::nullopt)
-  , _pub(std::move(pub))
+  , _pub(pub)
 {}
 
 bool
@@ -159,10 +159,11 @@ struct ParentNodeHashInput
 {
   const uint8_t hash_type = 1;
   tls::optional<ParentNodeInfo> info;
-  tls::opaque<1> left_hash;
-  tls::opaque<1> right_hash;
+  bytes left_hash;
+  bytes right_hash;
 
   TLS_SERIALIZABLE(hash_type, info, left_hash, right_hash);
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector_trait<1>, tls::vector_trait<1>);
 };
 
 void
