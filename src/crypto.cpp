@@ -146,7 +146,7 @@ struct HKDFLabel
   bytes context;
 
   TLS_SERIALIZABLE(length, label, context);
-  TLS_TRAITS(tls::pass, tls::vector_trait<1>, tls::vector_trait<4>);
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>);
 };
 
 bytes
@@ -286,11 +286,11 @@ struct HPKEContext
              tls::pass,
              tls::pass,
              tls::pass,
-             tls::vector_trait<0>,
-             tls::vector_trait<0>,
-             tls::vector_trait<0>,
-             tls::vector_trait<0>,
-             tls::vector_trait<0>);
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>);
 };
 
 static std::tuple<bytes, bytes>

@@ -18,7 +18,7 @@ struct TreeMathTestVectors
   {
     std::vector<NodeIndex> nodes;
     TLS_SERIALIZABLE(nodes);
-    TLS_TRAITS(tls::vector_trait<4>);
+    TLS_TRAITS(tls::vector<4>);
   };
 
   LeafCount n_leaves{ 255 };
@@ -41,14 +41,14 @@ struct TreeMathTestVectors
                    copath,
                    ancestor)
   TLS_TRAITS(tls::pass,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>);
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::vector<4>);
 };
 
 /////
@@ -82,7 +82,7 @@ struct CryptoTestVectors
                      hkdf_extract_out,
                      derive_key_pair_pub,
                      hpke_out)
-    TLS_TRAITS(tls::pass, tls::vector_trait<1>, tls::pass, tls::pass);
+    TLS_TRAITS(tls::pass, tls::vector<1>, tls::pass, tls::pass);
   };
 
   std::vector<TestCase> cases;
@@ -93,12 +93,12 @@ struct CryptoTestVectors
                    hpke_aad,
                    hpke_plaintext,
                    cases)
-  TLS_TRAITS(tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<4>);
+  TLS_TRAITS(tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<4>);
 };
 
 /////
@@ -113,14 +113,14 @@ struct HashRatchetTestVectors
     bytes nonce;
 
     TLS_SERIALIZABLE(key, nonce);
-    TLS_TRAITS(tls::vector_trait<1>, tls::vector_trait<1>);
+    TLS_TRAITS(tls::vector<1>, tls::vector<1>);
   };
 
   struct KeySequence
   {
     std::vector<Step> steps;
     TLS_SERIALIZABLE(steps);
-    TLS_TRAITS(tls::vector_trait<4>);
+    TLS_TRAITS(tls::vector<4>);
   };
 
   struct TestCase
@@ -129,7 +129,7 @@ struct HashRatchetTestVectors
     std::vector<KeySequence> key_sequences;
 
     TLS_SERIALIZABLE(cipher_suite, key_sequences);
-    TLS_TRAITS(tls::pass, tls::vector_trait<4>);
+    TLS_TRAITS(tls::pass, tls::vector<4>);
   };
 
   uint32_t n_members;
@@ -139,7 +139,7 @@ struct HashRatchetTestVectors
   std::vector<TestCase> cases;
 
   TLS_SERIALIZABLE(n_members, n_generations, base_secret, cases);
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector_trait<1>, tls::vector_trait<4>);
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<4>);
 };
 
 /////
@@ -154,7 +154,7 @@ struct KeyScheduleTestVectors
     bytes nonce;
 
     TLS_SERIALIZABLE(key, nonce);
-    TLS_TRAITS(tls::vector_trait<1>, tls::vector_trait<1>);
+    TLS_TRAITS(tls::vector<1>, tls::vector<1>);
   };
 
   struct Epoch
@@ -188,16 +188,16 @@ struct KeyScheduleTestVectors
                      confirmation_key,
                      init_secret);
     TLS_TRAITS(tls::pass,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<4>,
-               tls::vector_trait<1>,
-               tls::vector_trait<4>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>);
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<4>,
+               tls::vector<1>,
+               tls::vector<4>,
+               tls::vector<1>,
+               tls::vector<1>);
   };
 
   struct TestCase
@@ -206,7 +206,7 @@ struct KeyScheduleTestVectors
     std::vector<Epoch> epochs;
 
     TLS_SERIALIZABLE(cipher_suite, epochs);
-    TLS_TRAITS(tls::pass, tls::vector_trait<2>);
+    TLS_TRAITS(tls::pass, tls::vector<2>);
   };
 
   uint32_t n_epochs;
@@ -223,9 +223,9 @@ struct KeyScheduleTestVectors
                    cases);
   TLS_TRAITS(tls::pass,
              tls::pass,
-             tls::vector_trait<1>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>);
+             tls::vector<1>,
+             tls::vector<4>,
+             tls::vector<4>);
 };
 
 /////
@@ -306,7 +306,7 @@ struct TreeTestVectors
   {
     bytes data;
     TLS_SERIALIZABLE(data);
-    TLS_TRAITS(tls::vector_trait<1>);
+    TLS_TRAITS(tls::vector<1>);
   };
 
   struct TreeNode
@@ -315,14 +315,14 @@ struct TreeTestVectors
     bytes hash;
 
     TLS_SERIALIZABLE(public_key, hash);
-    TLS_TRAITS(tls::pass, tls::vector_trait<1>);
+    TLS_TRAITS(tls::pass, tls::vector<1>);
   };
 
   struct TreeCase
   {
     std::vector<TreeNode> nodes;
     TLS_SERIALIZABLE(nodes);
-    TLS_TRAITS(tls::vector_trait<4>);
+    TLS_TRAITS(tls::vector<4>);
   };
 
   struct TestCase
@@ -333,7 +333,7 @@ struct TreeTestVectors
     std::vector<TreeCase> trees;
 
     TLS_SERIALIZABLE(cipher_suite, signature_scheme, credentials, trees);
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector_trait<4>, tls::vector_trait<4>)
+    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
   };
 
   std::vector<Bytes1> leaf_secrets;
@@ -341,7 +341,7 @@ struct TreeTestVectors
   std::vector<TestCase> cases;
 
   TLS_SERIALIZABLE(leaf_secrets, credentials, cases);
-  TLS_TRAITS(tls::vector_trait<4>, tls::vector_trait<4>, tls::vector_trait<4>);
+  TLS_TRAITS(tls::vector<4>, tls::vector<4>, tls::vector<4>);
 };
 
 /////
@@ -383,16 +383,16 @@ struct MessagesTestVectors
                      ciphertext);
     TLS_TRAITS(tls::pass,
                tls::pass,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>);
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>,
+               tls::vector<4>);
   };
 
   epoch_t epoch;
@@ -420,13 +420,13 @@ struct MessagesTestVectors
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<4>);
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<4>);
 };
 
 /////
@@ -522,13 +522,13 @@ struct SessionTestVectors
                      confirmation_key,
                      init_secret);
     TLS_TRAITS(tls::pass,
-               tls::vector_trait<4>,
-               tls::vector_trait<1>,
+               tls::vector<4>,
+               tls::vector<1>,
                tls::pass,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>,
-               tls::vector_trait<1>);
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>);
   };
 
   struct TestCase
@@ -544,11 +544,7 @@ struct SessionTestVectors
                      encrypt,
                      key_packages,
                      transcript);
-    TLS_TRAITS(tls::pass,
-               tls::pass,
-               tls::pass,
-               tls::vector_trait<4>,
-               tls::vector_trait<4>);
+    TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>, tls::vector<4>);
   };
 
   uint32_t group_size;
@@ -557,7 +553,7 @@ struct SessionTestVectors
   std::vector<TestCase> cases;
 
   TLS_SERIALIZABLE(group_size, group_id, cases);
-  TLS_TRAITS(tls::pass, tls::vector_trait<1>, tls::vector_trait<4>);
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>);
 };
 
 struct BasicSessionTestVectors : SessionTestVectors

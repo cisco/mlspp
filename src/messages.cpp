@@ -77,12 +77,12 @@ bytes
 GroupInfo::to_be_signed() const
 {
   tls::ostream w;
-  tls::vector_trait<1>{}.encode(w, group_id);
+  tls::vector<1>{}.encode(w, group_id);
   w << epoch << tree;
-  tls::vector_trait<1>{}.encode(w, confirmed_transcript_hash);
-  tls::vector_trait<1>{}.encode(w, interim_transcript_hash);
+  tls::vector<1>{}.encode(w, confirmed_transcript_hash);
+  tls::vector<1>{}.encode(w, interim_transcript_hash);
   w << path;
-  tls::vector_trait<1>{}.encode(w, confirmation);
+  tls::vector<1>{}.encode(w, confirmation);
   w << signer_index;
   return w.bytes();
 }
@@ -199,8 +199,8 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   }
 
   bytes padding;
-  tls::vector_trait<2>{}.decode(r, signature);
-  tls::vector_trait<2>{}.decode(r, padding);
+  tls::vector<2>{}.decode(r, signature);
+  tls::vector<2>{}.decode(r, padding);
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -262,8 +262,8 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   }
 
   bytes padding(padding_size, 0);
-  tls::vector_trait<2>{}.encode(w, signature);
-  tls::vector_trait<2>{}.encode(w, padding);
+  tls::vector<2>{}.encode(w, signature);
+  tls::vector<2>{}.encode(w, padding);
   return w.bytes();
 }
 
@@ -272,7 +272,7 @@ MLSPlaintext::commit_content() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  tls::vector_trait<1>{}.encode(w, group_id);
+  tls::vector<1>{}.encode(w, group_id);
   w << epoch << sender << commit_data.commit;
   return w.bytes();
 }
@@ -286,8 +286,8 @@ MLSPlaintext::commit_auth_data() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  tls::vector_trait<1>{}.encode(w, commit_data.confirmation);
-  tls::vector_trait<2>{}.encode(w, signature);
+  tls::vector<1>{}.encode(w, commit_data.confirmation);
+  tls::vector<2>{}.encode(w, signature);
   return w.bytes();
 }
 
@@ -296,9 +296,9 @@ MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
   w << context;
-  tls::vector_trait<1>{}.encode(w, group_id);
+  tls::vector<1>{}.encode(w, group_id);
   w << epoch << sender;
-  tls::vector_trait<4>{}.encode(w, authenticated_data);
+  tls::vector<4>{}.encode(w, authenticated_data);
   w << content;
   return w.bytes();
 }

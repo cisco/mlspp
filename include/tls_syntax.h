@@ -153,7 +153,7 @@ private:
   friend ostream& operator<<(ostream& out, const std::array<T, N>& data);
 
   template<size_t head, size_t min, size_t max>
-  friend struct vector_trait;
+  friend struct vector;
 };
 
 // Primitive writers defined in .cpp file
@@ -250,7 +250,7 @@ private:
   friend istream& operator>>(istream& in, std::array<T, N>& data);
 
   template<size_t head, size_t min, size_t max>
-  friend struct vector_trait;
+  friend struct vector;
 };
 
 // Primitive type readers defined in .cpp file
@@ -435,7 +435,7 @@ struct pass {
 
 // Vector encoding
 template<size_t head, size_t min=none, size_t max=none>
-struct vector_trait {
+struct vector {
   template<typename T>
   static ostream& encode(ostream& str, const std::vector<T>& data) {
     // Vectors with no header are written directly

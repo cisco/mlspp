@@ -500,11 +500,11 @@ content_aad(const bytes& group_id,
             const bytes& encrypted_sender_data)
 {
   tls::ostream w;
-  tls::vector_trait<1>::encode(w, group_id);
+  tls::vector<1>::encode(w, group_id);
   w << epoch << content_type;
-  tls::vector_trait<4>::encode(w, authenticated_data);
-  tls::vector_trait<1>::encode(w, sender_data_nonce);
-  tls::vector_trait<1>::encode(w, encrypted_sender_data);
+  tls::vector<4>::encode(w, authenticated_data);
+  tls::vector<1>::encode(w, sender_data_nonce);
+  tls::vector<1>::encode(w, encrypted_sender_data);
   return w.bytes();
 }
 
@@ -521,9 +521,9 @@ sender_data_aad(const bytes& group_id,
                 const bytes& sender_data_nonce)
 {
   tls::ostream w;
-  tls::vector_trait<1>::encode(w, group_id);
+  tls::vector<1>::encode(w, group_id);
   w << epoch << content_type;
-  tls::vector_trait<1>::encode(w, sender_data_nonce);
+  tls::vector<1>::encode(w, sender_data_nonce);
   return w.bytes();
 }
 

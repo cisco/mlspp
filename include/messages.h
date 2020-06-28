@@ -28,7 +28,7 @@ struct RatchetNode
   std::vector<HPKECiphertext> node_secrets;
 
   TLS_SERIALIZABLE(public_key, node_secrets);
-  TLS_TRAITS(tls::pass, tls::vector_trait<2>);
+  TLS_TRAITS(tls::pass, tls::vector<2>);
 };
 
 // struct {
@@ -39,7 +39,7 @@ struct DirectPath
   std::vector<RatchetNode> nodes;
 
   TLS_SERIALIZABLE(nodes);
-  TLS_TRAITS(tls::vector_trait<2>);
+  TLS_TRAITS(tls::vector<2>);
 };
 
 // struct {
@@ -69,7 +69,7 @@ struct KeyPackage
   bool verify() const;
 
   TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature);
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector_trait<2>);
+  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>);
 
   private:
   bytes to_be_signed() const;
@@ -127,16 +127,16 @@ struct GroupInfo {
                    confirmation,
                    signer_index,
                    signature);
-  TLS_TRAITS(tls::vector_trait<1>,
+  TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<1>,
              tls::pass,
-             tls::vector_trait<1>,
+             tls::vector<1>,
              tls::pass,
-             tls::vector_trait<2>);
+             tls::vector<2>);
 };
 
 // struct {
@@ -148,7 +148,7 @@ struct GroupSecrets {
   bytes init_secret;
 
   TLS_SERIALIZABLE(init_secret);
-  TLS_TRAITS(tls::vector_trait<1>);
+  TLS_TRAITS(tls::vector<1>);
 };
 
 // struct {
@@ -160,7 +160,7 @@ struct EncryptedGroupSecrets {
   HPKECiphertext encrypted_group_secrets;
 
   TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets);
-  TLS_TRAITS(tls::vector_trait<1>, tls::pass);
+  TLS_TRAITS(tls::vector<1>, tls::pass);
 };
 
 
@@ -185,7 +185,7 @@ struct Welcome {
   std::optional<int> find(const KeyPackage& kp) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info);
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector_trait<4>, tls::vector_trait<4>);
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>);
 
   private:
   bytes _init_secret;
@@ -248,7 +248,7 @@ struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
 struct ProposalID {
   bytes id;
   TLS_SERIALIZABLE(id);
-  TLS_TRAITS(tls::vector_trait<1>);
+  TLS_TRAITS(tls::vector<1>);
 };
 
 // struct {
@@ -266,10 +266,10 @@ struct Commit {
   DirectPath path;
 
   TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
-  TLS_TRAITS(tls::vector_trait<2>,
-             tls::vector_trait<2>,
-             tls::vector_trait<2>,
-             tls::vector_trait<2>,
+  TLS_TRAITS(tls::vector<2>,
+             tls::vector<2>,
+             tls::vector<2>,
+             tls::vector<2>,
              tls::pass);
 };
 
@@ -295,7 +295,7 @@ struct ApplicationData
   bytes data;
 
   TLS_SERIALIZABLE(data);
-  TLS_TRAITS(tls::vector_trait<4>);
+  TLS_TRAITS(tls::vector<4>);
 
   static const ContentType type;
 };
@@ -307,7 +307,7 @@ struct CommitData
 
   static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation);
-  TLS_TRAITS(tls::pass, tls::vector_trait<1>);
+  TLS_TRAITS(tls::pass, tls::vector<1>);
 };
 
 struct GroupContext;
@@ -356,12 +356,12 @@ struct MLSPlaintext
   bytes commit_auth_data() const;
 
   TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature);
-  TLS_TRAITS(tls::vector_trait<1>,
+  TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector_trait<4>,
+             tls::vector<4>,
              tls::pass,
-             tls::vector_trait<2>)
+             tls::vector<2>)
 };
 
 // struct {
@@ -384,13 +384,13 @@ struct MLSCiphertext
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
                    encrypted_sender_data, authenticated_data, ciphertext);
-  TLS_TRAITS(tls::vector_trait<1>,
+  TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector_trait<1>,
-             tls::vector_trait<1>,
-             tls::vector_trait<4>,
-             tls::vector_trait<4>);
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::vector<4>,
+             tls::vector<4>);
 };
 
 } // namespace mls

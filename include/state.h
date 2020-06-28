@@ -25,7 +25,7 @@ struct GroupContext
   bytes confirmed_transcript_hash;
 
   TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash);
-  TLS_TRAITS(tls::vector_trait<1>, tls::pass, tls::vector_trait<1>, tls::vector_trait<1>);
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>);
 };
 
 class State

@@ -20,7 +20,7 @@ struct ExampleStruct
 
   static const TypeSelector type;
   TLS_SERIALIZABLE(a, b, c);
-  TLS_TRAITS(tls::pass, tls::vector_trait<2>, tls::pass);
+  TLS_TRAITS(tls::pass, tls::vector<2>, tls::pass);
 };
 
 const TypeSelector ExampleStruct::type = TypeSelector::example_struct;
