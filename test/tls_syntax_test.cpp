@@ -101,19 +101,15 @@ protected:
   const bytes enc_struct =
     from_hex("11110002222233333333444444445555555566666666");
 
-  const tls::optional<ExampleStruct> val_optional{ val_struct };
+  const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
 
-  const tls::optional<ExampleStruct> val_optional_null = std::nullopt;
+  const std::optional<ExampleStruct> val_optional_null = std::nullopt;
   const bytes enc_optional_null = from_hex("00");
 
   const uint8_t variant_param = 0xff;
-  typedef tls::variant_optional<MustInitialize, uint8_t> test_var_optional;
   typedef tls::variant_variant<TypeSelector, uint8_t, MustInitialize>
     test_var_variant;
-
-  test_var_optional val_var_optional;
-  const bytes enc_var_optional = from_hex("01f0");
 
   const TypeSelector val_enum = TypeSelector::example_struct;
   const bytes enc_enum = from_hex("a0a0");
@@ -123,12 +119,6 @@ protected:
 
   const test_var_variant val_var_variant{ 0xff, MustInitialize{ 0xff, 0x0f } };
   const bytes enc_var_variant = from_hex("B0B0f0");
-
-  TLSSyntaxTest()
-    : val_var_optional(variant_param)
-  {
-    val_var_optional = MustInitialize{ 0xff, 0x0f };
-  }
 };
 
 template<typename T>
@@ -156,7 +146,6 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_struct, enc_struct);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
-  ostream_test(val_var_optional, enc_var_optional);
   ostream_test(val_enum, enc_enum);
   ostream_test(val_variant, enc_variant);
   ostream_test(val_var_variant, enc_var_variant);
@@ -194,14 +183,11 @@ TEST_F(TLSSyntaxTest, IStream)
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);
 
-  tls::optional<ExampleStruct> data_optional;
+  std::optional<ExampleStruct> data_optional;
   istream_test(val_optional, data_optional, enc_optional);
 
-  tls::optional<ExampleStruct> data_optional_null;
+  std::optional<ExampleStruct> data_optional_null;
   istream_test(val_optional_null, data_optional_null, enc_optional_null);
-
-  test_var_optional data_var_optional(variant_param);
-  istream_test(val_var_optional, data_var_optional, enc_var_optional);
 
   TypeSelector data_enum;
   istream_test(val_enum, data_enum, enc_enum);

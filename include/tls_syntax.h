@@ -70,62 +70,6 @@ class variant_variant : public variant<Te, Tp...>
   Tc _context;
 };
 
-template<typename T>
-class optional_base : public std::optional<T>
-{
-public:
-  using parent = std::optional<T>;
-  using parent::parent;
-  virtual ~optional_base() = default;
-
-  virtual T& emplace_new() = 0;
-};
-
-template<typename T>
-class optional : public optional_base<T>
-{
-public:
-  using parent = optional_base<T>;
-  using parent::parent;
-
-  virtual T& emplace_new() { return this->emplace(); }
-};
-
-template<typename T>
-bool
-operator==(const optional<T>& lhs, const optional<T>& rhs)
-{
-  auto both_blank = (!lhs.has_value() && !rhs.has_value());
-  auto both_occupied = (lhs.has_value() && rhs.has_value());
-  return (both_blank || (both_occupied && (lhs.value() == rhs.value())));
-}
-
-template<typename T, typename C>
-class variant_optional : public optional_base<T>
-{
-public:
-  using parent = optional_base<T>;
-  using parent::parent;
-
-  variant_optional(C ctor_arg)
-    : _ctor_arg(ctor_arg)
-  {}
-
-  virtual T& emplace_new() { return this->emplace(_ctor_arg); }
-
-private:
-  C _ctor_arg;
-};
-
-template<typename T, typename C>
-bool
-operator==(const variant_optional<T, C>& lhs, const variant_optional<T, C>& rhs)
-{
-  auto both_blank = (!lhs.has_value() && !rhs.has_value());
-  auto both_occupied = (lhs.has_value() && rhs.has_value());
-  return (both_blank || (both_occupied && (lhs.value() == rhs.value())));
-}
-
 ///
 /// ostream
 ///
@@ -172,7 +116,7 @@ operator<<(ostream& out, const std::array<T, N>& data)
 // Optional writer
 template<typename T>
 tls::ostream&
-operator<<(tls::ostream& out, const optional_base<T>& opt)
+operator<<(tls::ostream& out, const std::optional<T>& opt)
 {
   if (!opt.has_value()) {
     return out << uint8_t(0);
@@ -269,7 +213,7 @@ operator>>(istream& in, std::array<T, N>& data)
 // Optional reader
 template<typename T>
 tls::istream&
-operator>>(tls::istream& in, optional_base<T>& opt)
+operator>>(tls::istream& in, std::optional<T>& opt)
 {
   uint8_t present = 0;
   in >> present;
@@ -280,7 +224,7 @@ operator>>(tls::istream& in, optional_base<T>& opt)
       return in;
 
     case 1:
-      opt.emplace_new();
+      opt.emplace();
       return in >> opt.value();
 
     default:

@@ -311,7 +311,7 @@ struct TreeTestVectors
 
   struct TreeNode
   {
-    tls::optional<Bytes1> public_key;
+    std::optional<Bytes1> public_key;
     bytes hash;
 
     TLS_SERIALIZABLE(public_key, hash);
@@ -487,7 +487,7 @@ struct SessionTestVectors
 {
   struct Epoch
   {
-    tls::optional<Welcome> welcome;
+    std::optional<Welcome> welcome;
     bytes handshake;
     bytes commit_secret;
 
@@ -499,7 +499,7 @@ struct SessionTestVectors
 
     Epoch() = default;
 
-    Epoch(const tls::optional<Welcome>& welcome_in,
+    Epoch(const std::optional<Welcome>& welcome_in,
           const bytes& handshake_in,
           const bytes& commit_secret_in,
           const TestSession& session)

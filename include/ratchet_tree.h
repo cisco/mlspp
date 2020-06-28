@@ -43,16 +43,16 @@ private:
   std::vector<LeafIndex> _unmerged_leaves;
 
   // A credential is populated iff this is a leaf node
-  tls::optional<Credential> _cred;
+  std::optional<Credential> _cred;
 };
 
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
 // ensure that nodes are populated with blank values on unmarshal.
 // Otherwise, `*opt` will access uninitialized memory.
 struct OptionalRatchetTreeNode
-  : public tls::optional<RatchetTreeNode>
+  : public std::optional<RatchetTreeNode>
 {
-  using parent = tls::optional<RatchetTreeNode>;
+  using parent = std::optional<RatchetTreeNode>;
   using parent::parent;
 
   bool has_private() const;

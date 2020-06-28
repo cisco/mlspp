@@ -122,7 +122,7 @@ struct LeafNodeInfo
 struct LeafNodeHashInput
 {
   const uint8_t hash_type = 0;
-  tls::optional<LeafNodeInfo> info;
+  std::optional<LeafNodeInfo> info;
 
   TLS_SERIALIZABLE(hash_type, info);
 };
@@ -158,7 +158,7 @@ struct ParentNodeInfo
 struct ParentNodeHashInput
 {
   const uint8_t hash_type = 1;
-  tls::optional<ParentNodeInfo> info;
+  std::optional<ParentNodeInfo> info;
   bytes left_hash;
   bytes right_hash;
 
