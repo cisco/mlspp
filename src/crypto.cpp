@@ -290,7 +290,7 @@ struct HPKEContext
              tls::vector<0>,
              tls::vector<0>,
              tls::vector<0>,
-             tls::vector<0>);
+             tls::vector<0>)
 };
 
 static std::tuple<bytes, bytes>
