@@ -5,11 +5,6 @@
 using namespace mls;
 
 // An enum to test enum encoding, and as a type for variants
-enum struct TypeSelector : uint16_t
-{
-  example_struct = 0xA0A0,
-};
-
 enum struct IntSelector : uint16_t
 {
   uint8 = 0xAAAA,
@@ -17,18 +12,10 @@ enum struct IntSelector : uint16_t
 };
 
 template<>
-IntSelector
-tls::variant_trait<IntSelector>::value_for<uint8_t>()
-{
-  return IntSelector::uint8;
-}
+IntSelector tls::variant_value<IntSelector, uint8_t> = IntSelector::uint8;
 
 template<>
-IntSelector
-tls::variant_trait<IntSelector>::value_for<uint16_t>()
-{
-  return IntSelector::uint16;
-}
+IntSelector tls::variant_value<IntSelector, uint16_t> = IntSelector::uint16;
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -39,16 +26,13 @@ struct ExampleStruct
   std::vector<uint8_t> d;
   std::variant<uint8_t, uint16_t> e;
 
-  static const TypeSelector type;
-  TLS_SERIALIZABLE(a, b, c, d);
+  TLS_SERIALIZABLE(a, b, c, d, e);
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant_trait<IntSelector>);
+             tls::variant<IntSelector>);
 };
-
-const TypeSelector ExampleStruct::type = TypeSelector::example_struct;
 
 bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
@@ -83,9 +67,10 @@ protected:
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
     { 0x66 },
     { 0x77, 0x88 },
+    { uint16_t(0x9999) },
   };
   const bytes enc_struct =
-    from_hex("111122222222333333334444444455555555016600027788");
+    from_hex("111122222222333333334444444455555555016600027788BBBB9999");
 
   const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
@@ -93,11 +78,8 @@ protected:
   const std::optional<ExampleStruct> val_optional_null = std::nullopt;
   const bytes enc_optional_null = from_hex("00");
 
-  const TypeSelector val_enum = TypeSelector::example_struct;
-  const bytes enc_enum = from_hex("a0a0");
-
-  const tls::variant<TypeSelector, ExampleStruct> val_variant{ val_struct };
-  const bytes enc_variant = from_hex("A0A0") + enc_struct;
+  const IntSelector val_enum = IntSelector::uint8;
+  const bytes enc_enum = from_hex("aaaa");
 };
 
 template<typename T>
@@ -126,7 +108,6 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
-  ostream_test(val_variant, enc_variant);
 }
 
 template<typename T>
@@ -167,11 +148,8 @@ TEST_F(TLSSyntaxTest, IStream)
   std::optional<ExampleStruct> data_optional_null;
   istream_test(val_optional_null, data_optional_null, enc_optional_null);
 
-  TypeSelector data_enum;
+  IntSelector data_enum;
   istream_test(val_enum, data_enum, enc_enum);
-
-  tls::variant<TypeSelector, ExampleStruct> data_variant;
-  istream_test(val_variant, data_variant, enc_variant);
 }
 
 TEST_F(TLSSyntaxTest, Abbreviations)

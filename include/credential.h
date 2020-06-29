@@ -5,17 +5,6 @@
 
 namespace mls {
 
-// enum {
-//     basic(0),
-//     x509(1),
-//     (255)
-// } CredentialType;
-enum struct CredentialType : uint8_t
-{
-  basic = 0,
-  x509 = 1,
-};
-
 // struct {
 //     opaque identity<0..2^16-1>;
 //     SignatureScheme algorithm;
@@ -33,8 +22,6 @@ struct BasicCredential
 
   bytes identity;
   SignaturePublicKey public_key;
-
-  static const CredentialType type;
 };
 
 tls::ostream&
@@ -43,6 +30,17 @@ tls::istream&
 operator>>(tls::istream& str, BasicCredential& obj);
 bool
 operator==(const BasicCredential& lhs, const BasicCredential& rhs);
+
+// enum {
+//     basic(0),
+//     x509(1),
+//     (255)
+// } CredentialType;
+enum struct CredentialType : uint8_t
+{
+  basic = 0,
+  x509 = 1,
+};
 
 // struct {
 //     CredentialType credential_type;
@@ -64,10 +62,11 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  TLS_SERIALIZABLE(_cred)
+  TLS_SERIALIZABLE(_cred);
+  TLS_TRAITS(tls::variant<CredentialType>);
 
 private:
-  tls::variant<CredentialType, BasicCredential> _cred;
+  std::variant<BasicCredential> _cred;
 };
 
 } // namespace mls

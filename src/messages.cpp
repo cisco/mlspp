@@ -2,6 +2,33 @@
 #include "key_schedule.h"
 #include "state.h"
 
+// Variant type selectors in the `tls` namespace
+namespace tls {
+using namespace mls;
+
+// ProposalType
+template<>
+ProposalType variant_value<ProposalType, Add> = ProposalType::add;
+
+template<>
+ProposalType variant_value<ProposalType, Update> = ProposalType::update;
+
+template<>
+ProposalType variant_value<ProposalType, Remove> = ProposalType::remove;
+
+// ContentType
+template<>
+ContentType variant_value<ContentType, ApplicationData> =
+  ContentType::application;
+
+template<>
+ContentType variant_value<ContentType, Proposal> = ContentType::proposal;
+
+template<>
+ContentType variant_value<ContentType, CommitData> = ContentType::commit;
+
+} // namespace tls
+
 namespace mls {
 
 // KeyPackage
@@ -150,17 +177,7 @@ Welcome::find(const KeyPackage& kp) const
   return std::nullopt;
 }
 
-// Proposals
-
-const ProposalType Add::type = ProposalType::add;
-const ProposalType Update::type = ProposalType::update;
-const ProposalType Remove::type = ProposalType::remove;
-
 // MLSPlaintext
-
-const ContentType ApplicationData::type = ContentType::application;
-const ContentType Proposal::type = ContentType::proposal;
-const ContentType CommitData::type = ContentType::commit;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -244,21 +261,14 @@ bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  switch (content.inner_type()) {
-    case ContentType::application:
-      w << std::get<ApplicationData>(content);
-      break;
-
-    case ContentType::proposal:
-      w << std::get<Proposal>(content);
-      break;
-
-    case ContentType::commit:
-      w << std::get<CommitData>(content);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  if (std::holds_alternative<ApplicationData>(content)) {
+    w << std::get<ApplicationData>(content);
+  } else if (std::holds_alternative<Proposal>(content)) {
+    w << std::get<Proposal>(content);
+  } else if (std::holds_alternative<CommitData>(content)) {
+    w << std::get<CommitData>(content);
+  } else {
+    throw InvalidParameterError("Unknown content type");
   }
 
   bytes padding(padding_size, 0);
@@ -296,10 +306,10 @@ MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
   w << context;
-  tls::vector<1>{}.encode(w, group_id);
+  tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
-  tls::vector<4>{}.encode(w, authenticated_data);
-  w << content;
+  tls::vector<4>::encode(w, authenticated_data);
+  tls::variant<ContentType>::encode(w, content);
   return w.bytes();
 }
 

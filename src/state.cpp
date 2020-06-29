@@ -111,14 +111,14 @@ State::sign(const Proposal& proposal) const
 MLSPlaintext
 State::add(const KeyPackage& key_package) const
 {
-  return sign(Add{ key_package });
+  return sign({ Add{ key_package } });
 }
 
 MLSPlaintext
 State::update(const bytes& leaf_secret)
 {
   auto key = HPKEPrivateKey::derive(_suite, leaf_secret);
-  auto pt = sign(Update{ key.public_key() });
+  auto pt = sign({ Update{ key.public_key() } });
 
   auto id = proposal_id(pt);
   _update_secrets[id.id] = leaf_secret;
@@ -129,40 +129,30 @@ State::update(const bytes& leaf_secret)
 MLSPlaintext
 State::remove(LeafIndex removed) const
 {
-  return sign(Remove{ removed });
+  return sign({ Remove{ removed } });
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret) const
 {
   // Construct a commit from cached proposals
+  // TODO(rlb) ignore some proposals:
+  // * Update after Update
+  // * Update after Remove
+  // * Remove after Remove
   Commit commit;
   auto joiners = std::vector<KeyPackage>{};
   for (const auto& pt : _pending_proposals) {
     auto id = proposal_id(pt);
-    auto proposal = std::get<Proposal>(pt.content);
-    switch (proposal.inner_type()) {
-      case ProposalType::add: {
-        commit.adds.push_back(id);
-        auto add = std::get<Add>(proposal);
-        joiners.push_back(add.key_package);
-        break;
-      }
-
-      case ProposalType::update:
-        commit.updates.push_back(id);
-        break;
-
-      case ProposalType::remove:
-        commit.removes.push_back(id);
-        break;
-
-      default:
-        // TODO(rlb) ignore some proposals:
-        // * Update after Update
-        // * Update after Remove
-        // * Remove after Remove
-        break;
+    auto proposal = std::get<Proposal>(pt.content).content;
+    if (std::holds_alternative<Add>(proposal)) {
+      commit.adds.push_back(id);
+      auto add = std::get<Add>(proposal);
+      joiners.push_back(add.key_package);
+    } else if (std::holds_alternative<Update>(proposal)) {
+      commit.updates.push_back(id);
+    } else if (std::holds_alternative<Remove>(proposal)) {
+      commit.removes.push_back(id);
     }
   }
 
@@ -267,13 +257,12 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Proposals get queued, do not result in a state transition
-  auto content_type = pt.content.inner_type();
-  if (content_type == ContentType::proposal) {
+  if (std::holds_alternative<Proposal>(pt.content)) {
     _pending_proposals.push_back(pt);
     return std::nullopt;
   }
 
-  if (content_type != ContentType::commit) {
+  if (!std::holds_alternative<CommitData>(pt.content)) {
     throw InvalidParameterError("Incorrect content type");
   }
 
@@ -375,29 +364,24 @@ State::apply(const std::vector<ProposalID>& ids)
     }
 
     auto pt = maybe_pt.value();
-    auto proposal = std::get<Proposal>(pt.content);
-    switch (proposal.inner_type()) {
-      case ProposalType::add:
-        apply(std::get<Add>(proposal));
+    auto proposal = std::get<Proposal>(pt.content).content;
+    if (std::holds_alternative<Add>(proposal)) {
+      apply(std::get<Add>(proposal));
+    } else if (std::holds_alternative<Update>(proposal)) {
+      if (pt.sender != _index) {
+        apply(pt.sender, std::get<Update>(proposal));
         break;
-      case ProposalType::update:
-        if (pt.sender != _index) {
-          apply(pt.sender, std::get<Update>(proposal));
-          break;
-        }
+      }
 
-        if (_update_secrets.count(id.id) == 0) {
-          throw ProtocolError("Self-update with no cached secret");
-        }
+      if (_update_secrets.count(id.id) == 0) {
+        throw ProtocolError("Self-update with no cached secret");
+      }
 
-        apply(pt.sender, _update_secrets[id.id]);
-        break;
-      case ProposalType::remove:
-        apply(std::get<Remove>(proposal));
-        break;
-      default:
-        throw InvalidParameterError("Invalid proposal type");
-        break;
+      apply(pt.sender, _update_secrets[id.id]);
+    } else if (std::holds_alternative<Remove>(proposal)) {
+      apply(std::get<Remove>(proposal));
+    } else {
+      throw InvalidParameterError("Invalid proposal type");
     }
   }
 }
@@ -433,7 +417,7 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Invalid message signature");
   }
 
-  if (pt.content.inner_type() != ContentType::application) {
+  if (!std::holds_alternative<ApplicationData>(pt.content)) {
     throw ProtocolError("Unprotect of non-application message");
   }
 
@@ -548,18 +532,18 @@ State::encrypt(const MLSPlaintext& pt)
   // Pull from the key schedule
   uint32_t generation;
   KeyAndNonce keys;
-  switch (pt.content.inner_type()) {
-    case ContentType::application:
-      std::tie(generation, keys) = _keys.application_keys.next(_index);
-      break;
-
-    case ContentType::proposal:
-    case ContentType::commit:
-      std::tie(generation, keys) = _keys.handshake_keys.next(_index);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  ContentType content_type;
+  if (std::holds_alternative<ApplicationData>(pt.content)) {
+    std::tie(generation, keys) = _keys.application_keys.next(_index);
+    content_type = ContentType::application;
+  } else if (std::holds_alternative<Proposal>(pt.content)) {
+    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    content_type = ContentType::proposal;
+  } else if (std::holds_alternative<CommitData>(pt.content)) {
+    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    content_type = ContentType::commit;
+  } else {
+    throw InvalidParameterError("Unknown content type");
   }
 
   // Encrypt the sender data
@@ -567,8 +551,8 @@ State::encrypt(const MLSPlaintext& pt)
   sender_data << _index << generation;
 
   auto sender_data_nonce = random_bytes(suite_nonce_size(_suite));
-  auto sender_data_aad_val = sender_data_aad(
-    _group_id, _epoch, pt.content.inner_type(), sender_data_nonce);
+  auto sender_data_aad_val =
+    sender_data_aad(_group_id, _epoch, content_type, sender_data_nonce);
 
   auto encrypted_sender_data = seal(_suite,
                                     _keys.sender_data_key,
@@ -581,7 +565,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto content = pt.marshal_content(0);
   auto aad = content_aad(_group_id,
                          _epoch,
-                         pt.content.inner_type(),
+                         content_type,
                          pt.authenticated_data,
                          sender_data_nonce,
                          encrypted_sender_data);
@@ -593,7 +577,7 @@ State::encrypt(const MLSPlaintext& pt)
   MLSCiphertext ct;
   ct.group_id = _group_id;
   ct.epoch = _epoch;
-  ct.content_type = pt.content.inner_type();
+  ct.content_type = content_type;
   ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.authenticated_data = pt.authenticated_data;

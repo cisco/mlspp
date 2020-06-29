@@ -1,13 +1,25 @@
 #include "credential.h"
 #include "tls_syntax.h"
 
+namespace tls {
+
+///
+/// CredentialType
+///
+
+using namespace mls;
+
+template<>
+CredentialType variant_value<CredentialType, BasicCredential> =
+  CredentialType::basic;
+
+} // namespace tls
+
 namespace mls {
 
 ///
 /// BasicCredential
 ///
-
-const CredentialType BasicCredential::type = CredentialType::basic;
 
 tls::ostream&
 operator<<(tls::ostream& str, const BasicCredential& obj)

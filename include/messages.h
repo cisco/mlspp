@@ -204,22 +204,16 @@ enum struct ProposalType : uint8_t {
 
 struct Add {
   KeyPackage key_package;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Update {
   HPKEPublicKey leaf_key;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(leaf_key)
 };
 
 struct Remove {
   LeafIndex removed;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -237,12 +231,11 @@ enum struct ContentType : uint8_t
   commit = 3,
 };
 
-struct Proposal : public tls::variant<ProposalType, Add, Update, Remove>
+struct Proposal
 {
-  using parent = tls::variant<ProposalType, Add, Update, Remove>;
-  using parent::parent;
-
-  static const ContentType type;
+  std::variant<Add, Update, Remove> content;
+  TLS_SERIALIZABLE(content);
+  TLS_TRAITS(tls::variant<ProposalType>);
 };
 
 struct ProposalID {
@@ -296,8 +289,6 @@ struct ApplicationData
 
   TLS_SERIALIZABLE(data);
   TLS_TRAITS(tls::vector<4>);
-
-  static const ContentType type;
 };
 
 struct CommitData
@@ -305,7 +296,6 @@ struct CommitData
   Commit commit;
   bytes confirmation;
 
-  static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation);
   TLS_TRAITS(tls::pass, tls::vector<1>);
 };
@@ -318,7 +308,7 @@ struct MLSPlaintext
   epoch_t epoch;
   LeafIndex sender;
   bytes authenticated_data;
-  tls::variant<ContentType, ApplicationData, Proposal, CommitData> content;
+  std::variant<ApplicationData, Proposal, CommitData> content;
   bytes signature;
 
   // Constructor for unmarshaling directly
@@ -360,7 +350,7 @@ struct MLSPlaintext
              tls::pass,
              tls::pass,
              tls::vector<4>,
-             tls::pass,
+             tls::variant<ContentType>,
              tls::vector<2>)
 };
 
