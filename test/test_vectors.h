@@ -48,7 +48,7 @@ struct TreeMathTestVectors
              tls::vector<4>,
              tls::vector<4>,
              tls::vector<4>,
-             tls::vector<4>);
+             tls::vector<4>)
 };
 
 /////
@@ -98,7 +98,7 @@ struct CryptoTestVectors
              tls::vector<1>,
              tls::vector<1>,
              tls::vector<1>,
-             tls::vector<4>);
+             tls::vector<4>)
 };
 
 /////
@@ -197,7 +197,7 @@ struct KeyScheduleTestVectors
                tls::vector<1>,
                tls::vector<4>,
                tls::vector<1>,
-               tls::vector<1>);
+               tls::vector<1>)
   };
 
   struct TestCase
@@ -225,7 +225,7 @@ struct KeyScheduleTestVectors
              tls::pass,
              tls::vector<1>,
              tls::vector<4>,
-             tls::vector<4>);
+             tls::vector<4>)
 };
 
 /////
@@ -392,7 +392,7 @@ struct MessagesTestVectors
                tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
-               tls::vector<4>);
+               tls::vector<4>)
   };
 
   epoch_t epoch;
@@ -426,7 +426,7 @@ struct MessagesTestVectors
              tls::vector<1>,
              tls::vector<1>,
              tls::vector<1>,
-             tls::vector<4>);
+             tls::vector<4>)
 };
 
 /////
@@ -528,7 +528,7 @@ struct SessionTestVectors
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>,
-               tls::vector<1>);
+               tls::vector<1>)
   };
 
   struct TestCase
