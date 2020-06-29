@@ -220,8 +220,8 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   }
 
   bytes padding;
-  tls::vector<2>{}.decode(r, signature);
-  tls::vector<2>{}.decode(r, padding);
+  tls::vector<2>::decode(r, signature);
+  tls::vector<2>::decode(r, padding);
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,

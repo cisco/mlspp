@@ -263,7 +263,7 @@ struct Commit {
              tls::vector<2>,
              tls::vector<2>,
              tls::vector<2>,
-             tls::pass);
+             tls::pass)
 };
 
 // struct {
@@ -380,7 +380,7 @@ struct MLSCiphertext
              tls::vector<1>,
              tls::vector<1>,
              tls::vector<4>,
-             tls::vector<4>);
+             tls::vector<4>)
 };
 
 } // namespace mls
