@@ -32,8 +32,8 @@ public:
   void set_cipher_suite();
   void add_unmerged(LeafIndex index);
 
-  TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
-  TLS_TRAITS(tls::pass, tls::vector<4>, tls::pass);
+  TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred)
+  TLS_TRAITS(tls::pass, tls::vector<4>, tls::pass)
 
 private:
   std::optional<HPKEPrivateKey> _priv;

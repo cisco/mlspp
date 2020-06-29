@@ -27,8 +27,8 @@ struct RatchetNode
   HPKEPublicKey public_key;
   std::vector<HPKECiphertext> node_secrets;
 
-  TLS_SERIALIZABLE(public_key, node_secrets);
-  TLS_TRAITS(tls::pass, tls::vector<2>);
+  TLS_SERIALIZABLE(public_key, node_secrets)
+  TLS_TRAITS(tls::pass, tls::vector<2>)
 };
 
 // struct {
@@ -38,8 +38,8 @@ struct DirectPath
 {
   std::vector<RatchetNode> nodes;
 
-  TLS_SERIALIZABLE(nodes);
-  TLS_TRAITS(tls::vector<2>);
+  TLS_SERIALIZABLE(nodes)
+  TLS_TRAITS(tls::vector<2>)
 };
 
 // struct {
@@ -68,8 +68,8 @@ struct KeyPackage
   bytes hash() const;
   bool verify() const;
 
-  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature);
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>);
+  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature)
+  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>)
 
   private:
   bytes to_be_signed() const;
@@ -126,7 +126,7 @@ struct GroupInfo {
                    path,
                    confirmation,
                    signer_index,
-                   signature);
+                   signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
@@ -136,7 +136,7 @@ struct GroupInfo {
              tls::pass,
              tls::vector<1>,
              tls::pass,
-             tls::vector<2>);
+             tls::vector<2>)
 };
 
 // struct {
@@ -147,8 +147,8 @@ struct GroupInfo {
 struct GroupSecrets {
   bytes init_secret;
 
-  TLS_SERIALIZABLE(init_secret);
-  TLS_TRAITS(tls::vector<1>);
+  TLS_SERIALIZABLE(init_secret)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 // struct {
@@ -159,8 +159,8 @@ struct EncryptedGroupSecrets {
   bytes key_package_hash;
   HPKECiphertext encrypted_group_secrets;
 
-  TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets);
-  TLS_TRAITS(tls::vector<1>, tls::pass);
+  TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
 
@@ -184,8 +184,8 @@ struct Welcome {
   void encrypt(const KeyPackage& kp);
   std::optional<int> find(const KeyPackage& kp) const;
 
-  TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info);
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>);
+  TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
   private:
   bytes _init_secret;
@@ -234,14 +234,14 @@ enum struct ContentType : uint8_t
 struct Proposal
 {
   std::variant<Add, Update, Remove> content;
-  TLS_SERIALIZABLE(content);
-  TLS_TRAITS(tls::variant<ProposalType>);
+  TLS_SERIALIZABLE(content)
+  TLS_TRAITS(tls::variant<ProposalType>)
 };
 
 struct ProposalID {
   bytes id;
-  TLS_SERIALIZABLE(id);
-  TLS_TRAITS(tls::vector<1>);
+  TLS_SERIALIZABLE(id)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 // struct {
@@ -258,7 +258,7 @@ struct Commit {
   std::vector<ProposalID> ignored;
   DirectPath path;
 
-  TLS_SERIALIZABLE(updates, removes, adds, ignored, path);
+  TLS_SERIALIZABLE(updates, removes, adds, ignored, path)
   TLS_TRAITS(tls::vector<2>,
              tls::vector<2>,
              tls::vector<2>,
@@ -287,8 +287,8 @@ struct ApplicationData
 {
   bytes data;
 
-  TLS_SERIALIZABLE(data);
-  TLS_TRAITS(tls::vector<4>);
+  TLS_SERIALIZABLE(data)
+  TLS_TRAITS(tls::vector<4>)
 };
 
 struct CommitData
@@ -296,8 +296,8 @@ struct CommitData
   Commit commit;
   bytes confirmation;
 
-  TLS_SERIALIZABLE(commit, confirmation);
-  TLS_TRAITS(tls::pass, tls::vector<1>);
+  TLS_SERIALIZABLE(commit, confirmation)
+  TLS_TRAITS(tls::pass, tls::vector<1>)
 };
 
 struct GroupContext;
@@ -345,7 +345,7 @@ struct MLSPlaintext
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature);
+  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,

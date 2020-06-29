@@ -62,8 +62,8 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  TLS_SERIALIZABLE(_cred);
-  TLS_TRAITS(tls::variant<CredentialType>);
+  TLS_SERIALIZABLE(_cred)
+  TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
   std::variant<BasicCredential> _cred;

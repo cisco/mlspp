@@ -26,12 +26,12 @@ struct ExampleStruct
   std::vector<uint8_t> d;
   std::variant<uint8_t, uint16_t> e;
 
-  TLS_SERIALIZABLE(a, b, c, d, e);
+  TLS_SERIALIZABLE(a, b, c, d, e)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant<IntSelector>);
+             tls::variant<IntSelector>)
 };
 
 bool

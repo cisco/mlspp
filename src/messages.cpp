@@ -4,28 +4,32 @@
 
 // Variant type selectors in the `tls` namespace
 namespace tls {
-using namespace mls;
 
 // ProposalType
 template<>
-ProposalType variant_value<ProposalType, Add> = ProposalType::add;
+mls::ProposalType variant_value<mls::ProposalType, mls::Add> =
+  mls::ProposalType::add;
 
 template<>
-ProposalType variant_value<ProposalType, Update> = ProposalType::update;
+mls::ProposalType variant_value<mls::ProposalType, mls::Update> =
+  mls::ProposalType::update;
 
 template<>
-ProposalType variant_value<ProposalType, Remove> = ProposalType::remove;
+mls::ProposalType variant_value<mls::ProposalType, mls::Remove> =
+  mls::ProposalType::remove;
 
 // ContentType
 template<>
-ContentType variant_value<ContentType, ApplicationData> =
-  ContentType::application;
+mls::ContentType variant_value<mls::ContentType, mls::ApplicationData> =
+  mls::ContentType::application;
 
 template<>
-ContentType variant_value<ContentType, Proposal> = ContentType::proposal;
+mls::ContentType variant_value<mls::ContentType, mls::Proposal> =
+  mls::ContentType::proposal;
 
 template<>
-ContentType variant_value<ContentType, CommitData> = ContentType::commit;
+mls::ContentType variant_value<mls::ContentType, mls::CommitData> =
+  mls::ContentType::commit;
 
 } // namespace tls
 
@@ -104,12 +108,12 @@ bytes
 GroupInfo::to_be_signed() const
 {
   tls::ostream w;
-  tls::vector<1>{}.encode(w, group_id);
+  tls::vector<1>::encode(w, group_id);
   w << epoch << tree;
-  tls::vector<1>{}.encode(w, confirmed_transcript_hash);
-  tls::vector<1>{}.encode(w, interim_transcript_hash);
+  tls::vector<1>::encode(w, confirmed_transcript_hash);
+  tls::vector<1>::encode(w, interim_transcript_hash);
   w << path;
-  tls::vector<1>{}.encode(w, confirmation);
+  tls::vector<1>::encode(w, confirmation);
   w << signer_index;
   return w.bytes();
 }
@@ -272,8 +276,8 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   }
 
   bytes padding(padding_size, 0);
-  tls::vector<2>{}.encode(w, signature);
-  tls::vector<2>{}.encode(w, padding);
+  tls::vector<2>::encode(w, signature);
+  tls::vector<2>::encode(w, padding);
   return w.bytes();
 }
 
@@ -282,7 +286,7 @@ MLSPlaintext::commit_content() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  tls::vector<1>{}.encode(w, group_id);
+  tls::vector<1>::encode(w, group_id);
   w << epoch << sender << commit_data.commit;
   return w.bytes();
 }
@@ -296,8 +300,8 @@ MLSPlaintext::commit_auth_data() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  tls::vector<1>{}.encode(w, commit_data.confirmation);
-  tls::vector<2>{}.encode(w, signature);
+  tls::vector<1>::encode(w, commit_data.confirmation);
+  tls::vector<2>::encode(w, signature);
   return w.bytes();
 }
 

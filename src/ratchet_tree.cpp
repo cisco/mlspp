@@ -116,7 +116,7 @@ struct LeafNodeInfo
   HPKEPublicKey public_key;
   Credential credential;
 
-  TLS_SERIALIZABLE(public_key, credential);
+  TLS_SERIALIZABLE(public_key, credential)
 };
 
 struct LeafNodeHashInput
@@ -124,7 +124,7 @@ struct LeafNodeHashInput
   const uint8_t hash_type = 0;
   std::optional<LeafNodeInfo> info;
 
-  TLS_SERIALIZABLE(hash_type, info);
+  TLS_SERIALIZABLE(hash_type, info)
 };
 
 void
@@ -151,8 +151,8 @@ struct ParentNodeInfo
   HPKEPublicKey public_key;
   std::vector<LeafIndex> unmerged_leaves;
 
-  TLS_SERIALIZABLE(public_key, unmerged_leaves);
-  TLS_TRAITS(tls::pass, tls::vector<4>);
+  TLS_SERIALIZABLE(public_key, unmerged_leaves)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 struct ParentNodeHashInput
@@ -162,8 +162,8 @@ struct ParentNodeHashInput
   bytes left_hash;
   bytes right_hash;
 
-  TLS_SERIALIZABLE(hash_type, info, left_hash, right_hash);
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<1>);
+  TLS_SERIALIZABLE(hash_type, info, left_hash, right_hash)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<1>)
 };
 
 void

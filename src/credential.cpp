@@ -7,11 +7,9 @@ namespace tls {
 /// CredentialType
 ///
 
-using namespace mls;
-
 template<>
-CredentialType variant_value<CredentialType, BasicCredential> =
-  CredentialType::basic;
+mls::CredentialType variant_value<mls::CredentialType, mls::BasicCredential> =
+  mls::CredentialType::basic;
 
 } // namespace tls
 
