@@ -18,30 +18,31 @@ enum class NodeType : uint8_t {
 
 struct ParentNode {
   HPKEPublicKey public_key;
-  tls::vector<LeafIndex, 4> unmerged_leaves;
-  tls::opaque<1> parent_hash;
+  std::vector<LeafIndex> unmerged_leaves;
+  bytes parent_hash;
 
   static const NodeType type;
   TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash);
+  TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>);
 };
 
-bool operator==(const ParentNode& lhs, const ParentNode& rhs);
-
-struct Node : public tls::variant<NodeType, KeyPackage, ParentNode> {
-  using parent = tls::variant<NodeType, KeyPackage, ParentNode>;
-  using parent::parent;
+struct Node {
+  std::variant<KeyPackage, ParentNode> node;
 
   const HPKEPublicKey& public_key() const;
+
+  TLS_SERIALIZABLE(node)
+  TLS_TRAITS(tls::variant<NodeType>)
 };
 
-struct OptionalNode : public tls::optional<Node> {
-  using parent = tls::optional<Node>;
-  using parent::parent;
-
+struct OptionalNode {
+  std::optional<Node> node;
   bytes hash;
 
   void set_leaf_hash(CipherSuite suite, NodeIndex index);
   void set_parent_hash(CipherSuite suite, NodeIndex index, const bytes& left, const bytes& right);
+
+  TLS_SERIALIZABLE(node);
 };
 
 struct TreeKEMPublicKey;
@@ -49,8 +50,8 @@ struct TreeKEMPublicKey;
 struct TreeKEMPrivateKey {
   CipherSuite suite;
   LeafIndex index;
-  tls::opaque<1> update_secret;
-  std::map<NodeIndex, tls::opaque<1>> path_secrets;
+  bytes update_secret;
+  std::map<NodeIndex, bytes> path_secrets;
   std::map<NodeIndex, HPKEPrivateKey> private_key_cache;
 
   static TreeKEMPrivateKey create(CipherSuite suite,
@@ -77,7 +78,7 @@ struct TreeKEMPrivateKey {
 
 struct TreeKEMPublicKey {
   CipherSuite suite;
-  tls::vector<OptionalNode, 4> nodes;
+  std::vector<OptionalNode> nodes;
 
   TreeKEMPublicKey(CipherSuite suite);
 
@@ -99,6 +100,9 @@ struct TreeKEMPublicKey {
                                                   const bytes& leaf_secret,
                                                   const SignaturePrivateKey& sig_priv,
                                                   std::optional<KeyPackageOpts> opts);
+
+  TLS_SERIALIZABLE(nodes);
+  TLS_TRAITS(tls::vector<4>);
 
   private:
   void clear_hash_all();

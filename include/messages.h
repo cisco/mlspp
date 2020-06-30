@@ -248,9 +248,10 @@ struct ProposalID {
 struct RatchetNode
 {
   HPKEPublicKey public_key;
-  tls::vector<HPKECiphertext, 2> node_secrets;
+  std::vector<HPKECiphertext> node_secrets;
 
-  TLS_SERIALIZABLE(public_key, node_secrets);
+  TLS_SERIALIZABLE(public_key, node_secrets)
+  TLS_TRAITS(tls::pass, tls::vector<2>)
 };
 
 // struct {
@@ -259,14 +260,15 @@ struct RatchetNode
 struct DirectPath
 {
   KeyPackage leaf_key_package;
-  tls::vector<RatchetNode, 2> nodes;
+  std::vector<RatchetNode> nodes;
 
   void sign(CipherSuite suite,
             const HPKEPublicKey& init_pub,
             const SignaturePrivateKey& sig_priv,
             std::optional<KeyPackageOpts> opts);
 
-  TLS_SERIALIZABLE(leaf_key_package, nodes);
+  TLS_SERIALIZABLE(leaf_key_package, nodes)
+  TLS_TRAITS(tls::pass, tls::vector<2>)
 };
 
 // struct {
