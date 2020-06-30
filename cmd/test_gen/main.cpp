@@ -32,10 +32,10 @@ generate_tree_math()
     tv.sibling.push_back(sibling);
 
     auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
-    tv.dirpath.push_back(dirpath);
+    tv.dirpath.push_back(TreeMathTestVectors::NodeVector{ dirpath });
 
     auto copath = tree_math::copath(NodeIndex{ x }, w);
-    tv.copath.push_back(copath);
+    tv.copath.push_back(TreeMathTestVectors::NodeVector{ copath });
 
     for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
       auto ancestors = std::vector<NodeIndex>();
@@ -43,7 +43,7 @@ generate_tree_math()
         auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
         ancestors.push_back(a);
       }
-      tv.ancestor.push_back(ancestors);
+      tv.ancestor.emplace_back(TreeMathTestVectors::NodeVector{ ancestors });
     }
   }
 
@@ -112,7 +112,8 @@ generate_hash_ratchet()
       HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto key_nonce = ratchet.get(k);
-        tc.key_sequences.at(j).push_back({ key_nonce.key, key_nonce.nonce });
+        tc.key_sequences.at(j).steps.push_back(
+          { key_nonce.key, key_nonce.nonce });
       }
     }
 
@@ -165,10 +166,9 @@ generate_key_schedule()
       auto ctx = tls::marshal(group_context);
       epoch = epoch.next(LeafCount{ n_members }, update_secret, ctx);
 
-      auto handshake_keys =
-        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+      auto handshake_keys = std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       auto application_keys =
-        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+        std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
         auto hs = epoch.handshake_keys.get(k, tv.target_generation);
         handshake_keys.push_back({ hs.key, hs.nonce });
@@ -209,11 +209,13 @@ TreeTestVectors::TreeCase
 tree_to_case(const TestRatchetTree& tree)
 {
   auto nodes = tree.nodes();
-  TreeTestVectors::TreeCase tc(nodes.size());
+  TreeTestVectors::TreeCase tc{};
+  tc.nodes.resize(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
-    tc[i].hash = nodes[i].hash();
+    tc.nodes[i].hash = nodes[i].hash();
     if (nodes[i].has_value()) {
-      tc[i].public_key = nodes[i]->public_key().to_bytes();
+      tc.nodes[i].public_key =
+        TreeTestVectors::Bytes1{ nodes[i]->public_key().to_bytes() };
     }
   }
   return tc;
@@ -237,7 +239,7 @@ generate_tree()
   size_t n_leaves = 10;
   tv.leaf_secrets.resize(n_leaves);
   for (size_t i = 0; i < n_leaves; ++i) {
-    tv.leaf_secrets[i] = { uint8_t(i) };
+    tv.leaf_secrets[i].data = { uint8_t(i) };
   }
 
   for (size_t i = 0; i < suites.size(); ++i) {
@@ -257,9 +259,9 @@ generate_tree()
       auto cred = Credential::basic(id, sig.public_key());
       tc.credentials.push_back(cred);
 
-      auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j]);
+      auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j].data);
       tree.add_leaf(LeafIndex{ j }, priv.public_key(), tc.credentials[j]);
-      tree.encap(LeafIndex{ j }, {}, tv.leaf_secrets[j]);
+      tree.encap(LeafIndex{ j }, {}, tv.leaf_secrets[j].data);
       tc.trees.push_back(tree_to_case(tree));
     }
 
@@ -364,10 +366,10 @@ generate_messages()
 
     // Construct Commit
     auto commit = Commit{
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
       direct_path,
     };
 
@@ -556,10 +558,6 @@ verify_session_repro(const F& generator)
 {
   auto v0 = generator();
   auto v1 = generator();
-
-  // Obviously, inputs should repro
-  verify_equal_marshaled(v0.group_size, v1.group_size);
-  verify_equal_marshaled(v0.group_id, v1.group_id);
 
   for (size_t i = 0; i < v0.cases.size(); ++i) {
     // Randomized signatures break reproducibility

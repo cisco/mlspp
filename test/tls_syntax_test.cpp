@@ -5,69 +5,51 @@
 using namespace mls;
 
 // An enum to test enum encoding, and as a type for variants
-enum struct TypeSelector : uint16_t
+enum struct IntSelector : uint16_t
 {
-  example_struct = 0xA0A0,
-  must_initialize = 0xB0B0,
+  uint8 = 0xAAAA,
+  uint16 = 0xBBBB,
 };
 
-// A struct to test struct encoding, and its operators
+struct Uint8
+{
+  uint8_t value;
+  static const IntSelector type;
+  TLS_SERIALIZABLE(value);
+};
+
+const IntSelector Uint8::type = IntSelector::uint8;
+
+struct Uint16
+{
+  uint16_t value;
+  static const IntSelector type;
+  TLS_SERIALIZABLE(value);
+};
+
+const IntSelector Uint16::type = IntSelector::uint16;
+
+// A struct to test struct encoding and traits
 struct ExampleStruct
 {
   uint16_t a;
-  tls::vector<uint8_t, 2> b;
-  std::array<uint32_t, 4> c;
+  std::array<uint32_t, 4> b;
+  std::optional<uint8_t> c;
+  std::vector<uint8_t> d;
+  std::variant<Uint8, Uint16> e;
 
-  static const TypeSelector type;
-  TLS_SERIALIZABLE(a, b, c)
+  TLS_SERIALIZABLE(a, b, c, d, e)
+  TLS_TRAITS(tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>,
+             tls::variant<IntSelector>)
 };
-
-const TypeSelector ExampleStruct::type = TypeSelector::example_struct;
 
 bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 {
   return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
-}
-
-struct MustInitialize
-{
-  uint8_t offset;
-  uint8_t val;
-
-  MustInitialize(uint8_t offset_in)
-    : offset(offset_in)
-    , val(0)
-  {}
-
-  MustInitialize(uint8_t offset_in, uint8_t val_in)
-    : offset(offset_in)
-    , val(val_in)
-  {}
-
-  static const TypeSelector type;
-};
-
-const TypeSelector MustInitialize::type = TypeSelector::must_initialize;
-
-tls::ostream&
-operator<<(tls::ostream& out, const MustInitialize& data)
-{
-  return out << uint8_t(data.offset ^ data.val);
-}
-
-tls::istream&
-operator>>(tls::istream& in, MustInitialize& data)
-{
-  in >> data.val;
-  data.val ^= data.offset;
-  return in;
-}
-
-bool
-operator==(const MustInitialize& lhs, const MustInitialize& rhs)
-{
-  return (lhs.offset == rhs.offset) && (lhs.val == rhs.val);
 }
 
 // Known-answer tests
@@ -92,55 +74,24 @@ protected:
   const std::array<uint16_t, 4> val_array{ 1, 2, 3, 4 };
   const bytes enc_array = from_hex("0001000200030004");
 
-  const tls::vector<uint32_t, 3> val_vector{ 5, 6 };
-  const bytes enc_vector = from_hex("0000080000000500000006");
-
-  const tls::vector<uint32_t, 0> val_vector_raw{ 7, 8 };
-  const bytes enc_vector_raw = from_hex("0000000700000008");
-
   const ExampleStruct val_struct{
     0x1111,
-    { 0x22, 0x22 },
-    { 0x33333333, 0x44444444, 0x55555555, 0x66666666 }
+    { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
+    { 0x66 },
+    { 0x77, 0x88 },
+    { Uint16{ 0x9999 } },
   };
   const bytes enc_struct =
-    from_hex("11110002222233333333444444445555555566666666");
+    from_hex("111122222222333333334444444455555555016600027788BBBB9999");
 
-  const tls::optional<ExampleStruct> val_optional{ val_struct };
+  const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
 
-  const tls::optional<ExampleStruct> val_optional_null = std::nullopt;
+  const std::optional<ExampleStruct> val_optional_null = std::nullopt;
   const bytes enc_optional_null = from_hex("00");
 
-  const uint8_t variant_param = 0xff;
-  typedef tls::variant_vector<MustInitialize, uint8_t, 1> test_var_vector;
-  typedef tls::variant_optional<MustInitialize, uint8_t> test_var_optional;
-  typedef tls::variant_variant<TypeSelector, uint8_t, MustInitialize>
-    test_var_variant;
-
-  test_var_vector val_var_vector;
-  const bytes enc_var_vector = from_hex("02f00f");
-
-  test_var_optional val_var_optional;
-  const bytes enc_var_optional = from_hex("01f0");
-
-  const TypeSelector val_enum = TypeSelector::example_struct;
-  const bytes enc_enum = from_hex("a0a0");
-
-  const tls::variant<TypeSelector, ExampleStruct> val_variant{ val_struct };
-  const bytes enc_variant = from_hex("A0A0") + enc_struct;
-
-  const test_var_variant val_var_variant{ 0xff, MustInitialize{ 0xff, 0x0f } };
-  const bytes enc_var_variant = from_hex("B0B0f0");
-
-  TLSSyntaxTest()
-    : val_var_vector(variant_param)
-    , val_var_optional(variant_param)
-  {
-    val_var_vector.push_back({ 0xff, 0x0f });
-    val_var_vector.push_back({ 0xff, 0xf0 });
-    val_var_optional = MustInitialize{ 0xff, 0x0f };
-  }
+  const IntSelector val_enum = IntSelector::uint8;
+  const bytes enc_enum = from_hex("aaaa");
 };
 
 template<typename T>
@@ -165,16 +116,10 @@ TEST_F(TLSSyntaxTest, OStream)
   ostream_test(val_uint32, enc_uint32);
   ostream_test(val_uint64, enc_uint64);
   ostream_test(val_array, enc_array);
-  ostream_test(val_vector, enc_vector);
-  ostream_test(val_vector_raw, enc_vector_raw);
   ostream_test(val_struct, enc_struct);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
-  ostream_test(val_var_vector, enc_var_vector);
-  ostream_test(val_var_optional, enc_var_optional);
   ostream_test(val_enum, enc_enum);
-  ostream_test(val_variant, enc_variant);
-  ostream_test(val_var_variant, enc_var_variant);
 }
 
 template<typename T>
@@ -206,51 +151,34 @@ TEST_F(TLSSyntaxTest, IStream)
   std::array<uint16_t, 4> data_array;
   istream_test(val_array, data_array, enc_array);
 
-  tls::vector<uint32_t, 3> data_vector;
-  istream_test(val_vector, data_vector, enc_vector);
-
-  tls::vector<uint32_t, 0> data_vector_raw;
-  istream_test(val_vector_raw, data_vector_raw, enc_vector_raw);
-
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);
 
-  tls::optional<ExampleStruct> data_optional;
+  std::optional<ExampleStruct> data_optional;
   istream_test(val_optional, data_optional, enc_optional);
 
-  tls::optional<ExampleStruct> data_optional_null;
+  std::optional<ExampleStruct> data_optional_null;
   istream_test(val_optional_null, data_optional_null, enc_optional_null);
 
-  test_var_vector data_var_vector(variant_param);
-  istream_test(val_var_vector, data_var_vector, enc_var_vector);
-
-  test_var_optional data_var_optional(variant_param);
-  istream_test(val_var_optional, data_var_optional, enc_var_optional);
-
-  TypeSelector data_enum;
+  IntSelector data_enum;
   istream_test(val_enum, data_enum, enc_enum);
-
-  tls::variant<TypeSelector, ExampleStruct> data_variant;
-  istream_test(val_variant, data_variant, enc_variant);
-
-  test_var_variant data_var_variant(variant_param, MustInitialize{ 0, 0 });
-  istream_test(val_var_variant, data_var_variant, enc_var_variant);
 }
 
 TEST_F(TLSSyntaxTest, Abbreviations)
 {
-  MustInitialize val_in{ 0, 1 };
+  ExampleStruct val_in = val_struct;
+
   tls::ostream w;
-  w << val_in;
+  w << val_struct;
   auto streamed = w.bytes();
-  auto marshaled = tls::marshal(val_in);
+  auto marshaled = tls::marshal(val_struct);
   ASSERT_EQ(streamed, marshaled);
 
-  MustInitialize val_out1{ 0 };
+  ExampleStruct val_out1{ 0 };
   tls::unmarshal(marshaled, val_out1);
   ASSERT_EQ(val_in, val_out1);
 
-  auto val_out2 = tls::get<MustInitialize>(marshaled, 0);
+  auto val_out2 = tls::get<ExampleStruct>(marshaled);
   ASSERT_EQ(val_in, val_out2);
 }
 

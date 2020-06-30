@@ -19,12 +19,13 @@ namespace mls {
 // } GroupContext;
 struct GroupContext
 {
-  tls::opaque<1> group_id;
+  bytes group_id;
   epoch_t epoch;
-  tls::opaque<1> tree_hash;
-  tls::opaque<1> confirmed_transcript_hash;
+  bytes tree_hash;
+  bytes confirmed_transcript_hash;
 
   TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>)
 };
 
 class State
@@ -103,7 +104,7 @@ protected:
 
   // Cache of Proposals and update secrets
   std::list<MLSPlaintext> _pending_proposals;
-  std::map<ProposalID, bytes> _update_secrets;
+  std::map<bytes, bytes> _update_secrets;
 
   // Assemble a group context for this state
   GroupContext group_context() const;
@@ -125,7 +126,7 @@ protected:
   void apply(const Commit& commit);
 
   // Compute a proposal ID
-  bytes proposal_id(const MLSPlaintext& pt) const;
+  ProposalID proposal_id(const MLSPlaintext& pt) const;
 
   // Extract a proposal from the cache
   std::optional<MLSPlaintext> find_proposal(const ProposalID& id);

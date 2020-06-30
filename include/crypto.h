@@ -88,15 +88,16 @@ hkdf_expand_label(CipherSuite suite,
 // HPKE Keys
 struct HPKECiphertext
 {
-  tls::opaque<2> kem_output;
-  tls::opaque<4> ciphertext;
+  bytes kem_output;
+  bytes ciphertext;
 
-  TLS_SERIALIZABLE(kem_output, ciphertext);
+  TLS_SERIALIZABLE(kem_output, ciphertext)
+  TLS_TRAITS(tls::vector<2>, tls::vector<4>)
 };
 
 struct HPKEPublicKey
 {
-  tls::opaque<2> data;
+  bytes data;
 
   HPKEPublicKey() = default;
   HPKEPublicKey(const bytes& data);
@@ -104,7 +105,8 @@ struct HPKEPublicKey
   HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& pt) const;
   bytes to_bytes() const;
 
-  TLS_SERIALIZABLE(data);
+  TLS_SERIALIZABLE(data)
+  TLS_TRAITS(tls::vector<2>)
 };
 
 class HPKEPrivateKey
@@ -117,13 +119,14 @@ public:
   bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ct) const;
   HPKEPublicKey public_key() const;
 
-  TLS_SERIALIZABLE(_data, _pub_data);
+  TLS_SERIALIZABLE(_data, _pub_data)
+  TLS_TRAITS(tls::vector<2>, tls::vector<2>)
 
 private:
-  tls::opaque<2> _data;
-  tls::opaque<2> _pub_data;
+  bytes _data;
+  bytes _pub_data;
 
-  HPKEPrivateKey(CipherSuite suite, bytes data);
+  HPKEPrivateKey(CipherSuite suite, const bytes& data);
 };
 
 // Signature Keys
@@ -131,18 +134,19 @@ class SignaturePublicKey
 {
 public:
   SignaturePublicKey();
-  SignaturePublicKey(SignatureScheme scheme, bytes data);
+  SignaturePublicKey(SignatureScheme scheme, const bytes& data);
 
   void set_signature_scheme(SignatureScheme scheme);
   SignatureScheme signature_scheme() const;
   bool verify(const bytes& message, const bytes& signature) const;
   bytes to_bytes() const;
 
-  TLS_SERIALIZABLE(_data);
+  TLS_SERIALIZABLE(_data)
+  TLS_TRAITS(tls::vector<2>)
 
 private:
   SignatureScheme _scheme;
-  tls::opaque<2> _data;
+  bytes _data;
 };
 
 class SignaturePrivateKey
@@ -158,14 +162,15 @@ public:
   bytes sign(const bytes& message) const;
   SignaturePublicKey public_key() const;
 
-  TLS_SERIALIZABLE(_scheme, _data, _pub_data);
+  TLS_SERIALIZABLE(_scheme, _data, _pub_data)
+  TLS_TRAITS(tls::pass, tls::vector<2>, tls::vector<2>)
 
 private:
   SignatureScheme _scheme;
-  tls::opaque<2> _data;
-  tls::opaque<2> _pub_data;
+  bytes _data;
+  bytes _pub_data;
 
-  SignaturePrivateKey(SignatureScheme scheme, bytes data);
+  SignaturePrivateKey(SignatureScheme scheme, const bytes& data);
 };
 
 } // namespace mls

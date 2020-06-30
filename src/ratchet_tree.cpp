@@ -14,14 +14,14 @@ RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
   _pub = _priv.value().public_key();
 }
 
-RatchetTreeNode::RatchetTreeNode(HPKEPrivateKey priv)
-  : _priv(std::move(priv))
+RatchetTreeNode::RatchetTreeNode(const HPKEPrivateKey& priv)
+  : _priv(priv)
   , _pub(priv.public_key())
 {}
 
-RatchetTreeNode::RatchetTreeNode(HPKEPublicKey pub)
+RatchetTreeNode::RatchetTreeNode(const HPKEPublicKey& pub)
   : _priv(std::nullopt)
-  , _pub(std::move(pub))
+  , _pub(pub)
 {}
 
 bool
@@ -116,15 +116,15 @@ struct LeafNodeInfo
   HPKEPublicKey public_key;
   Credential credential;
 
-  TLS_SERIALIZABLE(public_key, credential);
+  TLS_SERIALIZABLE(public_key, credential)
 };
 
 struct LeafNodeHashInput
 {
   const uint8_t hash_type = 0;
-  tls::optional<LeafNodeInfo> info;
+  std::optional<LeafNodeInfo> info;
 
-  TLS_SERIALIZABLE(hash_type, info);
+  TLS_SERIALIZABLE(hash_type, info)
 };
 
 void
@@ -149,19 +149,21 @@ OptionalRatchetTreeNode::set_leaf_hash(CipherSuite suite)
 struct ParentNodeInfo
 {
   HPKEPublicKey public_key;
-  tls::vector<LeafIndex, 4> unmerged_leaves;
+  std::vector<LeafIndex> unmerged_leaves;
 
-  TLS_SERIALIZABLE(public_key, unmerged_leaves);
+  TLS_SERIALIZABLE(public_key, unmerged_leaves)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 struct ParentNodeHashInput
 {
   const uint8_t hash_type = 1;
-  tls::optional<ParentNodeInfo> info;
-  tls::opaque<1> left_hash;
-  tls::opaque<1> right_hash;
+  std::optional<ParentNodeInfo> info;
+  bytes left_hash;
+  bytes right_hash;
 
-  TLS_SERIALIZABLE(hash_type, info, left_hash, right_hash);
+  TLS_SERIALIZABLE(hash_type, info, left_hash, right_hash)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<1>)
 };
 
 void
@@ -658,14 +660,13 @@ operator<<(std::ostream& out, const RatchetTree& obj)
 tls::ostream&
 operator<<(tls::ostream& out, const RatchetTree& obj)
 {
-  return out << obj._nodes;
+  return tls::vector<4>::encode(out, obj._nodes);
 }
 
 tls::istream&
 operator>>(tls::istream& in, RatchetTree& obj)
 {
-  in >> obj._nodes;
-
+  tls::vector<4>::decode(in, obj._nodes);
   obj.set_hash_all(obj.root_index());
   return in;
 }
