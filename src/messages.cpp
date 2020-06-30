@@ -76,7 +76,6 @@ GroupInfo::to_be_signed() const
   w << epoch << tree;
   tls::vector<1>::encode(w, confirmed_transcript_hash);
   tls::vector<1>::encode(w, interim_transcript_hash);
-  w << path;
   tls::vector<1>::encode(w, confirmation);
   w << signer_index;
   return w.bytes();
@@ -121,19 +120,6 @@ Welcome::Welcome(CipherSuite suite,
   encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
 }
 
-void
-Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
-{
-  auto gs = GroupSecrets{ _epoch_secret, std::nullopt };
-  if (path_secret.has_value()) {
-    gs.path_secret = path_secret.value();
-  }
-
-  auto gs_data = tls::marshal(gs);
-  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
-  secrets.push_back({ kp.hash(), enc_gs });
-}
-
 std::optional<int>
 Welcome::find(const KeyPackage& kp) const
 {
@@ -144,6 +130,44 @@ Welcome::find(const KeyPackage& kp) const
     }
   }
   return std::nullopt;
+}
+
+void
+Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
+{
+  auto gs = GroupSecrets{ _epoch_secret, std::nullopt };
+  if (path_secret.has_value()) {
+    gs.path_secret = { path_secret.value() };
+  }
+
+  auto gs_data = tls::marshal(gs);
+  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
+  secrets.push_back({ kp.hash(), enc_gs });
+}
+
+GroupInfo
+Welcome::decrypt(const bytes& epoch_secret) const
+{
+  bytes key, nonce;
+  std::tie(key, nonce) = group_info_key_nonce(epoch_secret);
+  auto group_info_data =
+    open(cipher_suite, key, nonce, {}, encrypted_group_info);
+  return tls::get<GroupInfo>(group_info_data, cipher_suite);
+}
+
+std::tuple<bytes, bytes>
+Welcome::group_info_key_nonce(const bytes& epoch_secret) const
+{
+  auto key_size = suite_key_size(cipher_suite);
+  auto nonce_size = suite_nonce_size(cipher_suite);
+  auto secret_size = Digest(cipher_suite).output_size();
+
+  auto secret = hkdf_expand_label(
+    cipher_suite, epoch_secret, "group info", {}, secret_size);
+  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
+  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
+
+  return std::make_tuple(key, nonce);
 }
 
 // MLSPlaintext

@@ -136,8 +136,15 @@ struct GroupInfo {
 //   opaque path_secret<1..255>;
 // } GroupSecrets;
 struct GroupSecrets {
+  struct PathSecret {
+    bytes secret;
+
+    TLS_SERIALIZABLE(secret);
+    TLS_TRAITS(tls::vector<1>);
+  };
+
   bytes epoch_secret;
-  std::optional<PathSecret> bytes path_secret;
+  std::optional<PathSecret> path_secret;
 
   TLS_SERIALIZABLE(epoch_secret, path_secret)
   TLS_TRAITS(tls::vector<1>, tls::pass)

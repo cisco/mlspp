@@ -73,7 +73,7 @@ State::State(const HPKEPrivateKey& init_priv,
   auto update_secret = bytes{};
   if (secrets.path_secret.has_value()) {
     auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
-    update_secret = _tree.implant(ancestor, secrets.path_secret.value());
+    update_secret = _tree.implant(ancestor, secrets.path_secret.value().secret);
   }
 
   // Ratchet forward into the current epoch
