@@ -139,8 +139,8 @@ struct GroupSecrets {
   struct PathSecret {
     bytes secret;
 
-    TLS_SERIALIZABLE(secret);
-    TLS_TRAITS(tls::vector<1>);
+    TLS_SERIALIZABLE(secret)
+    TLS_TRAITS(tls::vector<1>)
   };
 
   bytes epoch_secret;
