@@ -391,7 +391,7 @@ struct variant {
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
     if (std::holds_alternative<Tc>(v)) {
-      str << variant_value<Te, Tc> << std::get<I>(v);
+      str << Tc::type << std::get<I>(v);
       return;
     }
 
@@ -416,7 +416,7 @@ struct variant {
   read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v)
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
-    if (variant_value<Te, Tc> == target_type) {
+    if (Tc::type == target_type) {
       str >> v.template emplace<I>();
       return;
     }

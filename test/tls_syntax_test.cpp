@@ -11,11 +11,23 @@ enum struct IntSelector : uint16_t
   uint16 = 0xBBBB,
 };
 
-template<>
-IntSelector tls::variant_value<IntSelector, uint8_t> = IntSelector::uint8;
+struct Uint8
+{
+  uint8_t value;
+  static const IntSelector type;
+  TLS_SERIALIZABLE(value);
+};
 
-template<>
-IntSelector tls::variant_value<IntSelector, uint16_t> = IntSelector::uint16;
+const IntSelector Uint8::type = IntSelector::uint8;
+
+struct Uint16
+{
+  uint16_t value;
+  static const IntSelector type;
+  TLS_SERIALIZABLE(value);
+};
+
+const IntSelector Uint16::type = IntSelector::uint16;
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -24,7 +36,7 @@ struct ExampleStruct
   std::array<uint32_t, 4> b;
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
-  std::variant<uint8_t, uint16_t> e;
+  std::variant<Uint8, Uint16> e;
 
   TLS_SERIALIZABLE(a, b, c, d, e)
   TLS_TRAITS(tls::pass,
@@ -67,7 +79,7 @@ protected:
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
     { 0x66 },
     { 0x77, 0x88 },
-    { uint16_t(0x9999) },
+    { Uint16{ 0x9999 } },
   };
   const bytes enc_struct =
     from_hex("111122222222333333334444444455555555016600027788BBBB9999");

@@ -2,37 +2,6 @@
 #include "key_schedule.h"
 #include "state.h"
 
-// Variant type selectors in the `tls` namespace
-namespace tls {
-
-// ProposalType
-template<>
-inline mls::ProposalType variant_value<mls::ProposalType, mls::Add> =
-  mls::ProposalType::add;
-
-template<>
-inline mls::ProposalType variant_value<mls::ProposalType, mls::Update> =
-  mls::ProposalType::update;
-
-template<>
-inline mls::ProposalType variant_value<mls::ProposalType, mls::Remove> =
-  mls::ProposalType::remove;
-
-// ContentType
-template<>
-inline mls::ContentType variant_value<mls::ContentType, mls::ApplicationData> =
-  mls::ContentType::application;
-
-template<>
-inline mls::ContentType variant_value<mls::ContentType, mls::Proposal> =
-  mls::ContentType::proposal;
-
-template<>
-inline mls::ContentType variant_value<mls::ContentType, mls::CommitData> =
-  mls::ContentType::commit;
-
-} // namespace tls
-
 namespace mls {
 
 // KeyPackage
@@ -182,6 +151,14 @@ Welcome::find(const KeyPackage& kp) const
 }
 
 // MLSPlaintext
+
+const ProposalType Add::type = ProposalType::add;
+const ProposalType Update::type = ProposalType::update;
+const ProposalType Remove::type = ProposalType::remove;
+
+const ContentType Proposal::type = ContentType::proposal;
+const ContentType CommitData::type = ContentType::commit;
+const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,

@@ -204,16 +204,22 @@ enum struct ProposalType : uint8_t {
 
 struct Add {
   KeyPackage key_package;
+
+  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Update {
   HPKEPublicKey leaf_key;
+
+  static const ProposalType type;
   TLS_SERIALIZABLE(leaf_key)
 };
 
 struct Remove {
   LeafIndex removed;
+
+  static const ProposalType type;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -234,6 +240,8 @@ enum struct ContentType : uint8_t
 struct Proposal
 {
   std::variant<Add, Update, Remove> content;
+
+  static const ContentType type;
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
 };
@@ -287,6 +295,7 @@ struct ApplicationData
 {
   bytes data;
 
+  static const ContentType type;
   TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<4>)
 };
@@ -296,6 +305,7 @@ struct CommitData
   Commit commit;
   bytes confirmation;
 
+  static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation)
   TLS_TRAITS(tls::pass, tls::vector<1>)
 };
