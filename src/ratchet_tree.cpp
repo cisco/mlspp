@@ -9,7 +9,8 @@ namespace mls {
 ///
 
 RatchetTreeNode::RatchetTreeNode(CipherSuite suite, const bytes& secret)
-  : _priv(HPKEPrivateKey::derive(suite, secret))
+  : _secret(secret)
+  , _priv(HPKEPrivateKey::derive(suite, secret))
 {
   _pub = _priv.value().public_key();
 }
@@ -28,6 +29,12 @@ bool
 RatchetTreeNode::public_equal(const RatchetTreeNode& other) const
 {
   return _pub == other._pub;
+}
+
+const std::optional<bytes>&
+RatchetTreeNode::secret() const
+{
+  return _secret;
 }
 
 const std::optional<HPKEPrivateKey>&
@@ -478,6 +485,35 @@ RatchetTree::get_credential(LeafIndex index) const
   return cred.value();
 }
 
+std::optional<bytes>
+RatchetTree::ancestor_secret(LeafIndex from, LeafIndex to) const
+{
+  auto ancestor = tree_math::ancestor(from, to);
+  auto& node = _nodes[ancestor];
+  if (!node.has_value()) {
+    return std::nullopt;
+  }
+
+  return node.value().secret();
+}
+
+bytes
+RatchetTree::implant(NodeIndex index, const bytes& path_secret)
+{
+  auto n = index;
+  auto r = root_index();
+  auto secret = path_secret;
+  while (n != r) {
+    _nodes[n] = new_node(secret);
+    secret = path_step(secret);
+    n = tree_math::parent(n, node_size());
+  }
+
+  _nodes[r] = new_node(secret);
+  set_hash_all(n);
+  return path_step(secret);
+}
+
 LeafCount
 RatchetTree::leaf_span() const
 {
@@ -522,21 +558,13 @@ RatchetTree::node_size() const
 RatchetTreeNode
 RatchetTree::new_node(const bytes& path_secret) const
 {
-  auto node_secret = node_step(path_secret);
-  return RatchetTreeNode(_suite, node_secret);
+  return RatchetTreeNode(_suite, path_secret);
 }
 
 bytes
 RatchetTree::path_step(const bytes& path_secret) const
 {
   auto out = hkdf_expand_label(_suite, path_secret, "path", {}, _secret_size);
-  return out;
-}
-
-bytes
-RatchetTree::node_step(const bytes& path_secret) const
-{
-  auto out = hkdf_expand_label(_suite, path_secret, "node", {}, _secret_size);
   return out;
 }
 

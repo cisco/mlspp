@@ -93,11 +93,9 @@ struct GroupInfo {
   bytes group_id;
   epoch_t epoch;
   RatchetTree tree;
-  bytes prior_confirmed_transcript_hash;
 
   bytes confirmed_transcript_hash;
   bytes interim_transcript_hash;
-  DirectPath path;
   bytes confirmation;
 
   LeafIndex signer_index;
@@ -107,10 +105,8 @@ struct GroupInfo {
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
             RatchetTree tree_in,
-            bytes prior_confirmed_transcript_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
-            DirectPath path_in,
             bytes confirmation_in);
 
   bytes to_be_signed() const;
@@ -120,10 +116,8 @@ struct GroupInfo {
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    tree,
-                   prior_confirmed_transcript_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
-                   path,
                    confirmation,
                    signer_index,
                    signature)
@@ -134,21 +128,26 @@ struct GroupInfo {
              tls::vector<1>,
              tls::vector<1>,
              tls::pass,
-             tls::vector<1>,
-             tls::pass,
              tls::vector<2>)
 };
 
 // struct {
-//   opaque group_info_key<1..255>;
-//   opaque group_info_nonce<1..255>;
+//   opaque epoch_secret<1..255>;
 //   opaque path_secret<1..255>;
 // } GroupSecrets;
 struct GroupSecrets {
-  bytes init_secret;
+  struct PathSecret {
+    bytes secret;
 
-  TLS_SERIALIZABLE(init_secret)
-  TLS_TRAITS(tls::vector<1>)
+    TLS_SERIALIZABLE(secret)
+    TLS_TRAITS(tls::vector<1>)
+  };
+
+  bytes epoch_secret;
+  std::optional<PathSecret> path_secret;
+
+  TLS_SERIALIZABLE(epoch_secret, path_secret)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
 // struct {
@@ -178,17 +177,19 @@ struct Welcome {
 
   Welcome();
   Welcome(CipherSuite suite,
-          bytes init_secret,
+          const bytes& epoch_secret,
           const GroupInfo& group_info);
 
-  void encrypt(const KeyPackage& kp);
+  void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
+  GroupInfo decrypt(const bytes& epoch_secret) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
   private:
-  bytes _init_secret;
+  bytes _epoch_secret;
+  std::tuple<bytes, bytes> group_info_key_nonce(const bytes& epoch_secret) const;
 };
 
 ///
