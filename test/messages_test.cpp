@@ -14,6 +14,8 @@ tls_round_trip(const bytes& vector,
 {
   auto marshaled = tls::marshal(constructed);
   if (reproducible) {
+    std::cout << "vec " << vector << std::endl;
+    std::cout << "mar " << marshaled << std::endl;
     ASSERT_EQ(vector, marshaled);
   }
 
@@ -106,10 +108,10 @@ TEST_F(MessagesTest, Interop)
 
     // Commit
     auto commit = Commit{
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
       direct_path,
     };
     tls_round_trip(tc.commit, commit, true);

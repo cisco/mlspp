@@ -142,10 +142,11 @@ hkdf_expand(CipherSuite suite,
 struct HKDFLabel
 {
   uint16_t length;
-  tls::opaque<1> label;
-  tls::opaque<4> context;
+  bytes label;
+  bytes context;
 
-  TLS_SERIALIZABLE(length, label, context);
+  TLS_SERIALIZABLE(length, label, context)
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 bytes
@@ -266,11 +267,11 @@ struct HPKEContext
   HPKEKEMID kem;
   HPKEKDFID kdf;
   HPKEAEADID aead;
-  tls::opaque<0> enc;
-  tls::opaque<0> pkRm;
-  tls::opaque<0> pkIm;
-  tls::opaque<0> psk_id_hash;
-  tls::opaque<0> info_hash;
+  bytes enc;
+  bytes pkRm;
+  bytes pkIm;
+  bytes psk_id_hash;
+  bytes info_hash;
 
   TLS_SERIALIZABLE(mode,
                    kem,
@@ -280,7 +281,16 @@ struct HPKEContext
                    pkRm,
                    pkIm,
                    psk_id_hash,
-                   info_hash)
+                   info_hash);
+  TLS_TRAITS(tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>,
+             tls::vector<0>)
 };
 
 static std::tuple<bytes, bytes>
@@ -393,9 +403,9 @@ HPKEPrivateKey::public_key() const
   return HPKEPublicKey(_pub_data);
 }
 
-HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
-  : _data(std::move(data))
-  , _pub_data(primitive::priv_to_pub(suite, data))
+HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, const bytes& data)
+  : _data(data)
+  , _pub_data(primitive::priv_to_pub(suite, _data))
 {}
 
 ///
@@ -406,9 +416,10 @@ SignaturePublicKey::SignaturePublicKey()
   : _scheme(SignatureScheme::unknown)
 {}
 
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
+SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme,
+                                       const bytes& data)
   : _scheme(scheme)
-  , _data(std::move(data))
+  , _data(data)
 {}
 
 void
@@ -469,9 +480,10 @@ SignaturePrivateKey::public_key() const
   return SignaturePublicKey(_scheme, _pub_data);
 }
 
-SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme, bytes data)
+SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
+                                         const bytes& data)
   : _scheme(scheme)
-  , _data(std::move(data))
+  , _data(data)
   , _pub_data(primitive::priv_to_pub(scheme, data))
 {}
 
