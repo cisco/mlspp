@@ -7,28 +7,28 @@ namespace tls {
 
 // ProposalType
 template<>
-mls::ProposalType variant_value<mls::ProposalType, mls::Add> =
+inline mls::ProposalType variant_value<mls::ProposalType, mls::Add> =
   mls::ProposalType::add;
 
 template<>
-mls::ProposalType variant_value<mls::ProposalType, mls::Update> =
+inline mls::ProposalType variant_value<mls::ProposalType, mls::Update> =
   mls::ProposalType::update;
 
 template<>
-mls::ProposalType variant_value<mls::ProposalType, mls::Remove> =
+inline mls::ProposalType variant_value<mls::ProposalType, mls::Remove> =
   mls::ProposalType::remove;
 
 // ContentType
 template<>
-mls::ContentType variant_value<mls::ContentType, mls::ApplicationData> =
+inline mls::ContentType variant_value<mls::ContentType, mls::ApplicationData> =
   mls::ContentType::application;
 
 template<>
-mls::ContentType variant_value<mls::ContentType, mls::Proposal> =
+inline mls::ContentType variant_value<mls::ContentType, mls::Proposal> =
   mls::ContentType::proposal;
 
 template<>
-mls::ContentType variant_value<mls::ContentType, mls::CommitData> =
+inline mls::ContentType variant_value<mls::ContentType, mls::CommitData> =
   mls::ContentType::commit;
 
 } // namespace tls

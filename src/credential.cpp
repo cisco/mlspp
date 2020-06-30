@@ -8,8 +8,9 @@ namespace tls {
 ///
 
 template<>
-mls::CredentialType variant_value<mls::CredentialType, mls::BasicCredential> =
-  mls::CredentialType::basic;
+inline mls::CredentialType
+  variant_value<mls::CredentialType, mls::BasicCredential> =
+    mls::CredentialType::basic;
 
 } // namespace tls
 
