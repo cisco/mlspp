@@ -72,8 +72,13 @@ bytes
 GroupInfo::to_be_signed() const
 {
   tls::ostream w;
-  w << group_id << epoch << tree << confirmed_transcript_hash
-    << interim_transcript_hash << confirmation << signer_index;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << tree;
+  tls::vector<1>::encode(w, confirmed_transcript_hash);
+  tls::vector<1>::encode(w, interim_transcript_hash);
+  w << path;
+  tls::vector<1>::encode(w, confirmation);
+  w << signer_index;
   return w.bytes();
 }
 
@@ -141,66 +146,15 @@ Welcome::find(const KeyPackage& kp) const
   return std::nullopt;
 }
 
-GroupInfo
-Welcome::decrypt(const bytes& epoch_secret) const
-{
-  bytes key, nonce;
-  std::tie(key, nonce) = group_info_key_nonce(epoch_secret);
-  auto group_info_data =
-    open(cipher_suite, key, nonce, {}, encrypted_group_info);
-  return tls::get<GroupInfo>(group_info_data, cipher_suite);
-}
-
-std::tuple<bytes, bytes>
-Welcome::group_info_key_nonce(const bytes& epoch_secret) const
-{
-  auto key_size = suite_key_size(cipher_suite);
-  auto nonce_size = suite_nonce_size(cipher_suite);
-  auto secret_size = Digest(cipher_suite).output_size();
-
-  auto secret = hkdf_expand_label(
-    cipher_suite, epoch_secret, "group info", {}, secret_size);
-  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
-  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
-
-  return std::make_tuple(key, nonce);
-}
-
-bool
-operator==(const Welcome& lhs, const Welcome& rhs)
-{
-  return (lhs.version == rhs.version) &&
-         (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.secrets == rhs.secrets) &&
-         (lhs.encrypted_group_info == rhs.encrypted_group_info);
-}
-
-tls::ostream&
-operator<<(tls::ostream& str, const Welcome& obj)
-{
-  return str << obj.version << obj.cipher_suite << obj.secrets
-             << obj.encrypted_group_info;
-}
-
-tls::istream&
-operator>>(tls::istream& str, Welcome& obj)
-{
-  str >> obj.version >> obj.cipher_suite >> obj.secrets >>
-    obj.encrypted_group_info;
-  return str;
-}
-
-// Proposals
+// MLSPlaintext
 
 const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
 const ProposalType Remove::type = ProposalType::remove;
 
-// MLSPlaintext
-
-const ContentType ApplicationData::type = ContentType::application;
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
+const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -238,8 +192,9 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
       throw InvalidParameterError("Unknown content type");
   }
 
-  tls::opaque<2> padding;
-  r >> signature >> padding;
+  bytes padding;
+  tls::vector<2>::decode(r, signature);
+  tls::vector<2>::decode(r, padding);
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -283,24 +238,19 @@ bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  switch (content.inner_type()) {
-    case ContentType::application:
-      w << std::get<ApplicationData>(content);
-      break;
-
-    case ContentType::proposal:
-      w << std::get<Proposal>(content);
-      break;
-
-    case ContentType::commit:
-      w << std::get<CommitData>(content);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  if (std::holds_alternative<ApplicationData>(content)) {
+    w << std::get<ApplicationData>(content);
+  } else if (std::holds_alternative<Proposal>(content)) {
+    w << std::get<Proposal>(content);
+  } else if (std::holds_alternative<CommitData>(content)) {
+    w << std::get<CommitData>(content);
+  } else {
+    throw InvalidParameterError("Unknown content type");
   }
 
-  w << signature << tls::opaque<2>(padding_size, 0);
+  bytes padding(padding_size, 0);
+  tls::vector<2>::encode(w, signature);
+  tls::vector<2>::encode(w, padding);
   return w.bytes();
 }
 
@@ -309,7 +259,8 @@ MLSPlaintext::commit_content() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  w << group_id << epoch << sender << commit_data.commit;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << sender << commit_data.commit;
   return w.bytes();
 }
 
@@ -322,7 +273,8 @@ MLSPlaintext::commit_auth_data() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  w << commit_data.confirmation << signature;
+  tls::vector<1>::encode(w, commit_data.confirmation);
+  tls::vector<2>::encode(w, signature);
   return w.bytes();
 }
 
@@ -330,7 +282,11 @@ bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
-  w << context << group_id << epoch << sender << authenticated_data << content;
+  w << context;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << sender;
+  tls::vector<4>::encode(w, authenticated_data);
+  tls::variant<ContentType>::encode(w, content);
   return w.bytes();
 }
 

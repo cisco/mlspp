@@ -38,7 +38,7 @@ struct ApplicationContext
     , generation(generation_in)
   {}
 
-  TLS_SERIALIZABLE(node, generation);
+  TLS_SERIALIZABLE(node, generation)
 };
 
 bytes

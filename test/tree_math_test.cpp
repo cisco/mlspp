@@ -36,6 +36,14 @@ protected:
       ASSERT_EQ(function(NodeIndex{ i }), answers[i]);
     }
   }
+
+  template<typename F, typename A>
+  void matrix_test(F function, A answers)
+  {
+    for (uint32_t i = 0; i < width.val; ++i) {
+      ASSERT_EQ(function(NodeIndex{ i }), answers[i].nodes);
+    }
+  }
 };
 
 TEST_F(TreeMathTest, Root)
@@ -68,12 +76,12 @@ TEST_F(TreeMathTest, Sibling)
 
 TEST_F(TreeMathTest, Dirpath)
 {
-  vector_test(size_scope(tree_math::dirpath), tv.dirpath);
+  matrix_test(size_scope(tree_math::dirpath), tv.dirpath);
 }
 
 TEST_F(TreeMathTest, Copath)
 {
-  vector_test(size_scope(tree_math::copath), tv.copath);
+  matrix_test(size_scope(tree_math::copath), tv.copath);
 }
 
 TEST_F(TreeMathTest, Ancestor)
@@ -83,6 +91,6 @@ TEST_F(TreeMathTest, Ancestor)
     for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
       ancestors.push_back(tree_math::ancestor(LeafIndex(l), LeafIndex(r)));
     }
-    ASSERT_EQ(ancestors, tv.ancestor[l]);
+    ASSERT_EQ(ancestors, tv.ancestor[l].nodes);
   }
 }

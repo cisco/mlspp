@@ -46,7 +46,7 @@ struct UInt32
     : val(val_in)
   {}
 
-  TLS_SERIALIZABLE(val);
+  TLS_SERIALIZABLE(val)
 };
 
 struct NodeCount;

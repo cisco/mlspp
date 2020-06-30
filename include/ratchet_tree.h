@@ -18,8 +18,8 @@ class RatchetTreeNode
 public:
   RatchetTreeNode() = default;
   RatchetTreeNode(CipherSuite suite, const bytes& secret);
-  RatchetTreeNode(HPKEPrivateKey priv);
-  RatchetTreeNode(HPKEPublicKey pub);
+  RatchetTreeNode(const HPKEPrivateKey& priv);
+  RatchetTreeNode(const HPKEPublicKey& pub);
 
   bool public_equal(const RatchetTreeNode& other) const;
   const std::optional<bytes>& secret() const;
@@ -33,7 +33,8 @@ public:
   void set_cipher_suite();
   void add_unmerged(LeafIndex index);
 
-  TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred);
+  TLS_SERIALIZABLE(_pub, _unmerged_leaves, _cred)
+  TLS_TRAITS(tls::pass, tls::vector<4>, tls::pass)
 
 private:
   std::optional<bytes> _secret;
@@ -41,19 +42,19 @@ private:
   HPKEPublicKey _pub;
 
   // Unmerged leaves to be included in resolution
-  tls::vector<LeafIndex, 4> _unmerged_leaves;
+  std::vector<LeafIndex> _unmerged_leaves;
 
   // A credential is populated iff this is a leaf node
-  tls::optional<Credential> _cred;
+  std::optional<Credential> _cred;
 };
 
 // XXX(rlb@ipv.sx): We have to subclass optional<T> in order to
 // ensure that nodes are populated with blank values on unmarshal.
 // Otherwise, `*opt` will access uninitialized memory.
 struct OptionalRatchetTreeNode
-  : public tls::optional<RatchetTreeNode>
+  : public std::optional<RatchetTreeNode>
 {
-  using parent = tls::optional<RatchetTreeNode>;
+  using parent = std::optional<RatchetTreeNode>;
   using parent::parent;
 
   bool has_private() const;
@@ -70,9 +71,9 @@ private:
 };
 
 struct RatchetTreeNodeVector
-  : public tls::vector<OptionalRatchetTreeNode, 4>
+  : public std::vector<OptionalRatchetTreeNode>
 {
-  using parent = tls::vector<OptionalRatchetTreeNode, 4>;
+  using parent = std::vector<OptionalRatchetTreeNode>;
   using parent::parent;
   using parent::operator[];
 

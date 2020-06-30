@@ -69,13 +69,14 @@ protected:
                       const TestRatchetTree& tree)
   {
     auto& nodes = tree.nodes();
-    ASSERT_EQ(vec.size(), nodes.size());
+    ASSERT_EQ(vec.nodes.size(), nodes.size());
 
-    for (size_t j = 0; j < vec.size(); ++j) {
-      ASSERT_EQ(vec[j].hash, nodes[j].hash());
-      ASSERT_EQ(vec[j].public_key.has_value(), nodes[j].has_value());
+    for (size_t j = 0; j < vec.nodes.size(); ++j) {
+      ASSERT_EQ(vec.nodes[j].hash, nodes[j].hash());
+      ASSERT_EQ(vec.nodes[j].public_key.has_value(), nodes[j].has_value());
       if (nodes[j].has_value()) {
-        ASSERT_EQ(vec[j].public_key.value(), nodes[j]->public_key().to_bytes());
+        ASSERT_EQ(vec.nodes[j].public_key.value().data,
+                  nodes[j]->public_key().to_bytes());
       }
     }
   }
@@ -89,9 +90,10 @@ TEST_F(RatchetTreeTest, Interop)
     // Add the leaves
     int tci = 0;
     for (uint32_t i = 0; i < tv.leaf_secrets.size(); ++i, ++tci) {
-      auto priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.leaf_secrets[i]);
+      auto priv =
+        HPKEPrivateKey::derive(tc.cipher_suite, tv.leaf_secrets[i].data);
       tree.add_leaf(LeafIndex{ i }, priv.public_key(), tc.credentials[i]);
-      tree.encap(LeafIndex{ i }, {}, tv.leaf_secrets[i]);
+      tree.encap(LeafIndex{ i }, {}, tv.leaf_secrets[i].data);
       assert_tree_eq(tc.trees[tci], tree);
     }
 
