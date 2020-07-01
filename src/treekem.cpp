@@ -77,11 +77,13 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
                           LeafIndex index,
                           const bytes& leaf_secret,
                           NodeIndex intersect,
-                          const bytes& path_secret)
+                          const std::optional<bytes>& path_secret)
 {
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
-  priv.implant(intersect, size, path_secret);
   priv.path_secrets[NodeIndex(index)] = leaf_secret;
+  if (path_secret.has_value()) {
+    priv.implant(intersect, size, path_secret.value());
+  }
   return priv;
 }
 
@@ -213,6 +215,23 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   implant(overlap_node, LeafCount(size), path_secret);
 }
 
+void
+TreeKEMPrivateKey::truncate(LeafCount size)
+{
+  auto ni = NodeIndex(LeafIndex{ size.val - 1 });
+  auto to_remove = std::vector<NodeIndex>{};
+  for (const auto& entry : path_secrets) {
+    if (entry.first.val > ni.val) {
+      to_remove.push_back(entry.first);
+    }
+  }
+
+  for (auto n : to_remove) {
+    path_secrets.erase(n);
+    private_key_cache.erase(n);
+  }
+}
+
 bool
 TreeKEMPrivateKey::consistent(const TreeKEMPrivateKey& other) const
 {
@@ -318,6 +337,7 @@ TreeKEMPublicKey::add_leaf(const KeyPackage& kp)
     parent.unmerged_leaves.push_back(index);
   }
 
+  clear_hash_path(index);
   return index;
 }
 
@@ -325,7 +345,7 @@ void
 TreeKEMPublicKey::update_leaf(LeafIndex index, const KeyPackage& kp)
 {
   blank_path(index);
-  nodes.at(index.val).node = Node{ kp };
+  nodes.at(NodeIndex(index).val).node = Node{ kp };
   clear_hash_path(index);
 }
 
@@ -341,6 +361,8 @@ TreeKEMPublicKey::blank_path(LeafIndex index)
   for (auto n : tree_math::dirpath(ni, NodeCount(size()))) {
     nodes.at(n.val).node.reset();
   }
+
+  clear_hash_path(index);
 }
 
 void
@@ -359,23 +381,27 @@ TreeKEMPublicKey::merge(LeafIndex from, const DirectPath& path)
     nodes.at(n.val).node = { ParentNode{ path.nodes[i].public_key, {}, {} } };
   }
 
-  // XXX(RLB): Should be possible to make a more targeted change, e.g., just
-  // resetting the path
-  clear_hash_all();
+  clear_hash_path(from);
   set_hash_all();
 }
 
 void
 TreeKEMPublicKey::set_hash_all()
 {
-  root_hash();
+  auto r = tree_math::root(NodeCount(size()));
+  get_hash(r);
 }
 
 bytes
-TreeKEMPublicKey::root_hash()
+TreeKEMPublicKey::root_hash() const
 {
   auto r = tree_math::root(NodeCount(size()));
-  return get_hash(r);
+  auto hash = nodes.at(r.val).hash;
+  if (hash.empty()) {
+    throw InvalidParameterError("Root hash not set");
+  }
+
+  return hash;
 }
 
 LeafCount
@@ -450,11 +476,19 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const SignaturePrivateKey& sig_priv,
                         std::optional<KeyPackageOpts> opts)
 {
+  // Grab information about the sender
+  auto& maybe_node = nodes.at(NodeIndex(from).val).node;
+  if (!maybe_node.has_value()) {
+    throw InvalidParameterError("Cannot encap from blank node");
+  }
+
+  auto path = DirectPath{};
+  path.leaf_key_package = std::get<KeyPackage>(maybe_node.value().node);
+
   // Generate path secrets
   auto priv = TreeKEMPrivateKey::create(suite, size(), from, leaf_secret);
 
   // Package into a DirectPath
-  auto path = DirectPath{};
   auto last = NodeIndex(from);
   for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
     auto path_secret = priv.path_secrets.at(n);
@@ -479,9 +513,15 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Update the pubic key itself
   merge(from, path);
-  clear_hash_all();
-  set_hash_all();
   return std::make_tuple(priv, path);
+}
+
+void
+TreeKEMPublicKey::truncate()
+{
+  while (nodes.size() > 0 && !nodes.back().node.has_value()) {
+    nodes.pop_back();
+  }
 }
 
 void

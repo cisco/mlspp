@@ -24,9 +24,10 @@ public:
 
   Session::InitInfo temp_init_info()
   {
-    auto init_key = HPKEPrivateKey::generate(suite);
+    auto init_secret = random_bytes(32);
+    auto init_key = HPKEPrivateKey::derive(suite, init_secret);
     auto kp = KeyPackage{ suite, init_key.public_key(), _identity_priv, _cred };
-    return { init_key, _identity_priv, kp };
+    return { init_secret, _identity_priv, kp };
   }
 
   KeyPackage fresh_key_package()

@@ -1,5 +1,7 @@
 #include "state.h"
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -8,27 +10,33 @@ namespace mls {
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const HPKEPrivateKey& leaf_priv,
+             const bytes& leaf_secret,
              const SignaturePrivateKey& sig_priv,
-             const Credential& credential)
+             const KeyPackage& key_package)
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
-  , _tree(suite, leaf_priv, credential)
+  , _tree(suite)
   , _index(0)
   , _identity_priv(sig_priv)
 {
   _keys.suite = suite;
   _keys.init_secret = zero_bytes(Digest(suite).output_size());
+
+  auto index = _tree.add_leaf(key_package);
+  _tree.set_hash_all();
+  _tree_priv =
+    TreeKEMPrivateKey::create(suite, _tree.size(), index, leaf_secret);
 }
 
 // Initialize a group from a Welcome
-State::State(const HPKEPrivateKey& init_priv,
+State::State(const bytes& init_secret,
              const SignaturePrivateKey& sig_priv,
              const KeyPackage& kp,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
+  , _identity_priv(sig_priv)
 {
   auto maybe_kpi = welcome.find(kp);
   if (!maybe_kpi.has_value()) {
@@ -41,12 +49,15 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   // Decrypt the GroupSecrets
+  auto init_priv = HPKEPrivateKey::derive(kp.cipher_suite, init_secret);
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
   auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
 
-  // Decrypt the GroupInfo
+  // Decrypt the GroupInfo and fill in details
   auto group_info = welcome.decrypt(secrets.epoch_secret);
+  group_info.tree.suite = kp.cipher_suite;
+  group_info.tree.set_hash_all();
 
   // Verify the signature on the GroupInfo
   if (!group_info.verify()) {
@@ -60,21 +71,22 @@ State::State(const HPKEPrivateKey& init_priv,
   _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
   _interim_transcript_hash = group_info.interim_transcript_hash;
 
-  // Add self to tree
+  // Construct TreeKEM private key from partrs provided
   auto maybe_index = _tree.find(kp);
   if (!maybe_index.has_value()) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
   _index = maybe_index.value();
-  _tree.merge(_index, init_priv);
-  _identity_priv = sig_priv;
 
-  auto update_secret = bytes{};
+  auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
+  auto path_secret = std::optional<bytes>{};
   if (secrets.path_secret.has_value()) {
-    auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
-    update_secret = _tree.implant(ancestor, secrets.path_secret.value().secret);
+    path_secret = secrets.path_secret.value().secret;
   }
+
+  _tree_priv = TreeKEMPrivateKey::joiner(
+    _suite, _tree.size(), _index, init_secret, ancestor, path_secret);
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
@@ -108,8 +120,12 @@ State::add(const KeyPackage& key_package) const
 MLSPlaintext
 State::update(const bytes& leaf_secret)
 {
-  auto key = HPKEPrivateKey::derive(_suite, leaf_secret);
-  auto pt = sign({ Update{ key.public_key() } });
+  // TODO(RLB) Allow changing the signing key
+  auto kp = _tree.key_package(_index).value();
+  kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key();
+  kp.sign(_identity_priv, std::nullopt);
+
+  auto pt = sign({ Update{ kp } });
 
   auto id = proposal_id(pt);
   _update_secrets[id.id] = leaf_secret;
@@ -159,11 +175,14 @@ State::commit(const bytes& leaf_secret) const
     next._tree.root_hash(),
     next._confirmed_transcript_hash,
   });
-  auto [path, update_secret] = next._tree.encap(_index, ctx, leaf_secret);
+  auto [new_priv, path] =
+    next._tree.encap(_index, ctx, leaf_secret, _identity_priv, std::nullopt);
+  next._tree_priv = new_priv;
   commit.path = path;
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt = next.ratchet_and_sign(commit, update_secret, group_context());
+  auto pt =
+    next.ratchet_and_sign(commit, new_priv.update_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
@@ -178,7 +197,8 @@ State::commit(const bytes& leaf_secret) const
 
   auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
-    auto path_secret = next._tree.ancestor_secret(_index, joiner_locations[i]);
+    auto [_overlap, path_secret, _ok] =
+      new_priv.shared_path_secret(joiner_locations[i]);
     welcome.encrypt(joiners[i], path_secret);
   }
 
@@ -270,8 +290,8 @@ State::handle(const MLSPlaintext& pt)
     next._tree.root_hash(),
     next._confirmed_transcript_hash,
   });
-  auto update_secret =
-    next._tree.decap(pt.sender, ctx, commit_data.commit.path);
+  next._tree_priv.decap(pt.sender, next._tree, ctx, commit_data.commit.path);
+  next._tree.merge(pt.sender, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = Digest(_suite)
@@ -283,7 +303,7 @@ State::handle(const MLSPlaintext& pt)
                                     .write(pt.commit_auth_data())
                                     .digest();
   next._epoch += 1;
-  next.update_epoch_secrets(update_secret);
+  next.update_epoch_secrets(next._tree_priv.update_secret);
 
   // Verify the confirmation MAC
   if (!next.verify_confirmation(commit_data.confirmation)) {
@@ -296,29 +316,26 @@ State::handle(const MLSPlaintext& pt)
 LeafIndex
 State::apply(const Add& add)
 {
-  auto target = _tree.leftmost_free();
-  _tree.add_leaf(target, add.key_package.init_key, add.key_package.credential);
-  return target;
+  return _tree.add_leaf(add.key_package);
 }
 
 void
 State::apply(LeafIndex target, const Update& update)
 {
-  _tree.blank_path(target, false);
-  _tree.merge(target, update.leaf_key);
+  _tree.update_leaf(target, update.key_package);
 }
 
 void
-State::apply(LeafIndex target, const bytes& leaf_secret)
+State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
 {
-  _tree.blank_path(target, false);
-  _tree.merge(target, leaf_secret);
+  _tree.update_leaf(target, update.key_package);
+  _tree_priv.set_leaf_secret(leaf_secret);
 }
 
 void
 State::apply(const Remove& remove)
 {
-  _tree.blank_path(remove.removed, true);
+  _tree.blank_path(remove.removed);
 }
 
 ProposalID
@@ -358,8 +375,9 @@ State::apply(const std::vector<ProposalID>& ids)
     if (std::holds_alternative<Add>(proposal)) {
       joiner_locations.push_back(apply(std::get<Add>(proposal)));
     } else if (std::holds_alternative<Update>(proposal)) {
+      auto& update = std::get<Update>(proposal);
       if (pt.sender != _index) {
-        apply(pt.sender, std::get<Update>(proposal));
+        apply(pt.sender, update);
         break;
       }
 
@@ -367,7 +385,7 @@ State::apply(const std::vector<ProposalID>& ids)
         throw ProtocolError("Self-update with no cached secret");
       }
 
-      apply(pt.sender, _update_secrets[id.id]);
+      apply(pt.sender, update, _update_secrets[id.id]);
     } else if (std::holds_alternative<Remove>(proposal)) {
       apply(std::get<Remove>(proposal));
     } else {
@@ -385,7 +403,9 @@ State::apply(const Commit& commit)
   apply(commit.removes);
   auto joiner_locations = apply(commit.adds);
 
-  _tree.truncate(_tree.leaf_span());
+  _tree.truncate();
+  _tree_priv.truncate(_tree.size());
+  _tree.set_hash_all();
   return joiner_locations;
 }
 
@@ -507,7 +527,12 @@ sender_data_aad(const bytes& group_id,
 bool
 State::verify(const MLSPlaintext& pt) const
 {
-  auto pub = _tree.get_credential(pt.sender).public_key();
+  auto maybe_kp = _tree.key_package(pt.sender);
+  if (!maybe_kp.has_value()) {
+    throw InvalidParameterError("Signature from blank node");
+  }
+
+  auto pub = maybe_kp.value().credential.public_key();
   return pt.verify(group_context(), pub);
 }
 
@@ -604,10 +629,6 @@ State::decrypt(const MLSCiphertext& ct)
   uint32_t generation;
   r >> sender >> generation;
 
-  if (!_tree.occupied(sender)) {
-    throw ProtocolError("Encryption from unoccupied leaf");
-  }
-
   // Pull from the key schedule
   KeyAndNonce keys;
   switch (ct.content_type) {
@@ -640,12 +661,6 @@ State::decrypt(const MLSCiphertext& ct)
   return MLSPlaintext{
     _group_id, _epoch, sender, ct.content_type, ct.authenticated_data, content
   };
-}
-
-void
-State::dump_tree() const
-{
-  std::cout << _tree << std::endl;
 }
 
 } // namespace mls

@@ -54,7 +54,7 @@ protected:
     auto cred = Credential::basic(user_id, id_priv.public_key());
     auto key_package =
       KeyPackage{ suite, init_priv.public_key(), id_priv, cred };
-    auto init_info = Session::InitInfo{ init_priv, id_priv, key_package };
+    auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
 
     // Initial add is different
     if (sessions.size() == 0) {
@@ -65,7 +65,7 @@ protected:
       auto my_key_package =
         KeyPackage{ suite, my_init_priv.public_key(), my_id_priv, my_cred };
       auto my_info =
-        Session::InitInfo{ my_init_priv, my_id_priv, my_key_package };
+        Session::InitInfo{ my_init_secret, my_id_priv, my_key_package };
 
       auto commit_secret = fresh_secret();
       auto [creator, welcome] =
@@ -152,11 +152,12 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
   for (auto suiteA : ciphersA) {
-    auto init_priv = HPKEPrivateKey::generate(suiteA);
+    auto init_secret = random_bytes(32);
+    auto init_priv = HPKEPrivateKey::derive(suiteA, init_secret);
     auto kp = KeyPackage{ suiteA, init_priv.public_key(), idA, credA };
-    auto info = Session::InitInfo{ init_priv, idA, kp };
+    auto info = Session::InitInfo{ init_secret, idA, kp };
     kpsA.emplace_back(suiteA, init_priv.public_key(), idA, credA);
-    infosA.emplace_back(init_priv, idA, kpsA.back());
+    infosA.emplace_back(init_secret, idA, kpsA.back());
   }
 
   // Bob supports P-256 and P-521
@@ -167,11 +168,12 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;
   for (auto suiteB : ciphersB) {
-    auto init_priv = HPKEPrivateKey::generate(suiteB);
+    auto init_secret = random_bytes(32);
+    auto init_priv = HPKEPrivateKey::derive(suiteB, init_secret);
     auto kp = KeyPackage{ suiteB, init_priv.public_key(), idB, credB };
-    auto info = Session::InitInfo{ init_priv, idB, kp };
+    auto info = Session::InitInfo{ init_secret, idB, kp };
     kpsB.emplace_back(suiteB, init_priv.public_key(), idB, credB);
-    infosB.emplace_back(init_priv, idB, kpsB.back());
+    infosB.emplace_back(init_secret, idB, kpsB.back());
   }
 
   auto init_secret = fresh_secret();
@@ -362,14 +364,14 @@ protected:
     auto scheme = tc.signature_scheme;
     DeterministicHPKE lock;
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
-      bytes seed = { uint8_t(i), 0 };
-      auto init_priv = HPKEPrivateKey::derive(suite, seed);
-      auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
-      auto cred = Credential::basic(seed, identity_priv.public_key());
+      bytes init_secret = { uint8_t(i), 0 };
+      auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+      auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
+      auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto key_package =
         KeyPackage{ suite, init_priv.public_key(), identity_priv, cred };
       auto init_info =
-        Session::InitInfo{ init_priv, identity_priv, key_package };
+        Session::InitInfo{ init_secret, identity_priv, key_package };
       ASSERT_EQ(key_package, tc.key_packages[i]);
       follow_basic(i, init_info, tc);
     }

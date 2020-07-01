@@ -1,5 +1,6 @@
 #include "common.h"
 #include "messages.h"
+#include "ratchet_tree.h"
 #include "session.h"
 #include "state.h"
 #include "tls_syntax.h"
@@ -229,6 +230,45 @@ struct KeyScheduleTestVectors
 };
 
 /////
+
+struct TestTreeKEMPublicKey : public TreeKEMPublicKey
+{
+  using TreeKEMPublicKey::TreeKEMPublicKey;
+
+  SignatureScheme scheme;
+
+  TestTreeKEMPublicKey(CipherSuite suite_in,
+                       SignatureScheme scheme_in,
+                       const std::vector<bytes>& secrets)
+    : TreeKEMPublicKey(suite_in)
+  {
+    scheme = scheme_in;
+
+    for (const auto& secret : secrets) {
+      add_leaf_secret(secret);
+    }
+
+    for (uint32_t i = 0; i < secrets.size() - 1; i += 1) {
+      auto secret = secrets[i];
+      secret.push_back(0);
+      auto pub = HPKEPrivateKey::derive(suite, secret).public_key();
+      nodes.at(2 * i + 1).node = Node{ ParentNode{ pub, {}, {} } };
+    }
+  }
+
+  void add_leaf_secret(const bytes& secret)
+  {
+    auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key();
+    auto sig_priv = SignaturePrivateKey::derive(scheme, secret);
+    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
+    auto kp = KeyPackage{ suite, init_pub, sig_priv, cred };
+
+    // Correct for non-determinism in the signature algorithm
+    kp.signature = secret;
+
+    add_leaf(kp);
+  }
+};
 
 class TestRatchetTree : public RatchetTree
 {

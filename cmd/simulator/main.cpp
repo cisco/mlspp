@@ -135,12 +135,13 @@ public:
 
   mls::Session::InitInfo fresh_init_info() const
   {
-    auto init = mls::HPKEPrivateKey::generate(suite);
+    auto secret = mls::random_bytes(32);
+    auto init = mls::HPKEPrivateKey::derive(suite, secret);
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv.public_key());
     auto kp = mls::KeyPackage{ suite, init.public_key(), priv, cred };
-    return { init, priv, kp };
+    return { secret, priv, kp };
   }
 
   std::vector<mls::CryptoMetrics::Report> broadcast(const mls::bytes& message)

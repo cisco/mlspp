@@ -1,4 +1,5 @@
 #include "common.h"
+#include "messages.h"
 #include "treekem.h"
 
 #include <gtest/gtest.h>

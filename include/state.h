@@ -3,7 +3,7 @@
 #include "crypto.h"
 #include "messages.h"
 #include "key_schedule.h"
-#include "ratchet_tree.h"
+#include "treekem.h"
 #include <optional>
 #include <set>
 #include <vector>
@@ -38,12 +38,12 @@ public:
   // Initialize an empty group
   State(bytes group_id,
         CipherSuite suite,
-        const HPKEPrivateKey& leaf_priv,
+        const bytes& init_secret,
         const SignaturePrivateKey& sig_priv,
-        const Credential& credential);
+        const KeyPackage& key_package);
 
   // Initialize a group from a Welcome
-  State(const HPKEPrivateKey& init_priv,
+  State(const bytes& init_secret,
         const SignaturePrivateKey& sig_priv,
         const KeyPackage& kp,
         const Welcome& welcome);
@@ -82,16 +82,14 @@ public:
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
-  // XXX
-  void dump_tree() const;
-
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
   CipherSuite _suite;
   bytes _group_id;
   epoch_t _epoch;
-  RatchetTree _tree;
+  TreeKEMPublicKey _tree;
+  TreeKEMPrivateKey _tree_priv;
   bytes _confirmed_transcript_hash;
   bytes _interim_transcript_hash;
 
@@ -120,7 +118,7 @@ protected:
   // Apply the changes requested by various messages
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target, const bytes& leaf_secret);
+  void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
   std::vector<LeafIndex> apply(const std::vector<ProposalID>& ids);
   std::vector<LeafIndex> apply(const Commit& commit);

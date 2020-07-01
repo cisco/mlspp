@@ -316,15 +316,18 @@ generate_messages()
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
-    auto ratchet_tree =
-      TestRatchetTree{ suite,
-                       { tv.random, tv.random, tv.random, tv.random },
-                       { cred, cred, cred, cred } };
-    ratchet_tree.blank_path(LeafIndex{ 2 }, true);
+    auto tree = TestTreeKEMPublicKey{
+      suite,
+      scheme,
+      { tv.random, tv.random, tv.random, tv.random },
+    };
+    tree.blank_path(LeafIndex{ 2 });
 
-    auto [direct_path, dummy] =
-      ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    auto [dummy, direct_path] =
+      tree.encap(LeafIndex{ 0 }, {}, tv.random, sig_priv, std::nullopt);
     silence_unused(dummy);
+    std::get<KeyPackage>(tree.nodes[0].node.value().node).signature = tv.random;
+    direct_path.leaf_key_package.signature = tv.random;
 
     // Construct CIK
     auto key_package =
@@ -332,8 +335,8 @@ generate_messages()
     key_package.signature = tv.random;
 
     // Construct Welcome
-    auto group_info = GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree,
-                                 tv.random,   tv.random, tv.random };
+    auto group_info =
+      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
@@ -353,7 +356,7 @@ generate_messages()
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
 
-    auto update_prop = Proposal{ Update{ dh_key } };
+    auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
@@ -442,12 +445,12 @@ generate_basic_session()
     std::vector<TestSession> sessions;
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
-      auto seed = bytes{ uint8_t(j), 0 };
-      auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
-      auto cred = Credential::basic(seed, identity_priv.public_key());
-      auto init = HPKEPrivateKey::derive(suite, seed);
+      auto init_secret = bytes{ uint8_t(j), 0 };
+      auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
+      auto cred = Credential::basic(init_secret, identity_priv.public_key());
+      auto init = HPKEPrivateKey::derive(suite, init_secret);
       auto kp = KeyPackage{ suite, init.public_key(), identity_priv, cred };
-      auto info = Session::InitInfo{ init, identity_priv, kp };
+      auto info = Session::InitInfo{ init_secret, identity_priv, kp };
       key_packages.push_back(kp);
       init_infos.emplace_back(info);
     }
