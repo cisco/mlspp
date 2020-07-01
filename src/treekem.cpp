@@ -276,7 +276,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const DirectPath& path)
 
   for (int i = 0; i < dp.size(); i++) {
     auto n = dp[i];
-    auto parent = ParentNode{ path.nodes[i].public_key, {}, {} };
+    nodes.at(n.val).node = { ParentNode{ path.nodes[i].public_key, {}, {} } };
   }
 
   // XXX(RLB): Should be possible to make a more targeted change, e.g., just
