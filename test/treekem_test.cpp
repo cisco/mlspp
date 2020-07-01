@@ -5,9 +5,26 @@
 
 using namespace mls;
 
-TEST(TreeKEMTest, ParentNodeEquals)
+class TreeKEMTest : public ::testing::Test
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
+protected:
+  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
+  const SignatureScheme scheme = SignatureScheme::Ed25519;
+
+  std::tuple<bytes, HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
+  new_key_package()
+  {
+    auto init_secret = random_bytes(32);
+    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto sig_priv = SignaturePrivateKey::generate(scheme);
+    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
+    auto kp = KeyPackage{ suite, init_priv.public_key(), sig_priv, cred };
+    return std::make_tuple(init_secret, init_priv, sig_priv, kp);
+  }
+};
+
+TEST_F(TreeKEMTest, ParentNodeEquals)
+{
   auto initA = HPKEPrivateKey::generate(suite);
   auto initB = HPKEPrivateKey::generate(suite);
 
@@ -21,52 +38,42 @@ TEST(TreeKEMTest, ParentNodeEquals)
   ASSERT_NE(nodeA, nodeB);
 }
 
-TEST(TreeKEMTest, NodePublicKey)
+TEST_F(TreeKEMTest, NodePublicKey)
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
-  auto initA = HPKEPrivateKey::generate(suite);
-  auto initB = HPKEPrivateKey::generate(suite);
+  auto parent_priv = HPKEPrivateKey::generate(suite);
+  auto parent = Node{ ParentNode{ parent_priv.public_key(), {}, {} } };
+  ASSERT_EQ(parent.public_key(), parent_priv.public_key());
 
-  auto parent = Node{ ParentNode{ initA.public_key(), {}, {} } };
-  ASSERT_EQ(parent.public_key(), initA.public_key());
-
-  const auto scheme = SignatureScheme::Ed25519;
-  auto identity_priv = SignaturePrivateKey::generate(scheme);
-  auto cred = Credential::basic({ 0, 1, 2, 3 }, identity_priv.public_key());
-  auto leaf =
-    Node{ KeyPackage{ suite, initB.public_key(), identity_priv, cred } };
-  ASSERT_EQ(leaf.public_key(), initB.public_key());
+  auto [leaf_secret, leaf_priv, sig_priv, kp] = new_key_package();
+  auto leaf = Node{ kp };
+  ASSERT_EQ(leaf.public_key(), leaf_priv.public_key());
 }
 
-TEST(TreeKEMTest, OptionalNodeHashes)
+TEST_F(TreeKEMTest, OptionalNodeHashes)
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
-  const auto scheme = SignatureScheme::Ed25519;
-  const auto init_priv = HPKEPrivateKey::generate(suite);
-  const auto sig_priv = SignaturePrivateKey::generate(scheme);
-  const auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
+  const auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
 
   auto node_index = NodeIndex{ 7 };
-  auto hash = bytes{ 0, 1, 2, 3, 4 };
+  auto child_hash = bytes{ 0, 1, 2, 3, 4 };
 
   auto parent = ParentNode{ init_priv.public_key(), {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent } };
   ASSERT_THROW(opt_parent.set_leaf_hash(suite, node_index),
                std::bad_variant_access);
 
-  opt_parent.set_parent_hash(suite, node_index, hash, hash);
+  opt_parent.set_parent_hash(suite, node_index, child_hash, child_hash);
   ASSERT_FALSE(opt_parent.hash.empty());
 
-  auto leaf = KeyPackage{ suite, init_priv.public_key(), sig_priv, cred };
-  auto opt_leaf = OptionalNode{ Node{ leaf } };
-  ASSERT_THROW(opt_leaf.set_parent_hash(suite, node_index, hash, hash),
-               std::bad_variant_access);
+  auto opt_leaf = OptionalNode{ Node{ kp } };
+  ASSERT_THROW(
+    opt_leaf.set_parent_hash(suite, node_index, child_hash, child_hash),
+    std::bad_variant_access);
 
   opt_leaf.set_leaf_hash(suite, node_index);
   ASSERT_FALSE(opt_leaf.hash.empty());
 }
 
-TEST(TreeKEMTest, TreeKEMPrivateKey)
+TEST_F(TreeKEMTest, TreeKEMPrivateKey)
 {
   const auto suite = CipherSuite::P256_SHA256_AES128GCM;
   const auto size = LeafCount{ 5 };
@@ -125,10 +132,8 @@ TEST(TreeKEMTest, TreeKEMPrivateKey)
 //    _
 //  X   _
 // X X _ X X
-TEST(TreeKEMTest, TreeKEMPublicKey)
+TEST_F(TreeKEMTest, TreeKEMPublicKey)
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
-  const auto scheme = SignatureScheme::Ed25519;
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
   const auto root = tree_math::root(NodeCount(size));
@@ -139,17 +144,14 @@ TEST(TreeKEMTest, TreeKEMPublicKey)
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
     // Construct a key package and a direct path
-    auto init_priv_add = HPKEPrivateKey::generate(suite);
-    auto init_priv_path = HPKEPrivateKey::generate(suite);
-    auto sig_priv = SignaturePrivateKey::generate(scheme);
-    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
+    auto [init_secret_add, init_priv_add, sig_priv_add, kp_add] =
+      new_key_package();
+    auto [init_secret_path, init_priv_path, sig_priv_path, kp_path] =
+      new_key_package();
+
     auto index = LeafIndex(i);
     auto curr_size = LeafCount(i + 1);
 
-    auto kp_add =
-      KeyPackage{ suite, init_priv_add.public_key(), sig_priv, cred };
-    auto kp_path =
-      KeyPackage{ suite, init_priv_path.public_key(), sig_priv, cred };
     auto path = DirectPath{ kp_path, {} };
     auto dp = tree_math::dirpath(NodeIndex(index), NodeCount(curr_size));
     while (path.nodes.size() < dp.size()) {
@@ -158,7 +160,9 @@ TEST(TreeKEMTest, TreeKEMPublicKey)
     }
 
     // Add the key package as a leaf
-    pub.add_leaf(kp_add);
+    auto add_index = pub.add_leaf(kp_add);
+    ASSERT_EQ(add_index, index);
+
     auto found = pub.find(kp_add);
     ASSERT_TRUE(found.has_value());
     ASSERT_EQ(found.value(), index);
@@ -189,7 +193,63 @@ TEST(TreeKEMTest, TreeKEMPublicKey)
   ASSERT_EQ(root_resolution, pub.resolve(root));
 }
 
-TEST(TreeKEMTest, EncapDecap)
+TEST_F(TreeKEMTest, EncapDecap)
 {
-  // TODO
+  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
+  const auto scheme = SignatureScheme::Ed25519;
+  const auto size = LeafCount{ 10 };
+
+  auto pub = TreeKEMPublicKey{ suite };
+  auto privs = std::vector<TreeKEMPrivateKey>{};
+  auto sig_privs = std::vector<SignaturePrivateKey>{};
+
+  // Add the first member
+  auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
+  sig_privs.push_back(sig_priv);
+
+  auto index = pub.add_leaf(kp);
+  ASSERT_EQ(index, LeafIndex{ 0 });
+
+  auto priv = TreeKEMPrivateKey::create(suite, pub.size(), index, init_secret);
+  privs.push_back(priv);
+  ASSERT_TRUE(priv.consistent(pub));
+
+  for (uint32_t i = 0; i < size.val - 2; i++) {
+    auto adder = LeafIndex{ i };
+    auto joiner = LeafIndex{ i + 1 };
+    auto context = bytes{ uint8_t(i) };
+    auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
+    sig_privs.push_back(sig_priv);
+
+    // Add the new joiner
+    auto index = pub.add_leaf(kp);
+    ASSERT_EQ(index, joiner);
+
+    auto leaf_secret = random_bytes(32);
+    auto [new_adder_priv, path] =
+      pub.encap(adder, context, leaf_secret, sig_privs.back(), std::nullopt);
+    privs[i] = new_adder_priv;
+    // TODO verify parent_hash_valid
+
+    pub.merge(adder, path);
+    ASSERT_TRUE(privs[i].consistent(pub));
+
+    auto [overlap, path_secret, ok] = privs[i].shared_path_secret(joiner);
+    ASSERT_TRUE(ok);
+
+    // New joiner initializes their private key
+    auto joiner_priv = TreeKEMPrivateKey::joiner(
+      suite, pub.size(), joiner, init_secret, overlap, path_secret);
+    privs.push_back(joiner_priv);
+    ASSERT_TRUE(privs[i + 1].consistent(privs[i]));
+    ASSERT_TRUE(privs[i + 1].consistent(pub));
+
+    // Other members update via decap()
+    for (uint32_t j = 0; j < i; j++) {
+      std::cout << i << " -> " << j << std::endl;
+      privs[j].decap(adder, pub, context, path);
+      ASSERT_TRUE(privs[j].consistent(privs[i]));
+      ASSERT_TRUE(privs[j].consistent(pub));
+    }
+  }
 }

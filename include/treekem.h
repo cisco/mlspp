@@ -68,19 +68,25 @@ struct TreeKEMPrivateKey {
   void set_leaf_secret(const bytes& secret);
   std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
   std::optional<HPKEPrivateKey> private_key(NodeIndex n);
+  std::optional<HPKEPrivateKey> private_key(NodeIndex n) const;
 
   void decap(LeafIndex from, const TreeKEMPublicKey& pub, const bytes& context, const DirectPath& path);
+
+  bool consistent(const TreeKEMPrivateKey& other) const;
+  bool consistent(const TreeKEMPublicKey& other) const;
 
   private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   bytes path_step(const bytes& path_secret) const;
+
+  friend std::ostream& operator<<(std::ostream& str, const TreeKEMPrivateKey& obj);
 };
 
 struct TreeKEMPublicKey {
   CipherSuite suite;
   std::vector<OptionalNode> nodes;
 
-  TreeKEMPublicKey(CipherSuite suite);
+  explicit TreeKEMPublicKey(CipherSuite suite);
 
   LeafIndex add_leaf(const KeyPackage& kp);
   void update_leaf(LeafIndex index, const KeyPackage& kp);

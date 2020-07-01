@@ -103,15 +103,18 @@ TreeKEMPrivateKey::implant(NodeIndex start,
 
   while (n != r) {
     path_secrets[n] = secret;
+    private_key_cache.erase(n);
+
     n = tree_math::parent(n, NodeCount(size));
     secret = path_step(secret);
   }
 
   path_secrets[r] = secret;
+  private_key_cache.erase(n);
 }
 
 std::optional<HPKEPrivateKey>
-TreeKEMPrivateKey::private_key(NodeIndex n)
+TreeKEMPrivateKey::private_key(NodeIndex n) const
 {
   auto pki = private_key_cache.find(n);
   if (pki != private_key_cache.end()) {
@@ -123,9 +126,17 @@ TreeKEMPrivateKey::private_key(NodeIndex n)
     return std::nullopt;
   }
 
-  auto priv = HPKEPrivateKey::derive(suite, i->second);
-  private_key_cache.insert({ n, priv });
-  return private_key_cache.at(n);
+  return HPKEPrivateKey::derive(suite, i->second);
+}
+
+std::optional<HPKEPrivateKey>
+TreeKEMPrivateKey::private_key(NodeIndex n)
+{
+  auto priv = const_cast<const TreeKEMPrivateKey*>(this)->private_key(n);
+  if (priv.has_value()) {
+    private_key_cache.insert({ n, priv.value() });
+  }
+  return priv;
 }
 
 void
@@ -167,6 +178,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
     if (tree_math::in_path(ni, dp[dpi])) {
       overlap_node = dp[dpi];
       copath_node = tree_math::sibling(last, size);
+      break;
     }
 
     last = dp[dpi];
@@ -199,6 +211,74 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   auto path_secret =
     priv.decrypt(suite, context, path.nodes[dpi].node_secrets[resi]);
   implant(overlap_node, LeafCount(size), path_secret);
+}
+
+bool
+TreeKEMPrivateKey::consistent(const TreeKEMPrivateKey& other) const
+{
+  if (suite != other.suite) {
+    return false;
+  }
+
+  if (update_secret != other.update_secret) {
+    return false;
+  }
+
+  for (auto& entry : path_secrets) {
+    auto other_entry = other.path_secrets.find(entry.first);
+    if (other_entry == other.path_secrets.end()) {
+      continue;
+    }
+
+    if (entry.second != other_entry->second) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool
+TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
+{
+  if (suite != other.suite) {
+    return false;
+  }
+
+  for (auto& entry : path_secrets) {
+    auto n = entry.first;
+    auto priv = private_key(n).value();
+
+    auto& opt_node = other.nodes.at(n.val).node;
+    if (!opt_node.has_value()) {
+      return false;
+    }
+
+    auto& pub = opt_node.value().public_key();
+    if (priv.public_key() != pub) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+std::ostream&
+operator<<(std::ostream& str, const TreeKEMPrivateKey& obj)
+{
+  auto suite = obj.suite;
+  auto index = obj.index;
+
+  str << "=== TreeKEMPrivateKey ===" << std::endl;
+  str << "suite=" << uint16_t(suite) << " index=" << obj.index.val << std::endl;
+  for (const auto& entry : obj.path_secrets) {
+    auto priv_pub = obj.private_key(entry.first).value().public_key();
+
+    str << "  " << entry.first.val /* << " => " << entry.second */ << " = "
+        << priv_pub.to_bytes() << std::endl;
+  }
+
+  return str;
 }
 
 ///
@@ -447,7 +527,7 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& obj)
   auto size = obj.nodes.size();
 
   str << "=== TreeKEMPublicKey ===" << std::endl;
-  str << "suite=" << 0 << " nodes=" << size << std::endl;
+  str << "suite=" << uint16_t(suite) << " nodes=" << size << std::endl;
   for (size_t i = 0; i < size; i++) {
     str << "  " << i << " ";
     if (!obj.nodes[i].node.has_value()) {
