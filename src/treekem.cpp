@@ -25,36 +25,18 @@ Node::public_key() const
 /// OptionalNode
 ///
 
-struct LeafNodeHashInput
-{
-  NodeIndex node_index;
-  std::optional<KeyPackage> key_package;
-
-  TLS_SERIALIZABLE(node_index, key_package)
-};
-
 void
 OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 {
-  auto hash_input_str = LeafNodeHashInput{ index, std::nullopt };
+  auto leaf = std::optional<KeyPackage>{};
   if (node.has_value()) {
-    hash_input_str.key_package = std::get<KeyPackage>(node.value().node);
+    leaf = std::get<KeyPackage>(node.value().node);
   }
 
-  auto hash_input = tls::marshal(hash_input_str);
-  hash = Digest(suite).write(hash_input).digest();
+  tls::ostream w;
+  w << index << leaf;
+  hash = Digest(suite).write(w.bytes()).digest();
 }
-
-struct ParentNodeHashInput
-{
-  NodeIndex node_index;
-  std::optional<ParentNode> parent_node;
-  bytes left_hash;
-  bytes right_hash;
-
-  TLS_SERIALIZABLE(node_index, parent_node, left_hash, right_hash)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<1>)
-};
 
 void
 OptionalNode::set_parent_hash(CipherSuite suite,
@@ -62,14 +44,16 @@ OptionalNode::set_parent_hash(CipherSuite suite,
                               const bytes& left,
                               const bytes& right)
 {
-  auto hash_input_str = ParentNodeHashInput{ index, std::nullopt, left, right };
+  auto parent = std::optional<ParentNode>{};
   if (node.has_value()) {
-    hash_input_str.parent_node = std::get<ParentNode>(node.value().node);
+    parent = std::get<ParentNode>(node.value().node);
   }
 
-  // auto hash_input = tls::marshal(hash_input_str);
-  auto hash_input = bytes{ 1, 2, 3, 4 };
-  hash = Digest(suite).write(hash_input).digest();
+  tls::ostream w;
+  w << index << parent;
+  tls::vector<1>::encode(w, left);
+  tls::vector<1>::encode(w, right);
+  hash = Digest(suite).write(w.bytes()).digest();
 }
 
 ///
