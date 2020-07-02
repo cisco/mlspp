@@ -71,6 +71,8 @@ struct TreeKEMPublicKey {
   std::vector<OptionalNode> nodes;
 
   explicit TreeKEMPublicKey(CipherSuite suite);
+
+  TreeKEMPublicKey() = default;
   TreeKEMPublicKey(const TreeKEMPublicKey& other) = default;
   TreeKEMPublicKey(TreeKEMPublicKey&& other) = default;
   TreeKEMPublicKey& operator=(const TreeKEMPublicKey& other) = default;

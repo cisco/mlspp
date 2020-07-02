@@ -53,6 +53,15 @@ KeyPackage::to_be_signed() const
   return out.bytes();
 }
 
+bool
+operator==(const KeyPackage& lhs, const KeyPackage& rhs)
+{
+  auto tbs = lhs.to_be_signed() == rhs.to_be_signed();
+  auto ver = lhs.verify() && rhs.verify();
+  auto same = lhs.signature == rhs.signature;
+  return tbs && (ver || same);
+}
+
 // DirectPath
 
 void

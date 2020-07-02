@@ -277,6 +277,67 @@ generate_tree()
   return tv;
 }
 
+TreeKEMTestVectors
+generate_treekem()
+{
+  TreeKEMTestVectors tv;
+
+  std::vector<CipherSuite> suites{
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  };
+
+  std::vector<SignatureScheme> schemes{
+    SignatureScheme::P256_SHA256,
+    SignatureScheme::Ed25519,
+  };
+
+  size_t n_leaves = 10;
+  tv.init_secrets.resize(n_leaves);
+  tv.leaf_secrets.resize(n_leaves);
+  for (size_t i = 0; i < n_leaves; ++i) {
+    tv.init_secrets[i].data = random_bytes(32);
+    tv.leaf_secrets[i].data = random_bytes(32);
+  }
+
+  for (size_t i = 0; i < suites.size(); ++i) {
+    auto suite = suites[i];
+    auto scheme = schemes[i];
+
+    TreeKEMTestVectors::TestCase tc;
+    tc.cipher_suite = suite;
+    tc.signature_scheme = scheme;
+
+    TreeKEMPublicKey tree{ suite };
+
+    // Add the leaves
+    for (uint32_t j = 0; j < n_leaves; ++j) {
+      auto context = bytes{ uint8_t(i), uint8_t(j) };
+      auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
+      auto sig_priv =
+        SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
+      auto cred = Credential::basic(context, sig_priv.public_key());
+      auto kp = KeyPackage{ suite, init_priv.public_key(), sig_priv, cred };
+
+      auto index = tree.add_leaf(kp);
+      tree.encap(
+        index, context, tv.leaf_secrets[j].data, sig_priv, std::nullopt);
+
+      tc.trees.push_back(tree);
+    }
+
+    // Blank out even-numbered leaves
+    for (uint32_t j = 0; j < n_leaves; j += 2) {
+      tree.blank_path(LeafIndex{ j });
+      tc.trees.push_back(tree);
+    }
+
+    tv.cases.push_back(tc);
+  }
+
+  return tv;
+}
+
 MessagesTestVectors
 generate_messages()
 {
@@ -583,25 +644,25 @@ verify_session_repro(const F& generator)
 int
 main()
 {
-  TreeMathTestVectors tree_math = generate_tree_math();
+  auto tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
-  CryptoTestVectors crypto = generate_crypto();
+  auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  HashRatchetTestVectors hash_ratchet = generate_hash_ratchet();
+  auto hash_ratchet = generate_hash_ratchet();
   write_test_vectors(hash_ratchet);
 
-  KeyScheduleTestVectors key_schedule = generate_key_schedule();
+  auto key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
-  TreeTestVectors tree = generate_tree();
+  auto tree = generate_treekem();
   write_test_vectors(tree);
 
-  MessagesTestVectors messages = generate_messages();
+  auto messages = generate_messages();
   write_test_vectors(messages);
 
-  BasicSessionTestVectors basic_session = generate_basic_session();
+  auto basic_session = generate_basic_session();
   write_test_vectors(basic_session);
 
   // Verify that the test vectors are reproducible (to the extent
@@ -609,7 +670,6 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
-  verify_reproducible(generate_tree);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
 
@@ -619,7 +679,7 @@ main()
     TestLoader<CryptoTestVectors>::get();
     TestLoader<HashRatchetTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
-    TestLoader<TreeTestVectors>::get();
+    TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {

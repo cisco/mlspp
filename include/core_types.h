@@ -65,7 +65,11 @@ struct KeyPackage
 
   private:
   bytes to_be_signed() const;
+
+  friend bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 };
+
+bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
 // struct {
 //    HPKEPublicKey public_key;

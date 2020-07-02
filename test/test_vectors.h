@@ -338,6 +338,35 @@ public:
   }
 };
 
+struct TreeKEMTestVectors
+{
+  static const std::string file_name;
+
+  struct Bytes1
+  {
+    bytes data;
+    TLS_SERIALIZABLE(data)
+    TLS_TRAITS(tls::vector<1>)
+  };
+
+  struct TestCase
+  {
+    CipherSuite cipher_suite;
+    SignatureScheme signature_scheme;
+    std::vector<TreeKEMPublicKey> trees;
+
+    TLS_SERIALIZABLE(cipher_suite, signature_scheme, trees);
+    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>);
+  };
+
+  std::vector<Bytes1> init_secrets;
+  std::vector<Bytes1> leaf_secrets;
+  std::vector<TestCase> cases;
+
+  TLS_SERIALIZABLE(init_secrets, leaf_secrets, cases)
+  TLS_TRAITS(tls::vector<4>, tls::vector<4>, tls::vector<4>)
+};
+
 struct TreeTestVectors
 {
   static const std::string file_name;

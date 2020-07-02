@@ -1,5 +1,5 @@
 #include "common.h"
-#include "messages.h"
+#include "test_vectors.h"
 #include "treekem.h"
 
 #include <gtest/gtest.h>
@@ -11,6 +11,12 @@ class TreeKEMTest : public ::testing::Test
 protected:
   const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
   const SignatureScheme scheme = SignatureScheme::Ed25519;
+
+  const TreeKEMTestVectors tv;
+
+  TreeKEMTest()
+    : tv(TestLoader<TreeKEMTestVectors>::get())
+  {}
 
   std::tuple<bytes, HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
   new_key_package()
@@ -251,6 +257,41 @@ TEST_F(TreeKEMTest, EncapDecap)
       privs[j].decap(adder, pub, context, path);
       ASSERT_TRUE(privs[j].consistent(privs[i]));
       ASSERT_TRUE(privs[j].consistent(pub));
+    }
+  }
+}
+
+TEST_F(TreeKEMTest, Interop)
+{
+  for (size_t i = 0; i < tv.cases.size(); ++i) {
+    const auto& tc = tv.cases[i];
+    auto suite = tc.cipher_suite;
+    auto scheme = tc.signature_scheme;
+
+    TreeKEMPublicKey tree{ suite };
+
+    // Add the leaves
+    uint32_t tci = 0;
+    auto n_leaves = tv.leaf_secrets.size();
+    for (uint32_t j = 0; j < n_leaves; ++j, ++tci) {
+      auto context = bytes{ uint8_t(i), uint8_t(j) };
+      auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
+      auto sig_priv =
+        SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
+      auto cred = Credential::basic(context, sig_priv.public_key());
+      auto kp = KeyPackage{ suite, init_priv.public_key(), sig_priv, cred };
+
+      auto index = tree.add_leaf(kp);
+      tree.encap(
+        index, context, tv.leaf_secrets[j].data, sig_priv, std::nullopt);
+
+      ASSERT_EQ(tc.trees[tci], tree);
+    }
+
+    // Blank out even-numbered leaves
+    for (uint32_t j = 0; j < n_leaves; j += 2, ++tci) {
+      tree.blank_path(LeafIndex{ j });
+      ASSERT_EQ(tc.trees[tci], tree);
     }
   }
 }

@@ -47,10 +47,7 @@ protected:
   const bytes hashABCD = from_hex(
     "67035df4b00b923caa2a2d566a825d7af436afc5d21ff3a9ea97bfde448bcc13");
 
-  const TreeTestVectors& tv;
-
   RatchetTreeTest()
-    : tv(TestLoader<TreeTestVectors>::get())
   {
     auto sigA = SignaturePrivateKey::derive(scheme, secretA);
     credA = Credential::basic({ 'A' }, sigA.public_key());
@@ -82,6 +79,7 @@ protected:
   }
 };
 
+/*
 TEST_F(RatchetTreeTest, Interop)
 {
   for (const auto& tc : tv.cases) {
@@ -104,6 +102,7 @@ TEST_F(RatchetTreeTest, Interop)
     }
   }
 }
+*/
 
 TEST_F(RatchetTreeTest, OneMember)
 {
