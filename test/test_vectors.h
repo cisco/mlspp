@@ -1,6 +1,5 @@
 #include "common.h"
 #include "messages.h"
-#include "ratchet_tree.h"
 #include "session.h"
 #include "state.h"
 #include "tls_syntax.h"
@@ -270,74 +269,6 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
   }
 };
 
-class TestRatchetTree : public RatchetTree
-{
-public:
-  using RatchetTree::RatchetTree;
-
-  TestRatchetTree(CipherSuite suite,
-                  const std::vector<bytes>& secrets,
-                  const std::vector<Credential>& creds)
-    : RatchetTree(suite)
-  {
-    if (secrets.size() != creds.size()) {
-      throw InvalidParameterError("Incorrect tree initialization data");
-    }
-
-    for (uint32_t i = 0; i < secrets.size(); i += 1) {
-      auto ix = LeafIndex{ i };
-      auto priv = HPKEPrivateKey::derive(suite, secrets[i]);
-      add_leaf(ix, priv.public_key(), creds[i]);
-      merge(ix, priv);
-      encap(ix, {}, secrets[i]);
-    }
-  }
-
-  const RatchetTreeNodeVector& nodes() const { return _nodes; }
-
-  bool check_credentials() const
-  {
-    for (LeafIndex i{ 0 }; i.val < size(); i.val += 1) {
-      auto& node = _nodes[NodeIndex{ i }];
-      if (node.has_value() && !node.value().credential().has_value()) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool check_invariant(LeafIndex from) const
-  {
-    std::vector<bool> in_dirpath(_nodes.size(), false);
-
-    // Ensure that we have private keys for everything in the direct
-    // path...
-    auto dirpath = tree_math::dirpath(NodeIndex{ from }, node_size());
-    dirpath.insert(dirpath.begin(), NodeIndex{ from });
-
-    for (const auto& node : dirpath) {
-      in_dirpath[node.val] = true;
-      if (_nodes[node].has_value() && !_nodes[node].has_private()) {
-        return false;
-      }
-    }
-
-    // ... and nothing else
-    for (size_t i = 0; i < _nodes.size(); ++i) {
-      if (in_dirpath[i]) {
-        continue;
-      }
-
-      if (_nodes[i].has_private()) {
-        throw std::runtime_error("unexpected private key");
-        return false;
-      }
-    }
-
-    return true;
-  }
-};
-
 struct TreeKEMTestVectors
 {
   static const std::string file_name;
@@ -364,52 +295,6 @@ struct TreeKEMTestVectors
   std::vector<TestCase> cases;
 
   TLS_SERIALIZABLE(init_secrets, leaf_secrets, cases)
-  TLS_TRAITS(tls::vector<4>, tls::vector<4>, tls::vector<4>)
-};
-
-struct TreeTestVectors
-{
-  static const std::string file_name;
-
-  struct Bytes1
-  {
-    bytes data;
-    TLS_SERIALIZABLE(data)
-    TLS_TRAITS(tls::vector<1>)
-  };
-
-  struct TreeNode
-  {
-    std::optional<Bytes1> public_key;
-    bytes hash;
-
-    TLS_SERIALIZABLE(public_key, hash)
-    TLS_TRAITS(tls::pass, tls::vector<1>)
-  };
-
-  struct TreeCase
-  {
-    std::vector<TreeNode> nodes;
-    TLS_SERIALIZABLE(nodes)
-    TLS_TRAITS(tls::vector<4>)
-  };
-
-  struct TestCase
-  {
-    CipherSuite cipher_suite;
-    SignatureScheme signature_scheme;
-    std::vector<Credential> credentials;
-    std::vector<TreeCase> trees;
-
-    TLS_SERIALIZABLE(cipher_suite, signature_scheme, credentials, trees)
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
-  };
-
-  std::vector<Bytes1> leaf_secrets;
-  std::vector<Credential> credentials;
-  std::vector<TestCase> cases;
-
-  TLS_SERIALIZABLE(leaf_secrets, credentials, cases)
   TLS_TRAITS(tls::vector<4>, tls::vector<4>, tls::vector<4>)
 };
 
