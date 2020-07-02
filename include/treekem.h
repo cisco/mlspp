@@ -24,7 +24,7 @@ struct OptionalNode {
   void set_leaf_hash(CipherSuite suite, NodeIndex index);
   void set_parent_hash(CipherSuite suite, NodeIndex index, const bytes& left, const bytes& right);
 
-  TLS_SERIALIZABLE(node);
+  TLS_SERIALIZABLE(node)
 };
 
 struct TreeKEMPublicKey;
@@ -99,8 +99,8 @@ struct TreeKEMPublicKey {
 
   void truncate();
 
-  TLS_SERIALIZABLE(nodes);
-  TLS_TRAITS(tls::vector<4>);
+  TLS_SERIALIZABLE(nodes)
+  TLS_TRAITS(tls::vector<4>)
 
   private:
   void clear_hash_all();
