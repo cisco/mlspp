@@ -52,6 +52,9 @@ TEST_F(TreeKEMTest, NodePublicKey)
   ASSERT_EQ(parent.public_key(), parent_priv.public_key());
 
   auto [leaf_secret, leaf_priv, sig_priv, kp] = new_key_package();
+  silence_unused(leaf_secret);
+  silence_unused(sig_priv);
+
   auto leaf = Node{ kp };
   ASSERT_EQ(leaf.public_key(), leaf_priv.public_key());
 }
@@ -59,6 +62,8 @@ TEST_F(TreeKEMTest, NodePublicKey)
 TEST_F(TreeKEMTest, OptionalNodeHashes)
 {
   const auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
+  silence_unused(init_secret);
+  silence_unused(sig_priv);
 
   auto node_index = NodeIndex{ 7 };
   auto child_hash = bytes{ 0, 1, 2, 3, 4 };
@@ -82,7 +87,6 @@ TEST_F(TreeKEMTest, OptionalNodeHashes)
 
 TEST_F(TreeKEMTest, TreeKEMPrivateKey)
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
   const auto size = LeafCount{ 5 };
   const auto index = LeafIndex{ 2 };
   const auto intersect = NodeIndex{ 3 };
@@ -153,8 +157,15 @@ TEST_F(TreeKEMTest, TreeKEMPublicKey)
     // Construct a key package and a direct path
     auto [init_secret_add, init_priv_add, sig_priv_add, kp_add] =
       new_key_package();
+    silence_unused(init_secret_add);
+    silence_unused(init_priv_add);
+    silence_unused(sig_priv_add);
+
     auto [init_secret_path, init_priv_path, sig_priv_path, kp_path] =
       new_key_package();
+    silence_unused(init_secret_path);
+    silence_unused(init_priv_path);
+    silence_unused(sig_priv_path);
 
     auto index = LeafIndex(i);
     auto curr_size = LeafCount(i + 1);
@@ -178,8 +189,6 @@ TEST_F(TreeKEMTest, TreeKEMPublicKey)
     ASSERT_TRUE(found_kp.has_value());
     ASSERT_EQ(found_kp.value(), kp_add);
 
-    std::cout << "add " << i << std::endl << pub << std::endl;
-
     // Merge the direct path
     pub.merge(index, path);
     found = pub.find(kp_path);
@@ -202,8 +211,6 @@ TEST_F(TreeKEMTest, TreeKEMPublicKey)
 
 TEST_F(TreeKEMTest, EncapDecap)
 {
-  const auto suite = CipherSuite::P256_SHA256_AES128GCM;
-  const auto scheme = SignatureScheme::Ed25519;
   const auto size = LeafCount{ 10 };
 
   auto pub = TreeKEMPublicKey{ suite };
@@ -211,13 +218,15 @@ TEST_F(TreeKEMTest, EncapDecap)
   auto sig_privs = std::vector<SignaturePrivateKey>{};
 
   // Add the first member
-  auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
-  sig_privs.push_back(sig_priv);
+  auto [init_secret_0, init_priv_0, sig_priv_0, kp0] = new_key_package();
+  silence_unused(init_priv_0);
+  sig_privs.push_back(sig_priv_0);
 
-  auto index = pub.add_leaf(kp);
+  auto index = pub.add_leaf(kp0);
   ASSERT_EQ(index, LeafIndex{ 0 });
 
-  auto priv = TreeKEMPrivateKey::create(suite, pub.size(), index, init_secret);
+  auto priv =
+    TreeKEMPrivateKey::create(suite, pub.size(), index, init_secret_0);
   privs.push_back(priv);
   ASSERT_TRUE(priv.consistent(pub));
 
@@ -253,7 +262,6 @@ TEST_F(TreeKEMTest, EncapDecap)
 
     // Other members update via decap()
     for (uint32_t j = 0; j < i; j++) {
-      std::cout << i << " -> " << j << std::endl;
       privs[j].decap(adder, pub, context, path);
       ASSERT_TRUE(privs[j].consistent(privs[i]));
       ASSERT_TRUE(privs[j].consistent(pub));
@@ -265,21 +273,21 @@ TEST_F(TreeKEMTest, Interop)
 {
   for (size_t i = 0; i < tv.cases.size(); ++i) {
     const auto& tc = tv.cases[i];
-    auto suite = tc.cipher_suite;
-    auto scheme = tc.signature_scheme;
 
-    TreeKEMPublicKey tree{ suite };
+    TreeKEMPublicKey tree{ tc.cipher_suite };
 
     // Add the leaves
     uint32_t tci = 0;
     auto n_leaves = tv.leaf_secrets.size();
     for (uint32_t j = 0; j < n_leaves; ++j, ++tci) {
       auto context = bytes{ uint8_t(i), uint8_t(j) };
-      auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
-      auto sig_priv =
-        SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
+      auto init_priv =
+        HPKEPrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
+      auto sig_priv = SignaturePrivateKey::derive(tc.signature_scheme,
+                                                  tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
-      auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
+      auto kp =
+        KeyPackage{ tc.cipher_suite, init_priv.public_key(), cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
