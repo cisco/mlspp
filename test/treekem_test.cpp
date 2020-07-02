@@ -222,11 +222,11 @@ TEST_F(TreeKEMTest, EncapDecap)
   silence_unused(init_priv_0);
   sig_privs.push_back(sig_priv_0);
 
-  auto index = pub.add_leaf(kp0);
-  ASSERT_EQ(index, LeafIndex{ 0 });
+  auto index_0 = pub.add_leaf(kp0);
+  ASSERT_EQ(index_0, LeafIndex{ 0 });
 
   auto priv =
-    TreeKEMPrivateKey::create(suite, pub.size(), index, init_secret_0);
+    TreeKEMPrivateKey::create(suite, pub.size(), index_0, init_secret_0);
   privs.push_back(priv);
   ASSERT_TRUE(priv.consistent(pub));
 
@@ -235,6 +235,7 @@ TEST_F(TreeKEMTest, EncapDecap)
     auto joiner = LeafIndex{ i + 1 };
     auto context = bytes{ uint8_t(i) };
     auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
+    silence_unused(init_priv);
     sig_privs.push_back(sig_priv);
 
     // Add the new joiner
