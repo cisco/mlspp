@@ -113,7 +113,7 @@ struct Welcome {
 
   Welcome();
   Welcome(CipherSuite suite,
-          const bytes& epoch_secret,
+          bytes epoch_secret,
           const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);

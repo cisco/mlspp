@@ -39,12 +39,12 @@ public:
   State(bytes group_id,
         CipherSuite suite,
         const bytes& init_secret,
-        const SignaturePrivateKey& sig_priv,
+        SignaturePrivateKey sig_priv,
         const KeyPackage& key_package);
 
   // Initialize a group from a Welcome
   State(const bytes& init_secret,
-        const SignaturePrivateKey& sig_priv,
+        SignaturePrivateKey sig_priv,
         const KeyPackage& kp,
         const Welcome& welcome);
 

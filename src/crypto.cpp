@@ -336,8 +336,8 @@ hpke_key_schedule(CipherSuite suite,
   return std::make_tuple(key, nonce);
 }
 
-HPKEPublicKey::HPKEPublicKey(const bytes& data_in)
-  : data(data_in)
+HPKEPublicKey::HPKEPublicKey(bytes data_in)
+  : data(std::move(data_in))
 {}
 
 HPKECiphertext
@@ -403,8 +403,8 @@ HPKEPrivateKey::public_key() const
   return HPKEPublicKey(_pub_data);
 }
 
-HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, const bytes& data)
-  : _data(data)
+HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
+  : _data(std::move(data))
   , _pub_data(primitive::priv_to_pub(suite, _data))
 {}
 
@@ -416,8 +416,7 @@ SignaturePublicKey::SignaturePublicKey()
   : _scheme(SignatureScheme::unknown)
 {}
 
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme,
-                                       const bytes& data)
+SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
   : _scheme(scheme)
   , _data(data)
 {}

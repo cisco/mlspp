@@ -4,20 +4,20 @@
 
 namespace mls {
 
-Session::InitInfo::InitInfo(const bytes& init_secret_in,
-                            const SignaturePrivateKey& sig_priv_in,
-                            const KeyPackage& key_package_in)
-  : init_secret(init_secret_in)
-  , sig_priv(sig_priv_in)
-  , key_package(key_package_in)
+Session::InitInfo::InitInfo(bytes init_secret_in,
+                            SignaturePrivateKey sig_priv_in,
+                            KeyPackage key_package_in)
+  : init_secret(std::move(init_secret_in))
+  , sig_priv(std::move(sig_priv_in))
+  , key_package(std::move(key_package_in))
 {
   auto init_priv =
     HPKEPrivateKey::derive(key_package.cipher_suite, init_secret);
-  if (init_priv.public_key() != key_package_in.init_key) {
+  if (init_priv.public_key() != key_package.init_key) {
     throw InvalidParameterError("Init key mismatch");
   }
 
-  if (sig_priv_in.public_key() != key_package_in.credential.public_key()) {
+  if (sig_priv.public_key() != key_package.credential.public_key()) {
     throw InvalidParameterError("Signature key mismatch");
   }
 }

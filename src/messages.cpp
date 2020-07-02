@@ -76,7 +76,7 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 const bytes& epoch_secret,
+                 bytes epoch_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)

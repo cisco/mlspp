@@ -10,15 +10,15 @@ namespace mls {
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const bytes& leaf_secret,
-             const SignaturePrivateKey& sig_priv,
+             const bytes& init_secret,
+             SignaturePrivateKey sig_priv,
              const KeyPackage& key_package)
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
   , _index(0)
-  , _identity_priv(sig_priv)
+  , _identity_priv(std::move(sig_priv))
 {
   _keys.suite = suite;
   _keys.init_secret = zero_bytes(Digest(suite).output_size());
@@ -26,12 +26,12 @@ State::State(bytes group_id,
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv =
-    TreeKEMPrivateKey::create(suite, _tree.size(), index, leaf_secret);
+    TreeKEMPrivateKey::create(suite, _tree.size(), index, init_secret);
 }
 
 // Initialize a group from a Welcome
 State::State(const bytes& init_secret,
-             const SignaturePrivateKey& sig_priv,
+             SignaturePrivateKey sig_priv,
              const KeyPackage& kp,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
@@ -197,8 +197,10 @@ State::commit(const bytes& leaf_secret) const
 
   auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
-    auto [_overlap, path_secret, _ok] =
+    auto [overlap, path_secret, ok] =
       new_priv.shared_path_secret(joiner_locations[i]);
+    silence_unused(overlap);
+    silence_unused(ok);
     welcome.encrypt(joiners[i], path_secret);
   }
 
