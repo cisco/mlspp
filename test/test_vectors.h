@@ -286,8 +286,8 @@ struct TreeKEMTestVectors
     SignatureScheme signature_scheme;
     std::vector<TreeKEMPublicKey> trees;
 
-    TLS_SERIALIZABLE(cipher_suite, signature_scheme, trees);
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>);
+    TLS_SERIALIZABLE(cipher_suite, signature_scheme, trees)
+    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
   };
 
   std::vector<Bytes1> init_secrets;

@@ -15,7 +15,7 @@ struct Uint8
 {
   uint8_t value;
   static const IntSelector type;
-  TLS_SERIALIZABLE(value);
+  TLS_SERIALIZABLE(value)
 };
 
 const IntSelector Uint8::type = IntSelector::uint8;
@@ -24,7 +24,7 @@ struct Uint16
 {
   uint16_t value;
   static const IntSelector type;
-  TLS_SERIALIZABLE(value);
+  TLS_SERIALIZABLE(value)
 };
 
 const IntSelector Uint16::type = IntSelector::uint16;
