@@ -140,7 +140,7 @@ public:
     auto priv = mls::SignaturePrivateKey::generate(scheme);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv.public_key());
-    auto kp = mls::KeyPackage{ suite, init.public_key(), priv, cred };
+    auto kp = mls::KeyPackage{ suite, init.public_key(), cred, priv };
     return { secret, priv, kp };
   }
 

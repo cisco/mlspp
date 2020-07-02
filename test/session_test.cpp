@@ -53,7 +53,7 @@ protected:
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
     auto cred = Credential::basic(user_id, id_priv.public_key());
     auto key_package =
-      KeyPackage{ suite, init_priv.public_key(), id_priv, cred };
+      KeyPackage{ suite, init_priv.public_key(), cred, id_priv };
     auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
 
     // Initial add is different
@@ -63,7 +63,7 @@ protected:
       auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
       auto my_cred = Credential::basic(user_id, my_id_priv.public_key());
       auto my_key_package =
-        KeyPackage{ suite, my_init_priv.public_key(), my_id_priv, my_cred };
+        KeyPackage{ suite, my_init_priv.public_key(), my_cred, my_id_priv };
       auto my_info =
         Session::InitInfo{ my_init_secret, my_id_priv, my_key_package };
 
@@ -154,9 +154,9 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   for (auto suiteA : ciphersA) {
     auto init_secret = random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suiteA, init_secret);
-    auto kp = KeyPackage{ suiteA, init_priv.public_key(), idA, credA };
+    auto kp = KeyPackage{ suiteA, init_priv.public_key(), credA, idA };
     auto info = Session::InitInfo{ init_secret, idA, kp };
-    kpsA.emplace_back(suiteA, init_priv.public_key(), idA, credA);
+    kpsA.emplace_back(suiteA, init_priv.public_key(), credA, idA);
     infosA.emplace_back(init_secret, idA, kpsA.back());
   }
 
@@ -170,9 +170,9 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   for (auto suiteB : ciphersB) {
     auto init_secret = random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suiteB, init_secret);
-    auto kp = KeyPackage{ suiteB, init_priv.public_key(), idB, credB };
+    auto kp = KeyPackage{ suiteB, init_priv.public_key(), credB, idB };
     auto info = Session::InitInfo{ init_secret, idB, kp };
-    kpsB.emplace_back(suiteB, init_priv.public_key(), idB, credB);
+    kpsB.emplace_back(suiteB, init_priv.public_key(), credB, idB);
     infosB.emplace_back(init_secret, idB, kpsB.back());
   }
 
@@ -369,7 +369,7 @@ protected:
       auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
       auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto key_package =
-        KeyPackage{ suite, init_priv.public_key(), identity_priv, cred };
+        KeyPackage{ suite, init_priv.public_key(), cred, identity_priv };
       auto init_info =
         Session::InitInfo{ init_secret, identity_priv, key_package };
       ASSERT_EQ(key_package, tc.key_packages[i]);

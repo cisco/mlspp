@@ -17,8 +17,8 @@ struct ParentNode {
   bytes parent_hash;
 
   static const NodeType type;
-  TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash);
-  TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>);
+  TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash)
+  TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>)
 };
 
 enum class ProtocolVersion : uint8_t
@@ -49,14 +49,14 @@ struct KeyPackage
 
   KeyPackage();
   KeyPackage(CipherSuite suite_in,
-             const HPKEPublicKey& init_key_in,
-             const SignaturePrivateKey& sig_priv_in,
-             const Credential& credential_in);
+             HPKEPublicKey init_key_in,
+             Credential credential_in,
+             const SignaturePrivateKey& sig_priv_in);
 
   bytes hash() const;
 
   void sign(const SignaturePrivateKey& sig_priv,
-            std::optional<KeyPackageOpts> opts);
+            const std::optional<KeyPackageOpts>& opts);
   bool verify() const;
 
   static const NodeType type;
@@ -97,7 +97,7 @@ struct DirectPath
   void sign(CipherSuite suite,
             const HPKEPublicKey& init_pub,
             const SignaturePrivateKey& sig_priv,
-            std::optional<KeyPackageOpts> opts);
+            const std::optional<KeyPackageOpts>& opts);
 
   TLS_SERIALIZABLE(leaf_key_package, nodes)
   TLS_TRAITS(tls::pass, tls::vector<2>)

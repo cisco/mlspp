@@ -245,7 +245,7 @@ generate_treekem()
       auto sig_priv =
         SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
-      auto kp = KeyPackage{ suite, init_priv.public_key(), sig_priv, cred };
+      auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
@@ -320,7 +320,7 @@ generate_messages()
 
     // Construct CIK
     auto key_package =
-      KeyPackage{ suite, dh_priv.public_key(), sig_priv, cred };
+      KeyPackage{ suite, dh_priv.public_key(), cred, sig_priv };
     key_package.signature = tv.random;
 
     // Construct Welcome
@@ -438,7 +438,7 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
       auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto init = HPKEPrivateKey::derive(suite, init_secret);
-      auto kp = KeyPackage{ suite, init.public_key(), identity_priv, cred };
+      auto kp = KeyPackage{ suite, init.public_key(), cred, identity_priv };
       auto info = Session::InitInfo{ init_secret, identity_priv, kp };
       key_packages.push_back(kp);
       init_infos.emplace_back(info);

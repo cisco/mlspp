@@ -10,13 +10,13 @@ KeyPackage::KeyPackage()
 {}
 
 KeyPackage::KeyPackage(CipherSuite suite_in,
-                       const HPKEPublicKey& init_key_in,
-                       const SignaturePrivateKey& sig_priv_in,
-                       const Credential& credential_in)
+                       HPKEPublicKey init_key_in,
+                       Credential credential_in,
+                       const SignaturePrivateKey& sig_priv_in)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
-  , init_key(init_key_in)
-  , credential(credential_in)
+  , init_key(std::move(init_key_in))
+  , credential(std::move(credential_in))
 {
   sign(sig_priv_in, std::nullopt);
 }
@@ -30,9 +30,11 @@ KeyPackage::hash() const
 
 void
 KeyPackage::sign(const SignaturePrivateKey& sig_priv,
-                 std::optional<KeyPackageOpts> opts)
+                 const std::optional<KeyPackageOpts>& opts)
 {
   // TODO(RLB): Apply opts
+  silence_unused(opts);
+
   auto tbs = to_be_signed();
   signature = sig_priv.sign(tbs);
 }
@@ -68,9 +70,11 @@ void
 DirectPath::sign(CipherSuite suite,
                  const HPKEPublicKey& init_pub,
                  const SignaturePrivateKey& sig_priv,
-                 std::optional<KeyPackageOpts> opts)
+                 const std::optional<KeyPackageOpts>& opts)
 {
-  // TODO set parent hash extension
+  // TODO(RLB) set parent hash extension
+  silence_unused(suite);
+
   leaf_key_package.init_key = init_pub;
   leaf_key_package.sign(sig_priv, opts);
 }

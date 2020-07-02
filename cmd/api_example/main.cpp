@@ -26,7 +26,7 @@ public:
   {
     auto init_secret = random_bytes(32);
     auto init_key = HPKEPrivateKey::derive(suite, init_secret);
-    auto kp = KeyPackage{ suite, init_key.public_key(), _identity_priv, _cred };
+    auto kp = KeyPackage{ suite, init_key.public_key(), _cred, _identity_priv };
     return { init_secret, _identity_priv, kp };
   }
 
