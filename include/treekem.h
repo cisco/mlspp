@@ -95,7 +95,7 @@ struct TreeKEMPublicKey {
                                                   const bytes& context,
                                                   const bytes& leaf_secret,
                                                   const SignaturePrivateKey& sig_priv,
-                                                  std::optional<KeyPackageOpts> opts);
+                                                  const std::optional<KeyPackageOpts>& opts);
 
   void truncate();
 

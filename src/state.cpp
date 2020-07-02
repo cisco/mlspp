@@ -36,7 +36,7 @@ State::State(const bytes& init_secret,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
-  , _identity_priv(sig_priv)
+  , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
   if (!maybe_kpi.has_value()) {

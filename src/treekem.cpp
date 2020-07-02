@@ -134,7 +134,7 @@ TreeKEMPrivateKey::private_key(NodeIndex n) const
 std::optional<HPKEPrivateKey>
 TreeKEMPrivateKey::private_key(NodeIndex n)
 {
-  auto priv = const_cast<const TreeKEMPrivateKey*>(this)->private_key(n);
+  auto priv = static_cast<const TreeKEMPrivateKey&>(*this).private_key(n);
   if (priv.has_value()) {
     private_key_cache.insert({ n, priv.value() });
   }
@@ -173,7 +173,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
     throw ProtocolError("Malformed direct path");
   }
 
-  int dpi = 0;
+  size_t dpi = 0;
   auto last = NodeIndex(from);
   NodeIndex overlap_node, copath_node;
   for (dpi = 0; dpi < dp.size(); dpi++) {
@@ -196,7 +196,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
     throw ProtocolError("Malformed direct path node");
   }
 
-  int resi = 0;
+  size_t resi = 0;
   NodeIndex res_overlap_node;
   for (resi = 0; resi < res.size(); resi++) {
     if (path_secrets.find(res[resi]) != path_secrets.end()) {
@@ -285,15 +285,13 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
 std::ostream&
 operator<<(std::ostream& str, const TreeKEMPrivateKey& obj)
 {
-  auto suite = obj.suite;
-  auto index = obj.index;
-
   str << "=== TreeKEMPrivateKey ===" << std::endl;
-  str << "suite=" << uint16_t(suite) << " index=" << obj.index.val << std::endl;
+  str << "suite=" << uint16_t(obj.suite) << " index=" << obj.index.val
+      << std::endl;
   for (const auto& entry : obj.path_secrets) {
     auto priv_pub = obj.private_key(entry.first).value().public_key();
 
-    str << "  " << entry.first.val /* << " => " << entry.second */ << " = "
+    str << "  " << entry.first.val << " => " << entry.second << " = "
         << priv_pub.to_bytes() << std::endl;
   }
 
@@ -376,7 +374,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const DirectPath& path)
     throw ProtocolError("Malformed direct path");
   }
 
-  for (int i = 0; i < dp.size(); i++) {
+  for (size_t i = 0; i < dp.size(); i++) {
     auto n = dp[i];
     nodes.at(n.val).node = { ParentNode{ path.nodes[i].public_key, {}, {} } };
   }
@@ -474,7 +472,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const bytes& context,
                         const bytes& leaf_secret,
                         const SignaturePrivateKey& sig_priv,
-                        std::optional<KeyPackageOpts> opts)
+                        const std::optional<KeyPackageOpts>& opts)
 {
   // Grab information about the sender
   auto& maybe_node = nodes.at(NodeIndex(from).val).node;
@@ -519,7 +517,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
-  while (nodes.size() > 0 && !nodes.back().node.has_value()) {
+  while (!nodes.empty() && !nodes.back().node.has_value()) {
     nodes.pop_back();
   }
 }

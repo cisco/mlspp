@@ -418,7 +418,7 @@ SignaturePublicKey::SignaturePublicKey()
 
 SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
   : _scheme(scheme)
-  , _data(data)
+  , _data(std::move(data))
 {}
 
 void
