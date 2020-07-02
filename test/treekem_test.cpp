@@ -195,7 +195,7 @@ TEST_F(TreeKEMTest, TreeKEMPublicKey)
     ASSERT_TRUE(found.has_value());
     ASSERT_EQ(found.value(), index);
     for (const auto dpn : dp) {
-      ASSERT_TRUE(pub.nodes.at(dpn.val).node.has_value());
+      ASSERT_TRUE(pub.node_at(dpn).node.has_value());
     }
 
     found_kp = pub.key_package(index);

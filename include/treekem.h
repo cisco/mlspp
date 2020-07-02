@@ -21,6 +21,12 @@ struct OptionalNode {
   std::optional<Node> node;
   bytes hash;
 
+  KeyPackage& key_package() { return std::get<KeyPackage>(node.value().node); }
+  const KeyPackage& key_package() const { return std::get<KeyPackage>(node.value().node); }
+
+  ParentNode& parent_node() { return std::get<ParentNode>(node.value().node); }
+  const ParentNode& parent_node() const { return std::get<ParentNode>(node.value().node); }
+
   void set_leaf_hash(CipherSuite suite, NodeIndex index);
   void set_parent_hash(CipherSuite suite, NodeIndex index, const bytes& left, const bytes& right);
 
@@ -86,10 +92,10 @@ struct TreeKEMPublicKey {
   void set_hash_all();
   bytes root_hash() const;
   LeafCount size() const;
-  std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
   std::optional<KeyPackage> key_package(LeafIndex index) const;
+  std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::tuple<TreeKEMPrivateKey, DirectPath> encap(LeafIndex from,
                                                   const bytes& context,
@@ -99,6 +105,11 @@ struct TreeKEMPublicKey {
 
   void truncate();
 
+  OptionalNode& node_at(NodeIndex n) { return nodes.at(n.val); }
+  const OptionalNode& node_at(NodeIndex n) const { return nodes.at(n.val); }
+  OptionalNode& node_at(LeafIndex n) { return nodes.at(NodeIndex(n).val); }
+  const OptionalNode& node_at(LeafIndex n) const { return nodes.at(NodeIndex(n).val); }
+
   TLS_SERIALIZABLE(nodes)
   TLS_TRAITS(tls::vector<4>)
 
@@ -106,6 +117,8 @@ struct TreeKEMPublicKey {
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
   bytes get_hash(NodeIndex index);
+
+  friend struct TreeKEMPrivateKey;
 };
 
 std::ostream& operator<<(std::ostream& str, const TreeKEMPublicKey& obj);
