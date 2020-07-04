@@ -350,7 +350,7 @@ struct MessagesTestVectors
   };
 
   epoch_t epoch;
-  LeafIndex signer_index;
+  Sender sender;
   LeafIndex removed;
   bytes user_id;
   bytes group_id;
@@ -362,7 +362,7 @@ struct MessagesTestVectors
   std::vector<TestCase> cases;
 
   TLS_SERIALIZABLE(epoch,
-                   signer_index,
+                   sender,
                    removed,
                    user_id,
                    group_id,

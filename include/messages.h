@@ -201,7 +201,7 @@ struct Commit {
   std::vector<ProposalID> adds;
   DirectPath path;
 
-  TLS_SERIALIZABLE(updates, removes, adds, ignored, path)
+  TLS_SERIALIZABLE(updates, removes, adds, path)
   TLS_TRAITS(tls::vector<2>,
              tls::vector<2>,
              tls::vector<2>,
@@ -246,11 +246,25 @@ struct CommitData
 
 struct GroupContext;
 
+enum struct SenderType : uint8_t {
+    invalid = 0,
+    member = 1,
+    preconfigured = 2,
+    new_member = 3,
+};
+
+struct Sender {
+    SenderType sender_type;
+    uint32_t sender;
+
+    TLS_SERIALIZABLE(sender_type, sender);
+};
+
 struct MLSPlaintext
 {
   bytes group_id;
   epoch_t epoch;
-  LeafIndex sender;
+  Sender sender;
   bytes authenticated_data;
   std::variant<ApplicationData, Proposal, CommitData> content;
   bytes signature;
@@ -261,7 +275,7 @@ struct MLSPlaintext
   // Constructor for decrypting
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
-               LeafIndex sender,
+               Sender sender,
                ContentType content_type,
                bytes authenticated_data,
                const bytes& content);
@@ -269,15 +283,15 @@ struct MLSPlaintext
   // Constructors for encrypting
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
-               LeafIndex sender,
-               const ApplicationData& application_data);
+               Sender sender,
+               ApplicationData application_data);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
-               LeafIndex sender,
-               const Proposal& proposal);
+               Sender sender,
+               Proposal proposal);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
-               LeafIndex sender,
+               Sender sender,
                const Commit& commit);
 
   bytes to_be_signed(const GroupContext& context) const;
