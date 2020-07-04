@@ -6,6 +6,101 @@
 
 namespace mls {
 
+///
+/// Extensions
+///
+
+enum class ProtocolVersion : uint8_t {
+  mls10 = 0xFF,
+};
+
+enum struct ExtensionType : uint16_t {
+  supported_versions = 1,
+  supported_ciphersuites = 2,
+  lifetime = 3,
+  key_id = 4,
+  parent_hash = 5,
+};
+
+struct Extension {
+  ExtensionType type;
+  bytes data;
+
+  TLS_SERIALIZABLE(type, data);
+  TLS_TRAITS(tls::pass, tls::vector<2>);
+};
+
+struct ExtensionList {
+  std::vector<Extension> extensions;
+
+  // XXX(RLB) It would be good if this maintained extensions in order.  It might
+  // be possible to do this automatically by changing the storage to a
+  // map<ExtensionType, bytes> and extending the TLS code to marshal that type.
+  template<typename T>
+  inline void add(const T& obj) {
+    auto data = tls::marshal(obj);
+    extensions.push_back({T::type, std::move(data)});
+  }
+
+  template<typename T>
+  std::optional<T> get() {
+    for (const auto& ext : extensions) {
+      if (ext.type == T::type) {
+        return tls::get<T>(ext.data);
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  TLS_SERIALIZABLE(extensions);
+  TLS_TRAITS(tls::vector<2>);
+};
+
+struct SupportedVersionsExtension {
+  std::vector<ProtocolVersion> versions;
+
+  static const ExtensionType type;
+  TLS_SERIALIZABLE(versions);
+  TLS_TRAITS(tls::vector<1>);
+};
+
+struct SupportedCipherSuitesExtension {
+  std::vector<CipherSuite> cipher_suites;
+
+  static const ExtensionType type;
+  TLS_SERIALIZABLE(cipher_suites);
+  TLS_TRAITS(tls::vector<1>);
+};
+
+struct LifetimeExtension {
+  uint64_t not_before;
+  uint64_t not_after;
+
+  static const ExtensionType type;
+  TLS_SERIALIZABLE(not_before, not_after);
+};
+
+struct KeyIDExtension {
+  bytes key_id;
+
+  static const ExtensionType type;
+  TLS_SERIALIZABLE(key_id);
+  TLS_TRAITS(tls::vector<2>);
+};
+
+struct ParentHashExtension {
+  bytes parent_hash;
+
+  static const ExtensionType type;
+  TLS_SERIALIZABLE(parent_hash);
+  TLS_TRAITS(tls::vector<1>);
+};
+
+///
+/// NodeType, ParentNode, and KeyPackage
+///
+
 enum class NodeType : uint8_t {
   leaf = 0x00,
   parent = 0x01,
@@ -19,11 +114,6 @@ struct ParentNode {
   static const NodeType type;
   TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash)
   TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>)
-};
-
-enum class ProtocolVersion : uint8_t
-{
-  mls10 = 0xFF,
 };
 
 // struct {
@@ -71,6 +161,10 @@ struct KeyPackage
 
 bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
+///
+/// DirectPath
+///
+
 // struct {
 //    HPKEPublicKey public_key;
 //    HPKECiphertext node_secrets<0..2^16-1>;
@@ -83,8 +177,6 @@ struct RatchetNode
   TLS_SERIALIZABLE(public_key, node_secrets)
   TLS_TRAITS(tls::pass, tls::vector<2>)
 };
-
-enum class NodeType : uint8_t;
 
 // struct {
 //    RatchetNode nodes<0..2^16-1>;

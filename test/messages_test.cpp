@@ -34,6 +34,37 @@ protected:
   {}
 };
 
+TEST_F(MessagesTest, Extensions)
+{
+  auto sv0 = SupportedVersionsExtension{ { ProtocolVersion::mls10 } };
+  auto sc0 = SupportedCipherSuitesExtension{ {
+    CipherSuite::P256_SHA256_AES128GCM,
+    CipherSuite::X25519_SHA256_AES128GCM,
+  } };
+  auto lt0 = LifetimeExtension{ 0xA0A0A0A0A0A0A0A0, 0xB0B0B0B0B0B0B0B0 };
+  auto kid0 = KeyIDExtension{ { 0, 1, 2, 3 } };
+  auto ph0 = ParentHashExtension{ { 4, 5, 6, 7 } };
+
+  ExtensionList exts;
+  exts.add(sv0);
+  exts.add(sc0);
+  exts.add(lt0);
+  exts.add(kid0);
+  exts.add(ph0);
+
+  auto sv1 = exts.get<SupportedVersionsExtension>();
+  auto sc1 = exts.get<SupportedCipherSuitesExtension>();
+  auto lt1 = exts.get<LifetimeExtension>();
+  auto kid1 = exts.get<KeyIDExtension>();
+  auto ph1 = exts.get<ParentHashExtension>();
+
+  ASSERT_EQ(sv0, sv1);
+  ASSERT_EQ(sc0, sc1);
+  ASSERT_EQ(lt0, lt1);
+  ASSERT_EQ(kid0, kid1);
+  ASSERT_EQ(ph0, ph1);
+}
+
 TEST_F(MessagesTest, Interop)
 {
   for (const auto& tc : tv.cases) {

@@ -2,6 +2,22 @@
 
 namespace mls {
 
+///
+/// Extensions
+///
+
+const ExtensionType SupportedVersionsExtension::type =
+  ExtensionType::supported_versions;
+const ExtensionType SupportedCipherSuitesExtension::type =
+  ExtensionType::supported_ciphersuites;
+const ExtensionType LifetimeExtension::type = ExtensionType::lifetime;
+const ExtensionType KeyIDExtension::type = ExtensionType::key_id;
+const ExtensionType ParentHashExtension::type = ExtensionType::parent_hash;
+
+///
+/// NodeType, ParentNode, and KeyPackage
+///
+
 const NodeType KeyPackage::type = NodeType::leaf;
 
 KeyPackage::KeyPackage()
@@ -64,7 +80,9 @@ operator==(const KeyPackage& lhs, const KeyPackage& rhs)
   return tbs && (ver || same);
 }
 
-// DirectPath
+///
+/// DirectPath
+///
 
 void
 DirectPath::sign(CipherSuite suite,
