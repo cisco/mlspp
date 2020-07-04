@@ -1,61 +1,9 @@
 #include "messages.h"
 #include "key_schedule.h"
 #include "state.h"
+#include "treekem.h"
 
 namespace mls {
-
-// KeyPackage
-
-KeyPackage::KeyPackage()
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::unknown)
-{}
-
-KeyPackage::KeyPackage(CipherSuite suite_in,
-                       const HPKEPrivateKey& init_key_in,
-                       Credential credential_in)
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(suite_in)
-  , init_key(init_key_in.public_key())
-  , credential(std::move(credential_in))
-  , _private_key(init_key_in)
-{
-  if (!credential.private_key().has_value()) {
-    throw InvalidParameterError("Credential must have a private key");
-  }
-
-  auto tbs = to_be_signed();
-  signature = credential.private_key().value().sign(tbs);
-}
-
-const std::optional<HPKEPrivateKey>&
-KeyPackage::private_key() const
-{
-  return _private_key;
-}
-
-bytes
-KeyPackage::hash() const
-{
-  auto marshaled = tls::marshal(*this);
-  return Digest(cipher_suite).write(marshaled).digest();
-}
-
-bool
-KeyPackage::verify() const
-{
-  auto tbs = to_be_signed();
-  auto identity_key = credential.public_key();
-  return identity_key.verify(tbs, signature);
-}
-
-bytes
-KeyPackage::to_be_signed() const
-{
-  tls::ostream out;
-  out << version << cipher_suite << init_key << credential;
-  return out.bytes();
-}
 
 // GroupInfo
 
@@ -66,20 +14,15 @@ GroupInfo::GroupInfo(CipherSuite suite)
 
 GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
-                     RatchetTree tree_in,
-                     bytes prior_confirmed_transcript_hash_in,
+                     TreeKEMPublicKey tree_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
-                     DirectPath path_in,
                      bytes confirmation_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))
-  , prior_confirmed_transcript_hash(
-      std::move(prior_confirmed_transcript_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
-  , path(std::move(path_in))
   , confirmation(std::move(confirmation_in))
 {}
 
@@ -87,15 +30,24 @@ bytes
 GroupInfo::to_be_signed() const
 {
   tls::ostream w;
-  w << group_id << epoch << tree << confirmed_transcript_hash
-    << interim_transcript_hash << path << confirmation << signer_index;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << tree;
+  tls::vector<1>::encode(w, confirmed_transcript_hash);
+  tls::vector<1>::encode(w, interim_transcript_hash);
+  tls::vector<1>::encode(w, confirmation);
+  w << signer_index;
   return w.bytes();
 }
 
 void
 GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 {
-  auto cred = tree.get_credential(LeafIndex{ index });
+  auto maybe_kp = tree.key_package(index);
+  if (!maybe_kp.has_value()) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = maybe_kp.value().credential;
   if (cred.public_key() != priv.public_key()) {
     throw InvalidParameterError("Bad key for index");
   }
@@ -107,7 +59,12 @@ GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 bool
 GroupInfo::verify() const
 {
-  auto cred = tree.get_credential(LeafIndex{ signer_index });
+  auto maybe_kp = tree.key_package(signer_index);
+  if (!maybe_kp.has_value()) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = maybe_kp.value().credential;
   return cred.public_key().verify(to_be_signed(), signature);
 }
 
@@ -119,55 +76,69 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 bytes init_secret,
+                 bytes epoch_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
-  , _init_secret(std::move(init_secret))
+  , _epoch_secret(std::move(epoch_secret))
 {
-  auto first_epoch = FirstEpoch::create(cipher_suite, _init_secret);
+  bytes key, nonce;
+  std::tie(key, nonce) = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info = seal(cipher_suite,
-                              first_epoch.group_info_key,
-                              first_epoch.group_info_nonce,
-                              {},
-                              group_info_data);
+  encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
+}
+
+std::optional<int>
+Welcome::find(const KeyPackage& kp) const
+{
+  auto hash = kp.hash();
+  for (size_t i = 0; i < secrets.size(); i++) {
+    if (hash == secrets[i].key_package_hash) {
+      return i;
+    }
+  }
+  return std::nullopt;
 }
 
 void
-Welcome::encrypt(const KeyPackage& kp)
+Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _init_secret };
+  auto gs = GroupSecrets{ _epoch_secret, std::nullopt };
+  if (path_secret.has_value()) {
+    gs.path_secret = { path_secret.value() };
+  }
+
   auto gs_data = tls::marshal(gs);
   auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
   secrets.push_back({ kp.hash(), enc_gs });
 }
 
-bool
-operator==(const Welcome& lhs, const Welcome& rhs)
+GroupInfo
+Welcome::decrypt(const bytes& epoch_secret) const
 {
-  return (lhs.version == rhs.version) &&
-         (lhs.cipher_suite == rhs.cipher_suite) &&
-         (lhs.secrets == rhs.secrets) &&
-         (lhs.encrypted_group_info == rhs.encrypted_group_info);
+  bytes key, nonce;
+  std::tie(key, nonce) = group_info_key_nonce(epoch_secret);
+  auto group_info_data =
+    open(cipher_suite, key, nonce, {}, encrypted_group_info);
+  return tls::get<GroupInfo>(group_info_data, cipher_suite);
 }
 
-tls::ostream&
-operator<<(tls::ostream& str, const Welcome& obj)
+std::tuple<bytes, bytes>
+Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 {
-  return str << obj.version << obj.cipher_suite << obj.secrets
-             << obj.encrypted_group_info;
+  auto key_size = suite_key_size(cipher_suite);
+  auto nonce_size = suite_nonce_size(cipher_suite);
+  auto secret_size = Digest(cipher_suite).output_size();
+
+  auto secret = hkdf_expand_label(
+    cipher_suite, epoch_secret, "group info", {}, secret_size);
+  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
+  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
+
+  return std::make_tuple(key, nonce);
 }
 
-tls::istream&
-operator>>(tls::istream& str, Welcome& obj)
-{
-  str >> obj.version >> obj.cipher_suite >> obj.secrets >>
-    obj.encrypted_group_info;
-  return str;
-}
-
-// Proposals
+// MLSPlaintext
 
 const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
@@ -175,9 +146,9 @@ const ProposalType Remove::type = ProposalType::remove;
 
 // MLSPlaintext
 
-const ContentType ApplicationData::type = ContentType::application;
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
+const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -215,8 +186,9 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
       throw InvalidParameterError("Unknown content type");
   }
 
-  tls::opaque<2> padding;
-  r >> signature >> padding;
+  bytes padding;
+  tls::vector<2>::decode(r, signature);
+  tls::vector<2>::decode(r, padding);
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -260,24 +232,19 @@ bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  switch (content.inner_type()) {
-    case ContentType::application:
-      w << std::get<ApplicationData>(content);
-      break;
-
-    case ContentType::proposal:
-      w << std::get<Proposal>(content);
-      break;
-
-    case ContentType::commit:
-      w << std::get<CommitData>(content);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  if (std::holds_alternative<ApplicationData>(content)) {
+    w << std::get<ApplicationData>(content);
+  } else if (std::holds_alternative<Proposal>(content)) {
+    w << std::get<Proposal>(content);
+  } else if (std::holds_alternative<CommitData>(content)) {
+    w << std::get<CommitData>(content);
+  } else {
+    throw InvalidParameterError("Unknown content type");
   }
 
-  w << signature << tls::opaque<2>(padding_size, 0);
+  bytes padding(padding_size, 0);
+  tls::vector<2>::encode(w, signature);
+  tls::vector<2>::encode(w, padding);
   return w.bytes();
 }
 
@@ -286,7 +253,8 @@ MLSPlaintext::commit_content() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  w << group_id << epoch << sender << commit_data.commit;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << sender << commit_data.commit;
   return w.bytes();
 }
 
@@ -299,7 +267,8 @@ MLSPlaintext::commit_auth_data() const
 {
   auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
-  w << commit_data.confirmation << signature;
+  tls::vector<1>::encode(w, commit_data.confirmation);
+  tls::vector<2>::encode(w, signature);
   return w.bytes();
 }
 
@@ -307,7 +276,11 @@ bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
-  w << context << group_id << epoch << sender << authenticated_data << content;
+  w << context;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch << sender;
+  tls::vector<4>::encode(w, authenticated_data);
+  tls::variant<ContentType>::encode(w, content);
   return w.bytes();
 }
 

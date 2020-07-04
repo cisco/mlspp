@@ -26,12 +26,12 @@ struct BasicCredential
   BasicCredential()
   {}
 
-  BasicCredential(tls::opaque<2> identity_in, SignaturePublicKey public_key_in)
+  BasicCredential(bytes identity_in, SignaturePublicKey public_key_in)
     : identity(std::move(identity_in))
     , public_key(std::move(public_key_in))
   {}
 
-  tls::opaque<2> identity;
+  bytes identity;
   SignaturePublicKey public_key;
 
   static const CredentialType type;
@@ -59,19 +59,16 @@ class Credential
 public:
   bytes identity() const;
   SignaturePublicKey public_key() const;
-  std::optional<SignaturePrivateKey> private_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
-  static Credential basic(const bytes& identity,
-                          const SignaturePrivateKey& private_key);
 
   TLS_SERIALIZABLE(_cred)
+  TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  tls::variant<CredentialType, BasicCredential> _cred;
-  std::optional<SignaturePrivateKey> _priv;
+  std::variant<BasicCredential> _cred;
 };
 
 } // namespace mls

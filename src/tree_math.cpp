@@ -128,9 +128,15 @@ dirpath(NodeIndex x, NodeCount w)
 {
   std::vector<NodeIndex> d;
 
+  auto p = parent(x, w);
   auto r = root(w);
-  for (auto c = x; c.val != r.val; c = parent(c, w)) {
-    d.push_back(c);
+  while (p.val != r.val) {
+    d.push_back(p);
+    p = parent(p, w);
+  }
+
+  if (x.val != r.val) {
+    d.push_back(p);
   }
 
   return d;
@@ -140,11 +146,48 @@ std::vector<NodeIndex>
 copath(NodeIndex x, NodeCount w)
 {
   auto d = dirpath(x, w);
-  std::vector<NodeIndex> c(d.size());
-  for (size_t i = 0; i < d.size(); ++i) {
-    c[i] = sibling(d[i], w);
+  if (d.empty()) {
+    return std::vector<NodeIndex>();
   }
+
+  std::vector<NodeIndex> path;
+  path.push_back(x);
+  // exclude root
+  for (size_t i = 0; i < d.size() - 1; ++i) {
+    path.push_back(d[i]);
+  }
+
+  std::vector<NodeIndex> c(path.size());
+  for (size_t i = 0; i < path.size(); ++i) {
+    c[i] = sibling(path[i], w);
+  }
+
   return c;
+}
+
+bool
+in_path(NodeIndex x, NodeIndex y)
+{
+  auto lx = level(x);
+  auto ly = level(y);
+  return lx <= ly && (x.val >> (ly + 1) == y.val >> (ly + 1));
+}
+
+// Common ancestor of two leaves
+NodeIndex
+ancestor(LeafIndex l, LeafIndex r)
+{
+  auto ln = NodeIndex(l);
+  auto rn = NodeIndex(r);
+
+  uint8_t k = 0;
+  while (ln != rn) {
+    ln.val = ln.val >> 1;
+    rn.val = rn.val >> 1;
+    k += 1;
+  }
+
+  return NodeIndex((ln.val << k) + (1 << (k - 1)) - 1);
 }
 
 } // namespace tree_math

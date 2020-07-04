@@ -9,7 +9,7 @@ TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
-  tv.n_leaves = LeafCount{ 255 };
+  tv.n_leaves = LeafCount{ 63 };
 
   for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
     auto w = NodeCount{ LeafCount{ n } };
@@ -30,6 +30,21 @@ generate_tree_math()
 
     auto sibling = tree_math::sibling(NodeIndex{ x }, w);
     tv.sibling.push_back(sibling);
+
+    auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
+    tv.dirpath.push_back(TreeMathTestVectors::NodeVector{ dirpath });
+
+    auto copath = tree_math::copath(NodeIndex{ x }, w);
+    tv.copath.push_back(TreeMathTestVectors::NodeVector{ copath });
+
+    for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
+      auto ancestors = std::vector<NodeIndex>();
+      for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
+        auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
+        ancestors.push_back(a);
+      }
+      tv.ancestor.emplace_back(TreeMathTestVectors::NodeVector{ ancestors });
+    }
   }
 
   return tv;
@@ -97,7 +112,8 @@ generate_hash_ratchet()
       HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto key_nonce = ratchet.get(k);
-        tc.key_sequences.at(j).push_back({ key_nonce.key, key_nonce.nonce });
+        tc.key_sequences.at(j).steps.push_back(
+          { key_nonce.key, key_nonce.nonce });
       }
     }
 
@@ -150,10 +166,9 @@ generate_key_schedule()
       auto ctx = tls::marshal(group_context);
       epoch = epoch.next(LeafCount{ n_members }, update_secret, ctx);
 
-      auto handshake_keys =
-        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+      auto handshake_keys = std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       auto application_keys =
-        tls::vector<KeyScheduleTestVectors::KeyAndNonce, 4>();
+        std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
         auto hs = epoch.handshake_keys.get(k, tv.target_generation);
         handshake_keys.push_back({ hs.key, hs.nonce });
@@ -190,24 +205,10 @@ generate_key_schedule()
   return tv;
 }
 
-TreeTestVectors::TreeCase
-tree_to_case(const TestRatchetTree& tree)
+TreeKEMTestVectors
+generate_treekem()
 {
-  auto nodes = tree.nodes();
-  TreeTestVectors::TreeCase tc(nodes.size());
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    tc[i].hash = nodes[i].hash();
-    if (nodes[i].has_value()) {
-      tc[i].public_key = nodes[i]->public_key().to_bytes();
-    }
-  }
-  return tc;
-}
-
-TreeTestVectors
-generate_tree()
-{
-  TreeTestVectors tv;
+  TreeKEMTestVectors tv;
 
   std::vector<CipherSuite> suites{
     CipherSuite::P256_SHA256_AES128GCM,
@@ -220,38 +221,43 @@ generate_tree()
   };
 
   size_t n_leaves = 10;
+  tv.init_secrets.resize(n_leaves);
   tv.leaf_secrets.resize(n_leaves);
   for (size_t i = 0; i < n_leaves; ++i) {
-    tv.leaf_secrets[i] = { uint8_t(i) };
+    tv.init_secrets[i].data = random_bytes(32);
+    tv.leaf_secrets[i].data = random_bytes(32);
   }
 
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
     auto scheme = schemes[i];
 
-    TreeTestVectors::TestCase tc;
+    TreeKEMTestVectors::TestCase tc;
     tc.cipher_suite = suite;
     tc.signature_scheme = scheme;
 
-    TestRatchetTree tree{ suite };
+    TreeKEMPublicKey tree{ suite };
 
     // Add the leaves
     for (uint32_t j = 0; j < n_leaves; ++j) {
-      auto id = bytes(1, uint8_t(j));
-      auto sig = SignaturePrivateKey::derive(scheme, id);
-      auto cred = Credential::basic(id, sig);
-      tc.credentials.push_back(cred);
+      auto context = bytes{ uint8_t(i), uint8_t(j) };
+      auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
+      auto sig_priv =
+        SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
+      auto cred = Credential::basic(context, sig_priv.public_key());
+      auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
 
-      auto priv = HPKEPrivateKey::derive(suite, tv.leaf_secrets[j]);
-      tree.add_leaf(LeafIndex{ j }, priv.public_key(), tc.credentials[j]);
-      tree.encap(LeafIndex{ j }, {}, tv.leaf_secrets[j]);
-      tc.trees.push_back(tree_to_case(tree));
+      auto index = tree.add_leaf(kp);
+      tree.encap(
+        index, context, tv.leaf_secrets[j].data, sig_priv, std::nullopt);
+
+      tc.trees.push_back(tree);
     }
 
     // Blank out even-numbered leaves
     for (uint32_t j = 0; j < n_leaves; j += 2) {
-      tree.blank_path(LeafIndex{ j }, true);
-      tc.trees.push_back(tree_to_case(tree));
+      tree.blank_path(LeafIndex{ j });
+      tc.trees.push_back(tree);
     }
 
     tv.cases.push_back(tc);
@@ -297,26 +303,29 @@ generate_messages()
     auto dh_key = dh_priv.public_key();
     auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv);
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
-    auto ratchet_tree =
-      TestRatchetTree{ suite,
-                       { tv.random, tv.random, tv.random, tv.random },
-                       { cred, cred, cred, cred } };
-    ratchet_tree.blank_path(LeafIndex{ 2 }, true);
+    auto tree = TestTreeKEMPublicKey{
+      suite,
+      scheme,
+      { tv.random, tv.random, tv.random, tv.random },
+    };
+    tree.blank_path(LeafIndex{ 2 });
 
-    auto [direct_path, dummy] =
-      ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    auto [dummy, direct_path] =
+      tree.encap(LeafIndex{ 0 }, {}, tv.random, sig_priv, std::nullopt);
     silence_unused(dummy);
+    std::get<KeyPackage>(tree.nodes[0].node.value().node).signature = tv.random;
+    direct_path.leaf_key_package.signature = tv.random;
 
     // Construct CIK
-    auto key_package = KeyPackage{ suite, dh_priv, cred };
+    auto key_package =
+      KeyPackage{ suite, dh_priv.public_key(), cred, sig_priv };
     key_package.signature = tv.random;
 
     // Construct Welcome
     auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree, tv.random,
-                 tv.random,   tv.random, direct_path,  tv.random };
+      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 
@@ -336,7 +345,7 @@ generate_messages()
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
     add_hs.signature = tv.random;
 
-    auto update_prop = Proposal{ Update{ dh_key } };
+    auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
@@ -348,10 +357,10 @@ generate_messages()
 
     // Construct Commit
     auto commit = Commit{
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
       direct_path,
     };
 
@@ -420,15 +429,19 @@ generate_basic_session()
     std::vector<SessionTestVectors::Epoch> transcript;
 
     // Initialize empty sessions
+    std::vector<Session::InitInfo> init_infos;
     std::vector<KeyPackage> key_packages;
     std::vector<TestSession> sessions;
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
-      auto seed = bytes{ uint8_t(j), 0 };
-      auto identity_priv = SignaturePrivateKey::derive(scheme, seed);
-      auto cred = Credential::basic(seed, identity_priv);
-      auto init = HPKEPrivateKey::derive(suite, seed);
-      key_packages.emplace_back(suite, init, cred);
+      auto init_secret = bytes{ uint8_t(j), 0 };
+      auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
+      auto cred = Credential::basic(init_secret, identity_priv.public_key());
+      auto init = HPKEPrivateKey::derive(suite, init_secret);
+      auto kp = KeyPackage{ suite, init.public_key(), cred, identity_priv };
+      auto info = Session::InitInfo{ init_secret, identity_priv, kp };
+      key_packages.push_back(kp);
+      init_infos.emplace_back(info);
     }
 
     // Add everyone
@@ -439,7 +452,7 @@ generate_basic_session()
       bytes add;
       if (j == 1) {
         auto [session, welcome_new] = Session::start(
-          tv.group_id, { key_packages[0] }, { key_packages[1] }, commit_secret);
+          tv.group_id, { init_infos[0] }, { key_packages[1] }, commit_secret);
         session.encrypt_handshake(encrypt);
 
         sessions.push_back(session);
@@ -452,7 +465,7 @@ generate_basic_session()
         }
       }
 
-      auto joiner = Session::join({ key_packages[j] }, welcome);
+      auto joiner = Session::join({ init_infos[j] }, welcome);
       joiner.encrypt_handshake(encrypt);
       sessions.push_back(joiner);
 
@@ -537,10 +550,6 @@ verify_session_repro(const F& generator)
   auto v0 = generator();
   auto v1 = generator();
 
-  // Obviously, inputs should repro
-  verify_equal_marshaled(v0.group_size, v1.group_size);
-  verify_equal_marshaled(v0.group_id, v1.group_id);
-
   for (size_t i = 0; i < v0.cases.size(); ++i) {
     // Randomized signatures break reproducibility
     if (!deterministic_signature_scheme(v0.cases[i].signature_scheme)) {
@@ -563,25 +572,25 @@ verify_session_repro(const F& generator)
 int
 main()
 {
-  TreeMathTestVectors tree_math = generate_tree_math();
+  auto tree_math = generate_tree_math();
   write_test_vectors(tree_math);
 
-  CryptoTestVectors crypto = generate_crypto();
+  auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  HashRatchetTestVectors hash_ratchet = generate_hash_ratchet();
+  auto hash_ratchet = generate_hash_ratchet();
   write_test_vectors(hash_ratchet);
 
-  KeyScheduleTestVectors key_schedule = generate_key_schedule();
+  auto key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
-  TreeTestVectors tree = generate_tree();
+  auto tree = generate_treekem();
   write_test_vectors(tree);
 
-  MessagesTestVectors messages = generate_messages();
+  auto messages = generate_messages();
   write_test_vectors(messages);
 
-  BasicSessionTestVectors basic_session = generate_basic_session();
+  auto basic_session = generate_basic_session();
   write_test_vectors(basic_session);
 
   // Verify that the test vectors are reproducible (to the extent
@@ -589,7 +598,6 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
-  verify_reproducible(generate_tree);
   verify_reproducible(generate_messages);
   verify_session_repro(generate_basic_session);
 
@@ -599,7 +607,7 @@ main()
     TestLoader<CryptoTestVectors>::get();
     TestLoader<HashRatchetTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
-    TestLoader<TreeTestVectors>::get();
+    TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
     TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {

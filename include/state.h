@@ -3,7 +3,7 @@
 #include "crypto.h"
 #include "messages.h"
 #include "key_schedule.h"
-#include "ratchet_tree.h"
+#include "treekem.h"
 #include <optional>
 #include <set>
 #include <vector>
@@ -19,12 +19,13 @@ namespace mls {
 // } GroupContext;
 struct GroupContext
 {
-  tls::opaque<1> group_id;
+  bytes group_id;
   epoch_t epoch;
-  tls::opaque<1> tree_hash;
-  tls::opaque<1> confirmed_transcript_hash;
+  bytes tree_hash;
+  bytes confirmed_transcript_hash;
 
   TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>)
 };
 
 class State
@@ -37,20 +38,15 @@ public:
   // Initialize an empty group
   State(bytes group_id,
         CipherSuite suite,
-        const HPKEPrivateKey& leaf_priv,
-        const Credential& credential);
+        const bytes& init_secret,
+        SignaturePrivateKey sig_priv,
+        const KeyPackage& key_package);
 
   // Initialize a group from a Welcome
-  State(const std::vector<KeyPackage>& my_key_packages,
+  State(const bytes& init_secret,
+        SignaturePrivateKey sig_priv,
+        const KeyPackage& kp,
         const Welcome& welcome);
-
-  // Negotiate an initial state with another peer based on their
-  // KeyPackage
-  static std::tuple<Welcome, State> negotiate(
-    const bytes& group_id,
-    const std::vector<KeyPackage>& my_key_packages,
-    const std::vector<KeyPackage>& key_packages,
-    const bytes& commit_secret);
 
   ///
   /// Message factories
@@ -86,16 +82,14 @@ public:
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
-  // XXX
-  void dump_tree() const;
-
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
   CipherSuite _suite;
   bytes _group_id;
   epoch_t _epoch;
-  RatchetTree _tree;
+  TreeKEMPublicKey _tree;
+  TreeKEMPrivateKey _tree_priv;
   bytes _confirmed_transcript_hash;
   bytes _interim_transcript_hash;
 
@@ -108,7 +102,7 @@ protected:
 
   // Cache of Proposals and update secrets
   std::list<MLSPlaintext> _pending_proposals;
-  std::map<ProposalID, bytes> _update_secrets;
+  std::map<bytes, bytes> _update_secrets;
 
   // Assemble a group context for this state
   GroupContext group_context() const;
@@ -122,15 +116,15 @@ protected:
   MLSPlaintext sign(const Proposal& proposal) const;
 
   // Apply the changes requested by various messages
-  void apply(const Add& add);
+  LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target, const bytes& leaf_secret);
+  void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
-  void apply(const std::vector<ProposalID>& ids);
-  void apply(const Commit& commit);
+  std::vector<LeafIndex> apply(const std::vector<ProposalID>& ids);
+  std::vector<LeafIndex> apply(const Commit& commit);
 
   // Compute a proposal ID
-  bytes proposal_id(const MLSPlaintext& pt) const;
+  ProposalID proposal_id(const MLSPlaintext& pt) const;
 
   // Extract a proposal from the cache
   std::optional<MLSPlaintext> find_proposal(const ProposalID& id);

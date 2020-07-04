@@ -12,15 +12,16 @@ const CredentialType BasicCredential::type = CredentialType::basic;
 tls::ostream&
 operator<<(tls::ostream& str, const BasicCredential& obj)
 {
-  return str << obj.identity << obj.public_key.signature_scheme()
-             << obj.public_key;
+  tls::vector<2>::encode(str, obj.identity);
+  return str << obj.public_key.signature_scheme() << obj.public_key;
 }
 
 tls::istream&
 operator>>(tls::istream& str, BasicCredential& obj)
 {
   SignatureScheme scheme;
-  str >> obj.identity >> scheme >> obj.public_key;
+  tls::vector<2>::decode(str, obj.identity);
+  str >> scheme >> obj.public_key;
   obj.public_key.set_signature_scheme(scheme);
   return str;
 }
@@ -57,12 +58,6 @@ Credential::public_key() const
   throw std::bad_variant_access();
 }
 
-std::optional<SignaturePrivateKey>
-Credential::private_key() const
-{
-  return _priv;
-}
-
 bool
 Credential::valid_for(const SignaturePrivateKey& priv) const
 {
@@ -74,14 +69,6 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 {
   Credential cred;
   cred._cred = BasicCredential{ identity, public_key };
-  return cred;
-}
-
-Credential
-Credential::basic(const bytes& identity, const SignaturePrivateKey& private_key)
-{
-  auto cred = basic(identity, private_key.public_key());
-  cred._priv = private_key;
   return cred;
 }
 

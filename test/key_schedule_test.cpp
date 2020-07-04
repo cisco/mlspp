@@ -21,11 +21,11 @@ TEST_F(HashRatchetTest, Interop)
     ASSERT_EQ(tc.key_sequences.size(), tv.n_members);
     for (uint32_t j = 0; j < tv.n_members; ++j) {
       HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
-      ASSERT_EQ(tc.key_sequences[j].size(), tv.n_generations);
+      ASSERT_EQ(tc.key_sequences[j].steps.size(), tv.n_generations);
       for (uint32_t k = 0; k < tv.n_generations; ++k) {
         auto kn = ratchet.get(k);
-        ASSERT_EQ(tc.key_sequences[j][k].key, kn.key);
-        ASSERT_EQ(tc.key_sequences[j][k].nonce, kn.nonce);
+        ASSERT_EQ(tc.key_sequences[j].steps[k].key, kn.key);
+        ASSERT_EQ(tc.key_sequences[j].steps[k].nonce, kn.nonce);
       }
     }
   }

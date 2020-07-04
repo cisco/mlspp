@@ -10,14 +10,24 @@ namespace mls {
 class Session
 {
 public:
+  struct InitInfo {
+    bytes init_secret;
+    SignaturePrivateKey sig_priv;
+    KeyPackage key_package;
+
+    InitInfo(bytes init_secret_in,
+             SignaturePrivateKey sig_priv_in,
+             KeyPackage key_package);
+  };
+
   Session(const Session& other) = default;
 
   static std::tuple<Session, Welcome>
     start(const bytes& group_id,
-          const std::vector<KeyPackage>& my_key_packages,
+          const std::vector<InitInfo>& my_info,
           const std::vector<KeyPackage>& key_packages,
           const bytes& initial_secret);
-  static Session join(const std::vector<KeyPackage>& key_packages,
+  static Session join(const std::vector<InitInfo>& my_info,
                       const Welcome& welcome);
 
   void encrypt_handshake(bool enabled);

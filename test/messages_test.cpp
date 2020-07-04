@@ -14,6 +14,8 @@ tls_round_trip(const bytes& vector,
 {
   auto marshaled = tls::marshal(constructed);
   if (reproducible) {
+    std::cout << "vec " << vector << std::endl;
+    std::cout << "mar " << marshaled << std::endl;
     ASSERT_EQ(vector, marshaled);
   }
 
@@ -43,28 +45,31 @@ TEST_F(MessagesTest, Interop)
     auto sig_priv =
       SignaturePrivateKey::derive(tc.signature_scheme, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv);
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
     DeterministicHPKE lock;
-    auto ratchet_tree =
-      TestRatchetTree{ tc.cipher_suite,
-                       { tv.random, tv.random, tv.random, tv.random },
-                       { cred, cred, cred, cred } };
-    ratchet_tree.blank_path(LeafIndex{ 2 }, true);
+    auto tree =
+      TestTreeKEMPublicKey{ tc.cipher_suite,
+                            tc.signature_scheme,
+                            { tv.random, tv.random, tv.random, tv.random } };
+    tree.blank_path(LeafIndex{ 2 });
 
-    auto [direct_path, dummy] =
-      ratchet_tree.encap(LeafIndex{ 0 }, {}, tv.random);
+    auto [dummy, direct_path] =
+      tree.encap(LeafIndex{ 0 }, {}, tv.random, sig_priv, std::nullopt);
     silence_unused(dummy);
+    std::get<KeyPackage>(tree.nodes[0].node.value().node).signature = tv.random;
+    direct_path.leaf_key_package.signature = tv.random;
 
     // KeyPackage
-    KeyPackage key_package{ tc.cipher_suite, dh_priv, cred };
+    KeyPackage key_package{
+      tc.cipher_suite, dh_priv.public_key(), cred, sig_priv
+    };
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch,  ratchet_tree, tv.random,
-                 tv.random,   tv.random, direct_path,  tv.random };
+      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
@@ -91,7 +96,7 @@ TEST_F(MessagesTest, Interop)
     add_hs.signature = tv.random;
     tls_round_trip(tc.add_proposal, add_hs, true);
 
-    auto update_prop = Proposal{ Update{ dh_key } };
+    auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
     update_hs.signature = tv.random;
@@ -105,10 +110,10 @@ TEST_F(MessagesTest, Interop)
 
     // Commit
     auto commit = Commit{
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
-      { tv.random, tv.random },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
+      { { tv.random }, { tv.random } },
       direct_path,
     };
     tls_round_trip(tc.commit, commit, true);
