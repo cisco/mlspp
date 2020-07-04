@@ -100,7 +100,7 @@ struct HPKEPublicKey
   bytes data;
 
   HPKEPublicKey() = default;
-  HPKEPublicKey(const bytes& data);
+  HPKEPublicKey(bytes data);
 
   HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& pt) const;
   bytes to_bytes() const;
@@ -126,7 +126,7 @@ private:
   bytes _data;
   bytes _pub_data;
 
-  HPKEPrivateKey(CipherSuite suite, const bytes& data);
+  HPKEPrivateKey(CipherSuite suite, bytes data);
 };
 
 // Signature Keys
@@ -134,7 +134,7 @@ class SignaturePublicKey
 {
 public:
   SignaturePublicKey();
-  SignaturePublicKey(SignatureScheme scheme, const bytes& data);
+  SignaturePublicKey(SignatureScheme scheme, bytes data);
 
   void set_signature_scheme(SignatureScheme scheme);
   SignatureScheme signature_scheme() const;

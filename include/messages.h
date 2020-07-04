@@ -1,79 +1,15 @@
 #pragma once
 
 #include "common.h"
+#include "credential.h"
 #include "crypto.h"
-#include "ratchet_tree.h"
+#include "core_types.h"
+#include "treekem.h"
 #include "tls_syntax.h"
 #include <optional>
 #include <variant>
 
 namespace mls {
-
-///
-/// Protocol versions
-///
-
-enum class ProtocolVersion : uint8_t
-{
-  mls10 = 0xFF,
-};
-
-// struct {
-//    HPKEPublicKey public_key;
-//    HPKECiphertext node_secrets<0..2^16-1>;
-// } RatchetNode
-struct RatchetNode
-{
-  HPKEPublicKey public_key;
-  std::vector<HPKECiphertext> node_secrets;
-
-  TLS_SERIALIZABLE(public_key, node_secrets)
-  TLS_TRAITS(tls::pass, tls::vector<2>)
-};
-
-// struct {
-//    RatchetNode nodes<0..2^16-1>;
-// } DirectPath;
-struct DirectPath
-{
-  std::vector<RatchetNode> nodes;
-
-  TLS_SERIALIZABLE(nodes)
-  TLS_TRAITS(tls::vector<2>)
-};
-
-// struct {
-//     ProtocolVersion version;
-//     CipherSuite cipher_suite;
-//     HPKEPublicKey init_key;
-//     Credential credential;
-//     Extension extensions<0..2^16-1>;
-//     opaque signature<0..2^16-1>;
-// } KeyPackage;
-struct KeyPackage
-{
-  ProtocolVersion version;
-  CipherSuite cipher_suite;
-  HPKEPublicKey init_key;
-  Credential credential;
-  // TODO Extensions
-  bytes signature;
-
-  KeyPackage();
-  KeyPackage(CipherSuite suite_in,
-             const HPKEPublicKey& init_key_in, // NOLINT(modernize-pass-by-value)
-             const SignaturePrivateKey& sig_priv_in, // NOLINT(modernize-pass-by-value)
-             const Credential& credential_in);
-
-  bytes hash() const;
-  bool verify() const;
-
-  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>)
-
-  private:
-  bytes to_be_signed() const;
-};
 
 // struct {
 //   // GroupContext inputs
@@ -92,7 +28,7 @@ struct KeyPackage
 struct GroupInfo {
   bytes group_id;
   epoch_t epoch;
-  RatchetTree tree;
+  TreeKEMPublicKey tree;
 
   bytes confirmed_transcript_hash;
   bytes interim_transcript_hash;
@@ -104,7 +40,7 @@ struct GroupInfo {
   GroupInfo(CipherSuite suite);
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
-            RatchetTree tree_in,
+            TreeKEMPublicKey tree_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
             bytes confirmation_in);
@@ -177,7 +113,7 @@ struct Welcome {
 
   Welcome();
   Welcome(CipherSuite suite,
-          const bytes& epoch_secret,
+          bytes epoch_secret,
           const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
@@ -211,10 +147,10 @@ struct Add {
 };
 
 struct Update {
-  HPKEPublicKey leaf_key;
+  KeyPackage key_package;
 
   static const ProposalType type;
-  TLS_SERIALIZABLE(leaf_key)
+  TLS_SERIALIZABLE(key_package)
 };
 
 struct Remove {

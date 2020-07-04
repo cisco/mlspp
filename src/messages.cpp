@@ -1,51 +1,9 @@
 #include "messages.h"
 #include "key_schedule.h"
 #include "state.h"
+#include "treekem.h"
 
 namespace mls {
-
-// KeyPackage
-
-KeyPackage::KeyPackage()
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::unknown)
-{}
-
-KeyPackage::KeyPackage(CipherSuite suite_in,
-                       const HPKEPublicKey& init_key_in,
-                       const SignaturePrivateKey& sig_priv_in,
-                       const Credential& credential_in)
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(suite_in)
-  , init_key(init_key_in)
-  , credential(credential_in)
-{
-  auto tbs = to_be_signed();
-  signature = sig_priv_in.sign(tbs);
-}
-
-bytes
-KeyPackage::hash() const
-{
-  auto marshaled = tls::marshal(*this);
-  return Digest(cipher_suite).write(marshaled).digest();
-}
-
-bool
-KeyPackage::verify() const
-{
-  auto tbs = to_be_signed();
-  auto identity_key = credential.public_key();
-  return identity_key.verify(tbs, signature);
-}
-
-bytes
-KeyPackage::to_be_signed() const
-{
-  tls::ostream out;
-  out << version << cipher_suite << init_key << credential;
-  return out.bytes();
-}
 
 // GroupInfo
 
@@ -56,7 +14,7 @@ GroupInfo::GroupInfo(CipherSuite suite)
 
 GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
-                     RatchetTree tree_in,
+                     TreeKEMPublicKey tree_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
                      bytes confirmation_in)
@@ -84,7 +42,12 @@ GroupInfo::to_be_signed() const
 void
 GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 {
-  auto cred = tree.get_credential(LeafIndex{ index });
+  auto maybe_kp = tree.key_package(index);
+  if (!maybe_kp.has_value()) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = maybe_kp.value().credential;
   if (cred.public_key() != priv.public_key()) {
     throw InvalidParameterError("Bad key for index");
   }
@@ -96,7 +59,12 @@ GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 bool
 GroupInfo::verify() const
 {
-  auto cred = tree.get_credential(LeafIndex{ signer_index });
+  auto maybe_kp = tree.key_package(signer_index);
+  if (!maybe_kp.has_value()) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = maybe_kp.value().credential;
   return cred.public_key().verify(to_be_signed(), signature);
 }
 
@@ -108,7 +76,7 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 const bytes& epoch_secret,
+                 bytes epoch_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
@@ -175,6 +143,8 @@ Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
 const ProposalType Remove::type = ProposalType::remove;
+
+// MLSPlaintext
 
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;

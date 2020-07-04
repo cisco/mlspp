@@ -4,18 +4,20 @@
 
 namespace mls {
 
-Session::InitInfo::InitInfo(const HPKEPrivateKey& init_priv_in,
-                            const SignaturePrivateKey& sig_priv_in,
-                            const KeyPackage& key_package_in)
-  : init_priv(init_priv_in)
-  , sig_priv(sig_priv_in)
-  , key_package(key_package_in)
+Session::InitInfo::InitInfo(bytes init_secret_in,
+                            SignaturePrivateKey sig_priv_in,
+                            KeyPackage key_package_in)
+  : init_secret(std::move(init_secret_in))
+  , sig_priv(std::move(sig_priv_in))
+  , key_package(std::move(key_package_in))
 {
-  if (init_priv_in.public_key() != key_package_in.init_key) {
+  auto init_priv =
+    HPKEPrivateKey::derive(key_package.cipher_suite, init_secret);
+  if (init_priv.public_key() != key_package.init_key) {
     throw InvalidParameterError("Init key mismatch");
   }
 
-  if (sig_priv_in.public_key() != key_package_in.credential.public_key()) {
+  if (sig_priv.public_key() != key_package.credential.public_key()) {
     throw InvalidParameterError("Signature key mismatch");
   }
 }
@@ -55,11 +57,11 @@ Session::start(const bytes& group_id,
   }
 
   auto& suite = my_selected_info->key_package.cipher_suite;
-  auto& init_priv = my_selected_info->init_priv;
+  auto& init_secret = my_selected_info->init_secret;
   auto& sig_priv = my_selected_info->sig_priv;
-  auto& cred = my_selected_info->key_package.credential;
+  auto& kp = my_selected_info->key_package;
 
-  auto init_state = State{ group_id, suite, init_priv, sig_priv, cred };
+  auto init_state = State{ group_id, suite, init_secret, sig_priv, kp };
   auto add = init_state.add(*other_selected_kp);
   init_state.handle(add);
   auto [unused_commit, welcome, state] = init_state.commit(initial_secret);
@@ -81,7 +83,7 @@ Session::join(const std::vector<InitInfo>& my_info, const Welcome& welcome)
     }
 
     session.add_state(
-      0, { info.init_priv, info.sig_priv, info.key_package, welcome });
+      0, { info.init_secret, info.sig_priv, info.key_package, welcome });
     return session;
   }
 

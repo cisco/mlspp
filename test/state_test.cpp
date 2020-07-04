@@ -15,24 +15,23 @@ protected:
   const bytes user_id = { 4, 5, 6, 7 };
   const bytes test_message = from_hex("01020304");
 
+  std::vector<bytes> init_secrets;
   std::vector<SignaturePrivateKey> identity_privs;
-  std::vector<Credential> credentials;
-  std::vector<HPKEPrivateKey> init_privs;
   std::vector<KeyPackage> key_packages;
   std::vector<State> states;
 
   StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
+      auto init_secret = random_bytes(32);
       auto identity_priv = SignaturePrivateKey::generate(scheme);
       auto credential = Credential::basic(user_id, identity_priv.public_key());
-      auto init_priv = HPKEPrivateKey::generate(suite);
+      auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
       auto key_package =
-        KeyPackage{ suite, init_priv.public_key(), identity_priv, credential };
+        KeyPackage{ suite, init_priv.public_key(), credential, identity_priv };
 
+      init_secrets.push_back(init_secret);
       identity_privs.push_back(identity_priv);
-      credentials.push_back(credential);
-      init_privs.push_back(init_priv);
       key_packages.push_back(key_package);
     }
   }
@@ -46,8 +45,9 @@ protected:
 TEST_F(StateTest, TwoPerson)
 {
   // Initialize the creator's state
-  auto first0 =
-    State{ group_id, suite, init_privs[0], identity_privs[0], credentials[0] };
+  auto first0 = State{
+    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]
+  };
 
   // Create an Add proposal for the new participant
   auto add = first0.add(key_packages[1]);
@@ -59,7 +59,7 @@ TEST_F(StateTest, TwoPerson)
 
   // Initialize the second participant from the Welcome
   auto second0 =
-    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+    State{ init_secrets[1], identity_privs[1], key_packages[1], welcome };
   ASSERT_EQ(first1, second0);
 
   /// Verify that they can exchange protected messages
@@ -72,7 +72,7 @@ TEST_F(StateTest, Multi)
 {
   // Initialize the creator's state
   states.emplace_back(
-    group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
+    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
 
   // Create and process an Add proposal for each new participant
   for (size_t i = 1; i < group_size; i += 1) {
@@ -88,7 +88,7 @@ TEST_F(StateTest, Multi)
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_secrets[i], identity_privs[i], key_packages[i], welcome);
   }
 
   // Verify that everyone can send and be received
@@ -105,7 +105,7 @@ TEST_F(StateTest, FullSize)
 {
   // Initialize the creator's state
   states.emplace_back(
-    group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
+    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -125,7 +125,7 @@ TEST_F(StateTest, FullSize)
     }
 
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_secrets[i], identity_privs[i], key_packages[i], welcome);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -152,7 +152,7 @@ protected:
     : StateTest()
   {
     states.emplace_back(
-      group_id, suite, init_privs[0], identity_privs[0], credentials[0]);
+      group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto add = states[0].add(key_packages[i]);
@@ -164,8 +164,7 @@ protected:
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(
-        init_privs[i], identity_privs[i], key_packages[i], welcome);
-      states[i].dump_tree();
+        init_secrets[i], identity_privs[i], key_packages[i], welcome);
     }
   }
 

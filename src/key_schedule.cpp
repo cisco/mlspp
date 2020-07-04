@@ -1,7 +1,5 @@
 #include "key_schedule.h"
 
-#include <iostream>
-
 namespace mls {
 
 static void

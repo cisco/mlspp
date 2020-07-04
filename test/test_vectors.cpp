@@ -13,7 +13,7 @@ const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
 const std::string CryptoTestVectors::file_name = "./crypto.bin";
 const std::string HashRatchetTestVectors::file_name = "./hash_ratchet.bin";
 const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
-const std::string TreeTestVectors::file_name = "./tree.bin";
+const std::string TreeKEMTestVectors::file_name = "./treekem.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
 
@@ -97,6 +97,6 @@ template struct TestLoader<TreeMathTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
 template struct TestLoader<HashRatchetTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
-template struct TestLoader<TreeTestVectors>;
+template struct TestLoader<TreeKEMTestVectors>;
 template struct TestLoader<MessagesTestVectors>;
 template struct TestLoader<BasicSessionTestVectors>;

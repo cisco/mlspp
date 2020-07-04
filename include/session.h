@@ -11,13 +11,13 @@ class Session
 {
 public:
   struct InitInfo {
-    HPKEPrivateKey init_priv;
+    bytes init_secret;
     SignaturePrivateKey sig_priv;
     KeyPackage key_package;
 
-    InitInfo(const HPKEPrivateKey& init_priv_in,
-    const SignaturePrivateKey& sig_priv_in,
-    const KeyPackage& key_package);
+    InitInfo(bytes init_secret_in,
+             SignaturePrivateKey sig_priv_in,
+             KeyPackage key_package);
   };
 
   Session(const Session& other) = default;

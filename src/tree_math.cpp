@@ -165,6 +165,14 @@ copath(NodeIndex x, NodeCount w)
   return c;
 }
 
+bool
+in_path(NodeIndex x, NodeIndex y)
+{
+  auto lx = level(x);
+  auto ly = level(y);
+  return lx <= ly && (x.val >> (ly + 1) == y.val >> (ly + 1));
+}
+
 // Common ancestor of two leaves
 NodeIndex
 ancestor(LeafIndex l, LeafIndex r)

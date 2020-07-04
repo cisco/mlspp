@@ -67,6 +67,7 @@ struct LeafIndex : public UInt32
 {
   using UInt32::UInt32;
   bool operator<(const LeafIndex other) const { return val < other.val; }
+  bool operator<(const LeafCount other) const { return val < other.val; }
 };
 
 struct NodeIndex : public UInt32
@@ -75,6 +76,8 @@ struct NodeIndex : public UInt32
   explicit NodeIndex(const LeafIndex x)
     : UInt32(2 * x.val)
   {}
+
+  bool operator<(const NodeIndex other) const { return val < other.val; }
 };
 
 // Internal namespace to keep these generic names clean
@@ -104,6 +107,9 @@ dirpath(NodeIndex x, NodeCount w);
 
 std::vector<NodeIndex>
 copath(NodeIndex x, NodeCount w);
+
+bool
+in_path(NodeIndex x, NodeIndex y);
 
 NodeIndex
 ancestor(LeafIndex l, LeafIndex r);
