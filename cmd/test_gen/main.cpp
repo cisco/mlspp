@@ -319,13 +319,16 @@ generate_messages()
     direct_path.leaf_key_package.signature = tv.random;
 
     // Construct CIK
+    auto ext_list =
+      ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
     auto key_package =
       KeyPackage{ suite, dh_priv.public_key(), cred, sig_priv };
+    key_package.extensions = ext_list;
     key_package.signature = tv.random;
 
     // Construct Welcome
-    auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
+    auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
+                                 tv.random,   ext_list, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
 

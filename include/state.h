@@ -12,10 +12,11 @@
 namespace mls {
 
 // struct {
-//   opaque group_id<0..255>;
-//   uint32 epoch;
-//   opaque tree_hash<0..255>;
-//   opaque transcript_hash<0..255>;
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     opaque tree_hash<0..255>;
+//     opaque confirmed_transcript_hash<0..255>;
+//     Extension extensions<0..2^16-1>;
 // } GroupContext;
 struct GroupContext
 {
@@ -23,9 +24,10 @@ struct GroupContext
   epoch_t epoch;
   bytes tree_hash;
   bytes confirmed_transcript_hash;
+  ExtensionList extensions;
 
-  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>)
+  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash, extensions)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>, tls::pass)
 };
 
 class State
@@ -92,6 +94,7 @@ protected:
   TreeKEMPrivateKey _tree_priv;
   bytes _confirmed_transcript_hash;
   bytes _interim_transcript_hash;
+  ExtensionList _extensions;
 
   // Shared secret state
   KeyScheduleEpoch _keys;

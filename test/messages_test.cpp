@@ -92,15 +92,17 @@ TEST_F(MessagesTest, Interop)
     direct_path.leaf_key_package.signature = tv.random;
 
     // KeyPackage
-    KeyPackage key_package{
-      tc.cipher_suite, dh_priv.public_key(), cred, sig_priv
-    };
+    auto ext_list =
+      ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
+    auto key_package =
+      KeyPackage{ tc.cipher_suite, dh_priv.public_key(), cred, sig_priv };
+    key_package.extensions = ext_list;
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
-    auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
+    auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
+                                 tv.random,   ext_list, tv.random };
     group_info.signer_index = tv.signer_index;
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);

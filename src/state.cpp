@@ -191,6 +191,7 @@ State::commit(const bytes& leaf_secret) const
     next._tree,
     next._confirmed_transcript_hash,
     next._interim_transcript_hash,
+    next._extensions,
     std::get<CommitData>(pt.content).confirmation,
   };
   group_info.sign(_index, _identity_priv);

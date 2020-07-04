@@ -134,7 +134,7 @@ struct KeyPackage
   CipherSuite cipher_suite;
   HPKEPublicKey init_key;
   Credential credential;
-  // TODO Extensions
+  ExtensionList extensions;
   bytes signature;
 
   KeyPackage();
@@ -150,8 +150,8 @@ struct KeyPackage
   bool verify() const;
 
   static const NodeType type;
-  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, signature)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>)
+  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, extensions, signature)
+  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>)
 
   private:
   bytes to_be_signed() const;

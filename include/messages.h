@@ -12,18 +12,15 @@
 namespace mls {
 
 // struct {
-//   // GroupContext inputs
 //   opaque group_id<0..255>;
-//   uint32 epoch;
-//   optional<RatchetNode> tree<1..2^32-1>;
+//   uint64 epoch;
+//   optional<Node> tree<1..2^32-1>;
 //   opaque confirmed_transcript_hash<0..255>;
-//
-//   // Inputs to the next round of the key schedule
 //   opaque interim_transcript_hash<0..255>;
-//   opaque epoch_secret<0..255>;
-//
+//   Extension extensions<0..2^16-1>;
+//   opaque confirmation<0..255>
 //   uint32 signer_index;
-//   opaque signature<0..255>;
+//   opaque signature<0..2^16-1>;
 // } GroupInfo;
 struct GroupInfo {
   bytes group_id;
@@ -32,8 +29,9 @@ struct GroupInfo {
 
   bytes confirmed_transcript_hash;
   bytes interim_transcript_hash;
-  bytes confirmation;
+  ExtensionList extensions;
 
+  bytes confirmation;
   LeafIndex signer_index;
   bytes signature;
 
@@ -43,6 +41,7 @@ struct GroupInfo {
             TreeKEMPublicKey tree_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
+            ExtensionList extensions_in,
             bytes confirmation_in);
 
   bytes to_be_signed() const;
@@ -54,6 +53,7 @@ struct GroupInfo {
                    tree,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
+                   extensions,
                    confirmation,
                    signer_index,
                    signature)
@@ -62,6 +62,7 @@ struct GroupInfo {
              tls::pass,
              tls::vector<1>,
              tls::vector<1>,
+             tls::pass,
              tls::vector<1>,
              tls::pass,
              tls::vector<2>)
