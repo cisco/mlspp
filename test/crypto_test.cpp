@@ -277,12 +277,7 @@ TEST_F(CryptoTest, AES256GCM)
 
 TEST_F(CryptoTest, BasicDH)
 {
-  std::vector<CipherSuite> suites{ CipherSuite::P256_AES128GCM_SHA256_P256,
-                                   CipherSuite::P521_AES256GCM_SHA512_P521,
-                                   CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-                                   CipherSuite::X448_AES256GCM_SHA512_Ed448 };
-
-  for (auto suite : suites) {
+  for (auto suite : all_supported_suites) {
     auto s = bytes{ 0, 1, 2, 3 };
 
     CryptoMetrics::reset();
@@ -318,12 +313,7 @@ TEST_F(CryptoTest, BasicDH)
 
 TEST_F(CryptoTest, DHSerialize)
 {
-  std::vector<CipherSuite> suites{ CipherSuite::P256_AES128GCM_SHA256_P256,
-                                   CipherSuite::P521_AES256GCM_SHA512_P521,
-                                   CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-                                   CipherSuite::X448_AES256GCM_SHA512_Ed448 };
-
-  for (auto suite : suites) {
+  for (auto suite : all_supported_suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
@@ -389,15 +379,10 @@ TEST_F(CryptoTest, X448)
 
 TEST_F(CryptoTest, HPKE)
 {
-  std::vector<CipherSuite> suites{ CipherSuite::P256_AES128GCM_SHA256_P256,
-                                   CipherSuite::P521_AES256GCM_SHA512_P521,
-                                   CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-                                   CipherSuite::X448_AES256GCM_SHA512_Ed448 };
-
   auto aad = random_bytes(100);
   auto original = random_bytes(100);
 
-  for (auto suite : suites) {
+  for (auto suite : all_supported_suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
@@ -410,14 +395,9 @@ TEST_F(CryptoTest, HPKE)
 
 TEST_F(CryptoTest, BasicSignature)
 {
-  std::vector<SignatureScheme> schemes{ SignatureScheme::P256_SHA256,
-                                        SignatureScheme::P521_SHA512,
-                                        SignatureScheme::Ed25519,
-                                        SignatureScheme::Ed448 };
-
-  for (auto scheme : schemes) {
-    auto a = SignaturePrivateKey::generate(scheme);
-    auto b = SignaturePrivateKey::generate(scheme);
+  for (auto suite : all_supported_suites) {
+    auto a = SignaturePrivateKey::generate(suite);
+    auto b = SignaturePrivateKey::generate(suite);
 
     ASSERT_EQ(a, a);
     ASSERT_EQ(b, b);
@@ -436,18 +416,12 @@ TEST_F(CryptoTest, BasicSignature)
 
 TEST_F(CryptoTest, SignatureSerialize)
 {
-  std::vector<SignatureScheme> schemes{
-    SignatureScheme::P256_SHA256,
-    SignatureScheme::P521_SHA512,
-    SignatureScheme::Ed25519,
-    SignatureScheme::Ed448,
-  };
-
-  for (auto scheme : schemes) {
-    auto x = SignaturePrivateKey::generate(scheme);
+  for (auto suite : all_supported_suites) {
+    auto scheme = suite_signature_scheme(suite);
+    auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key();
 
-    SignaturePublicKey parsed(scheme, gX.to_bytes());
+    SignaturePublicKey parsed(suite, gX.to_bytes());
     ASSERT_EQ(parsed, gX);
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
@@ -458,9 +432,9 @@ TEST_F(CryptoTest, SignatureSerialize)
 
 TEST_F(CryptoTest, Ed25519)
 {
-  auto scheme = SignatureScheme::Ed25519;
-  auto sk = SignaturePrivateKey::parse(scheme, ed25519_sk);
-  auto pk = SignaturePublicKey(scheme, ed25519_pk);
+  auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
+  auto sk = SignaturePrivateKey::parse(suite, ed25519_sk);
+  auto pk = SignaturePublicKey(suite, ed25519_pk);
   ASSERT_EQ(pk, sk.public_key());
 
   auto sig = sk.sign(ed25519_msg);
@@ -470,9 +444,9 @@ TEST_F(CryptoTest, Ed25519)
 
 TEST_F(CryptoTest, Ed448)
 {
-  auto scheme = SignatureScheme::Ed448;
-  auto sk = SignaturePrivateKey::parse(scheme, ed448_sk);
-  auto pk = SignaturePublicKey(scheme, ed448_pk);
+  auto suite = CipherSuite::X448_AES256GCM_SHA512_Ed448;
+  auto sk = SignaturePrivateKey::parse(suite, ed448_sk);
+  auto pk = SignaturePublicKey(suite, ed448_pk);
   ASSERT_EQ(pk, sk.public_key());
 
   auto sig = sk.sign(ed448_msg);

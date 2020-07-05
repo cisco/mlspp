@@ -77,6 +77,7 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808,
 };
 
+extern const std::array<CipherSuite, 4> all_supported_suites;
 SignatureScheme suite_signature_scheme(CipherSuite suite);
 size_t suite_nonce_size(CipherSuite suite);
 size_t suite_key_size(CipherSuite suite);

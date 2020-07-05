@@ -10,7 +10,6 @@ class TreeKEMTest : public ::testing::Test
 {
 protected:
   const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
-  const SignatureScheme scheme = SignatureScheme::Ed25519;
 
   const TreeKEMTestVectors tv;
 
@@ -23,7 +22,7 @@ protected:
   {
     auto init_secret = random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-    auto sig_priv = SignaturePrivateKey::generate(scheme);
+    auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
     auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
     return std::make_tuple(init_secret, init_priv, sig_priv, kp);
@@ -284,8 +283,8 @@ TEST_F(TreeKEMTest, Interop)
       auto context = bytes{ uint8_t(i), uint8_t(j) };
       auto init_priv =
         HPKEPrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
-      auto sig_priv = SignaturePrivateKey::derive(tc.signature_scheme,
-                                                  tv.init_secrets[j].data);
+      auto sig_priv =
+        SignaturePrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
       auto kp =
         KeyPackage{ tc.cipher_suite, init_priv.public_key(), cred, sig_priv };

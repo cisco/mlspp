@@ -10,14 +10,13 @@
 using namespace mls;
 
 const auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
-const auto scheme = SignatureScheme::Ed25519;
 
 class User
 {
 public:
   User(const std::string& name)
   {
-    _identity_priv = SignaturePrivateKey::generate(scheme);
+    _identity_priv = SignaturePrivateKey::generate(suite);
     auto id = bytes(name.begin(), name.end());
     _cred = Credential::basic(id, _identity_priv.public_key());
   }

@@ -5,10 +5,10 @@ using namespace mls;
 
 TEST(CredentialTest, Basic)
 {
-  auto scheme = SignatureScheme::P256_SHA256;
+  auto suite = CipherSuite::P256_AES128GCM_SHA256_P256;
 
   auto user_id = bytes{ 0x00, 0x01, 0x02, 0x03 };
-  auto priv = SignaturePrivateKey::generate(scheme);
+  auto priv = SignaturePrivateKey::generate(suite);
   auto pub = priv.public_key();
 
   auto cred = Credential::basic(user_id, pub);

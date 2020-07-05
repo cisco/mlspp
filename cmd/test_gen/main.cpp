@@ -215,11 +215,6 @@ generate_treekem()
     CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
   };
 
-  std::vector<SignatureScheme> schemes{
-    SignatureScheme::P256_SHA256,
-    SignatureScheme::Ed25519,
-  };
-
   size_t n_leaves = 10;
   tv.init_secrets.resize(n_leaves);
   tv.leaf_secrets.resize(n_leaves);
@@ -230,11 +225,9 @@ generate_treekem()
 
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
-    auto scheme = schemes[i];
 
     TreeKEMTestVectors::TestCase tc;
     tc.cipher_suite = suite;
-    tc.signature_scheme = scheme;
 
     TreeKEMPublicKey tree{ suite };
 
@@ -243,7 +236,7 @@ generate_treekem()
       auto context = bytes{ uint8_t(i), uint8_t(j) };
       auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
       auto sig_priv =
-        SignaturePrivateKey::derive(scheme, tv.init_secrets[j].data);
+        SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
       auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
 
@@ -276,11 +269,6 @@ generate_messages()
     CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
   };
 
-  std::vector<SignatureScheme> schemes{
-    SignatureScheme::P256_SHA256,
-    SignatureScheme::Ed25519,
-  };
-
   // Set the inputs
   tv.epoch = 0xA0A1A2A3;
   tv.signer_index = LeafIndex{ 0xB0B1B2B3 };
@@ -296,18 +284,16 @@ generate_messages()
   DeterministicHPKE lock;
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
-    auto scheme = schemes[i];
 
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
-    auto sig_priv = SignaturePrivateKey::derive(scheme, tv.sig_seed);
+    auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
     auto tree = TestTreeKEMPublicKey{
       suite,
-      scheme,
       { tv.random, tv.random, tv.random, tv.random },
     };
     tree.blank_path(LeafIndex{ 2 });
@@ -371,7 +357,6 @@ generate_messages()
     };
 
     tv.cases.push_back({ suite,
-                         scheme,
                          tls::marshal(key_package),
                          tls::marshal(group_info),
                          tls::marshal(group_secrets),
@@ -406,13 +391,6 @@ generate_basic_session()
     CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
   };
 
-  std::vector<SignatureScheme> schemes{
-    SignatureScheme::P256_SHA256,
-    SignatureScheme::P256_SHA256,
-    SignatureScheme::Ed25519,
-    SignatureScheme::Ed25519,
-  };
-
   std::vector<bool> encrypts{ false, true, false, true };
 
   tv.group_size = 5;
@@ -421,7 +399,6 @@ generate_basic_session()
   DeterministicHPKE lock;
   for (size_t i = 0; i < suites.size(); ++i) {
     auto suite = suites[i];
-    auto scheme = schemes[i];
     auto encrypt = encrypts[i];
     const bytes key_package_id = { 0, 1, 2, 3 };
     const bytes group_init_secret = { 4, 5, 6, 7 };
@@ -435,7 +412,7 @@ generate_basic_session()
     auto ciphersuites = std::vector<CipherSuite>{ suite };
     for (size_t j = 0; j < tv.group_size; ++j) {
       auto init_secret = bytes{ uint8_t(j), 0 };
-      auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
+      auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
       auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto init = HPKEPrivateKey::derive(suite, init_secret);
       auto kp = KeyPackage{ suite, init.public_key(), cred, identity_priv };
@@ -501,7 +478,7 @@ generate_basic_session()
     }
 
     // Construct the test case
-    tv.cases.push_back({ suite, scheme, encrypt, key_packages, transcript });
+    tv.cases.push_back({ suite, encrypt, key_packages, transcript });
   }
 
   return tv;
@@ -552,7 +529,7 @@ verify_session_repro(const F& generator)
 
   for (size_t i = 0; i < v0.cases.size(); ++i) {
     // Randomized signatures break reproducibility
-    if (!deterministic_signature_scheme(v0.cases[i].signature_scheme)) {
+    if (!deterministic_signature_scheme(v0.cases[i].cipher_suite)) {
       continue;
     }
 

@@ -80,6 +80,13 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(abbrev) << "...";
 }
 
+const std::array<CipherSuite, 4> all_supported_suites = {
+  CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+  CipherSuite::P256_AES128GCM_SHA256_P256,
+  CipherSuite::X448_AES256GCM_SHA512_Ed448,
+  CipherSuite::P521_AES256GCM_SHA512_P521,
+};
+
 SignatureScheme
 suite_signature_scheme(CipherSuite suite)
 {
