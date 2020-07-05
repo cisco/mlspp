@@ -7,7 +7,7 @@ using namespace mls;
 class StateTest : public ::testing::Test
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
+  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
   const SignatureScheme scheme = SignatureScheme::P256_SHA256;
 
   const size_t group_size = 5;

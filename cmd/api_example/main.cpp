@@ -9,7 +9,7 @@
 
 using namespace mls;
 
-const auto suite = CipherSuite::X25519_SHA256_AES128GCM;
+const auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
 const auto scheme = SignatureScheme::Ed25519;
 
 class User

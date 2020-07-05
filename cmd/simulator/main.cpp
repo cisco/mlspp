@@ -225,7 +225,7 @@ public:
 int
 main(int argc, char** argv)
 {
-  const auto suite = mls::CipherSuite::X25519_SHA256_AES128GCM;
+  const auto suite = mls::CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
   const auto scheme = mls::SignatureScheme::Ed25519;
 
   if (argc < 2) {

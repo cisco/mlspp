@@ -215,20 +215,20 @@ static std::tuple<HPKEKEMID, HPKEKDFID, HPKEAEADID>
 hpke_suite(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P256, HPKEKDFID::HKDF_SHA256, HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
       return std::make_tuple(HPKEKEMID::DHKEM_X25519,
                              HPKEKDFID::HKDF_SHA256,
                              HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return std::make_tuple(
         HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 

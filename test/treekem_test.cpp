@@ -9,7 +9,7 @@ using namespace mls;
 class TreeKEMTest : public ::testing::Test
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
+  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
   const SignatureScheme scheme = SignatureScheme::Ed25519;
 
   const TreeKEMTestVectors tv;
