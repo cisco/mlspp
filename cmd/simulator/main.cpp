@@ -122,13 +122,11 @@ class Simulation
 {
 private:
   mls::CipherSuite suite;
-  mls::SignatureScheme scheme;
   std::vector<std::optional<mls::Session>> sessions;
 
 public:
-  Simulation(mls::CipherSuite suite_in, mls::SignatureScheme scheme_in)
+  Simulation(mls::CipherSuite suite_in)
     : suite(suite_in)
-    , scheme(scheme_in)
   {}
 
   mls::bytes random() const { return mls::random_bytes(32); }
@@ -137,7 +135,7 @@ public:
   {
     auto secret = mls::random_bytes(32);
     auto init = mls::HPKEPrivateKey::derive(suite, secret);
-    auto priv = mls::SignaturePrivateKey::generate(scheme);
+    auto priv = mls::SignaturePrivateKey::generate(suite);
     auto id = random();
     auto cred = mls::Credential::basic(id, priv.public_key());
     auto kp = mls::KeyPackage{ suite, init.public_key(), cred, priv };
@@ -225,8 +223,7 @@ public:
 int
 main(int argc, char** argv)
 {
-  const auto suite = mls::CipherSuite::X25519_SHA256_AES128GCM;
-  const auto scheme = mls::SignatureScheme::Ed25519;
+  const auto suite = mls::CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
 
   if (argc < 2) {
     std::cout << "Usage: simulator <script.json>" << std::endl;
@@ -237,7 +234,7 @@ main(int argc, char** argv)
   auto script = json::parse(script_json).get<Script>();
 
   // Initialize a set of sessions
-  Simulation sim(suite, scheme);
+  Simulation sim(suite);
   sim.init(script.initial_size);
 
   // Follow the steps in the script

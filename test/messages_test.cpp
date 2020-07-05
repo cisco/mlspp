@@ -68,20 +68,18 @@ TEST_F(MessagesTest, Extensions)
 TEST_F(MessagesTest, Interop)
 {
   for (const auto& tc : tv.cases) {
-    auto reproducible = deterministic_signature_scheme(tc.signature_scheme);
+    auto reproducible = deterministic_signature_scheme(tc.cipher_suite);
 
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
-    auto sig_priv =
-      SignaturePrivateKey::derive(tc.signature_scheme, tv.sig_seed);
+    auto sig_priv = SignaturePrivateKey::derive(tc.cipher_suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
 
     DeterministicHPKE lock;
     auto tree =
       TestTreeKEMPublicKey{ tc.cipher_suite,
-                            tc.signature_scheme,
                             { tv.random, tv.random, tv.random, tv.random } };
     tree.blank_path(LeafIndex{ 2 });
 

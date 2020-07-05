@@ -134,8 +134,9 @@ class SignaturePublicKey
 {
 public:
   SignaturePublicKey();
-  SignaturePublicKey(SignatureScheme scheme, bytes data);
+  SignaturePublicKey(CipherSuite suite, bytes data);
 
+  void set_cipher_suite(CipherSuite suite);
   void set_signature_scheme(SignatureScheme scheme);
   SignatureScheme signature_scheme() const;
   bool verify(const bytes& message, const bytes& signature) const;
@@ -154,9 +155,9 @@ class SignaturePrivateKey
 public:
   SignaturePrivateKey();
 
-  static SignaturePrivateKey generate(SignatureScheme scheme);
-  static SignaturePrivateKey parse(SignatureScheme scheme, const bytes& data);
-  static SignaturePrivateKey derive(SignatureScheme scheme,
+  static SignaturePrivateKey generate(CipherSuite suite);
+  static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
+  static SignaturePrivateKey derive(CipherSuite suite,
                                     const bytes& secret);
 
   bytes sign(const bytes& message) const;
@@ -166,11 +167,12 @@ public:
   TLS_TRAITS(tls::pass, tls::vector<2>, tls::vector<2>)
 
 private:
+  CipherSuite _suite;
   SignatureScheme _scheme;
   bytes _data;
   bytes _pub_data;
 
-  SignaturePrivateKey(SignatureScheme scheme, const bytes& data);
+  SignaturePrivateKey(CipherSuite suite, const bytes& data);
 };
 
 } // namespace mls

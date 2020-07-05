@@ -7,8 +7,7 @@ using namespace mls;
 class SessionTest : public ::testing::Test
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
-  const SignatureScheme scheme = SignatureScheme::Ed25519;
+  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
   const int group_size = 5;
   const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
@@ -20,7 +19,7 @@ protected:
 
   SignaturePrivateKey new_identity_key()
   {
-    return SignaturePrivateKey::generate(scheme);
+    return SignaturePrivateKey::generate(suite);
   }
 
   bytes fresh_secret() const { return random_bytes(secret_size); }
@@ -147,8 +146,10 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
   auto credA = Credential::basic(user_id, idA.public_key());
-  std::vector<CipherSuite> ciphersA{ CipherSuite::P256_SHA256_AES128GCM,
-                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<CipherSuite> ciphersA{
+    CipherSuite::P256_AES128GCM_SHA256_P256,
+    CipherSuite::X25519_AES128GCM_SHA256_Ed25519
+  };
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
   for (auto suiteA : ciphersA) {
@@ -163,8 +164,10 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
   auto credB = Credential::basic(user_id, idB.public_key());
-  std::vector<CipherSuite> ciphersB{ CipherSuite::P256_SHA256_AES128GCM,
-                                     CipherSuite::X25519_SHA256_AES128GCM };
+  std::vector<CipherSuite> ciphersB{
+    CipherSuite::P256_AES128GCM_SHA256_P256,
+    CipherSuite::X25519_AES128GCM_SHA256_Ed25519
+  };
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;
   for (auto suiteB : ciphersB) {
@@ -182,7 +185,7 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
   TestSession alice = std::get<0>(session_welcome_add);
   TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
   ASSERT_EQ(alice, bob);
-  ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_SHA256_AES128GCM);
+  ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_AES128GCM_SHA256_P256);
 }
 
 class RunningSessionTest : public SessionTest
@@ -361,12 +364,11 @@ protected:
   void follow_all(const SessionTestVectors::TestCase& tc)
   {
     auto suite = tc.cipher_suite;
-    auto scheme = tc.signature_scheme;
     DeterministicHPKE lock;
     for (uint32_t i = 0; i < basic_tv.group_size; ++i) {
       bytes init_secret = { uint8_t(i), 0 };
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-      auto identity_priv = SignaturePrivateKey::derive(scheme, init_secret);
+      auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
       auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto key_package =
         KeyPackage{ suite, init_priv.public_key(), cred, identity_priv };
@@ -389,7 +391,7 @@ TEST_F(SessionInteropTest, Basic)
     // Note that encrypted tests are still OK (with deterministic signatures),
     // since the transcript doesn't cover the MLSCiphertext, in particular, the
     // sender data nonce and encrypted sender data.
-    if (!deterministic_signature_scheme(tc.signature_scheme)) {
+    if (!deterministic_signature_scheme(tc.cipher_suite)) {
       continue;
     }
 

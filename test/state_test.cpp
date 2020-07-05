@@ -7,8 +7,7 @@ using namespace mls;
 class StateTest : public ::testing::Test
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_SHA256_AES128GCM;
-  const SignatureScheme scheme = SignatureScheme::P256_SHA256;
+  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
 
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
@@ -24,7 +23,7 @@ protected:
   {
     for (size_t i = 0; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
-      auto identity_priv = SignaturePrivateKey::generate(scheme);
+      auto identity_priv = SignaturePrivateKey::generate(suite);
       auto credential = Credential::basic(user_id, identity_priv.public_key());
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
       auto key_package =

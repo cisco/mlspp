@@ -215,20 +215,20 @@ static std::tuple<HPKEKEMID, HPKEKDFID, HPKEAEADID>
 hpke_suite(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P256, HPKEKDFID::HKDF_SHA256, HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
       return std::make_tuple(HPKEKEMID::DHKEM_X25519,
                              HPKEKDFID::HKDF_SHA256,
                              HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return std::make_tuple(
         HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
@@ -416,8 +416,8 @@ SignaturePublicKey::SignaturePublicKey()
   : _scheme(SignatureScheme::unknown)
 {}
 
-SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
-  : _scheme(scheme)
+SignaturePublicKey::SignaturePublicKey(CipherSuite suite, bytes data)
+  : _scheme(suite_signature_scheme(suite))
   , _data(std::move(data))
 {}
 
@@ -425,6 +425,12 @@ void
 SignaturePublicKey::set_signature_scheme(SignatureScheme scheme)
 {
   _scheme = scheme;
+}
+
+void
+SignaturePublicKey::set_cipher_suite(CipherSuite suite)
+{
+  _scheme = suite_signature_scheme(suite);
 }
 
 SignatureScheme
@@ -450,21 +456,23 @@ SignaturePrivateKey::SignaturePrivateKey()
 {}
 
 SignaturePrivateKey
-SignaturePrivateKey::generate(SignatureScheme scheme)
+SignaturePrivateKey::generate(CipherSuite suite)
 {
-  return SignaturePrivateKey(scheme, primitive::generate(scheme));
+  auto scheme = suite_signature_scheme(suite);
+  return SignaturePrivateKey(suite, primitive::generate(scheme));
 }
 
 SignaturePrivateKey
-SignaturePrivateKey::parse(SignatureScheme scheme, const bytes& data)
+SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  return SignaturePrivateKey(scheme, data);
+  return SignaturePrivateKey(suite, data);
 }
 
 SignaturePrivateKey
-SignaturePrivateKey::derive(SignatureScheme scheme, const bytes& secret)
+SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  return SignaturePrivateKey(scheme, primitive::derive(scheme, secret));
+  auto scheme = suite_signature_scheme(suite);
+  return SignaturePrivateKey(suite, primitive::derive(scheme, secret));
 }
 
 bytes
@@ -476,14 +484,14 @@ SignaturePrivateKey::sign(const bytes& message) const
 SignaturePublicKey
 SignaturePrivateKey::public_key() const
 {
-  return SignaturePublicKey(_scheme, _pub_data);
+  return SignaturePublicKey(_suite, _pub_data);
 }
 
-SignaturePrivateKey::SignaturePrivateKey(SignatureScheme scheme,
-                                         const bytes& data)
-  : _scheme(scheme)
+SignaturePrivateKey::SignaturePrivateKey(CipherSuite suite, const bytes& data)
+  : _suite(suite)
+  , _scheme(suite_signature_scheme(suite))
   , _data(data)
-  , _pub_data(primitive::priv_to_pub(scheme, data))
+  , _pub_data(primitive::priv_to_pub(_scheme, data))
 {}
 
 } // namespace mls
