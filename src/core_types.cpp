@@ -88,11 +88,7 @@ KeyPackage::verify_expiry(uint64_t now) const
   }
 
   auto& lt = maybe_lt.value();
-  if (now < lt.not_before || now > lt.not_after) {
-    return false;
-  }
-
-  return true;
+  return lt.not_before <= now && now <= lt.not_after;
 }
 
 bool
