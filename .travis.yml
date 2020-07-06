@@ -8,6 +8,7 @@ addons:
       - cmake
       - clang-format
       - libssl-dev
+      - ninja-build
 
 script:
   - MLSPP_LINT=ON make
