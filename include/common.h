@@ -77,10 +77,16 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808,
 };
 
+struct CipherDetails {
+  const size_t secret_size;
+  const size_t key_size;
+  const size_t nonce_size;
+  const SignatureScheme scheme;
+
+  static const CipherDetails& get(CipherSuite suite);
+};
+
 extern const std::array<CipherSuite, 6> all_supported_suites;
-SignatureScheme suite_signature_scheme(CipherSuite suite);
-size_t suite_nonce_size(CipherSuite suite);
-size_t suite_key_size(CipherSuite suite);
 
 ///
 /// Error types

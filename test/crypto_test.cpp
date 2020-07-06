@@ -239,8 +239,8 @@ TEST_F(CryptoTest, AES128GCM)
     suite, aes128gcm_key, aes128gcm_nonce, aes128gcm_aad, aes128gcm_ct);
   ASSERT_EQ(decrypted, aes128gcm_pt);
 
-  auto rtt_key = random_bytes(suite_key_size(suite));
-  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
+  auto rtt_key = random_bytes(CipherDetails::get(suite).key_size);
+  auto rtt_nonce = random_bytes(CipherDetails::get(suite).nonce_size);
   auto rtt_aad = random_bytes(100);
   auto rtt_pt = random_bytes(50);
 
@@ -263,8 +263,8 @@ TEST_F(CryptoTest, AES256GCM)
     suite, aes256gcm_key, aes256gcm_nonce, aes256gcm_aad, aes256gcm_ct);
   ASSERT_EQ(decrypted, aes256gcm_pt);
 
-  auto rtt_key = random_bytes(suite_key_size(suite));
-  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
+  auto rtt_key = random_bytes(CipherDetails::get(suite).key_size);
+  auto rtt_nonce = random_bytes(CipherDetails::get(suite).nonce_size);
   auto rtt_aad = random_bytes(100);
   auto rtt_pt = random_bytes(50);
 
@@ -273,6 +273,12 @@ TEST_F(CryptoTest, AES256GCM)
   auto rtt_decrypted =
     primitive::open(suite, rtt_key, rtt_nonce, rtt_aad, rtt_encrypted);
   ASSERT_EQ(rtt_decrypted, rtt_pt);
+}
+
+TEST_F(CryptoTest, RoundTripAEAD)
+{
+  for (auto suite : all_supported_suites) {
+  }
 }
 
 TEST_F(CryptoTest, BasicDH)

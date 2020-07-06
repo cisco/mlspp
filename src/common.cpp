@@ -89,59 +89,77 @@ const std::array<CipherSuite, 6> all_supported_suites = {
   CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448,
 };
 
-SignatureScheme
-suite_signature_scheme(CipherSuite suite)
+template<CipherSuite CS>
+extern const CipherDetails cipher_details;
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::X25519_AES128GCM_SHA256_Ed25519>{
+    32,
+    16,
+    12,
+    SignatureScheme::Ed25519,
+  };
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::P256_AES128GCM_SHA256_P256>{
+    32,
+    16,
+    12,
+    SignatureScheme::P256_SHA256,
+  };
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519>{
+    32,
+    16,
+    12,
+    SignatureScheme::Ed25519,
+  };
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::X448_AES256GCM_SHA512_Ed448>{
+    64,
+    32,
+    12,
+    SignatureScheme::Ed448,
+  };
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::P521_AES256GCM_SHA512_P521>{
+    64,
+    32,
+    12,
+    SignatureScheme::P521_SHA512,
+  };
+
+template<>
+static const CipherDetails
+  cipher_details<CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448>{
+    64,
+    32,
+    12,
+    SignatureScheme::Ed448,
+  };
+
+#define CIPHER_DETAILS_CASE(suite)                                             \
+  case CipherSuite::suite:                                                     \
+    return cipher_details<CipherSuite::suite>;
+
+inline const CipherDetails&
+CipherDetails::get(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-      return SignatureScheme::Ed25519;
-
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-      return SignatureScheme::P256_SHA256;
-
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
-      return SignatureScheme::Ed448;
-
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-      return SignatureScheme::P521_SHA512;
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite");
-  }
-}
-
-size_t
-suite_nonce_size(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-      return 12;
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite");
-  }
-}
-
-size_t
-suite_key_size(CipherSuite suite)
-{
-  switch (suite) {
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-      return 16;
-
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
-      return 32;
+    CIPHER_DETAILS_CASE(X25519_AES128GCM_SHA256_Ed25519)
+    CIPHER_DETAILS_CASE(P256_AES128GCM_SHA256_P256)
+    CIPHER_DETAILS_CASE(X25519_CHACHA20POLY1305_SHA256_Ed25519)
+    CIPHER_DETAILS_CASE(X448_AES256GCM_SHA512_Ed448)
+    CIPHER_DETAILS_CASE(P521_AES256GCM_SHA512_P521)
+    CIPHER_DETAILS_CASE(X448_CHACHA20POLY1305_SHA512_Ed448)
 
     default:
       throw InvalidParameterError("Unsupported ciphersuite");

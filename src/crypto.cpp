@@ -303,9 +303,9 @@ hpke_key_schedule(CipherSuite suite,
 {
   auto [kem, kdf, aead] = hpke_suite(suite);
   auto Npk = hpke_npk(kem);
-  auto Nh = Digest(suite).output_size();
-  auto Nk = suite_key_size(suite);
-  auto Nn = suite_nonce_size(suite);
+  auto Nh = CipherDetails::get(suite).secret_size;
+  auto Nk = CipherDetails::get(suite).key_size;
+  auto Nn = CipherDetails::get(suite).nonce_size;
 
   // We only support base and no-info.  So we can hard-wire these inputs, and
   // skip VerifyMode().  We will need to generalize if we support other modes or
@@ -419,7 +419,7 @@ SignaturePublicKey::SignaturePublicKey()
 {}
 
 SignaturePublicKey::SignaturePublicKey(CipherSuite suite, bytes data)
-  : _scheme(suite_signature_scheme(suite))
+  : _scheme(CipherDetails::get(suite).scheme)
   , _data(std::move(data))
 {}
 
@@ -432,7 +432,7 @@ SignaturePublicKey::set_signature_scheme(SignatureScheme scheme)
 void
 SignaturePublicKey::set_cipher_suite(CipherSuite suite)
 {
-  _scheme = suite_signature_scheme(suite);
+  _scheme = CipherDetails::get(suite).scheme;
 }
 
 SignatureScheme
@@ -461,7 +461,7 @@ SignaturePrivateKey::SignaturePrivateKey()
 SignaturePrivateKey
 SignaturePrivateKey::generate(CipherSuite suite)
 {
-  auto scheme = suite_signature_scheme(suite);
+  auto scheme = CipherDetails::get(suite).scheme;
   return SignaturePrivateKey(suite, primitive::generate(scheme));
 }
 
@@ -474,7 +474,7 @@ SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 SignaturePrivateKey
 SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  auto scheme = suite_signature_scheme(suite);
+  auto scheme = CipherDetails::get(suite).scheme;
   return SignaturePrivateKey(suite, primitive::derive(scheme, secret));
 }
 
@@ -492,7 +492,7 @@ SignaturePrivateKey::public_key() const
 
 SignaturePrivateKey::SignaturePrivateKey(CipherSuite suite, const bytes& data)
   : _suite(suite)
-  , _scheme(suite_signature_scheme(suite))
+  , _scheme(CipherDetails::get(suite).scheme)
   , _data(data)
   , _pub_data(primitive::priv_to_pub(_scheme, data))
 {}
