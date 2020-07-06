@@ -93,7 +93,7 @@ template<CipherSuite CS>
 extern const CipherDetails cipher_details;
 
 template<>
-static const CipherDetails
+const CipherDetails
   cipher_details<CipherSuite::X25519_AES128GCM_SHA256_Ed25519>{
     32,
     16,
@@ -102,16 +102,15 @@ static const CipherDetails
   };
 
 template<>
-static const CipherDetails
-  cipher_details<CipherSuite::P256_AES128GCM_SHA256_P256>{
-    32,
-    16,
-    12,
-    SignatureScheme::P256_SHA256,
-  };
+const CipherDetails cipher_details<CipherSuite::P256_AES128GCM_SHA256_P256>{
+  32,
+  16,
+  12,
+  SignatureScheme::P256_SHA256,
+};
 
 template<>
-static const CipherDetails
+const CipherDetails
   cipher_details<CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519>{
     32,
     32,
@@ -120,25 +119,23 @@ static const CipherDetails
   };
 
 template<>
-static const CipherDetails
-  cipher_details<CipherSuite::X448_AES256GCM_SHA512_Ed448>{
-    64,
-    32,
-    12,
-    SignatureScheme::Ed448,
-  };
+const CipherDetails cipher_details<CipherSuite::X448_AES256GCM_SHA512_Ed448>{
+  64,
+  32,
+  12,
+  SignatureScheme::Ed448,
+};
 
 template<>
-static const CipherDetails
-  cipher_details<CipherSuite::P521_AES256GCM_SHA512_P521>{
-    64,
-    32,
-    12,
-    SignatureScheme::P521_SHA512,
-  };
+const CipherDetails cipher_details<CipherSuite::P521_AES256GCM_SHA512_P521>{
+  64,
+  32,
+  12,
+  SignatureScheme::P521_SHA512,
+};
 
 template<>
-static const CipherDetails
+const CipherDetails
   cipher_details<CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448>{
     64,
     32,
