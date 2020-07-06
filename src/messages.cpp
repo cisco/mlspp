@@ -17,12 +17,14 @@ GroupInfo::GroupInfo(bytes group_id_in,
                      TreeKEMPublicKey tree_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
+                     ExtensionList extensions_in,
                      bytes confirmation_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
+  , extensions(std::move(extensions_in))
   , confirmation(std::move(confirmation_in))
 {}
 

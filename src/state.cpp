@@ -115,6 +115,23 @@ State::sign(const Proposal& proposal) const
 MLSPlaintext
 State::add(const KeyPackage& key_package) const
 {
+  // Check that the key package is validly signed
+  if (!key_package.verify()) {
+    throw InvalidParameterError("Invalid signature on key package");
+  }
+
+  // Check that the group's basic properties are supported
+  auto now = seconds_since_epoch();
+  if (!key_package.verify_expiry(now)) {
+    throw InvalidParameterError("Expired key package");
+  }
+
+  // Check that the group's extensions are supported
+  if (!key_package.verify_extension_support(_extensions)) {
+    throw InvalidParameterError(
+      "Key package does not support group's extensions");
+  }
+
   return sign({ Add{ key_package } });
 }
 
@@ -192,6 +209,7 @@ State::commit(const bytes& leaf_secret) const
     next._tree,
     next._confirmed_transcript_hash,
     next._interim_transcript_hash,
+    next._extensions,
     std::get<CommitData>(pt.content).confirmation,
   };
   group_info.sign(_index, _identity_priv);

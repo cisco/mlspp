@@ -38,6 +38,12 @@ operator<<(std::ostream& out, const bytes& data);
 using epoch_t = uint64_t;
 
 ///
+/// Get the current system clock time in the format MLS expects
+///
+
+uint64_t seconds_since_epoch();
+
+///
 /// Auto-generate equality and inequality operators for TLS-serializable things
 ///
 

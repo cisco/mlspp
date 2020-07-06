@@ -67,6 +67,14 @@ operator^(const bytes& lhs, const bytes& rhs)
   return out;
 }
 
+uint64_t
+seconds_since_epoch()
+{
+  // TODO(RLB) This should use std::chrono, but that seems not to be available
+  // on some platforms.
+  return std::time(nullptr);
+}
+
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
