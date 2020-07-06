@@ -80,33 +80,8 @@ KeyPackage::sign(const SignaturePrivateKey& sig_priv,
 }
 
 bool
-KeyPackage::verify_basic_extensions(ProtocolVersion version,
-                                    CipherSuite suite,
-                                    uint64_t now) const
+KeyPackage::verify_expiry(uint64_t now) const
 {
-  // Verify version support
-  auto maybe_sv = extensions.find<SupportedVersionsExtension>();
-  if (!maybe_sv.has_value()) {
-    return false;
-  }
-
-  auto& sv = maybe_sv.value().versions;
-  if (std::find(sv.begin(), sv.end(), version) == sv.end()) {
-    return false;
-  }
-
-  // Verify ciphersuite support
-  auto maybe_sc = extensions.find<SupportedCipherSuitesExtension>();
-  if (!maybe_sc.has_value()) {
-    return false;
-  }
-
-  auto& sc = maybe_sc.value().cipher_suites;
-  if (std::find(sc.begin(), sc.end(), suite) == sc.end()) {
-    return false;
-  }
-
-  // Verify expiry
   auto maybe_lt = extensions.find<LifetimeExtension>();
   if (!maybe_lt.has_value()) {
     return false;

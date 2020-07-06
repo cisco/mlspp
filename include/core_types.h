@@ -28,8 +28,8 @@ struct Extension {
   ExtensionType type;
   bytes data;
 
-  TLS_SERIALIZABLE(type, data);
-  TLS_TRAITS(tls::pass, tls::vector<2>);
+  TLS_SERIALIZABLE(type, data)
+  TLS_TRAITS(tls::pass, tls::vector<2>)
 };
 
 struct ExtensionList {
@@ -65,24 +65,24 @@ struct ExtensionList {
 
   bool has(ExtensionType type) const;
 
-  TLS_SERIALIZABLE(extensions);
-  TLS_TRAITS(tls::vector<2>);
+  TLS_SERIALIZABLE(extensions)
+  TLS_TRAITS(tls::vector<2>)
 };
 
 struct SupportedVersionsExtension {
   std::vector<ProtocolVersion> versions;
 
   static const ExtensionType type;
-  TLS_SERIALIZABLE(versions);
-  TLS_TRAITS(tls::vector<1>);
+  TLS_SERIALIZABLE(versions)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 struct SupportedCipherSuitesExtension {
   std::vector<CipherSuite> cipher_suites;
 
   static const ExtensionType type;
-  TLS_SERIALIZABLE(cipher_suites);
-  TLS_TRAITS(tls::vector<1>);
+  TLS_SERIALIZABLE(cipher_suites)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 struct LifetimeExtension {
@@ -90,23 +90,23 @@ struct LifetimeExtension {
   uint64_t not_after;
 
   static const ExtensionType type;
-  TLS_SERIALIZABLE(not_before, not_after);
+  TLS_SERIALIZABLE(not_before, not_after)
 };
 
 struct KeyIDExtension {
   bytes key_id;
 
   static const ExtensionType type;
-  TLS_SERIALIZABLE(key_id);
-  TLS_TRAITS(tls::vector<2>);
+  TLS_SERIALIZABLE(key_id)
+  TLS_TRAITS(tls::vector<2>)
 };
 
 struct ParentHashExtension {
   bytes parent_hash;
 
   static const ExtensionType type;
-  TLS_SERIALIZABLE(parent_hash);
-  TLS_TRAITS(tls::vector<1>);
+  TLS_SERIALIZABLE(parent_hash)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 ///
@@ -160,9 +160,7 @@ struct KeyPackage
   void sign(const SignaturePrivateKey& sig_priv,
             const std::optional<KeyPackageOpts>& opts);
 
-  bool verify_basic_extensions(ProtocolVersion version,
-                               CipherSuite suite,
-                               uint64_t now) const;
+  bool verify_expiry(uint64_t now) const;
   bool verify_extension_support(const ExtensionList& ext_list) const;
   bool verify() const;
 

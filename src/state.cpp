@@ -120,10 +120,9 @@ State::add(const KeyPackage& key_package) const
   }
 
   // Check that the group's basic properties are supported
-  auto version = ProtocolVersion::mls10;
   auto now = seconds_since_epoch();
-  if (!key_package.verify_basic_extensions(version, _suite, now)) {
-    throw InvalidParameterError("Basic extensions invalid");
+  if (!key_package.verify_expiry(now)) {
+    throw InvalidParameterError("Expired key package");
   }
 
   // Check that the group's extensions are supported
