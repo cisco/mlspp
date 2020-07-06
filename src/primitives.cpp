@@ -139,12 +139,12 @@ static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
       return EVP_sha256();
 
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return EVP_sha512();
 
     default:
@@ -253,12 +253,12 @@ static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
       return EVP_aes_128_gcm();
 
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return EVP_aes_256_gcm();
 
     default:
@@ -270,10 +270,10 @@ static size_t
 openssl_tag_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return 16;
 
     default:
@@ -407,13 +407,13 @@ OpenSSLKeyType
 ossl_key_type(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
       return OpenSSLKeyType::P256;
-    case CipherSuite::P521_SHA512_AES256GCM:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
       return OpenSSLKeyType::P521;
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
       return OpenSSLKeyType::X25519;
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return OpenSSLKeyType::X448;
     default:
       throw InvalidParameterError("Unknown ciphersuite");
@@ -729,15 +729,16 @@ public:
 
   void set_secret(const bytes& data) override
   {
+    // Choose a suite that will result in the right hash algorithm
     CipherSuite ersatz_suite;
     switch (static_cast<RawKeyType>(_type)) {
       case RawKeyType::X25519:
       case RawKeyType::Ed25519:
-        ersatz_suite = CipherSuite::P256_SHA256_AES128GCM;
+        ersatz_suite = CipherSuite::P256_AES128GCM_SHA256_P256;
         break;
       case RawKeyType::X448:
       case RawKeyType::Ed448:
-        ersatz_suite = CipherSuite::P521_SHA512_AES256GCM;
+        ersatz_suite = CipherSuite::P521_AES256GCM_SHA512_P521;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");
@@ -863,13 +864,14 @@ public:
 
   void set_secret(const bytes& data) override
   {
+    // Choose a suite that will result in the right hash algorithm
     CipherSuite ersatz_suite;
     switch (static_cast<ECKeyType>(_curve_nid)) {
       case ECKeyType::P256:
-        ersatz_suite = CipherSuite::P256_SHA256_AES128GCM;
+        ersatz_suite = CipherSuite::P256_AES128GCM_SHA256_P256;
         break;
       case ECKeyType::P521:
-        ersatz_suite = CipherSuite::P521_SHA512_AES256GCM;
+        ersatz_suite = CipherSuite::P521_AES256GCM_SHA512_P521;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");

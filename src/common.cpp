@@ -80,14 +80,39 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(abbrev) << "...";
 }
 
+const std::array<CipherSuite, 4> all_supported_suites = {
+  CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+  CipherSuite::P256_AES128GCM_SHA256_P256,
+  CipherSuite::X448_AES256GCM_SHA512_Ed448,
+  CipherSuite::P521_AES256GCM_SHA512_P521,
+};
+
+SignatureScheme
+suite_signature_scheme(CipherSuite suite)
+{
+  switch (suite) {
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+      return SignatureScheme::Ed25519;
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+      return SignatureScheme::P256_SHA256;
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+      return SignatureScheme::Ed448;
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
+      return SignatureScheme::P521_SHA512;
+
+    default:
+      throw InvalidParameterError("Unsupported ciphersuite");
+  }
+}
+
 size_t
 suite_nonce_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
       return 12;
 
     default:
@@ -99,12 +124,12 @@ size_t
 suite_key_size(CipherSuite suite)
 {
   switch (suite) {
-    case CipherSuite::P256_SHA256_AES128GCM:
-    case CipherSuite::X25519_SHA256_AES128GCM:
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
       return 16;
 
-    case CipherSuite::P521_SHA512_AES256GCM:
-    case CipherSuite::X448_SHA512_AES256GCM:
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
       return 32;
 
     default:

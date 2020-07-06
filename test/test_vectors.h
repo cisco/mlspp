@@ -234,15 +234,9 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
 {
   using TreeKEMPublicKey::TreeKEMPublicKey;
 
-  SignatureScheme scheme;
-
-  TestTreeKEMPublicKey(CipherSuite suite_in,
-                       SignatureScheme scheme_in,
-                       const std::vector<bytes>& secrets)
+  TestTreeKEMPublicKey(CipherSuite suite_in, const std::vector<bytes>& secrets)
     : TreeKEMPublicKey(suite_in)
   {
-    scheme = scheme_in;
-
     for (const auto& secret : secrets) {
       add_leaf_secret(secret);
     }
@@ -258,7 +252,7 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
   void add_leaf_secret(const bytes& secret)
   {
     auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key();
-    auto sig_priv = SignaturePrivateKey::derive(scheme, secret);
+    auto sig_priv = SignaturePrivateKey::derive(suite, secret);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
     auto kp = KeyPackage{ suite, init_pub, cred, sig_priv };
 
@@ -283,11 +277,10 @@ struct TreeKEMTestVectors
   struct TestCase
   {
     CipherSuite cipher_suite;
-    SignatureScheme signature_scheme;
     std::vector<TreeKEMPublicKey> trees;
 
-    TLS_SERIALIZABLE(cipher_suite, signature_scheme, trees)
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
+    TLS_SERIALIZABLE(cipher_suite, trees)
+    TLS_TRAITS(tls::pass, tls::vector<4>)
   };
 
   std::vector<Bytes1> init_secrets;
@@ -301,7 +294,7 @@ struct TreeKEMTestVectors
 /////
 
 bool
-deterministic_signature_scheme(SignatureScheme scheme);
+deterministic_signature_scheme(CipherSuite suite);
 
 struct MessagesTestVectors
 {
@@ -310,7 +303,6 @@ struct MessagesTestVectors
   struct TestCase
   {
     CipherSuite cipher_suite;
-    SignatureScheme signature_scheme;
 
     bytes key_package;
     bytes group_info;
@@ -324,7 +316,6 @@ struct MessagesTestVectors
     bytes ciphertext;
 
     TLS_SERIALIZABLE(cipher_suite,
-                     signature_scheme,
                      key_package,
                      group_info,
                      group_secrets,
@@ -336,7 +327,6 @@ struct MessagesTestVectors
                      commit,
                      ciphertext);
     TLS_TRAITS(tls::pass,
-               tls::pass,
                tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
@@ -488,17 +478,12 @@ struct SessionTestVectors
   struct TestCase
   {
     CipherSuite cipher_suite;
-    SignatureScheme signature_scheme;
     bool encrypt;
     std::vector<KeyPackage> key_packages;
     std::vector<Epoch> transcript;
 
-    TLS_SERIALIZABLE(cipher_suite,
-                     signature_scheme,
-                     encrypt,
-                     key_packages,
-                     transcript);
-    TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
+    TLS_SERIALIZABLE(cipher_suite, encrypt, key_packages, transcript);
+    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
   };
 
   uint32_t group_size;
