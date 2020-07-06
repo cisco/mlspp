@@ -99,8 +99,8 @@ TEST_F(MessagesTest, Interop)
     tls_round_trip(tc.key_package, key_package, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
-    auto group_info =
-      GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, ext_list, tv.random };
+    auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
+                                 tv.random,   ext_list, tv.random };
     group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
