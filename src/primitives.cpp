@@ -348,7 +348,7 @@ open(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ciphertext.size() < tag_size) {
-    throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
+    throw InvalidParameterError("AEAD ciphertext smaller than tag size");
   }
 
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
@@ -387,7 +387,7 @@ open(CipherSuite suite,
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw InvalidParameterError("AES-GCM authentication failure");
+    throw InvalidParameterError("AEAD authentication failure");
   }
 
   return plaintext;

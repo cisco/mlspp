@@ -1,5 +1,6 @@
 #include "crypto.h"
 
+#include <iostream>
 #include <string>
 
 namespace mls {
@@ -356,8 +357,9 @@ HPKEPublicKey::encrypt(CipherSuite suite,
   auto [enc, zz] = dhkem_encap(suite, data, seed);
   auto [key, nonce] = hpke_key_schedule(suite, *this, enc, zz);
 
-  // Context.Encrypt
   auto ct = primitive::seal(suite, key, nonce, aad, pt);
+
+  // Context.Encrypt
   return HPKECiphertext{ enc, ct };
 }
 

@@ -114,7 +114,7 @@ template<>
 static const CipherDetails
   cipher_details<CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519>{
     32,
-    16,
+    32,
     12,
     SignatureScheme::Ed25519,
   };
@@ -150,7 +150,7 @@ static const CipherDetails
   case CipherSuite::suite:                                                     \
     return cipher_details<CipherSuite::suite>;
 
-inline const CipherDetails&
+const CipherDetails&
 CipherDetails::get(CipherSuite suite)
 {
   switch (suite) {
