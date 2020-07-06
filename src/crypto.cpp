@@ -224,11 +224,13 @@ hpke_suite(CipherSuite suite)
         HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
     case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return std::make_tuple(HPKEKEMID::DHKEM_X25519,
                              HPKEKDFID::HKDF_SHA256,
                              HPKEAEADID::AES_GCM_128);
 
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
       return std::make_tuple(
         HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
