@@ -578,8 +578,6 @@ main()
   verify_reproducible(generate_tree_math);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
-  verify_reproducible(generate_messages);
-  verify_session_repro(generate_basic_session);
 
   // Verify that the test vectors load
   try {

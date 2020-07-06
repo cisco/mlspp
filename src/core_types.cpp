@@ -6,6 +6,10 @@ namespace mls {
 /// Extensions
 ///
 
+const std::array<ProtocolVersion, 1> all_supported_versions = {
+  ProtocolVersion::mls10
+};
+
 const ExtensionType SupportedVersionsExtension::type =
   ExtensionType::supported_versions;
 const ExtensionType SupportedCipherSuitesExtension::type =
@@ -13,6 +17,15 @@ const ExtensionType SupportedCipherSuitesExtension::type =
 const ExtensionType LifetimeExtension::type = ExtensionType::lifetime;
 const ExtensionType KeyIDExtension::type = ExtensionType::key_id;
 const ExtensionType ParentHashExtension::type = ExtensionType::parent_hash;
+
+bool
+ExtensionList::has(ExtensionType type) const
+{
+  return std::any_of(
+    extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
+      return ext.type == type;
+    });
+}
 
 ///
 /// NodeType, ParentNode, and KeyPackage
@@ -25,6 +38,9 @@ KeyPackage::KeyPackage()
   , cipher_suite(CipherSuite::unknown)
 {}
 
+static const uint64_t default_not_before = 0x0000000000000000;
+static const uint64_t default_not_after = 0xffffffffffffffff;
+
 KeyPackage::KeyPackage(CipherSuite suite_in,
                        HPKEPublicKey init_key_in,
                        Credential credential_in,
@@ -34,6 +50,14 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , init_key(std::move(init_key_in))
   , credential(std::move(credential_in))
 {
+  extensions.add(SupportedVersionsExtension{
+    { all_supported_versions.begin(), all_supported_versions.end() } });
+  extensions.add(SupportedCipherSuitesExtension{
+    { all_supported_suites.begin(), all_supported_suites.end() } });
+
+  // TODO(RLB) Set non-eternal lifetimes
+  extensions.add(LifetimeExtension{ default_not_before, default_not_after });
+
   sign(sig_priv_in, std::nullopt);
 }
 
@@ -53,6 +77,56 @@ KeyPackage::sign(const SignaturePrivateKey& sig_priv,
 
   auto tbs = to_be_signed();
   signature = sig_priv.sign(tbs);
+}
+
+bool
+KeyPackage::verify_basic_extensions(ProtocolVersion version,
+                                    CipherSuite suite,
+                                    uint64_t now) const
+{
+  // Verify version support
+  auto maybe_sv = extensions.find<SupportedVersionsExtension>();
+  if (!maybe_sv.has_value()) {
+    return false;
+  }
+
+  auto& sv = maybe_sv.value().versions;
+  if (std::find(sv.begin(), sv.end(), version) == sv.end()) {
+    return false;
+  }
+
+  // Verify ciphersuite support
+  auto maybe_sc = extensions.find<SupportedCipherSuitesExtension>();
+  if (!maybe_sc.has_value()) {
+    return false;
+  }
+
+  auto& sc = maybe_sc.value().cipher_suites;
+  if (std::find(sc.begin(), sc.end(), suite) == sc.end()) {
+    return false;
+  }
+
+  // Verify expiry
+  auto maybe_lt = extensions.find<LifetimeExtension>();
+  if (!maybe_lt.has_value()) {
+    return false;
+  }
+
+  auto& lt = maybe_lt.value();
+  if (now < lt.not_before || now > lt.not_after) {
+    return false;
+  }
+
+  return true;
+}
+
+bool
+KeyPackage::verify_extension_support(const ExtensionList& ext_list) const
+{
+  return std::all_of(
+    ext_list.extensions.begin(),
+    ext_list.extensions.end(),
+    [&](const Extension& ext) -> bool { return extensions.has(ext.type); });
 }
 
 bool

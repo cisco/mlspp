@@ -67,6 +67,14 @@ operator^(const bytes& lhs, const bytes& rhs)
   return out;
 }
 
+uint64_t
+seconds_since_epoch()
+{
+  auto since_epoch = std::chrono::system_clock::now().time_since_epoch();
+  auto secs = std::chrono::duration_cast<std::chrono::seconds>(since_epoch);
+  return secs.count();
+}
+
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {

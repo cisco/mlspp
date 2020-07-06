@@ -14,6 +14,8 @@ enum class ProtocolVersion : uint8_t {
   mls10 = 0xFF,
 };
 
+extern const std::array<ProtocolVersion, 1> all_supported_versions;
+
 enum struct ExtensionType : uint16_t {
   supported_versions = 1,
   supported_ciphersuites = 2,
@@ -39,11 +41,19 @@ struct ExtensionList {
   template<typename T>
   inline void add(const T& obj) {
     auto data = tls::marshal(obj);
+
+    auto curr = std::find_if(extensions.begin(), extensions.end(),
+        [&](const Extension& ext) -> bool { return ext.type == T::type; });
+    if (curr != extensions.end()) {
+      curr->data = std::move(data);
+      return;
+    }
+
     extensions.push_back({T::type, std::move(data)});
   }
 
   template<typename T>
-  std::optional<T> get() {
+  std::optional<T> find() const {
     for (const auto& ext : extensions) {
       if (ext.type == T::type) {
         return tls::get<T>(ext.data);
@@ -52,6 +62,8 @@ struct ExtensionList {
 
     return std::nullopt;
   }
+
+  bool has(ExtensionType type) const;
 
   TLS_SERIALIZABLE(extensions);
   TLS_TRAITS(tls::vector<2>);
@@ -147,6 +159,11 @@ struct KeyPackage
 
   void sign(const SignaturePrivateKey& sig_priv,
             const std::optional<KeyPackageOpts>& opts);
+
+  bool verify_basic_extensions(ProtocolVersion version,
+                               CipherSuite suite,
+                               uint64_t now) const;
+  bool verify_extension_support(const ExtensionList& ext_list) const;
   bool verify() const;
 
   static const NodeType type;
