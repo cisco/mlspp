@@ -40,7 +40,7 @@ example: all
 	./build/cmd/api_example/api_example
 
 clean:
-	cd ${BUILD_DIR} && make clean
+	cd ${BUILD_DIR} && ninja clean
 
 cclean:
 	rm -rf ${BUILD_DIR}
