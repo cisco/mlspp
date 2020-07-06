@@ -26,36 +26,6 @@ protected:
     from_hex("204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c3359"
              "6fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445");
 
-  // AES-GCM
-  // https://tools.ietf.org/html/draft-mcgrew-gcm-test-01#section-4
-  const bytes aes128gcm_key = from_hex("4c80cdefbb5d10da906ac73c3613a634");
-  const bytes aes128gcm_nonce = from_hex("2e443b684956ed7e3b244cfe");
-  const bytes aes128gcm_aad = from_hex("000043218765432100000000");
-  const bytes aes128gcm_pt = from_hex("45000048699a000080114db7c0a80102"
-                                      "c0a801010a9bf15638d3010000010000"
-                                      "00000000045f736970045f7564700373"
-                                      "69700963796265726369747902646b00"
-                                      "0021000101020201");
-  const bytes aes128gcm_ct = from_hex("fecf537e729d5b07dc30df528dd22b76"
-                                      "8d1b98736696a6fd348509fa13ceac34"
-                                      "cfa2436f14a3f3cf65925bf1f4a13c5d"
-                                      "15b21e1884f5ff6247aeabb786b93bce"
-                                      "61bc17d768fd9732459018148f6cbe72"
-                                      "2fd04796562dfdb4");
-  const bytes aes256gcm_key = from_hex("abbccddef00112233445566778899aab"
-                                       "abbccddef00112233445566778899aab");
-  const bytes aes256gcm_nonce = from_hex("112233440102030405060708");
-  const bytes aes256gcm_aad = from_hex("4a2cbfe300000002");
-  const bytes aes256gcm_pt = from_hex("4500003069a6400080062690c0a80102"
-                                      "9389155e0a9e008b2dc57ee000000000"
-                                      "7002400020bf0000020405b401010402"
-                                      "01020201");
-  const bytes aes256gcm_ct = from_hex("ff425c9b724599df7a3bcd510194e00d"
-                                      "6a78107f1b0b1cbf06efae9d65a5d763"
-                                      "748a637985771d347f0545659f14e99d"
-                                      "ef842d8eb335f4eecfdbf831824b4c49"
-                                      "15956c96");
-
   // DH with P-256
   // KASValidityTest_ECCEphemeralUnified_NOKC_ZZOnly_init.fax [EC]
   // http://csrc.nist.gov/groups/STM/cavp/documents/keymgmt/kastestvectors.zip
@@ -186,6 +156,84 @@ protected:
 
   const CryptoTestVectors& tv;
 
+  struct AEADTest
+  {
+    const CipherSuite suite;
+    const bytes key;
+    const bytes nonce;
+    const bytes aad;
+    const bytes pt;
+    const bytes ct;
+
+    void run() const
+    {
+      auto encrypted = primitive::seal(suite, key, nonce, aad, pt);
+      std::cout << "enc " << encrypted << std::endl;
+      std::cout << "kat " << ct << std::endl;
+
+      ASSERT_EQ(encrypted, ct);
+
+      auto decrypted = primitive::open(suite, key, nonce, aad, ct);
+      ASSERT_EQ(decrypted, pt);
+    }
+  };
+
+  // AES-GCM
+  // https://tools.ietf.org/html/draft-mcgrew-gcm-test-01#section-4
+  const AEADTest aes128gcm_test{
+    CipherSuite::P256_AES128GCM_SHA256_P256,
+    from_hex("4c80cdefbb5d10da906ac73c3613a634"),
+    from_hex("2e443b684956ed7e3b244cfe"),
+    from_hex("000043218765432100000000"),
+    from_hex("45000048699a000080114db7c0a80102c0a801010a9bf15638d3010000010000"
+             "00000000045f736970045f756470037369700963796265726369747902646b00"
+             "0021000101020201"),
+    from_hex("fecf537e729d5b07dc30df528dd22b768d1b98736696a6fd348509fa13ceac34"
+             "cfa2436f14a3f3cf65925bf1f4a13c5d15b21e1884f5ff6247aeabb786b93bce"
+             "61bc17d768fd9732459018148f6cbe722fd04796562dfdb4"),
+  };
+
+  const AEADTest aes256gcm_test{
+    CipherSuite::P521_AES256GCM_SHA512_P521,
+    from_hex(
+      "abbccddef00112233445566778899aababbccddef00112233445566778899aab"),
+    from_hex("112233440102030405060708"),
+    from_hex("4a2cbfe300000002"),
+    from_hex("4500003069a6400080062690c0a801029389155e0a9e008b2dc57ee000000000"
+             "7002400020bf0000020405b40101040201020201"),
+    from_hex("ff425c9b724599df7a3bcd510194e00d6a78107f1b0b1cbf06efae9d65a5d763"
+             "748a637985771d347f0545659f14e99def842d8eb335f4eecfdbf831824b4c49"
+             "15956c96"),
+  };
+
+  // ChaCha20-Poly1305
+  // https://tools.ietf.org/html/rfc8439#appendix-A.5
+  const AEADTest chacha_test{
+    CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519,
+    from_hex("1c9240a5eb55d38af333888604f6b5f0"
+             "473917c1402b80099dca5cbc207075c0"),
+    from_hex("000000000102030405060708"),
+    from_hex("f33388860000000000004e91"),
+    from_hex("496e7465726e65742d4472616674732061726520647261667420646f63756d65"
+             "6e74732076616c696420666f722061206d6178696d756d206f6620736978206d"
+             "6f6e74687320616e64206d617920626520757064617465642c207265706c6163"
+             "65642c206f72206f62736f6c65746564206279206f7468657220646f63756d65"
+             "6e747320617420616e792074696d652e20497420697320696e617070726f7072"
+             "6961746520746f2075736520496e7465726e65742d4472616674732061732072"
+             "65666572656e6365206d6174657269616c206f7220746f206369746520746865"
+             "6d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67"
+             "726573732e2fe2809d"),
+    from_hex("64a0861575861af460f062c79be643bd5e805cfd345cf389f108670ac76c8cb2"
+             "4c6cfc18755d43eea09ee94e382d26b0bdb7b73c321b0100d4f03b7f355894cf"
+             "332f830e710b97ce98c8a84abd0b948114ad176e008d33bd60f982b1ff37c855"
+             "9797a06ef4f0ef61c186324e2b3506383606907b6a7c02b0f9f6157b53c867e4"
+             "b9166c767b804d46a59b5216cde7a4e99040c5a40433225ee282a1b0a06c523e"
+             "af4534d7f83fa1155b0047718cbc546a0d072b04b3564eea1b422273f548271a"
+             "0bb2316053fa76991955ebd63159434ecebb4e466dae5a1073a6727627097a10"
+             "49e617d91d361094fa68f0ff77987130305beaba2eda04df997b714d6c6f2c29"
+             "a6ad5cb4022b02709beead9d67890cbb22392336fea1851f38"),
+  };
+
   CryptoTest()
     : tv(TestLoader<CryptoTestVectors>::get())
   {}
@@ -227,52 +275,25 @@ TEST_F(CryptoTest, SHA2)
   ASSERT_EQ(metrics.digest, 1);
 }
 
-TEST_F(CryptoTest, AES128GCM)
+TEST_F(CryptoTest, KnownAnswerAEAD)
 {
-  auto suite = CipherSuite::P256_AES128GCM_SHA256_P256;
-
-  auto encrypted = primitive::seal(
-    suite, aes128gcm_key, aes128gcm_nonce, aes128gcm_aad, aes128gcm_pt);
-  ASSERT_EQ(encrypted, aes128gcm_ct);
-
-  auto decrypted = primitive::open(
-    suite, aes128gcm_key, aes128gcm_nonce, aes128gcm_aad, aes128gcm_ct);
-  ASSERT_EQ(decrypted, aes128gcm_pt);
-
-  auto rtt_key = random_bytes(suite_key_size(suite));
-  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
-  auto rtt_aad = random_bytes(100);
-  auto rtt_pt = random_bytes(50);
-
-  auto rtt_encrypted =
-    primitive::seal(suite, rtt_key, rtt_nonce, rtt_aad, rtt_pt);
-  auto rtt_decrypted =
-    primitive::open(suite, rtt_key, rtt_nonce, rtt_aad, rtt_encrypted);
-  ASSERT_EQ(rtt_decrypted, rtt_pt);
+  aes128gcm_test.run();
+  aes256gcm_test.run();
+  chacha_test.run();
 }
 
-TEST_F(CryptoTest, AES256GCM)
+TEST_F(CryptoTest, RoundTripAEAD)
 {
-  auto suite = CipherSuite::P521_AES256GCM_SHA512_P521;
+  for (auto suite : all_supported_suites) {
+    auto key = random_bytes(CipherDetails::get(suite).key_size);
+    auto nonce = random_bytes(CipherDetails::get(suite).nonce_size);
+    auto aad = random_bytes(100);
+    auto pt = random_bytes(50);
 
-  auto encrypted = primitive::seal(
-    suite, aes256gcm_key, aes256gcm_nonce, aes256gcm_aad, aes256gcm_pt);
-  ASSERT_EQ(encrypted, aes256gcm_ct);
-
-  auto decrypted = primitive::open(
-    suite, aes256gcm_key, aes256gcm_nonce, aes256gcm_aad, aes256gcm_ct);
-  ASSERT_EQ(decrypted, aes256gcm_pt);
-
-  auto rtt_key = random_bytes(suite_key_size(suite));
-  auto rtt_nonce = random_bytes(suite_nonce_size(suite));
-  auto rtt_aad = random_bytes(100);
-  auto rtt_pt = random_bytes(50);
-
-  auto rtt_encrypted =
-    primitive::seal(suite, rtt_key, rtt_nonce, rtt_aad, rtt_pt);
-  auto rtt_decrypted =
-    primitive::open(suite, rtt_key, rtt_nonce, rtt_aad, rtt_encrypted);
-  ASSERT_EQ(rtt_decrypted, rtt_pt);
+    auto encrypted = primitive::seal(suite, key, nonce, aad, pt);
+    auto decrypted = primitive::open(suite, key, nonce, aad, encrypted);
+    ASSERT_EQ(decrypted, pt);
+  }
 }
 
 TEST_F(CryptoTest, BasicDH)
@@ -297,17 +318,6 @@ TEST_F(CryptoTest, BasicDH)
     ASSERT_EQ(gX, gX);
     ASSERT_EQ(gY, gY);
     ASSERT_NE(gX, gY);
-
-    CryptoMetrics::reset();
-    auto se = gX.encrypt(suite, {}, s);
-    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
-    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 1);
-
-    CryptoMetrics::reset();
-    auto sd = x.decrypt(suite, {}, se);
-    ASSERT_EQ(sd, s);
-    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 0);
-    ASSERT_EQ(CryptoMetrics::snapshot().var_base_dh, 1);
   }
 }
 
@@ -417,7 +427,6 @@ TEST_F(CryptoTest, BasicSignature)
 TEST_F(CryptoTest, SignatureSerialize)
 {
   for (auto suite : all_supported_suites) {
-    auto scheme = suite_signature_scheme(suite);
     auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key();
 
@@ -425,7 +434,7 @@ TEST_F(CryptoTest, SignatureSerialize)
     ASSERT_EQ(parsed, gX);
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
-    gX2.set_signature_scheme(scheme);
+    gX2.set_cipher_suite(suite);
     ASSERT_EQ(gX2, gX);
   }
 }

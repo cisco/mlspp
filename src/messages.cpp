@@ -128,14 +128,14 @@ Welcome::decrypt(const bytes& epoch_secret) const
 std::tuple<bytes, bytes>
 Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 {
-  auto key_size = suite_key_size(cipher_suite);
-  auto nonce_size = suite_nonce_size(cipher_suite);
-  auto secret_size = Digest(cipher_suite).output_size();
+  auto details = CipherDetails::get(cipher_suite);
 
   auto secret = hkdf_expand_label(
-    cipher_suite, epoch_secret, "group info", {}, secret_size);
-  auto key = hkdf_expand_label(cipher_suite, secret, "key", {}, key_size);
-  auto nonce = hkdf_expand_label(cipher_suite, secret, "nonce", {}, nonce_size);
+    cipher_suite, epoch_secret, "group info", {}, details.secret_size);
+  auto key =
+    hkdf_expand_label(cipher_suite, secret, "key", {}, details.key_size);
+  auto nonce =
+    hkdf_expand_label(cipher_suite, secret, "nonce", {}, details.nonce_size);
 
   return std::make_tuple(key, nonce);
 }

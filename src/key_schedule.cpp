@@ -62,9 +62,9 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , node(node_in)
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
-  , key_size(suite_key_size(suite_in))
-  , nonce_size(suite_nonce_size(suite_in))
-  , secret_size(Digest(suite).output_size())
+  , key_size(CipherDetails::get(suite_in).key_size)
+  , nonce_size(CipherDetails::get(suite_in).nonce_size)
+  , secret_size(CipherDetails::get(suite_in).secret_size)
 {}
 
 std::tuple<uint32_t, KeyAndNonce>
@@ -130,7 +130,7 @@ HashRatchet::erase(uint32_t generation)
 
 BaseKeySource::BaseKeySource(CipherSuite suite_in)
   : suite(suite_in)
-  , secret_size(Digest(suite).output_size())
+  , secret_size(CipherDetails::get(suite_in).secret_size)
 {}
 
 struct NoFSBaseKeySource : public BaseKeySource
@@ -165,7 +165,7 @@ struct TreeBaseKeySource : public BaseKeySource
     , root(tree_math::root(NodeCount{ group_size }))
     , width(NodeCount{ group_size })
     , secrets(NodeCount{ group_size }.val)
-    , secret_size(Digest(suite_in).output_size())
+    , secret_size(CipherDetails::get(suite_in).secret_size)
   {
     secrets[root.val] = std::move(application_secret_in);
   }
@@ -301,7 +301,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
     derive_secret(suite, epoch_secret, "confirm", context);
   auto init_secret = derive_secret(suite, epoch_secret, "init", context);
 
-  auto key_size = suite_key_size(suite);
+  auto key_size = CipherDetails::get(suite).key_size;
   auto sender_data_key =
     hkdf_expand_label(suite, sender_data_secret, "sd key", {}, key_size);
 

@@ -1,5 +1,6 @@
 #include "crypto.h"
 
+#include <iostream>
 #include <string>
 
 namespace mls {
@@ -224,11 +225,13 @@ hpke_suite(CipherSuite suite)
         HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
     case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return std::make_tuple(HPKEKEMID::DHKEM_X25519,
                              HPKEKDFID::HKDF_SHA256,
                              HPKEAEADID::AES_GCM_128);
 
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
       return std::make_tuple(
         HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
@@ -301,9 +304,9 @@ hpke_key_schedule(CipherSuite suite,
 {
   auto [kem, kdf, aead] = hpke_suite(suite);
   auto Npk = hpke_npk(kem);
-  auto Nh = Digest(suite).output_size();
-  auto Nk = suite_key_size(suite);
-  auto Nn = suite_nonce_size(suite);
+  auto Nh = CipherDetails::get(suite).secret_size;
+  auto Nk = CipherDetails::get(suite).key_size;
+  auto Nn = CipherDetails::get(suite).nonce_size;
 
   // We only support base and no-info.  So we can hard-wire these inputs, and
   // skip VerifyMode().  We will need to generalize if we support other modes or
@@ -354,8 +357,9 @@ HPKEPublicKey::encrypt(CipherSuite suite,
   auto [enc, zz] = dhkem_encap(suite, data, seed);
   auto [key, nonce] = hpke_key_schedule(suite, *this, enc, zz);
 
-  // Context.Encrypt
   auto ct = primitive::seal(suite, key, nonce, aad, pt);
+
+  // Context.Encrypt
   return HPKECiphertext{ enc, ct };
 }
 
@@ -417,7 +421,7 @@ SignaturePublicKey::SignaturePublicKey()
 {}
 
 SignaturePublicKey::SignaturePublicKey(CipherSuite suite, bytes data)
-  : _scheme(suite_signature_scheme(suite))
+  : _scheme(CipherDetails::get(suite).scheme)
   , _data(std::move(data))
 {}
 
@@ -430,7 +434,7 @@ SignaturePublicKey::set_signature_scheme(SignatureScheme scheme)
 void
 SignaturePublicKey::set_cipher_suite(CipherSuite suite)
 {
-  _scheme = suite_signature_scheme(suite);
+  _scheme = CipherDetails::get(suite).scheme;
 }
 
 SignatureScheme
@@ -459,7 +463,7 @@ SignaturePrivateKey::SignaturePrivateKey()
 SignaturePrivateKey
 SignaturePrivateKey::generate(CipherSuite suite)
 {
-  auto scheme = suite_signature_scheme(suite);
+  auto scheme = CipherDetails::get(suite).scheme;
   return SignaturePrivateKey(suite, primitive::generate(scheme));
 }
 
@@ -472,7 +476,7 @@ SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 SignaturePrivateKey
 SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  auto scheme = suite_signature_scheme(suite);
+  auto scheme = CipherDetails::get(suite).scheme;
   return SignaturePrivateKey(suite, primitive::derive(scheme, secret));
 }
 
@@ -490,7 +494,7 @@ SignaturePrivateKey::public_key() const
 
 SignaturePrivateKey::SignaturePrivateKey(CipherSuite suite, const bytes& data)
   : _suite(suite)
-  , _scheme(suite_signature_scheme(suite))
+  , _scheme(CipherDetails::get(suite).scheme)
   , _data(data)
   , _pub_data(primitive::priv_to_pub(_scheme, data))
 {}

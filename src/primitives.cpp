@@ -141,10 +141,12 @@ openssl_digest_type(CipherSuite suite)
   switch (suite) {
     case CipherSuite::P256_AES128GCM_SHA256_P256:
     case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return EVP_sha256();
 
     case CipherSuite::P521_AES256GCM_SHA512_P521:
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
       return EVP_sha512();
 
     default:
@@ -261,6 +263,10 @@ openssl_cipher(CipherSuite suite)
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
       return EVP_aes_256_gcm();
 
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+      return EVP_chacha20_poly1305();
+
     default:
       throw InvalidParameterError("Unsupported ciphersuite");
   }
@@ -274,6 +280,8 @@ openssl_tag_size(CipherSuite suite)
     case CipherSuite::P521_AES256GCM_SHA512_P521:
     case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
       return 16;
 
     default:
@@ -340,7 +348,7 @@ open(CipherSuite suite,
 {
   auto tag_size = openssl_tag_size(suite);
   if (ciphertext.size() < tag_size) {
-    throw InvalidParameterError("AES-GCM ciphertext smaller than tag size");
+    throw InvalidParameterError("AEAD ciphertext smaller than tag size");
   }
 
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
@@ -379,7 +387,7 @@ open(CipherSuite suite,
   // Providing nullptr as an argument is safe here because this
   // function never writes with GCM; it only verifies the tag
   if (1 != EVP_DecryptFinal(ctx.get(), nullptr, &out_size)) {
-    throw InvalidParameterError("AES-GCM authentication failure");
+    throw InvalidParameterError("AEAD authentication failure");
   }
 
   return plaintext;
@@ -412,8 +420,10 @@ ossl_key_type(CipherSuite suite)
     case CipherSuite::P521_AES256GCM_SHA512_P521:
       return OpenSSLKeyType::P521;
     case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return OpenSSLKeyType::X25519;
     case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
       return OpenSSLKeyType::X448;
     default:
       throw InvalidParameterError("Unknown ciphersuite");
