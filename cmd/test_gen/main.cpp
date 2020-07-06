@@ -283,7 +283,7 @@ generate_messages()
 
   // Set the inputs
   tv.epoch = 0xA0A1A2A3;
-  tv.signer_index = LeafIndex{ 0xB0B1B2B3 };
+  tv.sender = Sender{ SenderType::member, 0xB0B1B2B3 };
   tv.removed = LeafIndex{ 0xC0C1C2C3 };
   tv.user_id = bytes(16, 0xD1);
   tv.group_id = bytes(16, 0xD2);
@@ -326,7 +326,7 @@ generate_messages()
     // Construct Welcome
     auto group_info =
       GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
-    group_info.signer_index = tv.signer_index;
+    group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;
 
     auto group_secrets = GroupSecrets{ tv.random };
@@ -341,23 +341,21 @@ generate_messages()
 
     // Construct Proposals
     auto add_prop = Proposal{ Add{ key_package } };
-    auto add_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
+    auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
 
     auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
     update_hs.signature = tv.random;
 
-    auto remove_prop = Proposal{ Remove{ tv.signer_index } };
+    auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
     auto remove_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
     remove_hs.signature = tv.random;
 
     // Construct Commit
     auto commit = Commit{
-      { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },

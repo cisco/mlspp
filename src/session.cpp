@@ -155,7 +155,11 @@ Session::handle(const bytes& handshake_data)
     r >> proposal >> commit;
   }
 
-  if (proposal.sender == current_state().index()) {
+  if (proposal.sender.sender_type != SenderType::member) {
+    throw ProtocolError("External senders not supported");
+  }
+
+  if (LeafIndex(proposal.sender.sender) == current_state().index()) {
     if (!_outbound_cache.has_value()) {
       throw ProtocolError("Received from self without sending");
     }

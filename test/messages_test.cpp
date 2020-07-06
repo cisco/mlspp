@@ -70,7 +70,7 @@ TEST_F(MessagesTest, Interop)
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info =
       GroupInfo{ tv.group_id, tv.epoch, tree, tv.random, tv.random, tv.random };
-    group_info.signer_index = tv.signer_index;
+    group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
 
@@ -91,26 +91,24 @@ TEST_F(MessagesTest, Interop)
 
     // Proposals
     auto add_prop = Proposal{ Add{ key_package } };
-    auto add_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, add_prop };
+    auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
     tls_round_trip(tc.add_proposal, add_hs, true);
 
     auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, update_prop };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
     update_hs.signature = tv.random;
     tls_round_trip(tc.update_proposal, update_hs, true);
 
-    auto remove_prop = Proposal{ Remove{ tv.signer_index } };
+    auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
     auto remove_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.signer_index, remove_prop };
+      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
     remove_hs.signature = tv.random;
     tls_round_trip(tc.remove_proposal, remove_hs, true);
 
     // Commit
     auto commit = Commit{
-      { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
