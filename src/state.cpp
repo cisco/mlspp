@@ -106,7 +106,8 @@ State::State(const bytes& init_secret,
 MLSPlaintext
 State::sign(const Proposal& proposal) const
 {
-  auto pt = MLSPlaintext{ _group_id, _epoch, _index, proposal };
+  auto sender = Sender{ SenderType::member, _index.val };
+  auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(group_context(), _identity_priv);
   return pt;
 }
@@ -245,7 +246,8 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
-  auto pt = MLSPlaintext{ _group_id, _epoch, _index, op };
+  auto sender = Sender{ SenderType::member, _index.val };
+  auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
 
   _confirmed_transcript_hash = Digest(_suite)
                                  .write(_interim_transcript_hash)
@@ -294,7 +296,12 @@ State::handle(const MLSPlaintext& pt)
     throw InvalidParameterError("Incorrect content type");
   }
 
-  if (pt.sender == _index) {
+  if (pt.sender.sender_type != SenderType::member) {
+    throw ProtocolError("Commit must originate from within the group");
+  }
+  auto sender = LeafIndex(pt.sender.sender);
+
+  if (sender == _index) {
     throw InvalidParameterError("Handle own commits with caching");
   }
 
@@ -310,8 +317,8 @@ State::handle(const MLSPlaintext& pt)
     next._tree.root_hash(),
     next._confirmed_transcript_hash,
   });
-  next._tree_priv.decap(pt.sender, next._tree, ctx, commit_data.commit.path);
-  next._tree.merge(pt.sender, commit_data.commit.path);
+  next._tree_priv.decap(sender, next._tree, ctx, commit_data.commit.path);
+  next._tree.merge(sender, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = Digest(_suite)
@@ -396,8 +403,9 @@ State::apply(const std::vector<ProposalID>& ids)
       joiner_locations.push_back(apply(std::get<Add>(proposal)));
     } else if (std::holds_alternative<Update>(proposal)) {
       auto& update = std::get<Update>(proposal);
-      if (pt.sender != _index) {
-        apply(pt.sender, update);
+      auto sender = LeafIndex(pt.sender.sender);
+      if (sender != _index) {
+        apply(sender, update);
         break;
       }
 
@@ -405,7 +413,7 @@ State::apply(const std::vector<ProposalID>& ids)
         throw ProtocolError("Self-update with no cached secret");
       }
 
-      apply(pt.sender, update, _update_secrets[id.id]);
+      apply(sender, update, _update_secrets[id.id]);
     } else if (std::holds_alternative<Remove>(proposal)) {
       apply(std::get<Remove>(proposal));
     } else {
@@ -436,7 +444,8 @@ State::apply(const Commit& commit)
 MLSCiphertext
 State::protect(const bytes& pt)
 {
-  MLSPlaintext mpt{ _group_id, _epoch, _index, ApplicationData{ pt } };
+  auto sender = Sender{ SenderType::member, _index.val };
+  MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(group_context(), _identity_priv);
   return encrypt(mpt);
 }
@@ -547,7 +556,12 @@ sender_data_aad(const bytes& group_id,
 bool
 State::verify(const MLSPlaintext& pt) const
 {
-  auto maybe_kp = _tree.key_package(pt.sender);
+  if (pt.sender.sender_type != SenderType::member) {
+    // TODO(RLB) Support external senders
+    throw InvalidParameterError("External senders not supported");
+  }
+
+  auto maybe_kp = _tree.key_package(LeafIndex(pt.sender.sender));
   if (!maybe_kp.has_value()) {
     throw InvalidParameterError("Signature from blank node");
   }
@@ -586,7 +600,7 @@ State::encrypt(const MLSPlaintext& pt)
 
   // Encrypt the sender data
   tls::ostream sender_data;
-  sender_data << _index << generation;
+  sender_data << Sender{ SenderType::member, _index.val } << generation;
 
   auto sender_data_nonce = random_bytes(suite_nonce_size(_suite));
   auto sender_data_aad_val =
@@ -645,9 +659,14 @@ State::decrypt(const MLSCiphertext& ct)
                           ct.encrypted_sender_data);
 
   tls::istream r(sender_data);
-  LeafIndex sender;
+  Sender raw_sender;
   uint32_t generation;
-  r >> sender >> generation;
+  r >> raw_sender >> generation;
+
+  if (raw_sender.sender_type != SenderType::member) {
+    throw InvalidParameterError("Encrypted message from non-member");
+  }
+  auto sender = LeafIndex(raw_sender.sender);
 
   // Pull from the key schedule
   KeyAndNonce keys;
@@ -679,7 +698,8 @@ State::decrypt(const MLSCiphertext& ct)
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{
-    _group_id, _epoch, sender, ct.content_type, ct.authenticated_data, content
+    _group_id, _epoch, raw_sender, ct.content_type, ct.authenticated_data,
+    content
   };
 }
 

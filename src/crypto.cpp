@@ -452,7 +452,8 @@ SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 }
 
 SignaturePrivateKey::SignaturePrivateKey()
-  : _scheme(SignatureScheme::unknown)
+  : _suite(CipherSuite::unknown)
+  , _scheme(SignatureScheme::unknown)
 {}
 
 SignaturePrivateKey

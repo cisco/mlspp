@@ -154,13 +154,13 @@ const ContentType ApplicationData::type = ContentType::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
-                           LeafIndex sender_in,
+                           Sender sender_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
 {
@@ -195,31 +195,31 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
-                           LeafIndex sender_in,
-                           const ApplicationData& application_data_in)
+                           Sender sender_in,
+                           ApplicationData application_data_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
-  , content(application_data_in)
+  , sender(std::move(sender_in))
+  , content(std::move(application_data_in))
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
-                           LeafIndex sender_in,
-                           const Proposal& proposal)
+                           Sender sender_in,
+                           Proposal proposal)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
-  , content(proposal)
+  , sender(std::move(sender_in))
+  , content(std::move(proposal))
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
-                           LeafIndex sender_in,
+                           Sender sender_in,
                            const Commit& commit)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , content(CommitData{ commit, {} })
 {}
 
