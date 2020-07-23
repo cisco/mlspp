@@ -1,7 +1,7 @@
-#include "common.h"
+#include "mls/common.h"
 #include "test_vectors.h"
-#include "tls_syntax.h"
-#include "tree_math.h"
+#include "mls/tls_syntax.h"
+#include "mls/tree_math.h"
 
 #include <gtest/gtest.h>
 #include <vector>

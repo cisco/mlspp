@@ -1,9 +1,9 @@
 #pragma once
 
-#include "common.h"
+#include "mls/common.h"
 #include "openssl/evp.h"
-#include "primitives.h"
-#include "tls_syntax.h"
+#include "mls/primitives.h"
+#include "mls/tls_syntax.h"
 #include <vector>
 
 namespace mls {
