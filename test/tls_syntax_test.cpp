@@ -1,5 +1,5 @@
-#include "common.h"
-#include "tls_syntax.h"
+#include "mls/common.h"
+#include "mls/tls_syntax.h"
 #include <gtest/gtest.h>
 
 using namespace mls;

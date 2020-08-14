@@ -1,4 +1,4 @@
-#include "credential.h"
+#include "mls/credential.h"
 #include <gtest/gtest.h>
 
 using namespace mls;

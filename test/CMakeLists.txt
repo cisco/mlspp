@@ -38,5 +38,5 @@ target_link_libraries(${GTEST_APP_NAME} gtest_main)
 target_link_libraries(${GTEST_APP_NAME} ${OPENSSL_LIBRARIES})
 target_link_libraries(${GTEST_APP_NAME} ${LIB_NAME})
 
-gtest_discover_tests(${GTEST_APP_NAME}
-                     WORKING_DIRECTORY ${GTEST_RUN_PATH})
+#gtest_discover_tests(${GTEST_APP_NAME}
+#                     WORKING_DIRECTORY ${GTEST_RUN_PATH})
