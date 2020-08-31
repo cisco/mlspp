@@ -1,24 +1,12 @@
-#include "mls/state.h"
 #include "test_vectors.h"
-#include <gtest/gtest.h>
+#include <doctest/doctest.h>
+#include <mls/state.h>
 
 using namespace mls;
 
-class StateTest : public ::testing::Test
+class StateTest
 {
-protected:
-  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
-
-  const size_t group_size = 5;
-  const bytes group_id = { 0, 1, 2, 3 };
-  const bytes user_id = { 4, 5, 6, 7 };
-  const bytes test_message = from_hex("01020304");
-
-  std::vector<bytes> init_secrets;
-  std::vector<SignaturePrivateKey> identity_privs;
-  std::vector<KeyPackage> key_packages;
-  std::vector<State> states;
-
+public:
   StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
@@ -35,13 +23,26 @@ protected:
     }
   }
 
+protected:
+  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
+
+  const size_t group_size = 5;
+  const bytes group_id = { 0, 1, 2, 3 };
+  const bytes user_id = { 4, 5, 6, 7 };
+  const bytes test_message = from_hex("01020304");
+
+  std::vector<bytes> init_secrets;
+  std::vector<SignaturePrivateKey> identity_privs;
+  std::vector<KeyPackage> key_packages;
+  std::vector<State> states;
+
   bytes fresh_secret() const
   {
     return random_bytes(Digest(suite).output_size());
   }
 };
 
-TEST_F(StateTest, TwoPerson)
+TEST_CASE_FIXTURE(StateTest, "Two Person")
 {
   // Initialize the creator's state
   auto first0 = State{
@@ -59,15 +60,15 @@ TEST_F(StateTest, TwoPerson)
   // Initialize the second participant from the Welcome
   auto second0 =
     State{ init_secrets[1], identity_privs[1], key_packages[1], welcome };
-  ASSERT_EQ(first1, second0);
+  REQUIRE(first1 == second0);
 
   /// Verify that they can exchange protected messages
   auto encrypted = first1.protect(test_message);
   auto decrypted = second0.unprotect(encrypted);
-  ASSERT_EQ(decrypted, test_message);
+  REQUIRE(decrypted == test_message);
 }
 
-TEST_F(StateTest, Multi)
+TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 {
   // Initialize the creator's state
   states.emplace_back(
@@ -95,12 +96,12 @@ TEST_F(StateTest, Multi)
     auto encrypted = state.protect(test_message);
     for (auto& other : states) {
       auto decrypted = other.unprotect(encrypted);
-      ASSERT_EQ(decrypted, test_message);
+      REQUIRE(decrypted == test_message);
     }
   }
 }
 
-TEST_F(StateTest, FullSize)
+TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 {
   // Initialize the creator's state
   states.emplace_back(
@@ -128,7 +129,7 @@ TEST_F(StateTest, FullSize)
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
-      ASSERT_EQ(state, states[0]);
+      REQUIRE(state == states[0]);
     }
 
     // Check that everyone can send and be received
@@ -136,7 +137,7 @@ TEST_F(StateTest, FullSize)
       auto encrypted = state.protect(test_message);
       for (auto& other : states) {
         auto decrypted = other.unprotect(encrypted);
-        ASSERT_EQ(decrypted, test_message);
+        REQUIRE(decrypted == test_message);
       }
     }
   }
@@ -165,19 +166,19 @@ protected:
       states.emplace_back(
         init_secrets[i], identity_privs[i], key_packages[i], welcome);
     }
-  }
 
-  void SetUp() override { check_consistency(); }
+    check_consistency();
+  }
 
   void check_consistency()
   {
     for (const auto& state : states) {
-      ASSERT_EQ(state, states[0]);
+      REQUIRE(state == states[0]);
     }
   }
 };
 
-TEST_F(RunningGroupTest, Update)
+TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = fresh_secret();
@@ -199,7 +200,7 @@ TEST_F(RunningGroupTest, Update)
   }
 }
 
-TEST_F(RunningGroupTest, Remove)
+TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
   for (int i = group_size - 2; i > 0; i -= 1) {
     auto remove = states[i].remove(LeafIndex{ uint32_t(i + 1) });

@@ -1,7 +1,7 @@
 #include "mls/crypto.h"
 #include "mls/session.h"
-#include "test_vectors.h"
 #include "mls/tree_math.h"
+#include "test_vectors.h"
 #include <fstream>
 #include <iostream>
 

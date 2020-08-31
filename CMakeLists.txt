@@ -61,7 +61,7 @@ file(GLOB LIB_SOURCE_FILES "${LIBRARY_SRC_PATH}/*.cpp")
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES})
 target_include_directories(${LIB_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR}
-                                       PRIVATE ${LIBRARY_INCLUDE_PATH})
+                                       PUBLIC ${LIBRARY_INCLUDE_PATH})
 target_link_libraries(${LIB_NAME} ${OPENSSL_LIBRARIES})
 
 if(CLANG_TIDY_EXE)
@@ -75,9 +75,7 @@ endif()
 ### Tests
 ###
 
-enable_testing()
 add_subdirectory(test)
-
 
 ###
 ### Applications

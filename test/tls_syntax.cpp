@@ -1,6 +1,6 @@
-#include "mls/common.h"
-#include "mls/tls_syntax.h"
-#include <gtest/gtest.h>
+#include <doctest/doctest.h>
+#include <mls/common.h>
+#include <mls/tls_syntax.h>
 
 using namespace mls;
 
@@ -53,7 +53,7 @@ operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 }
 
 // Known-answer tests
-class TLSSyntaxTest : public ::testing::Test
+class TLSSyntaxTest
 {
 protected:
   const bool val_bool = true;
@@ -100,15 +100,15 @@ ostream_test(T val, const std::vector<uint8_t>& enc)
 {
   tls::ostream w;
   w << val;
-  ASSERT_EQ(w.bytes(), enc);
+  REQUIRE(w.bytes() == enc);
 }
 
-TEST_F(TLSSyntaxTest, OStream)
+TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
 {
   bytes answer{ 1, 2, 3, 4 };
   tls::ostream w;
   w.write_raw(answer);
-  ASSERT_EQ(w.bytes(), answer);
+  REQUIRE(w.bytes() == answer);
 
   ostream_test(val_bool, enc_bool);
   ostream_test(val_uint8, enc_uint8);
@@ -128,10 +128,10 @@ istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 {
   tls::istream r(enc);
   r >> data;
-  ASSERT_EQ(data, val);
+  REQUIRE(data == val);
 }
 
-TEST_F(TLSSyntaxTest, IStream)
+TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 {
   bool data_bool;
   istream_test(val_bool, data_bool, enc_bool);
@@ -164,7 +164,7 @@ TEST_F(TLSSyntaxTest, IStream)
   istream_test(val_enum, data_enum, enc_enum);
 }
 
-TEST_F(TLSSyntaxTest, Abbreviations)
+TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
 {
   ExampleStruct val_in = val_struct;
 
@@ -172,14 +172,14 @@ TEST_F(TLSSyntaxTest, Abbreviations)
   w << val_struct;
   auto streamed = w.bytes();
   auto marshaled = tls::marshal(val_struct);
-  ASSERT_EQ(streamed, marshaled);
+  REQUIRE(streamed == marshaled);
 
   ExampleStruct val_out1{ 0 };
   tls::unmarshal(marshaled, val_out1);
-  ASSERT_EQ(val_in, val_out1);
+  REQUIRE(val_in == val_out1);
 
   auto val_out2 = tls::get<ExampleStruct>(marshaled);
-  ASSERT_EQ(val_in, val_out2);
+  REQUIRE(val_in == val_out2);
 }
 
 // TODO(rlb@ipv.sx) Test failure cases
