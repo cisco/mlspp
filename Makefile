@@ -47,6 +47,7 @@ cclean:
 	rm -rf ${BUILD_DIR}
 
 format:
+	find include -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
