@@ -31,6 +31,9 @@ example: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target api_example
 	./build/cmd/api_example/api_example
 
+everything: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR}
+
 clean:
 	cmake --build ${BUILD_DIR} --target clean
 
