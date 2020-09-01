@@ -10,7 +10,7 @@ CLANG_FORMAT=clang-format -i
 TEST_VECTOR_DIR=./build/test
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-.PHONY: all tidy test libs test-libs gen example everything clean cclean format
+.PHONY: all tidy test libs test-libs test-all gen example everything clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
@@ -32,6 +32,8 @@ libs: ${BUILD_DIR}
 test-libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target tls_syntax_test
 	cd build/lib/tls_syntax/test/ && ctest
+
+test-all: test-libs test
 
 gen: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target test_gen
