@@ -174,7 +174,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
   auto marshaled = tls::marshal(val_struct);
   REQUIRE(streamed == marshaled);
 
-  ExampleStruct val_out1{ 0 };
+  ExampleStruct val_out1{};
   tls::unmarshal(marshaled, val_out1);
   REQUIRE(val_in == val_out1);
 

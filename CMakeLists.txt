@@ -1,51 +1,26 @@
+cmake_minimum_required(VERSION 3.12)
+
+project(mlspp
+  VERSION 0.1
+  LANGUAGES CXX
+)
+
 ###
-### Environment Config
+### Dependencies
 ###
+find_package(OpenSSL 1.1 REQUIRED)
 
-cmake_minimum_required(VERSION 3.3)
-
-project(mlspp)
-
+###
+### Global Config
+###
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Find OpenSSL
-find_package(OpenSSL 1.1 REQUIRED)
-
-# Maybe set up linters
-option(MLSPP_LINT "Whether to run linters" OFF)
-
-if(MLSPP_LINT)
-  message(STATUS "Enabling linters...")
-
-  # Find clang-tidy
-  find_program(
-    CLANG_TIDY_EXE
-    NAMES "clang-tidy"
-    DOC "Path to clang-tidy executable"
-    )
-  if(NOT CLANG_TIDY_EXE)
-    message(STATUS "clang-tidy not found.")
-  else()
-    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator,-fuchsia-default-arguments")
-  endif()
-  
-  # Enable pedantic mode
-  # XXX(rlb@ipv.sx): I would include -Wextra here, but it fails on
-  # gtest.  The right answer is probably just to apply -Werror to the
-  # library and not to the tests, since the library is where these
-  # things matter most.
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wshadow -pedantic-errors")
-  
-  # Enable ASan and UBSan (TSan not relevant; MSan Linux-only)
-  set(DEBUG_FLAGS "-fPIE -fno-omit-frame-pointer -g")
-  set(SANITIZERS "-fno-sanitize-recover=all -fsanitize=undefined -fsanitize=address") 
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
-  set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${DEBUG_FLAGS} ${SANITIZERS}")
-else()
-  message(STATUS "Linters disabled!")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  add_compile_options(-Wall -pedantic -Wextra -Werror)
+elseif(MSVC)
+  add_compile_options(/W4 /WX)
 endif()
 
 ###
@@ -54,22 +29,17 @@ endif()
 
 set(LIB_NAME "${PROJECT_NAME}")
 
-set(LIBRARY_SRC_PATH  "${PROJECT_SOURCE_DIR}/src" )
-set(LIBRARY_INCLUDE_PATH  "${PROJECT_SOURCE_DIR}/include")
+file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-file(GLOB LIB_SOURCE_FILES "${LIBRARY_SRC_PATH}/*.cpp")
-
-add_library(${LIB_NAME} STATIC ${LIB_SOURCE_FILES})
-target_include_directories(${LIB_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR}
-                                       PUBLIC ${LIBRARY_INCLUDE_PATH})
-target_link_libraries(${LIB_NAME} ${OPENSSL_LIBRARIES})
-
-if(CLANG_TIDY_EXE)
-  set_target_properties(
-    ${LIB_NAME} PROPERTIES
-    CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
-  )
-endif()
+add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+target_include_directories(${LIB_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
+  PRIVATE
+    ${OPENSSL_INCLUDE_DIR}
+)
 
 ###
 ### Tests

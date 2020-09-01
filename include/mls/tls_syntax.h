@@ -380,7 +380,7 @@ struct variant {
 
   template<size_t I = 0, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  write_variant(tls::ostream& str, const std::variant<Tp...>& t)
+  write_variant(tls::ostream&, const std::variant<Tp...>&)
   {
     throw WriteError("Empty variant");
   }
@@ -406,7 +406,7 @@ struct variant {
 
   template<size_t I = 0, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& t)
+  read_variant(tls::istream&, Te, std::variant<Tp...>&)
   {
     throw ReadError("Invalid variant type label");
   }
@@ -437,7 +437,7 @@ struct variant {
 // Struct writer without traits (enabled by macro)
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
-write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+write_tuple(tls::ostream&, const std::tuple<Tp...>&)
 { }
 
 template<size_t I = 0, typename... Tp>
@@ -458,8 +458,8 @@ operator<<(tls::ostream& str, const T& obj) {
 // Struct writer with traits (enabled by macro)
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
-write_tuple_traits(tls::ostream& str, const std::tuple<Tp...>& t)
-{ }
+write_tuple_traits(tls::ostream&, const std::tuple<Tp...>&)
+{}
 
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I < sizeof...(Tp), void>::type
@@ -479,7 +479,7 @@ operator<<(tls::ostream& str, const T& obj) {
 // Struct reader without traits (enabled by macro)
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
-read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+read_tuple(tls::istream&, const std::tuple<Tp...>&)
 { }
 
 template<size_t I = 0, typename... Tp>
@@ -500,7 +500,7 @@ operator>>(tls::istream& str, T& obj) {
 // Struct reader with traits (enabled by macro)
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
-read_tuple_traits(tls::istream& str, const std::tuple<Tp...>& t)
+read_tuple_traits(tls::istream&, const std::tuple<Tp...>&)
 { }
 
 template<typename Tr, size_t I = 0, typename... Tp>

@@ -95,7 +95,7 @@ TEST_CASE("Messages Interop")
     group_info.signature = tv.random;
     tls_round_trip(tc.group_info, group_info, true, tc.cipher_suite);
 
-    auto group_secrets = GroupSecrets{ tv.random };
+    auto group_secrets = GroupSecrets{ tv.random, std::nullopt };
     tls_round_trip(tc.group_secrets, group_secrets, true);
 
     auto encrypted_group_secrets =
@@ -139,8 +139,8 @@ TEST_CASE("Messages Interop")
 
     // MLSCiphertext
     MLSCiphertext ciphertext{
-      tv.group_id, tv.epoch,  ContentType::application,
-      tv.random,   tv.random, tv.random,
+      tv.group_id, tv.epoch,  ContentType::application, tv.random, tv.random,
+      tv.random,   tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }
