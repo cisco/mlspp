@@ -29,6 +29,9 @@ jobs:
         brew install pkgconfig doctest
         brew reinstall openssl
 
+    - name: configure to use clang-tidy
+      run: make tidy
+
     - name: build
       run: make everything
 

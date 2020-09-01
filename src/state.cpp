@@ -235,10 +235,7 @@ GroupContext
 State::group_context() const
 {
   return GroupContext{
-    _group_id,
-    _epoch,
-    _tree.root_hash(),
-    _confirmed_transcript_hash,
+    _group_id,   _epoch, _tree.root_hash(), _confirmed_transcript_hash,
     _extensions,
   };
 }
@@ -308,7 +305,7 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Apply the commit
-  auto& commit_data = std::get<CommitData>(pt.content);
+  const auto& commit_data = std::get<CommitData>(pt.content);
   State next = *this;
   next.apply(commit_data.commit);
 
@@ -586,7 +583,7 @@ MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
-  uint32_t generation;
+  uint32_t generation = 0;
   KeyAndNonce keys;
   ContentType content_type;
   if (std::holds_alternative<ApplicationData>(pt.content)) {
@@ -664,7 +661,7 @@ State::decrypt(const MLSCiphertext& ct)
 
   tls::istream r(sender_data);
   Sender raw_sender;
-  uint32_t generation;
+  uint32_t generation = 0;
   r >> raw_sender >> generation;
 
   if (raw_sender.sender_type != SenderType::member) {

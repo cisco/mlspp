@@ -134,11 +134,7 @@ generate_key_schedule()
   };
 
   GroupContext base_group_context{
-    { 0xA0, 0xA0, 0xA0, 0xA0 },
-    0,
-    bytes(32, 0xA1),
-    bytes(32, 0xA2),
-    {},
+    { 0xA0, 0xA0, 0xA0, 0xA0 }, 0, bytes(32, 0xA1), bytes(32, 0xA2), {},
   };
 
   tv.n_epochs = 50;
@@ -283,9 +279,7 @@ generate_messages()
 
   // Construct a test case for each suite
   DeterministicHPKE lock;
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-
+  for (auto suite : suites) {
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key();
@@ -354,8 +348,8 @@ generate_messages()
 
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
-      tv.group_id, tv.epoch,  ContentType::application,
-      tv.random,   tv.random, tv.random, tv.random,
+      tv.group_id, tv.epoch,  ContentType::application, tv.random, tv.random,
+      tv.random,   tv.random,
     };
 
     tv.cases.push_back({ suite,
@@ -434,7 +428,7 @@ generate_basic_session()
           tv.group_id, { init_infos[0] }, { key_packages[1] }, commit_secret);
         session.encrypt_handshake(encrypt);
 
-        sessions.push_back(session);
+        sessions.emplace_back(session);
         welcome = welcome_new;
       } else {
         std::tie(welcome, add) =
@@ -446,7 +440,7 @@ generate_basic_session()
 
       auto joiner = Session::join({ init_infos[j] }, welcome);
       joiner.encrypt_handshake(encrypt);
-      sessions.push_back(joiner);
+      sessions.emplace_back(joiner);
 
       transcript.emplace_back(welcome, add, commit_secret, sessions[0]);
     }
@@ -463,7 +457,7 @@ generate_basic_session()
     }
 
     // Remove everyone (R->L)
-    for (int j = tv.group_size - 2; j >= 0; --j) {
+    for (int j = static_cast<int>(tv.group_size) - 2; j >= 0; --j) {
       auto commit_secret = pseudo_random(suite, transcript.size());
       auto remove = sessions[j].remove(commit_secret, j + 1);
       for (int k = 0; k <= j; ++k) {
@@ -498,7 +492,8 @@ write_test_vectors(const T& vectors)
                                 T::file_name);
   }
 
-  auto data = reinterpret_cast<const char*>(marshaled.data());
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+  const auto* data = reinterpret_cast<const char*>(marshaled.data());
   file.write(data, marshaled.size());
 }
 
@@ -549,7 +544,7 @@ verify_session_repro(const F& generator)
 }
 
 int
-main()
+main() // NOLINT(bugprone-exception-escape)
 {
   auto tree_math = generate_tree_math();
   write_test_vectors(tree_math);

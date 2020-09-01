@@ -26,7 +26,7 @@ from_hex(const std::string& hex)
     throw std::invalid_argument("Odd-length hex string");
   }
 
-  int len = hex.length() / 2;
+  int len = static_cast<int>(hex.length()) / 2;
   bytes out(len);
   for (int i = 0; i < len; i += 1) {
     std::string byte = hex.substr(2 * i, 2);
@@ -151,20 +151,28 @@ const CipherDetails
     SignatureScheme::Ed448,
   };
 
-#define CIPHER_DETAILS_CASE(suite)                                             \
-  case CipherSuite::suite:                                                     \
-    return cipher_details<CipherSuite::suite>;
-
 const CipherDetails&
 CipherDetails::get(CipherSuite suite)
 {
   switch (suite) {
-    CIPHER_DETAILS_CASE(X25519_AES128GCM_SHA256_Ed25519)
-    CIPHER_DETAILS_CASE(P256_AES128GCM_SHA256_P256)
-    CIPHER_DETAILS_CASE(X25519_CHACHA20POLY1305_SHA256_Ed25519)
-    CIPHER_DETAILS_CASE(X448_AES256GCM_SHA512_Ed448)
-    CIPHER_DETAILS_CASE(P521_AES256GCM_SHA512_P521)
-    CIPHER_DETAILS_CASE(X448_CHACHA20POLY1305_SHA512_Ed448)
+    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+      return cipher_details<CipherSuite::X25519_AES128GCM_SHA256_Ed25519>;
+
+    case CipherSuite::P256_AES128GCM_SHA256_P256:
+      return cipher_details<CipherSuite::P256_AES128GCM_SHA256_P256>;
+
+    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+      return cipher_details<
+        CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519>;
+
+    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+      return cipher_details<CipherSuite::X448_AES256GCM_SHA512_Ed448>;
+
+    case CipherSuite::P521_AES256GCM_SHA512_P521:
+      return cipher_details<CipherSuite::P521_AES256GCM_SHA512_P521>;
+
+    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+      return cipher_details<CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448>;
 
     default:
       throw InvalidParameterError("Unsupported ciphersuite");

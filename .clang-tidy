@@ -1,0 +1,16 @@
+---
+Checks:            '*,
+                    -fuchsia-*,
+                    -google-runtime-references,
+                    -hicpp-no-assembler,
+                    -readability-magic-numbers,
+                    -cppcoreguidelines-avoid-magic-numbers,
+                    -modernize-use-trailing-return-type,
+                    -cppcoreguidelines-non-private-member-variables-in-classes,
+                    -misc-non-private-member-variables-in-classes,
+                    -modernize-use-nodiscard,
+                    -google-build-using-namespace,
+                    -cert-err58-cpp,
+                    '
+WarningsAsErrors:  '*'
+HeaderFilterRegex: '*'
