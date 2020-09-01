@@ -1,9 +1,9 @@
 #pragma once
 
 #include "mls/common.h"
-#include "openssl/evp.h"
 #include "mls/primitives.h"
 #include "mls/tls_syntax.h"
+#include "openssl/evp.h"
 #include <vector>
 
 namespace mls {
@@ -31,9 +31,11 @@ private:
 };
 
 // Interface to metrics
-class CryptoMetrics {
+class CryptoMetrics
+{
 public:
-  struct Report {
+  struct Report
+  {
     uint32_t fixed_base_dh;
     uint32_t var_base_dh;
     uint32_t digest;
@@ -64,10 +66,11 @@ public:
   Digest(CipherSuite suite);
 };
 
-bytes hmac(CipherSuite suite, const bytes& key, const bytes& data);
+bytes
+hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
-using primitive::seal;
 using primitive::open;
+using primitive::seal;
 
 bytes
 zero_bytes(size_t size);
@@ -102,7 +105,9 @@ struct HPKEPublicKey
   HPKEPublicKey() = default;
   HPKEPublicKey(bytes data);
 
-  HPKECiphertext encrypt(CipherSuite suite, const bytes& aad, const bytes& pt) const;
+  HPKECiphertext encrypt(CipherSuite suite,
+                         const bytes& aad,
+                         const bytes& pt) const;
   bytes to_bytes() const;
 
   TLS_SERIALIZABLE(data)
@@ -116,7 +121,9 @@ public:
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
 
-  bytes decrypt(CipherSuite suite, const bytes& aad, const HPKECiphertext& ct) const;
+  bytes decrypt(CipherSuite suite,
+                const bytes& aad,
+                const HPKECiphertext& ct) const;
   HPKEPublicKey public_key() const;
 
   TLS_SERIALIZABLE(_data, _pub_data)
@@ -157,8 +164,7 @@ public:
 
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
-  static SignaturePrivateKey derive(CipherSuite suite,
-                                    const bytes& secret);
+  static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
 
   bytes sign(const bytes& message) const;
   SignaturePublicKey public_key() const;

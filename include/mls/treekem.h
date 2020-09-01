@@ -1,14 +1,15 @@
 #pragma once
 
 #include "mls/common.h"
-#include "mls/crypto.h"
 #include "mls/core_types.h"
+#include "mls/crypto.h"
 #include "mls/tls_syntax.h"
 #include "mls/tree_math.h"
 
 namespace mls {
 
-struct Node {
+struct Node
+{
   std::variant<KeyPackage, ParentNode> node;
 
   const HPKEPublicKey& public_key() const;
@@ -17,25 +18,36 @@ struct Node {
   TLS_TRAITS(tls::variant<NodeType>)
 };
 
-struct OptionalNode {
+struct OptionalNode
+{
   std::optional<Node> node;
   bytes hash;
 
   KeyPackage& key_package() { return std::get<KeyPackage>(node.value().node); }
-  const KeyPackage& key_package() const { return std::get<KeyPackage>(node.value().node); }
+  const KeyPackage& key_package() const
+  {
+    return std::get<KeyPackage>(node.value().node);
+  }
 
   ParentNode& parent_node() { return std::get<ParentNode>(node.value().node); }
-  const ParentNode& parent_node() const { return std::get<ParentNode>(node.value().node); }
+  const ParentNode& parent_node() const
+  {
+    return std::get<ParentNode>(node.value().node);
+  }
 
   void set_leaf_hash(CipherSuite suite, NodeIndex index);
-  void set_parent_hash(CipherSuite suite, NodeIndex index, const bytes& left, const bytes& right);
+  void set_parent_hash(CipherSuite suite,
+                       NodeIndex index,
+                       const bytes& left,
+                       const bytes& right);
 
   TLS_SERIALIZABLE(node)
 };
 
 struct TreeKEMPublicKey;
 
-struct TreeKEMPrivateKey {
+struct TreeKEMPrivateKey
+{
   CipherSuite suite;
   LeafIndex index;
   bytes update_secret;
@@ -58,21 +70,26 @@ struct TreeKEMPrivateKey {
   std::optional<HPKEPrivateKey> private_key(NodeIndex n);
   std::optional<HPKEPrivateKey> private_key(NodeIndex n) const;
 
-  void decap(LeafIndex from, const TreeKEMPublicKey& pub, const bytes& context, const DirectPath& path);
+  void decap(LeafIndex from,
+             const TreeKEMPublicKey& pub,
+             const bytes& context,
+             const DirectPath& path);
 
   void truncate(LeafCount size);
 
   bool consistent(const TreeKEMPrivateKey& other) const;
   bool consistent(const TreeKEMPublicKey& other) const;
 
-  private:
+private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   bytes path_step(const bytes& path_secret) const;
 
-  friend std::ostream& operator<<(std::ostream& str, const TreeKEMPrivateKey& obj);
+  friend std::ostream& operator<<(std::ostream& str,
+                                  const TreeKEMPrivateKey& obj);
 };
 
-struct TreeKEMPublicKey {
+struct TreeKEMPublicKey
+{
   CipherSuite suite;
   std::vector<OptionalNode> nodes;
 
@@ -97,23 +114,27 @@ struct TreeKEMPublicKey {
   std::optional<KeyPackage> key_package(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
-  std::tuple<TreeKEMPrivateKey, DirectPath> encap(LeafIndex from,
-                                                  const bytes& context,
-                                                  const bytes& leaf_secret,
-                                                  const SignaturePrivateKey& sig_priv,
-                                                  const std::optional<KeyPackageOpts>& opts);
+  std::tuple<TreeKEMPrivateKey, DirectPath> encap(
+    LeafIndex from,
+    const bytes& context,
+    const bytes& leaf_secret,
+    const SignaturePrivateKey& sig_priv,
+    const std::optional<KeyPackageOpts>& opts);
 
   void truncate();
 
   OptionalNode& node_at(NodeIndex n) { return nodes.at(n.val); }
   const OptionalNode& node_at(NodeIndex n) const { return nodes.at(n.val); }
   OptionalNode& node_at(LeafIndex n) { return nodes.at(NodeIndex(n).val); }
-  const OptionalNode& node_at(LeafIndex n) const { return nodes.at(NodeIndex(n).val); }
+  const OptionalNode& node_at(LeafIndex n) const
+  {
+    return nodes.at(NodeIndex(n).val);
+  }
 
   TLS_SERIALIZABLE(nodes)
   TLS_TRAITS(tls::vector<4>)
 
-  private:
+private:
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
   bytes get_hash(NodeIndex index);
@@ -121,6 +142,7 @@ struct TreeKEMPublicKey {
   friend struct TreeKEMPrivateKey;
 };
 
-std::ostream& operator<<(std::ostream& str, const TreeKEMPublicKey& obj);
+std::ostream&
+operator<<(std::ostream& str, const TreeKEMPublicKey& obj);
 
 } // namespace mls

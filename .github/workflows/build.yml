@@ -1,0 +1,34 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: dependencies (ubuntu and macos)
+      if: ${{ matrix.os == 'macos-latest' || matrix.os == 'ubuntu-latest' }}
+      run: |
+        brew install pkgconfig doctest
+        brew reinstall openssl
+
+    - name: build and run tests
+      run: make test
+

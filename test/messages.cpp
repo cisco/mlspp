@@ -1,6 +1,6 @@
-#include "mls/messages.h"
 #include "test_vectors.h"
 #include <doctest/doctest.h>
+#include <mls/messages.h>
 #include <mls/tls_syntax.h>
 
 using namespace mls;

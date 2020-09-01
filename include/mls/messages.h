@@ -1,11 +1,11 @@
 #pragma once
 
 #include "mls/common.h"
+#include "mls/core_types.h"
 #include "mls/credential.h"
 #include "mls/crypto.h"
-#include "mls/core_types.h"
-#include "mls/treekem.h"
 #include "mls/tls_syntax.h"
+#include "mls/treekem.h"
 #include <optional>
 #include <variant>
 
@@ -22,7 +22,8 @@ namespace mls {
 //   uint32 signer_index;
 //   opaque signature<0..2^16-1>;
 // } GroupInfo;
-struct GroupInfo {
+struct GroupInfo
+{
   bytes group_id;
   epoch_t epoch;
   TreeKEMPublicKey tree;
@@ -72,8 +73,10 @@ struct GroupInfo {
 //   opaque epoch_secret<1..255>;
 //   opaque path_secret<1..255>;
 // } GroupSecrets;
-struct GroupSecrets {
-  struct PathSecret {
+struct GroupSecrets
+{
+  struct PathSecret
+  {
     bytes secret;
 
     TLS_SERIALIZABLE(secret)
@@ -91,7 +94,8 @@ struct GroupSecrets {
 //   opaque key_package_hash<1..255>;
 //   HPKECiphertext encrypted_group_secrets;
 // } EncryptedGroupSecrets;
-struct EncryptedGroupSecrets {
+struct EncryptedGroupSecrets
+{
   bytes key_package_hash;
   HPKECiphertext encrypted_group_secrets;
 
@@ -99,23 +103,21 @@ struct EncryptedGroupSecrets {
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
-
 // struct {
 //   ProtocolVersion version = mls10;
 //   CipherSuite cipher_suite;
 //   EncryptedGroupSecrets group_secretss<1..2^32-1>;
 //   opaque encrypted_group_info<1..2^32-1>;
 // } Welcome;
-struct Welcome {
+struct Welcome
+{
   ProtocolVersion version;
   CipherSuite cipher_suite;
   std::vector<EncryptedGroupSecrets> secrets;
   bytes encrypted_group_info;
 
   Welcome();
-  Welcome(CipherSuite suite,
-          bytes epoch_secret,
-          const GroupInfo& group_info);
+  Welcome(CipherSuite suite, bytes epoch_secret, const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
@@ -124,37 +126,42 @@ struct Welcome {
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
-  private:
+private:
   bytes _epoch_secret;
-  std::tuple<bytes, bytes> group_info_key_nonce(const bytes& epoch_secret) const;
+  std::tuple<bytes, bytes> group_info_key_nonce(
+    const bytes& epoch_secret) const;
 };
 
 ///
 /// Proposals & Commit
 ///
 
-enum struct ProposalType : uint8_t {
+enum struct ProposalType : uint8_t
+{
   invalid = 0,
   add = 1,
   update = 2,
   remove = 3,
 };
 
-struct Add {
+struct Add
+{
   KeyPackage key_package;
 
   static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
-struct Update {
+struct Update
+{
   KeyPackage key_package;
 
   static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
-struct Remove {
+struct Remove
+{
   LeafIndex removed;
 
   static const ProposalType type;
@@ -184,7 +191,8 @@ struct Proposal
   TLS_TRAITS(tls::variant<ProposalType>)
 };
 
-struct ProposalID {
+struct ProposalID
+{
   bytes id;
   TLS_SERIALIZABLE(id)
   TLS_TRAITS(tls::vector<1>)
@@ -196,17 +204,15 @@ struct ProposalID {
 //     ProposalID adds<0..2^16-1>;
 //     DirectPath path;
 // } Commit;
-struct Commit {
+struct Commit
+{
   std::vector<ProposalID> updates;
   std::vector<ProposalID> removes;
   std::vector<ProposalID> adds;
   DirectPath path;
 
   TLS_SERIALIZABLE(updates, removes, adds, path)
-  TLS_TRAITS(tls::vector<2>,
-             tls::vector<2>,
-             tls::vector<2>,
-             tls::pass)
+  TLS_TRAITS(tls::vector<2>, tls::vector<2>, tls::vector<2>, tls::pass)
 };
 
 // struct {
@@ -247,18 +253,20 @@ struct CommitData
 
 struct GroupContext;
 
-enum struct SenderType : uint8_t {
-    invalid = 0,
-    member = 1,
-    preconfigured = 2,
-    new_member = 3,
+enum struct SenderType : uint8_t
+{
+  invalid = 0,
+  member = 1,
+  preconfigured = 2,
+  new_member = 3,
 };
 
-struct Sender {
-    SenderType sender_type;
-    uint32_t sender;
+struct Sender
+{
+  SenderType sender_type;
+  uint32_t sender;
 
-    TLS_SERIALIZABLE(sender_type, sender);
+  TLS_SERIALIZABLE(sender_type, sender);
 };
 
 struct MLSPlaintext
@@ -286,10 +294,7 @@ struct MLSPlaintext
                epoch_t epoch,
                Sender sender,
                ApplicationData application_data);
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               Sender sender,
-               Proposal proposal);
+  MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
@@ -304,7 +309,12 @@ struct MLSPlaintext
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content, signature)
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   sender,
+                   authenticated_data,
+                   content,
+                   signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
@@ -331,8 +341,13 @@ struct MLSCiphertext
   bytes authenticated_data;
   bytes ciphertext;
 
-  TLS_SERIALIZABLE(group_id, epoch, content_type, sender_data_nonce,
-                   encrypted_sender_data, authenticated_data, ciphertext);
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   content_type,
+                   sender_data_nonce,
+                   encrypted_sender_data,
+                   authenticated_data,
+                   ciphertext);
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,

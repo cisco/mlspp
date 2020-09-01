@@ -10,7 +10,8 @@ namespace mls {
 struct BaseKeySource;
 struct HashRatchet;
 
-struct KeyAndNonce {
+struct KeyAndNonce
+{
   bytes key;
   bytes nonce;
 };
@@ -65,13 +66,14 @@ struct GroupKeySource
   KeyAndNonce get(LeafIndex sender, uint32_t generation);
   void erase(LeafIndex sender, uint32_t generation);
 
-  private:
+private:
   HashRatchet& chain(LeafIndex sender);
 };
 
 struct KeyScheduleEpoch;
 
-struct KeyScheduleEpoch {
+struct KeyScheduleEpoch
+{
   CipherSuite suite;
   bytes epoch_secret;
 
@@ -89,10 +91,16 @@ struct KeyScheduleEpoch {
 
   KeyScheduleEpoch() = default;
 
-  static KeyScheduleEpoch create(CipherSuite suite, LeafCount size, const bytes& epoch_secret, const bytes& context);
-  KeyScheduleEpoch next(LeafCount size, const bytes& update_secret, const bytes& context);
+  static KeyScheduleEpoch create(CipherSuite suite,
+                                 LeafCount size,
+                                 const bytes& epoch_secret,
+                                 const bytes& context);
+  KeyScheduleEpoch next(LeafCount size,
+                        const bytes& update_secret,
+                        const bytes& context);
 };
 
-bool operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs);
+bool
+operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs);
 
 } // namespace mls

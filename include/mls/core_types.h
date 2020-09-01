@@ -10,13 +10,15 @@ namespace mls {
 /// Extensions
 ///
 
-enum class ProtocolVersion : uint8_t {
+enum class ProtocolVersion : uint8_t
+{
   mls10 = 0xFF,
 };
 
 extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
-enum struct ExtensionType : uint16_t {
+enum struct ExtensionType : uint16_t
+{
   supported_versions = 1,
   supported_ciphersuites = 2,
   lifetime = 3,
@@ -24,7 +26,8 @@ enum struct ExtensionType : uint16_t {
   parent_hash = 5,
 };
 
-struct Extension {
+struct Extension
+{
   ExtensionType type;
   bytes data;
 
@@ -32,28 +35,33 @@ struct Extension {
   TLS_TRAITS(tls::pass, tls::vector<2>)
 };
 
-struct ExtensionList {
+struct ExtensionList
+{
   std::vector<Extension> extensions;
 
   // XXX(RLB) It would be good if this maintained extensions in order.  It might
   // be possible to do this automatically by changing the storage to a
   // map<ExtensionType, bytes> and extending the TLS code to marshal that type.
   template<typename T>
-  inline void add(const T& obj) {
+  inline void add(const T& obj)
+  {
     auto data = tls::marshal(obj);
 
-    auto curr = std::find_if(extensions.begin(), extensions.end(),
-        [&](const Extension& ext) -> bool { return ext.type == T::type; });
+    auto curr = std::find_if(
+      extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
+        return ext.type == T::type;
+      });
     if (curr != extensions.end()) {
       curr->data = std::move(data);
       return;
     }
 
-    extensions.push_back({T::type, std::move(data)});
+    extensions.push_back({ T::type, std::move(data) });
   }
 
   template<typename T>
-  std::optional<T> find() const {
+  std::optional<T> find() const
+  {
     for (const auto& ext : extensions) {
       if (ext.type == T::type) {
         return tls::get<T>(ext.data);
@@ -69,7 +77,8 @@ struct ExtensionList {
   TLS_TRAITS(tls::vector<2>)
 };
 
-struct SupportedVersionsExtension {
+struct SupportedVersionsExtension
+{
   std::vector<ProtocolVersion> versions;
 
   static const ExtensionType type;
@@ -77,7 +86,8 @@ struct SupportedVersionsExtension {
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct SupportedCipherSuitesExtension {
+struct SupportedCipherSuitesExtension
+{
   std::vector<CipherSuite> cipher_suites;
 
   static const ExtensionType type;
@@ -85,7 +95,8 @@ struct SupportedCipherSuitesExtension {
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct LifetimeExtension {
+struct LifetimeExtension
+{
   uint64_t not_before;
   uint64_t not_after;
 
@@ -93,7 +104,8 @@ struct LifetimeExtension {
   TLS_SERIALIZABLE(not_before, not_after)
 };
 
-struct KeyIDExtension {
+struct KeyIDExtension
+{
   bytes key_id;
 
   static const ExtensionType type;
@@ -101,7 +113,8 @@ struct KeyIDExtension {
   TLS_TRAITS(tls::vector<2>)
 };
 
-struct ParentHashExtension {
+struct ParentHashExtension
+{
   bytes parent_hash;
 
   static const ExtensionType type;
@@ -113,12 +126,14 @@ struct ParentHashExtension {
 /// NodeType, ParentNode, and KeyPackage
 ///
 
-enum class NodeType : uint8_t {
+enum class NodeType : uint8_t
+{
   leaf = 0x00,
   parent = 0x01,
 };
 
-struct ParentNode {
+struct ParentNode
+{
   HPKEPublicKey public_key;
   std::vector<LeafIndex> unmerged_leaves;
   bytes parent_hash;
@@ -136,7 +151,8 @@ struct ParentNode {
 //     Extension extensions<0..2^16-1>;
 //     opaque signature<0..2^16-1>;
 // } KeyPackage;
-struct KeyPackageOpts {
+struct KeyPackageOpts
+{
   // TODO: Things to change in a KeyPackage
 };
 
@@ -165,16 +181,27 @@ struct KeyPackage
   bool verify() const;
 
   static const NodeType type;
-  TLS_SERIALIZABLE(version, cipher_suite, init_key, credential, extensions, signature)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<2>)
+  TLS_SERIALIZABLE(version,
+                   cipher_suite,
+                   init_key,
+                   credential,
+                   extensions,
+                   signature)
+  TLS_TRAITS(tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>)
 
-  private:
+private:
   bytes to_be_signed() const;
 
   friend bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 };
 
-bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
+bool
+operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
 ///
 /// DirectPath
@@ -209,6 +236,5 @@ struct DirectPath
   TLS_SERIALIZABLE(leaf_key_package, nodes)
   TLS_TRAITS(tls::pass, tls::vector<2>)
 };
-
 
 } // namespace mls

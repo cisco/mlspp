@@ -10,7 +10,8 @@ namespace mls {
 class Session
 {
 public:
-  struct InitInfo {
+  struct InitInfo
+  {
     bytes init_secret;
     SignaturePrivateKey sig_priv;
     KeyPackage key_package;
@@ -22,17 +23,18 @@ public:
 
   Session(const Session& other) = default;
 
-  static std::tuple<Session, Welcome>
-    start(const bytes& group_id,
-          const std::vector<InitInfo>& my_info,
-          const std::vector<KeyPackage>& key_packages,
-          const bytes& initial_secret);
+  static std::tuple<Session, Welcome> start(
+    const bytes& group_id,
+    const std::vector<InitInfo>& my_info,
+    const std::vector<KeyPackage>& key_packages,
+    const bytes& initial_secret);
   static Session join(const std::vector<InitInfo>& my_info,
                       const Welcome& welcome);
 
   void encrypt_handshake(bool enabled);
 
-  std::tuple<Welcome, bytes> add(const bytes& add_secret, const KeyPackage& key_package);
+  std::tuple<Welcome, bytes> add(const bytes& add_secret,
+                                 const KeyPackage& key_package);
   bytes update(const bytes& leaf_secret);
   bytes remove(const bytes& evict_secret, uint32_t index);
 
@@ -50,7 +52,8 @@ protected:
 
   Session();
 
-  std::tuple<Welcome, bytes> commit_and_cache(const bytes& secret, const MLSPlaintext& proposal);
+  std::tuple<Welcome, bytes> commit_and_cache(const bytes& secret,
+                                              const MLSPlaintext& proposal);
   void make_init_key(const bytes& init_secret);
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();

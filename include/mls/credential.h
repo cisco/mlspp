@@ -23,8 +23,7 @@ enum struct CredentialType : uint8_t
 // } BasicCredential;
 struct BasicCredential
 {
-  BasicCredential()
-  {}
+  BasicCredential() {}
 
   BasicCredential(bytes identity_in, SignaturePublicKey public_key_in)
     : identity(std::move(identity_in))

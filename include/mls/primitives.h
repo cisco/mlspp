@@ -30,41 +30,47 @@ bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data);
 
 // Symmetric encryption
-bytes seal(CipherSuite suite,
-           const bytes& key,
-           const bytes& nonce,
-           const bytes& aad,
-           const bytes& plaintext);
+bytes
+seal(CipherSuite suite,
+     const bytes& key,
+     const bytes& nonce,
+     const bytes& aad,
+     const bytes& plaintext);
 
-bytes open(CipherSuite suite,
-           const bytes& key,
-           const bytes& nonce,
-           const bytes& aad,
-           const bytes& ciphertext);
+bytes
+open(CipherSuite suite,
+     const bytes& key,
+     const bytes& nonce,
+     const bytes& aad,
+     const bytes& ciphertext);
 
 // DHKEM
-bytes generate(CipherSuite suite);
-bytes derive(CipherSuite suite, const bytes& data);
-bytes priv_to_pub(CipherSuite suite, const bytes& data);
+bytes
+generate(CipherSuite suite);
+bytes
+derive(CipherSuite suite, const bytes& data);
+bytes
+priv_to_pub(CipherSuite suite, const bytes& data);
 
-bytes dh(CipherSuite suite,
-         const bytes& priv,
-         const bytes& pub);
-
+bytes
+dh(CipherSuite suite, const bytes& priv, const bytes& pub);
 
 // Signing
-bytes generate(SignatureScheme scheme);
-bytes derive(SignatureScheme scheme, const bytes& data);
-bytes priv_to_pub(SignatureScheme scheme, const bytes& data);
+bytes
+generate(SignatureScheme scheme);
+bytes
+derive(SignatureScheme scheme, const bytes& data);
+bytes
+priv_to_pub(SignatureScheme scheme, const bytes& data);
 
-bytes sign(SignatureScheme scheme,
-           const bytes& priv,
-           const bytes& message);
+bytes
+sign(SignatureScheme scheme, const bytes& priv, const bytes& message);
 
-bool verify(SignatureScheme scheme,
-             const bytes& pub,
-             const bytes& message,
-             const bytes& signature);
+bool
+verify(SignatureScheme scheme,
+       const bytes& pub,
+       const bytes& message,
+       const bytes& signature);
 
 } // namespace primitive
 } // namespace mls
