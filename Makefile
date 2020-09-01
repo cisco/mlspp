@@ -1,8 +1,9 @@
 # This is just a convenience Makefile to avoid having to remember
 # all the CMake commands and their arguments.
 
-# choose: Ninja, Unix Makefiles, Xcode
-GENERATOR=Ninja
+# Set CMAKE_GENERATOR to choose how you build, e.g.:
+#   CMAKE_GENERATOR=Ninja
+
 BUILD_DIR=build
 CLANG_FORMAT=clang-format -i -style=mozilla
 
@@ -19,7 +20,7 @@ ${TEST_VECTOR_DIR}:
 	mkdir -p ${TEST_VECTOR_DIR}
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
-	cmake -H. -G "${GENERATOR}" -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
+	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=${MLSPP_LINT} -DCMAKE_BUILD_TYPE=Debug
 
 lint:
 	cmake -H. -B${BUILD_DIR} -DMLSPP_LINT=ON -DCMAKE_BUILD_TYPE=Debug
