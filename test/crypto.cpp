@@ -1,11 +1,13 @@
-#include "mls/crypto.h"
+#include <doctest/doctest.h>
+#include <mls/crypto.h>
+
 #include "test_vectors.h"
-#include <gtest/gtest.h>
+
 #include <string>
 
 using namespace mls;
 
-class CryptoTest : public ::testing::Test
+class CryptoTest
 {
 protected:
   // Known-answer tests of almost individual primitives (except for
@@ -168,13 +170,10 @@ protected:
     void run() const
     {
       auto encrypted = primitive::seal(suite, key, nonce, aad, pt);
-      std::cout << "enc " << encrypted << std::endl;
-      std::cout << "kat " << ct << std::endl;
-
-      ASSERT_EQ(encrypted, ct);
+      REQUIRE(encrypted == ct);
 
       auto decrypted = primitive::open(suite, key, nonce, aad, ct);
-      ASSERT_EQ(decrypted, pt);
+      REQUIRE(decrypted == pt);
     }
   };
 
@@ -239,50 +238,50 @@ protected:
   {}
 };
 
-TEST_F(CryptoTest, Interop)
+TEST_CASE_FIXTURE(CryptoTest, "Crypto Interop")
 {
   for (const auto& tc : tv.cases) {
     auto suite = tc.cipher_suite;
 
     auto hkdf_extract_out =
       hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
-    ASSERT_EQ(hkdf_extract_out, tc.hkdf_extract_out);
+    REQUIRE(hkdf_extract_out == tc.hkdf_extract_out);
 
     auto derive_key_pair_priv =
       HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
     auto derive_key_pair_pub = derive_key_pair_priv.public_key();
-    ASSERT_EQ(derive_key_pair_pub, tc.derive_key_pair_pub);
+    REQUIRE(derive_key_pair_pub == tc.derive_key_pair_pub);
 
     auto hpke_plaintext =
       derive_key_pair_priv.decrypt(suite, tv.hpke_aad, tc.hpke_out);
-    ASSERT_EQ(hpke_plaintext, tv.hpke_plaintext);
+    REQUIRE(hpke_plaintext == tv.hpke_plaintext);
   }
 }
 
-TEST_F(CryptoTest, SHA2)
+TEST_CASE_FIXTURE(CryptoTest, "SHA2")
 {
   auto suite256 = CipherSuite::P256_AES128GCM_SHA256_P256;
   auto suite512 = CipherSuite::P521_AES256GCM_SHA512_P521;
 
   CryptoMetrics::reset();
-  ASSERT_EQ(Digest(suite256).write(sha2_in).digest(), sha256_out);
+  REQUIRE(Digest(suite256).write(sha2_in).digest() == sha256_out);
   auto metrics = CryptoMetrics::snapshot();
-  ASSERT_EQ(metrics.digest, 1);
+  REQUIRE(metrics.digest == 1);
 
   CryptoMetrics::reset();
-  ASSERT_EQ(Digest(suite512).write(sha2_in).digest(), sha512_out);
+  REQUIRE(Digest(suite512).write(sha2_in).digest() == sha512_out);
   metrics = CryptoMetrics::snapshot();
-  ASSERT_EQ(metrics.digest, 1);
+  REQUIRE(metrics.digest == 1);
 }
 
-TEST_F(CryptoTest, KnownAnswerAEAD)
+TEST_CASE_FIXTURE(CryptoTest, "Known Answer AEAD")
 {
   aes128gcm_test.run();
   aes256gcm_test.run();
   chacha_test.run();
 }
 
-TEST_F(CryptoTest, RoundTripAEAD)
+TEST_CASE_FIXTURE(CryptoTest, "Round Trip AEAD")
 {
   for (auto suite : all_supported_suites) {
     auto key = random_bytes(CipherDetails::get(suite).key_size);
@@ -292,102 +291,102 @@ TEST_F(CryptoTest, RoundTripAEAD)
 
     auto encrypted = primitive::seal(suite, key, nonce, aad, pt);
     auto decrypted = primitive::open(suite, key, nonce, aad, encrypted);
-    ASSERT_EQ(decrypted, pt);
+    REQUIRE(decrypted == pt);
   }
 }
 
-TEST_F(CryptoTest, BasicDH)
+TEST_CASE_FIXTURE(CryptoTest, "Basic DH")
 {
   for (auto suite : all_supported_suites) {
     auto s = bytes{ 0, 1, 2, 3 };
 
     CryptoMetrics::reset();
     auto x = HPKEPrivateKey::generate(suite);
-    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
+    REQUIRE(CryptoMetrics::snapshot().fixed_base_dh == 1);
 
     CryptoMetrics::reset();
     auto y = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
-    ASSERT_EQ(CryptoMetrics::snapshot().fixed_base_dh, 1);
+    REQUIRE(CryptoMetrics::snapshot().fixed_base_dh == 1);
 
-    ASSERT_EQ(x, x);
-    ASSERT_EQ(y, y);
-    ASSERT_NE(x, y);
+    REQUIRE(x == x);
+    REQUIRE(y == y);
+    REQUIRE(x != y);
 
     auto gX = x.public_key();
     auto gY = y.public_key();
-    ASSERT_EQ(gX, gX);
-    ASSERT_EQ(gY, gY);
-    ASSERT_NE(gX, gY);
+    REQUIRE(gX == gX);
+    REQUIRE(gY == gY);
+    REQUIRE(gX != gY);
   }
 }
 
-TEST_F(CryptoTest, DHSerialize)
+TEST_CASE_FIXTURE(CryptoTest, "DH Serialization")
 {
   for (auto suite : all_supported_suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key();
 
     HPKEPublicKey parsed(gX.to_bytes());
-    ASSERT_EQ(parsed, gX);
+    REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX));
-    ASSERT_EQ(gX2, gX);
+    REQUIRE(gX2 == gX);
   }
 }
 
-TEST_F(CryptoTest, P256DH)
+TEST_CASE_FIXTURE(CryptoTest, "P256DH")
 {
   auto suite = CipherSuite::P256_AES128GCM_SHA256_P256;
 
   auto pkA = primitive::priv_to_pub(suite, p256dh_skA);
-  ASSERT_EQ(pkA, p256dh_pkA);
+  REQUIRE(pkA == p256dh_pkA);
 
   auto kAB = primitive::dh(suite, p256dh_skA, p256dh_pkB);
-  ASSERT_EQ(kAB, p256dh_K);
+  REQUIRE(kAB == p256dh_K);
 }
 
-TEST_F(CryptoTest, P521DH)
+TEST_CASE_FIXTURE(CryptoTest, "P521DH")
 {
   auto suite = CipherSuite::P521_AES256GCM_SHA512_P521;
 
   auto pkA = primitive::priv_to_pub(suite, p521dh_skA);
-  ASSERT_EQ(pkA, p521dh_pkA);
+  REQUIRE(pkA == p521dh_pkA);
 
   auto kAB = primitive::dh(suite, p521dh_skA, p521dh_pkB);
-  ASSERT_EQ(kAB, p521dh_K);
+  REQUIRE(kAB == p521dh_K);
 }
 
-TEST_F(CryptoTest, X25519)
+TEST_CASE_FIXTURE(CryptoTest, "X25519")
 {
   auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
 
   auto pkA = primitive::priv_to_pub(suite, x25519_skA);
   auto pkB = primitive::priv_to_pub(suite, x25519_skB);
-  ASSERT_EQ(pkA, x25519_pkA);
-  ASSERT_EQ(pkB, x25519_pkB);
+  REQUIRE(pkA == x25519_pkA);
+  REQUIRE(pkB == x25519_pkB);
 
   auto kAB = primitive::dh(suite, x25519_skA, pkB);
   auto kBA = primitive::dh(suite, x25519_skB, pkA);
-  ASSERT_EQ(kAB, x25519_K);
-  ASSERT_EQ(kBA, x25519_K);
+  REQUIRE(kAB == x25519_K);
+  REQUIRE(kBA == x25519_K);
 }
 
-TEST_F(CryptoTest, X448)
+TEST_CASE_FIXTURE(CryptoTest, "X448")
 {
   auto suite = CipherSuite::X448_AES256GCM_SHA512_Ed448;
 
   auto pkA = primitive::priv_to_pub(suite, x448_skA);
   auto pkB = primitive::priv_to_pub(suite, x448_skB);
-  ASSERT_EQ(pkA, x448_pkA);
-  ASSERT_EQ(pkB, x448_pkB);
+  REQUIRE(pkA == x448_pkA);
+  REQUIRE(pkB == x448_pkB);
 
   auto kAB = primitive::dh(suite, x448_skA, pkB);
   auto kBA = primitive::dh(suite, x448_skB, pkA);
-  ASSERT_EQ(kAB, x448_K);
-  ASSERT_EQ(kBA, x448_K);
+  REQUIRE(kAB == x448_K);
+  REQUIRE(kBA == x448_K);
 }
 
-TEST_F(CryptoTest, HPKE)
+TEST_CASE_FIXTURE(CryptoTest, "HPKE")
 {
   auto aad = random_bytes(100);
   auto original = random_bytes(100);
@@ -399,66 +398,66 @@ TEST_F(CryptoTest, HPKE)
     auto encrypted = gX.encrypt(suite, aad, original);
     auto decrypted = x.decrypt(suite, aad, encrypted);
 
-    ASSERT_EQ(original, decrypted);
+    REQUIRE(original == decrypted);
   }
 }
 
-TEST_F(CryptoTest, BasicSignature)
+TEST_CASE_FIXTURE(CryptoTest, "Basic Signature")
 {
   for (auto suite : all_supported_suites) {
     auto a = SignaturePrivateKey::generate(suite);
     auto b = SignaturePrivateKey::generate(suite);
 
-    ASSERT_EQ(a, a);
-    ASSERT_EQ(b, b);
-    ASSERT_NE(a, b);
+    REQUIRE(a == a);
+    REQUIRE(b == b);
+    REQUIRE(a != b);
 
-    ASSERT_EQ(a.public_key(), a.public_key());
-    ASSERT_EQ(b.public_key(), b.public_key());
-    ASSERT_NE(a.public_key(), b.public_key());
+    REQUIRE(a.public_key() == a.public_key());
+    REQUIRE(b.public_key() == b.public_key());
+    REQUIRE(a.public_key() != b.public_key());
 
     auto message = from_hex("01020304");
     auto signature = a.sign(message);
 
-    ASSERT_TRUE(a.public_key().verify(message, signature));
+    REQUIRE(a.public_key().verify(message, signature));
   }
 }
 
-TEST_F(CryptoTest, SignatureSerialize)
+TEST_CASE_FIXTURE(CryptoTest, "Signature Serializion")
 {
   for (auto suite : all_supported_suites) {
     auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key();
 
     SignaturePublicKey parsed(suite, gX.to_bytes());
-    ASSERT_EQ(parsed, gX);
+    REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
     gX2.set_cipher_suite(suite);
-    ASSERT_EQ(gX2, gX);
+    REQUIRE(gX2 == gX);
   }
 }
 
-TEST_F(CryptoTest, Ed25519)
+TEST_CASE_FIXTURE(CryptoTest, "Ed25519")
 {
   auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
   auto sk = SignaturePrivateKey::parse(suite, ed25519_sk);
   auto pk = SignaturePublicKey(suite, ed25519_pk);
-  ASSERT_EQ(pk, sk.public_key());
+  REQUIRE(pk == sk.public_key());
 
   auto sig = sk.sign(ed25519_msg);
-  ASSERT_EQ(sig, ed25519_sig);
-  ASSERT_TRUE(pk.verify(ed25519_msg, sig));
+  REQUIRE(sig == ed25519_sig);
+  REQUIRE(pk.verify(ed25519_msg, sig));
 }
 
-TEST_F(CryptoTest, Ed448)
+TEST_CASE_FIXTURE(CryptoTest, "Ed448")
 {
   auto suite = CipherSuite::X448_AES256GCM_SHA512_Ed448;
   auto sk = SignaturePrivateKey::parse(suite, ed448_sk);
   auto pk = SignaturePublicKey(suite, ed448_pk);
-  ASSERT_EQ(pk, sk.public_key());
+  REQUIRE(pk == sk.public_key());
 
   auto sig = sk.sign(ed448_msg);
-  ASSERT_EQ(sig, ed448_sig);
-  ASSERT_TRUE(pk.verify(ed448_msg, sig));
+  REQUIRE(sig == ed448_sig);
+  REQUIRE(pk.verify(ed448_msg, sig));
 }

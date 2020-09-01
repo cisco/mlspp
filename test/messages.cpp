@@ -1,7 +1,7 @@
-#include "mls/messages.h"
-#include "mls/tls_syntax.h"
 #include "test_vectors.h"
-#include <gtest/gtest.h>
+#include <doctest/doctest.h>
+#include <mls/messages.h>
+#include <mls/tls_syntax.h>
 
 using namespace mls;
 
@@ -14,27 +14,15 @@ tls_round_trip(const bytes& vector,
 {
   auto marshaled = tls::marshal(constructed);
   if (reproducible) {
-    std::cout << "vec " << vector << std::endl;
-    std::cout << "mar " << marshaled << std::endl;
-    ASSERT_EQ(vector, marshaled);
+    REQUIRE(vector == marshaled);
   }
 
   auto unmarshaled = tls::get<T>(vector, args...);
-  ASSERT_EQ(constructed, unmarshaled);
-  ASSERT_EQ(tls::marshal(unmarshaled), vector);
+  REQUIRE(constructed == unmarshaled);
+  REQUIRE(tls::marshal(unmarshaled) == vector);
 }
 
-class MessagesTest : public ::testing::Test
-{
-protected:
-  const MessagesTestVectors& tv;
-
-  MessagesTest()
-    : tv(TestLoader<MessagesTestVectors>::get())
-  {}
-};
-
-TEST_F(MessagesTest, Extensions)
+TEST_CASE("Extensions")
 {
   auto sv0 = SupportedVersionsExtension{ { ProtocolVersion::mls10 } };
   auto sc0 = SupportedCipherSuitesExtension{ {
@@ -58,15 +46,17 @@ TEST_F(MessagesTest, Extensions)
   auto kid1 = exts.find<KeyIDExtension>();
   auto ph1 = exts.find<ParentHashExtension>();
 
-  ASSERT_EQ(sv0, sv1);
-  ASSERT_EQ(sc0, sc1);
-  ASSERT_EQ(lt0, lt1);
-  ASSERT_EQ(kid0, kid1);
-  ASSERT_EQ(ph0, ph1);
+  REQUIRE(sv0 == sv1);
+  REQUIRE(sc0 == sc1);
+  REQUIRE(lt0 == lt1);
+  REQUIRE(kid0 == kid1);
+  REQUIRE(ph0 == ph1);
 }
 
-TEST_F(MessagesTest, Interop)
+TEST_CASE("Messages Interop")
 {
+  const auto& tv = TestLoader<MessagesTestVectors>::get();
+
   for (const auto& tc : tv.cases) {
     auto reproducible = deterministic_signature_scheme(tc.cipher_suite);
 

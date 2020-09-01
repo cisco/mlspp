@@ -1,9 +1,9 @@
-#include "mls/credential.h"
-#include <gtest/gtest.h>
+#include <doctest/doctest.h>
+#include <mls/credential.h>
 
 using namespace mls;
 
-TEST(CredentialTest, Basic)
+TEST_CASE("Basic Credential")
 {
   auto suite = CipherSuite::P256_AES128GCM_SHA256_P256;
 
@@ -12,6 +12,6 @@ TEST(CredentialTest, Basic)
   auto pub = priv.public_key();
 
   auto cred = Credential::basic(user_id, pub);
-  ASSERT_EQ(cred.identity(), user_id);
-  ASSERT_EQ(cred.public_key(), pub);
+  REQUIRE(cred.identity() == user_id);
+  REQUIRE(cred.public_key() == pub);
 }

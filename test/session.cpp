@@ -1,10 +1,10 @@
-#include "mls/session.h"
 #include "test_vectors.h"
-#include <gtest/gtest.h>
+#include <doctest/doctest.h>
+#include <mls/session.h>
 
 using namespace mls;
 
-class SessionTest : public ::testing::Test
+class SessionTest
 {
 protected:
   const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
@@ -110,7 +110,7 @@ protected:
         continue;
       }
 
-      ASSERT_EQ(session, sessions[ref]);
+      REQUIRE(session == sessions[ref]);
 
       auto plaintext = bytes{ 0, 1, 2, 3 };
       auto encrypted = session.protect(plaintext);
@@ -120,28 +120,28 @@ protected:
         }
 
         auto decrypted = other.unprotect(encrypted);
-        ASSERT_EQ(plaintext, decrypted);
+        REQUIRE(plaintext == decrypted);
       }
     }
 
     // Verify that the epoch got updated
-    ASSERT_NE(sessions[ref].current_epoch(), initial_epoch);
+    REQUIRE(sessions[ref].current_epoch() != initial_epoch);
   }
 };
 
-TEST_F(SessionTest, CreateTwoPerson)
+TEST_CASE_FIXTURE(SessionTest, "Two-Person Session Creation")
 {
   broadcast_add();
 }
 
-TEST_F(SessionTest, CreateFullSize)
+TEST_CASE_FIXTURE(SessionTest, "Full-Size Session Creation")
 {
   for (int i = 0; i < group_size - 1; i += 1) {
     broadcast_add();
   }
 }
 
-TEST_F(SessionTest, CiphersuiteNegotiation)
+TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
@@ -184,8 +184,8 @@ TEST_F(SessionTest, CiphersuiteNegotiation)
     Session::start({ 0, 1, 2, 3 }, infosA, kpsB, init_secret);
   TestSession alice = std::get<0>(session_welcome_add);
   TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
-  ASSERT_EQ(alice, bob);
-  ASSERT_EQ(alice.cipher_suite(), CipherSuite::P256_AES128GCM_SHA256_P256);
+  REQUIRE(alice == bob);
+  REQUIRE(alice.cipher_suite() == CipherSuite::P256_AES128GCM_SHA256_P256);
 }
 
 class RunningSessionTest : public SessionTest
@@ -200,7 +200,7 @@ protected:
   }
 };
 
-TEST_F(RunningSessionTest, Update)
+TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
@@ -211,7 +211,7 @@ TEST_F(RunningSessionTest, Update)
   }
 }
 
-TEST_F(RunningSessionTest, Remove)
+TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
 {
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
@@ -223,7 +223,7 @@ TEST_F(RunningSessionTest, Remove)
   }
 }
 
-TEST_F(RunningSessionTest, Replace)
+TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
 {
   for (int i = 0; i < group_size; ++i) {
     auto target = (i + 1) % group_size;
@@ -241,7 +241,7 @@ TEST_F(RunningSessionTest, Replace)
   }
 }
 
-TEST_F(RunningSessionTest, FullLifeCycle)
+TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 {
   // 1. Group is created in the ctor
 
@@ -265,7 +265,7 @@ TEST_F(RunningSessionTest, FullLifeCycle)
   }
 }
 
-class SessionInteropTest : public ::testing::Test
+class SessionInteropTest
 {
 protected:
   const BasicSessionTestVectors& basic_tv;
@@ -277,11 +277,11 @@ protected:
   void assert_consistency(const TestSession& session,
                           const SessionTestVectors::Epoch& epoch)
   {
-    ASSERT_EQ(session.current_epoch(), epoch.epoch);
-    ASSERT_EQ(session.current_epoch_secret(), epoch.epoch_secret);
-    ASSERT_EQ(session.current_application_secret(), epoch.application_secret);
-    ASSERT_EQ(session.current_confirmation_key(), epoch.confirmation_key);
-    ASSERT_EQ(session.current_init_secret(), epoch.init_secret);
+    REQUIRE(session.current_epoch() == epoch.epoch);
+    REQUIRE(session.current_epoch_secret() == epoch.epoch_secret);
+    REQUIRE(session.current_application_secret() == epoch.application_secret);
+    REQUIRE(session.current_confirmation_key() == epoch.confirmation_key);
+    REQUIRE(session.current_init_secret() == epoch.init_secret);
   }
 
   void follow_basic(uint32_t index,
@@ -374,13 +374,13 @@ protected:
         KeyPackage{ suite, init_priv.public_key(), cred, identity_priv };
       auto init_info =
         Session::InitInfo{ init_secret, identity_priv, key_package };
-      ASSERT_EQ(key_package, tc.key_packages[i]);
+      REQUIRE(key_package == tc.key_packages[i]);
       follow_basic(i, init_info, tc);
     }
   }
 };
 
-TEST_F(SessionInteropTest, Basic)
+TEST_CASE_FIXTURE(SessionInteropTest, "Basic Session Interop")
 {
   for (const auto& tc : basic_tv.cases) {
     // XXX(rlb@ipv.sx): Tests with randomized signature schemes are disabled for
