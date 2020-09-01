@@ -5,7 +5,7 @@
 #   CMAKE_GENERATOR=Ninja
 
 BUILD_DIR=build
-CLANG_FORMAT=clang-format -i -style=mozilla
+CLANG_FORMAT=clang-format -i
 
 TEST_VECTOR_DIR=./build/test/vectors
 TEST_RUN=./build/test/mlspp_gtest
