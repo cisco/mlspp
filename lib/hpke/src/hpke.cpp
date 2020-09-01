@@ -60,25 +60,28 @@ KEM::create(KEM::ID id)
 }
 
 bytes
-KEM::serialize_private(const KEM::PrivateKey&) const
+KEM::serialize_private(const KEM::PrivateKey& /* unused */) const
 {
   throw std::runtime_error("Not implemented");
 }
 
 std::unique_ptr<KEM::PrivateKey>
-KEM::deserialize_private(const bytes&) const
+KEM::deserialize_private(const bytes& /* unused */) const
 {
   throw std::runtime_error("Not implemented");
 }
 
 std::pair<bytes, bytes>
-KEM::auth_encap(const PublicKey&, const PrivateKey&) const
+KEM::auth_encap(const PublicKey& /* unused */,
+                const PrivateKey& /* unused */) const
 {
   throw std::runtime_error("Not implemented");
 }
 
 bytes
-KEM::auth_decap(const bytes&, const PublicKey&, const PrivateKey&) const
+KEM::auth_decap(const bytes& /* unused */,
+                const PublicKey& /* unused */,
+                const PrivateKey& /* unused */) const
 {
   throw std::runtime_error("Not implemented");
 }
