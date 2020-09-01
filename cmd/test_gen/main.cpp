@@ -134,11 +134,7 @@ generate_key_schedule()
   };
 
   GroupContext base_group_context{
-    { 0xA0, 0xA0, 0xA0, 0xA0 },
-    0,
-    bytes(32, 0xA1),
-    bytes(32, 0xA2),
-    {},
+    { 0xA0, 0xA0, 0xA0, 0xA0 }, 0, bytes(32, 0xA1), bytes(32, 0xA2), {},
   };
 
   tv.n_epochs = 50;
@@ -352,8 +348,8 @@ generate_messages()
 
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
-      tv.group_id, tv.epoch,  ContentType::application,
-      tv.random,   tv.random, tv.random, tv.random,
+      tv.group_id, tv.epoch,  ContentType::application, tv.random, tv.random,
+      tv.random,   tv.random,
     };
 
     tv.cases.push_back({ suite,

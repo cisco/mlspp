@@ -235,10 +235,7 @@ GroupContext
 State::group_context() const
 {
   return GroupContext{
-    _group_id,
-    _epoch,
-    _tree.root_hash(),
-    _confirmed_transcript_hash,
+    _group_id,   _epoch, _tree.root_hash(), _confirmed_transcript_hash,
     _extensions,
   };
 }
