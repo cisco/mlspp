@@ -175,7 +175,8 @@ TreeKEMPrivateKey::decap(LeafIndex from,
 
   size_t dpi = 0;
   auto last = NodeIndex(from);
-  NodeIndex overlap_node, copath_node;
+  NodeIndex overlap_node;
+  NodeIndex copath_node;
   for (dpi = 0; dpi < dp.size(); dpi++) {
     if (tree_math::in_path(ni, dp[dpi])) {
       overlap_node = dp[dpi];
@@ -243,7 +244,7 @@ TreeKEMPrivateKey::consistent(const TreeKEMPrivateKey& other) const
     return false;
   }
 
-  for (auto& entry : path_secrets) {
+  for (const auto& entry : path_secrets) {
     auto other_entry = other.path_secrets.find(entry.first);
     if (other_entry == other.path_secrets.end()) {
       continue;
@@ -264,16 +265,16 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     return false;
   }
 
-  for (auto& entry : path_secrets) {
+  for (const auto& entry : path_secrets) {
     auto n = entry.first;
     auto priv = private_key(n).value();
 
-    auto& opt_node = other.node_at(n).node;
+    const auto& opt_node = other.node_at(n).node;
     if (!opt_node.has_value()) {
       return false;
     }
 
-    auto& pub = opt_node.value().public_key();
+    const auto& pub = opt_node.value().public_key();
     if (priv.public_key() != pub) {
       return false;
     }
@@ -411,14 +412,14 @@ std::vector<NodeIndex>
 TreeKEMPublicKey::resolve(NodeIndex index) const
 {
   if (nodes[index.val].node.has_value()) {
-    auto& node = nodes[index.val].node.value();
+    const auto& node = nodes[index.val].node.value();
     auto out = std::vector<NodeIndex>{ index };
     if (std::holds_alternative<KeyPackage>(node.node)) {
       return out;
     }
 
-    auto& parent = std::get<ParentNode>(node.node);
-    auto& unmerged = parent.unmerged_leaves;
+    const auto& parent = std::get<ParentNode>(node.node);
+    const auto& unmerged = parent.unmerged_leaves;
     std::transform(unmerged.begin(),
                    unmerged.end(),
                    std::back_inserter(out),
@@ -495,7 +496,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
     auto copath = tree_math::sibling(last, NodeCount(size()));
     auto res = resolve(copath);
     for (auto nr : res) {
-      auto& node_pub = node_at(nr).node.value().public_key();
+      const auto& node_pub = node_at(nr).node.value().public_key();
       auto ct = node_pub.encrypt(suite, context, path_secret);
       node.node_secrets.push_back(ct);
     }

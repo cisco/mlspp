@@ -3,18 +3,21 @@
 
 # choose: Ninja, Unix Makefiles, Xcode
 BUILD_DIR=build
-CLANG_FORMAT=clang-format -i -style=mozilla
+CLANG_FORMAT=clang-format -i
 
 TEST_VECTOR_DIR=./build/test
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-.PHONY: all lint test gen gen_debug example clean cclean format
+.PHONY: all tidy test gen example everything clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
-	cmake -H. -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
+
+tidy:
+	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
@@ -28,6 +31,9 @@ gen: ${BUILD_DIR}
 example: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target api_example
 	./build/cmd/api_example/api_example
+
+everything:
+	cmake --build ${BUILD_DIR}
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean

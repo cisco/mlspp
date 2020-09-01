@@ -26,13 +26,13 @@ deterministic_signature_scheme(CipherSuite suite)
 {
   switch (CipherDetails::get(suite).scheme) {
     case SignatureScheme::P256_SHA256:
-      return false;
     case SignatureScheme::P521_SHA512:
       return false;
+
     case SignatureScheme::Ed25519:
-      return true;
     case SignatureScheme::Ed448:
       return true;
+
     default:
       return false;
   }

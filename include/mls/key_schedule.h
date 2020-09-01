@@ -90,7 +90,7 @@ struct KeyScheduleEpoch {
   KeyScheduleEpoch() = default;
 
   static KeyScheduleEpoch create(CipherSuite suite, LeafCount size, const bytes& epoch_secret, const bytes& context);
-  KeyScheduleEpoch next(LeafCount size, const bytes& update_secret, const bytes& context);
+  KeyScheduleEpoch next(LeafCount size, const bytes& update_secret, const bytes& context) const;
 };
 
 bool operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs);

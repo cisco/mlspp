@@ -179,15 +179,21 @@ ancestor(LeafIndex l, LeafIndex r)
 {
   auto ln = NodeIndex(l);
   auto rn = NodeIndex(r);
+  if (ln == rn) {
+    return ln;
+  }
 
   uint8_t k = 0;
+  uint8_t one = 1;
   while (ln != rn) {
-    ln.val = ln.val >> 1;
-    rn.val = rn.val >> 1;
+    ln.val = ln.val >> one;
+    rn.val = rn.val >> one;
     k += 1;
   }
 
-  return NodeIndex((ln.val << k) + (1 << (k - 1)) - 1);
+  uint32_t prefix = ln.val << k;
+  uint32_t stop = (one << uint8_t(k - 1));
+  return NodeIndex(prefix + (stop - 1));
 }
 
 } // namespace tree_math

@@ -32,8 +32,8 @@ const IntSelector Uint16::type = IntSelector::uint16;
 // A struct to test struct encoding and traits
 struct ExampleStruct
 {
-  uint16_t a;
-  std::array<uint32_t, 4> b;
+  uint16_t a{ 0 };
+  std::array<uint32_t, 4> b{ 0, 0, 0, 0 };
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   std::variant<Uint8, Uint16> e;
@@ -133,22 +133,22 @@ istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 {
-  bool data_bool;
+  bool data_bool = false;
   istream_test(val_bool, data_bool, enc_bool);
 
-  uint8_t data_uint8;
+  uint8_t data_uint8 = 0;
   istream_test(val_uint8, data_uint8, enc_uint8);
 
-  uint16_t data_uint16;
+  uint16_t data_uint16 = 0;
   istream_test(val_uint16, data_uint16, enc_uint16);
 
-  uint32_t data_uint32;
+  uint32_t data_uint32 = 0;
   istream_test(val_uint32, data_uint32, enc_uint32);
 
-  uint64_t data_uint64;
+  uint64_t data_uint64 = 0;
   istream_test(val_uint64, data_uint64, enc_uint64);
 
-  std::array<uint16_t, 4> data_array;
+  std::array<uint16_t, 4> data_array = { 0, 0, 0, 0 };
   istream_test(val_array, data_array, enc_array);
 
   ExampleStruct data_struct;

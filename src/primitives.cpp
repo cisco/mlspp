@@ -11,9 +11,7 @@
 
 #include <stdexcept>
 
-namespace mls {
-
-namespace primitive {
+namespace mls::primitive {
 
 ///
 /// Smarter smart pointers
@@ -162,7 +160,7 @@ struct Digest::Implementation
   explicit Implementation(CipherSuite suite)
     : ctx(EVP_MD_CTX_new())
   {
-    auto md = openssl_digest_type(suite);
+    const auto* md = openssl_digest_type(suite);
     size = EVP_MD_size(md);
     if (EVP_DigestInit(ctx.get(), md) != 1) {
       throw openssl_error();
@@ -183,11 +181,11 @@ struct Digest::Implementation
     }
   }
 
-  bytes digest()
+  bytes digest() const
   {
     unsigned int outlen = size;
     auto out = bytes(outlen);
-    auto ptr = out.data();
+    auto* ptr = out.data();
     if (EVP_DigestFinal(ctx.get(), ptr, &outlen) != 1) {
       throw openssl_error();
     }
@@ -216,7 +214,7 @@ Digest::write(const bytes& data)
 }
 
 bytes
-Digest::digest()
+Digest::digest() const
 {
   return _impl->digest();
 }
@@ -231,7 +229,7 @@ bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
   unsigned int size = 0;
-  auto type = openssl_digest_type(suite);
+  const auto* type = openssl_digest_type(suite);
   bytes md(EVP_MAX_MD_SIZE);
   if (nullptr == HMAC(type,
                       key.data(),
@@ -297,11 +295,11 @@ seal(CipherSuite suite,
      const bytes& plaintext)
 {
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
-  if (ctx.get() == nullptr) {
+  if (ctx == nullptr) {
     throw openssl_error();
   }
 
-  auto cipher = openssl_cipher(suite);
+  const auto* cipher = openssl_cipher(suite);
   if (1 != EVP_EncryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
     throw openssl_error();
   }
@@ -352,11 +350,11 @@ open(CipherSuite suite,
   }
 
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
-  if (ctx.get() == nullptr) {
+  if (ctx == nullptr) {
     throw openssl_error();
   }
 
-  auto cipher = openssl_cipher(suite);
+  const auto* cipher = openssl_cipher(suite);
   if (1 != EVP_DecryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
     throw openssl_error();
   }
@@ -367,7 +365,7 @@ open(CipherSuite suite,
     throw openssl_error();
   }
 
-  int out_size;
+  int out_size = 0;
   if (!aad.empty()) {
     if (1 != EVP_DecryptUpdate(
                ctx.get(), nullptr, &out_size, aad.data(), aad.size())) {
@@ -376,11 +374,10 @@ open(CipherSuite suite,
   }
 
   bytes plaintext(ciphertext.size() - tag_size);
-  if (1 != EVP_DecryptUpdate(ctx.get(),
-                             plaintext.data(),
-                             &out_size,
-                             ciphertext.data(),
-                             ciphertext.size() - tag_size)) {
+  const auto ct_end = static_cast<int>(ciphertext.size() - tag_size);
+  if (1 !=
+      EVP_DecryptUpdate(
+        ctx.get(), plaintext.data(), &out_size, ciphertext.data(), ct_end)) {
     throw openssl_error();
   }
 
@@ -496,13 +493,13 @@ struct OpenSSLKey
     // functions fail to mark the required EVP_PKEYs as const, even
     // though they are not modified.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    auto priv_pkey = const_cast<EVP_PKEY*>(_key.get());
+    auto* priv_pkey = const_cast<EVP_PKEY*>(_key.get());
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    auto pub_pkey = const_cast<EVP_PKEY*>(other._key.get());
+    auto* pub_pkey = const_cast<EVP_PKEY*>(other._key.get());
 
     auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-    if (ctx.get() == nullptr) {
+    if (ctx == nullptr) {
       throw openssl_error();
     }
 
@@ -514,7 +511,7 @@ struct OpenSSLKey
       throw openssl_error();
     }
 
-    size_t out_len;
+    size_t out_len = 0;
     if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
       throw openssl_error();
     }
@@ -535,7 +532,7 @@ struct OpenSSLKey
     }
 
     auto ctx = make_typed_unique(EVP_MD_CTX_create());
-    if (ctx.get() == nullptr) {
+    if (ctx == nullptr) {
       throw openssl_error();
     }
 
@@ -563,7 +560,7 @@ struct OpenSSLKey
     }
 
     auto ctx = make_typed_unique(EVP_MD_CTX_create());
-    if (ctx.get() == nullptr) {
+    if (ctx == nullptr) {
       throw openssl_error();
     }
 
@@ -683,7 +680,7 @@ public:
 
   bytes marshal() const override
   {
-    size_t raw_len;
+    size_t raw_len = 0;
     if (1 != EVP_PKEY_get_raw_public_key(_key.get(), nullptr, &raw_len)) {
       throw openssl_error();
     }
@@ -699,7 +696,7 @@ public:
 
   bytes marshal_private() const override
   {
-    size_t raw_len;
+    size_t raw_len = 0;
     if (1 != EVP_PKEY_get_raw_private_key(_key.get(), nullptr, &raw_len)) {
       throw openssl_error();
     }
@@ -717,7 +714,7 @@ public:
 
   void set_public(const bytes& data) override
   {
-    auto pkey =
+    auto* pkey =
       EVP_PKEY_new_raw_public_key(_type, nullptr, data.data(), data.size());
     if (pkey == nullptr) {
       throw openssl_error();
@@ -728,7 +725,7 @@ public:
 
   void set_private(const bytes& data) override
   {
-    auto pkey =
+    auto* pkey =
       EVP_PKEY_new_raw_private_key(_type, nullptr, data.data(), data.size());
     if (pkey == nullptr) {
       throw openssl_error();
@@ -802,7 +799,7 @@ public:
 
   bytes marshal() const override
   {
-    auto pub = EVP_PKEY_get0_EC_KEY(_key.get());
+    auto* pub = EVP_PKEY_get0_EC_KEY(_key.get());
 
     auto len = i2o_ECPublicKey(pub, nullptr);
     if (len == 0) {
@@ -811,8 +808,8 @@ public:
       throw openssl_error();
     }
 
-    bytes out(len);
-    auto data = out.data();
+    auto out = bytes(len);
+    auto* data = out.data();
     if (i2o_ECPublicKey(pub, &data) == 0) {
       throw openssl_error();
     }
@@ -822,11 +819,11 @@ public:
 
   bytes marshal_private() const override
   {
-    auto eckey = EVP_PKEY_get0_EC_KEY(_key.get());
-    auto d = EC_KEY_get0_private_key(eckey);
+    const auto* eckey = EVP_PKEY_get0_EC_KEY(_key.get());
+    const auto* d = EC_KEY_get0_private_key(eckey);
 
     bytes out(BN_num_bytes(d));
-    auto data = out.data();
+    auto* data = out.data();
     if (BN_bn2bin(d, data) != int(out.size())) {
       throw openssl_error();
     }
@@ -848,8 +845,8 @@ public:
   {
     auto eckey = make_typed_unique(new_ec_key());
 
-    auto eckey_ptr = eckey.get();
-    auto data_ptr = data.data();
+    auto* eckey_ptr = eckey.get();
+    const auto* data_ptr = data.data();
     if (nullptr == o2i_ECPublicKey(&eckey_ptr, &data_ptr, data.size())) {
       throw openssl_error();
     }
@@ -861,7 +858,7 @@ public:
   {
     auto eckey = make_typed_unique(new_ec_key());
 
-    auto group = EC_KEY_get0_group(eckey.get());
+    const auto* group = EC_KEY_get0_group(eckey.get());
     auto d = make_typed_unique(BN_bin2bn(data.data(), data.size(), nullptr));
     auto pt = make_typed_unique(EC_POINT_new(group));
     EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
@@ -902,7 +899,7 @@ private:
 
   void reset(EC_KEY* eckey)
   {
-    auto pkey = EVP_PKEY_new();
+    auto* pkey = EVP_PKEY_new();
 
     // Can't be accountable for OpenSSL's internal casting
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
@@ -1053,5 +1050,4 @@ verify(SignatureScheme scheme,
   return key->verify(message, signature);
 }
 
-} // namespace primitive
-} // namespace mls
+} // namespace mls::primitive

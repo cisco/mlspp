@@ -17,7 +17,7 @@ public:
   ~Digest();
   Digest& write(uint8_t byte);
   Digest& write(const bytes& data);
-  bytes digest();
+  bytes digest() const;
 
   size_t output_size() const;
 

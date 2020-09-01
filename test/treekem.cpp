@@ -244,7 +244,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto [new_adder_priv, path] =
       pub.encap(adder, context, leaf_secret, sig_privs.back(), std::nullopt);
     privs[i] = new_adder_priv;
-    // TODO verify parent_hash_valid
+    // TODO(RLB) verify parent_hash_valid
 
     pub.merge(adder, path);
     REQUIRE(privs[i].consistent(pub));
