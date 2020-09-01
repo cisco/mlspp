@@ -30,7 +30,7 @@ jobs:
         brew reinstall openssl
 
     - name: build
-      run: make
+      run: make everything
 
     - name: generate test vectors
       run: make gen

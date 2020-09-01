@@ -192,6 +192,7 @@ State::commit(const bytes& leaf_secret) const
     next._epoch + 1,
     next._tree.root_hash(),
     next._confirmed_transcript_hash,
+    next._extensions,
   });
   auto [new_priv, path] =
     next._tree.encap(_index, ctx, leaf_secret, _identity_priv, std::nullopt);
@@ -238,6 +239,7 @@ State::group_context() const
     _epoch,
     _tree.root_hash(),
     _confirmed_transcript_hash,
+    _extensions,
   };
 }
 
@@ -316,6 +318,7 @@ State::handle(const MLSPlaintext& pt)
     next._epoch + 1,
     next._tree.root_hash(),
     next._confirmed_transcript_hash,
+    next._extensions,
   });
   next._tree_priv.decap(sender, next._tree, ctx, commit_data.commit.path);
   next._tree.merge(sender, commit_data.commit.path);
@@ -502,6 +505,7 @@ State::update_epoch_secrets(const bytes& update_secret)
     _epoch,
     _tree.root_hash(),
     _confirmed_transcript_hash,
+    _extensions,
   });
   _keys = _keys.next(LeafCount{ _tree.size() }, update_secret, ctx);
 }
