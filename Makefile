@@ -13,7 +13,7 @@ TEST_GEN=./build/cmd/test_gen/test_gen
 
 .PHONY: all lint test gen gen_debug example clean cclean format
 
-all: ${BUILD_DIR} ${TEST_VECTOR_DIR} format src/* include/** test/*
+all: ${BUILD_DIR} ${TEST_VECTOR_DIR} src/* include/** test/*
 	cmake --build ${BUILD_DIR}
 
 ${TEST_VECTOR_DIR}:
