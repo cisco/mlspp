@@ -1,5 +1,5 @@
 #include "mls/credential.h"
-#include "mls/tls_syntax.h"
+#include <tls/tls_syntax.h>
 
 namespace mls {
 

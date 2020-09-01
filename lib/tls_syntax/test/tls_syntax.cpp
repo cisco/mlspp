@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
-#include <mls/common.h>
-#include <mls/tls_syntax.h>
+#include <tls/tls_syntax.h>
 
 using namespace mls;
 

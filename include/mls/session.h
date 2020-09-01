@@ -2,7 +2,7 @@
 
 #include "mls/common.h"
 #include "mls/state.h"
-#include "mls/tls_syntax.h"
+#include <tls/tls_syntax.h>
 #include <map>
 
 namespace mls {

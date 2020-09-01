@@ -3,7 +3,7 @@
 #include "mls/common.h"
 #include "mls/core_types.h"
 #include "mls/crypto.h"
-#include "mls/tls_syntax.h"
+#include <tls/tls_syntax.h>
 #include "mls/tree_math.h"
 
 namespace mls {
