@@ -6,34 +6,10 @@
 #include <stdexcept>
 #include <vector>
 
+#include <bytes/bytes.h>
+using namespace bytes_ns;
+
 namespace mls {
-
-///
-/// Byte strings and serialization
-///
-
-using bytes = std::vector<uint8_t>;
-
-bytes
-to_bytes(const std::string& ascii);
-
-std::string
-to_hex(const bytes& data);
-
-bytes
-from_hex(const std::string& hex);
-
-bytes&
-operator+=(bytes& lhs, const bytes& rhs);
-
-bytes
-operator+(const bytes& lhs, const bytes& rhs);
-
-bytes
-operator^(const bytes& lhs, const bytes& rhs);
-
-std::ostream&
-operator<<(std::ostream& out, const bytes& data);
 
 using epoch_t = uint64_t;
 

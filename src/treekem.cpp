@@ -283,22 +283,6 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
   return true;
 }
 
-std::ostream&
-operator<<(std::ostream& str, const TreeKEMPrivateKey& obj)
-{
-  str << "=== TreeKEMPrivateKey ===" << std::endl;
-  str << "suite=" << uint16_t(obj.suite) << " index=" << obj.index.val
-      << std::endl;
-  for (const auto& entry : obj.path_secrets) {
-    auto priv_pub = obj.private_key(entry.first).value().public_key();
-
-    str << "  " << entry.first.val << " => " << entry.second << " = "
-        << priv_pub.to_bytes() << std::endl;
-  }
-
-  return str;
-}
-
 ///
 /// TreeKEMPublicKey
 ///
@@ -556,27 +540,6 @@ TreeKEMPublicKey::get_hash(NodeIndex index)
   auto rh = get_hash(tree_math::right(index, NodeCount(size())));
   node_at(index).set_parent_hash(suite, index, lh, rh);
   return node_at(index).hash;
-}
-
-std::ostream&
-operator<<(std::ostream& str, const TreeKEMPublicKey& obj)
-{
-  auto suite = obj.suite;
-  auto size = obj.nodes.size();
-
-  str << "=== TreeKEMPublicKey ===" << std::endl;
-  str << "suite=" << uint16_t(suite) << " nodes=" << size << std::endl;
-  for (size_t i = 0; i < size; i++) {
-    str << "  " << i << " ";
-    if (!obj.nodes[i].node.has_value()) {
-      str << "-" << std::endl;
-      continue;
-    }
-
-    str << obj.nodes[i].node.value().public_key().data << std::endl;
-  }
-
-  return str;
 }
 
 } // namespace mls

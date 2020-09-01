@@ -83,9 +83,6 @@ struct TreeKEMPrivateKey
 private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
   bytes path_step(const bytes& path_secret) const;
-
-  friend std::ostream& operator<<(std::ostream& str,
-                                  const TreeKEMPrivateKey& obj);
 };
 
 struct TreeKEMPublicKey
@@ -141,8 +138,5 @@ private:
 
   friend struct TreeKEMPrivateKey;
 };
-
-std::ostream&
-operator<<(std::ostream& str, const TreeKEMPublicKey& obj);
 
 } // namespace mls
