@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 #include <tls/tls_syntax.h>
+#include <vector>
 
 // The below functions provide the index calculus for the tree
 // structures used in MLS.  They are premised on a "flat"

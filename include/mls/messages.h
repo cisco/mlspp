@@ -4,9 +4,9 @@
 #include "mls/core_types.h"
 #include "mls/credential.h"
 #include "mls/crypto.h"
-#include <tls/tls_syntax.h>
 #include "mls/treekem.h"
 #include <optional>
+#include <tls/tls_syntax.h>
 #include <variant>
 
 namespace mls {

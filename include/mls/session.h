@@ -2,8 +2,8 @@
 
 #include "mls/common.h"
 #include "mls/state.h"
-#include <tls/tls_syntax.h>
 #include <map>
+#include <tls/tls_syntax.h>
 
 namespace mls {
 
