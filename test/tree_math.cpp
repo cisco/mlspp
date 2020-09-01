@@ -1,7 +1,6 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
 #include <mls/common.h>
-#include <mls/tls_syntax.h>
 #include <mls/tree_math.h>
 
 #include <vector>

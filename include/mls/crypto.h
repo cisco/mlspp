@@ -2,8 +2,8 @@
 
 #include "mls/common.h"
 #include "mls/primitives.h"
-#include "mls/tls_syntax.h"
-#include "openssl/evp.h"
+#include <openssl/evp.h>
+#include <tls/tls_syntax.h>
 #include <vector>
 
 namespace mls {

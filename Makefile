@@ -10,7 +10,7 @@ CLANG_FORMAT=clang-format -i
 TEST_VECTOR_DIR=./build/test
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-.PHONY: all tidy test gen example everything clean cclean format
+.PHONY: all tidy test libs test-libs test-all gen example everything clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
@@ -25,6 +25,16 @@ test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
 	cd ${TEST_VECTOR_DIR} && ctest
 
+libs: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR} --target bytes
+	cmake --build ${BUILD_DIR} --target tls_syntax
+
+test-libs: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR} --target tls_syntax_test
+	cd build/lib/tls_syntax/test/ && ctest
+
+test-all: test-libs test
+
 gen: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target test_gen
 	mkdir -p ${TEST_VECTOR_DIR}
@@ -34,7 +44,7 @@ example: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target api_example
 	./build/cmd/api_example/api_example
 
-everything:
+everything: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
 
 clean:
@@ -48,3 +58,4 @@ format:
 	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
+	find lib -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}

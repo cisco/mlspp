@@ -1,8 +1,8 @@
+#include <bytes/bytes.h>
 #include <doctest/doctest.h>
-#include <mls/common.h>
-#include <mls/tls_syntax.h>
+#include <tls/tls_syntax.h>
 
-using namespace mls;
+using namespace bytes_ns;
 
 // An enum to test enum encoding, and as a type for variants
 enum struct IntSelector : uint16_t

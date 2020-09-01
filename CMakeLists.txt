@@ -8,11 +8,6 @@ project(mlspp
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 
 ###
-### Dependencies
-###
-find_package(OpenSSL 1.1 REQUIRED)
-
-###
 ### Global Config
 ###
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -35,6 +30,16 @@ if(CLANG_TIDY)
 endif()
 
 ###
+### Dependencies
+###
+
+# Internal libraries
+add_subdirectory(lib)
+
+# External libraries
+find_package(OpenSSL 1.1 REQUIRED)
+
+###
 ### Library Config
 ###
 
@@ -44,6 +49,8 @@ file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/inc
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+add_dependencies(${LIB_NAME} bytes tls_syntax)
+target_link_libraries(${LIB_NAME} bytes tls_syntax)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
