@@ -1,13 +1,13 @@
 #pragma once
 
 #include "mls/crypto.h"
-#include "mls/messages.h"
 #include "mls/key_schedule.h"
+#include "mls/messages.h"
 #include "mls/treekem.h"
+#include <list>
 #include <optional>
 #include <set>
 #include <vector>
-#include <list>
 
 namespace mls {
 
@@ -26,8 +26,16 @@ struct GroupContext
   bytes confirmed_transcript_hash;
   ExtensionList extensions;
 
-  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash, extensions)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>, tls::pass)
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   extensions)
+  TLS_TRAITS(tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass)
 };
 
 class State
@@ -58,7 +66,8 @@ public:
   MLSPlaintext update(const bytes& leaf_secret);
   MLSPlaintext remove(LeafIndex removed) const;
 
-  std::tuple<MLSPlaintext, Welcome, State> commit(const bytes& leaf_secret) const;
+  std::tuple<MLSPlaintext, Welcome, State> commit(
+    const bytes& leaf_secret) const;
 
   ///
   /// Generic handshake message handler
@@ -112,8 +121,9 @@ protected:
 
   // Ratchet the key schedule forward and sign the commit that caused the
   // transition
-  MLSPlaintext
-  ratchet_and_sign(const Commit& op, const bytes& update_secret, const GroupContext& prev_ctx);
+  MLSPlaintext ratchet_and_sign(const Commit& op,
+                                const bytes& update_secret,
+                                const GroupContext& prev_ctx);
 
   // Create an MLSPlaintext with a signature over some content
   MLSPlaintext sign(const Proposal& proposal) const;

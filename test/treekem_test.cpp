@@ -1,6 +1,6 @@
 #include "mls/common.h"
-#include "test_vectors.h"
 #include "mls/treekem.h"
+#include "test_vectors.h"
 
 #include <gtest/gtest.h>
 

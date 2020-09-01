@@ -87,7 +87,8 @@ operator<<(tls::ostream& out, const std::optional<T>& opt)
 // Enum writer
 template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
 tls::ostream&
-operator<<(tls::ostream& str, const T& val) {
+operator<<(tls::ostream& str, const T& val)
+{
   auto u = static_cast<std::underlying_type_t<T>>(val);
   return str << u;
 }
@@ -168,7 +169,8 @@ operator>>(tls::istream& in, std::optional<T>& opt)
 // the variant reader will enforce, at least.
 template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
 tls::istream&
-operator>>(tls::istream& str, T& val) {
+operator>>(tls::istream& str, T& val)
+{
   std::underlying_type_t<T> u;
   str >> u;
   val = static_cast<T>(u);
@@ -203,19 +205,20 @@ get(const std::vector<uint8_t>& data, Tp... args)
 }
 
 // Use this macro to define struct serialization with minimal boilerplate
-#define TLS_SERIALIZABLE(...) \
-  static const bool _tls_serializable = true; \
-  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); } \
+#define TLS_SERIALIZABLE(...)                                                  \
+  static const bool _tls_serializable = true;                                  \
+  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); }          \
   auto _tls_fields_w() const { return std::forward_as_tuple(__VA_ARGS__); }
 
 // If your struct contains nontrivial members (e.g., vectors), use this to
 // define traits for them.
-#define TLS_TRAITS(...) \
-  static const bool _tls_has_traits = true; \
+#define TLS_TRAITS(...)                                                        \
+  static const bool _tls_has_traits = true;                                    \
   using _tls_traits = std::tuple<__VA_ARGS__>;
 
 template<typename T>
-struct is_serializable {
+struct is_serializable
+{
   template<typename U>
   static std::true_type test(decltype(U::_tls_serializable));
 
@@ -226,7 +229,8 @@ struct is_serializable {
 };
 
 template<typename T>
-struct has_traits {
+struct has_traits
+{
   template<typename U>
   static std::true_type test(decltype(U::_tls_has_traits));
 
@@ -252,23 +256,28 @@ struct has_traits {
 // * varints
 
 // Pass-through (normal encoding/decoding)
-struct pass {
+struct pass
+{
   template<typename T>
-  static ostream& encode(ostream& str, const T& val) {
+  static ostream& encode(ostream& str, const T& val)
+  {
     return str << val;
   }
 
   template<typename T>
-  static istream& decode(istream& str, T& val) {
+  static istream& decode(istream& str, T& val)
+  {
     return str >> val;
   }
 };
 
 // Vector encoding
-template<size_t head, size_t min=none, size_t max=none>
-struct vector {
+template<size_t head, size_t min = none, size_t max = none>
+struct vector
+{
   template<typename T>
-  static ostream& encode(ostream& str, const std::vector<T>& data) {
+  static ostream& encode(ostream& str, const std::vector<T>& data)
+  {
     // Vectors with no header are written directly
     if (head == 0) {
       for (const auto& item : data) {
@@ -319,7 +328,8 @@ struct vector {
   }
 
   template<typename T>
-  static istream& decode(istream& str, std::vector<T>& data) {
+  static istream& decode(istream& str, std::vector<T>& data)
+  {
     switch (head) {
       case 0: // fallthrough
       case 1: // fallthrough
@@ -374,7 +384,8 @@ template<typename Te, typename Tv>
 Te variant_value;
 
 template<typename Te>
-struct variant {
+struct variant
+{
   template<typename Tv>
   static Te value_for();
 
@@ -386,8 +397,9 @@ struct variant {
   }
 
   template<size_t I = 0, typename... Tp>
-  static inline typename std::enable_if<I < sizeof...(Tp), void>::type
-  write_variant(tls::ostream& str, const std::variant<Tp...>& v)
+    static inline typename std::enable_if <
+    I<sizeof...(Tp), void>::type write_variant(tls::ostream& str,
+                                               const std::variant<Tp...>& v)
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
     if (std::holds_alternative<Tc>(v)) {
@@ -399,7 +411,8 @@ struct variant {
   }
 
   template<typename... Tp>
-  static ostream& encode(ostream& str, const std::variant<Tp...>& data) {
+  static ostream& encode(ostream& str, const std::variant<Tp...>& data)
+  {
     write_variant(str, data);
     return str;
   }
@@ -412,8 +425,10 @@ struct variant {
   }
 
   template<size_t I = 0, typename... Tp>
-  static inline typename std::enable_if<I < sizeof...(Tp), void>::type
-  read_variant(tls::istream& str, Te target_type, std::variant<Tp...>& v)
+    static inline typename std::enable_if <
+    I<sizeof...(Tp), void>::type read_variant(tls::istream& str,
+                                              Te target_type,
+                                              std::variant<Tp...>& v)
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
     if (Tc::type == target_type) {
@@ -438,19 +453,23 @@ struct variant {
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
-{ }
+{}
 
 template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
+  inline typename std::enable_if <
+  I<sizeof...(Tp), void>::type
+  write_tuple(tls::ostream& str, const std::tuple<Tp...>& t)
 {
   str << std::get<I>(t);
   write_tuple<I + 1, Tp...>(str, t);
 }
 
 template<typename T>
-inline typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value, tls::ostream&>::type
-operator<<(tls::ostream& str, const T& obj) {
+inline
+  typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value,
+                          tls::ostream&>::type
+  operator<<(tls::ostream& str, const T& obj)
+{
   write_tuple(str, obj._tls_fields_w());
   return str;
 }
@@ -459,19 +478,23 @@ operator<<(tls::ostream& str, const T& obj) {
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 write_tuple_traits(tls::ostream& str, const std::tuple<Tp...>& t)
-{ }
+{}
 
 template<typename Tr, size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-write_tuple_traits(tls::ostream& str, const std::tuple<Tp...>& t)
+  inline typename std::enable_if <
+  I<sizeof...(Tp), void>::type
+  write_tuple_traits(tls::ostream& str, const std::tuple<Tp...>& t)
 {
   std::tuple_element_t<I, Tr>::encode(str, std::get<I>(t));
   write_tuple_traits<Tr, I + 1, Tp...>(str, t);
 }
 
 template<typename T>
-inline typename std::enable_if<is_serializable<T>::value && has_traits<T>::value, tls::ostream&>::type
-operator<<(tls::ostream& str, const T& obj) {
+inline
+  typename std::enable_if<is_serializable<T>::value && has_traits<T>::value,
+                          tls::ostream&>::type
+  operator<<(tls::ostream& str, const T& obj)
+{
   write_tuple_traits<typename T::_tls_traits>(str, obj._tls_fields_w());
   return str;
 }
@@ -480,19 +503,23 @@ operator<<(tls::ostream& str, const T& obj) {
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
-{ }
+{}
 
 template<size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
+  inline typename std::enable_if <
+  I<sizeof...(Tp), void>::type
+  read_tuple(tls::istream& str, const std::tuple<Tp...>& t)
 {
   str >> std::get<I>(t);
   read_tuple<I + 1, Tp...>(str, t);
 }
 
 template<typename T>
-inline typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value, tls::istream&>::type
-operator>>(tls::istream& str, T& obj) {
+inline
+  typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value,
+                          tls::istream&>::type
+  operator>>(tls::istream& str, T& obj)
+{
   read_tuple(str, obj._tls_fields_r());
   return str;
 }
@@ -501,19 +528,23 @@ operator>>(tls::istream& str, T& obj) {
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 read_tuple_traits(tls::istream& str, const std::tuple<Tp...>& t)
-{ }
+{}
 
 template<typename Tr, size_t I = 0, typename... Tp>
-inline typename std::enable_if<I < sizeof...(Tp), void>::type
-read_tuple_traits(tls::istream& str, const std::tuple<Tp...>& t)
+  inline typename std::enable_if <
+  I<sizeof...(Tp), void>::type
+  read_tuple_traits(tls::istream& str, const std::tuple<Tp...>& t)
 {
   std::tuple_element_t<I, Tr>::decode(str, std::get<I>(t));
   read_tuple_traits<Tr, I + 1, Tp...>(str, t);
 }
 
 template<typename T>
-inline typename std::enable_if<is_serializable<T>::value && has_traits<T>::value, tls::istream&>::type
-operator>>(tls::istream& str, T& obj) {
+inline
+  typename std::enable_if<is_serializable<T>::value && has_traits<T>::value,
+                          tls::istream&>::type
+  operator>>(tls::istream& str, T& obj)
+{
   read_tuple_traits<typename T::_tls_traits>(str, obj._tls_fields_r());
   return str;
 }

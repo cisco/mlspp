@@ -41,7 +41,8 @@ using epoch_t = uint64_t;
 /// Get the current system clock time in the format MLS expects
 ///
 
-uint64_t seconds_since_epoch();
+uint64_t
+seconds_since_epoch();
 
 ///
 /// Auto-generate equality and inequality operators for TLS-serializable things
@@ -49,13 +50,15 @@ uint64_t seconds_since_epoch();
 
 template<typename T>
 inline typename std::enable_if<T::_tls_serializable, bool>::type
-operator==(const T& lhs, const T& rhs) {
+operator==(const T& lhs, const T& rhs)
+{
   return lhs._tls_fields_w() == rhs._tls_fields_w();
 }
 
 template<typename T>
 inline typename std::enable_if<T::_tls_serializable, bool>::type
-operator!=(const T& lhs, const T& rhs) {
+operator!=(const T& lhs, const T& rhs)
+{
   return lhs._tls_fields_w() != rhs._tls_fields_w();
 }
 
@@ -83,7 +86,8 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808,
 };
 
-struct CipherDetails {
+struct CipherDetails
+{
   const size_t secret_size;
   const size_t key_size;
   const size_t nonce_size;
@@ -166,7 +170,9 @@ public:
 
 // A slightly more elegant way to silence -Werror=unused-variable
 template<typename T>
-void silence_unused(const T& val) {
+void
+silence_unused(const T& val)
+{
   (void)val;
 }
 
