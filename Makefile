@@ -1,7 +1,9 @@
 # This is just a convenience Makefile to avoid having to remember
 # all the CMake commands and their arguments.
 
-# choose: Ninja, Unix Makefiles, Xcode
+# Set CMAKE_GENERATOR in the environment to select how you build, e.g.:
+#   CMAKE_GENERATOR=Ninja
+
 BUILD_DIR=build
 CLANG_FORMAT=clang-format -i
 
