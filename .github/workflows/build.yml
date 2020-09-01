@@ -29,6 +29,12 @@ jobs:
         brew install pkgconfig doctest
         brew reinstall openssl
 
-    - name: build and run tests
+    - name: build
+      run: make
+
+    - name: generate test vectors
+      run: make gen
+
+    - name: run tests
       run: make test
 
