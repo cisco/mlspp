@@ -83,7 +83,7 @@ istream::read_uint(T& data, int length)
 istream&
 operator>>(istream& in, bool& data)
 {
-  uint8_t val;
+  uint8_t val = 0;
   in >> val;
 
   // Linter thinks uint8_t is signed (?)

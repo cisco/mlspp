@@ -56,10 +56,10 @@ Session::start(const bytes& group_id,
     throw ProtocolError("Negotiation failure");
   }
 
-  auto& suite = my_selected_info->key_package.cipher_suite;
-  auto& init_secret = my_selected_info->init_secret;
-  auto& sig_priv = my_selected_info->sig_priv;
-  auto& kp = my_selected_info->key_package;
+  const auto suite = my_selected_info->key_package.cipher_suite;
+  const auto& init_secret = my_selected_info->init_secret;
+  const auto& sig_priv = my_selected_info->sig_priv;
+  const auto& kp = my_selected_info->key_package;
 
   auto init_state = State{ group_id, suite, init_secret, sig_priv, kp };
   auto add = init_state.add(*other_selected_kp);
@@ -142,12 +142,14 @@ void
 Session::handle(const bytes& handshake_data)
 {
   auto& state = current_state();
-  MLSPlaintext proposal, commit;
+  MLSPlaintext proposal;
+  MLSPlaintext commit;
   tls::istream r(handshake_data);
   if (_encrypt_handshake) {
     // TODO(rlb): Verify that epoch of the ciphertext matches that of the
     // current state
-    MLSCiphertext enc_proposal, enc_commit;
+    MLSCiphertext enc_proposal;
+    MLSCiphertext enc_commit;
     r >> enc_proposal >> enc_commit;
     proposal = state.decrypt(enc_proposal);
     commit = state.decrypt(enc_commit);

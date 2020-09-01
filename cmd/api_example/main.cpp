@@ -14,7 +14,7 @@ const auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
 class User
 {
 public:
-  User(const std::string& name)
+  explicit User(const std::string& name)
   {
     _identity_priv = SignaturePrivateKey::generate(suite);
     auto id = bytes(name.begin(), name.end());
@@ -45,7 +45,7 @@ private:
 };
 
 void
-verify_send(std::string label, Session& send, Session& recv)
+verify_send(const std::string& label, Session& send, Session& recv)
 {
   auto plaintext = bytes{ 0, 1, 2, 3 };
   auto encrypted = send.protect(plaintext);
@@ -56,7 +56,7 @@ verify_send(std::string label, Session& send, Session& recv)
 }
 
 void
-verify(std::string label, Session& alice, Session& bob)
+verify(const std::string& label, Session& alice, Session& bob)
 {
   if (alice != bob) {
     throw std::runtime_error(label + ": not equal");
@@ -67,7 +67,7 @@ verify(std::string label, Session& alice, Session& bob)
 }
 
 int
-main()
+main() // NOLINT(bugprone-exception-escape)
 {
   ////////// DRAMATIS PERSONAE ///////////
 

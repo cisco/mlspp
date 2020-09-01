@@ -149,7 +149,6 @@ protected:
   std::vector<State> states;
 
   RunningGroupTest()
-    : StateTest()
   {
     states.emplace_back(
       group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
@@ -202,7 +201,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 
 TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
-  for (int i = group_size - 2; i > 0; i -= 1) {
+  for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove(LeafIndex{ uint32_t(i + 1) });
     states[i].handle(remove);
     auto [commit, welcome, new_state] = states[i].commit(fresh_secret());

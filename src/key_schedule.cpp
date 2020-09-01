@@ -236,6 +236,10 @@ GroupKeySource::GroupKeySource(const GroupKeySource& other)
 GroupKeySource&
 GroupKeySource::operator=(const GroupKeySource& other)
 {
+  if (&other == this) {
+    return *this;
+  }
+
   suite = other.suite;
   if (other.base_source != nullptr) {
     base_source.reset(other.base_source->dup());
@@ -325,7 +329,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
 KeyScheduleEpoch
 KeyScheduleEpoch::next(LeafCount size,
                        const bytes& update_secret,
-                       const bytes& context)
+                       const bytes& context) const
 {
   auto new_epoch_secret = hkdf_extract(suite, init_secret, update_secret);
   return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);

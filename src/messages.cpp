@@ -84,8 +84,7 @@ Welcome::Welcome(CipherSuite suite,
   , cipher_suite(suite)
   , _epoch_secret(std::move(epoch_secret))
 {
-  bytes key, nonce;
-  std::tie(key, nonce) = group_info_key_nonce(_epoch_secret);
+  auto [key, nonce] = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
 }
@@ -118,8 +117,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 GroupInfo
 Welcome::decrypt(const bytes& epoch_secret) const
 {
-  bytes key, nonce;
-  std::tie(key, nonce) = group_info_key_nonce(epoch_secret);
+  auto [key, nonce] = group_info_key_nonce(epoch_secret);
   auto group_info_data =
     open(cipher_suite, key, nonce, {}, encrypted_group_info);
   return tls::get<GroupInfo>(group_info_data, cipher_suite);
@@ -146,8 +144,6 @@ const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
 const ProposalType Remove::type = ProposalType::remove;
 
-// MLSPlaintext
-
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
 const ContentType ApplicationData::type = ContentType::application;
@@ -160,7 +156,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
 {
@@ -199,7 +195,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            ApplicationData application_data_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , content(std::move(application_data_in))
 {}
 
@@ -209,7 +205,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            Proposal proposal)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , content(std::move(proposal))
 {}
 
@@ -219,7 +215,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            const Commit& commit)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , content(CommitData{ commit, {} })
 {}
 
@@ -253,7 +249,7 @@ MLSPlaintext::marshal_content(size_t padding_size) const
 bytes
 MLSPlaintext::commit_content() const
 {
-  auto& commit_data = std::get<CommitData>(content);
+  const auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender << commit_data.commit;
@@ -267,7 +263,7 @@ MLSPlaintext::commit_content() const
 bytes
 MLSPlaintext::commit_auth_data() const
 {
-  auto& commit_data = std::get<CommitData>(content);
+  const auto& commit_data = std::get<CommitData>(content);
   tls::ostream w;
   tls::vector<1>::encode(w, commit_data.confirmation);
   tls::vector<2>::encode(w, signature);

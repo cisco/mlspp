@@ -97,7 +97,7 @@ struct KeyScheduleEpoch
                                  const bytes& context);
   KeyScheduleEpoch next(LeafCount size,
                         const bytes& update_secret,
-                        const bytes& context);
+                        const bytes& context) const;
 };
 
 bool

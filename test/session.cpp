@@ -56,7 +56,7 @@ protected:
     auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
 
     // Initial add is different
-    if (sessions.size() == 0) {
+    if (sessions.empty()) {
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
       auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
@@ -70,8 +70,8 @@ protected:
       auto [creator, welcome] =
         Session::start(group_id, { my_info }, { key_package }, commit_secret);
       auto joiner = Session::join({ init_info }, welcome);
-      sessions.push_back(creator);
-      sessions.push_back(joiner);
+      sessions.emplace_back(creator);
+      sessions.emplace_back(joiner);
       return;
     }
 
@@ -84,7 +84,7 @@ protected:
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
-      sessions.push_back(next);
+      sessions.emplace_back(next);
     } else if (index < sessions.size()) {
       sessions[index] = next;
     } else {
@@ -192,7 +192,6 @@ class RunningSessionTest : public SessionTest
 {
 protected:
   RunningSessionTest()
-    : SessionTest()
   {
     for (int i = 0; i < group_size - 1; i += 1) {
       broadcast_add();
@@ -238,6 +237,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
     // Re-add at target
     initial_epoch = sessions[i].current_epoch();
     broadcast_add(i, target);
+    check(initial_epoch, target);
   }
 }
 
@@ -274,8 +274,8 @@ protected:
     : basic_tv(TestLoader<BasicSessionTestVectors>::get())
   {}
 
-  void assert_consistency(const TestSession& session,
-                          const SessionTestVectors::Epoch& epoch)
+  static void assert_consistency(const TestSession& session,
+                                 const SessionTestVectors::Epoch& epoch)
   {
     REQUIRE(session.current_epoch() == epoch.epoch);
     REQUIRE(session.current_epoch_secret() == epoch.epoch_secret);
@@ -303,7 +303,7 @@ protected:
       curr = 1;
     } else {
       // Member i>0 is initialized with a welcome on step i-1
-      auto& epoch = tc.transcript.at(index - 1);
+      const auto& epoch = tc.transcript.at(index - 1);
       session = Session::join({ my_init_info }, epoch.welcome.value());
       session->encrypt_handshake(tc.encrypt);
       assert_consistency(*session, epoch);
@@ -312,7 +312,7 @@ protected:
 
     // Process the adds after join
     for (; curr < basic_tv.group_size - 1; curr += 1) {
-      auto& epoch = tc.transcript.at(curr);
+      const auto& epoch = tc.transcript.at(curr);
 
       // Generate an add to cache the next state
       if (curr == index) {
@@ -329,7 +329,7 @@ protected:
 
     // Process updates
     for (size_t i = 0; i < basic_tv.group_size; ++i, ++curr) {
-      auto& epoch = tc.transcript.at(curr);
+      const auto& epoch = tc.transcript.at(curr);
 
       // Generate an update to cache next state
       if (i == index) {
@@ -343,8 +343,9 @@ protected:
     }
 
     // Process removes until this member has been removed
-    for (int sender = basic_tv.group_size - 2; sender >= 0; --sender, ++curr) {
-      auto& epoch = tc.transcript.at(curr);
+    auto group_size = static_cast<int>(basic_tv.group_size);
+    for (int sender = group_size - 2; sender >= 0; --sender, ++curr) {
+      const auto& epoch = tc.transcript.at(curr);
       if (int(index) > sender) {
         break;
       }
