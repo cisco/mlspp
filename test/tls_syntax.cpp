@@ -32,8 +32,8 @@ const IntSelector Uint16::type = IntSelector::uint16;
 // A struct to test struct encoding and traits
 struct ExampleStruct
 {
-  uint16_t a;
-  std::array<uint32_t, 4> b;
+  uint16_t a{0};
+  std::array<uint32_t, 4> b{0, 0, 0, 0};
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   std::variant<Uint8, Uint16> e;
@@ -174,7 +174,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
   auto marshaled = tls::marshal(val_struct);
   REQUIRE(streamed == marshaled);
 
-  ExampleStruct val_out1{ 0 };
+  ExampleStruct val_out1;
   tls::unmarshal(marshaled, val_out1);
   REQUIRE(val_in == val_out1);
 

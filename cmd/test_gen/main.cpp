@@ -138,6 +138,7 @@ generate_key_schedule()
     0,
     bytes(32, 0xA1),
     bytes(32, 0xA2),
+    {},
   };
 
   tv.n_epochs = 50;
@@ -318,7 +319,7 @@ generate_messages()
     group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;
 
-    auto group_secrets = GroupSecrets{ tv.random };
+    auto group_secrets = GroupSecrets{ tv.random, std::nullopt };
     auto encrypted_group_secrets =
       EncryptedGroupSecrets{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
 
@@ -354,7 +355,7 @@ generate_messages()
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
       tv.group_id, tv.epoch,  ContentType::application,
-      tv.random,   tv.random, tv.random,
+      tv.random,   tv.random, tv.random, tv.random,
     };
 
     tv.cases.push_back({ suite,
