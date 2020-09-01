@@ -5,6 +5,8 @@ project(mlspp
   LANGUAGES CXX
 )
 
+option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
+
 ###
 ### Dependencies
 ###
@@ -21,6 +23,15 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"
   add_compile_options(-Wall -pedantic -Wextra -Werror)
 elseif(MSVC)
   add_compile_options(/W4 /WX)
+endif()
+
+if(CLANG_TIDY)
+  find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+  if(CLANG_TIDY_EXE)
+    set(CMAKE_CXX_CLANG_TIDY  ${CLANG_TIDY_EXE})
+  else()
+    message(WARNING "clang-tidy requested, but not found")
+  endif()
 endif()
 
 ###
