@@ -68,19 +68,3 @@ TEST_CASE("Key Schedule Interop")
     }
   }
 }
-
-/*
-class KeyScheduleTest : public ::testing::Test
-{
-protected:
-  const KeyScheduleTestVectors& tv;
-
-  KeyScheduleTest()
-    : tv(TestLoader<KeyScheduleTestVectors>::get())
-  {}
-};
-
-TEST_F(KeyScheduleTest, Interop)
-{
-}
-*/
