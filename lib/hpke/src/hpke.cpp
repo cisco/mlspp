@@ -36,24 +36,20 @@ KEM::create(KEM::ID id)
 {
   switch (id) {
     case KEM::ID::DHKEM_P256_SHA256:
-      return std::make_unique<DHKEM>(
-        id, DHGroup::ID::P256, KDF::ID::HKDF_SHA256);
+      return std::make_unique<DHKEM>(id, Group::ID::P256, KDF::ID::HKDF_SHA256);
 
     case KEM::ID::DHKEM_P384_SHA384:
-      return std::make_unique<DHKEM>(
-        id, DHGroup::ID::P384, KDF::ID::HKDF_SHA384);
+      return std::make_unique<DHKEM>(id, Group::ID::P384, KDF::ID::HKDF_SHA384);
 
     case KEM::ID::DHKEM_P512_SHA512:
-      return std::make_unique<DHKEM>(
-        id, DHGroup::ID::P521, KDF::ID::HKDF_SHA512);
+      return std::make_unique<DHKEM>(id, Group::ID::P521, KDF::ID::HKDF_SHA512);
 
     case KEM::ID::DHKEM_X25519_SHA256:
       return std::make_unique<DHKEM>(
-        id, DHGroup::ID::X25519, KDF::ID::HKDF_SHA256);
+        id, Group::ID::X25519, KDF::ID::HKDF_SHA256);
 
     case KEM::ID::DHKEM_X448_SHA512:
-      return std::make_unique<DHKEM>(
-        id, DHGroup::ID::X448, KDF::ID::HKDF_SHA512);
+      return std::make_unique<DHKEM>(id, Group::ID::X448, KDF::ID::HKDF_SHA512);
 
     default:
       throw std::runtime_error("Unsupported algorithm");

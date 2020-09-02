@@ -2,57 +2,21 @@
 
 #include <hpke/hpke.h>
 
+#include "group.h"
+
 namespace hpke {
-
-struct DHGroup
-{
-  enum struct ID : uint8_t
-  {
-    P256,
-    P384,
-    P521,
-    X25519,
-    X448,
-  };
-
-  static std::unique_ptr<DHGroup> create(ID group_id, KDF::ID kdf_id);
-  virtual ~DHGroup() = default;
-
-  virtual std::unique_ptr<KEM::PrivateKey> generate_key_pair() const = 0;
-  virtual std::unique_ptr<KEM::PrivateKey> derive_key_pair(
-    const bytes& ikm) const = 0;
-
-  virtual bytes serialize(const KEM::PublicKey& pk) const = 0;
-  virtual std::unique_ptr<KEM::PublicKey> deserialize(
-    const bytes& enc) const = 0;
-
-  virtual bytes serialize_private(const KEM::PrivateKey& sk) const = 0;
-  virtual std::unique_ptr<KEM::PrivateKey> deserialize_private(
-    const bytes& skm) const = 0;
-
-  virtual bytes dh(const KEM::PrivateKey& sk,
-                   const KEM::PublicKey& pk) const = 0;
-
-  size_t dh_size() const;
-  size_t pk_size() const;
-  size_t sk_size() const;
-
-protected:
-  ID group_id;
-  std::unique_ptr<KDF> kdf;
-  bytes suite_id;
-
-  friend struct DHKEM;
-
-  DHGroup(ID group_id_in, KDF::ID kdf_id)
-    : group_id(group_id_in)
-    , kdf(KDF::create(kdf_id))
-  {}
-};
 
 struct DHKEM : public KEM
 {
-  DHKEM(KEM::ID kem_id_in, DHGroup::ID group_id_in, KDF::ID kdf_id_in);
+  struct PrivateKey : public KEM::PrivateKey
+  {
+    PrivateKey(Group::PrivateKey* group_priv_in);
+    std::unique_ptr<KEM::PublicKey> public_key() const override;
+
+    std::unique_ptr<Group::PrivateKey> group_priv;
+  };
+
+  DHKEM(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
   std::unique_ptr<KEM> clone() const override;
   ~DHKEM() override = default;
 
@@ -83,9 +47,9 @@ struct DHKEM : public KEM
 
 private:
   KEM::ID kem_id;
-  DHGroup::ID group_id;
+  Group::ID group_id;
   KDF::ID kdf_id;
-  std::unique_ptr<DHGroup> dh;
+  std::unique_ptr<Group> group;
   std::unique_ptr<KDF> kdf;
   bytes suite_id;
 

@@ -23,6 +23,13 @@ typed_delete(EVP_PKEY_CTX* ptr)
 
 template<>
 void
+typed_delete(EVP_MD_CTX* ptr)
+{
+  EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
 typed_delete(EVP_PKEY* ptr)
 {
   EVP_PKEY_free(ptr);
