@@ -2,6 +2,8 @@
 
 #include "mls/common.h"
 #include "mls/crypto.h"
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 namespace mls {
 
@@ -43,6 +45,28 @@ operator>>(tls::istream& str, BasicCredential& obj);
 bool
 operator==(const BasicCredential& lhs, const BasicCredential& rhs);
 
+
+// case x509:
+//     opaque cert_data<1..2^24-1>;
+struct X509Credential
+{
+
+    X509Credential() {}
+
+    //std::vector<X509 *> chain;
+    bytes identity;
+    SignaturePublicKey public_key;
+    static const CredentialType type;
+};
+
+tls::ostream&
+operator<<(tls::ostream& str, const X509Credential& obj);
+tls::istream&
+operator>>(tls::istream& str, X509Credential& obj);
+bool
+operator==(const X509Credential& lhs, const X509Credential& rhs);
+
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
@@ -63,11 +87,13 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
+  static Credential x509();
+
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  std::variant<BasicCredential> _cred;
+  std::variant<BasicCredential, X509Credential> _cred;
 };
 
 } // namespace mls

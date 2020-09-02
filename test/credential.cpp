@@ -15,3 +15,10 @@ TEST_CASE("Basic Credential")
   REQUIRE(cred.identity() == user_id);
   REQUIRE(cred.public_key() == pub);
 }
+
+TEST_CASE("X509 Credential")
+{
+    auto cred = Credential::x509();
+    REQUIRE(cred.public_key().signature_scheme() == SignatureScheme::unknown);
+    REQUIRE(cred.identity().size() == 0);
+}
