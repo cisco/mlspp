@@ -1,19 +1,13 @@
 #pragma once
 
+#include <hpke/digest.h>
 #include <hpke/hpke.h>
 
 namespace hpke {
 
 struct HKDF : public KDF
 {
-  enum struct Digest : uint8_t
-  {
-    sha256,
-    sha384,
-    sha512,
-  };
-
-  HKDF(Digest digest_in);
+  HKDF(Digest::ID digest_id_in);
 
   std::unique_ptr<KDF> clone() const override;
   ~HKDF() override = default;
@@ -23,7 +17,8 @@ struct HKDF : public KDF
   size_t hash_size() const override;
 
 private:
-  const Digest digest;
+  Digest::ID digest_id;
+  std::unique_ptr<Digest> digest;
 
   bytes hmac(const bytes& key, const bytes& data) const;
 };

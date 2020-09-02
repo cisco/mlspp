@@ -1,3 +1,4 @@
+#include <hpke/digest.h>
 #include <hpke/hpke.h>
 
 #include "aead_cipher.h"
@@ -91,13 +92,13 @@ KDF::create(KDF::ID id)
 {
   switch (id) {
     case KDF::ID::HKDF_SHA256:
-      return std::make_unique<HKDF>(HKDF::Digest::sha256);
+      return std::make_unique<HKDF>(Digest::ID::sha256);
 
     case KDF::ID::HKDF_SHA384:
-      return std::make_unique<HKDF>(HKDF::Digest::sha384);
+      return std::make_unique<HKDF>(Digest::ID::sha384);
 
     case KDF::ID::HKDF_SHA512:
-      return std::make_unique<HKDF>(HKDF::Digest::sha512);
+      return std::make_unique<HKDF>(Digest::ID::sha512);
 
     default:
       throw std::runtime_error("Unsupported algorithm");
