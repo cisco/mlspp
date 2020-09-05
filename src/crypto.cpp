@@ -12,72 +12,17 @@ namespace mls {
 int DeterministicHPKE::_refct = 0;
 
 ///
-/// Metrics
-///
-
-uint32_t CryptoMetrics::fixed_base_dh = 0;
-uint32_t CryptoMetrics::var_base_dh = 0;
-uint32_t CryptoMetrics::digest = 0;
-uint32_t CryptoMetrics::hmac = 0;
-
-CryptoMetrics::Report
-CryptoMetrics::snapshot()
-{
-  return {
-    fixed_base_dh,
-    var_base_dh,
-    digest,
-    hmac,
-  };
-}
-
-void
-CryptoMetrics::reset()
-{
-  fixed_base_dh = 0;
-  var_base_dh = 0;
-  digest = 0;
-  hmac = 0;
-}
-
-void
-CryptoMetrics::count_fixed_base_dh()
-{
-  fixed_base_dh += 1;
-}
-
-void
-CryptoMetrics::count_var_base_dh()
-{
-  var_base_dh += 1;
-}
-
-void
-CryptoMetrics::count_digest()
-{
-  digest += 1;
-}
-
-void
-CryptoMetrics::count_hmac()
-{
-  hmac += 1;
-}
-
-///
 /// Pass-through / metrics wrappers
 ///
 
 Digest::Digest(CipherSuite suite)
   : primitive::Digest(suite)
 {
-  CryptoMetrics::count_digest();
 }
 
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
 {
-  CryptoMetrics::count_hmac();
   return primitive::hmac(suite, key, data);
 }
 
@@ -215,23 +160,23 @@ enum struct HPKEAEADID : uint16_t
 static std::tuple<HPKEKEMID, HPKEKDFID, HPKEAEADID>
 hpke_suite(CipherSuite suite)
 {
-  switch (suite) {
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
+  switch (suite.id) {
+    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P256, HPKEKDFID::HKDF_SHA256, HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
       return std::make_tuple(
         HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return std::make_tuple(HPKEKEMID::DHKEM_X25519,
                              HPKEKDFID::HKDF_SHA256,
                              HPKEAEADID::AES_GCM_128);
 
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return std::make_tuple(
         HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
 
@@ -244,14 +189,12 @@ static std::tuple<bytes, bytes>
 dhkem_encap(CipherSuite suite, const bytes& pub, const bytes& seed)
 {
   bytes ephemeral;
-  CryptoMetrics::count_fixed_base_dh();
   if (seed.empty()) {
     ephemeral = primitive::generate(suite);
   } else {
     ephemeral = primitive::derive(suite, seed);
   }
 
-  CryptoMetrics::count_var_base_dh();
   auto enc = primitive::priv_to_pub(suite, ephemeral);
   auto zz = primitive::dh(suite, ephemeral, pub);
   return std::make_tuple(enc, zz);
@@ -260,7 +203,6 @@ dhkem_encap(CipherSuite suite, const bytes& pub, const bytes& seed)
 static bytes
 dhkem_decap(CipherSuite suite, const bytes& priv, const bytes& enc)
 {
-  CryptoMetrics::count_var_base_dh();
   return primitive::dh(suite, priv, enc);
 }
 
@@ -372,7 +314,6 @@ HPKEPublicKey::to_bytes() const
 HPKEPrivateKey
 HPKEPrivateKey::generate(CipherSuite suite)
 {
-  CryptoMetrics::count_fixed_base_dh();
   return HPKEPrivateKey(suite, primitive::generate(suite));
 }
 
@@ -385,7 +326,6 @@ HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 HPKEPrivateKey
 HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  CryptoMetrics::count_fixed_base_dh();
   return HPKEPrivateKey(suite, primitive::derive(suite, secret));
 }
 
@@ -456,7 +396,7 @@ SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
 }
 
 SignaturePrivateKey::SignaturePrivateKey()
-  : _suite(CipherSuite::unknown)
+  : _suite(CipherSuite::ID::unknown)
   , _scheme(SignatureScheme::unknown)
 {}
 

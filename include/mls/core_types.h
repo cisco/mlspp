@@ -88,7 +88,7 @@ struct SupportedVersionsExtension
 
 struct SupportedCipherSuitesExtension
 {
-  std::vector<CipherSuite> cipher_suites;
+  std::vector<CipherSuite::ID> cipher_suites;
 
   static const ExtensionType type;
   TLS_SERIALIZABLE(cipher_suites)

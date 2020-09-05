@@ -7,7 +7,7 @@ using namespace mls;
 class SessionTest
 {
 protected:
-  const CipherSuite suite = CipherSuite::P256_AES128GCM_SHA256_P256;
+  const CipherSuite suite{CipherSuite::ID::P256_AES128GCM_SHA256_P256};
   const int group_size = 5;
   const size_t secret_size = 32;
   const bytes group_id = { 0, 1, 2, 3 };
@@ -147,8 +147,8 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   auto idA = new_identity_key();
   auto credA = Credential::basic(user_id, idA.public_key());
   std::vector<CipherSuite> ciphersA{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519
+    CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
+    CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
   };
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
@@ -165,8 +165,8 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   auto idB = new_identity_key();
   auto credB = Credential::basic(user_id, idB.public_key());
   std::vector<CipherSuite> ciphersB{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519
+    CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
+    CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
   };
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;
@@ -185,7 +185,7 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   TestSession alice = std::get<0>(session_welcome_add);
   TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
   REQUIRE(alice == bob);
-  REQUIRE(alice.cipher_suite() == CipherSuite::P256_AES128GCM_SHA256_P256);
+  REQUIRE(alice.cipher_suite().id == CipherSuite::ID::P256_AES128GCM_SHA256_P256);
 }
 
 class RunningSessionTest : public SessionTest

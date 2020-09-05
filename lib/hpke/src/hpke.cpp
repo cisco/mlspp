@@ -41,7 +41,7 @@ KEM::create(KEM::ID id)
     case KEM::ID::DHKEM_P384_SHA384:
       return std::make_unique<DHKEM>(id, Group::ID::P384, KDF::ID::HKDF_SHA384);
 
-    case KEM::ID::DHKEM_P512_SHA512:
+    case KEM::ID::DHKEM_P521_SHA512:
       return std::make_unique<DHKEM>(id, Group::ID::P521, KDF::ID::HKDF_SHA512);
 
     case KEM::ID::DHKEM_X25519_SHA256:
@@ -88,13 +88,13 @@ KDF::create(KDF::ID id)
 {
   switch (id) {
     case KDF::ID::HKDF_SHA256:
-      return std::make_unique<HKDF>(Digest::ID::sha256);
+      return std::make_unique<HKDF>(Digest::ID::SHA256);
 
     case KDF::ID::HKDF_SHA384:
-      return std::make_unique<HKDF>(Digest::ID::sha384);
+      return std::make_unique<HKDF>(Digest::ID::SHA384);
 
     case KDF::ID::HKDF_SHA512:
-      return std::make_unique<HKDF>(Digest::ID::sha512);
+      return std::make_unique<HKDF>(Digest::ID::SHA512);
 
     default:
       throw std::runtime_error("Unsupported algorithm");

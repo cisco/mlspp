@@ -219,7 +219,7 @@ struct TreeBaseKeySource : public BaseKeySource
 ///
 
 GroupKeySource::GroupKeySource()
-  : suite(CipherSuite::unknown)
+  : suite(CipherSuite::ID::unknown)
   , base_source(nullptr)
 {}
 

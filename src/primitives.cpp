@@ -1,4 +1,5 @@
 #include "mls/primitives.h"
+#include "mls/crypto.h"
 
 #include "openssl/ecdh.h"
 #include "openssl/ecdsa.h"
@@ -136,15 +137,15 @@ random_bytes(size_t size)
 static const EVP_MD*
 openssl_digest_type(CipherSuite suite)
 {
-  switch (suite) {
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+  switch (suite.id) {
+    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return EVP_sha256();
 
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return EVP_sha512();
 
     default:
@@ -252,17 +253,17 @@ hmac(CipherSuite suite, const bytes& key, const bytes& data)
 static const EVP_CIPHER*
 openssl_cipher(CipherSuite suite)
 {
-  switch (suite) {
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
+  switch (suite.id) {
+    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
       return EVP_aes_128_gcm();
 
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
       return EVP_aes_256_gcm();
 
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return EVP_chacha20_poly1305();
 
     default:
@@ -273,13 +274,13 @@ openssl_cipher(CipherSuite suite)
 static size_t
 openssl_tag_size(CipherSuite suite)
 {
-  switch (suite) {
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+  switch (suite.id) {
+    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
+    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return 16;
 
     default:
@@ -411,16 +412,16 @@ enum struct OpenSSLKeyType
 OpenSSLKeyType
 ossl_key_type(CipherSuite suite)
 {
-  switch (suite) {
-    case CipherSuite::P256_AES128GCM_SHA256_P256:
+  switch (suite.id) {
+    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
       return OpenSSLKeyType::P256;
-    case CipherSuite::P521_AES256GCM_SHA512_P521:
+    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
       return OpenSSLKeyType::P521;
-    case CipherSuite::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return OpenSSLKeyType::X25519;
-    case CipherSuite::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::X448_CHACHA20POLY1305_SHA512_Ed448:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return OpenSSLKeyType::X448;
     default:
       throw InvalidParameterError("Unknown ciphersuite");
@@ -741,11 +742,11 @@ public:
     switch (static_cast<RawKeyType>(_type)) {
       case RawKeyType::X25519:
       case RawKeyType::Ed25519:
-        ersatz_suite = CipherSuite::P256_AES128GCM_SHA256_P256;
+        ersatz_suite = CipherSuite::ID::P256_AES128GCM_SHA256_P256;
         break;
       case RawKeyType::X448:
       case RawKeyType::Ed448:
-        ersatz_suite = CipherSuite::P521_AES256GCM_SHA512_P521;
+        ersatz_suite = CipherSuite::ID::P521_AES256GCM_SHA512_P521;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");
@@ -875,10 +876,10 @@ public:
     CipherSuite ersatz_suite;
     switch (static_cast<ECKeyType>(_curve_nid)) {
       case ECKeyType::P256:
-        ersatz_suite = CipherSuite::P256_AES128GCM_SHA256_P256;
+        ersatz_suite = CipherSuite::ID::P256_AES128GCM_SHA256_P256;
         break;
       case ECKeyType::P521:
-        ersatz_suite = CipherSuite::P521_AES256GCM_SHA512_P521;
+        ersatz_suite = CipherSuite::ID::P521_AES256GCM_SHA512_P521;
         break;
       default:
         throw InvalidParameterError("set_secret not supported");

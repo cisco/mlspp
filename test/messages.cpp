@@ -26,8 +26,8 @@ TEST_CASE("Extensions")
 {
   auto sv0 = SupportedVersionsExtension{ { ProtocolVersion::mls10 } };
   auto sc0 = SupportedCipherSuitesExtension{ {
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   } };
   auto lt0 = LifetimeExtension{ 0xA0A0A0A0A0A0A0A0, 0xB0B0B0B0B0B0B0B0 };
   auto kid0 = KeyIDExtension{ { 0, 1, 2, 3 } };

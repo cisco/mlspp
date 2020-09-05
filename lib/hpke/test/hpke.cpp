@@ -119,7 +119,7 @@ TEST_CASE("HPKE Round-Trip")
   const std::vector<KEM::ID> kems{ KEM::ID::DHKEM_P256_SHA256,
                                    KEM::ID::DHKEM_P384_SHA384,
                                    KEM::ID::DHKEM_P384_SHA384,
-                                   KEM::ID::DHKEM_P512_SHA512,
+                                   KEM::ID::DHKEM_P521_SHA512,
                                    KEM::ID::DHKEM_X448_SHA512 };
   const std::vector<KDF::ID> kdfs{ KDF::ID::HKDF_SHA256,
                                    KDF::ID::HKDF_SHA384,

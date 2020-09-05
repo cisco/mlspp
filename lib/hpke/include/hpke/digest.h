@@ -11,9 +11,9 @@ struct Digest
 {
   enum struct ID
   {
-    sha256,
-    sha384,
-    sha512,
+    SHA256,
+    SHA384,
+    SHA512,
   };
 
   static std::unique_ptr<Digest> create(ID id);
@@ -31,4 +31,4 @@ private:
   friend class std::unique_ptr<Digest>;
 };
 
-}
+} // namespace hpke

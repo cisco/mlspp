@@ -56,8 +56,8 @@ generate_crypto()
   CryptoTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
   tv.hkdf_extract_salt = { 0, 1, 2, 3 };
@@ -95,8 +95,8 @@ generate_hash_ratchet()
   HashRatchetTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    {CipherSuite::ID::P256_AES128GCM_SHA256_P256},
+      {CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519},
   };
 
   tv.n_members = 16;
@@ -129,8 +129,8 @@ generate_key_schedule()
   KeyScheduleTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
   GroupContext base_group_context{
@@ -208,8 +208,8 @@ generate_treekem()
   TreeKEMTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
   size_t n_leaves = 10;
@@ -262,8 +262,8 @@ generate_messages()
   MessagesTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
   // Set the inputs
@@ -381,10 +381,10 @@ generate_basic_session()
   BasicSessionTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
   std::vector<bool> encrypts{ false, true, false, true };

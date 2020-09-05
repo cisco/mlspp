@@ -10,7 +10,7 @@ TEST_CASE("KEM round-trip")
   const std::vector<KEM::ID> ids{ KEM::ID::DHKEM_P256_SHA256,
                                   KEM::ID::DHKEM_P384_SHA384,
                                   KEM::ID::DHKEM_P384_SHA384,
-                                  KEM::ID::DHKEM_P512_SHA512,
+                                  KEM::ID::DHKEM_P521_SHA512,
                                   KEM::ID::DHKEM_X448_SHA512 };
 
   const auto plaintext = from_hex("00010203");

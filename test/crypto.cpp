@@ -180,7 +180,7 @@ protected:
   // AES-GCM
   // https://tools.ietf.org/html/draft-mcgrew-gcm-test-01#section-4
   const AEADTest aes128gcm_test{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
     from_hex("4c80cdefbb5d10da906ac73c3613a634"),
     from_hex("2e443b684956ed7e3b244cfe"),
     from_hex("000043218765432100000000"),
@@ -193,7 +193,7 @@ protected:
   };
 
   const AEADTest aes256gcm_test{
-    CipherSuite::P521_AES256GCM_SHA512_P521,
+    CipherSuite::ID::P521_AES256GCM_SHA512_P521,
     from_hex(
       "abbccddef00112233445566778899aababbccddef00112233445566778899aab"),
     from_hex("112233440102030405060708"),
@@ -208,7 +208,7 @@ protected:
   // ChaCha20-Poly1305
   // https://tools.ietf.org/html/rfc8439#appendix-A.5
   const AEADTest chacha_test{
-    CipherSuite::X25519_CHACHA20POLY1305_SHA256_Ed25519,
+    CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
     from_hex("1c9240a5eb55d38af333888604f6b5f0"
              "473917c1402b80099dca5cbc207075c0"),
     from_hex("000000000102030405060708"),
@@ -260,18 +260,11 @@ TEST_CASE_FIXTURE(CryptoTest, "Crypto Interop")
 
 TEST_CASE_FIXTURE(CryptoTest, "SHA2")
 {
-  auto suite256 = CipherSuite::P256_AES128GCM_SHA256_P256;
-  auto suite512 = CipherSuite::P521_AES256GCM_SHA512_P521;
+  auto suite256 = CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256);
+  auto suite512 = CipherSuite(CipherSuite::ID::P521_AES256GCM_SHA512_P521);
 
-  CryptoMetrics::reset();
   REQUIRE(Digest(suite256).write(sha2_in).digest() == sha256_out);
-  auto metrics = CryptoMetrics::snapshot();
-  REQUIRE(metrics.digest == 1);
-
-  CryptoMetrics::reset();
   REQUIRE(Digest(suite512).write(sha2_in).digest() == sha512_out);
-  metrics = CryptoMetrics::snapshot();
-  REQUIRE(metrics.digest == 1);
 }
 
 TEST_CASE_FIXTURE(CryptoTest, "Known Answer AEAD")
@@ -300,13 +293,8 @@ TEST_CASE_FIXTURE(CryptoTest, "Basic DH")
   for (auto suite : all_supported_suites) {
     auto s = bytes{ 0, 1, 2, 3 };
 
-    CryptoMetrics::reset();
     auto x = HPKEPrivateKey::generate(suite);
-    REQUIRE(CryptoMetrics::snapshot().fixed_base_dh == 1);
-
-    CryptoMetrics::reset();
     auto y = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
-    REQUIRE(CryptoMetrics::snapshot().fixed_base_dh == 1);
 
     REQUIRE(x == x);
     REQUIRE(y == y);
@@ -336,7 +324,7 @@ TEST_CASE_FIXTURE(CryptoTest, "DH Serialization")
 
 TEST_CASE_FIXTURE(CryptoTest, "P256DH")
 {
-  auto suite = CipherSuite::P256_AES128GCM_SHA256_P256;
+  auto suite = CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256);
 
   auto pkA = primitive::priv_to_pub(suite, p256dh_skA);
   REQUIRE(pkA == p256dh_pkA);
@@ -347,7 +335,7 @@ TEST_CASE_FIXTURE(CryptoTest, "P256DH")
 
 TEST_CASE_FIXTURE(CryptoTest, "P521DH")
 {
-  auto suite = CipherSuite::P521_AES256GCM_SHA512_P521;
+  auto suite = CipherSuite(CipherSuite::ID::P521_AES256GCM_SHA512_P521);
 
   auto pkA = primitive::priv_to_pub(suite, p521dh_skA);
   REQUIRE(pkA == p521dh_pkA);
@@ -358,7 +346,7 @@ TEST_CASE_FIXTURE(CryptoTest, "P521DH")
 
 TEST_CASE_FIXTURE(CryptoTest, "X25519")
 {
-  auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
+  auto suite = CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519);
 
   auto pkA = primitive::priv_to_pub(suite, x25519_skA);
   auto pkB = primitive::priv_to_pub(suite, x25519_skB);
@@ -373,7 +361,7 @@ TEST_CASE_FIXTURE(CryptoTest, "X25519")
 
 TEST_CASE_FIXTURE(CryptoTest, "X448")
 {
-  auto suite = CipherSuite::X448_AES256GCM_SHA512_Ed448;
+  auto suite = CipherSuite(CipherSuite::ID::X448_AES256GCM_SHA512_Ed448);
 
   auto pkA = primitive::priv_to_pub(suite, x448_skA);
   auto pkB = primitive::priv_to_pub(suite, x448_skB);
@@ -440,7 +428,7 @@ TEST_CASE_FIXTURE(CryptoTest, "Signature Serializion")
 
 TEST_CASE_FIXTURE(CryptoTest, "Ed25519")
 {
-  auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
+  auto suite = CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519);
   auto sk = SignaturePrivateKey::parse(suite, ed25519_sk);
   auto pk = SignaturePublicKey(suite, ed25519_pk);
   REQUIRE(pk == sk.public_key());
@@ -452,7 +440,7 @@ TEST_CASE_FIXTURE(CryptoTest, "Ed25519")
 
 TEST_CASE_FIXTURE(CryptoTest, "Ed448")
 {
-  auto suite = CipherSuite::X448_AES256GCM_SHA512_Ed448;
+  auto suite = CipherSuite(CipherSuite::ID::X448_AES256GCM_SHA512_Ed448);
   auto sk = SignaturePrivateKey::parse(suite, ed448_sk);
   auto pk = SignaturePublicKey(suite, ed448_pk);
   REQUIRE(pk == sk.public_key());

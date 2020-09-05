@@ -11,13 +11,13 @@ static const EVP_MD*
 openssl_digest_type(Digest::ID digest)
 {
   switch (digest) {
-    case Digest::ID::sha256:
+    case Digest::ID::SHA256:
       return EVP_sha256();
 
-    case Digest::ID::sha384:
+    case Digest::ID::SHA384:
       return EVP_sha384();
 
-    case Digest::ID::sha512:
+    case Digest::ID::SHA512:
       return EVP_sha512();
 
     default:
