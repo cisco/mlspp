@@ -63,8 +63,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
 bytes
 KeyPackage::hash() const
 {
-  auto marshaled = tls::marshal(*this);
-  return Digest(cipher_suite).write(marshaled).digest();
+  return cipher_suite.digest->hash(tls::marshal(*this));
 }
 
 void

@@ -24,7 +24,7 @@ const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
 bool
 deterministic_signature_scheme(CipherSuite suite)
 {
-  switch (CipherDetails::get(suite).scheme) {
+  switch (scheme_for_suite(suite.id)) {
     case SignatureScheme::P256_SHA256:
     case SignatureScheme::P521_SHA512:
       return false;

@@ -8,7 +8,7 @@ using namespace mls;
 class TreeKEMTest
 {
 protected:
-  const CipherSuite suite{CipherSuite::ID::P256_AES128GCM_SHA256_P256};
+  const CipherSuite suite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
 
   const TreeKEMTestVectors tv;
 

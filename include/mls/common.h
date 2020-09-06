@@ -9,8 +9,8 @@
 #include <bytes/bytes.h>
 using namespace bytes_ns;
 
-#include <hpke/hpke.h>
 #include <hpke/digest.h>
+#include <hpke/hpke.h>
 #include <hpke/signature.h>
 
 #include <tls/tls_syntax.h>
@@ -47,8 +47,10 @@ operator!=(const T& lhs, const T& rhs)
 ///
 /// Cipher suites
 ///
-struct CipherSuite {
-  enum struct ID : uint16_t {
+struct CipherSuite
+{
+  enum struct ID : uint16_t
+  {
     unknown = 0x0000,
     X25519_AES128GCM_SHA256_Ed25519 = 0x0001,
     P256_AES128GCM_SHA256_P256 = 0x0002,
@@ -69,14 +71,23 @@ struct CipherSuite {
   std::unique_ptr<hpke::Digest> digest;
   std::unique_ptr<hpke::Signature> sig;
 
-  private:
+  bytes expand_with_label(const bytes& secret,
+                          const std::string& label,
+                          const bytes& context,
+                          size_t size) const;
+
+private:
   void reset(ID id_in);
 };
 
-tls::istream& operator>>(tls::istream& str, CipherSuite& suite);
-tls::ostream& operator<<(tls::ostream& str, const CipherSuite& suite);
-bool operator==(const CipherSuite& lhs, const CipherSuite& rhs);
-bool operator!=(const CipherSuite& lhs, const CipherSuite& rhs);
+tls::istream&
+operator>>(tls::istream& str, CipherSuite& suite);
+tls::ostream&
+operator<<(tls::ostream& str, const CipherSuite& suite);
+bool
+operator==(const CipherSuite& lhs, const CipherSuite& rhs);
+bool
+operator!=(const CipherSuite& lhs, const CipherSuite& rhs);
 
 enum struct SignatureScheme : uint16_t
 {
@@ -87,19 +98,9 @@ enum struct SignatureScheme : uint16_t
   Ed448 = 0x0808,
 };
 
-struct CipherDetails
-{
-  const size_t secret_size;
-  const size_t key_size;
-  const size_t nonce_size;
-  const SignatureScheme scheme;
-
-  static const CipherDetails& get(CipherSuite suite);
-};
+SignatureScheme scheme_for_suite(CipherSuite::ID id);
 
 extern const std::array<CipherSuite::ID, 6> all_supported_suites;
-
-
 
 ///
 /// Error types

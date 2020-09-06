@@ -95,8 +95,8 @@ generate_hash_ratchet()
   HashRatchetTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    {CipherSuite::ID::P256_AES128GCM_SHA256_P256},
-      {CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519},
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   tv.n_members = 16;

@@ -209,12 +209,12 @@ struct HPKE
                                    const bytes& psk_id,
                                    const KEM::PublicKey& pkS) const;
 
-private:
   bytes suite;
   std::unique_ptr<KEM> kem;
   std::unique_ptr<KDF> kdf;
   std::unique_ptr<AEAD> aead;
 
+private:
   static bool verify_psk_inputs(Mode mode,
                                 const bytes& psk,
                                 const bytes& psk_id);

@@ -554,7 +554,8 @@ inline
 ///
 
 template<size_t N>
-struct opaque {
+struct opaque
+{
   std::vector<uint8_t> data;
 
   TLS_SERIALIZABLE(data)
@@ -562,7 +563,9 @@ struct opaque {
 };
 
 template<size_t N>
-bool operator==(const opaque<N>& lhs, const opaque<N>& rhs) {
+bool
+operator==(const opaque<N>& lhs, const opaque<N>& rhs)
+{
   return lhs.data == rhs.data;
 }
 

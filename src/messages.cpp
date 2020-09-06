@@ -85,7 +85,8 @@ Welcome::Welcome(CipherSuite suite,
 {
   auto [key, nonce] = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
+  encrypted_group_info =
+    cipher_suite.hpke->aead->seal(key, nonce, {}, group_info_data);
 }
 
 std::optional<int>
@@ -118,21 +119,27 @@ Welcome::decrypt(const bytes& epoch_secret) const
 {
   auto [key, nonce] = group_info_key_nonce(epoch_secret);
   auto group_info_data =
-    open(cipher_suite, key, nonce, {}, encrypted_group_info);
-  return tls::get<GroupInfo>(group_info_data, cipher_suite);
+    cipher_suite.hpke->aead->open(key, nonce, {}, encrypted_group_info);
+  if (!group_info_data.has_value()) {
+    throw ProtocolError("Welcome decryption failed");
+  }
+
+  return tls::get<GroupInfo>(group_info_data.value(), cipher_suite);
 }
 
 std::tuple<bytes, bytes>
 Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 {
-  auto details = CipherDetails::get(cipher_suite);
+  auto secret_size = cipher_suite.hpke->kdf->hash_size();
+  auto key_size = cipher_suite.hpke->aead->key_size();
+  auto nonce_size = cipher_suite.hpke->aead->nonce_size();
 
-  auto secret = hkdf_expand_label(
-    cipher_suite, epoch_secret, "group info", {}, details.secret_size);
+  auto secret = cipher_suite.expand_with_label(
+    epoch_secret, "group info", {}, secret_size);
   auto key =
-    hkdf_expand_label(cipher_suite, secret, "key", {}, details.key_size);
+    cipher_suite.expand_with_label(secret, "key", {}, key_size);
   auto nonce =
-    hkdf_expand_label(cipher_suite, secret, "nonce", {}, details.nonce_size);
+    cipher_suite.expand_with_label(secret, "nonce", {}, nonce_size);
 
   return std::make_tuple(key, nonce);
 }
