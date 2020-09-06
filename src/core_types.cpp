@@ -74,7 +74,7 @@ KeyPackage::sign(const SignaturePrivateKey& sig_priv,
   silence_unused(opts);
 
   auto tbs = to_be_signed();
-  signature = sig_priv.sign(tbs);
+  signature = sig_priv.sign(cipher_suite, tbs);
 }
 
 bool
@@ -103,7 +103,7 @@ KeyPackage::verify() const
 {
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
-  return identity_key.verify(tbs, signature);
+  return identity_key.verify(cipher_suite, tbs, signature);
 }
 
 bytes

@@ -17,8 +17,7 @@ int DeterministicHPKE::_refct = 0;
 
 Digest::Digest(CipherSuite suite)
   : primitive::Digest(suite)
-{
-}
+{}
 
 bytes
 hmac(CipherSuite suite, const bytes& key, const bytes& data)
@@ -168,95 +167,61 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
 }
 
 HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
-  : data(priv_data)
-  , public_key{pub_data}
+  : data(std::move(priv_data))
+  , public_key{ std::move(pub_data) }
 {}
 
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
-
-SignaturePublicKey::SignaturePublicKey()
-  : _scheme(SignatureScheme::unknown)
-{}
-
-SignaturePublicKey::SignaturePublicKey(CipherSuite suite, bytes data)
-  : _scheme(scheme_for_suite(suite.id))
-  , _data(std::move(data))
-{}
-
-void
-SignaturePublicKey::set_signature_scheme(SignatureScheme scheme)
-{
-  _scheme = scheme;
-}
-
-void
-SignaturePublicKey::set_cipher_suite(CipherSuite suite)
-{
-  _scheme = scheme_for_suite(suite.id);
-}
-
-SignatureScheme
-SignaturePublicKey::signature_scheme() const
-{
-  return _scheme;
-}
-
-bytes
-SignaturePublicKey::to_bytes() const
-{
-  return _data;
-}
-
 bool
-SignaturePublicKey::verify(const bytes& message, const bytes& signature) const
+SignaturePublicKey::verify(const CipherSuite& suite,
+                           const bytes& message,
+                           const bytes& signature) const
 {
-  return primitive::verify(_scheme, _data, message, signature);
+  auto pub = suite.sig->deserialize(data);
+  return suite.sig->verify(message, signature, *pub);
 }
-
-SignaturePrivateKey::SignaturePrivateKey()
-  : _suite(CipherSuite::ID::unknown)
-  , _scheme(SignatureScheme::unknown)
-{}
 
 SignaturePrivateKey
 SignaturePrivateKey::generate(CipherSuite suite)
 {
-  auto scheme = scheme_for_suite(suite.id);
-  return SignaturePrivateKey(suite, primitive::generate(scheme));
+  auto priv = suite.sig->generate_key_pair();
+  auto priv_data = suite.sig->serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig->serialize(*pub);
+  return SignaturePrivateKey(priv_data, pub_data);
 }
 
 SignaturePrivateKey
 SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  return SignaturePrivateKey(suite, data);
+  auto priv = suite.sig->deserialize_private(data);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig->serialize(*pub);
+  return SignaturePrivateKey(data, pub_data);
 }
 
 SignaturePrivateKey
 SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  auto scheme = scheme_for_suite(suite.id);
-  return SignaturePrivateKey(suite, primitive::derive(scheme, secret));
+  auto priv = suite.sig->derive_key_pair(secret);
+  auto priv_data = suite.sig->serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig->serialize(*pub);
+  return SignaturePrivateKey(priv_data, pub_data);
 }
 
 bytes
-SignaturePrivateKey::sign(const bytes& message) const
+SignaturePrivateKey::sign(const CipherSuite& suite, const bytes& message) const
 {
-  return primitive::sign(_scheme, _data, message);
+  auto priv = suite.sig->deserialize_private(data);
+  return suite.sig->sign(message, *priv);
 }
 
-SignaturePublicKey
-SignaturePrivateKey::public_key() const
-{
-  return SignaturePublicKey(_suite, _pub_data);
-}
-
-SignaturePrivateKey::SignaturePrivateKey(CipherSuite suite, const bytes& data)
-  : _suite(suite)
-  , _scheme(scheme_for_suite(suite.id))
-  , _data(data)
-  , _pub_data(primitive::priv_to_pub(_scheme, data))
+SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
+  : data(std::move(priv_data))
+  , public_key{ std::move(pub_data) }
 {}
 
 } // namespace mls

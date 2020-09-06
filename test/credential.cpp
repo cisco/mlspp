@@ -9,7 +9,7 @@ TEST_CASE("Basic Credential")
 
   auto user_id = bytes{ 0x00, 0x01, 0x02, 0x03 };
   auto priv = SignaturePrivateKey::generate(suite);
-  auto pub = priv.public_key();
+  auto pub = priv.public_key;
 
   auto cred = Credential::basic(user_id, pub);
   REQUIRE(cred.identity() == user_id);

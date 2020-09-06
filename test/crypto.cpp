@@ -199,7 +199,7 @@ TEST_CASE_FIXTURE(CryptoTest, "DH Serialization")
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key;
 
-    HPKEPublicKey parsed{gX.data};
+    HPKEPublicKey parsed{ gX.data };
     REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX));
@@ -285,14 +285,14 @@ TEST_CASE_FIXTURE(CryptoTest, "Basic Signature")
     REQUIRE(b == b);
     REQUIRE(a != b);
 
-    REQUIRE(a.public_key() == a.public_key());
-    REQUIRE(b.public_key() == b.public_key());
-    REQUIRE(a.public_key() != b.public_key());
+    REQUIRE(a.public_key == a.public_key);
+    REQUIRE(b.public_key == b.public_key);
+    REQUIRE(a.public_key != b.public_key);
 
     auto message = from_hex("01020304");
-    auto signature = a.sign(message);
+    auto signature = a.sign(suite, message);
 
-    REQUIRE(a.public_key().verify(message, signature));
+    REQUIRE(a.public_key.verify(suite, message, signature));
   }
 }
 
@@ -300,13 +300,12 @@ TEST_CASE_FIXTURE(CryptoTest, "Signature Serializion")
 {
   for (auto suite : all_supported_suites) {
     auto x = SignaturePrivateKey::generate(suite);
-    auto gX = x.public_key();
+    auto gX = x.public_key;
 
-    SignaturePublicKey parsed(suite, gX.to_bytes());
+    SignaturePublicKey parsed{gX.data};
     REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
-    gX2.set_cipher_suite(suite);
     REQUIRE(gX2 == gX);
   }
 }
@@ -315,22 +314,22 @@ TEST_CASE_FIXTURE(CryptoTest, "Ed25519")
 {
   auto suite = CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519);
   auto sk = SignaturePrivateKey::parse(suite, ed25519_sk);
-  auto pk = SignaturePublicKey(suite, ed25519_pk);
-  REQUIRE(pk == sk.public_key());
+  auto pk = SignaturePublicKey{ed25519_pk};
+  REQUIRE(pk == sk.public_key);
 
-  auto sig = sk.sign(ed25519_msg);
+  auto sig = sk.sign(suite, ed25519_msg);
   REQUIRE(sig == ed25519_sig);
-  REQUIRE(pk.verify(ed25519_msg, sig));
+  REQUIRE(pk.verify(suite, ed25519_msg, sig));
 }
 
 TEST_CASE_FIXTURE(CryptoTest, "Ed448")
 {
   auto suite = CipherSuite(CipherSuite::ID::X448_AES256GCM_SHA512_Ed448);
   auto sk = SignaturePrivateKey::parse(suite, ed448_sk);
-  auto pk = SignaturePublicKey(suite, ed448_pk);
-  REQUIRE(pk == sk.public_key());
+  auto pk = SignaturePublicKey{ed448_pk};
+  REQUIRE(pk == sk.public_key);
 
-  auto sig = sk.sign(ed448_msg);
+  auto sig = sk.sign(suite, ed448_msg);
   REQUIRE(sig == ed448_sig);
-  REQUIRE(pk.verify(ed448_msg, sig));
+  REQUIRE(pk.verify(suite, ed448_msg, sig));
 }

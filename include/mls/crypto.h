@@ -98,56 +98,42 @@ struct HPKEPrivateKey
                 const bytes& aad,
                 const HPKECiphertext& ct) const;
 
-  TLS_SERIALIZABLE(data)
-  TLS_TRAITS(tls::vector<2>)
+  TLS_SERIALIZABLE(data, public_key)
+  TLS_TRAITS(tls::vector<2>, tls::pass)
 
-  private:
+private:
   HPKEPrivateKey(bytes priv_data, bytes pub_data);
 };
 
 // Signature Keys
-class SignaturePublicKey
+struct SignaturePublicKey
 {
-public:
-  SignaturePublicKey();
-  SignaturePublicKey(CipherSuite suite, bytes data);
+  bytes data;
 
-  void set_cipher_suite(CipherSuite suite);
-  void set_signature_scheme(SignatureScheme scheme);
-  SignatureScheme signature_scheme() const;
-  bool verify(const bytes& message, const bytes& signature) const;
-  bytes to_bytes() const;
+  bool verify(const CipherSuite& suite,
+              const bytes& message,
+              const bytes& signature) const;
 
-  TLS_SERIALIZABLE(_data)
+  TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<2>)
-
-private:
-  SignatureScheme _scheme;
-  bytes _data;
 };
 
-class SignaturePrivateKey
+struct SignaturePrivateKey
 {
-public:
-  SignaturePrivateKey();
-
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
 
-  bytes sign(const bytes& message) const;
-  SignaturePublicKey public_key() const;
+  bytes data;
+  SignaturePublicKey public_key;
 
-  TLS_SERIALIZABLE(_scheme, _data, _pub_data)
-  TLS_TRAITS(tls::pass, tls::vector<2>, tls::vector<2>)
+  bytes sign(const CipherSuite& suite, const bytes& message) const;
+
+  TLS_SERIALIZABLE(data, public_key)
+  TLS_TRAITS(tls::vector<2>, tls::pass)
 
 private:
-  CipherSuite _suite;
-  SignatureScheme _scheme;
-  bytes _data;
-  bytes _pub_data;
-
-  SignaturePrivateKey(CipherSuite suite, const bytes& data);
+  SignaturePrivateKey(bytes priv_data, bytes pub_data);
 };
 
 } // namespace mls

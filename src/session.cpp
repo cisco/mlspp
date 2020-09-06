@@ -17,7 +17,7 @@ Session::InitInfo::InitInfo(bytes init_secret_in,
     throw InvalidParameterError("Init key mismatch");
   }
 
-  if (sig_priv.public_key() != key_package.credential.public_key()) {
+  if (sig_priv.public_key != key_package.credential.public_key()) {
     throw InvalidParameterError("Signature key mismatch");
   }
 }

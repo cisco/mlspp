@@ -234,7 +234,7 @@ generate_treekem()
       auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
       auto sig_priv =
         SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
-      auto cred = Credential::basic(context, sig_priv.public_key());
+      auto cred = Credential::basic(context, sig_priv.public_key);
       auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
@@ -284,8 +284,8 @@ generate_messages()
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
-    auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
+    auto sig_key = sig_priv.public_key;
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
 
     auto tree = TestTreeKEMPublicKey{
       suite,
@@ -302,8 +302,7 @@ generate_messages()
     // Construct CIK
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
-    auto key_package =
-      KeyPackage{ suite, dh_priv.public_key, cred, sig_priv };
+    auto key_package = KeyPackage{ suite, dh_priv.public_key, cred, sig_priv };
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
 
@@ -409,7 +408,7 @@ generate_basic_session()
     for (size_t j = 0; j < tv.group_size; ++j) {
       auto init_secret = bytes{ uint8_t(j), 0 };
       auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
-      auto cred = Credential::basic(init_secret, identity_priv.public_key());
+      auto cred = Credential::basic(init_secret, identity_priv.public_key);
       auto init = HPKEPrivateKey::derive(suite, init_secret);
       auto kp = KeyPackage{ suite, init.public_key, cred, identity_priv };
       auto info = Session::InitInfo{ init_secret, identity_priv, kp };

@@ -50,9 +50,8 @@ protected:
     auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-    auto cred = Credential::basic(user_id, id_priv.public_key());
-    auto key_package =
-      KeyPackage{ suite, init_priv.public_key, cred, id_priv };
+    auto cred = Credential::basic(user_id, id_priv.public_key);
+    auto key_package = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
     auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
 
     // Initial add is different
@@ -60,7 +59,7 @@ protected:
       auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
       auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
-      auto my_cred = Credential::basic(user_id, my_id_priv.public_key());
+      auto my_cred = Credential::basic(user_id, my_id_priv.public_key);
       auto my_key_package =
         KeyPackage{ suite, my_init_priv.public_key, my_cred, my_id_priv };
       auto my_info =
@@ -145,7 +144,7 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
 {
   // Alice supports P-256 and X25519
   auto idA = new_identity_key();
-  auto credA = Credential::basic(user_id, idA.public_key());
+  auto credA = Credential::basic(user_id, idA.public_key);
   std::vector<CipherSuite> ciphersA{
     CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
     CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
@@ -163,7 +162,7 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
 
   // Bob supports P-256 and P-521
   auto idB = new_identity_key();
-  auto credB = Credential::basic(user_id, idB.public_key());
+  auto credB = Credential::basic(user_id, idB.public_key);
   std::vector<CipherSuite> ciphersB{
     CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
     CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
@@ -371,7 +370,7 @@ protected:
       bytes init_secret = { uint8_t(i), 0 };
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
       auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
-      auto cred = Credential::basic(init_secret, identity_priv.public_key());
+      auto cred = Credential::basic(init_secret, identity_priv.public_key);
       auto key_package =
         KeyPackage{ suite, init_priv.public_key, cred, identity_priv };
       auto init_info =

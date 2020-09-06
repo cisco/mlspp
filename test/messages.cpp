@@ -64,8 +64,8 @@ TEST_CASE("Messages Interop")
     auto dh_priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
     auto dh_key = dh_priv.public_key;
     auto sig_priv = SignaturePrivateKey::derive(tc.cipher_suite, tv.sig_seed);
-    auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
+    auto sig_key = sig_priv.public_key;
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
 
     DeterministicHPKE lock;
     auto tree =

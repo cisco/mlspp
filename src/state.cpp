@@ -108,7 +108,7 @@ State::sign(const Proposal& proposal) const
 {
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
-  pt.sign(group_context(), _identity_priv);
+  pt.sign(_suite, group_context(), _identity_priv);
   return pt;
 }
 
@@ -256,7 +256,7 @@ State::ratchet_and_sign(const Commit& op,
   auto& commit_data = std::get<CommitData>(pt.content);
   commit_data.confirmation =
     _suite.digest->hmac(_keys.confirmation_key, _confirmed_transcript_hash);
-  pt.sign(prev_ctx, _identity_priv);
+  pt.sign(_suite, prev_ctx, _identity_priv);
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
   _interim_transcript_hash = _suite.digest->hash(interim_transcript);
@@ -438,7 +438,7 @@ State::protect(const bytes& pt)
 {
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
-  mpt.sign(group_context(), _identity_priv);
+  mpt.sign(_suite, group_context(), _identity_priv);
   return encrypt(mpt);
 }
 
@@ -560,7 +560,7 @@ State::verify(const MLSPlaintext& pt) const
   }
 
   auto pub = maybe_kp.value().credential.public_key();
-  return pt.verify(group_context(), pub);
+  return pt.verify(_suite, group_context(), pub);
 }
 
 bool
@@ -688,14 +688,15 @@ State::decrypt(const MLSCiphertext& ct)
                          ct.authenticated_data,
                          ct.sender_data_nonce,
                          ct.encrypted_sender_data);
-  auto content = _suite.hpke->aead->open(keys.key, keys.nonce, aad, ct.ciphertext);
+  auto content =
+    _suite.hpke->aead->open(keys.key, keys.nonce, aad, ct.ciphertext);
   if (!content.has_value()) {
     throw ProtocolError("Content decryption failed");
   }
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{
-    _group_id, _epoch, raw_sender, ct.content_type, ct.authenticated_data,
+    _group_id,      _epoch, raw_sender, ct.content_type, ct.authenticated_data,
     content.value()
   };
 }
