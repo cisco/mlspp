@@ -294,7 +294,7 @@ struct TreeKEMTestVectors
 /////
 
 bool
-deterministic_signature_scheme(CipherSuite suite);
+deterministic_signature_scheme(const CipherSuite& suite);
 
 struct MessagesTestVectors
 {

@@ -21,15 +21,13 @@ const std::string MessagesTestVectors::file_name = "./messages.bin";
 ///
 
 bool
-deterministic_signature_scheme(CipherSuite suite)
+deterministic_signature_scheme(const CipherSuite& suite)
 {
-  switch (scheme_for_suite(suite.id)) {
-    case SignatureScheme::P256_SHA256:
-    case SignatureScheme::P521_SHA512:
-      return false;
-
-    case SignatureScheme::Ed25519:
-    case SignatureScheme::Ed448:
+  switch (suite.id) {
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return true;
 
     default:

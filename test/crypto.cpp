@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
 #include <mls/crypto.h>
-#include <hpke/random.h>
 
 #include "test_vectors.h"
 
@@ -31,8 +30,8 @@ TEST_CASE("Crypto Interop")
 
 TEST_CASE("Basic HPKE")
 {
-  auto aad = hpke::random_bytes(100);
-  auto original = hpke::random_bytes(100);
+  auto aad = random_bytes(100);
+  auto original = random_bytes(100);
 
   for (auto suite : all_supported_suites) {
     auto s = bytes{ 0, 1, 2, 3 };

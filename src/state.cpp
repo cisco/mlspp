@@ -1,6 +1,5 @@
 #include "mls/state.h"
 
-#include <hpke/random.h>
 #include <iostream>
 
 namespace mls {
@@ -596,7 +595,7 @@ State::encrypt(const MLSPlaintext& pt)
   tls::ostream sender_data;
   sender_data << Sender{ SenderType::member, _index.val } << generation;
 
-  auto sender_data_nonce = hpke::random_bytes(_suite.hpke->aead->nonce_size());
+  auto sender_data_nonce = random_bytes(_suite.hpke->aead->nonce_size());
   auto sender_data_aad_val =
     sender_data_aad(_group_id, _epoch, content_type, sender_data_nonce);
 

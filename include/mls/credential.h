@@ -18,7 +18,6 @@ enum struct CredentialType : uint8_t
 
 // struct {
 //     opaque identity<0..2^16-1>;
-//     SignatureScheme algorithm;
 //     SignaturePublicKey public_key;
 // } BasicCredential;
 struct BasicCredential
