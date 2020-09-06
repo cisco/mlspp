@@ -1,34 +1,11 @@
 #pragma once
 
 #include "mls/common.h"
-#include "mls/primitives.h"
 #include <openssl/evp.h>
 #include <tls/tls_syntax.h>
 #include <vector>
 
 namespace mls {
-
-// DeterministicHPKE enables RAII-based requests for HPKE to be
-// done deterministically.  The RAII pattern is used here to ensure
-// that the determinism always gets turned off.  To avoid conflicts
-// between multiple requests for determinism, determinism is turned
-// off when the last object in the stack is destroyed; it's
-// basically a ref-counted bool.
-//
-// This should only be used for interop testing / test vector
-// purposes; it should not be enabled in production systems.
-//
-// TODO(rlb@ipv.sx): Find a way to hide this API from normal usage.
-class DeterministicHPKE
-{
-public:
-  DeterministicHPKE() { _refct += 1; }
-  ~DeterministicHPKE() { _refct -= 1; }
-  static bool enabled() { return _refct > 0; }
-
-private:
-  static int _refct;
-};
 
 // Pass-throughs from the primitives, some with metrics wrappers
 using primitive::random_bytes;

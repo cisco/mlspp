@@ -305,6 +305,7 @@ struct MessagesTestVectors
     CipherSuite cipher_suite;
 
     bytes key_package;
+    bytes direct_path;
     bytes group_info;
     bytes group_secrets;
     bytes encrypted_group_secrets;
@@ -317,6 +318,7 @@ struct MessagesTestVectors
 
     TLS_SERIALIZABLE(cipher_suite,
                      key_package,
+                     direct_path,
                      group_info,
                      group_secrets,
                      encrypted_group_secrets,
@@ -327,6 +329,7 @@ struct MessagesTestVectors
                      commit,
                      ciphertext);
     TLS_TRAITS(tls::pass,
+               tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
@@ -423,82 +426,6 @@ public:
 };
 
 } // namespace mls
-
-// Splitting the test data from the file definition here allows us
-// to have a consistent struct for different scenarios that live in
-// different files.
-struct SessionTestVectors
-{
-  struct Epoch
-  {
-    std::optional<Welcome> welcome;
-    bytes handshake;
-    bytes commit_secret;
-
-    epoch_t epoch;
-    bytes epoch_secret;
-    bytes application_secret;
-    bytes confirmation_key;
-    bytes init_secret;
-
-    Epoch() = default;
-
-    Epoch(const std::optional<Welcome>& welcome_in,
-          const bytes& handshake_in,
-          const bytes& commit_secret_in,
-          const TestSession& session)
-      : welcome(welcome_in)
-      , handshake(handshake_in)
-      , commit_secret(commit_secret_in)
-      , epoch(session.current_epoch())
-      , epoch_secret(session.current_epoch_secret())
-      , application_secret(session.current_application_secret())
-      , confirmation_key(session.current_confirmation_key())
-      , init_secret(session.current_init_secret())
-    {}
-
-    TLS_SERIALIZABLE(welcome,
-                     handshake,
-                     commit_secret,
-                     epoch,
-                     epoch_secret,
-                     application_secret,
-                     confirmation_key,
-                     init_secret);
-    TLS_TRAITS(tls::pass,
-               tls::vector<4>,
-               tls::vector<1>,
-               tls::pass,
-               tls::vector<1>,
-               tls::vector<1>,
-               tls::vector<1>,
-               tls::vector<1>)
-  };
-
-  struct TestCase
-  {
-    CipherSuite cipher_suite;
-    bool encrypt;
-    std::vector<KeyPackage> key_packages;
-    std::vector<Epoch> transcript;
-
-    TLS_SERIALIZABLE(cipher_suite, encrypt, key_packages, transcript);
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
-  };
-
-  uint32_t group_size;
-  bytes group_id;
-
-  std::vector<TestCase> cases;
-
-  TLS_SERIALIZABLE(group_size, group_id, cases)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
-};
-
-struct BasicSessionTestVectors : SessionTestVectors
-{
-  static const std::string file_name;
-};
 
 /////
 

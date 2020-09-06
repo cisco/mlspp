@@ -66,18 +66,12 @@ TEST_CASE("Messages Interop")
     auto sig_priv = SignaturePrivateKey::derive(tc.cipher_suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key;
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
+    auto fake_hpke_ciphertext = HPKECiphertext{tv.random, tv.random};
 
-    DeterministicHPKE lock;
     auto tree =
       TestTreeKEMPublicKey{ tc.cipher_suite,
                             { tv.random, tv.random, tv.random, tv.random } };
     tree.blank_path(LeafIndex{ 2 });
-
-    auto [dummy, direct_path] =
-      tree.encap(LeafIndex{ 0 }, {}, tv.random, sig_priv, std::nullopt);
-    silence_unused(dummy);
-    std::get<KeyPackage>(tree.nodes[0].node.value().node).signature = tv.random;
-    direct_path.leaf_key_package.signature = tv.random;
 
     // KeyPackage
     auto ext_list =
@@ -87,6 +81,16 @@ TEST_CASE("Messages Interop")
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
+
+    // DirectPath
+    auto direct_path = DirectPath{
+      key_package,
+      {
+        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+      }
+    };
+    tls_round_trip(tc.direct_path, direct_path, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
@@ -100,7 +104,7 @@ TEST_CASE("Messages Interop")
 
     auto encrypted_group_secrets =
       EncryptedGroupSecrets{ tv.random,
-                             dh_key.encrypt(tc.cipher_suite, {}, tv.random) };
+                             HPKECiphertext{ tv.random, tv.random } };
     tls_round_trip(tc.encrypted_group_secrets, encrypted_group_secrets, true);
 
     Welcome welcome;

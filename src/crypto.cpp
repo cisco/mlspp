@@ -6,12 +6,6 @@
 namespace mls {
 
 ///
-/// Test mode controls
-///
-
-int DeterministicHPKE::_refct = 0;
-
-///
 /// Pass-through / metrics wrappers
 ///
 
