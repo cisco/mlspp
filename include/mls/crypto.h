@@ -75,38 +75,34 @@ struct HPKEPublicKey
 {
   bytes data;
 
-  HPKEPublicKey() = default;
-  HPKEPublicKey(bytes data);
-
   HPKECiphertext encrypt(CipherSuite suite,
                          const bytes& aad,
                          const bytes& pt) const;
-  bytes to_bytes() const;
 
   TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<2>)
 };
 
-class HPKEPrivateKey
+struct HPKEPrivateKey
 {
-public:
   static HPKEPrivateKey generate(CipherSuite suite);
   static HPKEPrivateKey parse(CipherSuite suite, const bytes& data);
   static HPKEPrivateKey derive(CipherSuite suite, const bytes& secret);
 
+  HPKEPrivateKey() = default;
+
+  bytes data;
+  HPKEPublicKey public_key;
+
   bytes decrypt(CipherSuite suite,
                 const bytes& aad,
                 const HPKECiphertext& ct) const;
-  HPKEPublicKey public_key() const;
 
-  TLS_SERIALIZABLE(_data, _pub_data)
-  TLS_TRAITS(tls::vector<2>, tls::vector<2>)
+  TLS_SERIALIZABLE(data)
+  TLS_TRAITS(tls::vector<2>)
 
-private:
-  bytes _data;
-  bytes _pub_data;
-
-  HPKEPrivateKey(CipherSuite suite, bytes data);
+  private:
+  HPKEPrivateKey(bytes priv_data, bytes pub_data);
 };
 
 // Signature Keys

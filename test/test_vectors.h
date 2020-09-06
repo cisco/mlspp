@@ -244,14 +244,14 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
     for (uint32_t i = 0; i < secrets.size() - 1; i += 1) {
       auto secret = secrets[i];
       secret.push_back(0);
-      auto pub = HPKEPrivateKey::derive(suite, secret).public_key();
+      auto pub = HPKEPrivateKey::derive(suite, secret).public_key;
       nodes.at(2 * i + 1).node = Node{ ParentNode{ pub, {}, {} } };
     }
   }
 
   void add_leaf_secret(const bytes& secret)
   {
-    auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key();
+    auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, secret);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
     auto kp = KeyPackage{ suite, init_pub, cred, sig_priv };

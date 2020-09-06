@@ -140,7 +140,7 @@ State::update(const bytes& leaf_secret)
 {
   // TODO(RLB) Allow changing the signing key
   auto kp = _tree.key_package(_index).value();
-  kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key();
+  kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   kp.sign(_identity_priv, std::nullopt);
 
   auto pt = sign({ Update{ kp } });

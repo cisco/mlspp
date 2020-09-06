@@ -76,7 +76,7 @@ generate_crypto()
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto derive_key_pair_pub = priv.public_key();
+    auto derive_key_pair_pub = priv.public_key;
 
     // HPKE
     auto hpke_out =
@@ -235,7 +235,7 @@ generate_treekem()
       auto sig_priv =
         SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
-      auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
+      auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
@@ -282,7 +282,7 @@ generate_messages()
   for (auto suite : suites) {
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
-    auto dh_key = dh_priv.public_key();
+    auto dh_key = dh_priv.public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
@@ -303,7 +303,7 @@ generate_messages()
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
     auto key_package =
-      KeyPackage{ suite, dh_priv.public_key(), cred, sig_priv };
+      KeyPackage{ suite, dh_priv.public_key, cred, sig_priv };
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
 
@@ -411,7 +411,7 @@ generate_basic_session()
       auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
       auto cred = Credential::basic(init_secret, identity_priv.public_key());
       auto init = HPKEPrivateKey::derive(suite, init_secret);
-      auto kp = KeyPackage{ suite, init.public_key(), cred, identity_priv };
+      auto kp = KeyPackage{ suite, init.public_key, cred, identity_priv };
       auto info = Session::InitInfo{ init_secret, identity_priv, kp };
       key_packages.push_back(kp);
       init_infos.emplace_back(info);

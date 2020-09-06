@@ -164,7 +164,7 @@ TEST_CASE_FIXTURE(CryptoTest, "Crypto Interop")
 
     auto derive_key_pair_priv =
       HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto derive_key_pair_pub = derive_key_pair_priv.public_key();
+    auto derive_key_pair_pub = derive_key_pair_priv.public_key;
     REQUIRE(derive_key_pair_pub == tc.derive_key_pair_pub);
 
     auto hpke_plaintext =
@@ -185,8 +185,8 @@ TEST_CASE_FIXTURE(CryptoTest, "Basic DH")
     REQUIRE(y == y);
     REQUIRE(x != y);
 
-    auto gX = x.public_key();
-    auto gY = y.public_key();
+    auto gX = x.public_key;
+    auto gY = y.public_key;
     REQUIRE(gX == gX);
     REQUIRE(gY == gY);
     REQUIRE(gX != gY);
@@ -197,9 +197,9 @@ TEST_CASE_FIXTURE(CryptoTest, "DH Serialization")
 {
   for (auto suite : all_supported_suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
-    auto gX = x.public_key();
+    auto gX = x.public_key;
 
-    HPKEPublicKey parsed(gX.to_bytes());
+    HPKEPublicKey parsed{gX.data};
     REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX));
@@ -266,7 +266,7 @@ TEST_CASE_FIXTURE(CryptoTest, "HPKE")
 
   for (auto suite : all_supported_suites) {
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
-    auto gX = x.public_key();
+    auto gX = x.public_key;
 
     auto encrypted = gX.encrypt(suite, aad, original);
     auto decrypted = x.decrypt(suite, aad, encrypted);

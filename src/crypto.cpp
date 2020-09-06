@@ -112,221 +112,44 @@ hkdf_expand_label(CipherSuite suite,
 ///
 /// HPKEPublicKey and HPKEPrivateKey
 ///
-
-enum struct HPKEMode : uint8_t
-{
-  base = 0x00,
-  psk = 0x01,
-  auth = 0x02,
-};
-
-enum struct HPKEKEMID : uint16_t
-{
-  DHKEM_P256 = 0x0001,
-  DHKEM_X25519 = 0x0002,
-  DHKEM_P521 = 0x0003,
-  DHKEM_X448 = 0x0004,
-};
-
-static size_t
-hpke_npk(HPKEKEMID kem)
-{
-  switch (kem) {
-    case HPKEKEMID::DHKEM_P256:
-      return 65;
-    case HPKEKEMID::DHKEM_X25519:
-      return 32;
-    case HPKEKEMID::DHKEM_P521:
-      return 133;
-    case HPKEKEMID::DHKEM_X448:
-      return 56;
-    default:
-      throw InvalidParameterError("Unknown HPKE KEM ID");
-  }
-}
-
-enum struct HPKEKDFID : uint16_t
-{
-  HKDF_SHA256 = 0x0001,
-  HKDF_SHA512 = 0x0002,
-};
-
-enum struct HPKEAEADID : uint16_t
-{
-  AES_GCM_128 = 0x0001,
-  AES_GCM_256 = 0x0002,
-};
-
-static std::tuple<HPKEKEMID, HPKEKDFID, HPKEAEADID>
-hpke_suite(CipherSuite suite)
-{
-  switch (suite.id) {
-    case CipherSuite::ID::P256_AES128GCM_SHA256_P256:
-      return std::make_tuple(
-        HPKEKEMID::DHKEM_P256, HPKEKDFID::HKDF_SHA256, HPKEAEADID::AES_GCM_128);
-
-    case CipherSuite::ID::P521_AES256GCM_SHA512_P521:
-      return std::make_tuple(
-        HPKEKEMID::DHKEM_P521, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
-
-    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
-    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-      return std::make_tuple(HPKEKEMID::DHKEM_X25519,
-                             HPKEKDFID::HKDF_SHA256,
-                             HPKEAEADID::AES_GCM_128);
-
-    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
-    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
-      return std::make_tuple(
-        HPKEKEMID::DHKEM_X448, HPKEKDFID::HKDF_SHA512, HPKEAEADID::AES_GCM_256);
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite for HPKE");
-  }
-}
-
-static std::tuple<bytes, bytes>
-dhkem_encap(CipherSuite suite, const bytes& pub, const bytes& seed)
-{
-  bytes ephemeral;
-  if (seed.empty()) {
-    ephemeral = primitive::generate(suite);
-  } else {
-    ephemeral = primitive::derive(suite, seed);
-  }
-
-  auto enc = primitive::priv_to_pub(suite, ephemeral);
-  auto zz = primitive::dh(suite, ephemeral, pub);
-  return std::make_tuple(enc, zz);
-}
-
-static bytes
-dhkem_decap(CipherSuite suite, const bytes& priv, const bytes& enc)
-{
-  return primitive::dh(suite, priv, enc);
-}
-
-struct HPKEContext
-{
-  HPKEMode mode;
-  HPKEKEMID kem;
-  HPKEKDFID kdf;
-  HPKEAEADID aead;
-  bytes enc;
-  bytes pkRm;
-  bytes pkIm;
-  bytes psk_id_hash;
-  bytes info_hash;
-
-  TLS_SERIALIZABLE(mode,
-                   kem,
-                   kdf,
-                   aead,
-                   enc,
-                   pkRm,
-                   pkIm,
-                   psk_id_hash,
-                   info_hash);
-  TLS_TRAITS(tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<0>,
-             tls::vector<0>,
-             tls::vector<0>,
-             tls::vector<0>,
-             tls::vector<0>)
-};
-
-static std::tuple<bytes, bytes>
-hpke_key_schedule(CipherSuite suite,
-                  const HPKEPublicKey& pkR,
-                  const bytes& enc,
-                  const bytes& zz)
-{
-  auto [kem, kdf, aead] = hpke_suite(suite);
-  auto Npk = hpke_npk(kem);
-  auto Nh = suite.hpke->kdf->hash_size();
-  auto Nk = suite.hpke->aead->key_size();
-  auto Nn = suite.hpke->aead->nonce_size();
-
-  // We only support base and no-info.  So we can hard-wire these inputs, and
-  // skip VerifyMode().  We will need to generalize if we support other modes or
-  // non-empty info later.
-  auto mode = HPKEMode::base;
-  auto info = bytes{};
-  auto pkIm = bytes(Npk, 0);
-  auto psk = bytes(Nh, 0);
-  auto psk_id = bytes{};
-
-  auto ctx = tls::marshal(HPKEContext{
-    mode,
-    kem,
-    kdf,
-    aead,
-    enc,
-    pkR.to_bytes(),
-    pkIm,
-    Digest(suite).write(psk_id).digest(),
-    Digest(suite).write(info).digest(),
-  });
-
-  auto key_ctx = to_bytes("hpke key") + ctx;
-  auto nonce_ctx = to_bytes("hpke nonce") + ctx;
-
-  auto secret = hkdf_extract(suite, psk, zz);
-  auto key = hkdf_expand(suite, secret, key_ctx, Nk);
-  auto nonce = hkdf_expand(suite, secret, nonce_ctx, Nn);
-
-  return std::make_tuple(key, nonce);
-}
-
-HPKEPublicKey::HPKEPublicKey(bytes data_in)
-  : data(std::move(data_in))
-{}
-
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
                        const bytes& aad,
                        const bytes& pt) const
 {
-  // SetupBaseI
-  bytes seed;
-  if (DeterministicHPKE::enabled()) {
-    seed = to_bytes() + pt;
-  }
-
-  auto [enc, zz] = dhkem_encap(suite, data, seed);
-  auto [key, nonce] = hpke_key_schedule(suite, *this, enc, zz);
-
-  auto ct = primitive::seal(suite, key, nonce, aad, pt);
-
-  // Context.Encrypt
+  auto pkR = suite.hpke->kem->deserialize(data);
+  auto [enc, ctx] = suite.hpke->setup_base_s(*pkR, {});
+  auto ct = ctx.seal(aad, pt);
   return HPKECiphertext{ enc, ct };
-}
-
-bytes
-HPKEPublicKey::to_bytes() const
-{
-  return data;
 }
 
 HPKEPrivateKey
 HPKEPrivateKey::generate(CipherSuite suite)
 {
-  return HPKEPrivateKey(suite, primitive::generate(suite));
+  auto priv = suite.hpke->kem->generate_key_pair();
+  auto priv_data = suite.hpke->kem->serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.hpke->kem->serialize(*pub);
+  return HPKEPrivateKey(priv_data, pub_data);
 }
 
 HPKEPrivateKey
 HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  return HPKEPrivateKey(suite, data);
+  auto priv = suite.hpke->kem->deserialize_private(data);
+  auto pub = priv->public_key();
+  auto pub_data = suite.hpke->kem->serialize(*pub);
+  return HPKEPrivateKey(data, pub_data);
 }
 
 HPKEPrivateKey
 HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
-  return HPKEPrivateKey(suite, primitive::derive(suite, secret));
+  auto priv = suite.hpke->kem->derive_key_pair(secret);
+  auto priv_data = suite.hpke->kem->serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.hpke->kem->serialize(*pub);
+  return HPKEPrivateKey(priv_data, pub_data);
 }
 
 bytes
@@ -334,22 +157,19 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
                         const bytes& aad,
                         const HPKECiphertext& ct) const
 {
-  // SetupBaseR
-  auto zz = dhkem_decap(suite, _data, ct.kem_output);
-  auto [key, nonce] = hpke_key_schedule(suite, public_key(), ct.kem_output, zz);
+  auto skR = suite.hpke->kem->deserialize_private(data);
+  auto ctx = suite.hpke->setup_base_r(ct.kem_output, *skR, {});
+  auto pt = ctx.open(aad, ct.ciphertext);
+  if (!pt.has_value()) {
+    throw InvalidParameterError("HPKE decryption failure");
+  }
 
-  return primitive::open(suite, key, nonce, aad, ct.ciphertext);
+  return pt.value();
 }
 
-HPKEPublicKey
-HPKEPrivateKey::public_key() const
-{
-  return HPKEPublicKey(_pub_data);
-}
-
-HPKEPrivateKey::HPKEPrivateKey(CipherSuite suite, bytes data)
-  : _data(std::move(data))
-  , _pub_data(primitive::priv_to_pub(suite, _data))
+HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
+  : data(priv_data)
+  , public_key{pub_data}
 {}
 
 ///

@@ -23,7 +23,7 @@ protected:
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
-    auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
+    auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
     return std::make_tuple(init_secret, init_priv, sig_priv, kp);
   }
 };
@@ -34,9 +34,9 @@ TEST_CASE_FIXTURE(TreeKEMTest, "ParentNode Equality")
   auto initB = HPKEPrivateKey::generate(suite);
 
   auto nodeA =
-    ParentNode{ initA.public_key(), { LeafIndex(1), LeafIndex(2) }, { 3, 4 } };
+    ParentNode{ initA.public_key, { LeafIndex(1), LeafIndex(2) }, { 3, 4 } };
   auto nodeB =
-    ParentNode{ initB.public_key(), { LeafIndex(5), LeafIndex(6) }, { 7, 8 } };
+    ParentNode{ initB.public_key, { LeafIndex(5), LeafIndex(6) }, { 7, 8 } };
 
   REQUIRE(nodeA == nodeA);
   REQUIRE(nodeB == nodeB);
@@ -46,15 +46,15 @@ TEST_CASE_FIXTURE(TreeKEMTest, "ParentNode Equality")
 TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
 {
   auto parent_priv = HPKEPrivateKey::generate(suite);
-  auto parent = Node{ ParentNode{ parent_priv.public_key(), {}, {} } };
-  REQUIRE(parent.public_key() == parent_priv.public_key());
+  auto parent = Node{ ParentNode{ parent_priv.public_key, {}, {} } };
+  REQUIRE(parent.public_key() == parent_priv.public_key);
 
   auto [leaf_secret, leaf_priv, sig_priv, kp] = new_key_package();
   silence_unused(leaf_secret);
   silence_unused(sig_priv);
 
   auto leaf = Node{ kp };
-  REQUIRE(leaf.public_key() == leaf_priv.public_key());
+  REQUIRE(leaf.public_key() == leaf_priv.public_key);
 }
 
 TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
@@ -66,7 +66,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   auto node_index = NodeIndex{ 7 };
   auto child_hash = bytes{ 0, 1, 2, 3, 4 };
 
-  auto parent = ParentNode{ init_priv.public_key(), {}, {} };
+  auto parent = ParentNode{ init_priv.public_key, {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent }, {} };
   REQUIRE_THROWS_AS(opt_parent.set_leaf_hash(suite, node_index),
                     std::bad_variant_access);
@@ -171,7 +171,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     auto path = DirectPath{ kp_path, {} };
     auto dp = tree_math::dirpath(NodeIndex(index), NodeCount(curr_size));
     while (path.nodes.size() < dp.size()) {
-      auto node_pub = HPKEPrivateKey::generate(suite).public_key();
+      auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });
     }
 
@@ -286,7 +286,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Interop")
         SignaturePrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key());
       auto kp =
-        KeyPackage{ tc.cipher_suite, init_priv.public_key(), cred, sig_priv };
+        KeyPackage{ tc.cipher_suite, init_priv.public_key, cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
       tree.encap(

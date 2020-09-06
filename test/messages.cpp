@@ -62,7 +62,7 @@ TEST_CASE("Messages Interop")
 
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(tc.cipher_suite, tv.dh_seed);
-    auto dh_key = dh_priv.public_key();
+    auto dh_key = dh_priv.public_key;
     auto sig_priv = SignaturePrivateKey::derive(tc.cipher_suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key();
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
@@ -83,7 +83,7 @@ TEST_CASE("Messages Interop")
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
     auto key_package =
-      KeyPackage{ tc.cipher_suite, dh_priv.public_key(), cred, sig_priv };
+      KeyPackage{ tc.cipher_suite, dh_priv.public_key, cred, sig_priv };
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);

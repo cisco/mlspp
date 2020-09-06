@@ -275,7 +275,7 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     }
 
     const auto& pub = opt_node.value().public_key();
-    if (priv.public_key() != pub) {
+    if (priv.public_key != pub) {
       return false;
     }
   }
@@ -475,7 +475,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
   for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
     auto path_secret = priv.path_secrets.at(n);
     auto node_priv = priv.private_key(n).value();
-    auto node = RatchetNode{ node_priv.public_key(), {} };
+    auto node = RatchetNode{ node_priv.public_key, {} };
 
     auto copath = tree_math::sibling(last, NodeCount(size()));
     auto res = resolve(copath);
@@ -491,7 +491,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Sign the DirectPath
   auto leaf_priv = priv.private_key(NodeIndex(from)).value();
-  path.sign(suite, leaf_priv.public_key(), sig_priv, opts);
+  path.sign(suite, leaf_priv.public_key, sig_priv, opts);
 
   // Update the pubic key itself
   merge(from, path);
