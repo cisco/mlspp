@@ -22,7 +22,5 @@ make_typed_unique(T* ptr)
 
 std::runtime_error
 openssl_error();
-bytes
-random_bytes(size_t size);
 
 } // namespace hpke

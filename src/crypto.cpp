@@ -5,24 +5,6 @@
 
 namespace mls {
 
-///
-/// Pass-through / metrics wrappers
-///
-
-Digest::Digest(CipherSuite suite)
-  : primitive::Digest(suite)
-{}
-
-bytes
-hmac(CipherSuite suite, const bytes& key, const bytes& data)
-{
-  return primitive::hmac(suite, key, data);
-}
-
-///
-/// HKDF and DeriveSecret
-///
-
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs)
 {
@@ -38,68 +20,6 @@ constant_time_eq(const bytes& lhs, const bytes& rhs)
     diff |= (lhs[i] ^ rhs[i]);
   }
   return (diff == 0);
-}
-
-bytes
-hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm)
-{
-  return hmac(suite, salt, ikm);
-}
-
-bytes
-zero_bytes(size_t size)
-{
-  bytes out(size);
-  for (auto& b : out) {
-    b = 0;
-  }
-  return out;
-}
-
-// For simplicity, we enforce that size <= Hash.length, so that
-// HKDF-Expand(Secret, Label) reduces to:
-//
-//   HMAC(Secret, Label || 0x01)
-static bytes
-hkdf_expand(CipherSuite suite,
-            const bytes& secret,
-            const bytes& info,
-            size_t size)
-{
-  // Ensure that we need only one hash invocation
-  if (size > Digest(suite).output_size()) {
-    throw InvalidParameterError("Size too big for hkdf_expand");
-  }
-
-  auto label = info;
-  label.push_back(0x01);
-  auto mac = hmac(suite, secret, label);
-  mac.resize(size);
-  return mac;
-}
-
-struct HKDFLabel
-{
-  uint16_t length;
-  bytes label;
-  bytes context;
-
-  TLS_SERIALIZABLE(length, label, context)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
-};
-
-bytes
-hkdf_expand_label(CipherSuite suite,
-                  const bytes& secret,
-                  const std::string& label,
-                  const bytes& context,
-                  const size_t length)
-{
-  auto mls_label = to_bytes(std::string("mls10 ") + label);
-  auto length16 = static_cast<uint16_t>(length);
-  HKDFLabel label_str{ length16, mls_label, context };
-  auto label_bytes = tls::marshal(label_str);
-  return hkdf_expand(suite, secret, label_bytes, length);
 }
 
 ///

@@ -1,8 +1,13 @@
-#include "mls/crypto.h"
-#include "mls/tree_math.h"
+#include <mls/crypto.h>
+#include <mls/tree_math.h>
+
 #include "test_vectors.h"
+
+#include <hpke/random.h>
+
 #include <fstream>
 #include <iostream>
+
 
 TreeMathTestVectors
 generate_tree_math()
@@ -59,8 +64,8 @@ generate_crypto()
     CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   };
 
-  tv.hkdf_extract_salt = { 0, 1, 2, 3 };
-  tv.hkdf_extract_ikm = { 4, 5, 6, 7 };
+  tv.kdf_extract_salt = { 0, 1, 2, 3 };
+  tv.kdf_extract_ikm = { 4, 5, 6, 7 };
 
   tv.derive_key_pair_seed = { 0, 1, 2, 3 };
 
@@ -69,9 +74,9 @@ generate_crypto()
 
   // Construct a test case for each suite
   for (auto suite : suites) {
-    // HKDF-Extract
-    auto hkdf_extract_out =
-      hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
+    // kdf-Extract
+    auto kdf_extract_out =
+      suite.hpke->kdf->extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
@@ -82,7 +87,7 @@ generate_crypto()
       derive_key_pair_pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
 
     tv.cases.push_back(
-      { suite, hkdf_extract_out, derive_key_pair_pub, hpke_out });
+      { suite, kdf_extract_out, derive_key_pair_pub, hpke_out });
   }
 
   return tv;
@@ -146,7 +151,7 @@ generate_key_schedule()
     KeyScheduleTestVectors::TestCase tc;
     tc.cipher_suite = suite;
 
-    auto secret_size = Digest(suite).output_size();
+    auto secret_size = suite.hpke->kdf->hash_size();
 
     auto group_context = base_group_context;
     auto update_secret = bytes(secret_size, 0);
@@ -215,8 +220,8 @@ generate_treekem()
   tv.init_secrets.resize(n_leaves);
   tv.leaf_secrets.resize(n_leaves);
   for (size_t i = 0; i < n_leaves; ++i) {
-    tv.init_secrets[i].data = random_bytes(32);
-    tv.leaf_secrets[i].data = random_bytes(32);
+    tv.init_secrets[i].data = hpke::random_bytes(32);
+    tv.leaf_secrets[i].data = hpke::random_bytes(32);
   }
 
   for (size_t i = 0; i < suites.size(); ++i) {
@@ -277,7 +282,6 @@ generate_messages()
   tv.random = bytes(32, 0xD6);
 
   // Construct a test case for each suite
-  DeterministicHPKE lock;
   for (auto suite : suites) {
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
@@ -369,13 +373,6 @@ generate_messages()
   }
 
   return tv;
-}
-
-bytes
-pseudo_random(CipherSuite suite, int seq)
-{
-  auto seq_data = tls::marshal(uint32_t(seq));
-  return Digest(suite).write(seq_data).digest();
 }
 
 template<typename T>

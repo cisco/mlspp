@@ -57,8 +57,8 @@ struct CryptoTestVectors
 {
   static const std::string file_name;
 
-  bytes hkdf_extract_salt;
-  bytes hkdf_extract_ikm;
+  bytes kdf_extract_salt;
+  bytes kdf_extract_ikm;
 
   bytes derive_key_pair_seed;
 
@@ -69,8 +69,8 @@ struct CryptoTestVectors
   {
     CipherSuite cipher_suite;
 
-    // HKDF-Extract
-    bytes hkdf_extract_out;
+    // kdf-Extract
+    bytes kdf_extract_out;
 
     // Derive-Key-Pair
     HPKEPublicKey derive_key_pair_pub;
@@ -79,7 +79,7 @@ struct CryptoTestVectors
     HPKECiphertext hpke_out;
 
     TLS_SERIALIZABLE(cipher_suite,
-                     hkdf_extract_out,
+                     kdf_extract_out,
                      derive_key_pair_pub,
                      hpke_out)
     TLS_TRAITS(tls::pass, tls::vector<1>, tls::pass, tls::pass)
@@ -87,8 +87,8 @@ struct CryptoTestVectors
 
   std::vector<TestCase> cases;
 
-  TLS_SERIALIZABLE(hkdf_extract_salt,
-                   hkdf_extract_ikm,
+  TLS_SERIALIZABLE(kdf_extract_salt,
+                   kdf_extract_ikm,
                    derive_key_pair_seed,
                    hpke_aad,
                    hpke_plaintext,

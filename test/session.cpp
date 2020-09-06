@@ -1,5 +1,6 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
+#include <hpke/random.h>
 #include <mls/session.h>
 
 using namespace mls;
@@ -22,7 +23,7 @@ protected:
     return SignaturePrivateKey::generate(suite);
   }
 
-  bytes fresh_secret() const { return random_bytes(secret_size); }
+  bytes fresh_secret() const { return hpke::random_bytes(secret_size); }
 
   void broadcast(const bytes& message) { broadcast(message, no_except); }
 
@@ -152,7 +153,7 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
   for (auto suiteA : ciphersA) {
-    auto init_secret = random_bytes(32);
+    auto init_secret = hpke::random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suiteA, init_secret);
     auto kp = KeyPackage{ suiteA, init_priv.public_key, credA, idA };
     auto info = Session::InitInfo{ init_secret, idA, kp };
@@ -170,7 +171,7 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;
   for (auto suiteB : ciphersB) {
-    auto init_secret = random_bytes(32);
+    auto init_secret = hpke::random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suiteB, init_secret);
     auto kp = KeyPackage{ suiteB, init_priv.public_key, credB, idB };
     auto info = Session::InitInfo{ init_secret, idB, kp };

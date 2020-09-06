@@ -7,36 +7,8 @@
 
 namespace mls {
 
-// Pass-throughs from the primitives, some with metrics wrappers
-using primitive::random_bytes;
-
-class Digest : public primitive::Digest
-{
-public:
-  Digest(CipherSuite suite);
-};
-
-bytes
-hmac(CipherSuite suite, const bytes& key, const bytes& data);
-
-using primitive::open;
-using primitive::seal;
-
-bytes
-zero_bytes(size_t size);
-
 bool
 constant_time_eq(const bytes& lhs, const bytes& rhs);
-
-bytes
-hkdf_extract(CipherSuite suite, const bytes& salt, const bytes& ikm);
-
-bytes
-hkdf_expand_label(CipherSuite suite,
-                  const bytes& secret,
-                  const std::string& label,
-                  const bytes& context,
-                  const size_t length);
 
 // HPKE Keys
 struct HPKECiphertext

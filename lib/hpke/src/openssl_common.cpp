@@ -3,7 +3,6 @@
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
-#include <openssl/rand.h>
 
 namespace hpke {
 
@@ -65,20 +64,6 @@ openssl_error()
 {
   auto code = ERR_get_error();
   return std::runtime_error(ERR_error_string(code, nullptr));
-}
-
-///
-/// Random data
-///
-
-bytes
-random_bytes(size_t size)
-{
-  auto rand = bytes(size);
-  if (1 != RAND_bytes(rand.data(), size)) {
-    throw openssl_error();
-  }
-  return rand;
 }
 
 } // namespace hpke

@@ -1,5 +1,6 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
+#include <hpke/random.h>
 #include <mls/state.h>
 
 using namespace mls;
@@ -10,7 +11,7 @@ public:
   StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
-      auto init_secret = random_bytes(32);
+      auto init_secret = hpke::random_bytes(32);
       auto identity_priv = SignaturePrivateKey::generate(suite);
       auto credential = Credential::basic(user_id, identity_priv.public_key);
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
@@ -39,7 +40,7 @@ protected:
 
   bytes fresh_secret() const
   {
-    return random_bytes(Digest(suite).output_size());
+    return hpke::random_bytes(suite.hpke->kdf->hash_size());
   }
 };
 

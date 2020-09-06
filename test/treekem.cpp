@@ -1,5 +1,6 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
+#include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/treekem.h>
 
@@ -19,7 +20,7 @@ protected:
   std::tuple<bytes, HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
   new_key_package()
   {
-    auto init_secret = random_bytes(32);
+    auto init_secret = hpke::random_bytes(32);
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
@@ -88,8 +89,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   const auto size = LeafCount{ 5 };
   const auto index = LeafIndex{ 2 };
   const auto intersect = NodeIndex{ 3 };
-  const auto random = random_bytes(32);
-  const auto random2 = random_bytes(32);
+  const auto random = hpke::random_bytes(32);
+  const auto random2 = hpke::random_bytes(32);
 
   // create() populates the direct path
   auto priv_create = TreeKEMPrivateKey::create(suite, size, index, random);
@@ -240,7 +241,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto index = pub.add_leaf(kp);
     REQUIRE(index == joiner);
 
-    auto leaf_secret = random_bytes(32);
+    auto leaf_secret = hpke::random_bytes(32);
     auto [new_adder_priv, path] =
       pub.encap(adder, context, leaf_secret, sig_privs.back(), std::nullopt);
     privs[i] = new_adder_priv;
