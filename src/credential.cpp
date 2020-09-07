@@ -1,4 +1,5 @@
 #include "mls/credential.h"
+#include "mls/credential_helpers.h"
 #include <tls/tls_syntax.h>
 
 namespace mls {
@@ -37,6 +38,17 @@ operator==(const BasicCredential& lhs, const BasicCredential& rhs)
 /// X509 Credential
 ///
 
+X509Credential::X509Credential(const std::vector<X509_ptr>& chain_in) {
+  if (chain_in.empty()) {
+    throw InvalidParameterError("x509 credential: empty cert chain");
+  }
+
+  chain = chain_in;
+  //chain[0] is the leaf cert
+  public_key = cert_export_public_key(chain[0].get());
+  identity = cert_export_subject(chain[0].get());
+}
+
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
@@ -72,7 +84,7 @@ Credential::identity() const
       return std::get<BasicCredential>(_cred).identity;
     case 1:
       // dummy identity
-      return bytes{};
+      return std::get<X509Credential>(_cred).identity;
   }
 
   throw std::bad_variant_access();
@@ -86,7 +98,7 @@ Credential::public_key() const
       return std::get<BasicCredential>(_cred).public_key;
     case 1:
       // return dummy signature
-      return SignaturePublicKey();
+      return std::get<X509Credential>(_cred).public_key;
   }
 
   throw std::bad_variant_access();
@@ -107,10 +119,10 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 }
 
 Credential
-Credential::x509()
+Credential::x509(const std::vector<X509_ptr>& chain)
 {
     Credential cred;
-    //cred._cred = X509Credential{};
+    cred._cred = X509Credential{chain};
     return cred;
 }
 

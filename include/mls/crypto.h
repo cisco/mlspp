@@ -142,7 +142,7 @@ class SignaturePublicKey
 public:
   SignaturePublicKey();
   SignaturePublicKey(CipherSuite suite, bytes data);
-
+  SignaturePublicKey(SignatureScheme scheme, bytes data);
   void set_cipher_suite(CipherSuite suite);
   void set_signature_scheme(SignatureScheme scheme);
   SignatureScheme signature_scheme() const;

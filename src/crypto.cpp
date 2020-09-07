@@ -425,6 +425,11 @@ SignaturePublicKey::SignaturePublicKey(CipherSuite suite, bytes data)
   , _data(std::move(data))
 {}
 
+SignaturePublicKey::SignaturePublicKey(SignatureScheme scheme, bytes data)
+  : _scheme(scheme)
+  , _data(std::move(data))
+{}
+
 void
 SignaturePublicKey::set_signature_scheme(SignatureScheme scheme)
 {
