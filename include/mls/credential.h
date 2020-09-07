@@ -63,7 +63,6 @@ struct X509Credential
   bytes identity;
   SignaturePublicKey scheme_;
   static const CredentialType type;
-
 };
 
 tls::ostream&
@@ -72,7 +71,6 @@ tls::istream&
 operator>>(tls::istream& str, X509Credential& obj);
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
-
 
 // struct {
 //     CredentialType credential_type;

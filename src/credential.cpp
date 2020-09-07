@@ -38,13 +38,14 @@ operator==(const BasicCredential& lhs, const BasicCredential& rhs)
 /// X509 Credential
 ///
 
-X509Credential::X509Credential(const std::vector<X509_ptr>& chain_in) {
+X509Credential::X509Credential(const std::vector<X509_ptr>& chain_in)
+{
   if (chain_in.empty()) {
     throw InvalidParameterError("x509 credential: empty cert chain");
   }
 
   chain = chain_in;
-  //chain[0] is the leaf cert
+  // chain[0] is the leaf cert
   public_key = cert_export_public_key(chain[0].get());
   identity = cert_export_subject(chain[0].get());
 }
@@ -52,24 +53,24 @@ X509Credential::X509Credential(const std::vector<X509_ptr>& chain_in) {
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
-    tls::vector<2>::encode(str, obj.identity);
-    return str << obj.public_key.signature_scheme() << obj.public_key;
+  tls::vector<2>::encode(str, obj.identity);
+  return str << obj.public_key.signature_scheme() << obj.public_key;
 }
 
 tls::istream&
 operator>>(tls::istream& str, X509Credential& obj)
 {
-    SignatureScheme scheme;
-    tls::vector<2>::decode(str, obj.identity);
-    str >> scheme >> obj.public_key;
-    obj.public_key.set_signature_scheme(scheme);
-    return str;
+  SignatureScheme scheme;
+  tls::vector<2>::decode(str, obj.identity);
+  str >> scheme >> obj.public_key;
+  obj.public_key.set_signature_scheme(scheme);
+  return str;
 }
 
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs)
 {
-    return (lhs.identity == rhs.identity) && (lhs.public_key == rhs.public_key);
+  return (lhs.identity == rhs.identity) && (lhs.public_key == rhs.public_key);
 }
 
 ///
@@ -121,10 +122,9 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 Credential
 Credential::x509(const std::vector<X509_ptr>& chain)
 {
-    Credential cred;
-    cred._cred = X509Credential{chain};
-    return cred;
+  Credential cred;
+  cred._cred = X509Credential{ chain };
+  return cred;
 }
-
 
 } // namespace mls

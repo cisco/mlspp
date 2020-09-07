@@ -1,10 +1,10 @@
 #pragma once
 
-#include <openssl/asn1.h>
-#include <openssl/pem.h>
-#include <openssl/err.h>
-#include <openssl/rand.h>
-#include <openssl/objects.h>
+#include "openssl/asn1.h"
+#include "openssl/err.h"
+#include "openssl/objects.h"
+#include "openssl/pem.h"
+#include "openssl/rand.h"
 
 namespace mls {
 
@@ -14,7 +14,9 @@ namespace mls {
 
 using EVP_PKEY_ptr = std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)>;
 
-SignatureScheme cert_export_signature_algorithm(X509* cert) {
+SignatureScheme
+cert_export_signature_algorithm(X509* cert)
+{
   int algo_nid = X509_get_signature_nid(cert);
   switch (algo_nid) {
     case EVP_PKEY_ED25519:
@@ -28,7 +30,9 @@ SignatureScheme cert_export_signature_algorithm(X509* cert) {
   return SignatureScheme::unknown;
 }
 
-SignaturePublicKey cert_export_public_key(X509* cert) {
+SignaturePublicKey
+cert_export_public_key(X509* cert)
+{
   SignaturePublicKey public_key;
 
   auto scheme = cert_export_signature_algorithm(cert);
@@ -36,7 +40,7 @@ SignaturePublicKey cert_export_public_key(X509* cert) {
   switch (scheme) {
     case SignatureScheme::Ed448:
     case SignatureScheme::Ed25519: {
-      EVP_PKEY_ptr key (X509_get_pubkey(cert), ::EVP_PKEY_free);
+      EVP_PKEY_ptr key(X509_get_pubkey(cert), ::EVP_PKEY_free);
       size_t raw_len = 0;
       if (1 != EVP_PKEY_get_raw_public_key(key.get(), nullptr, &raw_len)) {
         break;
@@ -46,7 +50,7 @@ SignaturePublicKey cert_export_public_key(X509* cert) {
       if (1 != EVP_PKEY_get_raw_public_key(key.get(), data_ptr, &raw_len)) {
         break;
       }
-      public_key = {scheme, raw};
+      public_key = { scheme, raw };
       break;
     }
     default:
@@ -56,8 +60,11 @@ SignaturePublicKey cert_export_public_key(X509* cert) {
   return public_key;
 }
 
-bytes cert_export_subject(X509* cert) {
-  std::string subject((X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0)));
+bytes
+cert_export_subject(X509* cert)
+{
+  std::string subject(
+    (X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0)));
   auto ret = bytes(subject.begin(), subject.end());
   return ret;
 }
