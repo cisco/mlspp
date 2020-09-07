@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
 #include "mls/common.h"
 #include "mls/crypto.h"
+#include <memory>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
