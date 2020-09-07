@@ -31,16 +31,14 @@ extern const CipherAlgorithms cipher_algs;
 template<>
 const CipherAlgorithms
   cipher_algs<CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519>{
-    KEM::ID::DHKEM_X25519_SHA256, KDF::ID::HKDF_SHA256,
-    AEAD::ID::AES_128_GCM,        Digest::ID::SHA256,
-    Signature::ID::Ed25519,
+    KEM::ID::DHKEM_X25519_SHA256, KDF::ID::HKDF_SHA256,   AEAD::ID::AES_128_GCM,
+    Digest::ID::SHA256,           Signature::ID::Ed25519,
   };
 
 template<>
 const CipherAlgorithms cipher_algs<CipherSuite::ID::P256_AES128GCM_SHA256_P256>{
-  KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256,
-  AEAD::ID::AES_128_GCM,      Digest::ID::SHA256,
-  Signature::ID::P256_SHA256,
+  KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256,       AEAD::ID::AES_128_GCM,
+  Digest::ID::SHA256,         Signature::ID::P256_SHA256,
 };
 
 template<>
@@ -60,9 +58,8 @@ const CipherAlgorithms
 
 template<>
 const CipherAlgorithms cipher_algs<CipherSuite::ID::P521_AES256GCM_SHA512_P521>{
-  KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512,
-  AEAD::ID::AES_256_GCM,      Digest::ID::SHA512,
-  Signature::ID::P521_SHA512,
+  KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512,       AEAD::ID::AES_256_GCM,
+  Digest::ID::SHA512,         Signature::ID::P521_SHA512,
 };
 
 template<>

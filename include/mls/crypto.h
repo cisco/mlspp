@@ -1,12 +1,12 @@
 #pragma once
 
+#include <hpke/digest.h>
+#include <hpke/hpke.h>
+#include <hpke/random.h>
+#include <hpke/signature.h>
 #include <mls/common.h>
 #include <openssl/evp.h>
 #include <tls/tls_syntax.h>
-#include <hpke/digest.h>
-#include <hpke/hpke.h>
-#include <hpke/signature.h>
-#include <hpke/random.h>
 #include <vector>
 
 namespace mls {

@@ -14,7 +14,8 @@ TEST_CASE("Crypto Interop")
   for (const auto& tc : tv.cases) {
     auto suite = tc.cipher_suite;
 
-    auto kdf_extract_out = suite.hpke->kdf->extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
+    auto kdf_extract_out =
+      suite.hpke->kdf->extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
     REQUIRE(kdf_extract_out == tc.kdf_extract_out);
 
     auto derive_key_pair_priv =
@@ -97,7 +98,7 @@ TEST_CASE("Signature Key Serializion")
     auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key;
 
-    SignaturePublicKey parsed{gX.data};
+    SignaturePublicKey parsed{ gX.data };
     REQUIRE(parsed == gX);
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));

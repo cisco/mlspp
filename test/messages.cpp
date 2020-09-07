@@ -66,7 +66,7 @@ TEST_CASE("Messages Interop")
     auto sig_priv = SignaturePrivateKey::derive(tc.cipher_suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key;
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
-    auto fake_hpke_ciphertext = HPKECiphertext{tv.random, tv.random};
+    auto fake_hpke_ciphertext = HPKECiphertext{ tv.random, tv.random };
 
     auto tree =
       TestTreeKEMPublicKey{ tc.cipher_suite,
@@ -83,13 +83,12 @@ TEST_CASE("Messages Interop")
     tls_round_trip(tc.key_package, key_package, reproducible);
 
     // DirectPath
-    auto direct_path = DirectPath{
-      key_package,
-      {
-        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-      }
-    };
+    auto direct_path =
+      DirectPath{ key_package,
+                  {
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                  } };
     tls_round_trip(tc.direct_path, direct_path, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome

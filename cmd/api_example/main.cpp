@@ -9,23 +9,23 @@
 
 using namespace mls;
 
-const auto suite = CipherSuite::X25519_AES128GCM_SHA256_Ed25519;
+const auto suite = CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
 
 class User
 {
 public:
   explicit User(const std::string& name)
+    : _identity_priv(SignaturePrivateKey::generate(suite))
   {
-    _identity_priv = SignaturePrivateKey::generate(suite);
     auto id = bytes(name.begin(), name.end());
-    _cred = Credential::basic(id, _identity_priv.public_key());
+    _cred = Credential::basic(id, _identity_priv.public_key);
   }
 
   Session::InitInfo temp_init_info()
   {
     auto init_secret = random_bytes(32);
     auto init_key = HPKEPrivateKey::derive(suite, init_secret);
-    auto kp = KeyPackage{ suite, init_key.public_key(), _cred, _identity_priv };
+    auto kp = KeyPackage{ suite, init_key.public_key, _cred, _identity_priv };
     return { init_secret, _identity_priv, kp };
   }
 

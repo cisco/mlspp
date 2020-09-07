@@ -8,7 +8,6 @@
 #include <fstream>
 #include <iostream>
 
-
 TreeMathTestVectors
 generate_tree_math()
 {
@@ -289,7 +288,7 @@ generate_messages()
     auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
     auto sig_key = sig_priv.public_key;
     auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
-    auto fake_hpke_ciphertext = HPKECiphertext{tv.random, tv.random};
+    auto fake_hpke_ciphertext = HPKECiphertext{ tv.random, tv.random };
 
     auto tree = TestTreeKEMPublicKey{
       suite,
@@ -305,13 +304,12 @@ generate_messages()
     key_package.signature = tv.random;
 
     // Construct DirectPath
-    auto direct_path = DirectPath{
-      key_package,
-      {
-        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-        { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-      }
-    };
+    auto direct_path =
+      DirectPath{ key_package,
+                  {
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                  } };
 
     // Construct Welcome
     auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
@@ -321,7 +319,8 @@ generate_messages()
 
     auto group_secrets = GroupSecrets{ tv.random, std::nullopt };
     auto encrypted_group_secrets =
-      EncryptedGroupSecrets{ tv.random, HPKECiphertext{ tv.random, tv.random } };
+      EncryptedGroupSecrets{ tv.random,
+                             HPKECiphertext{ tv.random, tv.random } };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
