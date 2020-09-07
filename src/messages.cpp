@@ -88,7 +88,7 @@ Welcome::Welcome(CipherSuite suite,
   auto [key, nonce] = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
-    cipher_suite.hpke->aead->seal(key, nonce, {}, group_info_data);
+    cipher_suite.get().hpke.aead.seal(key, nonce, {}, group_info_data);
 }
 
 std::optional<int>
@@ -121,7 +121,7 @@ Welcome::decrypt(const bytes& epoch_secret) const
 {
   auto [key, nonce] = group_info_key_nonce(epoch_secret);
   auto group_info_data =
-    cipher_suite.hpke->aead->open(key, nonce, {}, encrypted_group_info);
+    cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data.has_value()) {
     throw ProtocolError("Welcome decryption failed");
   }
@@ -132,9 +132,9 @@ Welcome::decrypt(const bytes& epoch_secret) const
 std::tuple<bytes, bytes>
 Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 {
-  auto secret_size = cipher_suite.hpke->kdf->hash_size();
-  auto key_size = cipher_suite.hpke->aead->key_size();
-  auto nonce_size = cipher_suite.hpke->aead->nonce_size();
+  auto secret_size = cipher_suite.get().hpke.kdf.hash_size();
+  auto key_size = cipher_suite.get().hpke.aead.key_size();
+  auto nonce_size = cipher_suite.get().hpke.aead.nonce_size();
 
   auto secret =
     cipher_suite.expand_with_label(epoch_secret, "group info", {}, secret_size);

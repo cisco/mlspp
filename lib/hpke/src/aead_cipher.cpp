@@ -5,6 +5,36 @@
 
 namespace hpke {
 
+AEADCipher make_aead(AEAD::ID cipher_in)
+{
+  return AEADCipher(cipher_in);
+}
+
+static AEADCipher aes_128_gcm = make_aead(AEAD::ID::AES_128_GCM);
+static AEADCipher aes_256_gcm = make_aead(AEAD::ID::AES_256_GCM);
+static AEADCipher chacha20_poly1305 = make_aead(AEAD::ID::CHACHA20_POLY1305);
+
+template<>
+const AEADCipher&
+AEADCipher::get<AEAD::ID::AES_128_GCM>()
+{
+  return aes_128_gcm;
+}
+
+template<>
+const AEADCipher&
+AEADCipher::get<AEAD::ID::AES_256_GCM>()
+{
+  return aes_256_gcm;
+}
+
+template<>
+const AEADCipher&
+AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>()
+{
+  return chacha20_poly1305;
+}
+
 static size_t
 cipher_key_size(AEAD::ID cipher)
 {
@@ -73,12 +103,6 @@ AEADCipher::AEADCipher(AEAD::ID cipher_in)
   , nn(cipher_nonce_size(cipher_in))
   , tag_size(cipher_tag_size(cipher_in))
 {}
-
-std::unique_ptr<AEAD>
-AEADCipher::clone() const
-{
-  return std::make_unique<AEADCipher>(cipher);
-}
 
 bytes
 AEADCipher::seal(const bytes& key,

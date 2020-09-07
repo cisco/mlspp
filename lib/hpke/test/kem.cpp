@@ -18,34 +18,34 @@ TEST_CASE("KEM round-trip")
   const auto seedR = from_hex("B0B0B0B0");
 
   for (const auto& id : ids) {
-    auto kem = KEM::create(id);
+    const auto& kem = KEM::create(id);
 
-    auto skS = kem->derive_key_pair(seedS);
-    auto skR = kem->derive_key_pair(seedR);
+    auto skS = kem.derive_key_pair(seedS);
+    auto skR = kem.derive_key_pair(seedR);
 
     auto pkS = skS->public_key();
     auto pkR = skR->public_key();
 
-    auto pkSm = kem->serialize(*pkS);
-    REQUIRE(pkSm.size() == kem->pk_size());
+    auto pkSm = kem.serialize(*pkS);
+    REQUIRE(pkSm.size() == kem.pk_size());
 
     SUBCASE("Encap/Decap")
     {
-      auto [secretS, enc] = kem->encap(*pkR);
-      REQUIRE(enc.size() == kem->enc_size());
-      REQUIRE(secretS.size() == kem->secret_size());
+      auto [secretS, enc] = kem.encap(*pkR);
+      REQUIRE(enc.size() == kem.enc_size());
+      REQUIRE(secretS.size() == kem.secret_size());
 
-      auto secretR = kem->decap(enc, *skR);
+      auto secretR = kem.decap(enc, *skR);
       REQUIRE(secretR == secretS);
     }
 
     SUBCASE("AuthEncap/AuthDecap")
     {
-      auto [secretS, enc] = kem->auth_encap(*pkR, *skS);
-      REQUIRE(enc.size() == kem->enc_size());
-      REQUIRE(secretS.size() == kem->secret_size());
+      auto [secretS, enc] = kem.auth_encap(*pkR, *skS);
+      REQUIRE(enc.size() == kem.enc_size());
+      REQUIRE(secretS.size() == kem.secret_size());
 
-      auto secretR = kem->auth_decap(enc, *pkS, *skR);
+      auto secretR = kem.auth_decap(enc, *pkS, *skR);
       REQUIRE(secretR == secretS);
     }
   }

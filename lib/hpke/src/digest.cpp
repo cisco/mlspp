@@ -25,10 +25,48 @@ openssl_digest_type(Digest::ID digest)
   }
 }
 
-std::unique_ptr<Digest>
+Digest make_digest(Digest::ID id) {
+  return Digest(id);
+}
+
+static const Digest sha256 = make_digest(Digest::ID::SHA256);
+static const Digest sha384 = make_digest(Digest::ID::SHA384);
+static const Digest sha512 = make_digest(Digest::ID::SHA512);
+
+template<>
+const Digest& Digest::get<Digest::ID::SHA256>()
+{
+  return sha256;
+}
+
+template<>
+const Digest& Digest::get<Digest::ID::SHA384>()
+{
+  return sha384;
+}
+
+template<>
+const Digest& Digest::get<Digest::ID::SHA512>()
+{
+  return sha512;
+}
+
+const Digest&
 Digest::create(Digest::ID id)
 {
-  return std::unique_ptr<Digest>(new Digest(id));
+  switch (id) {
+    case Digest::ID::SHA256:
+      return Digest::get<Digest::ID::SHA256>();
+
+    case Digest::ID::SHA384:
+      return Digest::get<Digest::ID::SHA384>();
+
+    case Digest::ID::SHA512:
+      return Digest::get<Digest::ID::SHA512>();
+
+    default:
+      throw std::runtime_error("Unsupported ciphersuite");
+  }
 }
 
 Digest::Digest(Digest::ID id_in)

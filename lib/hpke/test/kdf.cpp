@@ -66,19 +66,19 @@ TEST_CASE("KDF Known-Answer")
   };
 
   for (const auto& tc : cases) {
-    const auto kdf = KDF::create(tc.id);
+    const auto& kdf = KDF::create(tc.id);
 
-    auto extracted = kdf->extract(salt, ikm);
+    auto extracted = kdf.extract(salt, ikm);
     CHECK(extracted == tc.extracted);
 
-    auto expanded = kdf->expand(extracted, info, expand_size);
+    auto expanded = kdf.expand(extracted, info, expand_size);
     CHECK(expanded == tc.expanded);
 
     auto labeled_extracted =
-      kdf->labeled_extract(tc.suite_id, salt, label, ikm);
+      kdf.labeled_extract(tc.suite_id, salt, label, ikm);
     CHECK(labeled_extracted == tc.labeled_extracted);
 
-    auto labeled_expanded = kdf->labeled_expand(
+    auto labeled_expanded = kdf.labeled_expand(
       tc.suite_id, labeled_extracted, label, info, expand_size);
     CHECK(labeled_expanded == tc.labeled_expanded);
   }

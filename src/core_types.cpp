@@ -63,7 +63,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
 bytes
 KeyPackage::hash() const
 {
-  return cipher_suite.digest->hash(tls::marshal(*this));
+  return cipher_suite.get().digest.hash(tls::marshal(*this));
 }
 
 void

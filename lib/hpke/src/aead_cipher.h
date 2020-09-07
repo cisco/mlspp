@@ -6,8 +6,9 @@ namespace hpke {
 
 struct AEADCipher : public AEAD
 {
-  AEADCipher(AEAD::ID cipher_in);
-  std::unique_ptr<AEAD> clone() const override;
+  template<AEAD::ID id>
+  static const AEADCipher& get();
+
   ~AEADCipher() override = default;
 
   bytes seal(const bytes& key,
@@ -27,6 +28,9 @@ private:
   const size_t nk;
   const size_t nn;
   const size_t tag_size;
+
+  AEADCipher(AEAD::ID cipher_in);
+  friend AEADCipher make_aead(AEAD::ID cipher_in);
 };
 
 } // namespace hpke

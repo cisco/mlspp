@@ -16,8 +16,9 @@ struct DHKEM : public KEM
     std::unique_ptr<Group::PrivateKey> group_priv;
   };
 
-  DHKEM(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
-  std::unique_ptr<KEM> clone() const override;
+  template<KEM::ID>
+  static const DHKEM& get();
+
   ~DHKEM() override = default;
 
   std::unique_ptr<KEM::PrivateKey> generate_key_pair() const override;
@@ -46,14 +47,14 @@ struct DHKEM : public KEM
   size_t sk_size() const override;
 
 private:
-  KEM::ID kem_id;
-  Group::ID group_id;
-  KDF::ID kdf_id;
-  std::unique_ptr<Group> group;
-  std::unique_ptr<KDF> kdf;
+  const Group& group;
+  const KDF& kdf;
   bytes suite_id;
 
   bytes extract_and_expand(const bytes& dh, const bytes& kem_context) const;
+
+  DHKEM(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
+  friend DHKEM make_dhkem(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
 };
 
 } // namespace hpke

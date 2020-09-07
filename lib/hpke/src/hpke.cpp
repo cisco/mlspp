@@ -31,25 +31,24 @@ static const bytes label_secret = to_bytes("secret");
 /// Factory methods for primitives
 ///
 
-std::unique_ptr<KEM>
+const KEM&
 KEM::create(KEM::ID id)
 {
   switch (id) {
     case KEM::ID::DHKEM_P256_SHA256:
-      return std::make_unique<DHKEM>(id, Group::ID::P256, KDF::ID::HKDF_SHA256);
+      return DHKEM::get<KEM::ID::DHKEM_P256_SHA256>();
 
     case KEM::ID::DHKEM_P384_SHA384:
-      return std::make_unique<DHKEM>(id, Group::ID::P384, KDF::ID::HKDF_SHA384);
+      return DHKEM::get<KEM::ID::DHKEM_P384_SHA384>();
 
     case KEM::ID::DHKEM_P521_SHA512:
-      return std::make_unique<DHKEM>(id, Group::ID::P521, KDF::ID::HKDF_SHA512);
+      return DHKEM::get<KEM::ID::DHKEM_P521_SHA512>();
 
     case KEM::ID::DHKEM_X25519_SHA256:
-      return std::make_unique<DHKEM>(
-        id, Group::ID::X25519, KDF::ID::HKDF_SHA256);
+      return DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>();
 
     case KEM::ID::DHKEM_X448_SHA512:
-      return std::make_unique<DHKEM>(id, Group::ID::X448, KDF::ID::HKDF_SHA512);
+      return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 
     default:
       throw std::runtime_error("Unsupported algorithm");
@@ -83,18 +82,18 @@ KEM::auth_decap(const bytes& /* unused */,
   throw std::runtime_error("Not implemented");
 }
 
-std::unique_ptr<KDF>
+const KDF&
 KDF::create(KDF::ID id)
 {
   switch (id) {
     case KDF::ID::HKDF_SHA256:
-      return std::make_unique<HKDF>(Digest::ID::SHA256);
+      return HKDF::get<Digest::ID::SHA256>();
 
     case KDF::ID::HKDF_SHA384:
-      return std::make_unique<HKDF>(Digest::ID::SHA384);
+      return HKDF::get<Digest::ID::SHA384>();
 
     case KDF::ID::HKDF_SHA512:
-      return std::make_unique<HKDF>(Digest::ID::SHA512);
+      return HKDF::get<Digest::ID::SHA512>();
 
     default:
       throw std::runtime_error("Unsupported algorithm");
@@ -122,10 +121,19 @@ KDF::labeled_expand(const bytes& suite_id,
   return expand(prk, labeled_info, size);
 }
 
-std::unique_ptr<AEAD>
+const AEAD&
 AEAD::create(AEAD::ID id)
 {
-  return std::make_unique<AEADCipher>(id);
+  switch (id) {
+    case AEAD::ID::AES_128_GCM:
+      return AEADCipher::get<AEAD::ID::AES_128_GCM>();
+
+    case AEAD::ID::AES_256_GCM:
+      return AEADCipher::get<AEAD::ID::AES_256_GCM>();
+
+    case AEAD::ID::CHACHA20_POLY1305:
+      return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
+  }
 }
 
 ///
@@ -135,14 +143,14 @@ AEAD::create(AEAD::ID id)
 bytes
 Context::do_export(const bytes& exporter_context, size_t size) const
 {
-  return kdf->labeled_expand(
+  return kdf.labeled_expand(
     suite, exporter_secret, label_sec, exporter_context, size);
 }
 
 bytes
 Context::current_nonce() const
 {
-  auto curr = i2osp(seq, aead->nonce_size());
+  auto curr = i2osp(seq, aead.nonce_size());
   return curr ^ nonce;
 }
 
@@ -166,8 +174,8 @@ Context::Context(bytes suite_in,
   , key(std::move(key_in))
   , nonce(std::move(nonce_in))
   , exporter_secret(std::move(exporter_secret_in))
-  , kdf(kdf_in.clone())
-  , aead(aead_in.clone())
+  , kdf(kdf_in)
+  , aead(aead_in)
   , seq(0)
 {}
 
@@ -190,7 +198,7 @@ SenderContext::SenderContext(Context&& c)
 bytes
 SenderContext::seal(const bytes& aad, const bytes& pt)
 {
-  auto ct = aead->seal(key, current_nonce(), aad, pt);
+  auto ct = aead.seal(key, current_nonce(), aad, pt);
   increment_seq();
   return ct;
 }
@@ -202,7 +210,7 @@ ReceiverContext::ReceiverContext(Context&& c)
 std::optional<bytes>
 ReceiverContext::open(const bytes& aad, const bytes& ct)
 {
-  auto maybe_pt = aead->open(key, current_nonce(), aad, ct);
+  auto maybe_pt = aead.open(key, current_nonce(), aad, ct);
   increment_seq();
   return maybe_pt;
 }
@@ -232,7 +240,7 @@ HPKE::HPKE(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
 HPKE::SenderInfo
 HPKE::setup_base_s(const KEM::PublicKey& pkR, const bytes& info) const
 {
-  auto [shared_secret, enc] = kem->encap(pkR);
+  auto [shared_secret, enc] = kem.encap(pkR);
   auto ctx =
     key_schedule(Mode::base, shared_secret, info, default_psk, default_psk_id);
   return std::make_pair(enc, SenderContext(std::move(ctx)));
@@ -243,7 +251,7 @@ HPKE::setup_base_r(const bytes& enc,
                    const KEM::PrivateKey& skR,
                    const bytes& info) const
 {
-  auto shared_secret = kem->decap(enc, skR);
+  auto shared_secret = kem.decap(enc, skR);
   auto ctx =
     key_schedule(Mode::base, shared_secret, info, default_psk, default_psk_id);
   return ReceiverContext(std::move(ctx));
@@ -255,7 +263,7 @@ HPKE::setup_psk_s(const KEM::PublicKey& pkR,
                   const bytes& psk,
                   const bytes& psk_id) const
 {
-  auto [shared_secret, enc] = kem->encap(pkR);
+  auto [shared_secret, enc] = kem.encap(pkR);
   auto ctx = key_schedule(Mode::psk, shared_secret, info, psk, psk_id);
   return std::make_pair(enc, SenderContext(std::move(ctx)));
 }
@@ -267,7 +275,7 @@ HPKE::setup_psk_r(const bytes& enc,
                   const bytes& psk,
                   const bytes& psk_id) const
 {
-  auto shared_secret = kem->decap(enc, skR);
+  auto shared_secret = kem.decap(enc, skR);
   auto ctx = key_schedule(Mode::psk, shared_secret, info, psk, psk_id);
   return ReceiverContext(std::move(ctx));
 }
@@ -277,7 +285,7 @@ HPKE::setup_auth_s(const KEM::PublicKey& pkR,
                    const bytes& info,
                    const KEM::PrivateKey& skS) const
 {
-  auto [shared_secret, enc] = kem->auth_encap(pkR, skS);
+  auto [shared_secret, enc] = kem.auth_encap(pkR, skS);
   auto ctx =
     key_schedule(Mode::auth, shared_secret, info, default_psk, default_psk_id);
   return std::make_pair(enc, SenderContext(std::move(ctx)));
@@ -289,7 +297,7 @@ HPKE::setup_auth_r(const bytes& enc,
                    const bytes& info,
                    const KEM::PublicKey& pkS) const
 {
-  auto shared_secret = kem->auth_decap(enc, pkS, skR);
+  auto shared_secret = kem.auth_decap(enc, pkS, skR);
   auto ctx =
     key_schedule(Mode::auth, shared_secret, info, default_psk, default_psk_id);
   return ReceiverContext(std::move(ctx));
@@ -302,7 +310,7 @@ HPKE::setup_auth_psk_s(const KEM::PublicKey& pkR,
                        const bytes& psk_id,
                        const KEM::PrivateKey& skS) const
 {
-  auto [shared_secret, enc] = kem->auth_encap(pkR, skS);
+  auto [shared_secret, enc] = kem.auth_encap(pkR, skS);
   auto ctx = key_schedule(Mode::auth_psk, shared_secret, info, psk, psk_id);
   return std::make_pair(enc, SenderContext(std::move(ctx)));
 }
@@ -315,7 +323,7 @@ HPKE::setup_auth_psk_r(const bytes& enc,
                        const bytes& psk_id,
                        const KEM::PublicKey& pkS) const
 {
-  auto shared_secret = kem->auth_decap(enc, pkS, skR);
+  auto shared_secret = kem.auth_decap(enc, pkS, skR);
   auto ctx = key_schedule(Mode::auth_psk, shared_secret, info, psk, psk_id);
   return ReceiverContext(std::move(ctx));
 }
@@ -344,23 +352,23 @@ HPKE::key_schedule(Mode mode,
     throw std::runtime_error("Invalid PSK inputs");
   }
 
-  auto psk_id_hash = kdf->labeled_extract(suite, {}, label_psk_id_hash, psk_id);
-  auto info_hash = kdf->labeled_extract(suite, {}, label_info_hash, info);
+  auto psk_id_hash = kdf.labeled_extract(suite, {}, label_psk_id_hash, psk_id);
+  auto info_hash = kdf.labeled_extract(suite, {}, label_info_hash, info);
   auto mode_bytes = bytes{ uint8_t(mode) };
   auto key_schedule_context = mode_bytes + psk_id_hash + info_hash;
 
-  auto psk_hash = kdf->labeled_extract(suite, {}, label_psk_hash, psk);
+  auto psk_hash = kdf.labeled_extract(suite, {}, label_psk_hash, psk);
   auto secret =
-    kdf->labeled_extract(suite, psk_hash, label_secret, shared_secret);
+    kdf.labeled_extract(suite, psk_hash, label_secret, shared_secret);
 
-  auto key = kdf->labeled_expand(
-    suite, secret, label_key, key_schedule_context, aead->key_size());
-  auto nonce = kdf->labeled_expand(
-    suite, secret, label_nonce, key_schedule_context, aead->nonce_size());
-  auto exporter_secret = kdf->labeled_expand(
-    suite, secret, label_exp, key_schedule_context, kdf->hash_size());
+  auto key = kdf.labeled_expand(
+    suite, secret, label_key, key_schedule_context, aead.key_size());
+  auto nonce = kdf.labeled_expand(
+    suite, secret, label_nonce, key_schedule_context, aead.nonce_size());
+  auto exporter_secret = kdf.labeled_expand(
+    suite, secret, label_exp, key_schedule_context, kdf.hash_size());
 
-  return Context(suite, key, nonce, exporter_secret, *kdf, *aead);
+  return Context(suite, key, nonce, exporter_secret, kdf, aead);
 }
 
 } // namespace hpke

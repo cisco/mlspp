@@ -147,8 +147,8 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   auto idA = new_identity_key();
   auto credA = Credential::basic(user_id, idA.public_key);
   std::vector<CipherSuite> ciphersA{
-    CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
-    CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
   };
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
@@ -165,8 +165,8 @@ TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
   auto idB = new_identity_key();
   auto credB = Credential::basic(user_id, idB.public_key);
   std::vector<CipherSuite> ciphersB{
-    CipherSuite(CipherSuite::ID::P256_AES128GCM_SHA256_P256),
-    CipherSuite(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519)
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
   };
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;

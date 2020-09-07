@@ -59,8 +59,8 @@ generate_crypto()
   CryptoTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+      { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   tv.kdf_extract_salt = { 0, 1, 2, 3 };
@@ -75,7 +75,7 @@ generate_crypto()
   for (auto suite : suites) {
     // kdf-Extract
     auto kdf_extract_out =
-      suite.hpke->kdf->extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
+      suite.get().hpke.kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
@@ -132,8 +132,8 @@ generate_key_schedule()
   KeyScheduleTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   GroupContext base_group_context{
@@ -150,7 +150,7 @@ generate_key_schedule()
     KeyScheduleTestVectors::TestCase tc;
     tc.cipher_suite = suite;
 
-    auto secret_size = suite.hpke->kdf->hash_size();
+    auto secret_size = suite.get().hpke.kdf.hash_size();
 
     auto group_context = base_group_context;
     auto update_secret = bytes(secret_size, 0);
@@ -211,8 +211,8 @@ generate_treekem()
   TreeKEMTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   size_t n_leaves = 10;
@@ -265,8 +265,8 @@ generate_messages()
   MessagesTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+      { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   // Set the inputs

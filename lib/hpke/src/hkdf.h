@@ -7,9 +7,9 @@ namespace hpke {
 
 struct HKDF : public KDF
 {
-  HKDF(Digest::ID digest_id_in);
+  template<Digest::ID digest_id>
+  static const HKDF& get();
 
-  std::unique_ptr<KDF> clone() const override;
   ~HKDF() override = default;
 
   bytes extract(const bytes& salt, const bytes& ikm) const override;
@@ -17,10 +17,10 @@ struct HKDF : public KDF
   size_t hash_size() const override;
 
 private:
-  Digest::ID digest_id;
-  std::unique_ptr<Digest> digest;
+  const Digest& digest;
 
-  bytes hmac(const bytes& key, const bytes& data) const;
+  explicit HKDF(const Digest& digest_in);
+  friend HKDF make_hkdf(const Digest& digest);
 };
 
 } // namespace hpke

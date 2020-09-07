@@ -21,12 +21,12 @@ test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 static void
 test_base_vector(const HPKETestVector& tv)
 {
-  auto kem = KEM::create(tv.kem_id);
+  const auto& kem = KEM::create(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem->derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.seedR);
   auto pkR = skR->public_key();
-  auto pkRm = kem->serialize(*pkR);
+  auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
 
   auto ctxR = hpke.setup_base_r(tv.enc, *skR, tv.info);
@@ -36,14 +36,14 @@ test_base_vector(const HPKETestVector& tv)
 static void
 test_psk_vector(const HPKETestVector& tv)
 {
-  auto kem = KEM::create(tv.kem_id);
+  const auto& kem = KEM::create(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem->derive_key_pair(tv.seedR);
-  auto skRm = kem->serialize_private(*skR);
+  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skRm = kem.serialize_private(*skR);
 
   auto pkR = skR->public_key();
-  auto pkRm = kem->serialize(*pkR);
+  auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
 
   auto ctxR = hpke.setup_psk_r(tv.enc, *skR, tv.info, tv.psk, tv.psk_id);
@@ -53,17 +53,17 @@ test_psk_vector(const HPKETestVector& tv)
 static void
 test_auth_vector(const HPKETestVector& tv)
 {
-  auto kem = KEM::create(tv.kem_id);
+  const auto& kem = KEM::create(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem->derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.seedS);
   auto pkS = skS->public_key();
-  auto pkSm = kem->serialize(*pkS);
+  auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem->derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.seedR);
   auto pkR = skR->public_key();
-  auto pkRm = kem->serialize(*pkR);
+  auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
 
   auto ctxR = hpke.setup_auth_r(tv.enc, *skR, tv.info, *pkS);
@@ -73,17 +73,17 @@ test_auth_vector(const HPKETestVector& tv)
 static void
 test_auth_psk_vector(const HPKETestVector& tv)
 {
-  auto kem = KEM::create(tv.kem_id);
+  const auto& kem = KEM::create(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem->derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.seedS);
   auto pkS = skS->public_key();
-  auto pkSm = kem->serialize(*pkS);
+  auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem->derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.seedR);
   auto pkR = skR->public_key();
-  auto pkRm = kem->serialize(*pkR);
+  auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
 
   auto ctxR =
@@ -136,9 +136,9 @@ TEST_CASE("HPKE Round-Trip")
   const auto iterations = int(256);
 
   for (const auto& kem_id : kems) {
-    auto kem = KEM::create(kem_id);
-    auto skS = kem->derive_key_pair(seedS);
-    auto skR = kem->derive_key_pair(seedR);
+    const auto& kem = KEM::create(kem_id);
+    auto skS = kem.derive_key_pair(seedS);
+    auto skR = kem.derive_key_pair(seedR);
 
     auto pkS = skS->public_key();
     auto pkR = skR->public_key();

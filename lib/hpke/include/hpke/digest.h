@@ -16,7 +16,11 @@ struct Digest
     SHA512,
   };
 
-  static std::unique_ptr<Digest> create(ID id);
+  template<ID id>
+  static const Digest& get();
+
+  // XXX
+  static const Digest& create(Digest::ID id);
 
   bytes hash(const bytes& data) const;
   bytes hmac(const bytes& key, const bytes& data) const;
@@ -28,7 +32,7 @@ private:
   size_t output_size;
 
   explicit Digest(ID id);
-  friend class std::unique_ptr<Digest>;
+  friend Digest make_digest(ID id);
 };
 
 } // namespace hpke

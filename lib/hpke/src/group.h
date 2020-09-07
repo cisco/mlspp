@@ -31,11 +31,13 @@ struct Group
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
 
-  static std::unique_ptr<Group> create(ID group_id, KDF::ID kdf_id);
+  static const Group& create(Group::ID group_id);
+
   virtual ~Group() = default;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
+    const bytes& suite_id,
     const bytes& ikm) const = 0;
 
   virtual bytes serialize(const PublicKey& pk) const = 0;
@@ -58,8 +60,7 @@ struct Group
 
 protected:
   ID group_id;
-  std::unique_ptr<KDF> kdf;
-  bytes suite_id;
+  const KDF& kdf;
 
   friend struct DHKEM;
 

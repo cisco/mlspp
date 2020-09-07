@@ -8,21 +8,40 @@
 
 namespace hpke {
 
-HKDF::HKDF(Digest::ID digest_id_in)
-  : digest_id(digest_id_in)
-  , digest(Digest::create(digest_id_in))
-{}
-
-std::unique_ptr<KDF>
-HKDF::clone() const
-{
-  return std::make_unique<HKDF>(digest_id);
+HKDF make_hkdf(const Digest& digest) {
+  return HKDF(digest);
 }
+
+static const HKDF hkdf_sha256 = make_hkdf(Digest::get<Digest::ID::SHA256>());
+static const HKDF hkdf_sha384 = make_hkdf(Digest::get<Digest::ID::SHA384>());
+static const HKDF hkdf_sha512 = make_hkdf(Digest::get<Digest::ID::SHA512>());
+
+template<>
+const HKDF& HKDF::get<Digest::ID::SHA256>()
+{
+  return hkdf_sha256;
+}
+
+template<>
+const HKDF& HKDF::get<Digest::ID::SHA384>()
+{
+  return hkdf_sha384;
+}
+
+template<>
+const HKDF& HKDF::get<Digest::ID::SHA512>()
+{
+  return hkdf_sha512;
+}
+
+HKDF::HKDF(const Digest& digest_in)
+  : digest(digest_in)
+{}
 
 bytes
 HKDF::extract(const bytes& salt, const bytes& ikm) const
 {
-  return digest->hmac(salt, ikm);
+  return digest.hmac(salt, ikm);
 }
 
 bytes
@@ -35,7 +54,7 @@ HKDF::expand(const bytes& prk, const bytes& info, size_t size) const
     i += 1;
     auto block = Ti + info + bytes{ i };
 
-    Ti = digest->hmac(prk, block);
+    Ti = digest.hmac(prk, block);
     okm += Ti;
   }
 
@@ -46,7 +65,7 @@ HKDF::expand(const bytes& prk, const bytes& info, size_t size) const
 size_t
 HKDF::hash_size() const
 {
-  return digest->hash_size();
+  return digest.hash_size();
 }
 
 } // namespace hpke

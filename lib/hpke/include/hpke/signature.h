@@ -18,8 +18,7 @@ struct Signature
     Ed448,
   };
 
-  static std::unique_ptr<Signature> create(ID id);
-  virtual std::unique_ptr<Signature> clone() const = 0;
+  static const Signature& create(ID id);
   virtual ~Signature() = default;
 
   struct PublicKey

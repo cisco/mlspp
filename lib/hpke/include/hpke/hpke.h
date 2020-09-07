@@ -19,8 +19,7 @@ struct KEM
     DHKEM_X448_SHA512 = 0x0021,
   };
 
-  static std::unique_ptr<KEM> create(ID id);
-  virtual std::unique_ptr<KEM> clone() const = 0;
+  static const KEM& create(ID id);
   virtual ~KEM() = default;
 
   struct PublicKey
@@ -71,8 +70,7 @@ struct KDF
     HKDF_SHA512 = 0x0003,
   };
 
-  static std::unique_ptr<KDF> create(ID id);
-  virtual std::unique_ptr<KDF> clone() const = 0;
+  static const KDF& create(ID id);
   virtual ~KDF() = default;
 
   virtual bytes extract(const bytes& salt, const bytes& ikm) const = 0;
@@ -102,8 +100,7 @@ struct AEAD
     CHACHA20_POLY1305 = 0x0003,
   };
 
-  static std::unique_ptr<AEAD> create(ID id);
-  virtual std::unique_ptr<AEAD> clone() const = 0;
+  static const AEAD& create(ID id);
   virtual ~AEAD() = default;
 
   virtual bytes seal(const bytes& key,
@@ -128,8 +125,8 @@ protected:
   bytes key;
   bytes nonce;
   bytes exporter_secret;
-  std::unique_ptr<KDF> kdf;
-  std::unique_ptr<AEAD> aead;
+  const KDF& kdf;
+  const AEAD& aead;
 
   bytes current_nonce() const;
   void increment_seq();
@@ -210,9 +207,9 @@ struct HPKE
                                    const KEM::PublicKey& pkS) const;
 
   bytes suite;
-  std::unique_ptr<KEM> kem;
-  std::unique_ptr<KDF> kdf;
-  std::unique_ptr<AEAD> aead;
+  const KEM& kem;
+  const KDF& kdf;
+  const AEAD& aead;
 
 private:
   static bool verify_psk_inputs(Mode mode,

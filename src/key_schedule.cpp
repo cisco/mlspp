@@ -21,8 +21,8 @@ derive_secret(CipherSuite suite,
               const std::string& label,
               const bytes& context)
 {
-  auto context_hash = suite.digest->hash(context);
-  auto size = suite.digest->hash_size();
+  auto context_hash = suite.get().digest.hash(context);
+  auto size = suite.get().digest.hash_size();
   return suite.expand_with_label(secret, label, context_hash, size);
 }
 
@@ -62,9 +62,9 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , node(node_in)
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
-  , key_size(suite.hpke->aead->key_size())
-  , nonce_size(suite.hpke->aead->key_size())
-  , secret_size(suite.hpke->kdf->hash_size())
+  , key_size(suite.get().hpke.aead.key_size())
+  , nonce_size(suite.get().hpke.aead.key_size())
+  , secret_size(suite.get().hpke.kdf.hash_size())
 {}
 
 std::tuple<uint32_t, KeyAndNonce>
@@ -130,7 +130,7 @@ HashRatchet::erase(uint32_t generation)
 
 BaseKeySource::BaseKeySource(CipherSuite suite_in)
   : suite(suite_in)
-  , secret_size(suite_in.hpke->kdf->hash_size())
+  , secret_size(suite_in.get().hpke.kdf.hash_size())
 {}
 
 struct NoFSBaseKeySource : public BaseKeySource
@@ -165,7 +165,7 @@ struct TreeBaseKeySource : public BaseKeySource
     , root(tree_math::root(NodeCount{ group_size }))
     , width(NodeCount{ group_size })
     , secrets(NodeCount{ group_size }.val)
-    , secret_size(suite_in.hpke->kdf->hash_size())
+    , secret_size(suite_in.get().hpke.kdf.hash_size())
   {
     secrets[root.val] = std::move(application_secret_in);
   }
@@ -219,7 +219,7 @@ struct TreeBaseKeySource : public BaseKeySource
 ///
 
 GroupKeySource::GroupKeySource()
-  : suite(CipherSuite::ID::unknown)
+  : suite{CipherSuite::ID::unknown}
   , base_source(nullptr)
 {}
 
@@ -305,7 +305,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
     derive_secret(suite, epoch_secret, "confirm", context);
   auto init_secret = derive_secret(suite, epoch_secret, "init", context);
 
-  auto key_size = suite.hpke->aead->key_size();
+  auto key_size = suite.get().hpke.aead.key_size();
   auto sender_data_key =
     suite.expand_with_label(sender_data_secret, "sd key", {}, key_size);
 
@@ -331,7 +331,7 @@ KeyScheduleEpoch::next(LeafCount size,
                        const bytes& update_secret,
                        const bytes& context) const
 {
-  auto new_epoch_secret = suite.hpke->kdf->extract(init_secret, update_secret);
+  auto new_epoch_secret = suite.get().hpke.kdf.extract(init_secret, update_secret);
   return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
 }
 

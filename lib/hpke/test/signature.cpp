@@ -64,19 +64,19 @@ TEST_CASE("Signature Known-Answer")
   };
 
   for (const auto& tc : cases) {
-    auto sig = Signature::create(tc.id);
+    const auto& sig = Signature::create(tc.id);
 
-    auto priv = sig->deserialize_private(tc.priv_serialized);
+    auto priv = sig.deserialize_private(tc.priv_serialized);
     auto pub = priv->public_key();
-    auto pub_serialized = sig->serialize(*pub);
+    auto pub_serialized = sig.serialize(*pub);
     CHECK(pub_serialized == tc.pub_serialized);
 
     if (tc.deterministic) {
-      auto signature = sig->sign(tc.data, *priv);
+      auto signature = sig.sign(tc.data, *priv);
       CHECK(signature == tc.signature);
     }
 
-    CHECK(sig->verify(tc.data, tc.signature, *pub));
+    CHECK(sig.verify(tc.data, tc.signature, *pub));
   }
 }
 
@@ -91,12 +91,12 @@ TEST_CASE("Signature Round-Trip")
   const auto data = from_hex("00010203");
 
   for (const auto& id : ids) {
-    auto sig = Signature::create(id);
+    const auto& sig = Signature::create(id);
 
-    auto priv = sig->generate_key_pair();
+    auto priv = sig.generate_key_pair();
     auto pub = priv->public_key();
 
-    auto signature = sig->sign(data, *priv);
-    CHECK(sig->verify(data, signature, *pub));
+    auto signature = sig.sign(data, *priv);
+    CHECK(sig.verify(data, signature, *pub));
   }
 }

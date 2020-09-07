@@ -55,7 +55,7 @@ struct EVPGroup : public Group
 
   std::unique_ptr<Group::PrivateKey> generate_key_pair() const override
   {
-    return derive_key_pair(random_bytes(sk_size()));
+    return derive_key_pair({}, random_bytes(sk_size()));
   }
 
   bytes dh(const Group::PrivateKey& sk,
@@ -160,13 +160,14 @@ struct ECKeyGroup : public EVPGroup
   {}
 
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
-    const bytes& ikm) const override
+      const bytes& suite_id,
+      const bytes& ikm) const override
   {
     static const int retry_limit = 255;
     static const auto label_dkp_prk = to_bytes("dkp_prk");
     static const auto label_candidate = to_bytes("candidate");
 
-    auto dkp_prk = kdf->labeled_extract(suite_id, {}, label_dkp_prk, ikm);
+    auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
 
     auto eckey = make_typed_unique(new_ec_key());
     const auto* group = EC_KEY_get0_group(eckey.get());
@@ -185,7 +186,7 @@ struct ECKeyGroup : public EVPGroup
     while (BN_is_zero(sk.get()) != 0 || BN_cmp(sk.get(), order.get()) != -1) {
       auto ctr = i2osp(counter, 1);
       auto candidate =
-        kdf->labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size());
+        kdf.labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size());
       candidate[0] &= bitmask();
       sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
 
@@ -320,13 +321,14 @@ struct RawKeyGroup : public EVPGroup
   {}
 
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
+    const bytes& suite_id,
     const bytes& ikm) const override
   {
     static const auto label_dkp_prk = to_bytes("dkp_prk");
     static const auto label_sk = to_bytes("sk");
 
-    auto dkp_prk = kdf->labeled_extract(suite_id, {}, label_dkp_prk, ikm);
-    auto skm = kdf->labeled_expand(suite_id, dkp_prk, label_sk, {}, sk_size());
+    auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
+    auto skm = kdf.labeled_expand(suite_id, dkp_prk, label_sk, {}, sk_size());
     return deserialize_private(skm);
   }
 
@@ -404,20 +406,38 @@ private:
 /// General DH group
 ///
 
-std::unique_ptr<Group>
-Group::create(Group::ID group_id, KDF::ID kdf_id)
+static const ECKeyGroup group_p256(Group::ID::P256, KDF::ID::HKDF_SHA256);
+static const ECKeyGroup group_p384(Group::ID::P384, KDF::ID::HKDF_SHA384);
+static const ECKeyGroup group_p521(Group::ID::P521, KDF::ID::HKDF_SHA512);
+static const RawKeyGroup group_x25519(Group::ID::X25519, KDF::ID::HKDF_SHA256);
+static const RawKeyGroup group_ed25519(Group::ID::Ed25519, KDF::ID::HKDF_SHA256);
+static const RawKeyGroup group_x448(Group::ID::X448, KDF::ID::HKDF_SHA512);
+static const RawKeyGroup group_ed448(Group::ID::Ed448, KDF::ID::HKDF_SHA512);
+
+const Group&
+Group::create(Group::ID group_id)
 {
   switch (group_id) {
     case Group::ID::P256:
+      return group_p256;
+
     case Group::ID::P384:
+      return group_p384;
+
     case Group::ID::P521:
-      return std::make_unique<ECKeyGroup>(group_id, kdf_id);
+      return group_p521;
 
     case Group::ID::X25519:
-    case Group::ID::X448:
+      return group_x25519;
+
     case Group::ID::Ed25519:
+      return group_ed25519;
+
+    case Group::ID::X448:
+      return group_x448;
+
     case Group::ID::Ed448:
-      return std::make_unique<RawKeyGroup>(group_id, kdf_id);
+      return group_ed448;
   }
 }
 
