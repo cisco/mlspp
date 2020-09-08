@@ -17,56 +17,71 @@ DHKEM::PrivateKey::public_key() const
   return group_priv->public_key();
 }
 
-DHKEM make_dhkem(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in)
+DHKEM make_dhkem(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
 {
-  return DHKEM(kem_id_in, group_id_in, kdf_id_in);
+  return DHKEM(kem_id_in, group_in, kdf_in);
 }
 
-static const DHKEM dhkem_p256   = make_dhkem(KEM::ID::DHKEM_P256_SHA256, Group::ID::P256, KDF::ID::HKDF_SHA256);
-static const DHKEM dhkem_p384   = make_dhkem(KEM::ID::DHKEM_P384_SHA384, Group::ID::P384, KDF::ID::HKDF_SHA384);
-static const DHKEM dhkem_p512   = make_dhkem(KEM::ID::DHKEM_P521_SHA512, Group::ID::P521, KDF::ID::HKDF_SHA512);
-static const DHKEM dhkem_x25519 = make_dhkem(KEM::ID::DHKEM_X25519_SHA256, Group::ID::X25519, KDF::ID::HKDF_SHA256);
-static const DHKEM dhkem_x448   = make_dhkem(KEM::ID::DHKEM_X448_SHA512, Group::ID::X448, KDF::ID::HKDF_SHA512);
+template<>
+const DHKEM DHKEM::instance<KEM::ID::DHKEM_P256_SHA256> =
+  make_dhkem(KEM::ID::DHKEM_P256_SHA256, Group::get<Group::ID::P256>(), KDF::get<KDF::ID::HKDF_SHA256>());
+
+template<>
+const DHKEM DHKEM::instance<KEM::ID::DHKEM_P384_SHA384> =
+  make_dhkem(KEM::ID::DHKEM_P384_SHA384, Group::get<Group::ID::P384>(), KDF::get<KDF::ID::HKDF_SHA384>());
+
+template<>
+const DHKEM DHKEM::instance<KEM::ID::DHKEM_P521_SHA512> =
+  make_dhkem(KEM::ID::DHKEM_P521_SHA512, Group::get<Group::ID::P521>(), KDF::get<KDF::ID::HKDF_SHA512>());
+
+template<>
+const DHKEM DHKEM::instance<KEM::ID::DHKEM_X25519_SHA256> =
+  make_dhkem(KEM::ID::DHKEM_X25519_SHA256, Group::get<Group::ID::X25519>(), KDF::get<KDF::ID::HKDF_SHA256>());
+
+template<>
+const DHKEM DHKEM::instance<KEM::ID::DHKEM_X448_SHA512> =
+  make_dhkem(KEM::ID::DHKEM_X448_SHA512, Group::get<Group::ID::X448>(), KDF::get<KDF::ID::HKDF_SHA512>());
+
 
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_P256_SHA256>()
 {
-  return dhkem_p256;
+  return DHKEM::instance<KEM::ID::DHKEM_P256_SHA256>;
 }
 
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_P384_SHA384>()
 {
-  return dhkem_p384;
+  return DHKEM::instance<KEM::ID::DHKEM_P384_SHA384>;
 }
 
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_P521_SHA512>()
 {
-  return dhkem_p512;
+  return DHKEM::instance<KEM::ID::DHKEM_P521_SHA512>;
 }
 
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>()
 {
-  return dhkem_x25519;
+  return DHKEM::instance<KEM::ID::DHKEM_X25519_SHA256>;
 }
 
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
 {
-  return dhkem_x448;
+  return DHKEM::instance<KEM::ID::DHKEM_X448_SHA512>;
 }
 
 
-DHKEM::DHKEM(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in)
-  : group(Group::create(group_id_in))
-  , kdf(KDF::create(kdf_id_in))
+DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
+  : group(group_in)
+  , kdf(kdf_in)
 {
   static const auto label_kem = to_bytes("KEM");
   suite_id = label_kem + i2osp(uint16_t(kem_id_in), 2);

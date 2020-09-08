@@ -53,8 +53,11 @@ private:
 
   bytes extract_and_expand(const bytes& dh, const bytes& kem_context) const;
 
-  DHKEM(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
-  friend DHKEM make_dhkem(KEM::ID kem_id_in, Group::ID group_id_in, KDF::ID kdf_id_in);
+  DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in);
+  friend DHKEM make_dhkem(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in);
+
+  template<KEM::ID id>
+  static const DHKEM instance;
 };
 
 } // namespace hpke

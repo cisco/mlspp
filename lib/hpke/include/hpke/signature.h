@@ -18,7 +18,9 @@ struct Signature
     Ed448,
   };
 
-  static const Signature& create(ID id);
+  template<Signature::ID id>
+  static const Signature& get();
+
   virtual ~Signature() = default;
 
   struct PublicKey

@@ -31,28 +31,39 @@ static const bytes label_secret = to_bytes("secret");
 /// Factory methods for primitives
 ///
 
+template<>
 const KEM&
-KEM::create(KEM::ID id)
+KEM::get<KEM::ID::DHKEM_P256_SHA256>()
 {
-  switch (id) {
-    case KEM::ID::DHKEM_P256_SHA256:
-      return DHKEM::get<KEM::ID::DHKEM_P256_SHA256>();
+  return DHKEM::get<KEM::ID::DHKEM_P256_SHA256>();
+}
 
-    case KEM::ID::DHKEM_P384_SHA384:
-      return DHKEM::get<KEM::ID::DHKEM_P384_SHA384>();
+template<>
+const KEM&
+KEM::get<KEM::ID::DHKEM_P384_SHA384>()
+{
+  return DHKEM::get<KEM::ID::DHKEM_P384_SHA384>();
+}
 
-    case KEM::ID::DHKEM_P521_SHA512:
-      return DHKEM::get<KEM::ID::DHKEM_P521_SHA512>();
+template<>
+const KEM&
+KEM::get<KEM::ID::DHKEM_P521_SHA512>()
+{
+  return DHKEM::get<KEM::ID::DHKEM_P521_SHA512>();
+}
 
-    case KEM::ID::DHKEM_X25519_SHA256:
-      return DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>();
+template<>
+const KEM&
+KEM::get<KEM::ID::DHKEM_X25519_SHA256>()
+{
+  return DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>();
+}
 
-    case KEM::ID::DHKEM_X448_SHA512:
-      return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
-
-    default:
-      throw std::runtime_error("Unsupported algorithm");
-  }
+template<>
+const KEM&
+KEM::get<KEM::ID::DHKEM_X448_SHA512>()
+{
+  return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 }
 
 bytes
@@ -82,22 +93,25 @@ KEM::auth_decap(const bytes& /* unused */,
   throw std::runtime_error("Not implemented");
 }
 
+template<>
 const KDF&
-KDF::create(KDF::ID id)
+KDF::get<KDF::ID::HKDF_SHA256>()
 {
-  switch (id) {
-    case KDF::ID::HKDF_SHA256:
-      return HKDF::get<Digest::ID::SHA256>();
+  return HKDF::get<Digest::ID::SHA256>();
+}
 
-    case KDF::ID::HKDF_SHA384:
-      return HKDF::get<Digest::ID::SHA384>();
+template<>
+const KDF&
+KDF::get<KDF::ID::HKDF_SHA384>()
+{
+  return HKDF::get<Digest::ID::SHA384>();
+}
 
-    case KDF::ID::HKDF_SHA512:
-      return HKDF::get<Digest::ID::SHA512>();
-
-    default:
-      throw std::runtime_error("Unsupported algorithm");
-  }
+template<>
+const KDF&
+KDF::get<KDF::ID::HKDF_SHA512>()
+{
+  return HKDF::get<Digest::ID::SHA512>();
 }
 
 bytes
@@ -121,19 +135,25 @@ KDF::labeled_expand(const bytes& suite_id,
   return expand(prk, labeled_info, size);
 }
 
+template<>
 const AEAD&
-AEAD::create(AEAD::ID id)
+AEAD::get<AEAD::ID::AES_128_GCM>()
 {
-  switch (id) {
-    case AEAD::ID::AES_128_GCM:
-      return AEADCipher::get<AEAD::ID::AES_128_GCM>();
+  return AEADCipher::get<AEAD::ID::AES_128_GCM>();
+}
 
-    case AEAD::ID::AES_256_GCM:
-      return AEADCipher::get<AEAD::ID::AES_256_GCM>();
+template<>
+const AEAD&
+AEAD::get<AEAD::ID::AES_256_GCM>()
+{
+  return AEADCipher::get<AEAD::ID::AES_256_GCM>();
+}
 
-    case AEAD::ID::CHACHA20_POLY1305:
-      return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
-  }
+template<>
+const AEAD&
+AEAD::get<AEAD::ID::CHACHA20_POLY1305>()
+{
+  return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
 }
 
 ///
@@ -230,11 +250,57 @@ suite_id(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
          i2osp(static_cast<uint64_t>(aead_id), 2);
 }
 
+static const KEM&
+select_kem(KEM::ID id) {
+  switch (id) {
+    case KEM::ID::DHKEM_P256_SHA256:
+      return KEM::get<KEM::ID::DHKEM_P256_SHA256>();
+    case KEM::ID::DHKEM_P384_SHA384:
+      return KEM::get<KEM::ID::DHKEM_P384_SHA384>();
+    case KEM::ID::DHKEM_P521_SHA512:
+      return KEM::get<KEM::ID::DHKEM_P521_SHA512>();
+    case KEM::ID::DHKEM_X25519_SHA256:
+      return KEM::get<KEM::ID::DHKEM_X25519_SHA256>();
+    case KEM::ID::DHKEM_X448_SHA512:
+      return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
+}
+
+static const KDF&
+select_kdf(KDF::ID id) {
+  switch (id) {
+    case KDF::ID::HKDF_SHA256:
+      return KDF::get<KDF::ID::HKDF_SHA256>();
+    case KDF::ID::HKDF_SHA384:
+      return KDF::get<KDF::ID::HKDF_SHA384>();
+    case KDF::ID::HKDF_SHA512:
+      return KDF::get<KDF::ID::HKDF_SHA512>();
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
+}
+
+static const AEAD&
+select_aead(AEAD::ID id) {
+  switch (id) {
+    case AEAD::ID::AES_128_GCM:
+      return AEAD::get<AEAD::ID::AES_128_GCM>();
+    case AEAD::ID::AES_256_GCM:
+      return AEAD::get<AEAD::ID::AES_256_GCM>();
+    case AEAD::ID::CHACHA20_POLY1305:
+      return AEAD::get<AEAD::ID::CHACHA20_POLY1305>();
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
+}
+
 HPKE::HPKE(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
   : suite(suite_id(kem_id, kdf_id, aead_id))
-  , kem(KEM::create(kem_id))
-  , kdf(KDF::create(kdf_id))
-  , aead(AEAD::create(aead_id))
+  , kem(select_kem(kem_id))
+  , kdf(select_kdf(kdf_id))
+  , aead(select_aead(aead_id))
 {}
 
 HPKE::SenderInfo

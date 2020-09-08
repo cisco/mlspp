@@ -31,7 +31,8 @@ struct Group
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
 
-  static const Group& create(Group::ID group_id);
+  template<Group::ID id>
+  static const Group& get();
 
   virtual ~Group() = default;
 
@@ -64,9 +65,9 @@ protected:
 
   friend struct DHKEM;
 
-  Group(ID group_id_in, KDF::ID kdf_id)
+  Group(ID group_id_in, const KDF& kdf_in)
     : group_id(group_id_in)
-    , kdf(KDF::create(kdf_id))
+    , kdf(kdf_in)
   {}
 };
 

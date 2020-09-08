@@ -19,7 +19,9 @@ struct KEM
     DHKEM_X448_SHA512 = 0x0021,
   };
 
-  static const KEM& create(ID id);
+  template<KEM::ID>
+  static const KEM& get();
+
   virtual ~KEM() = default;
 
   struct PublicKey
@@ -70,7 +72,9 @@ struct KDF
     HKDF_SHA512 = 0x0003,
   };
 
-  static const KDF& create(ID id);
+  template<KDF::ID id>
+  static const KDF& get();
+
   virtual ~KDF() = default;
 
   virtual bytes extract(const bytes& salt, const bytes& ikm) const = 0;
@@ -100,7 +104,9 @@ struct AEAD
     CHACHA20_POLY1305 = 0x0003,
   };
 
-  static const AEAD& create(ID id);
+  template<AEAD::ID id>
+  static const AEAD& get();
+
   virtual ~AEAD() = default;
 
   virtual bytes seal(const bytes& key,

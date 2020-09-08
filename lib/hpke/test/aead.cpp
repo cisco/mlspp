@@ -80,7 +80,7 @@ TEST_CASE("AEAD Known-Answer")
   };
 
   for (const auto& tc : cases) {
-    const auto& aead = AEAD::create(tc.id);
+    const auto& aead = select_aead(tc.id);
 
     auto encrypted = aead.seal(tc.key, tc.nonce, tc.aad, tc.plaintext);
     CHECK(encrypted == tc.ciphertext);
@@ -100,7 +100,7 @@ TEST_CASE("AEAD Round-Trip")
   const auto aad = from_hex("04050607");
 
   for (const auto& id : ids) {
-    const auto& aead = AEAD::create(id);
+    const auto& aead = select_aead(id);
     auto key = bytes(aead.key_size(), 0xA0);
     auto nonce = bytes(aead.nonce_size(), 0xA1);
 

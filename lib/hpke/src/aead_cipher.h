@@ -31,6 +31,9 @@ private:
 
   AEADCipher(AEAD::ID cipher_in);
   friend AEADCipher make_aead(AEAD::ID cipher_in);
+
+  template<AEAD::ID id>
+  static const AEADCipher instance;
 };
 
 } // namespace hpke

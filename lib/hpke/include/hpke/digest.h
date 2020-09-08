@@ -19,9 +19,6 @@ struct Digest
   template<ID id>
   static const Digest& get();
 
-  // XXX
-  static const Digest& create(Digest::ID id);
-
   bytes hash(const bytes& data) const;
   bytes hmac(const bytes& key, const bytes& data) const;
 
@@ -33,6 +30,9 @@ private:
 
   explicit Digest(ID id);
   friend Digest make_digest(ID id);
+
+  template<Digest::ID id>
+  static const Digest instance;
 };
 
 } // namespace hpke

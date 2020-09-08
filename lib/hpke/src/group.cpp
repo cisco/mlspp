@@ -17,8 +17,8 @@ namespace hpke {
 
 struct EVPGroup : public Group
 {
-  EVPGroup(Group::ID group_id, KDF::ID kdf_id)
-    : Group(group_id, kdf_id)
+  EVPGroup(Group::ID group_id, const KDF& kdf)
+    : Group(group_id, kdf)
   {}
 
   struct PublicKey : public Group::PublicKey
@@ -154,10 +154,13 @@ struct EVPGroup : public Group
 
 struct ECKeyGroup : public EVPGroup
 {
-  ECKeyGroup(Group::ID group_id, KDF::ID kdf_id)
-    : EVPGroup(group_id, kdf_id)
+  ECKeyGroup(Group::ID group_id, const KDF& kdf)
+    : EVPGroup(group_id, kdf)
     , curve_nid(group_to_nid(group_id))
   {}
+
+  template<Group::ID id>
+  static const ECKeyGroup instance;
 
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
       const bytes& suite_id,
@@ -309,16 +312,28 @@ private:
   }
 };
 
+template<>
+const ECKeyGroup ECKeyGroup::instance<Group::ID::P256> = ECKeyGroup(Group::ID::P256, KDF::get<KDF::ID::HKDF_SHA256>());
+
+template<>
+const ECKeyGroup ECKeyGroup::instance<Group::ID::P384> = ECKeyGroup(Group::ID::P384, KDF::get<KDF::ID::HKDF_SHA384>());
+
+template<>
+const ECKeyGroup ECKeyGroup::instance<Group::ID::P521> = ECKeyGroup(Group::ID::P521, KDF::get<KDF::ID::HKDF_SHA512>());
+
 ///
 /// DH over "raw" curves
 ///
 
 struct RawKeyGroup : public EVPGroup
 {
-  RawKeyGroup(Group::ID group_id, KDF::ID kdf_id)
-    : EVPGroup(group_id, kdf_id)
+  RawKeyGroup(Group::ID group_id, const KDF& kdf)
+    : EVPGroup(group_id, kdf)
     , evp_type(group_to_evp(group_id))
   {}
+
+  template<Group::ID id>
+  static const RawKeyGroup instance;
 
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
     const bytes& suite_id,
@@ -402,44 +417,36 @@ private:
   }
 };
 
+template<>
+const RawKeyGroup RawKeyGroup::instance<Group::ID::X25519> = RawKeyGroup(Group::ID::X25519, KDF::get<KDF::ID::HKDF_SHA256>());
+
+template<>
+const RawKeyGroup RawKeyGroup::instance<Group::ID::Ed25519> = RawKeyGroup(Group::ID::Ed25519, KDF::get<KDF::ID::HKDF_SHA256>());
+
+template<>
+const RawKeyGroup RawKeyGroup::instance<Group::ID::X448> = RawKeyGroup(Group::ID::X448, KDF::get<KDF::ID::HKDF_SHA512>());
+
+template<>
+const RawKeyGroup RawKeyGroup::instance<Group::ID::Ed448> = RawKeyGroup(Group::ID::Ed448, KDF::get<KDF::ID::HKDF_SHA512>());
+
 ///
 /// General DH group
 ///
 
-static const ECKeyGroup group_p256(Group::ID::P256, KDF::ID::HKDF_SHA256);
-static const ECKeyGroup group_p384(Group::ID::P384, KDF::ID::HKDF_SHA384);
-static const ECKeyGroup group_p521(Group::ID::P521, KDF::ID::HKDF_SHA512);
-static const RawKeyGroup group_x25519(Group::ID::X25519, KDF::ID::HKDF_SHA256);
-static const RawKeyGroup group_ed25519(Group::ID::Ed25519, KDF::ID::HKDF_SHA256);
-static const RawKeyGroup group_x448(Group::ID::X448, KDF::ID::HKDF_SHA512);
-static const RawKeyGroup group_ed448(Group::ID::Ed448, KDF::ID::HKDF_SHA512);
 
-const Group&
-Group::create(Group::ID group_id)
-{
-  switch (group_id) {
-    case Group::ID::P256:
-      return group_p256;
+template<> const Group& Group::get<Group::ID::P256>() { return ECKeyGroup::instance<Group::ID::P256>; }
 
-    case Group::ID::P384:
-      return group_p384;
+template<> const Group& Group::get<Group::ID::P384>() { return ECKeyGroup::instance<Group::ID::P384>; }
 
-    case Group::ID::P521:
-      return group_p521;
+template<> const Group& Group::get<Group::ID::P521>() { return ECKeyGroup::instance<Group::ID::P521>; }
 
-    case Group::ID::X25519:
-      return group_x25519;
+template<> const Group& Group::get<Group::ID::X25519>() { return RawKeyGroup::instance<Group::ID::X25519>; }
 
-    case Group::ID::Ed25519:
-      return group_ed25519;
+template<> const Group& Group::get<Group::ID::Ed25519>() { return RawKeyGroup::instance<Group::ID::Ed25519>; }
 
-    case Group::ID::X448:
-      return group_x448;
+template<> const Group& Group::get<Group::ID::X448>() { return RawKeyGroup::instance<Group::ID::X448>; }
 
-    case Group::ID::Ed448:
-      return group_ed448;
-  }
-}
+template<> const Group& Group::get<Group::ID::Ed448>() { return RawKeyGroup::instance<Group::ID::Ed448>; }
 
 size_t
 Group::dh_size() const

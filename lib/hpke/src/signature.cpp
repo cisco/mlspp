@@ -21,8 +21,8 @@ struct ConcreteSignature : public Signature
     std::unique_ptr<Group::PrivateKey> group_priv;
   };
 
-  ConcreteSignature(Group::ID group_id_in)
-    : group(Group::create(group_id_in))
+  ConcreteSignature(const Group& group_in)
+    : group(group_in)
   {}
 
   std::unique_ptr<Signature::PrivateKey> generate_key_pair() const override
@@ -75,33 +75,61 @@ struct ConcreteSignature : public Signature
     return group.verify(data, sig, rpk);
   }
 
+  template<Signature::ID id>
+  static const ConcreteSignature instance;
+
 private:
   const Group& group;
 };
 
-static const ConcreteSignature sig_p256(Group::ID::P256);
-static const ConcreteSignature sig_p384(Group::ID::P384);
-static const ConcreteSignature sig_p521(Group::ID::P521);
-static const ConcreteSignature sig_ed25519(Group::ID::Ed25519);
-static const ConcreteSignature sig_ed448(Group::ID::Ed448);
+template<>
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::P256_SHA256> = ConcreteSignature(Group::get<Group::ID::P256>());
 
+template<>
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::P384_SHA384> = ConcreteSignature(Group::get<Group::ID::P384>());
+
+template<>
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::P521_SHA512> = ConcreteSignature(Group::get<Group::ID::P521>());
+
+template<>
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed25519> = ConcreteSignature(Group::get<Group::ID::Ed25519>());
+
+template<>
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed448> = ConcreteSignature(Group::get<Group::ID::Ed448>());
+
+template<>
 const Signature&
-Signature::create(ID id)
+Signature::get<Signature::ID::P256_SHA256>()
 {
-  switch (id) {
-    case Signature::ID::P256_SHA256: return sig_p256;
+  return ConcreteSignature::instance<Signature::ID::P256_SHA256>;
+}
 
-    case Signature::ID::P384_SHA384: return sig_p384;
+template<>
+const Signature&
+Signature::get<Signature::ID::P384_SHA384>()
+{
+  return ConcreteSignature::instance<Signature::ID::P384_SHA384>;
+}
 
-    case Signature::ID::P521_SHA512: return sig_p521;
+template<>
+const Signature&
+Signature::get<Signature::ID::P521_SHA512>()
+{
+  return ConcreteSignature::instance<Signature::ID::P521_SHA512>;
+}
 
-    case Signature::ID::Ed25519: return sig_ed25519;
+template<>
+const Signature&
+Signature::get<Signature::ID::Ed25519>()
+{
+  return ConcreteSignature::instance<Signature::ID::Ed25519>;
+}
 
-    case Signature::ID::Ed448: return sig_ed448;
-
-    default:
-      throw std::runtime_error("Unsupported algorithm");
-  }
+template<>
+const Signature&
+Signature::get<Signature::ID::Ed448>()
+{
+  return ConcreteSignature::instance<Signature::ID::Ed448>;
 }
 
 bytes

@@ -66,7 +66,7 @@ TEST_CASE("KDF Known-Answer")
   };
 
   for (const auto& tc : cases) {
-    const auto& kdf = KDF::create(tc.id);
+    const auto& kdf = select_kdf(tc.id);
 
     auto extracted = kdf.extract(salt, ikm);
     CHECK(extracted == tc.extracted);

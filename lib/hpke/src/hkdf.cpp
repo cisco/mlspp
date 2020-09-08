@@ -12,26 +12,31 @@ HKDF make_hkdf(const Digest& digest) {
   return HKDF(digest);
 }
 
-static const HKDF hkdf_sha256 = make_hkdf(Digest::get<Digest::ID::SHA256>());
-static const HKDF hkdf_sha384 = make_hkdf(Digest::get<Digest::ID::SHA384>());
-static const HKDF hkdf_sha512 = make_hkdf(Digest::get<Digest::ID::SHA512>());
+template<>
+const HKDF HKDF::instance<Digest::ID::SHA256> = make_hkdf(Digest::get<Digest::ID::SHA256>());
+
+template<>
+const HKDF HKDF::instance<Digest::ID::SHA384> = make_hkdf(Digest::get<Digest::ID::SHA384>());
+
+template<>
+const HKDF HKDF::instance<Digest::ID::SHA512> = make_hkdf(Digest::get<Digest::ID::SHA512>());
 
 template<>
 const HKDF& HKDF::get<Digest::ID::SHA256>()
 {
-  return hkdf_sha256;
+  return HKDF::instance<Digest::ID::SHA256>;
 }
 
 template<>
 const HKDF& HKDF::get<Digest::ID::SHA384>()
 {
-  return hkdf_sha384;
+  return HKDF::instance<Digest::ID::SHA384>;
 }
 
 template<>
 const HKDF& HKDF::get<Digest::ID::SHA512>()
 {
-  return hkdf_sha512;
+  return HKDF::instance<Digest::ID::SHA512>;
 }
 
 HKDF::HKDF(const Digest& digest_in)

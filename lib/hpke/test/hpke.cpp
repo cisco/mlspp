@@ -21,7 +21,7 @@ test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 static void
 test_base_vector(const HPKETestVector& tv)
 {
-  const auto& kem = KEM::create(tv.kem_id);
+  const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
   auto skR = kem.derive_key_pair(tv.seedR);
@@ -36,7 +36,7 @@ test_base_vector(const HPKETestVector& tv)
 static void
 test_psk_vector(const HPKETestVector& tv)
 {
-  const auto& kem = KEM::create(tv.kem_id);
+  const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
   auto skR = kem.derive_key_pair(tv.seedR);
@@ -53,7 +53,7 @@ test_psk_vector(const HPKETestVector& tv)
 static void
 test_auth_vector(const HPKETestVector& tv)
 {
-  const auto& kem = KEM::create(tv.kem_id);
+  const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
   auto skS = kem.derive_key_pair(tv.seedS);
@@ -73,7 +73,7 @@ test_auth_vector(const HPKETestVector& tv)
 static void
 test_auth_psk_vector(const HPKETestVector& tv)
 {
-  const auto& kem = KEM::create(tv.kem_id);
+  const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
   auto skS = kem.derive_key_pair(tv.seedS);
@@ -136,7 +136,7 @@ TEST_CASE("HPKE Round-Trip")
   const auto iterations = int(256);
 
   for (const auto& kem_id : kems) {
-    const auto& kem = KEM::create(kem_id);
+    const auto& kem = select_kem(kem_id);
     auto skS = kem.derive_key_pair(seedS);
     auto skR = kem.derive_key_pair(seedR);
 

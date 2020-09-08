@@ -18,7 +18,7 @@ TEST_CASE("KEM round-trip")
   const auto seedR = from_hex("B0B0B0B0");
 
   for (const auto& id : ids) {
-    const auto& kem = KEM::create(id);
+    const auto& kem = select_kem(id);
 
     auto skS = kem.derive_key_pair(seedS);
     auto skR = kem.derive_key_pair(seedR);

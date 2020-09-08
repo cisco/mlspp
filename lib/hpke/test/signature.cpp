@@ -64,7 +64,7 @@ TEST_CASE("Signature Known-Answer")
   };
 
   for (const auto& tc : cases) {
-    const auto& sig = Signature::create(tc.id);
+    const auto& sig = select_signature(tc.id);
 
     auto priv = sig.deserialize_private(tc.priv_serialized);
     auto pub = priv->public_key();
@@ -91,7 +91,7 @@ TEST_CASE("Signature Round-Trip")
   const auto data = from_hex("00010203");
 
   for (const auto& id : ids) {
-    const auto& sig = Signature::create(id);
+    const auto& sig = select_signature(id);
 
     auto priv = sig.generate_key_pair();
     auto pub = priv->public_key();

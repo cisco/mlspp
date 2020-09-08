@@ -10,29 +10,35 @@ AEADCipher make_aead(AEAD::ID cipher_in)
   return AEADCipher(cipher_in);
 }
 
-static AEADCipher aes_128_gcm = make_aead(AEAD::ID::AES_128_GCM);
-static AEADCipher aes_256_gcm = make_aead(AEAD::ID::AES_256_GCM);
-static AEADCipher chacha20_poly1305 = make_aead(AEAD::ID::CHACHA20_POLY1305);
+template<>
+const AEADCipher AEADCipher::instance<AEAD::ID::AES_128_GCM> = make_aead(AEAD::ID::AES_128_GCM);
+
+template<>
+const AEADCipher AEADCipher::instance<AEAD::ID::AES_256_GCM> = make_aead(AEAD::ID::AES_256_GCM);
+
+template<>
+const AEADCipher AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305> = make_aead(AEAD::ID::CHACHA20_POLY1305);
+
 
 template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::AES_128_GCM>()
 {
-  return aes_128_gcm;
+  return AEADCipher::instance<AEAD::ID::AES_128_GCM>;
 }
 
 template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::AES_256_GCM>()
 {
-  return aes_256_gcm;
+  return AEADCipher::instance<AEAD::ID::AES_256_GCM>;
 }
 
 template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>()
 {
-  return chacha20_poly1305;
+  return AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305>;
 }
 
 static size_t
