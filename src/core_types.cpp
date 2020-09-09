@@ -35,6 +35,7 @@ const NodeType KeyPackage::type = NodeType::leaf;
 
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
+  , cipher_suite{ CipherSuite::ID::unknown }
 {}
 
 static const uint64_t default_not_before = 0x0000000000000000;

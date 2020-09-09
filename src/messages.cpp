@@ -76,6 +76,7 @@ GroupInfo::verify() const
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
+  , cipher_suite{ CipherSuite::ID::unknown }
 {}
 
 Welcome::Welcome(CipherSuite suite,

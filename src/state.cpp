@@ -254,8 +254,8 @@ State::ratchet_and_sign(const Commit& op,
   update_epoch_secrets(update_secret);
 
   auto& commit_data = std::get<CommitData>(pt.content);
-  commit_data.confirmation =
-    _suite.get().digest.hmac(_keys.confirmation_key, _confirmed_transcript_hash);
+  commit_data.confirmation = _suite.get().digest.hmac(
+    _keys.confirmation_key, _confirmed_transcript_hash);
   pt.sign(_suite, prev_ctx, _identity_priv);
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
@@ -316,8 +316,8 @@ State::handle(const MLSPlaintext& pt)
   next._tree.merge(sender, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash =
-    _suite.get().digest.hash(next._interim_transcript_hash + pt.commit_content());
+  next._confirmed_transcript_hash = _suite.get().digest.hash(
+    next._interim_transcript_hash + pt.commit_content());
   next._interim_transcript_hash = _suite.get().digest.hash(
     next._confirmed_transcript_hash + pt.commit_auth_data());
 
@@ -566,8 +566,8 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm =
-    _suite.get().digest.hmac(_keys.confirmation_key, _confirmed_transcript_hash);
+  auto confirm = _suite.get().digest.hmac(_keys.confirmation_key,
+                                          _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
 
@@ -599,10 +599,11 @@ State::encrypt(const MLSPlaintext& pt)
   auto sender_data_aad_val =
     sender_data_aad(_group_id, _epoch, content_type, sender_data_nonce);
 
-  auto encrypted_sender_data = _suite.get().hpke.aead.seal(_keys.sender_data_key,
-                                                       sender_data_nonce,
-                                                       sender_data_aad_val,
-                                                       sender_data.bytes());
+  auto encrypted_sender_data =
+    _suite.get().hpke.aead.seal(_keys.sender_data_key,
+                                sender_data_nonce,
+                                sender_data_aad_val,
+                                sender_data.bytes());
 
   // Compute the plaintext input and AAD
   // XXX(rlb@ipv.sx): Apply padding?
@@ -615,7 +616,8 @@ State::encrypt(const MLSPlaintext& pt)
                          encrypted_sender_data);
 
   // Encrypt the plaintext
-  auto ciphertext = _suite.get().hpke.aead.seal(keys.key, keys.nonce, aad, content);
+  auto ciphertext =
+    _suite.get().hpke.aead.seal(keys.key, keys.nonce, aad, content);
 
   // Assemble the MLSCiphertext
   MLSCiphertext ct;
@@ -645,9 +647,9 @@ State::decrypt(const MLSCiphertext& ct)
   auto sender_data_aad_val = sender_data_aad(
     ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
   auto sender_data = _suite.get().hpke.aead.open(_keys.sender_data_key,
-                                             ct.sender_data_nonce,
-                                             sender_data_aad_val,
-                                             ct.encrypted_sender_data);
+                                                 ct.sender_data_nonce,
+                                                 sender_data_aad_val,
+                                                 ct.encrypted_sender_data);
   if (!sender_data.has_value()) {
     throw ProtocolError("Sender data decryption failed");
   }

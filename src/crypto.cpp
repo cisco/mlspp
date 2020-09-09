@@ -3,12 +3,12 @@
 #include <iostream>
 #include <string>
 
-using hpke::AEAD;
-using hpke::Digest;
-using hpke::HPKE;
-using hpke::KDF;
-using hpke::KEM;
-using hpke::Signature;
+using hpke::AEAD;      // NOLINT(misc-unused-using-decls)
+using hpke::Digest;    // NOLINT(misc-unused-using-decls)
+using hpke::HPKE;      // NOLINT(misc-unused-using-decls)
+using hpke::KDF;       // NOLINT(misc-unused-using-decls)
+using hpke::KEM;       // NOLINT(misc-unused-using-decls)
+using hpke::Signature; // NOLINT(misc-unused-using-decls)
 
 namespace mls {
 
@@ -17,46 +17,64 @@ namespace mls {
 ///
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519>{
-  HPKE(KEM::ID::DHKEM_X25519_SHA256, KDF::ID::HKDF_SHA256, AEAD::ID::AES_128_GCM),
-  Digest::get<Digest::ID::SHA256>(),
-  Signature::get<Signature::ID::Ed25519>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519>{
+    HPKE(KEM::ID::DHKEM_X25519_SHA256,
+         KDF::ID::HKDF_SHA256,
+         AEAD::ID::AES_128_GCM),
+    Digest::get<Digest::ID::SHA256>(),
+    Signature::get<Signature::ID::Ed25519>(),
+  };
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::P256_AES128GCM_SHA256_P256>{
-  HPKE(KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256, AEAD::ID::AES_128_GCM),
-  Digest::get<Digest::ID::SHA256>(),
-  Signature::get<Signature::ID::P256_SHA256>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::P256_AES128GCM_SHA256_P256>{
+    HPKE(KEM::ID::DHKEM_P256_SHA256,
+         KDF::ID::HKDF_SHA256,
+         AEAD::ID::AES_128_GCM),
+    Digest::get<Digest::ID::SHA256>(),
+    Signature::get<Signature::ID::P256_SHA256>(),
+  };
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519>{
-  HPKE(KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256, AEAD::ID::CHACHA20_POLY1305),
-  Digest::get<Digest::ID::SHA256>(),
-  Signature::get<Signature::ID::Ed25519>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519>{
+    HPKE(KEM::ID::DHKEM_P256_SHA256,
+         KDF::ID::HKDF_SHA256,
+         AEAD::ID::CHACHA20_POLY1305),
+    Digest::get<Digest::ID::SHA256>(),
+    Signature::get<Signature::ID::Ed25519>(),
+  };
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::X448_AES256GCM_SHA512_Ed448>{
-  HPKE(KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
-  Digest::get<Digest::ID::SHA512>(),
-  Signature::get<Signature::ID::Ed448>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::X448_AES256GCM_SHA512_Ed448>{
+    HPKE(KEM::ID::DHKEM_X448_SHA512,
+         KDF::ID::HKDF_SHA512,
+         AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA512>(),
+    Signature::get<Signature::ID::Ed448>(),
+  };
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::P521_AES256GCM_SHA512_P521>{
-  HPKE(KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
-  Digest::get<Digest::ID::SHA512>(),
-  Signature::get<Signature::ID::P521_SHA512>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::P521_AES256GCM_SHA512_P521>{
+    HPKE(KEM::ID::DHKEM_P521_SHA512,
+         KDF::ID::HKDF_SHA512,
+         AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA512>(),
+    Signature::get<Signature::ID::P521_SHA512>(),
+  };
 
 template<>
-const CipherSuite::Ciphers CipherSuite::ciphers<CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448>{
-  HPKE(KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::CHACHA20_POLY1305),
-  Digest::get<Digest::ID::SHA512>(),
-  Signature::get<Signature::ID::Ed448>(),
-};
+const CipherSuite::Ciphers
+  CipherSuite::ciphers<CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448>{
+    HPKE(KEM::ID::DHKEM_X448_SHA512,
+         KDF::ID::HKDF_SHA512,
+         AEAD::ID::CHACHA20_POLY1305),
+    Digest::get<Digest::ID::SHA512>(),
+    Signature::get<Signature::ID::Ed448>(),
+  };
 
 const CipherSuite::Ciphers&
 CipherSuite::get() const

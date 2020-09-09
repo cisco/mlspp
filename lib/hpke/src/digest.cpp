@@ -25,33 +25,41 @@ openssl_digest_type(Digest::ID digest)
   }
 }
 
-Digest make_digest(Digest::ID id) {
+Digest
+make_digest(Digest::ID id)
+{
   return Digest(id);
 }
 
 template<>
-const Digest Digest::instance<Digest::ID::SHA256> = make_digest(Digest::ID::SHA256);
+const Digest Digest::instance<Digest::ID::SHA256> =
+  make_digest(Digest::ID::SHA256);
 
 template<>
-const Digest Digest::instance<Digest::ID::SHA384> = make_digest(Digest::ID::SHA384);
+const Digest Digest::instance<Digest::ID::SHA384> =
+  make_digest(Digest::ID::SHA384);
 
 template<>
-const Digest Digest::instance<Digest::ID::SHA512> = make_digest(Digest::ID::SHA512);
+const Digest Digest::instance<Digest::ID::SHA512> =
+  make_digest(Digest::ID::SHA512);
 
 template<>
-const Digest& Digest::get<Digest::ID::SHA256>()
+const Digest&
+Digest::get<Digest::ID::SHA256>()
 {
   return Digest::instance<Digest::ID::SHA256>;
 }
 
 template<>
-const Digest& Digest::get<Digest::ID::SHA384>()
+const Digest&
+Digest::get<Digest::ID::SHA384>()
 {
   return Digest::instance<Digest::ID::SHA384>;
 }
 
 template<>
-const Digest& Digest::get<Digest::ID::SHA512>()
+const Digest&
+Digest::get<Digest::ID::SHA512>()
 {
   return Digest::instance<Digest::ID::SHA512>;
 }

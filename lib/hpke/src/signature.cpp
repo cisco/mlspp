@@ -9,7 +9,7 @@ struct ConcreteSignature : public Signature
 {
   struct PrivateKey : public Signature::PrivateKey
   {
-    PrivateKey(Group::PrivateKey* group_priv_in)
+    explicit PrivateKey(Group::PrivateKey* group_priv_in)
       : group_priv(group_priv_in)
     {}
 
@@ -21,7 +21,7 @@ struct ConcreteSignature : public Signature
     std::unique_ptr<Group::PrivateKey> group_priv;
   };
 
-  ConcreteSignature(const Group& group_in)
+  explicit ConcreteSignature(const Group& group_in)
     : group(group_in)
   {}
 
@@ -33,7 +33,8 @@ struct ConcreteSignature : public Signature
   std::unique_ptr<Signature::PrivateKey> derive_key_pair(
     const bytes& ikm) const override
   {
-    return std::make_unique<PrivateKey>(group.derive_key_pair({}, ikm).release());
+    return std::make_unique<PrivateKey>(
+      group.derive_key_pair({}, ikm).release());
   }
 
   bytes serialize(const Signature::PublicKey& pk) const override
@@ -83,19 +84,27 @@ private:
 };
 
 template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::P256_SHA256> = ConcreteSignature(Group::get<Group::ID::P256>());
+const ConcreteSignature
+  ConcreteSignature::instance<Signature::ID::P256_SHA256> =
+    ConcreteSignature(Group::get<Group::ID::P256>());
 
 template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::P384_SHA384> = ConcreteSignature(Group::get<Group::ID::P384>());
+const ConcreteSignature
+  ConcreteSignature::instance<Signature::ID::P384_SHA384> =
+    ConcreteSignature(Group::get<Group::ID::P384>());
 
 template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::P521_SHA512> = ConcreteSignature(Group::get<Group::ID::P521>());
+const ConcreteSignature
+  ConcreteSignature::instance<Signature::ID::P521_SHA512> =
+    ConcreteSignature(Group::get<Group::ID::P521>());
 
 template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed25519> = ConcreteSignature(Group::get<Group::ID::Ed25519>());
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed25519> =
+  ConcreteSignature(Group::get<Group::ID::Ed25519>());
 
 template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed448> = ConcreteSignature(Group::get<Group::ID::Ed448>());
+const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed448> =
+  ConcreteSignature(Group::get<Group::ID::Ed448>());
 
 template<>
 const Signature&

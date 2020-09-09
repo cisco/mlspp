@@ -251,7 +251,8 @@ suite_id(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
 }
 
 static const KEM&
-select_kem(KEM::ID id) {
+select_kem(KEM::ID id)
+{
   switch (id) {
     case KEM::ID::DHKEM_P256_SHA256:
       return KEM::get<KEM::ID::DHKEM_P256_SHA256>();
@@ -269,7 +270,8 @@ select_kem(KEM::ID id) {
 }
 
 static const KDF&
-select_kdf(KDF::ID id) {
+select_kdf(KDF::ID id)
+{
   switch (id) {
     case KDF::ID::HKDF_SHA256:
       return KDF::get<KDF::ID::HKDF_SHA256>();
@@ -283,7 +285,8 @@ select_kdf(KDF::ID id) {
 }
 
 static const AEAD&
-select_aead(AEAD::ID id) {
+select_aead(AEAD::ID id)
+{
   switch (id) {
     case AEAD::ID::AES_128_GCM:
       return AEAD::get<AEAD::ID::AES_128_GCM>();

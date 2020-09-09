@@ -60,7 +60,7 @@ generate_crypto()
 
   std::vector<CipherSuite> suites{
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-      { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   tv.kdf_extract_salt = { 0, 1, 2, 3 };
@@ -266,7 +266,7 @@ generate_messages()
 
   std::vector<CipherSuite> suites{
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-      { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   // Set the inputs

@@ -74,8 +74,7 @@ TEST_CASE("KDF Known-Answer")
     auto expanded = kdf.expand(extracted, info, expand_size);
     CHECK(expanded == tc.expanded);
 
-    auto labeled_extracted =
-      kdf.labeled_extract(tc.suite_id, salt, label, ikm);
+    auto labeled_extracted = kdf.labeled_extract(tc.suite_id, salt, label, ikm);
     CHECK(labeled_extracted == tc.labeled_extracted);
 
     auto labeled_expanded = kdf.labeled_expand(

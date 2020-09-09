@@ -9,7 +9,8 @@
 
 using namespace mls;
 
-const auto suite = CipherSuite{CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519};
+const auto suite =
+  CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
 class User
 {

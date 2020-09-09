@@ -5,20 +5,23 @@
 
 namespace hpke {
 
-AEADCipher make_aead(AEAD::ID cipher_in)
+AEADCipher
+make_aead(AEAD::ID cipher_in)
 {
   return AEADCipher(cipher_in);
 }
 
 template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::AES_128_GCM> = make_aead(AEAD::ID::AES_128_GCM);
+const AEADCipher AEADCipher::instance<AEAD::ID::AES_128_GCM> =
+  make_aead(AEAD::ID::AES_128_GCM);
 
 template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::AES_256_GCM> = make_aead(AEAD::ID::AES_256_GCM);
+const AEADCipher AEADCipher::instance<AEAD::ID::AES_256_GCM> =
+  make_aead(AEAD::ID::AES_256_GCM);
 
 template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305> = make_aead(AEAD::ID::CHACHA20_POLY1305);
-
+const AEADCipher AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305> =
+  make_aead(AEAD::ID::CHACHA20_POLY1305);
 
 template<>
 const AEADCipher&

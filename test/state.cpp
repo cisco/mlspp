@@ -25,7 +25,7 @@ public:
   }
 
 protected:
-  const CipherSuite suite{CipherSuite::ID::P256_AES128GCM_SHA256_P256};
+  const CipherSuite suite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
 
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };

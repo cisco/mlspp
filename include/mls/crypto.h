@@ -13,7 +13,6 @@ namespace mls {
 
 /// Cipher suites
 
-
 struct CipherSuite
 {
   enum struct ID : uint16_t
@@ -27,7 +26,8 @@ struct CipherSuite
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
   };
 
-  struct Ciphers {
+  struct Ciphers
+  {
     hpke::HPKE hpke;
     const hpke::Digest& digest;
     const hpke::Signature& sig;
@@ -40,11 +40,11 @@ struct CipherSuite
   bytes expand_with_label(const bytes& secret,
                           const std::string& label,
                           const bytes& context,
-                          size_t size) const;
+                          size_t length) const;
 
   TLS_SERIALIZABLE(id)
 
-  private:
+private:
   template<CipherSuite::ID>
   static const Ciphers ciphers;
 };

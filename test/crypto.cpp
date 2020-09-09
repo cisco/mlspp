@@ -35,7 +35,7 @@ TEST_CASE("Basic HPKE")
   auto original = random_bytes(100);
 
   for (auto suite_id : all_supported_suites) {
-    auto suite = CipherSuite{suite_id};
+    auto suite = CipherSuite{ suite_id };
     auto s = bytes{ 0, 1, 2, 3 };
 
     auto x = HPKEPrivateKey::generate(suite);
@@ -61,7 +61,7 @@ TEST_CASE("Basic HPKE")
 TEST_CASE("HPKE Key Serialization")
 {
   for (auto suite_id : all_supported_suites) {
-    auto suite = CipherSuite{suite_id};
+    auto suite = CipherSuite{ suite_id };
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key;
 
@@ -76,7 +76,7 @@ TEST_CASE("HPKE Key Serialization")
 TEST_CASE("Basic Signature")
 {
   for (auto suite_id : all_supported_suites) {
-    auto suite = CipherSuite{suite_id};
+    auto suite = CipherSuite{ suite_id };
     auto a = SignaturePrivateKey::generate(suite);
     auto b = SignaturePrivateKey::generate(suite);
 
@@ -98,7 +98,7 @@ TEST_CASE("Basic Signature")
 TEST_CASE("Signature Key Serializion")
 {
   for (auto suite_id : all_supported_suites) {
-    auto suite = CipherSuite{suite_id};
+    auto suite = CipherSuite{ suite_id };
     auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key;
 

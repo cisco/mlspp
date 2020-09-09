@@ -8,33 +8,41 @@
 
 namespace hpke {
 
-HKDF make_hkdf(const Digest& digest) {
+HKDF
+make_hkdf(const Digest& digest)
+{
   return HKDF(digest);
 }
 
 template<>
-const HKDF HKDF::instance<Digest::ID::SHA256> = make_hkdf(Digest::get<Digest::ID::SHA256>());
+const HKDF HKDF::instance<Digest::ID::SHA256> =
+  make_hkdf(Digest::get<Digest::ID::SHA256>());
 
 template<>
-const HKDF HKDF::instance<Digest::ID::SHA384> = make_hkdf(Digest::get<Digest::ID::SHA384>());
+const HKDF HKDF::instance<Digest::ID::SHA384> =
+  make_hkdf(Digest::get<Digest::ID::SHA384>());
 
 template<>
-const HKDF HKDF::instance<Digest::ID::SHA512> = make_hkdf(Digest::get<Digest::ID::SHA512>());
+const HKDF HKDF::instance<Digest::ID::SHA512> =
+  make_hkdf(Digest::get<Digest::ID::SHA512>());
 
 template<>
-const HKDF& HKDF::get<Digest::ID::SHA256>()
+const HKDF&
+HKDF::get<Digest::ID::SHA256>()
 {
   return HKDF::instance<Digest::ID::SHA256>;
 }
 
 template<>
-const HKDF& HKDF::get<Digest::ID::SHA384>()
+const HKDF&
+HKDF::get<Digest::ID::SHA384>()
 {
   return HKDF::instance<Digest::ID::SHA384>;
 }
 
 template<>
-const HKDF& HKDF::get<Digest::ID::SHA512>()
+const HKDF&
+HKDF::get<Digest::ID::SHA512>()
 {
   return HKDF::instance<Digest::ID::SHA512>;
 }

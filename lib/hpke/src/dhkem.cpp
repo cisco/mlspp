@@ -17,31 +17,41 @@ DHKEM::PrivateKey::public_key() const
   return group_priv->public_key();
 }
 
-DHKEM make_dhkem(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
+DHKEM
+make_dhkem(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
 {
   return DHKEM(kem_id_in, group_in, kdf_in);
 }
 
 template<>
 const DHKEM DHKEM::instance<KEM::ID::DHKEM_P256_SHA256> =
-  make_dhkem(KEM::ID::DHKEM_P256_SHA256, Group::get<Group::ID::P256>(), KDF::get<KDF::ID::HKDF_SHA256>());
+  make_dhkem(KEM::ID::DHKEM_P256_SHA256,
+             Group::get<Group::ID::P256>(),
+             KDF::get<KDF::ID::HKDF_SHA256>());
 
 template<>
 const DHKEM DHKEM::instance<KEM::ID::DHKEM_P384_SHA384> =
-  make_dhkem(KEM::ID::DHKEM_P384_SHA384, Group::get<Group::ID::P384>(), KDF::get<KDF::ID::HKDF_SHA384>());
+  make_dhkem(KEM::ID::DHKEM_P384_SHA384,
+             Group::get<Group::ID::P384>(),
+             KDF::get<KDF::ID::HKDF_SHA384>());
 
 template<>
 const DHKEM DHKEM::instance<KEM::ID::DHKEM_P521_SHA512> =
-  make_dhkem(KEM::ID::DHKEM_P521_SHA512, Group::get<Group::ID::P521>(), KDF::get<KDF::ID::HKDF_SHA512>());
+  make_dhkem(KEM::ID::DHKEM_P521_SHA512,
+             Group::get<Group::ID::P521>(),
+             KDF::get<KDF::ID::HKDF_SHA512>());
 
 template<>
 const DHKEM DHKEM::instance<KEM::ID::DHKEM_X25519_SHA256> =
-  make_dhkem(KEM::ID::DHKEM_X25519_SHA256, Group::get<Group::ID::X25519>(), KDF::get<KDF::ID::HKDF_SHA256>());
+  make_dhkem(KEM::ID::DHKEM_X25519_SHA256,
+             Group::get<Group::ID::X25519>(),
+             KDF::get<KDF::ID::HKDF_SHA256>());
 
 template<>
 const DHKEM DHKEM::instance<KEM::ID::DHKEM_X448_SHA512> =
-  make_dhkem(KEM::ID::DHKEM_X448_SHA512, Group::get<Group::ID::X448>(), KDF::get<KDF::ID::HKDF_SHA512>());
-
+  make_dhkem(KEM::ID::DHKEM_X448_SHA512,
+             Group::get<Group::ID::X448>(),
+             KDF::get<KDF::ID::HKDF_SHA512>());
 
 template<>
 const DHKEM&
@@ -77,7 +87,6 @@ DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
 {
   return DHKEM::instance<KEM::ID::DHKEM_X448_SHA512>;
 }
-
 
 DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
   : group(group_in)
@@ -124,8 +133,7 @@ DHKEM::serialize_private(const KEM::PrivateKey& sk) const
 std::unique_ptr<KEM::PrivateKey>
 DHKEM::deserialize_private(const bytes& skm) const
 {
-  return std::make_unique<PrivateKey>(
-    group.deserialize_private(skm).release());
+  return std::make_unique<PrivateKey>(group.deserialize_private(skm).release());
 }
 
 std::pair<bytes, bytes>

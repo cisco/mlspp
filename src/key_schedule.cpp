@@ -219,7 +219,7 @@ struct TreeBaseKeySource : public BaseKeySource
 ///
 
 GroupKeySource::GroupKeySource()
-  : suite{CipherSuite::ID::unknown}
+  : suite{ CipherSuite::ID::unknown }
   , base_source(nullptr)
 {}
 
@@ -331,7 +331,8 @@ KeyScheduleEpoch::next(LeafCount size,
                        const bytes& update_secret,
                        const bytes& context) const
 {
-  auto new_epoch_secret = suite.get().hpke.kdf.extract(init_secret, update_secret);
+  auto new_epoch_secret =
+    suite.get().hpke.kdf.extract(init_secret, update_secret);
   return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
 }
 
