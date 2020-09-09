@@ -8,7 +8,8 @@ namespace mls {
 // GroupInfo
 
 GroupInfo::GroupInfo(CipherSuite suite)
-  : epoch(0)
+  : suite(suite)
+  , epoch(0)
   , tree(suite)
 {}
 
@@ -19,7 +20,8 @@ GroupInfo::GroupInfo(bytes group_id_in,
                      bytes interim_transcript_hash_in,
                      ExtensionList extensions_in,
                      bytes confirmation_in)
-  : group_id(std::move(group_id_in))
+  : suite(tree_in.suite)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree(std::move(tree_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
@@ -50,12 +52,12 @@ GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
   }
 
   auto cred = maybe_kp.value().credential;
-  if (cred.public_key() != priv.public_key()) {
+  if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
 
   signer_index = index;
-  signature = priv.sign(to_be_signed());
+  signature = priv.sign(suite, to_be_signed());
 }
 
 bool
@@ -67,14 +69,14 @@ GroupInfo::verify() const
   }
 
   auto cred = maybe_kp.value().credential;
-  return cred.public_key().verify(to_be_signed(), signature);
+  return cred.public_key().verify(suite, to_be_signed(), signature);
 }
 
 // Welcome
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::unknown)
+  , cipher_suite{ CipherSuite::ID::unknown }
 {}
 
 Welcome::Welcome(CipherSuite suite,
@@ -86,7 +88,8 @@ Welcome::Welcome(CipherSuite suite,
 {
   auto [key, nonce] = group_info_key_nonce(_epoch_secret);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info = seal(cipher_suite, key, nonce, {}, group_info_data);
+  encrypted_group_info =
+    cipher_suite.get().hpke.aead.seal(key, nonce, {}, group_info_data);
 }
 
 std::optional<int>
@@ -119,21 +122,25 @@ Welcome::decrypt(const bytes& epoch_secret) const
 {
   auto [key, nonce] = group_info_key_nonce(epoch_secret);
   auto group_info_data =
-    open(cipher_suite, key, nonce, {}, encrypted_group_info);
-  return tls::get<GroupInfo>(group_info_data, cipher_suite);
+    cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
+  if (!group_info_data.has_value()) {
+    throw ProtocolError("Welcome decryption failed");
+  }
+
+  return tls::get<GroupInfo>(group_info_data.value(), cipher_suite);
 }
 
 std::tuple<bytes, bytes>
 Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 {
-  auto details = CipherDetails::get(cipher_suite);
+  auto secret_size = cipher_suite.get().hpke.kdf.hash_size();
+  auto key_size = cipher_suite.get().hpke.aead.key_size();
+  auto nonce_size = cipher_suite.get().hpke.aead.nonce_size();
 
-  auto secret = hkdf_expand_label(
-    cipher_suite, epoch_secret, "group info", {}, details.secret_size);
-  auto key =
-    hkdf_expand_label(cipher_suite, secret, "key", {}, details.key_size);
-  auto nonce =
-    hkdf_expand_label(cipher_suite, secret, "nonce", {}, details.nonce_size);
+  auto secret =
+    cipher_suite.expand_with_label(epoch_secret, "group info", {}, secret_size);
+  auto key = cipher_suite.expand_with_label(secret, "key", {}, key_size);
+  auto nonce = cipher_suite.expand_with_label(secret, "nonce", {}, nonce_size);
 
   return std::make_tuple(key, nonce);
 }
@@ -283,18 +290,21 @@ MLSPlaintext::to_be_signed(const GroupContext& context) const
 }
 
 void
-MLSPlaintext::sign(const GroupContext& context, const SignaturePrivateKey& priv)
+MLSPlaintext::sign(const CipherSuite& suite,
+                   const GroupContext& context,
+                   const SignaturePrivateKey& priv)
 {
   auto tbs = to_be_signed(context);
-  signature = priv.sign(tbs);
+  signature = priv.sign(suite, tbs);
 }
 
 bool
-MLSPlaintext::verify(const GroupContext& context,
+MLSPlaintext::verify(const CipherSuite& suite,
+                     const GroupContext& context,
                      const SignaturePublicKey& pub) const
 {
   auto tbs = to_be_signed(context);
-  return pub.verify(tbs, signature);
+  return pub.verify(suite, tbs, signature);
 }
 
 } // namespace mls

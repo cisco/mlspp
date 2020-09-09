@@ -35,7 +35,7 @@ OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 
   tls::ostream w;
   w << index << leaf;
-  hash = Digest(suite).write(w.bytes()).digest();
+  hash = suite.get().digest.hash(w.bytes());
 }
 
 void
@@ -53,7 +53,7 @@ OptionalNode::set_parent_hash(CipherSuite suite,
   w << index << parent;
   tls::vector<1>::encode(w, left);
   tls::vector<1>::encode(w, right);
-  hash = Digest(suite).write(w.bytes()).digest();
+  hash = suite.get().digest.hash(w.bytes());
 }
 
 ///
@@ -90,8 +90,8 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
 bytes
 TreeKEMPrivateKey::path_step(const bytes& path_secret) const
 {
-  auto secret_size = Digest(suite).output_size();
-  return hkdf_expand_label(suite, path_secret, "path", {}, secret_size);
+  auto secret_size = suite.get().digest.hash_size();
+  return suite.expand_with_label(path_secret, "path", {}, secret_size);
 }
 
 void
@@ -275,7 +275,7 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     }
 
     const auto& pub = opt_node.value().public_key();
-    if (priv.public_key() != pub) {
+    if (priv.public_key != pub) {
       return false;
     }
   }
@@ -475,7 +475,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
   for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
     auto path_secret = priv.path_secrets.at(n);
     auto node_priv = priv.private_key(n).value();
-    auto node = RatchetNode{ node_priv.public_key(), {} };
+    auto node = RatchetNode{ node_priv.public_key, {} };
 
     auto copath = tree_math::sibling(last, NodeCount(size()));
     auto res = resolve(copath);
@@ -491,7 +491,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Sign the DirectPath
   auto leaf_priv = priv.private_key(NodeIndex(from)).value();
-  path.sign(suite, leaf_priv.public_key(), sig_priv, opts);
+  path.sign(suite, leaf_priv.public_key, sig_priv, opts);
 
   // Update the pubic key itself
   merge(from, path);

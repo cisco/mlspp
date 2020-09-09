@@ -15,22 +15,19 @@ const std::string HashRatchetTestVectors::file_name = "./hash_ratchet.bin";
 const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
 const std::string TreeKEMTestVectors::file_name = "./treekem.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
-const std::string BasicSessionTestVectors::file_name = "./basic_session.bin";
 
 ///
 /// Test for deterministic signatures
 ///
 
 bool
-deterministic_signature_scheme(CipherSuite suite)
+deterministic_signature_scheme(const CipherSuite& suite)
 {
-  switch (CipherDetails::get(suite).scheme) {
-    case SignatureScheme::P256_SHA256:
-    case SignatureScheme::P521_SHA512:
-      return false;
-
-    case SignatureScheme::Ed25519:
-    case SignatureScheme::Ed448:
+  switch (suite.id) {
+    case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
+    case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+    case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:
+    case CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return true;
 
     default:
@@ -99,4 +96,3 @@ template struct TestLoader<HashRatchetTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
 template struct TestLoader<TreeKEMTestVectors>;
 template struct TestLoader<MessagesTestVectors>;
-template struct TestLoader<BasicSessionTestVectors>;

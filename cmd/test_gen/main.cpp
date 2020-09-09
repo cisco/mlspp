@@ -1,7 +1,10 @@
-#include "mls/crypto.h"
-#include "mls/session.h"
-#include "mls/tree_math.h"
+#include <mls/crypto.h>
+#include <mls/tree_math.h>
+
 #include "test_vectors.h"
+
+#include <hpke/random.h>
+
 #include <fstream>
 #include <iostream>
 
@@ -56,12 +59,12 @@ generate_crypto()
   CryptoTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
-  tv.hkdf_extract_salt = { 0, 1, 2, 3 };
-  tv.hkdf_extract_ikm = { 4, 5, 6, 7 };
+  tv.kdf_extract_salt = { 0, 1, 2, 3 };
+  tv.kdf_extract_ikm = { 4, 5, 6, 7 };
 
   tv.derive_key_pair_seed = { 0, 1, 2, 3 };
 
@@ -70,20 +73,20 @@ generate_crypto()
 
   // Construct a test case for each suite
   for (auto suite : suites) {
-    // HKDF-Extract
-    auto hkdf_extract_out =
-      hkdf_extract(suite, tv.hkdf_extract_salt, tv.hkdf_extract_ikm);
+    // kdf-Extract
+    auto kdf_extract_out =
+      suite.get().hpke.kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto derive_key_pair_pub = priv.public_key();
+    auto derive_key_pair_pub = priv.public_key;
 
     // HPKE
     auto hpke_out =
       derive_key_pair_pub.encrypt(suite, tv.hpke_aad, tv.hpke_plaintext);
 
     tv.cases.push_back(
-      { suite, hkdf_extract_out, derive_key_pair_pub, hpke_out });
+      { suite, kdf_extract_out, derive_key_pair_pub, hpke_out });
   }
 
   return tv;
@@ -95,8 +98,8 @@ generate_hash_ratchet()
   HashRatchetTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   tv.n_members = 16;
@@ -129,8 +132,8 @@ generate_key_schedule()
   KeyScheduleTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   GroupContext base_group_context{
@@ -147,7 +150,7 @@ generate_key_schedule()
     KeyScheduleTestVectors::TestCase tc;
     tc.cipher_suite = suite;
 
-    auto secret_size = Digest(suite).output_size();
+    auto secret_size = suite.get().hpke.kdf.hash_size();
 
     auto group_context = base_group_context;
     auto update_secret = bytes(secret_size, 0);
@@ -208,16 +211,16 @@ generate_treekem()
   TreeKEMTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   size_t n_leaves = 10;
   tv.init_secrets.resize(n_leaves);
   tv.leaf_secrets.resize(n_leaves);
   for (size_t i = 0; i < n_leaves; ++i) {
-    tv.init_secrets[i].data = random_bytes(32);
-    tv.leaf_secrets[i].data = random_bytes(32);
+    tv.init_secrets[i].data = hpke::random_bytes(32);
+    tv.leaf_secrets[i].data = hpke::random_bytes(32);
   }
 
   for (size_t i = 0; i < suites.size(); ++i) {
@@ -234,8 +237,8 @@ generate_treekem()
       auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
       auto sig_priv =
         SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
-      auto cred = Credential::basic(context, sig_priv.public_key());
-      auto kp = KeyPackage{ suite, init_priv.public_key(), cred, sig_priv };
+      auto cred = Credential::basic(context, sig_priv.public_key);
+      auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
@@ -262,8 +265,8 @@ generate_messages()
   MessagesTestVectors tv;
 
   std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   };
 
   // Set the inputs
@@ -278,14 +281,14 @@ generate_messages()
   tv.random = bytes(32, 0xD6);
 
   // Construct a test case for each suite
-  DeterministicHPKE lock;
   for (auto suite : suites) {
     // Miscellaneous data items we need to construct messages
     auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
-    auto dh_key = dh_priv.public_key();
+    auto dh_key = dh_priv.public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
-    auto sig_key = sig_priv.public_key();
-    auto cred = Credential::basic(tv.user_id, sig_priv.public_key());
+    auto sig_key = sig_priv.public_key;
+    auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
+    auto fake_hpke_ciphertext = HPKECiphertext{ tv.random, tv.random };
 
     auto tree = TestTreeKEMPublicKey{
       suite,
@@ -293,19 +296,20 @@ generate_messages()
     };
     tree.blank_path(LeafIndex{ 2 });
 
-    auto [dummy, direct_path] =
-      tree.encap(LeafIndex{ 0 }, {}, tv.random, sig_priv, std::nullopt);
-    silence_unused(dummy);
-    std::get<KeyPackage>(tree.nodes[0].node.value().node).signature = tv.random;
-    direct_path.leaf_key_package.signature = tv.random;
-
-    // Construct CIK
+    // Construct KeyPackage
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
-    auto key_package =
-      KeyPackage{ suite, dh_priv.public_key(), cred, sig_priv };
+    auto key_package = KeyPackage{ suite, dh_priv.public_key, cred, sig_priv };
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
+
+    // Construct DirectPath
+    auto direct_path =
+      DirectPath{ key_package,
+                  {
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
+                  } };
 
     // Construct Welcome
     auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
@@ -315,7 +319,8 @@ generate_messages()
 
     auto group_secrets = GroupSecrets{ tv.random, std::nullopt };
     auto encrypted_group_secrets =
-      EncryptedGroupSecrets{ tv.random, dh_key.encrypt(suite, {}, tv.random) };
+      EncryptedGroupSecrets{ tv.random,
+                             HPKECiphertext{ tv.random, tv.random } };
 
     Welcome welcome;
     welcome.version = ProtocolVersion::mls10;
@@ -354,6 +359,7 @@ generate_messages()
 
     tv.cases.push_back({ suite,
                          tls::marshal(key_package),
+                         tls::marshal(direct_path),
                          tls::marshal(group_info),
                          tls::marshal(group_secrets),
                          tls::marshal(encrypted_group_secrets),
@@ -363,118 +369,6 @@ generate_messages()
                          tls::marshal(remove_hs),
                          tls::marshal(commit),
                          tls::marshal(ciphertext) });
-  }
-
-  return tv;
-}
-
-bytes
-pseudo_random(CipherSuite suite, int seq)
-{
-  auto seq_data = tls::marshal(uint32_t(seq));
-  return Digest(suite).write(seq_data).digest();
-}
-
-BasicSessionTestVectors
-generate_basic_session()
-{
-  BasicSessionTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::P256_AES128GCM_SHA256_P256,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-    CipherSuite::X25519_AES128GCM_SHA256_Ed25519,
-  };
-
-  std::vector<bool> encrypts{ false, true, false, true };
-
-  tv.group_size = 5;
-  tv.group_id = bytes(16, 0xA0);
-
-  DeterministicHPKE lock;
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-    auto encrypt = encrypts[i];
-    const bytes key_package_id = { 0, 1, 2, 3 };
-    const bytes group_init_secret = { 4, 5, 6, 7 };
-
-    std::vector<SessionTestVectors::Epoch> transcript;
-
-    // Initialize empty sessions
-    std::vector<Session::InitInfo> init_infos;
-    std::vector<KeyPackage> key_packages;
-    std::vector<TestSession> sessions;
-    auto ciphersuites = std::vector<CipherSuite>{ suite };
-    for (size_t j = 0; j < tv.group_size; ++j) {
-      auto init_secret = bytes{ uint8_t(j), 0 };
-      auto identity_priv = SignaturePrivateKey::derive(suite, init_secret);
-      auto cred = Credential::basic(init_secret, identity_priv.public_key());
-      auto init = HPKEPrivateKey::derive(suite, init_secret);
-      auto kp = KeyPackage{ suite, init.public_key(), cred, identity_priv };
-      auto info = Session::InitInfo{ init_secret, identity_priv, kp };
-      key_packages.push_back(kp);
-      init_infos.emplace_back(info);
-    }
-
-    // Add everyone
-    for (size_t j = 1; j < tv.group_size; ++j) {
-      auto commit_secret = pseudo_random(suite, transcript.size());
-
-      Welcome welcome;
-      bytes add;
-      if (j == 1) {
-        auto [session, welcome_new] = Session::start(
-          tv.group_id, { init_infos[0] }, { key_packages[1] }, commit_secret);
-        session.encrypt_handshake(encrypt);
-
-        sessions.emplace_back(session);
-        welcome = welcome_new;
-      } else {
-        std::tie(welcome, add) =
-          sessions[j - 1].add(commit_secret, key_packages[j]);
-        for (size_t k = 0; k < j; ++k) {
-          sessions[k].handle(add);
-        }
-      }
-
-      auto joiner = Session::join({ init_infos[j] }, welcome);
-      joiner.encrypt_handshake(encrypt);
-      sessions.emplace_back(joiner);
-
-      transcript.emplace_back(welcome, add, commit_secret, sessions[0]);
-    }
-
-    // Update everyone (L->R)
-    for (size_t j = 0; j < tv.group_size; ++j) {
-      auto commit_secret = pseudo_random(suite, transcript.size());
-      auto update = sessions[j].update(commit_secret);
-      for (auto& session : sessions) {
-        session.handle(update);
-      }
-
-      transcript.emplace_back(std::nullopt, update, commit_secret, sessions[0]);
-    }
-
-    // Remove everyone (R->L)
-    for (int j = static_cast<int>(tv.group_size) - 2; j >= 0; --j) {
-      auto commit_secret = pseudo_random(suite, transcript.size());
-      auto remove = sessions[j].remove(commit_secret, j + 1);
-      for (int k = 0; k <= j; ++k) {
-        sessions[k].handle(remove);
-      }
-
-      for (int k = 0; k <= j; ++k) {
-        if (!(sessions[k] == sessions[0])) {
-          throw std::runtime_error("bad session during remove");
-        }
-      }
-
-      transcript.emplace_back(std::nullopt, remove, commit_secret, sessions[0]);
-    }
-
-    // Construct the test case
-    tv.cases.push_back({ suite, encrypt, key_packages, transcript });
   }
 
   return tv;
@@ -517,32 +411,6 @@ verify_reproducible(const F& generator)
   verify_equal_marshaled(v0, v1);
 }
 
-template<typename F>
-void
-verify_session_repro(const F& generator)
-{
-  auto v0 = generator();
-  auto v1 = generator();
-
-  for (size_t i = 0; i < v0.cases.size(); ++i) {
-    // Randomized signatures break reproducibility
-    if (!deterministic_signature_scheme(v0.cases[i].cipher_suite)) {
-      continue;
-    }
-
-    // Encrypted handshakes break reproducibility (because of random sender data
-    // nonces)
-    if (v0.cases[i].encrypt) {
-      continue;
-    }
-
-    verify_equal_marshaled(v0.cases[i], v1.cases[i]);
-  }
-
-  // TODO(rlb@ipv.sx): Verify that the parts of the non-EdDSA cases
-  // that should reproduce actually do.
-}
-
 int
 main() // NOLINT(bugprone-exception-escape)
 {
@@ -564,9 +432,6 @@ main() // NOLINT(bugprone-exception-escape)
   auto messages = generate_messages();
   write_test_vectors(messages);
 
-  auto basic_session = generate_basic_session();
-  write_test_vectors(basic_session);
-
   // Verify that the test vectors are reproducible (to the extent
   // possible)
   verify_reproducible(generate_tree_math);
@@ -581,7 +446,6 @@ main() // NOLINT(bugprone-exception-escape)
     TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
-    TestLoader<BasicSessionTestVectors>::get();
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }

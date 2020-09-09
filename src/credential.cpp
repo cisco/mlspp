@@ -9,29 +9,6 @@ namespace mls {
 
 const CredentialType BasicCredential::type = CredentialType::basic;
 
-tls::ostream&
-operator<<(tls::ostream& str, const BasicCredential& obj)
-{
-  tls::vector<2>::encode(str, obj.identity);
-  return str << obj.public_key.signature_scheme() << obj.public_key;
-}
-
-tls::istream&
-operator>>(tls::istream& str, BasicCredential& obj)
-{
-  SignatureScheme scheme;
-  tls::vector<2>::decode(str, obj.identity);
-  str >> scheme >> obj.public_key;
-  obj.public_key.set_signature_scheme(scheme);
-  return str;
-}
-
-bool
-operator==(const BasicCredential& lhs, const BasicCredential& rhs)
-{
-  return (lhs.identity == rhs.identity) && (lhs.public_key == rhs.public_key);
-}
-
 ///
 /// Credential
 ///
@@ -61,7 +38,7 @@ Credential::public_key() const
 bool
 Credential::valid_for(const SignaturePrivateKey& priv) const
 {
-  return priv.public_key() == public_key();
+  return priv.public_key == public_key();
 }
 
 Credential

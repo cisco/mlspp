@@ -72,4 +72,17 @@ operator^(const bytes& lhs, const bytes& rhs)
   return out;
 }
 
+std::ostream&
+operator<<(std::ostream& out, const bytes& data)
+{
+  // Adjust this threshold to make output more compact
+  size_t threshold = 0xffff;
+  if (data.size() < threshold) {
+    return out << to_hex(data);
+  }
+
+  bytes abbrev(data.begin(), data.begin() + threshold);
+  return out << to_hex(abbrev) << "...";
+}
+
 } // namespace bytes_ns

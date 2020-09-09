@@ -24,6 +24,10 @@ namespace mls {
 // } GroupInfo;
 struct GroupInfo
 {
+private:
+  CipherSuite suite;
+
+public:
   bytes group_id;
   epoch_t epoch;
   TreeKEMPublicKey tree;
@@ -301,8 +305,12 @@ struct MLSPlaintext
                const Commit& commit);
 
   bytes to_be_signed(const GroupContext& context) const;
-  void sign(const GroupContext& context, const SignaturePrivateKey& priv);
-  bool verify(const GroupContext& context, const SignaturePublicKey& pub) const;
+  void sign(const CipherSuite& suite,
+            const GroupContext& context,
+            const SignaturePrivateKey& priv);
+  bool verify(const CipherSuite& suite,
+              const GroupContext& context,
+              const SignaturePublicKey& pub) const;
 
   bytes marshal_content(size_t padding_size) const;
 

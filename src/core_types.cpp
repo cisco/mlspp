@@ -35,7 +35,7 @@ const NodeType KeyPackage::type = NodeType::leaf;
 
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::unknown)
+  , cipher_suite{ CipherSuite::ID::unknown }
 {}
 
 static const uint64_t default_not_before = 0x0000000000000000;
@@ -64,8 +64,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
 bytes
 KeyPackage::hash() const
 {
-  auto marshaled = tls::marshal(*this);
-  return Digest(cipher_suite).write(marshaled).digest();
+  return cipher_suite.get().digest.hash(tls::marshal(*this));
 }
 
 void
@@ -76,7 +75,7 @@ KeyPackage::sign(const SignaturePrivateKey& sig_priv,
   silence_unused(opts);
 
   auto tbs = to_be_signed();
-  signature = sig_priv.sign(tbs);
+  signature = sig_priv.sign(cipher_suite, tbs);
 }
 
 bool
@@ -105,7 +104,7 @@ KeyPackage::verify() const
 {
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
-  return identity_key.verify(tbs, signature);
+  return identity_key.verify(cipher_suite, tbs, signature);
 }
 
 bytes
