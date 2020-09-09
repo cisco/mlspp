@@ -9,6 +9,8 @@
 #include <bytes/bytes.h>
 using namespace bytes_ns;
 
+#include <tls/tls_syntax.h>
+
 namespace mls {
 
 using epoch_t = uint64_t;
@@ -37,42 +39,6 @@ operator!=(const T& lhs, const T& rhs)
 {
   return lhs._tls_fields_w() != rhs._tls_fields_w();
 }
-
-///
-/// CipherSuite and Signature identifiers
-///
-
-enum struct CipherSuite : uint16_t
-{
-  unknown = 0x0000,
-  X25519_AES128GCM_SHA256_Ed25519 = 0x0001,
-  P256_AES128GCM_SHA256_P256 = 0x0002,
-  X25519_CHACHA20POLY1305_SHA256_Ed25519 = 0x0003,
-  X448_AES256GCM_SHA512_Ed448 = 0x0004,
-  P521_AES256GCM_SHA512_P521 = 0x0005,
-  X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
-};
-
-enum struct SignatureScheme : uint16_t
-{
-  unknown = 0x0000,
-  P256_SHA256 = 0x0403,
-  P521_SHA512 = 0x0603,
-  Ed25519 = 0x0807,
-  Ed448 = 0x0808,
-};
-
-struct CipherDetails
-{
-  const size_t secret_size;
-  const size_t key_size;
-  const size_t nonce_size;
-  const SignatureScheme scheme;
-
-  static const CipherDetails& get(CipherSuite suite);
-};
-
-extern const std::array<CipherSuite, 6> all_supported_suites;
 
 ///
 /// Error types

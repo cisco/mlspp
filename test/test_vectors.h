@@ -57,8 +57,8 @@ struct CryptoTestVectors
 {
   static const std::string file_name;
 
-  bytes hkdf_extract_salt;
-  bytes hkdf_extract_ikm;
+  bytes kdf_extract_salt;
+  bytes kdf_extract_ikm;
 
   bytes derive_key_pair_seed;
 
@@ -69,8 +69,8 @@ struct CryptoTestVectors
   {
     CipherSuite cipher_suite;
 
-    // HKDF-Extract
-    bytes hkdf_extract_out;
+    // kdf-Extract
+    bytes kdf_extract_out;
 
     // Derive-Key-Pair
     HPKEPublicKey derive_key_pair_pub;
@@ -79,7 +79,7 @@ struct CryptoTestVectors
     HPKECiphertext hpke_out;
 
     TLS_SERIALIZABLE(cipher_suite,
-                     hkdf_extract_out,
+                     kdf_extract_out,
                      derive_key_pair_pub,
                      hpke_out)
     TLS_TRAITS(tls::pass, tls::vector<1>, tls::pass, tls::pass)
@@ -87,8 +87,8 @@ struct CryptoTestVectors
 
   std::vector<TestCase> cases;
 
-  TLS_SERIALIZABLE(hkdf_extract_salt,
-                   hkdf_extract_ikm,
+  TLS_SERIALIZABLE(kdf_extract_salt,
+                   kdf_extract_ikm,
                    derive_key_pair_seed,
                    hpke_aad,
                    hpke_plaintext,
@@ -244,16 +244,16 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
     for (uint32_t i = 0; i < secrets.size() - 1; i += 1) {
       auto secret = secrets[i];
       secret.push_back(0);
-      auto pub = HPKEPrivateKey::derive(suite, secret).public_key();
+      auto pub = HPKEPrivateKey::derive(suite, secret).public_key;
       nodes.at(2 * i + 1).node = Node{ ParentNode{ pub, {}, {} } };
     }
   }
 
   void add_leaf_secret(const bytes& secret)
   {
-    auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key();
+    auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, secret);
-    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key());
+    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
     auto kp = KeyPackage{ suite, init_pub, cred, sig_priv };
 
     // Correct for non-determinism in the signature algorithm
@@ -294,7 +294,7 @@ struct TreeKEMTestVectors
 /////
 
 bool
-deterministic_signature_scheme(CipherSuite suite);
+deterministic_signature_scheme(const CipherSuite& suite);
 
 struct MessagesTestVectors
 {
@@ -305,6 +305,7 @@ struct MessagesTestVectors
     CipherSuite cipher_suite;
 
     bytes key_package;
+    bytes direct_path;
     bytes group_info;
     bytes group_secrets;
     bytes encrypted_group_secrets;
@@ -317,6 +318,7 @@ struct MessagesTestVectors
 
     TLS_SERIALIZABLE(cipher_suite,
                      key_package,
+                     direct_path,
                      group_info,
                      group_secrets,
                      encrypted_group_secrets,
@@ -327,6 +329,7 @@ struct MessagesTestVectors
                      commit,
                      ciphertext);
     TLS_TRAITS(tls::pass,
+               tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
                tls::vector<4>,
@@ -423,82 +426,6 @@ public:
 };
 
 } // namespace mls
-
-// Splitting the test data from the file definition here allows us
-// to have a consistent struct for different scenarios that live in
-// different files.
-struct SessionTestVectors
-{
-  struct Epoch
-  {
-    std::optional<Welcome> welcome;
-    bytes handshake;
-    bytes commit_secret;
-
-    epoch_t epoch;
-    bytes epoch_secret;
-    bytes application_secret;
-    bytes confirmation_key;
-    bytes init_secret;
-
-    Epoch() = default;
-
-    Epoch(const std::optional<Welcome>& welcome_in,
-          const bytes& handshake_in,
-          const bytes& commit_secret_in,
-          const TestSession& session)
-      : welcome(welcome_in)
-      , handshake(handshake_in)
-      , commit_secret(commit_secret_in)
-      , epoch(session.current_epoch())
-      , epoch_secret(session.current_epoch_secret())
-      , application_secret(session.current_application_secret())
-      , confirmation_key(session.current_confirmation_key())
-      , init_secret(session.current_init_secret())
-    {}
-
-    TLS_SERIALIZABLE(welcome,
-                     handshake,
-                     commit_secret,
-                     epoch,
-                     epoch_secret,
-                     application_secret,
-                     confirmation_key,
-                     init_secret);
-    TLS_TRAITS(tls::pass,
-               tls::vector<4>,
-               tls::vector<1>,
-               tls::pass,
-               tls::vector<1>,
-               tls::vector<1>,
-               tls::vector<1>,
-               tls::vector<1>)
-  };
-
-  struct TestCase
-  {
-    CipherSuite cipher_suite;
-    bool encrypt;
-    std::vector<KeyPackage> key_packages;
-    std::vector<Epoch> transcript;
-
-    TLS_SERIALIZABLE(cipher_suite, encrypt, key_packages, transcript);
-    TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
-  };
-
-  uint32_t group_size;
-  bytes group_id;
-
-  std::vector<TestCase> cases;
-
-  TLS_SERIALIZABLE(group_size, group_id, cases)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
-};
-
-struct BasicSessionTestVectors : SessionTestVectors
-{
-  static const std::string file_name;
-};
 
 /////
 

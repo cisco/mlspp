@@ -92,6 +92,9 @@ protected:
 
   const IntSelector val_enum = IntSelector::uint8;
   const bytes enc_enum = from_hex("aaaa");
+
+  const tls::opaque<2> val_opaque{ from_hex("bbbb") };
+  const bytes enc_opaque = from_hex("0002bbbb");
 };
 
 template<typename T>
@@ -120,6 +123,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
+  ostream_test(val_opaque, enc_opaque);
 }
 
 template<typename T>
@@ -162,6 +166,9 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 
   IntSelector data_enum;
   istream_test(val_enum, data_enum, enc_enum);
+
+  tls::opaque<2> data_opaque;
+  istream_test(val_opaque, data_opaque, enc_opaque);
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")

@@ -21,7 +21,7 @@ State::State(bytes group_id,
   , _identity_priv(std::move(sig_priv))
 {
   _keys.suite = suite;
-  _keys.init_secret = zero_bytes(Digest(suite).output_size());
+  _keys.init_secret = bytes(suite.get().digest.hash_size(), 0);
 
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
@@ -108,7 +108,7 @@ State::sign(const Proposal& proposal) const
 {
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
-  pt.sign(group_context(), _identity_priv);
+  pt.sign(_suite, group_context(), _identity_priv);
   return pt;
 }
 
@@ -140,7 +140,7 @@ State::update(const bytes& leaf_secret)
 {
   // TODO(RLB) Allow changing the signing key
   auto kp = _tree.key_package(_index).value();
-  kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key();
+  kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   kp.sign(_identity_priv, std::nullopt);
 
   auto pt = sign({ Update{ kp } });
@@ -248,23 +248,18 @@ State::ratchet_and_sign(const Commit& op,
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
 
-  _confirmed_transcript_hash = Digest(_suite)
-                                 .write(_interim_transcript_hash)
-                                 .write(pt.commit_content())
-                                 .digest();
-
+  auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
+  _confirmed_transcript_hash = _suite.get().digest.hash(confirmed_transcript);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
   auto& commit_data = std::get<CommitData>(pt.content);
-  commit_data.confirmation =
-    hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
-  pt.sign(prev_ctx, _identity_priv);
+  commit_data.confirmation = _suite.get().digest.hmac(
+    _keys.confirmation_key, _confirmed_transcript_hash);
+  pt.sign(_suite, prev_ctx, _identity_priv);
 
-  _interim_transcript_hash = Digest(_suite)
-                               .write(_confirmed_transcript_hash)
-                               .write(pt.commit_auth_data())
-                               .digest();
+  auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
+  _interim_transcript_hash = _suite.get().digest.hash(interim_transcript);
 
   return pt;
 }
@@ -321,14 +316,11 @@ State::handle(const MLSPlaintext& pt)
   next._tree.merge(sender, commit_data.commit.path);
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash = Digest(_suite)
-                                      .write(next._interim_transcript_hash)
-                                      .write(pt.commit_content())
-                                      .digest();
-  next._interim_transcript_hash = Digest(_suite)
-                                    .write(next._confirmed_transcript_hash)
-                                    .write(pt.commit_auth_data())
-                                    .digest();
+  next._confirmed_transcript_hash = _suite.get().digest.hash(
+    next._interim_transcript_hash + pt.commit_content());
+  next._interim_transcript_hash = _suite.get().digest.hash(
+    next._confirmed_transcript_hash + pt.commit_auth_data());
+
   next._epoch += 1;
   next.update_epoch_secrets(next._tree_priv.update_secret);
 
@@ -368,7 +360,7 @@ State::apply(const Remove& remove)
 ProposalID
 State::proposal_id(const MLSPlaintext& pt) const
 {
-  return ProposalID{ Digest(_suite).write(tls::marshal(pt)).digest() };
+  return ProposalID{ _suite.get().digest.hash(tls::marshal(pt)) };
 }
 
 std::optional<MLSPlaintext>
@@ -446,7 +438,7 @@ State::protect(const bytes& pt)
 {
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
-  mpt.sign(group_context(), _identity_priv);
+  mpt.sign(_suite, group_context(), _identity_priv);
   return encrypt(mpt);
 }
 
@@ -568,14 +560,14 @@ State::verify(const MLSPlaintext& pt) const
   }
 
   auto pub = maybe_kp.value().credential.public_key();
-  return pt.verify(group_context(), pub);
+  return pt.verify(_suite, group_context(), pub);
 }
 
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm =
-    hmac(_suite, _keys.confirmation_key, _confirmed_transcript_hash);
+  auto confirm = _suite.get().digest.hmac(_keys.confirmation_key,
+                                          _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
 
@@ -603,15 +595,15 @@ State::encrypt(const MLSPlaintext& pt)
   tls::ostream sender_data;
   sender_data << Sender{ SenderType::member, _index.val } << generation;
 
-  auto sender_data_nonce = random_bytes(CipherDetails::get(_suite).nonce_size);
+  auto sender_data_nonce = random_bytes(_suite.get().hpke.aead.nonce_size());
   auto sender_data_aad_val =
     sender_data_aad(_group_id, _epoch, content_type, sender_data_nonce);
 
-  auto encrypted_sender_data = seal(_suite,
-                                    _keys.sender_data_key,
-                                    sender_data_nonce,
-                                    sender_data_aad_val,
-                                    sender_data.bytes());
+  auto encrypted_sender_data =
+    _suite.get().hpke.aead.seal(_keys.sender_data_key,
+                                sender_data_nonce,
+                                sender_data_aad_val,
+                                sender_data.bytes());
 
   // Compute the plaintext input and AAD
   // XXX(rlb@ipv.sx): Apply padding?
@@ -624,7 +616,8 @@ State::encrypt(const MLSPlaintext& pt)
                          encrypted_sender_data);
 
   // Encrypt the plaintext
-  auto ciphertext = seal(_suite, keys.key, keys.nonce, aad, content);
+  auto ciphertext =
+    _suite.get().hpke.aead.seal(keys.key, keys.nonce, aad, content);
 
   // Assemble the MLSCiphertext
   MLSCiphertext ct;
@@ -653,13 +646,15 @@ State::decrypt(const MLSCiphertext& ct)
   // Decrypt and parse the sender data
   auto sender_data_aad_val = sender_data_aad(
     ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
-  auto sender_data = open(_suite,
-                          _keys.sender_data_key,
-                          ct.sender_data_nonce,
-                          sender_data_aad_val,
-                          ct.encrypted_sender_data);
+  auto sender_data = _suite.get().hpke.aead.open(_keys.sender_data_key,
+                                                 ct.sender_data_nonce,
+                                                 sender_data_aad_val,
+                                                 ct.encrypted_sender_data);
+  if (!sender_data.has_value()) {
+    throw ProtocolError("Sender data decryption failed");
+  }
 
-  tls::istream r(sender_data);
+  tls::istream r(sender_data.value());
   Sender raw_sender;
   uint32_t generation = 0;
   r >> raw_sender >> generation;
@@ -695,12 +690,16 @@ State::decrypt(const MLSCiphertext& ct)
                          ct.authenticated_data,
                          ct.sender_data_nonce,
                          ct.encrypted_sender_data);
-  auto content = open(_suite, keys.key, keys.nonce, aad, ct.ciphertext);
+  auto content =
+    _suite.get().hpke.aead.open(keys.key, keys.nonce, aad, ct.ciphertext);
+  if (!content.has_value()) {
+    throw ProtocolError("Content decryption failed");
+  }
 
   // Set up a new plaintext based on the content
   return MLSPlaintext{
-    _group_id, _epoch, raw_sender, ct.content_type, ct.authenticated_data,
-    content
+    _group_id,      _epoch, raw_sender, ct.content_type, ct.authenticated_data,
+    content.value()
   };
 }
 

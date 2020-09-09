@@ -21,7 +21,6 @@ enum struct CredentialType : uint8_t
 
 // struct {
 //     opaque identity<0..2^16-1>;
-//     SignatureScheme algorithm;
 //     SignaturePublicKey public_key;
 // } BasicCredential;
 struct BasicCredential
@@ -36,15 +35,11 @@ struct BasicCredential
   bytes identity;
   SignaturePublicKey public_key;
 
+  TLS_SERIALIZABLE(identity, public_key)
+  TLS_TRAITS(tls::vector<2>, tls::pass)
+
   static const CredentialType type;
 };
-
-tls::ostream&
-operator<<(tls::ostream& str, const BasicCredential& obj);
-tls::istream&
-operator>>(tls::istream& str, BasicCredential& obj);
-bool
-operator==(const BasicCredential& lhs, const BasicCredential& rhs);
 
 ///
 /// X509 Credential
@@ -72,6 +67,7 @@ tls::istream&
 operator>>(tls::istream& str, X509Credential& obj);
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
+
 
 // struct {
 //     CredentialType credential_type;

@@ -13,11 +13,11 @@ Session::InitInfo::InitInfo(bytes init_secret_in,
 {
   auto init_priv =
     HPKEPrivateKey::derive(key_package.cipher_suite, init_secret);
-  if (init_priv.public_key() != key_package.init_key) {
+  if (init_priv.public_key != key_package.init_key) {
     throw InvalidParameterError("Init key mismatch");
   }
 
-  if (sig_priv.public_key() != key_package.credential.public_key()) {
+  if (sig_priv.public_key != key_package.credential.public_key()) {
     throw InvalidParameterError("Signature key mismatch");
   }
 }
