@@ -526,6 +526,9 @@ Group::pk_size() const
       return 56;
     case Group::ID::Ed448:
       return 57;
+
+    default:
+      throw std::runtime_error("Unknown group");
   }
 }
 
@@ -546,6 +549,9 @@ Group::sk_size() const
       return 56;
     case Group::ID::Ed448:
       return 57;
+
+    default:
+      throw std::runtime_error("Unknown group");
   }
 }
 
