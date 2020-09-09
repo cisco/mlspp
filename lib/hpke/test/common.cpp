@@ -18,6 +18,9 @@ select_signature(Signature::ID id)
 
     case Signature::ID::Ed448:
       return Signature::get<Signature::ID::Ed448>();
+
+    default:
+      throw std::runtime_error("Unknown algorithm");
   }
 }
 
@@ -39,6 +42,9 @@ select_kem(KEM::ID id)
 
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+
+    default:
+      throw std::runtime_error("Unknown algorithm");
   }
 }
 
@@ -54,6 +60,9 @@ select_kdf(KDF::ID id)
 
     case KDF::ID::HKDF_SHA512:
       return KDF::get<KDF::ID::HKDF_SHA512>();
+
+    default:
+      throw std::runtime_error("Unknown algorithm");
   }
 }
 
@@ -69,5 +78,8 @@ select_aead(AEAD::ID id)
 
     case AEAD::ID::CHACHA20_POLY1305:
       return AEAD::get<AEAD::ID::CHACHA20_POLY1305>();
+
+    default:
+      throw std::runtime_error("Unknown algorithm");
   }
 }
