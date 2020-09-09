@@ -4,9 +4,6 @@
 
 namespace hpke {
 
-///
-/// DHKEM::PrivateKey
-///
 DHKEM::PrivateKey::PrivateKey(Group::PrivateKey* group_priv_in)
   : group_priv(group_priv_in)
 {}
