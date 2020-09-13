@@ -1,5 +1,4 @@
 #include "mls/credential.h"
-#include "mls/credential_helpers.h"
 #include <tls/tls_syntax.h>
 
 namespace mls {
@@ -15,32 +14,36 @@ const CredentialType X509Credential::type = CredentialType::x509;
 /// X509 Credential
 ///
 
-X509Credential::X509Credential(const std::vector<X509_ptr>& chain_in)
+X509Credential::X509Credential(const std::vector<bytes>& chain_in)
 {
-  if (chain_in.empty()) {
-    throw InvalidParameterError("x509 credential: empty cert chain");
-  }
 
-  chain = chain_in;
-  // chain[0] is the leaf cert
-  public_key = cert_export_public_key(chain[0].get());
-  identity = cert_export_subject(chain[0].get());
+	if (chain_in.empty()) {
+		throw InvalidParameterError("x509 credential: empty cert chain");
+	}
+
+	chain.resize(chain_in.size());
+	for (size_t i = 0; i < chain_in.size(); i++) {
+		auto p = std::unique_ptr<X509Certificate>(X509Certificate::get(chain_in[i]).release());
+		chain[i] = std::move(p);
+	}
+
+	// chain[0] is the leaf cert
+	//raw_public_key = chain[0]->public_key();
+	identity = chain[0]->subject_name();
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
   tls::vector<2>::encode(str, obj.identity);
-  return str << obj.public_key.signature_scheme() << obj.public_key;
+  return str << obj.public_key;
 }
 
 tls::istream&
 operator>>(tls::istream& str, X509Credential& obj)
 {
-  SignatureScheme scheme;
   tls::vector<2>::decode(str, obj.identity);
-  str >> scheme >> obj.public_key;
-  obj.public_key.set_signature_scheme(scheme);
+  str >> obj.public_key;
   return str;
 }
 
@@ -97,7 +100,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 }
 
 Credential
-Credential::x509(const std::vector<X509_ptr>& chain)
+Credential::x509(const std::vector<bytes>& chain)
 {
   Credential cred;
   cred._cred = X509Credential{ chain };

@@ -2,9 +2,9 @@
 
 #include "mls/common.h"
 #include "mls/crypto.h"
+#include "mls/x509_cert_helper.h"
 #include <memory>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
+
 
 namespace mls {
 
@@ -45,19 +45,17 @@ struct BasicCredential
 /// X509 Credential
 ///
 
-using X509_ptr = std::shared_ptr<X509>;
 // case x509:
 //     opaque cert_data<1..2^24-1>;
 struct X509Credential
 {
 
   X509Credential() {}
-  X509Credential(const std::vector<X509_ptr>& chain_in);
+  explicit X509Credential(const std::vector<bytes>& chain_in);
 
-  std::vector<X509_ptr> chain;
+  std::vector<std::unique_ptr<X509Certificate>> chain;
   SignaturePublicKey public_key;
   bytes identity;
-  SignaturePublicKey scheme_;
   static const CredentialType type;
 };
 
@@ -89,7 +87,7 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  static Credential x509(const std::vector<X509_ptr>& chain);
+  static Credential x509(const std::vector<bytes>& chain);
 
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)

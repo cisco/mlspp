@@ -172,7 +172,10 @@ TEST_CASE("X509 Credential")
   CertTemplate caTemplate = { true };
   auto* leaf_cert = make_cert(caTemplate, pub, priv);
 
-  auto cred = Credential::x509({ X509_ptr(leaf_cert, ::X509_free) });
+  int len = i2d_X509(leaf_cert, nullptr);
+  bytes raw(len);
+  i2d_X509(leaf_cert, reinterpret_cast<unsigned char *>(raw.data()));
+  auto cred = Credential::x509();
   REQUIRE(cred.public_key().signature_scheme() == SignatureScheme::Ed25519);
   REQUIRE(cred.identity().size() != 0);
 }
