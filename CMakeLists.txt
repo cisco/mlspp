@@ -49,8 +49,8 @@ file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/inc
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
-add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
-target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
+add_dependencies(${LIB_NAME} bytes tls_syntax hpke x509)
+target_link_libraries(${LIB_NAME} bytes tls_syntax hpke x509)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

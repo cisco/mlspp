@@ -25,37 +25,38 @@ openssl_error()
 }
 
 void
-rand_serial(ASN1_INTEGER *ai) {
-	//https://docs.huihoo.com/doxygen/openssl/1.0.1c/apps_8c_source.html
-	BIGNUM  *btmp = BN_new();
-	if (btmp == nullptr) {
-		throw openssl_error();
-	}
+rand_serial(ASN1_INTEGER* ai)
+{
+  // https://docs.huihoo.com/doxygen/openssl/1.0.1c/apps_8c_source.html
+  BIGNUM* btmp = BN_new();
+  if (btmp == nullptr) {
+    throw openssl_error();
+  }
 
-	if (BN_pseudo_rand(btmp, 64, 0, 0) == 0) {
-		throw openssl_error();
-	}
+  if (BN_pseudo_rand(btmp, 64, 0, 0) == 0) {
+    throw openssl_error();
+  }
 
-	if (BN_to_ASN1_INTEGER(btmp, ai) == nullptr) {
-		throw openssl_error();
-	}
+  if (BN_to_ASN1_INTEGER(btmp, ai) == nullptr) {
+    throw openssl_error();
+  }
 
-	BN_free(btmp);
+  BN_free(btmp);
 }
 
 int
 generate_set_random_serial(X509* crt)
 {
-	ASN1_INTEGER *serial = ASN1_INTEGER_new();
-	if (serial == nullptr) {
-		throw openssl_error();
-	}
-	rand_serial(serial);
-	if ( X509_set_serialNumber(crt, serial) == 0) {
-		throw openssl_error();
-	}
-	ASN1_INTEGER_free(serial);
-	return 1;
+  ASN1_INTEGER* serial = ASN1_INTEGER_new();
+  if (serial == nullptr) {
+    throw openssl_error();
+  }
+  rand_serial(serial);
+  if (X509_set_serialNumber(crt, serial) == 0) {
+    throw openssl_error();
+  }
+  ASN1_INTEGER_free(serial);
+  return 1;
 }
 
 // Generate a <priv,pub>ed2519 signing key pair.
@@ -67,7 +68,7 @@ newEd25519SigningKeyPair()
 
   auto data = random_bytes(secret_size);
   auto digest = Digest::get<Digest::ID::SHA256>().hash(data);
- // digest.resize(secret_size);
+  // digest.resize(secret_size);
   auto* pkey = EVP_PKEY_new_raw_private_key(
     EVP_PKEY_ED25519, nullptr, data.data(), data.size());
 
@@ -95,7 +96,10 @@ newEd25519SigningKeyPair()
 }
 
 X509*
-make_cert(CertTemplate cert_template, std::string identity, EVP_PKEY* public_key, EVP_PKEY* priv_key)
+make_cert(CertTemplate cert_template,
+          std::string identity,
+          EVP_PKEY* public_key,
+          EVP_PKEY* priv_key)
 {
   X509* cert = nullptr;
   X509V3_CTX ctx;
@@ -183,15 +187,16 @@ TEST_CASE("X509 Credential")
   auto key_pair = newEd25519SigningKeyPair();
   CertTemplate caTemplate = { true };
   std::string subject_identity = "cypto-core";
-  auto* leaf_cert = make_cert(caTemplate, subject_identity, std::get<1>(key_pair), std::get<0>(key_pair));
-	REQUIRE(leaf_cert != nullptr);
+  auto* leaf_cert = make_cert(
+    caTemplate, subject_identity, std::get<1>(key_pair), std::get<0>(key_pair));
+  REQUIRE(leaf_cert != nullptr);
 
   int len = i2d_X509(leaf_cert, nullptr);
   bytes leaf_cert_raw(len);
-  unsigned  char* tmp = leaf_cert_raw.data();
+  unsigned char* tmp = leaf_cert_raw.data();
   i2d_X509(leaf_cert, &tmp);
-  std::vector<bytes> cert_chain = {leaf_cert_raw};
+  std::vector<bytes> cert_chain = { leaf_cert_raw };
   auto cred = Credential::x509(cert_chain);
-  std::string subject {cred.identity().begin(), cred.identity().end()};
-  REQUIRE( subject.find(subject_identity) != 0);
+  std::string subject{ cred.identity().begin(), cred.identity().end() };
+  REQUIRE(subject.find(subject_identity) != 0);
 }

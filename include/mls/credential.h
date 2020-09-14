@@ -2,9 +2,10 @@
 
 #include "mls/common.h"
 #include "mls/crypto.h"
-#include "mls/x509_cert_helper.h"
+#include "x509/x509_cert_helper.h"
 #include <memory>
 
+using namespace x509_ns;
 
 namespace mls {
 
@@ -57,10 +58,10 @@ struct X509Credential
   SignaturePublicKey public_key;
   bytes identity;
 
-	TLS_SERIALIZABLE(identity, public_key)
-	TLS_TRAITS(tls::vector<2>, tls::pass)
+  TLS_SERIALIZABLE(identity, public_key)
+  TLS_TRAITS(tls::vector<2>, tls::pass)
 
-	static const CredentialType type;
+  static const CredentialType type;
 };
 
 // struct {
