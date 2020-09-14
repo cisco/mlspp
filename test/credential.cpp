@@ -198,5 +198,5 @@ TEST_CASE("X509 Credential")
   std::vector<bytes> cert_chain = { leaf_cert_raw };
   auto cred = Credential::x509(cert_chain);
   std::string subject{ cred.identity().begin(), cred.identity().end() };
-  REQUIRE(subject.find(subject_identity) != 0);
+  REQUIRE(subject.find(subject_identity) != std::string::npos);
 }
