@@ -16,7 +16,6 @@ const CredentialType X509Credential::type = CredentialType::x509;
 
 X509Credential::X509Credential(const std::vector<bytes>& chain_in)
 {
-
 	if (chain_in.empty()) {
 		throw InvalidParameterError("x509 credential: empty cert chain");
 	}
@@ -28,29 +27,8 @@ X509Credential::X509Credential(const std::vector<bytes>& chain_in)
 	}
 
 	// chain[0] is the leaf cert
-	//raw_public_key = chain[0]->public_key();
+	public_key.data = chain[0]->public_key();
 	identity = chain[0]->subject_name();
-}
-
-tls::ostream&
-operator<<(tls::ostream& str, const X509Credential& obj)
-{
-  tls::vector<2>::encode(str, obj.identity);
-  return str << obj.public_key;
-}
-
-tls::istream&
-operator>>(tls::istream& str, X509Credential& obj)
-{
-  tls::vector<2>::decode(str, obj.identity);
-  str >> obj.public_key;
-  return str;
-}
-
-bool
-operator==(const X509Credential& lhs, const X509Credential& rhs)
-{
-  return (lhs.identity == rhs.identity) && (lhs.public_key == rhs.public_key);
 }
 
 ///
@@ -100,7 +78,6 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 Credential
 Credential::x509(const std::vector<bytes>& chain)
 {
-	chain.empty();
   Credential cred;
   cred._cred = X509Credential{ chain };
   return cred;

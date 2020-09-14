@@ -56,16 +56,12 @@ struct X509Credential
   std::vector<X509Certificate_ptr> chain;
   SignaturePublicKey public_key;
   bytes identity;
-  static const CredentialType type;
+
+	TLS_SERIALIZABLE(identity, public_key)
+	TLS_TRAITS(tls::vector<2>, tls::pass)
+
+	static const CredentialType type;
 };
-
-tls::ostream&
-operator<<(tls::ostream& str, const X509Credential& obj);
-tls::istream&
-operator>>(tls::istream& str, X509Credential& obj);
-bool
-operator==(const X509Credential& lhs, const X509Credential& rhs);
-
 
 // struct {
 //     CredentialType credential_type;

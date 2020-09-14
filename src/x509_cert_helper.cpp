@@ -26,6 +26,7 @@ openssl_error()
 
 
 struct OpenSSLCertificate : public X509Certificate {
+
 	explicit OpenSSLCertificate(bytes cert_in) {
 		cert_raw = std::move(cert_in);
 		const unsigned char *buf = cert_raw.data();
@@ -42,17 +43,73 @@ struct OpenSSLCertificate : public X509Certificate {
 
 	bytes public_key() const override
 	{
-		return bytes();
+		return cert_export_public_key();
 	}
 
 	bytes subject_name() const override
 	{
-		return bytes();
+		return cert_export_subject();
 	}
 
 private:
+	SignatureAlgorithm
+	cert_export_signature_algorithm() const
+	{
+		int algo_nid = X509_get_signature_nid(certificate_ptr);
+		switch (algo_nid) {
+			case EVP_PKEY_ED25519:
+				return SignatureAlgorithm::ED25519;
+			case EVP_PKEY_ED448:
+				return SignatureAlgorithm::ED448;
+			default:
+				return SignatureAlgorithm::unknown;
+		}
+	}
+
+	bytes
+	cert_export_public_key() const
+	{
+		bytes public_key;
+		auto algo = cert_export_signature_algorithm();
+		switch (algo) {
+			case mls::SignatureAlgorithm::ED448:
+			case mls::SignatureAlgorithm::ED25519:
+			{
+				EVP_PKEY_ptr key(X509_get_pubkey(certificate_ptr), ::EVP_PKEY_free);
+				size_t raw_len = 0;
+				if (1 != EVP_PKEY_get_raw_public_key(key.get(), nullptr, &raw_len))
+				{
+					break;
+				}
+				public_key.resize(raw_len);
+				uint8_t* data_ptr = public_key.data();
+				if (1 != EVP_PKEY_get_raw_public_key(key.get(), data_ptr, &raw_len))
+				{
+					break;
+				}
+				return public_key;
+			}
+			default:
+				// todo: add support for other signature schemes
+				break;
+		}
+
+		return public_key;
+	}
+
+	bytes
+	cert_export_subject() const
+	{
+		std::string subject(
+						(X509_NAME_oneline(X509_get_subject_name(certificate_ptr), nullptr, 0)));
+		auto ret = bytes(subject.begin(), subject.end());
+		return ret;
+	}
+
 	bytes cert_raw;
 	X509* certificate_ptr;
+
+
 };
 
 std::unique_ptr<X509Certificate>
@@ -61,60 +118,6 @@ X509Certificate::get(const bytes& cert_in)
 	// default to openSSL for now unless we support
 	// different types
 	return std::make_unique<OpenSSLCertificate>(cert_in);
-}
-
-SignatureAlgorithm
-cert_export_signature_algorithm(X509* cert)
-{
-	int algo_nid = X509_get_signature_nid(cert);
-	switch (algo_nid) {
-		case EVP_PKEY_ED25519:
-			return SignatureAlgorithm::ED25519;
-		case EVP_PKEY_ED448:
-			return SignatureAlgorithm::ED448;
-		default:
-			return SignatureAlgorithm::unknown;
-	}
-}
-
-bytes
-cert_export_public_key(X509* cert)
-{
-	bytes public_key;
-	auto algo = cert_export_signature_algorithm(cert);
-	switch (algo) {
-	case mls::SignatureAlgorithm::ED448:
-	case mls::SignatureAlgorithm::ED25519:
-		{
-	    EVP_PKEY_ptr key(X509_get_pubkey(cert), ::EVP_PKEY_free);
-	    size_t raw_len = 0;
-	    if (1 != EVP_PKEY_get_raw_public_key(key.get(), nullptr, &raw_len))
-	    {
-	      break;
-      }
-			public_key.resize(raw_len);
-      uint8_t* data_ptr = public_key.data();
-      if (1 != EVP_PKEY_get_raw_public_key(key.get(), data_ptr, &raw_len))
-      {
-   	    break;
-      }
-			return public_key;
-	  }
-  default:
-    // todo: add support for other signature schemes
-    break;
-  }
-
-  return public_key;
-}
-
-bytes
-cert_export_subject(X509* cert)
-{
-	std::string subject(
-					(X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0)));
-	auto ret = bytes(subject.begin(), subject.end());
-	return ret;
 }
 
 
