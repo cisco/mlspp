@@ -23,7 +23,7 @@ X509Credential::X509Credential(const std::vector<bytes>& chain_in)
 
 	chain.resize(chain_in.size());
 	for (size_t i = 0; i < chain_in.size(); i++) {
-		auto p = std::unique_ptr<X509Certificate>(X509Certificate::get(chain_in[i]).release());
+		auto p = std::shared_ptr<X509Certificate>(X509Certificate::get(chain_in[i]));
 		chain[i] = std::move(p);
 	}
 
@@ -64,7 +64,6 @@ Credential::identity() const
     case 0:
       return std::get<BasicCredential>(_cred).identity;
     case 1:
-      // dummy identity
       return std::get<X509Credential>(_cred).identity;
   }
 
@@ -78,8 +77,7 @@ Credential::public_key() const
     case 0:
       return std::get<BasicCredential>(_cred).public_key;
     case 1:
-      // return dummy signature
-      return std::get<X509Credential>(_cred).public_key;
+    	return std::get<X509Credential>(_cred).public_key;
   }
 
   throw std::bad_variant_access();
@@ -102,6 +100,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 Credential
 Credential::x509(const std::vector<bytes>& chain)
 {
+	chain.empty();
   Credential cred;
   cred._cred = X509Credential{ chain };
   return cred;

@@ -47,13 +47,13 @@ struct BasicCredential
 
 // case x509:
 //     opaque cert_data<1..2^24-1>;
+using X509Certificate_ptr = std::shared_ptr<X509Certificate>;
 struct X509Credential
 {
-
   X509Credential() {}
   explicit X509Credential(const std::vector<bytes>& chain_in);
 
-  std::vector<std::unique_ptr<X509Certificate>> chain;
+  std::vector<X509Certificate_ptr> chain;
   SignaturePublicKey public_key;
   bytes identity;
   static const CredentialType type;

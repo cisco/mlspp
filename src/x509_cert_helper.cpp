@@ -29,11 +29,10 @@ struct OpenSSLCertificate : public X509Certificate {
 	explicit OpenSSLCertificate(bytes cert_in) {
 		cert_raw = std::move(cert_in);
 		const unsigned char *buf = cert_raw.data();
-		X509 *tmp = d2i_X509(nullptr, &buf, cert_raw.size());
-		if (tmp == nullptr) {
+		certificate_ptr = d2i_X509(nullptr, &buf, cert_raw.size());
+		if (certificate_ptr == nullptr) {
 			throw openssl_error();
 		}
-		certificate_ptr = tmp;
 	}
 
 	bool verify() const override
