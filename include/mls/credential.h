@@ -1,11 +1,11 @@
 #pragma once
 
+#include "hpke/certificate.h"
 #include "mls/common.h"
 #include "mls/crypto.h"
-#include "x509/x509_cert_helper.h"
 #include <memory>
 
-using namespace x509_ns;
+using namespace hpke;
 
 namespace mls {
 
@@ -48,18 +48,15 @@ struct BasicCredential
 
 // case x509:
 //     opaque cert_data<1..2^24-1>;
-using X509Certificate_ptr = std::shared_ptr<X509Certificate>;
 struct X509Credential
 {
   X509Credential() {}
-  explicit X509Credential(const std::vector<bytes>& chain_in);
+  explicit X509Credential(const std::vector<bytes>& raw_chain);
 
-  std::vector<X509Certificate_ptr> chain;
+  std::vector<std::shared_ptr<Certificate>> chain;
   SignaturePublicKey public_key;
-  bytes identity;
 
-  TLS_SERIALIZABLE(identity, public_key)
-  TLS_TRAITS(tls::vector<2>, tls::pass)
+  TLS_SERIALIZABLE(public_key)
 
   static const CredentialType type;
 };

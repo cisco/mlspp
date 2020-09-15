@@ -182,7 +182,7 @@ TEST_CASE("Basic Credential")
   REQUIRE(cred.public_key() == pub);
 }
 
-TEST_CASE("X509 Credential")
+TEST_CASE("X509 Credential Basic")
 {
   auto key_pair = newEd25519SigningKeyPair();
   CertTemplate caTemplate = { true };
@@ -197,6 +197,5 @@ TEST_CASE("X509 Credential")
   i2d_X509(leaf_cert, &tmp);
   std::vector<bytes> cert_chain = { leaf_cert_raw };
   auto cred = Credential::x509(cert_chain);
-  std::string subject{ cred.identity().begin(), cred.identity().end() };
-  REQUIRE(subject.find(subject_identity) != std::string::npos);
+  REQUIRE(cred.public_key().data.empty() == false);
 }

@@ -3,6 +3,7 @@
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/x509.h>
 
 namespace hpke {
 
@@ -53,6 +54,13 @@ void
 typed_delete(EC_KEY* ptr)
 {
   EC_KEY_free(ptr);
+}
+
+template<>
+void
+typed_delete(X509* ptr)
+{
+  X509_free(ptr);
 }
 
 ///

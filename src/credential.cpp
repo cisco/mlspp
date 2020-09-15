@@ -14,22 +14,16 @@ const CredentialType X509Credential::type = CredentialType::x509;
 /// X509 Credential
 ///
 
-X509Credential::X509Credential(const std::vector<bytes>& chain_in)
+X509Credential::X509Credential(const std::vector<bytes>& raw_chain)
 {
-  if (chain_in.empty()) {
+  if (raw_chain.empty()) {
     throw InvalidParameterError("x509 credential: empty cert chain");
   }
 
-  chain.resize(chain_in.size());
-  for (size_t i = 0; i < chain_in.size(); i++) {
-    auto p =
-      std::shared_ptr<X509Certificate>(X509Certificate::get(chain_in[i]));
-    chain[i] = std::move(p);
+  for (const auto& der : raw_chain) {
+    chain.push_back(std::shared_ptr<Certificate>(new Certificate(der)));
   }
-
-  // chain[0] is the leaf cert
-  public_key.data = chain[0]->public_key();
-  identity = chain[0]->subject_name();
+  public_key.data = chain[0]->public_key().data;
 }
 
 ///
@@ -42,8 +36,6 @@ Credential::identity() const
   switch (_cred.index()) {
     case 0:
       return std::get<BasicCredential>(_cred).identity;
-    case 1:
-      return std::get<X509Credential>(_cred).identity;
   }
 
   throw std::bad_variant_access();
