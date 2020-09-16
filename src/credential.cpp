@@ -21,10 +21,12 @@ X509Credential::X509Credential(const std::vector<bytes>& raw_chain)
   }
 
   for (const auto& der : raw_chain) {
-    chain.push_back(std::shared_ptr<Certificate>(new Certificate(der)));
+    chain.emplace_back(der);
   }
-  public_key.data = chain[0]->public_key().data;
+
+  public_key.data = chain[0].public_key().data;
 }
+
 
 ///
 /// Credential
@@ -72,7 +74,8 @@ Credential
 Credential::x509(const std::vector<bytes>& chain)
 {
   Credential cred;
-  cred._cred = X509Credential{ chain };
+  X509Credential x509Cred{chain};
+  cred._cred = std::move(x509Cred);
   return cred;
 }
 

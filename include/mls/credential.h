@@ -51,9 +51,10 @@ struct BasicCredential
 struct X509Credential
 {
   X509Credential() {}
-  explicit X509Credential(const std::vector<bytes>& raw_chain);
 
-  std::vector<std::shared_ptr<Certificate>> chain;
+	explicit X509Credential(const std::vector<bytes>& raw_chain);
+
+  std::vector<Certificate> chain;
   SignaturePublicKey public_key;
 
   TLS_SERIALIZABLE(public_key)
@@ -76,6 +77,7 @@ class Credential
 public:
   bytes identity() const;
   SignaturePublicKey public_key() const;
+
   bool valid_for(const SignaturePrivateKey& priv) const;
 
   static Credential basic(const bytes& identity,

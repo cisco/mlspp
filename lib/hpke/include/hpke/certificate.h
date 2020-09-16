@@ -32,8 +32,9 @@ struct Certificate
   };
 
   Certificate();
-  explicit Certificate(const bytes& der);
-  ~Certificate();
+	~Certificate();
+	Certificate(Certificate&& c);
+	explicit Certificate(const bytes& der);
 
   Signature::ID signature_algorithm() const;
 

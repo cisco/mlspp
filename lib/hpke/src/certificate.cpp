@@ -15,11 +15,13 @@ struct Certificate::Internals
 
   static X509* der_to_x509(const bytes& der);
 
+  Internals()
+   : openssl_cert(nullptr, typed_delete<X509>)
+	{}
+
   explicit Internals(const bytes& der)
     : openssl_cert(Internals::der_to_x509(der), typed_delete<X509>)
   {}
-
-  ~Internals() = default;
 
   Signature::ID signature_algorithm() const;
   std::optional<bytes> public_key() const;
@@ -92,9 +94,11 @@ Certificate::Certificate() = default;
 Certificate::Certificate(const bytes& der)
   : internal(new Internals(der))
 {
-  signature.pkey.data = internal->public_key().value();
-  signature.algorithm = internal->signature_algorithm();
+	signature.pkey.data = internal->public_key().value();
+	signature.algorithm = internal->signature_algorithm();
 }
+
+Certificate::Certificate(Certificate&& c) = default;
 
 Certificate::~Certificate() = default;
 
