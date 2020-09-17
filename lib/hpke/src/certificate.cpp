@@ -81,7 +81,18 @@ Certificate::Certificate(const bytes &der)
     raw(der)
 {}
 
+Certificate::Certificate(const Certificate&)
+  : internals(nullptr)
+  , public_key_algorithm(Signature::ID::Ed25519)
+{} // XXX
+
 Certificate::Certificate(Certificate&& other) = default;
+
+Certificate&
+Certificate::operator=(const Certificate&)
+{
+  return *this; // XXX
+}
 
 Certificate::~Certificate() = default;
 
