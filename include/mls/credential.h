@@ -1,7 +1,9 @@
 #pragma once
 
+#include "hpke/certificate.h"
 #include "mls/common.h"
 #include "mls/crypto.h"
+
 
 namespace mls {
 
@@ -38,6 +40,20 @@ struct BasicCredential
   static const CredentialType type;
 };
 
+struct X509Credential
+{
+	X509Credential() {}
+
+	//explicit X509Credential(const std::vector<bytes>& der_chain);
+
+	SignaturePublicKey public_key;
+	std::vector<hpke::Certificate> chain;
+
+	TLS_SERIALIZABLE(public_key)
+
+	static const CredentialType type;
+};
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
@@ -58,11 +74,13 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
+  static Credential x509(const std::vector<bytes>& der_chain);
+
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  std::variant<BasicCredential> _cred;
+  std::variant<BasicCredential, X509Credential> _cred;
 };
 
 } // namespace mls
