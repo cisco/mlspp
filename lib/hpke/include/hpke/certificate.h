@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-
+#include <hpke/signature.h>
 #include <bytes/bytes.h>
 using namespace bytes_ns;
 
@@ -9,35 +9,23 @@ namespace hpke {
 
 struct Certificate
 {
-  // TODO replace with real public members
-  /*
-  const Signature::ID public_key_algorithm;
-  const Signature::PublicKey public_key;
-  const bytes raw;
 
-  static Certificate parse(const bytes& der);
-  bool valid_from(const Certificate& parent);
+private:
+	struct Internals;
+	std::unique_ptr<Internals> internals;
 
-  private:
-  */
+public:
 
-  Certificate() = delete;
-  Certificate(int value_in);
-  Certificate(const Certificate& other);
-  Certificate(Certificate&& other);
-  ~Certificate();
+	Certificate(const bytes& der);
+	Certificate() = delete;
+	Certificate(Certificate&& other);
+	~Certificate();
 
-  int value() const;
+	bool valid_from(const Certificate& parent);
 
-  private:
-  struct Internals;
-  std::unique_ptr<Internals> internals;
-
-  // TODO constructors down here
-  // Certificate(Signature::ID,
-  //             Signature::PublicKey,
-  //             bytes,
-  //             Internals*);
+	const Signature::ID public_key_algorithm;
+	//const Signature::PublicKey public_key;
+	const bytes raw;
 };
 
 } // namespace hpke
