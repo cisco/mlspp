@@ -1,6 +1,6 @@
+#include "openssl_common.h"
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
-#include "openssl_common.h"
 #include <openssl/x509.h>
 
 namespace hpke {
@@ -25,6 +25,10 @@ struct Certificate::Internals
 
   explicit Internals(const bytes& der_in)
     : openssl_cert(parse(der_in), typed_delete<X509>){}
+
+  Internals(const Internals& other)
+    : openssl_cert(make_typed_unique<X509>(other.openssl_cert.get()))
+	{}
 
   Signature::ID signature_algorithm() const
   {
@@ -81,17 +85,28 @@ Certificate::Certificate(const bytes &der)
     raw(der)
 {}
 
-Certificate::Certificate(const Certificate&)
-  : internals(nullptr)
-  , public_key_algorithm(Signature::ID::Ed25519)
-{} // XXX
+Certificate::Certificate(const Certificate& other)
+  : internals(std::make_unique<Internals>(other.raw))
+  , public_key_algorithm(internals->signature_algorithm())
+{}
 
-Certificate::Certificate(Certificate&& other) = default;
+Certificate::Certificate(Certificate&& other) noexcept
+ : internals(std::move(other.internals)),
+   public_key_algorithm(other.public_key_algorithm)
+{}
+
+
 
 Certificate&
-Certificate::operator=(const Certificate&)
+Certificate::operator=(const Certificate& other)
 {
-  return *this; // XXX
+	if(this == &other) {
+		return *this;
+	}
+
+	// not much to do here since we have unique_ptr
+	// and defining an assignment is no a good idea.
+  return *this;
 }
 
 Certificate::~Certificate() = default;

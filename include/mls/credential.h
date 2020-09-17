@@ -44,7 +44,7 @@ struct X509Credential
 {
 	X509Credential() {}
 
-	//explicit X509Credential(const std::vector<bytes>& der_chain);
+	explicit X509Credential(const std::vector<bytes>& der_chain);
 
 	SignaturePublicKey public_key;
 	std::vector<hpke::Certificate> chain;

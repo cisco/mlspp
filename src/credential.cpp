@@ -10,6 +10,22 @@ namespace mls {
 const CredentialType BasicCredential::type = CredentialType::basic;
 
 ///
+/// X509Credential
+///
+
+X509Credential::X509Credential(const std::vector<bytes> &der_chain)
+{
+	if (der_chain.empty()) {
+		throw std::invalid_argument("empty certificate chain");
+	}
+
+	for(const auto& der: der_chain) {
+		chain.emplace_back(der);
+	}
+
+}
+
+///
 /// Credential
 ///
 
@@ -60,13 +76,8 @@ Credential::x509(const std::vector<bytes>& der_chain)
 	certs.emplace_back(bytes{});
 
 	Credential cred;
-	X509Credential x509Credential;
-	/*auto x509Credential = X509Credential(der_chain);
-	for (const auto& der: der_chain ) {
-		x509Credential.chain.emplace_back(der);
-	}
-	cred._cred = std::move(x509Credential);
-	*/
+	//X509Credential x509Credential{der_chain};
+	cred._cred = X509Credential{der_chain};
 	 return cred;
 }
 

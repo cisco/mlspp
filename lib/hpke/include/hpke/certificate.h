@@ -19,7 +19,7 @@ public:
 	Certificate(const bytes& der);
 	Certificate() = delete;
   Certificate(const Certificate& other);
-	Certificate(Certificate&& other);
+	Certificate(Certificate&& other) noexcept;
   Certificate& operator=(const Certificate& other);
 	~Certificate();
 
