@@ -16,17 +16,17 @@ private:
 
 public:
 
-	Certificate(const bytes& der);
 	Certificate() = delete;
+	explicit Certificate(const bytes& der);
   Certificate(const Certificate& other);
+	Certificate& operator=(const Certificate& other);
 	Certificate(Certificate&& other) noexcept;
-  Certificate& operator=(const Certificate& other);
 	~Certificate();
 
 	bool valid_from(const Certificate& parent);
 
 	const Signature::ID public_key_algorithm;
-	//const Signature::PublicKey public_key;
+	const Signature::PublicKey public_key;
 	const bytes raw;
 };
 
