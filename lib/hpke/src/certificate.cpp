@@ -65,18 +65,17 @@ struct Certificate::Internals
 		auto sig_alg = signature_algorithm();
 		switch (sig_alg) {
 			case Signature::ID::Ed25519: {
-				const auto& signature = Signature::get<Signature::ID::Ed25519>();
+				const auto &signature = Signature::get<Signature::ID::Ed25519>();
 				return *(signature.deserialize(pkey).release());
 			}
 			case Signature::ID::Ed448: {
-				const auto& signature = Signature::get<Signature::ID::Ed448>();
+				const auto &signature = Signature::get<Signature::ID::Ed448>();
 				return *(signature.deserialize(pkey).release());
 			}
 			default:
 				break;
 		}
 		throw std::runtime_error("Unknown algorithm");
-
   }
 
 	typed_unique_ptr<X509> openssl_cert;
@@ -108,7 +107,6 @@ Certificate::Certificate(Certificate&& other) noexcept
 {}
 
 
-
 Certificate&
 Certificate::operator=(const Certificate& other)
 {
@@ -117,7 +115,7 @@ Certificate::operator=(const Certificate& other)
 	}
 
 	// not much to do here since we have unique_ptr
-	// and defining an assignment is no a good idea.
+	// and defining an assignment is not a good idea.
   return *this;
 }
 
