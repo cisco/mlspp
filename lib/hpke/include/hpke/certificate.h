@@ -23,7 +23,7 @@ public:
 	Certificate(Certificate&& other) noexcept;
 	~Certificate();
 
-	bool valid_from(const Certificate& parent);
+	// bool valid_from(const Certificate& parent);
 
 	const Signature::ID public_key_algorithm;
 	const Signature::PublicKey public_key;

@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const certFile = "./cert_chain.bin"
+const certFile = "./cert_bundle.bin"
 const caCertFile = "./ca_cert.bin"
 const keyFile = "./key.bin"
 const caKeyFile = "./ca_key.bin"
@@ -126,8 +126,7 @@ func writeToFile(fileName string, data []string) {
 }
 
 func main() {
-    depth := 2
-
+    depth := 1
     rootPriv := newEd25519()
     writeToFile(caKeyFile, []string {string(rootPriv)})
 
@@ -136,7 +135,6 @@ func main() {
     writeToFile(keyFile, []string{string(myPriv)})
     writeToFile(caCertFile, []string{rootCertHex})
     writeToFile(certFile, chainHex)
-
 
     if DEBUG {
         f, err := os.Open(certFile)

@@ -121,5 +121,4 @@ Certificate::operator=(const Certificate& other)
 
 Certificate::~Certificate() = default;
 
-
 } // namespace hpke
