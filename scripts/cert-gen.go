@@ -126,7 +126,7 @@ func writeToFile(fileName string, data []string) {
 }
 
 func main() {
-    depth := 1
+    depth := 2
     rootPriv := newEd25519()
     writeToFile(caKeyFile, []string {string(rootPriv)})
 

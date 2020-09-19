@@ -4,7 +4,6 @@
 #include "mls/common.h"
 #include "mls/crypto.h"
 
-
 namespace mls {
 
 // enum {
@@ -42,16 +41,16 @@ struct BasicCredential
 
 struct X509Credential
 {
-	X509Credential() {}
+  X509Credential() {}
 
-	explicit X509Credential(const std::vector<bytes>& der_chain);
+  explicit X509Credential(const std::vector<bytes>& der_chain);
 
-	SignaturePublicKey public_key;
-	std::vector<hpke::Certificate> chain;
+  SignaturePublicKey public_key;
+  std::vector<hpke::Certificate> chain;
 
-	TLS_SERIALIZABLE(public_key)
+  TLS_SERIALIZABLE(public_key)
 
-	static const CredentialType type;
+  static const CredentialType type;
 };
 
 // struct {

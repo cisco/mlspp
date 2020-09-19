@@ -25,7 +25,7 @@ public:
   // bool valid_from(const Certificate& parent);
 
   const Signature::ID public_key_algorithm;
-  const Signature::PublicKey public_key;
+  const bytes public_key;
   const bytes raw;
 };
 

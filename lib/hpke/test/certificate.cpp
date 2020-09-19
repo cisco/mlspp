@@ -40,7 +40,7 @@ TEST_CASE("Certificate Known-Answer depth 1")
   //      algorithms
   // TODO create different cert chains based on depth and algo
 
-  // Chain is of depth 1
+  // Chain is of depth 2
   const std::string cert_bundle = "../../../../scripts/cert_bundle.bin";
   const std::string root_cert = "../../../../scripts/ca_cert.bin";
   auto certs = read_file(cert_bundle);
@@ -52,10 +52,16 @@ TEST_CASE("Certificate Known-Answer depth 1")
   auto leaf_der = from_hex(certs[0]);
   auto leaf = Certificate{ leaf_der };
 
-  auto root_der = from_hex(root_hex[0]);
+	auto issuing_der = from_hex(certs[1]);
+	auto issuing = Certificate{ issuing_der };
+
+	auto root_der = from_hex(root_hex[0]);
   auto root = Certificate{ root_der };
+
   CHECK(root.raw == root_der);
+  CHECK(issuing.raw == issuing_der);
   CHECK(leaf.raw == leaf_der);
+
   // TODO fix this one valid_from is implemented.
   // CHECK_FALSE(leaf.valid_from(root));
 }

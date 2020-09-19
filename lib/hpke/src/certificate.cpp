@@ -45,7 +45,7 @@ struct Certificate::Internals
     throw std::runtime_error("signature algorithm retrieval");
   }
 
-  Signature::PublicKey public_key() const
+  bytes public_key() const
   {
     auto key = make_typed_unique<EVP_PKEY>(X509_get_pubkey(openssl_cert.get()));
 
@@ -59,21 +59,7 @@ struct Certificate::Internals
     if (1 != EVP_PKEY_get_raw_public_key(key.get(), data_ptr, &raw_len)) {
       throw openssl_error();
     }
-
-    auto sig_alg = signature_algorithm();
-    switch (sig_alg) {
-      case Signature::ID::Ed25519: {
-        const auto& signature = Signature::get<Signature::ID::Ed25519>();
-        return *(signature.deserialize(pkey).release());
-      }
-      case Signature::ID::Ed448: {
-        const auto& signature = Signature::get<Signature::ID::Ed448>();
-        return *(signature.deserialize(pkey).release());
-      }
-      default:
-        break;
-    }
-    throw std::runtime_error("Unknown algorithm");
+    return pkey;
   }
 
   typed_unique_ptr<X509> openssl_cert;
