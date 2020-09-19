@@ -23,8 +23,7 @@ read_file(const std::string& filename)
     }
     f.close();
   } else {
-    throw std::system_error(
-      errno, std::system_category(), "failed to open " + filename);
+    throw std::system_error(errno, std::system_category(), "failed to open " + filename);
   }
   return lines;
 }
@@ -52,10 +51,10 @@ TEST_CASE("Certificate Known-Answer depth 1")
   auto leaf_der = from_hex(certs[0]);
   auto leaf = Certificate{ leaf_der };
 
-	auto issuing_der = from_hex(certs[1]);
-	auto issuing = Certificate{ issuing_der };
+  auto issuing_der = from_hex(certs[1]);
+  auto issuing = Certificate{ issuing_der };
 
-	auto root_der = from_hex(root_hex[0]);
+  auto root_der = from_hex(root_hex[0]);
   auto root = Certificate{ root_der };
 
   CHECK(root.raw == root_der);

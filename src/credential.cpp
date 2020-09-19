@@ -8,6 +8,7 @@ namespace mls {
 ///
 
 const CredentialType BasicCredential::type = CredentialType::basic;
+const CredentialType X509Credential::type = CredentialType::x509;
 
 ///
 /// X509Credential
@@ -22,6 +23,8 @@ X509Credential::X509Credential(const std::vector<bytes>& der_chain)
   for (const auto& der : der_chain) {
     chain.emplace_back(der);
   }
+
+  public_key = SignaturePublicKey{ chain[0].public_key };
 }
 
 ///
@@ -45,6 +48,8 @@ Credential::public_key() const
   switch (_cred.index()) {
     case 0:
       return std::get<BasicCredential>(_cred).public_key;
+    case 1:
+      return std::get<X509Credential>(_cred).public_key;
   }
 
   throw std::bad_variant_access();
@@ -71,11 +76,7 @@ Credential::x509(const std::vector<bytes>& der_chain)
     throw std::invalid_argument("empty cert chain");
   }
 
-  auto certs = std::vector<hpke::Certificate>();
-  certs.emplace_back(bytes{});
-
   Credential cred;
-  // X509Credential x509Credential{der_chain};
   cred._cred = X509Credential{ der_chain };
   return cred;
 }
