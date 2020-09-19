@@ -60,7 +60,7 @@ template<>
 void
 typed_delete(X509* ptr)
 {
-	X509_free(ptr);
+  X509_free(ptr);
 }
 
 ///
