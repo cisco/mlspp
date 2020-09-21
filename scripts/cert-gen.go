@@ -110,8 +110,8 @@ func main() {
   fmt.Printf("Root Priv Key %x\n", rootPriv)
 
   myPriv, rootCertHex, _, chainHex := makeCertChain(rootPriv, depth, false)
-  fmt.Printf("\n Root Certificate %s\n", rootCertHex)
-  fmt.Printf("\n MyPriv %x\n", myPriv)
+  fmt.Printf("\nRoot Certificate %s\n", rootCertHex)
+  fmt.Printf("\nMyPriv %x\n", myPriv)
   for _, c := range chainHex {
     fmt.Printf("\n\t --- Begin Certificate ---- \n")
     fmt.Printf("%s", c)

@@ -2,7 +2,9 @@
 
 #include <bytes/bytes.h>
 #include <hpke/signature.h>
+
 #include <memory>
+
 using namespace bytes_ns;
 
 namespace hpke {
