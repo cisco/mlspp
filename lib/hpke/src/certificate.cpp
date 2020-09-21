@@ -8,7 +8,7 @@ namespace hpke {
 ///
 /// Certificate X509 Impl
 
-struct Certificate::Internals
+struct Certificate::ParsedCertificate
 {
 
   static X509* parse(const bytes& der)
@@ -22,22 +22,22 @@ struct Certificate::Internals
     return cert;
   }
 
-  explicit Internals(const bytes& der_in)
+  explicit ParsedCertificate(const bytes& der_in)
     : openssl_cert(parse(der_in), typed_delete<X509>)
   {}
 
-  Internals(const Internals& other)
+	ParsedCertificate(const ParsedCertificate& other)
     : openssl_cert(make_typed_unique<X509>(other.openssl_cert.get()))
   {}
 
-  Signature::ID signature_algorithm() const
+  X509Signature::ID signature_algorithm() const
   {
     int algo_nid = X509_get_signature_nid(openssl_cert.get());
     switch (algo_nid) {
       case EVP_PKEY_ED25519:
-        return Signature::ID::Ed25519;
+        return X509Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
-        return Signature::ID::Ed448;
+        return X509Signature::ID::Ed448;
       default:
         // TODO (Suhas): Add support for ECDSA curves
         break;
@@ -45,7 +45,7 @@ struct Certificate::Internals
     throw std::runtime_error("signature algorithm retrieval");
   }
 
-  bytes public_key() const
+  X509Signature::PublicKey public_key() const
   {
     auto key = make_typed_unique<EVP_PKEY>(X509_get_pubkey(openssl_cert.get()));
 
@@ -59,7 +59,8 @@ struct Certificate::Internals
     if (1 != EVP_PKEY_get_raw_public_key(key.get(), data_ptr, &raw_len)) {
       throw openssl_error();
     }
-    return pkey;
+
+    return X509Signature::PublicKey{pkey};
   }
 
   typed_unique_ptr<X509> openssl_cert;
@@ -70,21 +71,21 @@ struct Certificate::Internals
 ///
 
 Certificate::Certificate(const bytes& der)
-  : internals(std::make_unique<Internals>(der))
-  , public_key_algorithm(internals->signature_algorithm())
-  , public_key(internals->public_key())
+  : parsed_cert(std::make_unique<ParsedCertificate>(der))
+  , public_key_algorithm(parsed_cert->signature_algorithm())
+  , public_key(parsed_cert->public_key())
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
-  : internals(std::make_unique<Internals>(other.raw))
-  , public_key_algorithm(internals->signature_algorithm())
-  , public_key(internals->public_key())
+  : parsed_cert(std::make_unique<ParsedCertificate>(other.raw))
+  , public_key_algorithm(parsed_cert->signature_algorithm())
+  , public_key(parsed_cert->public_key())
   , raw(other.raw)
 {}
 
 Certificate::Certificate(Certificate&& other) noexcept
-  : internals(std::move(other.internals))
+  : parsed_cert(std::move(other.parsed_cert))
   , public_key_algorithm(other.public_key_algorithm)
   , public_key(other.public_key)
 {}
