@@ -18,12 +18,14 @@ State::State(bytes group_id,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
-  _keys.suite = suite;
-  _keys.init_secret = bytes(suite.get().digest.hash_size(), 0);
-
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
+
+  // TODO(RLB): Align this to the latest spec
+  auto group_ctx = tls::marshal(group_context());
+  auto epoch_secret = bytes(suite.get().digest.hash_size(), 0);
+  _keys = KeyScheduleEpoch::create(_suite, LeafCount(1), epoch_secret, group_ctx);
 }
 
 // Initialize a group from a Welcome

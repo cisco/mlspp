@@ -91,6 +91,9 @@ struct KeyScheduleEpoch
 
   KeyScheduleEpoch() = default;
 
+  static KeyScheduleEpoch first(CipherSuite suite,
+                                const bytes& init_secret,
+                                const bytes& context);
   static KeyScheduleEpoch create(CipherSuite suite,
                                  LeafCount size,
                                  const bytes& epoch_secret,

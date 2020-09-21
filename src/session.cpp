@@ -3,7 +3,7 @@
 #include <mls/messages.h>
 #include <mls/state.h>
 
-#include <map>
+#include <deque>
 
 namespace mls {
 
@@ -29,10 +29,11 @@ struct PendingJoin::Inner
 
 struct Session::Inner
 {
-  std::map<epoch_t, State> state;
-  epoch_t current_epoch;
-  bool encrypt_handshake;
+  std::deque<State> history;
   std::optional<std::tuple<bytes, State>> outbound_cache;
+  bool encrypt_handshake;
+
+  Inner(State state);
 
   static Session begin(const bytes& group_id,
                        const HPKEPrivateKey& init_priv,
@@ -47,8 +48,7 @@ struct Session::Inner
   bytes export_message(const MLSPlaintext& plaintext);
   MLSPlaintext import_message(const bytes& encoded);
   void add_state(epoch_t prior_epoch, const State& group_state);
-  const State& current_state() const;
-  State& current_state();
+  State& for_epoch(epoch_t epoch);
 };
 
 ///
@@ -122,16 +122,19 @@ PendingJoin::complete(const bytes& welcome) const
 /// Session
 ///
 
+Session::Inner::Inner(State state)
+  : history{ std::move(state) }
+  , encrypt_handshake(false)
+{}
+
 Session
 Session::Inner::begin(const bytes& group_id,
                       const HPKEPrivateKey& init_priv,
                       const SignaturePrivateKey& sig_priv,
                       const KeyPackage& key_package)
 {
-  auto inner = std::make_unique<Inner>();
-  inner->add_state(
-    0,
-    { group_id, key_package.cipher_suite, init_priv, sig_priv, key_package });
+  auto state = State(group_id, key_package.cipher_suite, init_priv, sig_priv, key_package);
+  auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }
 
@@ -143,15 +146,15 @@ Session::Inner::join(const HPKEPrivateKey& init_priv,
 {
   auto welcome = tls::get<Welcome>(welcome_data);
 
-  auto inner = std::make_unique<Inner>();
-  inner->add_state(0, { init_priv, sig_priv, key_package, welcome });
+  auto state = State(init_priv, sig_priv, key_package, welcome);
+  auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }
 
 bytes
 Session::Inner::fresh_secret() const
 {
-  const auto suite = current_state().cipher_suite();
+  const auto suite = history.front().cipher_suite();
   const auto secret_size = suite.get().hpke.kdf.hash_size();
   return random_bytes(secret_size);
 }
@@ -163,7 +166,7 @@ Session::Inner::export_message(const MLSPlaintext& plaintext)
     return tls::marshal(plaintext);
   }
 
-  auto ciphertext = current_state().encrypt(plaintext);
+  auto ciphertext = history.front().encrypt(plaintext);
   return tls::marshal(ciphertext);
 }
 
@@ -175,40 +178,31 @@ Session::Inner::import_message(const bytes& encoded)
   }
 
   auto ciphertext = tls::get<MLSCiphertext>(encoded);
-  return current_state().decrypt(ciphertext);
+  return history.front().decrypt(ciphertext);
 }
 
 void
-Session::Inner::add_state(epoch_t prior_epoch, const State& group_state)
+Session::Inner::add_state(epoch_t prior_epoch, const State& state)
 {
-  // XXX(rlb@ipv.sx) Assumes no epoch collisions, which is clearly
-  // not the case with the current linear updating.
-  state.emplace(group_state.epoch(), group_state);
-
-  // XXX(rlb@ipv.sx) First successor updates the head pointer
-  if (prior_epoch == current_epoch || state.size() == 1) {
-    current_epoch = group_state.epoch();
-  }
-}
-
-const State&
-Session::Inner::current_state() const
-{
-  if (state.count(current_epoch) == 0) {
-    throw MissingStateError("No state available for current epoch");
+  if (!history.empty() && prior_epoch != history.front().epoch()) {
+    throw MissingStateError("Discontinuity in history");
   }
 
-  return state.at(current_epoch);
+  history.emplace_front(state);
+
+  // TODO(rlb) bound the size of the queue
 }
 
 State&
-Session::Inner::current_state()
+Session::Inner::for_epoch(epoch_t epoch)
 {
-  if (state.count(current_epoch) == 0) {
-    throw MissingStateError("No state available for current epoch");
+  for (auto& state : history) {
+    if (state.epoch() == epoch) {
+      return state;
+    }
   }
 
-  return state.at(current_epoch);
+  throw MissingStateError("No state for epoch");
 }
 
 Session::Session(const Session& other)
@@ -240,7 +234,7 @@ bytes
 Session::add(const bytes& key_package_data)
 {
   auto key_package = tls::get<KeyPackage>(key_package_data);
-  auto proposal = inner->current_state().add(key_package);
+  auto proposal = inner->history.front().add(key_package);
   return inner->export_message(proposal);
 }
 
@@ -248,14 +242,14 @@ bytes
 Session::update()
 {
   auto leaf_secret = inner->fresh_secret();
-  auto proposal = inner->current_state().update(leaf_secret);
+  auto proposal = inner->history.front().update(leaf_secret);
   return inner->export_message(proposal);
 }
 
 bytes
 Session::remove(uint32_t index)
 {
-  auto proposal = inner->current_state().remove(LeafIndex{ index });
+  auto proposal = inner->history.front().remove(LeafIndex{ index });
   return inner->export_message(proposal);
 }
 
@@ -264,7 +258,7 @@ Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
   auto [commit, welcome, new_state] =
-    inner->current_state().commit(commit_secret);
+    inner->history.front().commit(commit_secret);
 
   auto commit_msg = inner->export_message(commit);
   auto welcome_msg = tls::marshal(welcome);
@@ -284,7 +278,7 @@ Session::handle(const bytes& handshake_data)
 
   auto is_commit = std::holds_alternative<CommitData>(handshake.content);
   if (is_commit &&
-      LeafIndex(handshake.sender.sender) == inner->current_state().index()) {
+      LeafIndex(handshake.sender.sender) == inner->history.front().index()) {
     if (!inner->outbound_cache.has_value()) {
       throw ProtocolError("Received from self without sending");
     }
@@ -300,7 +294,7 @@ Session::handle(const bytes& handshake_data)
     return true;
   }
 
-  auto maybe_next_state = inner->current_state().handle(handshake);
+  auto maybe_next_state = inner->history.front().handle(handshake);
   if (!maybe_next_state.has_value()) {
     return false;
   }
@@ -312,19 +306,19 @@ Session::handle(const bytes& handshake_data)
 epoch_t
 Session::current_epoch() const
 {
-  return inner->current_epoch;
+  return inner->history.front().epoch();
 }
 
 uint32_t
 Session::index() const
 {
-  return inner->current_state().index().val;
+  return inner->history.front().index().val;
 }
 
 bytes
 Session::protect(const bytes& plaintext)
 {
-  auto ciphertext = inner->current_state().protect(plaintext);
+  auto ciphertext = inner->history.front().protect(plaintext);
   return tls::marshal(ciphertext);
 }
 
@@ -335,11 +329,7 @@ bytes
 Session::unprotect(const bytes& ciphertext)
 {
   auto ciphertext_obj = tls::get<MLSCiphertext>(ciphertext);
-  if (inner->state.count(ciphertext_obj.epoch) == 0) {
-    throw MissingStateError("No state available to decrypt ciphertext");
-  }
-
-  auto& state = inner->state.at(ciphertext_obj.epoch);
+  auto& state = inner->for_epoch(ciphertext_obj.epoch);
   return state.unprotect(ciphertext_obj);
 }
 
@@ -350,16 +340,9 @@ operator==(const Session& lhs, const Session& rhs)
     return false;
   }
 
-  if (lhs.inner->current_epoch != rhs.inner->current_epoch) {
-    return false;
-  }
-
-  for (const auto& pair : lhs.inner->state) {
-    if (rhs.inner->state.count(pair.first) == 0) {
-      continue;
-    }
-
-    if (rhs.inner->state.at(pair.first) != pair.second) {
+  auto size = std::min(lhs.inner->history.size(), rhs.inner->history.size());
+  for (size_t i = 0; i < size; i += 1) {
+    if (lhs.inner->history.at(i) != rhs.inner->history.at(i)) {
       return false;
     }
   }
