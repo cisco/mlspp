@@ -95,7 +95,8 @@ PendingJoin::Inner::create(CipherSuite suite,
                            SignaturePrivateKey sig_priv,
                            Credential cred)
 {
-  auto inner = std::make_unique<Inner>(suite, std::move(sig_priv), std::move(cred));
+  auto inner =
+    std::make_unique<Inner>(suite, std::move(sig_priv), std::move(cred));
   return PendingJoin(inner.release());
 }
 
