@@ -5,8 +5,8 @@
 #include <hpke/random.h>
 #include <hpke/signature.h>
 #include <mls/common.h>
-#include <openssl/evp.h>
 #include <tls/tls_syntax.h>
+
 #include <vector>
 
 namespace mls {

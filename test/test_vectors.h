@@ -390,41 +390,6 @@ public:
   KeyScheduleEpoch keys() const { return _keys; }
 };
 
-class TestSession : public Session
-{
-public:
-  using Session::Session;
-  TestSession(const Session& other)
-    : Session(other)
-  {}
-
-  uint32_t index() const { return current_state().index().val; }
-
-  epoch_t current_epoch() const { return _current_epoch; }
-
-  CipherSuite cipher_suite() const { return current_state().cipher_suite(); }
-
-  bytes current_epoch_secret() const
-  {
-    return TestState(current_state()).keys().epoch_secret;
-  }
-
-  bytes current_application_secret() const
-  {
-    return TestState(current_state()).keys().application_secret;
-  }
-
-  bytes current_confirmation_key() const
-  {
-    return TestState(current_state()).keys().confirmation_key;
-  }
-
-  bytes current_init_secret() const
-  {
-    return TestState(current_state()).keys().init_secret;
-  }
-};
-
 } // namespace mls
 
 /////

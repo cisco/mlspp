@@ -16,7 +16,7 @@ protected:
 
   static const uint32_t no_except = 0xffffffff;
 
-  std::vector<TestSession> sessions;
+  std::vector<Session> sessions;
 
   HPKEPrivateKey new_init_key() { return HPKEPrivateKey::generate(suite); }
 
