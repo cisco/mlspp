@@ -3,6 +3,8 @@
 #include <hpke/random.h>
 #include <mls/session.h>
 
+#include <iostream> // XXX
+
 using namespace mls;
 
 class SessionTest
@@ -29,7 +31,6 @@ protected:
 
   void broadcast(const bytes& message, const uint32_t except)
   {
-    auto initial_epoch = sessions[0].current_epoch();
     for (auto& session : sessions) {
       if (except != no_except && session.index() == except) {
         continue;
@@ -37,7 +38,6 @@ protected:
 
       session.handle(message);
     }
-    check(initial_epoch, except);
   }
 
   void broadcast_add()
@@ -77,9 +77,21 @@ protected:
 
     auto initial_epoch = sessions[0].current_epoch();
 
-    auto [welcome, add] = sessions[from].add(key_package);
-    auto next = Session::join({ init_info }, welcome);
+    auto add = sessions[from].add(key_package);
     broadcast(add, index);
+
+    auto [welcome, commit] = sessions[from].commit();
+    broadcast(commit, index);
+
+    // XXX
+    auto commit_pt = tls::get<MLSPlaintext>(commit);
+    auto commit_data = std::get<CommitData>(commit_pt.content);
+    auto commit_content = commit_data.commit;
+    std::cout << "proposals.updates = " << commit_content.updates.size() << std::endl;
+    std::cout << "proposals.removes = " << commit_content.removes.size() << std::endl;
+    std::cout << "proposals.adds    = " << commit_content.adds.size() << std::endl;
+
+    auto next = Session::join({ init_info }, welcome);
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
@@ -203,8 +215,13 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
+
     auto update = sessions[i].update();
     broadcast(update);
+
+    auto [_welcome, commit] = sessions[i].commit();
+    broadcast(commit);
+
     check(initial_epoch);
   }
 }
@@ -214,9 +231,14 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
     auto evict_secret = fresh_secret();
-    auto remove = sessions[i - 1].remove(i);
     sessions.pop_back();
+
+    auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
+
+    auto [_welcome, commit] = sessions[i - 1].commit();
+    broadcast(commit);
+
     check(initial_epoch);
   }
 }
@@ -230,6 +252,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
     auto initial_epoch = sessions[i].current_epoch();
     auto remove = sessions[i].remove(target);
     broadcast(remove, target);
+    auto [_welcome, commit] = sessions[i].commit();
+    broadcast(commit, target);
     check(initial_epoch, target);
 
     // Re-add at target
@@ -248,15 +272,19 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
     auto initial_epoch = sessions[0].current_epoch();
     auto update = sessions[i].update();
     broadcast(update);
+    auto [_welcome, commit] = sessions[i].commit();
+    broadcast(commit);
     check(initial_epoch);
   }
 
   // 3. Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto remove = sessions[i - 1].remove(i);
     sessions.pop_back();
+    auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
+    auto [_welcome, commit] = sessions[i-1].commit();
+    broadcast(commit);
     check(initial_epoch);
   }
 }

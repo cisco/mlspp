@@ -2,6 +2,8 @@
 #include "mls/common.h"
 #include "mls/state.h"
 
+#include <iostream> // XXX
+
 namespace mls {
 
 Session::InitInfo::InitInfo(bytes init_secret_in,
@@ -27,7 +29,7 @@ Session::Session()
   , _encrypt_handshake(false)
 {}
 
-std::tuple<Session, Welcome>
+std::tuple<Session, bytes>
 Session::start(const bytes& group_id,
                const std::vector<InitInfo>& my_info,
                const std::vector<KeyPackage>& key_packages,
@@ -69,12 +71,14 @@ Session::start(const bytes& group_id,
 
   Session session;
   session.add_state(0, state);
-  return std::make_tuple(session, welcome);
+  return std::make_tuple(session, tls::marshal(welcome));
 }
 
 Session
-Session::join(const std::vector<InitInfo>& my_info, const Welcome& welcome)
+Session::join(const std::vector<InitInfo>& my_info, const bytes& welcome_data)
 {
+  auto welcome = tls::get<Welcome>(welcome_data);
+
   Session session;
   for (const auto& info : my_info) {
     auto maybe_kpi = welcome.find(info.key_package);
@@ -96,28 +100,40 @@ Session::encrypt_handshake(bool enabled)
   _encrypt_handshake = enabled;
 }
 
-std::tuple<Welcome, bytes>
+bytes
 Session::add(const KeyPackage& key_package)
 {
-  const auto add_secret = fresh_secret();
   auto proposal = current_state().add(key_package);
-  return commit_and_cache(add_secret, proposal);
+  return export_message(proposal);
 }
 
 bytes
 Session::update()
 {
-  const auto leaf_secret = fresh_secret();
+  auto leaf_secret = fresh_secret();
   auto proposal = current_state().update(leaf_secret);
-  return std::get<1>(commit_and_cache(leaf_secret, proposal));
+  return export_message(proposal);
 }
 
 bytes
 Session::remove(uint32_t index)
 {
-  const auto evict_secret = fresh_secret();
   auto proposal = current_state().remove(LeafIndex{ index });
-  return std::get<1>(commit_and_cache(evict_secret, proposal));
+  return export_message(proposal);
+}
+
+std::tuple<bytes, bytes>
+Session::commit()
+{
+  auto commit_secret = fresh_secret();
+  auto [commit, welcome, new_state] = current_state().commit(commit_secret);
+
+  auto commit_msg = export_message(commit);
+  auto welcome_msg = tls::marshal(welcome);
+
+  _outbound_cache = std::make_tuple(commit_msg, new_state);
+  std::cout << "[" << current_state().index().val << "] populated cache " << _outbound_cache.has_value() << std::endl;
+  return std::make_tuple(welcome_msg, commit_msg);
 }
 
 bytes
@@ -128,74 +144,62 @@ Session::fresh_secret() const
   return random_bytes(secret_size);
 }
 
-std::tuple<Welcome, bytes>
-Session::commit_and_cache(const bytes& secret, const MLSPlaintext& proposal)
+bytes
+Session::export_message(const MLSPlaintext& plaintext)
 {
-  auto state = current_state();
-  state.handle(proposal);
-  auto [commit, welcome, new_state] = state.commit(secret);
-
-  tls::ostream w;
-  if (_encrypt_handshake) {
-    auto enc_proposal = state.encrypt(proposal);
-    auto enc_commit = state.encrypt(commit);
-    w << enc_proposal << enc_commit;
-  } else {
-    w << proposal << commit;
+  if (!_encrypt_handshake) {
+    return tls::marshal(plaintext);
   }
-  auto msg = w.bytes();
 
-  _outbound_cache = std::make_tuple(msg, new_state);
-  return std::make_tuple(welcome, msg);
+  auto ciphertext = current_state().encrypt(plaintext);
+  return tls::marshal(ciphertext);
 }
 
-void
-Session::handle(const bytes& handshake_data)
+MLSPlaintext
+Session::import_message(const bytes& encoded)
 {
-  auto& state = current_state();
-  MLSPlaintext proposal;
-  MLSPlaintext commit;
-  tls::istream r(handshake_data);
-  if (_encrypt_handshake) {
-    // TODO(rlb): Verify that epoch of the ciphertext matches that of the
-    // current state
-    MLSCiphertext enc_proposal;
-    MLSCiphertext enc_commit;
-    r >> enc_proposal >> enc_commit;
-    proposal = state.decrypt(enc_proposal);
-    commit = state.decrypt(enc_commit);
-  } else {
-    r >> proposal >> commit;
+  if (!_encrypt_handshake) {
+    return tls::get<MLSPlaintext>(encoded);
   }
 
-  if (proposal.sender.sender_type != SenderType::member) {
+  auto ciphertext = tls::get<MLSCiphertext>(encoded);
+  return current_state().decrypt(ciphertext);
+}
+
+bool
+Session::handle(const bytes& handshake_data)
+{
+  auto handshake = import_message(handshake_data);
+
+  if (handshake.sender.sender_type != SenderType::member) {
     throw ProtocolError("External senders not supported");
   }
 
-  if (LeafIndex(proposal.sender.sender) == current_state().index()) {
+  auto is_commit = std::holds_alternative<CommitData>(handshake.content);
+  if (is_commit && LeafIndex(handshake.sender.sender) == current_state().index()) {
     if (!_outbound_cache.has_value()) {
+  std::cout << "[" << current_state().index().val << "] Received from self without sending " << std::endl;
       throw ProtocolError("Received from self without sending");
     }
 
-    auto message = std::get<0>(_outbound_cache.value());
-    auto next_state = std::get<1>(_outbound_cache.value());
-
-    if (message != handshake_data) {
-      throw ProtocolError("Received different own message");
+    const auto& cached_msg = std::get<0>(_outbound_cache.value());
+    const auto& next_state = std::get<1>(_outbound_cache.value());
+    if (cached_msg != handshake_data) {
+      throw ProtocolError("Received message different from cached");
     }
 
-    add_state(proposal.epoch, next_state);
+    add_state(current_state().epoch(), next_state);
     _outbound_cache = std::nullopt;
-    return;
+    return true;
   }
 
-  state.handle(proposal);
-  auto next = state.handle(commit);
-  if (!next.has_value()) {
-    throw ProtocolError("Commit failed to produce a new state");
+  auto maybe_next_state = current_state().handle(handshake);
+  if (!maybe_next_state.has_value()) {
+    return false;
   }
 
-  add_state(commit.epoch, next.value());
+  add_state(handshake.epoch, maybe_next_state.value());
+  return true;
 }
 
 bytes
