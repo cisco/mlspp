@@ -86,6 +86,7 @@ struct KeyScheduleEpoch
   bytes application_secret;
   GroupKeySource application_keys;
 
+  bytes exporter_secret;
   bytes confirmation_key;
   bytes init_secret;
 

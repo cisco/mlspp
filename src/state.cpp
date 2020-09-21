@@ -569,6 +569,14 @@ State::verify_confirmation(const bytes& confirmation) const
   return constant_time_eq(confirm, confirmation);
 }
 
+bytes
+State::do_export(const std::string& label, const bytes& context, size_t size) const
+{
+  // TODO(RLB): Align with latest spec
+  auto secret = _suite.derive_secret(_keys.exporter_secret, label, context);
+  return _suite.expand_with_label(secret, "exporter", context, size);
+}
+
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {

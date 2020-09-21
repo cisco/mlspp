@@ -31,6 +31,9 @@ protected:
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
   const bytes test_message = from_hex("01020304");
+  const std::string export_label = "test";
+  const bytes export_context = from_hex("05060708");
+  const size_t export_size = 16;
 
   std::vector<HPKEPrivateKey> init_privs;
   std::vector<SignaturePrivateKey> identity_privs;
@@ -40,6 +43,28 @@ protected:
   bytes fresh_secret() const
   {
     return random_bytes(suite.get().hpke.kdf.hash_size());
+  }
+
+  void verify_group_functionality(std::vector<State>& states) {
+    if (states.empty()) {
+      return;
+    }
+
+    // Verify that they can all send and be received
+    for (auto& state : states) {
+      auto encrypted = state.protect(test_message);
+      for (auto& other : states) {
+        auto decrypted = other.unprotect(encrypted);
+        REQUIRE(decrypted == test_message);
+      }
+    }
+
+    // Verify that they produce the same value for export
+    auto ref = states[0].do_export(export_label, export_context, export_size);
+    REQUIRE(ref.size() == export_size);
+    for (auto& state : states) {
+      REQUIRE(ref == state.do_export(export_label, export_context, export_size));
+    }
   }
 };
 
@@ -62,10 +87,8 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
     State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
   REQUIRE(first1 == second0);
 
-  /// Verify that they can exchange protected messages
-  auto encrypted = first1.protect(test_message);
-  auto decrypted = second0.unprotect(encrypted);
-  REQUIRE(decrypted == test_message);
+  auto group = std::vector<State>{first1, second0};
+  verify_group_functionality(group);
 }
 
 TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
@@ -91,14 +114,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
       init_privs[i], identity_privs[i], key_packages[i], welcome);
   }
 
-  // Verify that everyone can send and be received
-  for (auto& state : states) {
-    auto encrypted = state.protect(test_message);
-    for (auto& other : states) {
-      auto decrypted = other.unprotect(encrypted);
-      REQUIRE(decrypted == test_message);
-    }
-  }
+  verify_group_functionality(states);
 }
 
 TEST_CASE_FIXTURE(StateTest, "Full Size Group")
@@ -132,14 +148,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
       REQUIRE(state == states[0]);
     }
 
-    // Check that everyone can send and be received
-    for (auto& state : states) {
-      auto encrypted = state.protect(test_message);
-      for (auto& other : states) {
-        auto decrypted = other.unprotect(encrypted);
-        REQUIRE(decrypted == test_message);
-      }
-    }
+    verify_group_functionality(states);
   }
 }
 
@@ -174,6 +183,8 @@ protected:
     for (const auto& state : states) {
       REQUIRE(state == states[0]);
     }
+
+    verify_group_functionality(states);
   }
 };
 

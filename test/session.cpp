@@ -93,6 +93,11 @@ protected:
       ref = 1;
     }
 
+    auto label = std::string("test");
+    auto context = bytes{ 4, 5, 6, 7 };
+    auto size = 16;
+    auto ref_export = sessions[ref].do_export(label, context, size);
+
     // Verify that everyone ended up in consistent states, and that
     // they can send and be received.
     for (auto& session : sessions) {
@@ -112,6 +117,8 @@ protected:
         auto decrypted = other.unprotect(encrypted);
         REQUIRE(plaintext == decrypted);
       }
+
+      REQUIRE(ref_export == session.do_export(label, context, size));
     }
 
     // Verify that the epoch got updated

@@ -173,6 +173,7 @@ struct KeyScheduleTestVectors
     bytes application_secret;
     std::vector<KeyAndNonce> application_keys;
 
+    bytes exporter_secret;
     bytes confirmation_key;
     bytes init_secret;
 
@@ -185,6 +186,7 @@ struct KeyScheduleTestVectors
                      handshake_keys,
                      application_secret,
                      application_keys,
+                     exporter_secret,
                      confirmation_key,
                      init_secret);
     TLS_TRAITS(tls::pass,
@@ -196,6 +198,7 @@ struct KeyScheduleTestVectors
                tls::vector<4>,
                tls::vector<1>,
                tls::vector<4>,
+               tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>)
   };

@@ -187,6 +187,7 @@ generate_key_schedule()
         handshake_keys,
         epoch.application_secret,
         application_keys,
+        epoch.exporter_secret,
         epoch.confirmation_key,
         epoch.init_secret,
       });

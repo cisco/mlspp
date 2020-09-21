@@ -80,6 +80,7 @@ public:
   epoch_t epoch() const { return _epoch; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
+  bytes do_export(const std::string& label, const bytes& context, size_t size) const;
 
   ///
   /// General encryption and decryption

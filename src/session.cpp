@@ -316,6 +316,12 @@ Session::index() const
 }
 
 bytes
+Session::do_export(const std::string& label, const bytes& context, size_t size) const
+{
+  return inner->history.front().do_export(label, context, size);
+}
+
+bytes
 Session::protect(const bytes& plaintext)
 {
   auto ciphertext = inner->history.front().protect(plaintext);

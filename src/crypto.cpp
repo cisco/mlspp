@@ -125,6 +125,16 @@ CipherSuite::expand_with_label(const bytes& secret,
   return get().hpke.kdf.expand(secret, label_bytes, length);
 }
 
+bytes
+CipherSuite::derive_secret(const bytes& secret,
+                           const std::string& label,
+                           const bytes& context) const
+{
+  auto context_hash = get().digest.hash(context);
+  auto size = get().digest.hash_size();
+  return expand_with_label(secret, label, context_hash, size);
+}
+
 const std::array<CipherSuite::ID, 6> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,
