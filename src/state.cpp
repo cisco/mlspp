@@ -25,7 +25,8 @@ State::State(bytes group_id,
   // TODO(RLB): Align this to the latest spec
   auto group_ctx = tls::marshal(group_context());
   auto epoch_secret = bytes(suite.get().digest.hash_size(), 0);
-  _keys = KeyScheduleEpoch::create(_suite, LeafCount(1), epoch_secret, group_ctx);
+  _keys =
+    KeyScheduleEpoch::create(_suite, LeafCount(1), epoch_secret, group_ctx);
 }
 
 // Initialize a group from a Welcome
@@ -570,7 +571,9 @@ State::verify_confirmation(const bytes& confirmation) const
 }
 
 bytes
-State::do_export(const std::string& label, const bytes& context, size_t size) const
+State::do_export(const std::string& label,
+                 const bytes& context,
+                 size_t size) const
 {
   // TODO(RLB): Align with latest spec
   auto secret = _suite.derive_secret(_keys.exporter_secret, label, context);

@@ -64,7 +64,7 @@ struct TreeKEMPrivateKey
   static TreeKEMPrivateKey joiner(CipherSuite suite,
                                   LeafCount size,
                                   LeafIndex index,
-                                  const HPKEPrivateKey& leaf_secret,
+                                  const HPKEPrivateKey& leaf_priv,
                                   NodeIndex intersect,
                                   const std::optional<bytes>& path_secret);
 

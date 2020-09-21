@@ -45,7 +45,8 @@ protected:
     return random_bytes(suite.get().hpke.kdf.hash_size());
   }
 
-  void verify_group_functionality(std::vector<State>& states) {
+  void verify_group_functionality(std::vector<State>& states)
+  {
     if (states.empty()) {
       return;
     }
@@ -63,7 +64,8 @@ protected:
     auto ref = states[0].do_export(export_label, export_context, export_size);
     REQUIRE(ref.size() == export_size);
     for (auto& state : states) {
-      REQUIRE(ref == state.do_export(export_label, export_context, export_size));
+      REQUIRE(ref ==
+              state.do_export(export_label, export_context, export_size));
     }
   }
 };
@@ -87,7 +89,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
     State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
   REQUIRE(first1 == second0);
 
-  auto group = std::vector<State>{first1, second0};
+  auto group = std::vector<State>{ first1, second0 };
   verify_group_functionality(group);
 }
 

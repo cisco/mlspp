@@ -1,8 +1,8 @@
 #pragma once
 
-#include <mls/crypto.h>
-#include <mls/credential.h>
 #include <mls/common.h>
+#include <mls/credential.h>
+#include <mls/crypto.h>
 
 namespace mls {
 
@@ -63,7 +63,9 @@ public:
   // Information about the current state
   epoch_t current_epoch() const;
   uint32_t index() const;
-  bytes do_export(const std::string& label, const bytes& context, size_t size) const;
+  bytes do_export(const std::string& label,
+                  const bytes& context,
+                  size_t size) const;
 
   // Application message protection
   bytes protect(const bytes& plaintext);

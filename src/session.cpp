@@ -33,7 +33,7 @@ struct Session::Inner
   std::optional<std::tuple<bytes, State>> outbound_cache;
   bool encrypt_handshake;
 
-  Inner(State state);
+  explicit Inner(State state);
 
   static Session begin(const bytes& group_id,
                        const HPKEPrivateKey& init_priv,
@@ -87,7 +87,7 @@ PendingJoin::Inner::Inner(CipherSuite suite_in,
   : suite(suite_in)
   , init_priv(HPKEPrivateKey::generate(suite))
   , sig_priv(std::move(sig_priv_in))
-  , key_package(suite, init_priv.public_key, cred_in, sig_priv)
+  , key_package(suite, init_priv.public_key, std::move(cred_in), sig_priv)
 {}
 
 PendingJoin
@@ -95,7 +95,7 @@ PendingJoin::Inner::create(CipherSuite suite,
                            SignaturePrivateKey sig_priv,
                            Credential cred)
 {
-  auto inner = std::make_unique<Inner>(suite, sig_priv, cred);
+  auto inner = std::make_unique<Inner>(suite, std::move(sig_priv), std::move(cred));
   return PendingJoin(inner.release());
 }
 
@@ -133,7 +133,8 @@ Session::Inner::begin(const bytes& group_id,
                       const SignaturePrivateKey& sig_priv,
                       const KeyPackage& key_package)
 {
-  auto state = State(group_id, key_package.cipher_suite, init_priv, sig_priv, key_package);
+  auto state =
+    State(group_id, key_package.cipher_suite, init_priv, sig_priv, key_package);
   auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }
@@ -316,7 +317,9 @@ Session::index() const
 }
 
 bytes
-Session::do_export(const std::string& label, const bytes& context, size_t size) const
+Session::do_export(const std::string& label,
+                   const bytes& context,
+                   size_t size) const
 {
   return inner->history.front().do_export(label, context, size);
 }
