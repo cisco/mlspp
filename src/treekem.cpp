@@ -61,6 +61,16 @@ OptionalNode::set_parent_hash(CipherSuite suite,
 ///
 
 TreeKEMPrivateKey
+TreeKEMPrivateKey::solo(CipherSuite suite,
+                        LeafIndex index,
+                        const HPKEPrivateKey& leaf_priv)
+{
+  auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
+  priv.private_key_cache.insert({ NodeIndex(index), leaf_priv });
+  return priv;
+}
+
+TreeKEMPrivateKey
 TreeKEMPrivateKey::create(CipherSuite suite,
                           LeafCount size,
                           LeafIndex index,
@@ -75,12 +85,12 @@ TreeKEMPrivateKey
 TreeKEMPrivateKey::joiner(CipherSuite suite,
                           LeafCount size,
                           LeafIndex index,
-                          const bytes& leaf_secret,
+                          const HPKEPrivateKey& leaf_priv,
                           NodeIndex intersect,
                           const std::optional<bytes>& path_secret)
 {
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
-  priv.path_secrets[NodeIndex(index)] = leaf_secret;
+  priv.private_key_cache.insert({ NodeIndex(index), leaf_priv });
   if (path_secret.has_value()) {
     priv.implant(intersect, size, path_secret.value());
   }
@@ -129,6 +139,14 @@ TreeKEMPrivateKey::private_key(NodeIndex n) const
   }
 
   return HPKEPrivateKey::derive(suite, i->second);
+}
+
+bool
+TreeKEMPrivateKey::have_private_key(NodeIndex n) const
+{
+  auto path_secret = path_secrets.find(n) != path_secrets.end();
+  auto cached_priv = private_key_cache.find(n) != private_key_cache.end();
+  return path_secret || cached_priv;
 }
 
 std::optional<HPKEPrivateKey>
@@ -200,7 +218,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   size_t resi = 0;
   NodeIndex res_overlap_node;
   for (resi = 0; resi < res.size(); resi++) {
-    if (path_secrets.find(res[resi]) != path_secrets.end()) {
+    if (have_private_key(res[resi])) {
       break;
     }
   }

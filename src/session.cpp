@@ -2,19 +2,15 @@
 #include "mls/common.h"
 #include "mls/state.h"
 
-#include <iostream> // XXX
-
 namespace mls {
 
-Session::InitInfo::InitInfo(bytes init_secret_in,
+Session::InitInfo::InitInfo(HPKEPrivateKey init_priv_in,
                             SignaturePrivateKey sig_priv_in,
                             KeyPackage key_package_in)
-  : init_secret(std::move(init_secret_in))
+  : init_priv(std::move(init_priv_in))
   , sig_priv(std::move(sig_priv_in))
   , key_package(std::move(key_package_in))
 {
-  auto init_priv =
-    HPKEPrivateKey::derive(key_package.cipher_suite, init_secret);
   if (init_priv.public_key != key_package.init_key) {
     throw InvalidParameterError("Init key mismatch");
   }
@@ -32,8 +28,7 @@ Session::Session()
 std::tuple<Session, bytes>
 Session::start(const bytes& group_id,
                const std::vector<InitInfo>& my_info,
-               const std::vector<KeyPackage>& key_packages,
-               const bytes& initial_secret)
+               const std::vector<KeyPackage>& key_packages)
 {
   // Negotiate a ciphersuite with the other party
   auto selected = false;
@@ -59,14 +54,15 @@ Session::start(const bytes& group_id,
   }
 
   const auto suite = my_selected_info->key_package.cipher_suite;
-  const auto& init_secret = my_selected_info->init_secret;
+  const auto& init_priv = my_selected_info->init_priv;
   const auto& sig_priv = my_selected_info->sig_priv;
   const auto& kp = my_selected_info->key_package;
 
-  auto init_state = State{ group_id, suite, init_secret, sig_priv, kp };
+  auto commit_secret = random_bytes(32); // XXX(RLB) stopgap until method removed
+  auto init_state = State{ group_id, suite, init_priv, sig_priv, kp };
   auto add = init_state.add(*other_selected_kp);
   init_state.handle(add);
-  auto [unused_commit, welcome, state] = init_state.commit(initial_secret);
+  auto [unused_commit, welcome, state] = init_state.commit(commit_secret);
   silence_unused(unused_commit);
 
   Session session;
@@ -87,7 +83,7 @@ Session::join(const std::vector<InitInfo>& my_info, const bytes& welcome_data)
     }
 
     session.add_state(
-      0, { info.init_secret, info.sig_priv, info.key_package, welcome });
+      0, { info.init_priv, info.sig_priv, info.key_package, welcome });
     return session;
   }
 
@@ -132,7 +128,6 @@ Session::commit()
   auto welcome_msg = tls::marshal(welcome);
 
   _outbound_cache = std::make_tuple(commit_msg, new_state);
-  std::cout << "[" << current_state().index().val << "] populated cache " << _outbound_cache.has_value() << std::endl;
   return std::make_tuple(welcome_msg, commit_msg);
 }
 
@@ -176,9 +171,9 @@ Session::handle(const bytes& handshake_data)
   }
 
   auto is_commit = std::holds_alternative<CommitData>(handshake.content);
-  if (is_commit && LeafIndex(handshake.sender.sender) == current_state().index()) {
+  if (is_commit &&
+      LeafIndex(handshake.sender.sender) == current_state().index()) {
     if (!_outbound_cache.has_value()) {
-  std::cout << "[" << current_state().index().val << "] Received from self without sending " << std::endl;
       throw ProtocolError("Received from self without sending");
     }
 

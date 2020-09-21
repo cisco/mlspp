@@ -12,11 +12,11 @@ class Session
 public:
   struct InitInfo
   {
-    bytes init_secret;
+    HPKEPrivateKey init_priv;
     SignaturePrivateKey sig_priv;
     KeyPackage key_package;
 
-    InitInfo(bytes init_secret_in,
+    InitInfo(HPKEPrivateKey init_priv_in,
              SignaturePrivateKey sig_priv_in,
              KeyPackage key_package);
   };
@@ -26,8 +26,7 @@ public:
   static std::tuple<Session, bytes> start(
     const bytes& group_id,
     const std::vector<InitInfo>& my_info,
-    const std::vector<KeyPackage>& key_packages,
-    const bytes& initial_secret);
+    const std::vector<KeyPackage>& key_packages);
   static Session join(const std::vector<InitInfo>& my_info,
                       const bytes& welcome);
 
@@ -56,7 +55,7 @@ protected:
   bytes export_message(const MLSPlaintext& plaintext);
   MLSPlaintext import_message(const bytes& encoded);
 
-  void make_init_key(const bytes& init_secret);
+  void make_init_key(const HPKEPrivateKey& init_priv);
   void add_state(epoch_t prior_epoch, const State& state);
   State& current_state();
   const State& current_state() const;

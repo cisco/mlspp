@@ -91,6 +91,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   const auto intersect = NodeIndex{ 3 };
   const auto random = random_bytes(32);
   const auto random2 = random_bytes(32);
+  const auto priv = HPKEPrivateKey::derive(suite, random);
 
   // create() populates the direct path
   auto priv_create = TreeKEMPrivateKey::create(suite, size, index, random);
@@ -106,9 +107,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
   auto priv_joiner =
-    TreeKEMPrivateKey::joiner(suite, size, index, random, intersect, random);
-  REQUIRE(priv_joiner.path_secrets.find(NodeIndex(4)) !=
-          priv_joiner.path_secrets.end());
+    TreeKEMPrivateKey::joiner(suite, size, index, priv, intersect, random);
+  REQUIRE(priv_joiner.private_key(NodeIndex(4)).has_value());
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(7)) !=
@@ -255,7 +255,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     // New joiner initializes their private key
     auto joiner_priv = TreeKEMPrivateKey::joiner(
-      suite, pub.size(), joiner, init_secret, overlap, path_secret);
+      suite, pub.size(), joiner, init_priv, overlap, path_secret);
     privs.push_back(joiner_priv);
     REQUIRE(privs[i + 1].consistent(privs[i]));
     REQUIRE(privs[i + 1].consistent(pub));

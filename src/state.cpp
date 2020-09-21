@@ -1,7 +1,5 @@
 #include "mls/state.h"
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -10,7 +8,7 @@ namespace mls {
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const bytes& init_secret,
+             const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& key_package)
   : _suite(suite)
@@ -25,12 +23,11 @@ State::State(bytes group_id,
 
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
-  _tree_priv =
-    TreeKEMPrivateKey::create(suite, _tree.size(), index, init_secret);
+  _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
 }
 
 // Initialize a group from a Welcome
-State::State(const bytes& init_secret,
+State::State(const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& kp,
              const Welcome& welcome)
@@ -49,7 +46,6 @@ State::State(const bytes& init_secret,
   }
 
   // Decrypt the GroupSecrets
-  auto init_priv = HPKEPrivateKey::derive(kp.cipher_suite, init_secret);
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
   auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
@@ -86,7 +82,7 @@ State::State(const bytes& init_secret,
   }
 
   _tree_priv = TreeKEMPrivateKey::joiner(
-    _suite, _tree.size(), _index, init_secret, ancestor, path_secret);
+    _suite, _tree.size(), _index, init_priv, ancestor, path_secret);
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());

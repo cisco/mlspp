@@ -54,6 +54,9 @@ struct TreeKEMPrivateKey
   std::map<NodeIndex, bytes> path_secrets;
   std::map<NodeIndex, HPKEPrivateKey> private_key_cache;
 
+  static TreeKEMPrivateKey solo(CipherSuite suite,
+                                LeafIndex index,
+                                const HPKEPrivateKey& leaf_priv);
   static TreeKEMPrivateKey create(CipherSuite suite,
                                   LeafCount size,
                                   LeafIndex index,
@@ -61,12 +64,14 @@ struct TreeKEMPrivateKey
   static TreeKEMPrivateKey joiner(CipherSuite suite,
                                   LeafCount size,
                                   LeafIndex index,
-                                  const bytes& leaf_secret,
+                                  const HPKEPrivateKey& leaf_secret,
                                   NodeIndex intersect,
                                   const std::optional<bytes>& path_secret);
 
   void set_leaf_secret(const bytes& secret);
   std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
+
+  bool have_private_key(NodeIndex n) const;
   std::optional<HPKEPrivateKey> private_key(NodeIndex n);
   std::optional<HPKEPrivateKey> private_key(NodeIndex n) const;
 

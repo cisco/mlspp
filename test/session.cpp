@@ -3,8 +3,6 @@
 #include <hpke/random.h>
 #include <mls/session.h>
 
-#include <iostream> // XXX
-
 using namespace mls;
 
 class SessionTest
@@ -19,6 +17,8 @@ protected:
   static const uint32_t no_except = 0xffffffff;
 
   std::vector<TestSession> sessions;
+
+  HPKEPrivateKey new_init_key() { return HPKEPrivateKey::generate(suite); }
 
   SignaturePrivateKey new_identity_key()
   {
@@ -48,27 +48,24 @@ protected:
 
   void broadcast_add(uint32_t from, uint32_t index)
   {
-    auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
-    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto init_priv = new_init_key();
     auto cred = Credential::basic(user_id, id_priv.public_key);
     auto key_package = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
-    auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
+    auto init_info = Session::InitInfo{ init_priv, id_priv, key_package };
 
     // Initial add is different
     if (sessions.empty()) {
-      auto my_init_secret = fresh_secret();
       auto my_id_priv = new_identity_key();
-      auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
+      auto my_init_priv = new_init_key();
       auto my_cred = Credential::basic(user_id, my_id_priv.public_key);
       auto my_key_package =
         KeyPackage{ suite, my_init_priv.public_key, my_cred, my_id_priv };
       auto my_info =
-        Session::InitInfo{ my_init_secret, my_id_priv, my_key_package };
+        Session::InitInfo{ my_init_priv, my_id_priv, my_key_package };
 
-      auto commit_secret = fresh_secret();
       auto [creator, welcome] =
-        Session::start(group_id, { my_info }, { key_package }, commit_secret);
+        Session::start(group_id, { my_info }, { key_package });
       auto joiner = Session::join({ init_info }, welcome);
       sessions.emplace_back(creator);
       sessions.emplace_back(joiner);
@@ -82,14 +79,6 @@ protected:
 
     auto [welcome, commit] = sessions[from].commit();
     broadcast(commit, index);
-
-    // XXX
-    auto commit_pt = tls::get<MLSPlaintext>(commit);
-    auto commit_data = std::get<CommitData>(commit_pt.content);
-    auto commit_content = commit_data.commit;
-    std::cout << "proposals.updates = " << commit_content.updates.size() << std::endl;
-    std::cout << "proposals.removes = " << commit_content.removes.size() << std::endl;
-    std::cout << "proposals.adds    = " << commit_content.adds.size() << std::endl;
 
     auto next = Session::join({ init_info }, welcome);
 
@@ -155,44 +144,38 @@ TEST_CASE_FIXTURE(SessionTest, "Full-Size Session Creation")
 TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
 {
   // Alice supports P-256 and X25519
-  auto idA = new_identity_key();
-  auto credA = Credential::basic(user_id, idA.public_key);
   std::vector<CipherSuite> ciphersA{
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
     { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
   };
   std::vector<KeyPackage> kpsA;
   std::vector<Session::InitInfo> infosA;
-  for (auto suiteA : ciphersA) {
-    auto init_secret = random_bytes(32);
-    auto init_priv = HPKEPrivateKey::derive(suiteA, init_secret);
-    auto kp = KeyPackage{ suiteA, init_priv.public_key, credA, idA };
-    auto info = Session::InitInfo{ init_secret, idA, kp };
-    kpsA.emplace_back(suiteA, init_priv.public_key, credA, idA);
-    infosA.emplace_back(init_secret, idA, kpsA.back());
+  for (auto suite : ciphersA) {
+    auto init_priv = HPKEPrivateKey::generate(suite);
+    auto id_priv = SignaturePrivateKey::generate(suite);
+    auto cred = Credential::basic(user_id, id_priv.public_key);
+    auto kp = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
+    kpsA.emplace_back(suite, init_priv.public_key, cred, id_priv);
+    infosA.emplace_back(init_priv, id_priv, kpsA.back());
   }
 
   // Bob supports P-256 and P-521
-  auto idB = new_identity_key();
-  auto credB = Credential::basic(user_id, idB.public_key);
   std::vector<CipherSuite> ciphersB{
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
     { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
   };
   std::vector<KeyPackage> kpsB;
   std::vector<Session::InitInfo> infosB;
-  for (auto suiteB : ciphersB) {
-    auto init_secret = random_bytes(32);
-    auto init_priv = HPKEPrivateKey::derive(suiteB, init_secret);
-    auto kp = KeyPackage{ suiteB, init_priv.public_key, credB, idB };
-    auto info = Session::InitInfo{ init_secret, idB, kp };
-    kpsB.emplace_back(suiteB, init_priv.public_key, credB, idB);
-    infosB.emplace_back(init_secret, idB, kpsB.back());
+  for (auto suite : ciphersB) {
+    auto init_priv = HPKEPrivateKey::generate(suite);
+    auto id_priv = SignaturePrivateKey::generate(suite);
+    auto cred = Credential::basic(user_id, id_priv.public_key);
+    auto kp = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
+    kpsB.emplace_back(suite, init_priv.public_key, cred, id_priv);
+    infosB.emplace_back(init_priv, id_priv, kpsB.back());
   }
 
-  auto init_secret = fresh_secret();
-  auto session_welcome_add =
-    Session::start({ 0, 1, 2, 3 }, infosA, kpsB, init_secret);
+  auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, infosA, kpsB);
   TestSession alice = std::get<0>(session_welcome_add);
   TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
   REQUIRE(alice == bob);
@@ -283,7 +266,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
     sessions.pop_back();
     auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
-    auto [_welcome, commit] = sessions[i-1].commit();
+    auto [_welcome, commit] = sessions[i - 1].commit();
     broadcast(commit);
     check(initial_epoch);
   }
