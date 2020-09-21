@@ -51,36 +51,26 @@ protected:
     auto id_priv = new_identity_key();
     auto init_priv = new_init_key();
     auto cred = Credential::basic(user_id, id_priv.public_key);
-    auto key_package = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
-    auto init_info = Session::InitInfo{ init_priv, id_priv, key_package };
+    auto client = Client(suite, id_priv, cred);
 
     // Initial add is different
     if (sessions.empty()) {
-      auto my_id_priv = new_identity_key();
-      auto my_init_priv = new_init_key();
-      auto my_cred = Credential::basic(user_id, my_id_priv.public_key);
-      auto my_key_package =
-        KeyPackage{ suite, my_init_priv.public_key, my_cred, my_id_priv };
-      auto my_info =
-        Session::InitInfo{ my_init_priv, my_id_priv, my_key_package };
-
-      auto [creator, welcome] =
-        Session::start(group_id, { my_info }, { key_package });
-      auto joiner = Session::join({ init_info }, welcome);
+      auto creator = client.begin_session(group_id);
       sessions.emplace_back(creator);
-      sessions.emplace_back(joiner);
       return;
     }
 
     auto initial_epoch = sessions[0].current_epoch();
 
-    auto add = sessions[from].add(key_package);
+    auto join = client.start_join();
+
+    auto add = sessions[from].add(join.key_package());
     broadcast(add, index);
 
     auto [welcome, commit] = sessions[from].commit();
     broadcast(commit, index);
 
-    auto next = Session::join({ init_info }, welcome);
+    auto next = join.complete(welcome);
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
@@ -141,54 +131,12 @@ TEST_CASE_FIXTURE(SessionTest, "Full-Size Session Creation")
   }
 }
 
-TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
-{
-  // Alice supports P-256 and X25519
-  std::vector<CipherSuite> ciphersA{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
-  };
-  std::vector<KeyPackage> kpsA;
-  std::vector<Session::InitInfo> infosA;
-  for (auto suite : ciphersA) {
-    auto init_priv = HPKEPrivateKey::generate(suite);
-    auto id_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic(user_id, id_priv.public_key);
-    auto kp = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
-    kpsA.emplace_back(suite, init_priv.public_key, cred, id_priv);
-    infosA.emplace_back(init_priv, id_priv, kpsA.back());
-  }
-
-  // Bob supports P-256 and P-521
-  std::vector<CipherSuite> ciphersB{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
-  };
-  std::vector<KeyPackage> kpsB;
-  std::vector<Session::InitInfo> infosB;
-  for (auto suite : ciphersB) {
-    auto init_priv = HPKEPrivateKey::generate(suite);
-    auto id_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic(user_id, id_priv.public_key);
-    auto kp = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
-    kpsB.emplace_back(suite, init_priv.public_key, cred, id_priv);
-    infosB.emplace_back(init_priv, id_priv, kpsB.back());
-  }
-
-  auto session_welcome_add = Session::start({ 0, 1, 2, 3 }, infosA, kpsB);
-  TestSession alice = std::get<0>(session_welcome_add);
-  TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
-  REQUIRE(alice == bob);
-  REQUIRE(alice.cipher_suite().id ==
-          CipherSuite::ID::P256_AES128GCM_SHA256_P256);
-}
-
 class RunningSessionTest : public SessionTest
 {
 protected:
   RunningSessionTest()
   {
-    for (int i = 0; i < group_size - 1; i += 1) {
+    for (int i = 0; i < group_size; i += 1) {
       broadcast_add();
     }
   }

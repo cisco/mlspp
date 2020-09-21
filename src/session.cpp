@@ -4,90 +4,84 @@
 
 namespace mls {
 
-Session::InitInfo::InitInfo(HPKEPrivateKey init_priv_in,
-                            SignaturePrivateKey sig_priv_in,
-                            KeyPackage key_package_in)
-  : init_priv(std::move(init_priv_in))
-  , sig_priv(std::move(sig_priv_in))
-  , key_package(std::move(key_package_in))
-{
-  if (init_priv.public_key != key_package.init_key) {
-    throw InvalidParameterError("Init key mismatch");
-  }
+///
+/// Client
+///
 
-  if (sig_priv.public_key != key_package.credential.public_key()) {
-    throw InvalidParameterError("Signature key mismatch");
-  }
+Client::Client(CipherSuite suite_in, SignaturePrivateKey sig_priv_in, Credential cred_in)
+  : suite(suite_in)
+  , sig_priv(std::move(sig_priv_in))
+  , cred(std::move(cred_in))
+{}
+
+Session
+Client::begin_session(const bytes& group_id) const
+{
+  auto init_priv = HPKEPrivateKey::generate(suite);
+  auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
+  return Session::begin(group_id, init_priv, sig_priv, kp);
 }
+
+PendingJoin
+Client::start_join() const
+{
+  return PendingJoin(suite, sig_priv, cred);
+}
+
+///
+/// PendingJoin
+///
+
+PendingJoin::PendingJoin(CipherSuite suite_in, SignaturePrivateKey sig_priv_in, Credential cred_in)
+  : suite(suite_in)
+  , init_priv(HPKEPrivateKey::generate(suite))
+  , sig_priv(std::move(sig_priv_in))
+  , key_package_inner(suite, init_priv.public_key, cred_in, sig_priv)
+{}
+
+bytes
+PendingJoin::key_package() const
+{
+  return tls::marshal(key_package_inner);
+}
+
+Session
+PendingJoin::complete(const bytes& welcome) const
+{
+  return Session::join(init_priv, sig_priv, key_package_inner, welcome);
+}
+
+///
+/// Session
+///
 
 Session::Session()
   : _current_epoch(0)
   , _encrypt_handshake(false)
 {}
 
-std::tuple<Session, bytes>
-Session::start(const bytes& group_id,
-               const std::vector<InitInfo>& my_info,
-               const std::vector<KeyPackage>& key_packages)
+Session
+Session::begin(const bytes& group_id,
+               const HPKEPrivateKey& init_priv,
+               const SignaturePrivateKey& sig_priv,
+               const KeyPackage& key_package)
 {
-  // Negotiate a ciphersuite with the other party
-  auto selected = false;
-  const InitInfo* my_selected_info = nullptr;
-  const KeyPackage* other_selected_kp = nullptr;
-  for (const auto& info : my_info) {
-    for (const auto& other_kp : key_packages) {
-      if (info.key_package.cipher_suite == other_kp.cipher_suite) {
-        selected = true;
-        my_selected_info = &info;
-        other_selected_kp = &other_kp;
-        break;
-      }
-    }
-
-    if (selected) {
-      break;
-    }
-  }
-
-  if (!selected) {
-    throw ProtocolError("Negotiation failure");
-  }
-
-  const auto suite = my_selected_info->key_package.cipher_suite;
-  const auto& init_priv = my_selected_info->init_priv;
-  const auto& sig_priv = my_selected_info->sig_priv;
-  const auto& kp = my_selected_info->key_package;
-
-  auto commit_secret = random_bytes(32); // XXX(RLB) stopgap until method removed
-  auto init_state = State{ group_id, suite, init_priv, sig_priv, kp };
-  auto add = init_state.add(*other_selected_kp);
-  init_state.handle(add);
-  auto [unused_commit, welcome, state] = init_state.commit(commit_secret);
-  silence_unused(unused_commit);
-
   Session session;
-  session.add_state(0, state);
-  return std::make_tuple(session, tls::marshal(welcome));
+  session.add_state(0, { group_id, key_package.cipher_suite, init_priv, sig_priv, key_package });
+  return session;
 }
 
 Session
-Session::join(const std::vector<InitInfo>& my_info, const bytes& welcome_data)
+Session::join(const HPKEPrivateKey& init_priv,
+              const SignaturePrivateKey& sig_priv,
+              const KeyPackage& key_package,
+              const bytes& welcome_data)
 {
   auto welcome = tls::get<Welcome>(welcome_data);
 
   Session session;
-  for (const auto& info : my_info) {
-    auto maybe_kpi = welcome.find(info.key_package);
-    if (!maybe_kpi.has_value()) {
-      continue;
-    }
-
-    session.add_state(
-      0, { info.init_priv, info.sig_priv, info.key_package, welcome });
-    return session;
-  }
-
-  throw InvalidParameterError("No matching KeyPackage found");
+  session.add_state(0, { init_priv, sig_priv, key_package, welcome });
+  return session;
 }
 
 void
@@ -97,8 +91,9 @@ Session::encrypt_handshake(bool enabled)
 }
 
 bytes
-Session::add(const KeyPackage& key_package)
+Session::add(const bytes& key_package_data)
 {
+  auto key_package = tls::get<KeyPackage>(key_package_data);
   auto proposal = current_state().add(key_package);
   return export_message(proposal);
 }
@@ -183,7 +178,7 @@ Session::handle(const bytes& handshake_data)
       throw ProtocolError("Received message different from cached");
     }
 
-    add_state(current_state().epoch(), next_state);
+    add_state(handshake.epoch, next_state);
     _outbound_cache = std::nullopt;
     return true;
   }
