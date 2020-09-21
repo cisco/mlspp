@@ -97,24 +97,35 @@ Session::encrypt_handshake(bool enabled)
 }
 
 std::tuple<Welcome, bytes>
-Session::add(const bytes& add_secret, const KeyPackage& key_package)
+Session::add(const KeyPackage& key_package)
 {
+  const auto add_secret = fresh_secret();
   auto proposal = current_state().add(key_package);
   return commit_and_cache(add_secret, proposal);
 }
 
 bytes
-Session::update(const bytes& leaf_secret)
+Session::update()
 {
+  const auto leaf_secret = fresh_secret();
   auto proposal = current_state().update(leaf_secret);
   return std::get<1>(commit_and_cache(leaf_secret, proposal));
 }
 
 bytes
-Session::remove(const bytes& evict_secret, uint32_t index)
+Session::remove(uint32_t index)
 {
+  const auto evict_secret = fresh_secret();
   auto proposal = current_state().remove(LeafIndex{ index });
   return std::get<1>(commit_and_cache(evict_secret, proposal));
+}
+
+bytes
+Session::fresh_secret() const
+{
+  const auto suite = current_state().cipher_suite();
+  const auto secret_size = suite.get().hpke.kdf.hash_size();
+  return random_bytes(secret_size);
 }
 
 std::tuple<Welcome, bytes>

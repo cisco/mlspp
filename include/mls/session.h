@@ -33,10 +33,9 @@ public:
 
   void encrypt_handshake(bool enabled);
 
-  std::tuple<Welcome, bytes> add(const bytes& add_secret,
-                                 const KeyPackage& key_package);
-  bytes update(const bytes& leaf_secret);
-  bytes remove(const bytes& evict_secret, uint32_t index);
+  std::tuple<Welcome, bytes> add(const KeyPackage& key_package);
+  bytes update();
+  bytes remove(uint32_t index);
 
   void handle(const bytes& handshake_data);
 
@@ -52,6 +51,7 @@ protected:
 
   Session();
 
+  bytes fresh_secret() const;
   std::tuple<Welcome, bytes> commit_and_cache(const bytes& secret,
                                               const MLSPlaintext& proposal);
   void make_init_key(const bytes& init_secret);

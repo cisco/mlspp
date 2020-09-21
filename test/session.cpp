@@ -77,8 +77,7 @@ protected:
 
     auto initial_epoch = sessions[0].current_epoch();
 
-    auto add_secret = fresh_secret();
-    auto [welcome, add] = sessions[from].add(add_secret, key_package);
+    auto [welcome, add] = sessions[from].add(key_package);
     auto next = Session::join({ init_info }, welcome);
     broadcast(add, index);
 
@@ -204,8 +203,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update_secret = fresh_secret();
-    auto update = sessions[i].update(update_secret);
+    auto update = sessions[i].update();
     broadcast(update);
     check(initial_epoch);
   }
@@ -216,7 +214,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
     auto evict_secret = fresh_secret();
-    auto remove = sessions[i - 1].remove(evict_secret, i);
+    auto remove = sessions[i - 1].remove(i);
     sessions.pop_back();
     broadcast(remove);
     check(initial_epoch);
@@ -230,8 +228,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
 
     // Remove target
     auto initial_epoch = sessions[i].current_epoch();
-    auto evict_secret = fresh_secret();
-    auto remove = sessions[i].remove(evict_secret, target);
+    auto remove = sessions[i].remove(target);
     broadcast(remove, target);
     check(initial_epoch, target);
 
@@ -249,8 +246,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
   // 2. Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update_secret = fresh_secret();
-    auto update = sessions[i].update(update_secret);
+    auto update = sessions[i].update();
     broadcast(update);
     check(initial_epoch);
   }
@@ -258,8 +254,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
   // 3. Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto evict_secret = fresh_secret();
-    auto remove = sessions[i - 1].remove(evict_secret, i);
+    auto remove = sessions[i - 1].remove(i);
     sessions.pop_back();
     broadcast(remove);
     check(initial_epoch);
