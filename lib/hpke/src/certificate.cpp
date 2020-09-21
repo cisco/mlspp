@@ -11,7 +11,7 @@ namespace hpke {
 struct Certificate::ParsedCertificate
 {
 
-  static X509* parse(const bytes& der)
+  static std::unique_ptr<Certificate::ParsedCertificate> parse(const bytes& der)
   {
     const unsigned char* buf = der.data();
     auto* cert = d2i_X509(nullptr, &buf, der.size());
@@ -19,11 +19,11 @@ struct Certificate::ParsedCertificate
       throw openssl_error();
     }
 
-    return cert;
+    return  std::make_unique<Certificate::ParsedCertificate>(cert);
   }
 
-  explicit ParsedCertificate(const bytes& der_in)
-    : openssl_cert(parse(der_in), typed_delete<X509>)
+  explicit ParsedCertificate(X509* native)
+    : openssl_cert(native, typed_delete<X509>)
   {}
 
 	ParsedCertificate(const ParsedCertificate& other)
@@ -71,14 +71,14 @@ struct Certificate::ParsedCertificate
 ///
 
 Certificate::Certificate(const bytes& der)
-  : parsed_cert(std::make_unique<ParsedCertificate>(der))
+  : parsed_cert(ParsedCertificate::parse(der))
   , public_key_algorithm(parsed_cert->signature_algorithm())
   , public_key(parsed_cert->public_key())
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
-  : parsed_cert(std::make_unique<ParsedCertificate>(other.raw))
+  : parsed_cert(ParsedCertificate::parse(other.raw))
   , public_key_algorithm(parsed_cert->signature_algorithm())
   , public_key(parsed_cert->public_key())
   , raw(other.raw)

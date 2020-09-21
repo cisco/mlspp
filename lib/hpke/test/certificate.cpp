@@ -28,12 +28,8 @@ read_file(const std::string& filename)
   return lines;
 }
 
-TEST_CASE("Certificate Known-Answer depth 1")
+TEST_CASE("Certificate Known-Answer depth 2")
 {
-  // TODO Take a known hex-encoded certs in a chain
-  //      ... instantiate them as Certificate objects
-  //      ... verify that they agree that they're in a sequence
-  // TODO Add a Go script under /scripts/ to generate test data
   // TODO Do this for each supported signature algorithm
   //      ... maybe including a case where parent and child have different
   //      algorithms
