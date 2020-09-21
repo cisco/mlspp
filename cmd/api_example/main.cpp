@@ -66,10 +66,7 @@ main() // NOLINT(bugprone-exception-escape)
   // Alice adds Bob and Charlie to the session
   auto add_bob = alice_session.add(bob_join.key_package());
   auto add_charlie = alice_session.add(charlie_join.key_package());
-
-  alice_session.handle(add_bob);
-  alice_session.handle(add_charlie);
-  auto [welcome, commit] = alice_session.commit();
+  auto [welcome, commit] = alice_session.commit({add_bob, add_charlie});
   alice_session.handle(commit);
 
   // Bob and Charlie initialize their sessions
@@ -84,9 +81,7 @@ main() // NOLINT(bugprone-exception-escape)
 
   // Bob updates his key
   auto update = bob_session.update();
-  bob_session.handle(update);
-
-  auto [_1, update_commit] = bob_session.commit();
+  auto [_1, update_commit] = bob_session.commit({update});
   bob_session.handle(update_commit);
 
   // Everyone else processes the update and commit
@@ -103,9 +98,7 @@ main() // NOLINT(bugprone-exception-escape)
 
   // Charlie removes Bob
   auto remove = charlie_session.remove(1);
-  charlie_session.handle(remove);
-
-  auto [_2, remove_commit] = charlie_session.commit();
+  auto [_2, remove_commit] = charlie_session.commit({remove});
   charlie_session.handle(remove_commit);
 
   // Alice and Charlie process the message (Bob is gone)

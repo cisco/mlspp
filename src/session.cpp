@@ -256,6 +256,28 @@ Session::remove(uint32_t index)
 }
 
 std::tuple<bytes, bytes>
+Session::commit(const bytes& proposal)
+{
+  return commit(std::vector<bytes>{proposal});
+}
+
+std::tuple<bytes, bytes>
+Session::commit(const std::vector<bytes>& proposals)
+{
+  for (const auto& proposal_data : proposals) {
+    const auto proposal = inner->import_message(proposal_data);
+    auto is_proposal = std::holds_alternative<Proposal>(proposal.content);
+    if (!is_proposal) {
+      throw ProtocolError("Only proposals can be committed");
+    }
+
+    inner->history.front().handle(proposal);
+  }
+
+  return commit();
+}
+
+std::tuple<bytes, bytes>
 Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
