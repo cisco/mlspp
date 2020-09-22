@@ -157,8 +157,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
     auto update = sessions[i].update();
     broadcast(update);
 
-    auto [_welcome, commit] = sessions[i].commit();
-    broadcast(commit);
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit));
 
     check(initial_epoch);
   }
@@ -174,8 +174,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
     auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
 
-    auto [_welcome, commit] = sessions[i - 1].commit();
-    broadcast(commit);
+    auto welcome_commit = sessions[i - 1].commit();
+    broadcast(std::get<1>(welcome_commit));
 
     check(initial_epoch);
   }
@@ -210,8 +210,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
     auto initial_epoch = sessions[0].current_epoch();
     auto update = sessions[i].update();
     broadcast(update);
-    auto [_welcome, commit] = sessions[i].commit();
-    broadcast(commit);
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit));
     check(initial_epoch);
   }
 
@@ -221,8 +221,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
     sessions.pop_back();
     auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
-    auto [_welcome, commit] = sessions[i - 1].commit();
-    broadcast(commit);
+    auto welcome_commit = sessions[i - 1].commit();
+    broadcast(std::get<1>(welcome_commit));
     check(initial_epoch);
   }
 }
