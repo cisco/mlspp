@@ -139,6 +139,6 @@ main() // NOLINT(bugprone-exception-escape)
 
   verify("remove A->C", sessionA, sessionC);
 
-  std::cout << "ok" << std::endl;
+  std::cout << "ok, all good" << std::endl;
   return 0;
 }
