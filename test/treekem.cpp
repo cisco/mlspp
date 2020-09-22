@@ -17,15 +17,14 @@ protected:
     : tv(TestLoader<TreeKEMTestVectors>::get())
   {}
 
-  std::tuple<bytes, HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
+  std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
   new_key_package()
   {
-    auto init_secret = random_bytes(32);
-    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto init_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
     auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
-    return std::make_tuple(init_secret, init_priv, sig_priv, kp);
+    return std::make_tuple(init_priv, sig_priv, kp);
   }
 };
 
@@ -50,8 +49,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
   auto parent = Node{ ParentNode{ parent_priv.public_key, {}, {} } };
   REQUIRE(parent.public_key() == parent_priv.public_key);
 
-  auto [leaf_secret, leaf_priv, sig_priv, kp] = new_key_package();
-  silence_unused(leaf_secret);
+  auto [leaf_priv, sig_priv, kp] = new_key_package();
   silence_unused(sig_priv);
 
   auto leaf = Node{ kp };
@@ -60,8 +58,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
 
 TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
 {
-  const auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
-  silence_unused(init_secret);
+  const auto [init_priv, sig_priv, kp] = new_key_package();
   silence_unused(sig_priv);
 
   auto node_index = NodeIndex{ 7 };
@@ -154,15 +151,11 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
     // Construct a key package and a direct path
-    auto [init_secret_add, init_priv_add, sig_priv_add, kp_add] =
-      new_key_package();
-    silence_unused(init_secret_add);
+    auto [init_priv_add, sig_priv_add, kp_add] = new_key_package();
     silence_unused(init_priv_add);
     silence_unused(sig_priv_add);
 
-    auto [init_secret_path, init_priv_path, sig_priv_path, kp_path] =
-      new_key_package();
-    silence_unused(init_secret_path);
+    auto [init_priv_path, sig_priv_path, kp_path] = new_key_package();
     silence_unused(init_priv_path);
     silence_unused(sig_priv_path);
 
@@ -217,15 +210,14 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
   auto sig_privs = std::vector<SignaturePrivateKey>{};
 
   // Add the first member
-  auto [init_secret_0, init_priv_0, sig_priv_0, kp0] = new_key_package();
-  silence_unused(init_priv_0);
+  auto [init_priv_0, sig_priv_0, kp0] = new_key_package();
   sig_privs.push_back(sig_priv_0);
 
   auto index_0 = pub.add_leaf(kp0);
   REQUIRE(index_0 == LeafIndex{ 0 });
 
   auto priv =
-    TreeKEMPrivateKey::create(suite, pub.size(), index_0, init_secret_0);
+    TreeKEMPrivateKey::solo(suite, index_0, init_priv_0);
   privs.push_back(priv);
   REQUIRE(priv.consistent(pub));
 
@@ -233,7 +225,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto adder = LeafIndex{ i };
     auto joiner = LeafIndex{ i + 1 };
     auto context = bytes{ uint8_t(i) };
-    auto [init_secret, init_priv, sig_priv, kp] = new_key_package();
+    auto [init_priv, sig_priv, kp] = new_key_package();
     silence_unused(init_priv);
     sig_privs.push_back(sig_priv);
 
