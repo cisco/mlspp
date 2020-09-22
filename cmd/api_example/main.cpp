@@ -82,6 +82,7 @@ main() // NOLINT(bugprone-exception-escape)
   // Bob updates his key
   auto update = bob_session.update();
   auto [_1, update_commit] = bob_session.commit({update});
+  silence_unused(_1);
   bob_session.handle(update_commit);
 
   // Everyone else processes the update and commit
@@ -99,6 +100,7 @@ main() // NOLINT(bugprone-exception-escape)
   // Charlie removes Bob
   auto remove = charlie_session.remove(1);
   auto [_2, remove_commit] = charlie_session.commit({remove});
+  silence_unused(_2);
   charlie_session.handle(remove_commit);
 
   // Alice and Charlie process the message (Bob is gone)
