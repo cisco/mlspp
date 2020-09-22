@@ -26,6 +26,7 @@ jobs:
     - name: dependencies (ubuntu and macos)
       if: ${{ matrix.os == 'macos-latest'}}
       run: |
+        sudo chown -R $(whoami) $(brew --prefix)/*
         brew cleanup
         brew install pkgconfig doctest
         brew reinstall openssl@1.1
