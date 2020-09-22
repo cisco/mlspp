@@ -27,6 +27,7 @@ jobs:
       if: ${{ matrix.os == 'macos-latest'}}
       run: |
         ls -alh /usr/local/Cellar/openssl
+        brew uninstall openssl
         brew cleanup
         brew install pkgconfig doctest
         brew reinstall openssl@1.1
