@@ -19,14 +19,14 @@ struct Certificate::ParsedCertificate
       throw openssl_error();
     }
 
-    return  std::make_unique<Certificate::ParsedCertificate>(cert);
+    return std::make_unique<Certificate::ParsedCertificate>(cert);
   }
 
   explicit ParsedCertificate(X509* native)
     : openssl_cert(native, typed_delete<X509>)
   {}
 
-	ParsedCertificate(const ParsedCertificate& other)
+  ParsedCertificate(const ParsedCertificate& other)
     : openssl_cert(make_typed_unique<X509>(other.openssl_cert.get()))
   {}
 
@@ -60,7 +60,7 @@ struct Certificate::ParsedCertificate
       throw openssl_error();
     }
 
-    return X509Signature::PublicKey{pkey};
+    return X509Signature::PublicKey{ pkey };
   }
 
   typed_unique_ptr<X509> openssl_cert;

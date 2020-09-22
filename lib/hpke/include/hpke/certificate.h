@@ -17,21 +17,22 @@ private:
   std::unique_ptr<ParsedCertificate> parsed_cert;
 
 public:
-	struct X509Signature {
-		enum struct ID : uint16_t
-		{
-			unknown = 0x0000,
-			Ed25519 = 0x0001,
-			Ed448 = 0x0002,
-		};
+  struct X509Signature
+  {
+    enum struct ID : uint16_t
+    {
+      unknown = 0x0000,
+      Ed25519 = 0x0001,
+      Ed448 = 0x0002,
+    };
 
-		struct PublicKey {
-			bytes data;
-		};
-	};
+    struct PublicKey
+    {
+      bytes data;
+    };
+  };
 
-
-	Certificate() = delete;
+  Certificate() = delete;
   explicit Certificate(const bytes& der);
   Certificate(const Certificate& other);
   Certificate& operator=(const Certificate& other);

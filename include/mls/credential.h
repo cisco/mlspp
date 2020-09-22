@@ -45,8 +45,8 @@ struct X509Credential
 
   explicit X509Credential(const std::vector<bytes>& der_chain_in);
 
-	std::vector<bytes> der_chain;
-	SignaturePublicKey public_key;
+  std::vector<bytes> der_chain;
+  SignaturePublicKey public_key;
 
   static const CredentialType type;
 };
