@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [macos-latest]
       fail-fast: false
     
     steps:
@@ -26,8 +26,7 @@ jobs:
     - name: dependencies (ubuntu and macos)
       if: ${{ matrix.os == 'macos-latest'}}
       run: |
-        brew update
-        brew install pkgconfig doctest
+        brew reinstall pkgconfig doctest
         brew reinstall openssl@1.1
 
     - name: configure to use clang-tidy
