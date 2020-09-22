@@ -26,6 +26,7 @@ jobs:
     - name: dependencies (ubuntu and macos)
       if: ${{ matrix.os == 'macos-latest' || matrix.os == 'ubuntu-latest' }}
       run: |
+        brew uninstall openssl
         brew install pkgconfig doctest
         brew reinstall openssl@1.1
 
