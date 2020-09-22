@@ -26,7 +26,8 @@ jobs:
     - name: dependencies (ubuntu and macos)
       if: ${{ matrix.os == 'macos-latest'}}
       run: |
-        brew reinstall pkgconfig doctest
+        brew cleanup
+        brew install pkgconfig doctest
         brew reinstall openssl@1.1
 
     - name: configure to use clang-tidy
