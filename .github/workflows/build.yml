@@ -28,7 +28,7 @@ jobs:
       run: |
         brew uninstall openssl
         brew install pkgconfig doctest
-        brew install openssl@1.1
+        brew reinstall openssl@1.1
   
     - name: dependencies (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
