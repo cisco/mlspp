@@ -125,7 +125,7 @@ PendingJoin::complete(const bytes& welcome) const
 
 Session::Inner::Inner(State state)
   : history{ std::move(state) }
-  , encrypt_handshake(false)
+  , encrypt_handshake(true)
 {}
 
 Session
