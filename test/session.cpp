@@ -190,8 +190,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
     auto initial_epoch = sessions[i].current_epoch();
     auto remove = sessions[i].remove(target);
     broadcast(remove, target);
-    auto [_welcome, commit] = sessions[i].commit();
-    broadcast(commit, target);
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit), target);
     check(initial_epoch, target);
 
     // Re-add at target
