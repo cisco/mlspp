@@ -26,10 +26,9 @@ struct Certificate::ParsedCertificate
     : openssl_cert(native, typed_delete<X509>)
   {}
 
-  ParsedCertificate(const ParsedCertificate& other)
-    : openssl_cert(make_typed_unique<X509>(other.openssl_cert.get()))
-  {}
-
+	ParsedCertificate(const Certificate::ParsedCertificate&) = delete;
+  Certificate::ParsedCertificate& operator=(const Certificate::ParsedCertificate&) = delete;
+  
   X509Signature::ID signature_algorithm() const
   {
     int algo_nid = X509_get_signature_nid(openssl_cert.get());
@@ -76,31 +75,6 @@ Certificate::Certificate(const bytes& der)
   , public_key(parsed_cert->public_key())
   , raw(der)
 {}
-
-Certificate::Certificate(const Certificate& other)
-  : parsed_cert(ParsedCertificate::parse(other.raw))
-  , public_key_algorithm(parsed_cert->signature_algorithm())
-  , public_key(parsed_cert->public_key())
-  , raw(other.raw)
-{}
-
-Certificate::Certificate(Certificate&& other) noexcept
-  : parsed_cert(std::move(other.parsed_cert))
-  , public_key_algorithm(other.public_key_algorithm)
-  , public_key(other.public_key)
-{}
-
-Certificate&
-Certificate::operator=(const Certificate& other)
-{
-  if (this == &other) {
-    return *this;
-  }
-
-  // not much to do here since we have unique_ptr
-  // and defining an assignment is not a good idea.
-  return *this;
-}
 
 Certificate::~Certificate() = default;
 

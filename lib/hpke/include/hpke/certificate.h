@@ -32,14 +32,14 @@ public:
     };
   };
 
-  Certificate() = delete;
-  explicit Certificate(const bytes& der);
-  Certificate(const Certificate& other);
-  Certificate& operator=(const Certificate& other);
-  Certificate(Certificate&& other) noexcept;
-  ~Certificate();
+	explicit Certificate(const bytes& der);
+	~Certificate();
 
-  // TODO not supported yet.
+	Certificate() = delete;
+  Certificate& operator=(const Certificate*) = delete;
+	Certificate(const Certificate& other) = delete;
+
+  // TODO(Suhas) not supported yet.
   // bool valid_from(const Certificate& parent);
 
   const X509Signature::ID public_key_algorithm;

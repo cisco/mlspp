@@ -1,6 +1,5 @@
 #pragma once
 
-#include "hpke/certificate.h"
 #include "mls/common.h"
 #include "mls/crypto.h"
 
@@ -41,22 +40,31 @@ struct BasicCredential
 
 struct X509Credential
 {
+	struct CertData
+	{
+		CertData() {}
+
+		CertData(const bytes& der_in)
+		  : der(std::move(der_in))
+		{}
+
+		bytes der;
+		TLS_SERIALIZABLE(der);
+		TLS_TRAITS(tls::vector<2>)
+	};
+
   X509Credential() {}
 
-  explicit X509Credential(const std::vector<bytes>& der_chain_in);
+  explicit X509Credential(const std::vector<CertData>& der_chain_in);
 
-  std::vector<bytes> der_chain;
+  std::vector<CertData> der_chain;
   SignaturePublicKey public_key;
 
-  static const CredentialType type;
+	TLS_SERIALIZABLE(der_chain, public_key)
+	TLS_TRAITS(tls::vector<4>, tls::pass)
+
+	static const CredentialType type;
 };
-
-// custom marshal/unmarshal operations
-tls::ostream&
-operator<<(tls::ostream& str, const X509Credential& obj);
-
-tls::istream&
-operator>>(tls::istream& str, X509Credential& obj);
 
 // struct {
 //     CredentialType credential_type;
@@ -78,7 +86,7 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  static Credential x509(const std::vector<bytes>& der_chain);
+  static Credential x509(const std::vector<X509Credential::CertData>& der_chain);
 
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)

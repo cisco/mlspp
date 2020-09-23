@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/hex"
 	"math/big"
 	"time"
 	"fmt"
@@ -38,7 +37,7 @@ func newEd25519() ed25519.PrivateKey {
   return priv
 }
 
-func makeCert(template, parent *x509.Certificate, parentPriv crypto.Signer, addSKI bool) (crypto.Signer, *x509.Certificate, string) {
+func makeCert(template, parent *x509.Certificate, parentPriv crypto.Signer, addSKI bool) (crypto.Signer, *x509.Certificate, []byte) {
   backdate := time.Hour
   lifetime := 24 * time.Hour
   skiSize := 4 // bytes
@@ -72,49 +71,51 @@ func makeCert(template, parent *x509.Certificate, parentPriv crypto.Signer, addS
   chk(err)
 
   // generate hex version for file storage
-  certHex := make([]byte, hex.EncodedLen(len(certData)))
-  hex.Encode(certHex, certData)
+  //certHex := make([]byte, hex.EncodedLen(len(certData)))
+  // hex.Encode(certHex, certData)
 
   cert, err := x509.ParseCertificate(certData)
   chk(err)
 
-  return priv, cert, string(certHex)
+  return priv, cert, certData
 }
 
-
-func makeCertChain(rootPriv crypto.Signer, depth int, addSKI bool) ([]byte, string, []*x509.Certificate,  []string) {
+func makeCertChain(rootPriv crypto.Signer, depth int, addSKI bool) ([]byte, []byte, []*x509.Certificate, [][]byte) {
   chain := make([]*x509.Certificate, depth)
-  chainHex  := make([]string, depth)
+  chainRaw  := make([][]byte, depth)
 
-  _, rootCert, rootHex := makeCert(caTemplate, nil, rootPriv, addSKI)
+  _, rootCert, rootCertRaw := makeCert(caTemplate, nil, rootPriv, addSKI)
 
   currPriv := rootPriv
   cert := rootCert
-  certHex := rootHex
+  certRaw := rootCertRaw
   for i := depth - 1; i > 0; i-- {
-    currPriv, cert, certHex = makeCert(caTemplate, cert, currPriv, addSKI)
+    currPriv, cert, certRaw = makeCert(caTemplate, cert, currPriv, addSKI)
     chain[i] = cert
-    chainHex[i] = certHex
+    chainRaw[i] = certRaw
   }
 
-  currPriv, cert, certHex = makeCert(leafTemplate, cert, currPriv, addSKI)
+  currPriv, cert, certRaw = makeCert(leafTemplate, cert, currPriv, addSKI)
   chain[0] = cert
-  chainHex[0] = certHex
+  chainRaw[0] = certRaw
 
-  return currPriv.(ed25519.PrivateKey), rootHex, chain, chainHex
+  return currPriv.(ed25519.PrivateKey), rootCertRaw, chain, chainRaw
 }
 
 func main() {
   depth := 2
   rootPriv := newEd25519()
-  fmt.Printf("Root Priv Key %x\n", rootPriv)
+  myPriv, rootCertRaw, _, chainRaw := makeCertChain(rootPriv, depth, false)
 
-  myPriv, rootCertHex, _, chainHex := makeCertChain(rootPriv, depth, false)
-  fmt.Printf("\nRoot Certificate %s\n", rootCertHex)
-  fmt.Printf("\nMyPriv %x\n", myPriv)
-  for _, c := range chainHex {
-    fmt.Printf("\n\t --- Begin Certificate ---- \n")
-    fmt.Printf("%s", c)
-    fmt.Printf("\n\t --- End Certificate ---- \n")
+  fmt.Printf("{\n")
+  fmt.Printf("  root_priv,\n")
+  fmt.Printf("  from_hex(\"%x\"),\n", rootPriv)
+  fmt.Printf("  root_cert,\n")
+  fmt.Printf("  from_hex(\"%x\"),\n", rootCertRaw)
+  fmt.Printf("  leaf_priv,\n")
+  fmt.Printf("  from_hex(\"%x\"),\n", myPriv)
+  for _, c := range chainRaw {
+    fmt.Printf("  from_hex(\"%x\"),\n", c)
   }
+  fmt.Printf("},\n")
 }

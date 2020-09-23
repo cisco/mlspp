@@ -1,4 +1,5 @@
 #include "mls/credential.h"
+#include "hpke/certificate.h"
 #include <tls/tls_syntax.h>
 
 namespace mls {
@@ -8,79 +9,25 @@ namespace mls {
 ///
 
 const CredentialType BasicCredential::type = CredentialType::basic;
-const CredentialType X509Credential::type = CredentialType::x509;
 
 ///
 /// X509Credential
 ///
 
-X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
+const CredentialType X509Credential::type = CredentialType::x509;
+
+X509Credential::X509Credential(const std::vector<X509Credential::CertData>& der_chain_in)
+  : der_chain(der_chain_in)
 {
-  if (der_chain_in.empty()) {
+  if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
   }
 
-  der_chain = der_chain_in;
-  // zeroth element represents leaf cert
-  hpke::Certificate cert{ der_chain_in[0] };
+ 	// first element represents leaf cert
+  hpke::Certificate cert{ der_chain_in[0].der };
   public_key = SignaturePublicKey{ cert.public_key.data };
-}
 
-///
-/// X509 Credential
-///
-
-struct Bytes2
-{
-  bytes vec;
-  TLS_SERIALIZABLE(vec);
-  TLS_TRAITS(tls::vector<2>)
-};
-
-tls::ostream&
-operator<<(tls::ostream& str, const X509Credential& obj)
-{
-  tls::ostream temp;
-  for (const auto& item : obj.der_chain) {
-    Bytes2 b{ item };
-    temp << b;
-  }
-
-  // concatenate all certs
-  bytes allCerts;
-  uint8_t depth = obj.der_chain.size();
-  str << depth;
-  tls::vector<4>::encode(str, temp.bytes());
-  return str << obj.public_key;
-}
-
-tls::istream&
-operator>>(tls::istream& str, X509Credential& obj)
-{
-  uint8_t depth = 0;
-  str >> depth;
-
-  bytes allCerts;
-  tls::vector<4>::decode(str, allCerts);
-
-  obj.der_chain.resize(depth);
-  str >> obj.public_key;
-
-  tls::istream temp(allCerts);
-  for (int i = 0; i < depth; i++) {
-    Bytes2 b;
-    temp >> b;
-    obj.der_chain[i] = b.vec;
-  }
-
-  return str;
-}
-
-bool
-operator==(const X509Credential& lhs, const X509Credential& rhs)
-{
-  return (lhs.der_chain.size() == rhs.der_chain.size()) &&
-         (lhs.public_key == rhs.public_key);
+  // TODO(Suhas) : Add verify chain logic
 }
 
 ///
@@ -126,7 +73,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 }
 
 Credential
-Credential::x509(const std::vector<bytes>& der_chain)
+Credential::x509(const std::vector<X509Credential::CertData>& der_chain)
 {
   Credential cred;
   cred._cred = X509Credential{ der_chain };
