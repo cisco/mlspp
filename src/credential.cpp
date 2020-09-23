@@ -16,14 +16,15 @@ const CredentialType BasicCredential::type = CredentialType::basic;
 
 const CredentialType X509Credential::type = CredentialType::x509;
 
-X509Credential::X509Credential(const std::vector<X509Credential::CertData>& der_chain_in)
+X509Credential::X509Credential(
+  const std::vector<X509Credential::CertData>& der_chain_in)
   : der_chain(der_chain_in)
 {
   if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
   }
 
- 	// first element represents leaf cert
+  // first element represents leaf cert
   hpke::Certificate cert{ der_chain_in[0].der };
   public_key = SignaturePublicKey{ cert.public_key.data };
 

@@ -32,12 +32,12 @@ public:
     };
   };
 
-	explicit Certificate(const bytes& der);
-	~Certificate();
+  explicit Certificate(const bytes& der);
+  ~Certificate();
 
-	Certificate() = delete;
+  Certificate() = delete;
   Certificate& operator=(const Certificate*) = delete;
-	Certificate(const Certificate& other) = delete;
+  Certificate(const Certificate& other) = delete;
 
   // TODO(Suhas) not supported yet.
   // bool valid_from(const Certificate& parent);

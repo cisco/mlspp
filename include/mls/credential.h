@@ -40,18 +40,18 @@ struct BasicCredential
 
 struct X509Credential
 {
-	struct CertData
-	{
-		CertData() {}
+  struct CertData
+  {
+    CertData() {}
 
-		CertData(const bytes& der_in)
-		  : der(std::move(der_in))
-		{}
+    CertData(const bytes& der_in)
+      : der(std::move(der_in))
+    {}
 
-		bytes der;
-		TLS_SERIALIZABLE(der);
-		TLS_TRAITS(tls::vector<2>)
-	};
+    bytes der;
+    TLS_SERIALIZABLE(der);
+    TLS_TRAITS(tls::vector<2>)
+  };
 
   X509Credential() {}
 
@@ -60,10 +60,10 @@ struct X509Credential
   std::vector<CertData> der_chain;
   SignaturePublicKey public_key;
 
-	TLS_SERIALIZABLE(der_chain, public_key)
-	TLS_TRAITS(tls::vector<4>, tls::pass)
+  TLS_SERIALIZABLE(der_chain, public_key)
+  TLS_TRAITS(tls::vector<4>, tls::pass)
 
-	static const CredentialType type;
+  static const CredentialType type;
 };
 
 // struct {
@@ -86,7 +86,8 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  static Credential x509(const std::vector<X509Credential::CertData>& der_chain);
+  static Credential x509(
+    const std::vector<X509Credential::CertData>& der_chain);
 
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)

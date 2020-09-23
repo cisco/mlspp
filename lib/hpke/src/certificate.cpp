@@ -26,9 +26,10 @@ struct Certificate::ParsedCertificate
     : openssl_cert(native, typed_delete<X509>)
   {}
 
-	ParsedCertificate(const Certificate::ParsedCertificate&) = delete;
-  Certificate::ParsedCertificate& operator=(const Certificate::ParsedCertificate&) = delete;
-  
+  ParsedCertificate(const Certificate::ParsedCertificate&) = delete;
+  Certificate::ParsedCertificate& operator=(
+    const Certificate::ParsedCertificate&) = delete;
+
   X509Signature::ID signature_algorithm() const
   {
     int algo_nid = X509_get_signature_nid(openssl_cert.get());
