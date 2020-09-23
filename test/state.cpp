@@ -18,7 +18,7 @@ public:
       auto key_package =
         KeyPackage{ suite, init_priv.public_key, credential, identity_priv };
 
-      init_secrets.push_back(init_secret);
+      init_privs.push_back(init_priv);
       identity_privs.push_back(identity_priv);
       key_packages.push_back(key_package);
     }
@@ -31,8 +31,11 @@ protected:
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
   const bytes test_message = from_hex("01020304");
+  const std::string export_label = "test";
+  const bytes export_context = from_hex("05060708");
+  const size_t export_size = 16;
 
-  std::vector<bytes> init_secrets;
+  std::vector<HPKEPrivateKey> init_privs;
   std::vector<SignaturePrivateKey> identity_privs;
   std::vector<KeyPackage> key_packages;
   std::vector<State> states;
@@ -41,14 +44,37 @@ protected:
   {
     return random_bytes(suite.get().hpke.kdf.hash_size());
   }
+
+  void verify_group_functionality(std::vector<State>& states)
+  {
+    if (states.empty()) {
+      return;
+    }
+
+    // Verify that they can all send and be received
+    for (auto& state : states) {
+      auto encrypted = state.protect(test_message);
+      for (auto& other : states) {
+        auto decrypted = other.unprotect(encrypted);
+        REQUIRE(decrypted == test_message);
+      }
+    }
+
+    // Verify that they produce the same value for export
+    auto ref = states[0].do_export(export_label, export_context, export_size);
+    REQUIRE(ref.size() == export_size);
+    for (auto& state : states) {
+      REQUIRE(ref ==
+              state.do_export(export_label, export_context, export_size));
+    }
+  }
 };
 
 TEST_CASE_FIXTURE(StateTest, "Two Person")
 {
   // Initialize the creator's state
-  auto first0 = State{
-    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]
-  };
+  auto first0 =
+    State{ group_id, suite, init_privs[0], identity_privs[0], key_packages[0] };
 
   // Create an Add proposal for the new participant
   auto add = first0.add(key_packages[1]);
@@ -60,20 +86,18 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 
   // Initialize the second participant from the Welcome
   auto second0 =
-    State{ init_secrets[1], identity_privs[1], key_packages[1], welcome };
+    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
   REQUIRE(first1 == second0);
 
-  /// Verify that they can exchange protected messages
-  auto encrypted = first1.protect(test_message);
-  auto decrypted = second0.unprotect(encrypted);
-  REQUIRE(decrypted == test_message);
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
 }
 
 TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 {
   // Initialize the creator's state
   states.emplace_back(
-    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
+    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
 
   // Create and process an Add proposal for each new participant
   for (size_t i = 1; i < group_size; i += 1) {
@@ -89,24 +113,17 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
     states.emplace_back(
-      init_secrets[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome);
   }
 
-  // Verify that everyone can send and be received
-  for (auto& state : states) {
-    auto encrypted = state.protect(test_message);
-    for (auto& other : states) {
-      auto decrypted = other.unprotect(encrypted);
-      REQUIRE(decrypted == test_message);
-    }
-  }
+  verify_group_functionality(states);
 }
 
 TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 {
   // Initialize the creator's state
   states.emplace_back(
-    group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
+    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -126,21 +143,14 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
     }
 
     states.emplace_back(
-      init_secrets[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
       REQUIRE(state == states[0]);
     }
 
-    // Check that everyone can send and be received
-    for (auto& state : states) {
-      auto encrypted = state.protect(test_message);
-      for (auto& other : states) {
-        auto decrypted = other.unprotect(encrypted);
-        REQUIRE(decrypted == test_message);
-      }
-    }
+    verify_group_functionality(states);
   }
 }
 
@@ -152,7 +162,7 @@ protected:
   RunningGroupTest()
   {
     states.emplace_back(
-      group_id, suite, init_secrets[0], identity_privs[0], key_packages[0]);
+      group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
 
     for (size_t i = 1; i < group_size; i += 1) {
       auto add = states[0].add(key_packages[i]);
@@ -164,7 +174,7 @@ protected:
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(
-        init_secrets[i], identity_privs[i], key_packages[i], welcome);
+        init_privs[i], identity_privs[i], key_packages[i], welcome);
     }
 
     check_consistency();
@@ -175,6 +185,8 @@ protected:
     for (const auto& state : states) {
       REQUIRE(state == states[0]);
     }
+
+    verify_group_functionality(states);
   }
 };
 

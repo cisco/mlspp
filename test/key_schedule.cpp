@@ -50,6 +50,7 @@ TEST_CASE("Key Schedule Interop")
       REQUIRE(my_epoch.handshake_secret == epoch.handshake_secret);
       REQUIRE(my_epoch.application_secret == epoch.application_secret);
 
+      REQUIRE(my_epoch.exporter_secret == epoch.exporter_secret);
       REQUIRE(my_epoch.confirmation_key == epoch.confirmation_key);
       REQUIRE(my_epoch.init_secret == epoch.init_secret);
 
