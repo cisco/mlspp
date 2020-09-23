@@ -16,7 +16,9 @@ protected:
 
   static const uint32_t no_except = 0xffffffff;
 
-  std::vector<TestSession> sessions;
+  std::vector<Session> sessions;
+
+  HPKEPrivateKey new_init_key() { return HPKEPrivateKey::generate(suite); }
 
   SignaturePrivateKey new_identity_key()
   {
@@ -29,7 +31,6 @@ protected:
 
   void broadcast(const bytes& message, const uint32_t except)
   {
-    auto initial_epoch = sessions[0].current_epoch();
     for (auto& session : sessions) {
       if (except != no_except && session.index() == except) {
         continue;
@@ -37,7 +38,6 @@ protected:
 
       session.handle(message);
     }
-    check(initial_epoch, except);
   }
 
   void broadcast_add()
@@ -48,39 +48,29 @@ protected:
 
   void broadcast_add(uint32_t from, uint32_t index)
   {
-    auto init_secret = fresh_secret();
     auto id_priv = new_identity_key();
-    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto init_priv = new_init_key();
     auto cred = Credential::basic(user_id, id_priv.public_key);
-    auto key_package = KeyPackage{ suite, init_priv.public_key, cred, id_priv };
-    auto init_info = Session::InitInfo{ init_secret, id_priv, key_package };
+    auto client = Client(suite, id_priv, cred);
 
     // Initial add is different
     if (sessions.empty()) {
-      auto my_init_secret = fresh_secret();
-      auto my_id_priv = new_identity_key();
-      auto my_init_priv = HPKEPrivateKey::derive(suite, my_init_secret);
-      auto my_cred = Credential::basic(user_id, my_id_priv.public_key);
-      auto my_key_package =
-        KeyPackage{ suite, my_init_priv.public_key, my_cred, my_id_priv };
-      auto my_info =
-        Session::InitInfo{ my_init_secret, my_id_priv, my_key_package };
-
-      auto commit_secret = fresh_secret();
-      auto [creator, welcome] =
-        Session::start(group_id, { my_info }, { key_package }, commit_secret);
-      auto joiner = Session::join({ init_info }, welcome);
+      auto creator = client.begin_session(group_id);
       sessions.emplace_back(creator);
-      sessions.emplace_back(joiner);
       return;
     }
 
     auto initial_epoch = sessions[0].current_epoch();
 
-    auto add_secret = fresh_secret();
-    auto [welcome, add] = sessions[from].add(add_secret, key_package);
-    auto next = Session::join({ init_info }, welcome);
+    auto join = client.start_join();
+
+    auto add = sessions[from].add(join.key_package());
     broadcast(add, index);
+
+    auto [welcome, commit] = sessions[from].commit();
+    broadcast(commit, index);
+
+    auto next = join.complete(welcome);
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
@@ -103,6 +93,11 @@ protected:
       ref = 1;
     }
 
+    auto label = std::string("test");
+    auto context = bytes{ 4, 5, 6, 7 };
+    auto size = 16;
+    auto ref_export = sessions[ref].do_export(label, context, size);
+
     // Verify that everyone ended up in consistent states, and that
     // they can send and be received.
     for (auto& session : sessions) {
@@ -122,6 +117,8 @@ protected:
         auto decrypted = other.unprotect(encrypted);
         REQUIRE(plaintext == decrypted);
       }
+
+      REQUIRE(ref_export == session.do_export(label, context, size));
     }
 
     // Verify that the epoch got updated
@@ -141,60 +138,12 @@ TEST_CASE_FIXTURE(SessionTest, "Full-Size Session Creation")
   }
 }
 
-TEST_CASE_FIXTURE(SessionTest, "Ciphersuite Negotiation")
-{
-  // Alice supports P-256 and X25519
-  auto idA = new_identity_key();
-  auto credA = Credential::basic(user_id, idA.public_key);
-  std::vector<CipherSuite> ciphersA{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
-  };
-  std::vector<KeyPackage> kpsA;
-  std::vector<Session::InitInfo> infosA;
-  for (auto suiteA : ciphersA) {
-    auto init_secret = random_bytes(32);
-    auto init_priv = HPKEPrivateKey::derive(suiteA, init_secret);
-    auto kp = KeyPackage{ suiteA, init_priv.public_key, credA, idA };
-    auto info = Session::InitInfo{ init_secret, idA, kp };
-    kpsA.emplace_back(suiteA, init_priv.public_key, credA, idA);
-    infosA.emplace_back(init_secret, idA, kpsA.back());
-  }
-
-  // Bob supports P-256 and P-521
-  auto idB = new_identity_key();
-  auto credB = Credential::basic(user_id, idB.public_key);
-  std::vector<CipherSuite> ciphersB{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 }
-  };
-  std::vector<KeyPackage> kpsB;
-  std::vector<Session::InitInfo> infosB;
-  for (auto suiteB : ciphersB) {
-    auto init_secret = random_bytes(32);
-    auto init_priv = HPKEPrivateKey::derive(suiteB, init_secret);
-    auto kp = KeyPackage{ suiteB, init_priv.public_key, credB, idB };
-    auto info = Session::InitInfo{ init_secret, idB, kp };
-    kpsB.emplace_back(suiteB, init_priv.public_key, credB, idB);
-    infosB.emplace_back(init_secret, idB, kpsB.back());
-  }
-
-  auto init_secret = fresh_secret();
-  auto session_welcome_add =
-    Session::start({ 0, 1, 2, 3 }, infosA, kpsB, init_secret);
-  TestSession alice = std::get<0>(session_welcome_add);
-  TestSession bob = Session::join(infosB, std::get<1>(session_welcome_add));
-  REQUIRE(alice == bob);
-  REQUIRE(alice.cipher_suite().id ==
-          CipherSuite::ID::P256_AES128GCM_SHA256_P256);
-}
-
 class RunningSessionTest : public SessionTest
 {
 protected:
   RunningSessionTest()
   {
-    for (int i = 0; i < group_size - 1; i += 1) {
+    for (int i = 0; i < group_size; i += 1) {
       broadcast_add();
     }
   }
@@ -204,9 +153,13 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update_secret = fresh_secret();
-    auto update = sessions[i].update(update_secret);
+
+    auto update = sessions[i].update();
     broadcast(update);
+
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit));
+
     check(initial_epoch);
   }
 }
@@ -216,9 +169,14 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
     auto evict_secret = fresh_secret();
-    auto remove = sessions[i - 1].remove(evict_secret, i);
     sessions.pop_back();
+
+    auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
+
+    auto welcome_commit = sessions[i - 1].commit();
+    broadcast(std::get<1>(welcome_commit));
+
     check(initial_epoch);
   }
 }
@@ -230,9 +188,10 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
 
     // Remove target
     auto initial_epoch = sessions[i].current_epoch();
-    auto evict_secret = fresh_secret();
-    auto remove = sessions[i].remove(evict_secret, target);
+    auto remove = sessions[i].remove(target);
     broadcast(remove, target);
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit), target);
     check(initial_epoch, target);
 
     // Re-add at target
@@ -249,19 +208,21 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
   // 2. Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto update_secret = fresh_secret();
-    auto update = sessions[i].update(update_secret);
+    auto update = sessions[i].update();
     broadcast(update);
+    auto welcome_commit = sessions[i].commit();
+    broadcast(std::get<1>(welcome_commit));
     check(initial_epoch);
   }
 
   // 3. Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].current_epoch();
-    auto evict_secret = fresh_secret();
-    auto remove = sessions[i - 1].remove(evict_secret, i);
     sessions.pop_back();
+    auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
+    auto welcome_commit = sessions[i - 1].commit();
+    broadcast(std::get<1>(welcome_commit));
     check(initial_epoch);
   }
 }

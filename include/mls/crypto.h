@@ -5,8 +5,8 @@
 #include <hpke/random.h>
 #include <hpke/signature.h>
 #include <mls/common.h>
-#include <openssl/evp.h>
 #include <tls/tls_syntax.h>
+
 #include <vector>
 
 namespace mls {
@@ -41,6 +41,9 @@ struct CipherSuite
                           const std::string& label,
                           const bytes& context,
                           size_t length) const;
+  bytes derive_secret(const bytes& secret,
+                      const std::string& label,
+                      const bytes& context) const;
 
   TLS_SERIALIZABLE(id)
 

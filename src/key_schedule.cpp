@@ -15,17 +15,6 @@ zeroize(bytes& data) // NOLINT(google-runtime-references)
 /// Key Derivation Functions
 ///
 
-bytes
-derive_secret(CipherSuite suite,
-              const bytes& secret,
-              const std::string& label,
-              const bytes& context)
-{
-  auto context_hash = suite.get().digest.hash(context);
-  auto size = suite.get().digest.hash_size();
-  return suite.expand_with_label(secret, label, context_hash, size);
-}
-
 struct ApplicationContext
 {
   NodeIndex node;
@@ -297,13 +286,13 @@ KeyScheduleEpoch::create(CipherSuite suite,
                          const bytes& context)
 {
   auto sender_data_secret =
-    derive_secret(suite, epoch_secret, "sender data", context);
+    suite.derive_secret(epoch_secret, "sender data", context);
   auto handshake_secret =
-    derive_secret(suite, epoch_secret, "handshake", context);
-  auto application_secret = derive_secret(suite, epoch_secret, "app", context);
-  auto confirmation_key =
-    derive_secret(suite, epoch_secret, "confirm", context);
-  auto init_secret = derive_secret(suite, epoch_secret, "init", context);
+    suite.derive_secret(epoch_secret, "handshake", context);
+  auto application_secret = suite.derive_secret(epoch_secret, "app", context);
+  auto exporter_secret = suite.derive_secret(epoch_secret, "exporter", context);
+  auto confirmation_key = suite.derive_secret(epoch_secret, "confirm", context);
+  auto init_secret = suite.derive_secret(epoch_secret, "init", context);
 
   auto key_size = suite.get().hpke.aead.key_size();
   auto sender_data_key =
@@ -322,6 +311,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
                            GroupKeySource{ handshake_base.release() },
                            application_secret,
                            GroupKeySource{ application_base.release() },
+                           exporter_secret,
                            confirmation_key,
                            init_secret };
 }
@@ -347,12 +337,13 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
   auto sender_data_key = (lhs.sender_data_key == rhs.sender_data_key);
   auto handshake_secret = (lhs.handshake_secret == rhs.handshake_secret);
   auto application_secret = (lhs.application_secret == rhs.application_secret);
+  auto exporter_secret = (lhs.exporter_secret == rhs.exporter_secret);
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
 
   return suite && epoch_secret && sender_data_secret && sender_data_key &&
-         handshake_secret && application_secret && confirmation_key &&
-         init_secret;
+         handshake_secret && application_secret && exporter_secret &&
+         confirmation_key && init_secret;
 }
 
 } // namespace mls
