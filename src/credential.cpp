@@ -54,7 +54,7 @@ X509Credential::X509Credential(
   // first element represents leaf cert
   const auto& sig = find_signature(parsed[0].public_key_algorithm);
   const auto pub_data = sig.serialize(*parsed[0].public_key);
-  public_key = SignaturePublicKey{ pub_data };
+  _public_key = SignaturePublicKey{ pub_data };
 
   // verify chain for valid signatures
   for (size_t i = 0; i < der_chain.size() - 1; i++) {
@@ -62,6 +62,27 @@ X509Credential::X509Credential(
       throw std::runtime_error("Certificate Chain validation failure");
     }
   }
+}
+
+SignaturePublicKey
+X509Credential::public_key() const {
+	return _public_key;
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const X509Credential& obj)
+{
+	tls::vector<4>::encode(str, obj.der_chain);
+	return str;
+}
+
+tls::istream&
+operator>>(tls::istream& str, X509Credential& obj)
+{
+	auto der_chain = std::vector<X509Credential::CertData>{};
+	tls::vector<4>::decode(str, der_chain);
+	obj = X509Credential(der_chain);
+	return str;
 }
 
 ///
@@ -86,7 +107,7 @@ Credential::public_key() const
     case 0:
       return std::get<BasicCredential>(_cred).public_key;
     case 1:
-      return std::get<X509Credential>(_cred).public_key;
+      return std::get<X509Credential>(_cred).public_key();
   }
 
   throw std::bad_variant_access();

@@ -52,14 +52,22 @@ struct X509Credential
 
   explicit X509Credential(std::vector<CertData> der_chain_in);
 
-  std::vector<CertData> der_chain;
-  SignaturePublicKey public_key;
+  SignaturePublicKey public_key() const;
 
-  TLS_SERIALIZABLE(der_chain, public_key)
-  TLS_TRAITS(tls::vector<4>, tls::pass)
+  std::vector<CertData> der_chain;
 
   static const CredentialType type;
+
+private:
+	SignaturePublicKey _public_key;
 };
+
+// custom marshal/unmarshal operations
+tls::ostream&
+operator<<(tls::ostream& str, const X509Credential& obj);
+
+tls::istream&
+operator>>(tls::istream& str, X509Credential& obj);
 
 // struct {
 //     CredentialType credential_type;
