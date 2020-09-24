@@ -3,6 +3,9 @@
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
 
+#include "openssl_common.h"
+#include <openssl/evp.h>
+
 namespace hpke {
 
 struct Group
@@ -69,6 +72,41 @@ protected:
     : group_id(group_id_in)
     , kdf(kdf_in)
   {}
+};
+
+struct EVPGroup : public Group
+{
+  EVPGroup(Group::ID group_id, const KDF& kdf);
+
+  struct PublicKey : public Group::PublicKey
+  {
+    explicit PublicKey(EVP_PKEY* pkey_in);
+    ~PublicKey() override = default;
+
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    typed_unique_ptr<EVP_PKEY> pkey;
+  };
+
+  struct PrivateKey : public Group::PrivateKey
+  {
+    explicit PrivateKey(EVP_PKEY* pkey_in);
+    ~PrivateKey() override = default;
+
+    std::unique_ptr<Group::PublicKey> public_key() const override;
+
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    typed_unique_ptr<EVP_PKEY> pkey;
+  };
+
+  std::unique_ptr<Group::PrivateKey> generate_key_pair() const override;
+
+  bytes dh(const Group::PrivateKey& sk,
+           const Group::PublicKey& pk) const override;
+
+  bytes sign(const bytes& data, const Group::PrivateKey& sk) const override;
+  bool verify(const bytes& data,
+              const bytes& sig,
+              const Group::PublicKey& pk) const override;
 };
 
 } // namespace hpke

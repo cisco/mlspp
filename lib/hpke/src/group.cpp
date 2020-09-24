@@ -15,138 +15,123 @@ namespace hpke {
 /// General implementation with OpenSSL EVP_PKEY
 ///
 
-struct EVPGroup : public Group
+EVPGroup::EVPGroup(Group::ID group_id, const KDF& kdf)
+  : Group(group_id, kdf)
+{}
+
+EVPGroup::PublicKey::PublicKey(EVP_PKEY* pkey_in)
+  : pkey(pkey_in, typed_delete<EVP_PKEY>)
+{}
+
+EVPGroup::PrivateKey::PrivateKey(EVP_PKEY* pkey_in)
+  : pkey(pkey_in, typed_delete<EVP_PKEY>)
+{}
+
+std::unique_ptr<Group::PublicKey>
+EVPGroup::PrivateKey::public_key() const
 {
-  EVPGroup(Group::ID group_id, const KDF& kdf)
-    : Group(group_id, kdf)
-  {}
+  if (1 != EVP_PKEY_up_ref(pkey.get())) {
+    throw openssl_error();
+  }
+  return std::make_unique<PublicKey>(pkey.get());
+}
 
-  struct PublicKey : public Group::PublicKey
-  {
-    explicit PublicKey(EVP_PKEY* pkey_in)
-      : pkey(pkey_in, typed_delete<EVP_PKEY>)
-    {}
+std::unique_ptr<Group::PrivateKey>
+EVPGroup::generate_key_pair() const
+{
+  return derive_key_pair({}, random_bytes(sk_size()));
+}
 
-    ~PublicKey() override = default;
+bytes
+EVPGroup::dh(const Group::PrivateKey& sk, const Group::PublicKey& pk) const
+{
+  const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
+  const auto& rpk = dynamic_cast<const PublicKey&>(pk);
 
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    typed_unique_ptr<EVP_PKEY> pkey;
-  };
+  // This and the next line are acceptable because the OpenSSL
+  // functions fail to mark the required EVP_PKEYs as const, even
+  // though they are not modified.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+  auto* priv_pkey = const_cast<EVP_PKEY*>(rsk.pkey.get());
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+  auto* pub_pkey = const_cast<EVP_PKEY*>(rpk.pkey.get());
 
-  struct PrivateKey : public Group::PrivateKey
-  {
-    explicit PrivateKey(EVP_PKEY* pkey_in)
-      : pkey(pkey_in, typed_delete<EVP_PKEY>)
-    {}
-
-    ~PrivateKey() override = default;
-
-    std::unique_ptr<Group::PublicKey> public_key() const override
-    {
-      if (1 != EVP_PKEY_up_ref(pkey.get())) {
-        throw openssl_error();
-      }
-      return std::make_unique<PublicKey>(pkey.get());
-    }
-
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    typed_unique_ptr<EVP_PKEY> pkey;
-  };
-
-  std::unique_ptr<Group::PrivateKey> generate_key_pair() const override
-  {
-    return derive_key_pair({}, random_bytes(sk_size()));
+  auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
+  if (ctx == nullptr) {
+    throw openssl_error();
   }
 
-  bytes dh(const Group::PrivateKey& sk,
-           const Group::PublicKey& pk) const override
-  {
-    const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
-    const auto& rpk = dynamic_cast<const PublicKey&>(pk);
-
-    // This and the next line are acceptable because the OpenSSL
-    // functions fail to mark the required EVP_PKEYs as const, even
-    // though they are not modified.
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    auto* priv_pkey = const_cast<EVP_PKEY*>(rsk.pkey.get());
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    auto* pub_pkey = const_cast<EVP_PKEY*>(rpk.pkey.get());
-
-    auto ctx = make_typed_unique(EVP_PKEY_CTX_new(priv_pkey, nullptr));
-    if (ctx == nullptr) {
-      throw openssl_error();
-    }
-
-    if (1 != EVP_PKEY_derive_init(ctx.get())) {
-      throw openssl_error();
-    }
-
-    if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
-      throw openssl_error();
-    }
-
-    size_t out_len = 0;
-    if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
-      throw openssl_error();
-    }
-
-    bytes out(out_len);
-    uint8_t* ptr = out.data();
-    if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
-      throw openssl_error();
-    }
-
-    return out;
+  if (1 != EVP_PKEY_derive_init(ctx.get())) {
+    throw openssl_error();
   }
 
-  bytes sign(const bytes& data, const Group::PrivateKey& sk) const override
-  {
-    const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
-
-    auto ctx = make_typed_unique(EVP_MD_CTX_create());
-    if (ctx == nullptr) {
-      throw openssl_error();
-    }
-
-    if (1 != EVP_DigestSignInit(
-               ctx.get(), nullptr, nullptr, nullptr, rsk.pkey.get())) {
-      throw openssl_error();
-    }
-
-    static const size_t max_sig_size = 200;
-    auto siglen = max_sig_size;
-    bytes sig(siglen);
-    if (1 != EVP_DigestSign(
-               ctx.get(), sig.data(), &siglen, data.data(), data.size())) {
-      throw openssl_error();
-    }
-
-    sig.resize(siglen);
-    return sig;
+  if (1 != EVP_PKEY_derive_set_peer(ctx.get(), pub_pkey)) {
+    throw openssl_error();
   }
 
-  bool verify(const bytes& data,
-              const bytes& sig,
-              const Group::PublicKey& pk) const override
-  {
-    const auto& rpk = dynamic_cast<const PublicKey&>(pk);
-
-    auto ctx = make_typed_unique(EVP_MD_CTX_create());
-    if (ctx == nullptr) {
-      throw openssl_error();
-    }
-
-    if (1 != EVP_DigestVerifyInit(
-               ctx.get(), nullptr, nullptr, nullptr, rpk.pkey.get())) {
-      throw openssl_error();
-    }
-
-    auto rv = EVP_DigestVerify(
-      ctx.get(), sig.data(), sig.size(), data.data(), data.size());
-
-    return rv == 1;
+  size_t out_len = 0;
+  if (1 != EVP_PKEY_derive(ctx.get(), nullptr, &out_len)) {
+    throw openssl_error();
   }
-};
+
+  bytes out(out_len);
+  uint8_t* ptr = out.data();
+  if (1 != (EVP_PKEY_derive(ctx.get(), ptr, &out_len))) {
+    throw openssl_error();
+  }
+
+  return out;
+}
+
+bytes
+EVPGroup::sign(const bytes& data, const Group::PrivateKey& sk) const
+{
+  const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
+
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
+
+  if (1 != EVP_DigestSignInit(
+             ctx.get(), nullptr, nullptr, nullptr, rsk.pkey.get())) {
+    throw openssl_error();
+  }
+
+  static const size_t max_sig_size = 200;
+  auto siglen = max_sig_size;
+  bytes sig(siglen);
+  if (1 != EVP_DigestSign(
+             ctx.get(), sig.data(), &siglen, data.data(), data.size())) {
+    throw openssl_error();
+  }
+
+  sig.resize(siglen);
+  return sig;
+}
+
+bool
+EVPGroup::verify(const bytes& data,
+                 const bytes& sig,
+                 const Group::PublicKey& pk) const
+{
+  const auto& rpk = dynamic_cast<const PublicKey&>(pk);
+
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
+
+  if (1 != EVP_DigestVerifyInit(
+             ctx.get(), nullptr, nullptr, nullptr, rpk.pkey.get())) {
+    throw openssl_error();
+  }
+
+  auto rv = EVP_DigestVerify(
+    ctx.get(), sig.data(), sig.size(), data.data(), data.size());
+
+  return rv == 1;
+}
 
 ///
 /// DH over "normal" curves

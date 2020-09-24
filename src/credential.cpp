@@ -16,6 +16,27 @@ const CredentialType BasicCredential::type = CredentialType::basic;
 
 const CredentialType X509Credential::type = CredentialType::x509;
 
+using hpke::Certificate; // NOLINT(misc-unused-using-decls)
+using hpke::Signature;   // NOLINT(misc-unused-using-decls)
+
+const Signature&
+find_signature(Signature::ID id)
+{
+  switch (id) {
+    case Signature::ID::P256_SHA256:
+      return Signature::get<Signature::ID::P256_SHA256>();
+    case Signature::ID::P384_SHA384:
+      return Signature::get<Signature::ID::P384_SHA384>();
+    case Signature::ID::P521_SHA512:
+      return Signature::get<Signature::ID::P521_SHA512>();
+    case Signature::ID::Ed25519:
+      return Signature::get<Signature::ID::Ed25519>();
+    case Signature::ID::Ed448:
+      return Signature::get<Signature::ID::Ed448>();
+  }
+  throw InvalidParameterError("Unsupported algorithm");
+}
+
 X509Credential::X509Credential(
   std::vector<X509Credential::CertData> der_chain_in)
   : der_chain(std::move(der_chain_in))
@@ -24,16 +45,20 @@ X509Credential::X509Credential(
     throw std::invalid_argument("empty certificate chain");
   }
 
+  // Parse the chain
+  auto parsed = std::vector<Certificate>();
+  for (const auto& cert : der_chain) {
+    parsed.emplace_back(cert.der);
+  }
+
   // first element represents leaf cert
-  hpke::Certificate cert{ der_chain[0].der };
-  public_key = SignaturePublicKey{ cert.public_key.data };
+  const auto& sig = find_signature(parsed[0].public_key_algorithm);
+  const auto pub_data = sig.serialize(*parsed[0].public_key);
+  public_key = SignaturePublicKey{ pub_data };
 
   // verify chain for valid signatures
   for (size_t i = 0; i < der_chain.size() - 1; i++) {
-    hpke::Certificate curr{ der_chain[i].der };
-    hpke::Certificate next{ der_chain[i + 1].der };
-
-    if (!curr.valid_from(next)) {
+    if (!parsed[i].valid_from(parsed[i + 1])) {
       throw std::runtime_error("Certificate Chain validation failure");
     }
   }
