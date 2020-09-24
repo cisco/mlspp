@@ -80,32 +80,36 @@ Certificate::Certificate(const bytes& der)
 Certificate::~Certificate() = default;
 
 bool
-Certificate::valid_from(const Certificate &parent)
+Certificate::valid_from(const Certificate& parent)
 {
-	auto sig_algo = parent.public_key_algorithm;
-	auto parent_public_key = parent.public_key.data;
-	EVP_PKEY *pkey = nullptr;
+  auto sig_algo = parent.public_key_algorithm;
+  auto parent_public_key = parent.public_key.data;
+  EVP_PKEY* pkey = nullptr;
 
-	switch (sig_algo) {
-		case X509Signature::ID::Ed25519: {
-			pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, nullptr, parent_public_key.data(),
-							parent_public_key.size());
-			break;
-		}
-		case X509Signature::ID::Ed448: {
-			pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED448, nullptr, parent_public_key.data(),
-																				 parent_public_key.size());
-			break;
-		}
-		default:
-			throw std::runtime_error("Unsupported algorithm");
-	}
+  switch (sig_algo) {
+    case X509Signature::ID::Ed25519: {
+      pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519,
+                                         nullptr,
+                                         parent_public_key.data(),
+                                         parent_public_key.size());
+      break;
+    }
+    case X509Signature::ID::Ed448: {
+      pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED448,
+                                         nullptr,
+                                         parent_public_key.data(),
+                                         parent_public_key.size());
+      break;
+    }
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
 
-	if (pkey == nullptr) {
-		throw std::runtime_error("Signature public key setup failed");
-	}
+  if (pkey == nullptr) {
+    throw std::runtime_error("Signature public key setup failed");
+  }
 
-	return X509_verify(parsed_cert->openssl_cert.get(), pkey) != 0;
+  return X509_verify(parsed_cert->openssl_cert.get(), pkey) != 0;
 }
 
 } // namespace hpke

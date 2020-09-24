@@ -28,12 +28,11 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(leaf.raw == leaf_der);
 
   CHECK(leaf.valid_from(issuing));
-	CHECK(issuing.valid_from(root));
-	CHECK(root.valid_from(root));
+  CHECK(issuing.valid_from(root));
+  CHECK(root.valid_from(root));
 
-	// negative tests
-	CHECK_FALSE(issuing.valid_from(leaf));
-	CHECK_FALSE(root.valid_from(issuing));
-	CHECK_FALSE(root.valid_from(leaf));
-
+  // negative tests
+  CHECK_FALSE(issuing.valid_from(leaf));
+  CHECK_FALSE(root.valid_from(issuing));
+  CHECK_FALSE(root.valid_from(leaf));
 }

@@ -17,8 +17,7 @@ protected:
     : tv(TestLoader<TreeKEMTestVectors>::get())
   {}
 
-  std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage>
-  new_key_package()
+  std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage> new_key_package()
   {
     auto init_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
@@ -216,8 +215,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
   auto index_0 = pub.add_leaf(kp0);
   REQUIRE(index_0 == LeafIndex{ 0 });
 
-  auto priv =
-    TreeKEMPrivateKey::solo(suite, index_0, init_priv_0);
+  auto priv = TreeKEMPrivateKey::solo(suite, index_0, init_priv_0);
   privs.push_back(priv);
   REQUIRE(priv.consistent(pub));
 

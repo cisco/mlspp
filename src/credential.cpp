@@ -16,7 +16,8 @@ const CredentialType BasicCredential::type = CredentialType::basic;
 
 const CredentialType X509Credential::type = CredentialType::x509;
 
-X509Credential::X509Credential(std::vector<X509Credential::CertData> der_chain_in)
+X509Credential::X509Credential(
+  std::vector<X509Credential::CertData> der_chain_in)
   : der_chain(std::move(der_chain_in))
 {
   if (der_chain.empty()) {
@@ -28,16 +29,14 @@ X509Credential::X509Credential(std::vector<X509Credential::CertData> der_chain_i
   public_key = SignaturePublicKey{ cert.public_key.data };
 
   // verify chain for valid signatures
-  for (size_t i = 0; i < der_chain.size()-1; i++) {
-  	hpke::Certificate curr {der_chain[i].der};
-  	hpke::Certificate next {der_chain[i+1].der};
+  for (size_t i = 0; i < der_chain.size() - 1; i++) {
+    hpke::Certificate curr{ der_chain[i].der };
+    hpke::Certificate next{ der_chain[i + 1].der };
 
-  	if (!curr.valid_from(next)) {
-			throw std::runtime_error("Certificate Chain validation failure");
-  	}
-
+    if (!curr.valid_from(next)) {
+      throw std::runtime_error("Certificate Chain validation failure");
+    }
   }
-
 }
 
 ///
