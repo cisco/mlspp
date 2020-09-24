@@ -65,24 +65,25 @@ X509Credential::X509Credential(
 }
 
 SignaturePublicKey
-X509Credential::public_key() const {
-	return _public_key;
+X509Credential::public_key() const
+{
+  return _public_key;
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
-	tls::vector<4>::encode(str, obj.der_chain);
-	return str;
+  tls::vector<4>::encode(str, obj.der_chain);
+  return str;
 }
 
 tls::istream&
 operator>>(tls::istream& str, X509Credential& obj)
 {
-	auto der_chain = std::vector<X509Credential::CertData>{};
-	tls::vector<4>::decode(str, der_chain);
-	obj = X509Credential(der_chain);
-	return str;
+  auto der_chain = std::vector<X509Credential::CertData>{};
+  tls::vector<4>::decode(str, der_chain);
+  obj = X509Credential(der_chain);
+  return str;
 }
 
 ///

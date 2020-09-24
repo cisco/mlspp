@@ -59,7 +59,7 @@ struct X509Credential
   static const CredentialType type;
 
 private:
-	SignaturePublicKey _public_key;
+  SignaturePublicKey _public_key;
 };
 
 // custom marshal/unmarshal operations
