@@ -55,7 +55,7 @@ struct X509Credential
 
   X509Credential() {}
 
-  explicit X509Credential(const std::vector<CertData>& der_chain_in);
+  explicit X509Credential(std::vector<CertData> der_chain_in);
 
   std::vector<CertData> der_chain;
   SignaturePublicKey public_key;

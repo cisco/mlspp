@@ -16,19 +16,28 @@ const CredentialType BasicCredential::type = CredentialType::basic;
 
 const CredentialType X509Credential::type = CredentialType::x509;
 
-X509Credential::X509Credential(
-  const std::vector<X509Credential::CertData>& der_chain_in)
-  : der_chain(der_chain_in)
+X509Credential::X509Credential(std::vector<X509Credential::CertData> der_chain_in)
+  : der_chain(std::move(der_chain_in))
 {
   if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
   }
 
   // first element represents leaf cert
-  hpke::Certificate cert{ der_chain_in[0].der };
+  hpke::Certificate cert{ der_chain[0].der };
   public_key = SignaturePublicKey{ cert.public_key.data };
 
-  // TODO(Suhas) : Add verify chain logic
+  // verify chain for valid signatures
+  for (size_t i = 0; i < der_chain.size()-1; i++) {
+  	hpke::Certificate curr {der_chain[i].der};
+  	hpke::Certificate next {der_chain[i+1].der};
+
+  	if (!curr.valid_from(next)) {
+			throw std::runtime_error("Certificate Chain validation failure");
+  	}
+
+  }
+
 }
 
 ///

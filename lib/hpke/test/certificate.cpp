@@ -27,6 +27,13 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(issuing.raw == issuing_der);
   CHECK(leaf.raw == leaf_der);
 
-  // TODO fix this one valid_from is implemented.
-  // CHECK_FALSE(leaf.valid_from(root));
+  CHECK(leaf.valid_from(issuing));
+	CHECK(issuing.valid_from(root));
+	CHECK(root.valid_from(root));
+
+	// negative tests
+	CHECK_FALSE(issuing.valid_from(leaf));
+	CHECK_FALSE(root.valid_from(issuing));
+	CHECK_FALSE(root.valid_from(leaf));
+
 }

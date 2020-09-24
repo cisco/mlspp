@@ -39,8 +39,7 @@ public:
   Certificate& operator=(const Certificate*) = delete;
   Certificate(const Certificate& other) = delete;
 
-  // TODO(Suhas) not supported yet.
-  // bool valid_from(const Certificate& parent);
+  bool valid_from(const Certificate& parent);
 
   const X509Signature::ID public_key_algorithm;
   const X509Signature::PublicKey public_key;
