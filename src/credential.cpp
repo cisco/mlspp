@@ -48,7 +48,7 @@ X509Credential::X509Credential(
   // Parse the chain
   auto parsed = std::vector<Certificate>();
   for (const auto& cert : der_chain) {
-    parsed.emplace_back(cert.der);
+    parsed.emplace_back(cert.data);
   }
 
   // first element represents leaf cert

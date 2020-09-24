@@ -42,14 +42,9 @@ struct X509Credential
 {
   struct CertData
   {
-    CertData() {}
+    bytes data;
 
-    CertData(const bytes& der_in)
-      : der(std::move(der_in))
-    {}
-
-    bytes der;
-    TLS_SERIALIZABLE(der);
+    TLS_SERIALIZABLE(data);
     TLS_TRAITS(tls::vector<2>)
   };
 

@@ -36,7 +36,7 @@ TEST_CASE("X509 Credential Depth 2")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ leaf_der, issuing_der };
+  std::vector<X509Credential::CertData> der_in{ { leaf_der }, { issuing_der } };
 
   auto cred = Credential::x509(der_in);
   CHECK(cred.public_key().data.size() != 0);
@@ -62,7 +62,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ leaf_der, issuing_der };
+  std::vector<X509Credential::CertData> der_in{ { leaf_der }, { issuing_der } };
 
   auto original = Credential::x509(der_in);
   CHECK(original.public_key().data.size() != 0);
@@ -84,7 +84,7 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ leaf_der };
+  std::vector<X509Credential::CertData> der_in{ { leaf_der } };
 
   auto original = Credential::x509(der_in);
   CHECK(original.public_key().data.size() != 0);
