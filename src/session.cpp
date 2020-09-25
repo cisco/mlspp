@@ -258,7 +258,7 @@ Session::remove(uint32_t index)
 std::tuple<bytes, bytes>
 Session::commit(const bytes& proposal)
 {
-  return commit(std::vector<bytes>{proposal});
+  return commit(std::vector<bytes>{ proposal });
 }
 
 std::tuple<bytes, bytes>

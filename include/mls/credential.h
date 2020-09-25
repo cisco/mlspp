@@ -38,6 +38,34 @@ struct BasicCredential
   static const CredentialType type;
 };
 
+struct X509Credential
+{
+  struct CertData
+  {
+    bytes data;
+
+    TLS_SERIALIZABLE(data);
+    TLS_TRAITS(tls::vector<2>)
+  };
+
+  X509Credential() = default;
+  explicit X509Credential(std::vector<CertData> der_chain_in);
+
+  SignaturePublicKey public_key() const;
+
+  std::vector<CertData> der_chain;
+  static const CredentialType type;
+
+private:
+  SignaturePublicKey _public_key;
+};
+
+tls::ostream&
+operator<<(tls::ostream& str, const X509Credential& obj);
+
+tls::istream&
+operator>>(tls::istream& str, X509Credential& obj);
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
@@ -58,11 +86,14 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
+  static Credential x509(
+    const std::vector<X509Credential::CertData>& der_chain);
+
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  std::variant<BasicCredential> _cred;
+  std::variant<BasicCredential, X509Credential> _cred;
 };
 
 } // namespace mls

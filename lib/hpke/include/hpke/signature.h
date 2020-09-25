@@ -51,4 +51,4 @@ struct Signature
                       const PublicKey& pk) const = 0;
 };
 
-}
+} // namespace hpke
