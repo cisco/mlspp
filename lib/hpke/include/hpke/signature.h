@@ -52,7 +52,7 @@ struct Signature
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
 
-  protected:
+protected:
   Signature(ID id_in);
 };
 

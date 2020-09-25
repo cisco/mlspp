@@ -64,7 +64,7 @@ struct KEM
   virtual size_t pk_size() const = 0;
   virtual size_t sk_size() const = 0;
 
-  protected:
+protected:
   KEM(ID id_in);
 };
 
@@ -101,7 +101,7 @@ struct KDF
                        const bytes& info,
                        size_t size) const;
 
-  protected:
+protected:
   KDF(ID id_in);
 };
 
@@ -133,7 +133,7 @@ struct AEAD
   virtual size_t key_size() const = 0;
   virtual size_t nonce_size() const = 0;
 
-  protected:
+protected:
   AEAD(ID id_in);
 };
 

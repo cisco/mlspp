@@ -86,7 +86,8 @@ public:
   bool valid_for(const SignaturePrivateKey& priv) const;
 
   template<typename T>
-  const T& get() const {
+  const T& get() const
+  {
     return std::get<T>(_cred);
   }
 

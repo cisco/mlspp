@@ -21,7 +21,8 @@ struct ConcreteSignature : public Signature
     std::unique_ptr<Group::PrivateKey> group_priv;
   };
 
-  static Signature::ID group_to_sig(Group::ID group_id) {
+  static Signature::ID group_to_sig(Group::ID group_id)
+  {
     switch (group_id) {
       case Group::ID::P256:
         return Signature::ID::P256_SHA256;
