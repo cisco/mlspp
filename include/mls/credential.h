@@ -79,7 +79,6 @@ operator>>(tls::istream& str, X509Credential& obj);
 class Credential
 {
 public:
-  bytes identity() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 

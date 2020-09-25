@@ -12,7 +12,6 @@ TEST_CASE("Basic Credential")
   auto pub = priv.public_key;
 
   auto cred = Credential::basic(user_id, pub);
-  REQUIRE(cred.identity() == user_id);
   REQUIRE(cred.public_key() == pub);
 }
 
