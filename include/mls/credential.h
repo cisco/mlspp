@@ -53,7 +53,9 @@ struct X509Credential
 
   SignaturePublicKey public_key() const;
 
+  // TODO(rlb) This should be const or exposed via a method
   std::vector<CertData> der_chain;
+
   static const CredentialType type;
 
 private:
@@ -79,8 +81,14 @@ operator>>(tls::istream& str, X509Credential& obj);
 class Credential
 {
 public:
+  CredentialType type() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
+
+  template<typename T>
+  const T& get() const {
+    return std::get<T>(_cred);
+  }
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);

@@ -90,6 +90,19 @@ operator>>(tls::istream& str, X509Credential& obj)
 /// Credential
 ///
 
+CredentialType
+Credential::type() const
+{
+  switch (_cred.index()) {
+    case 0:
+      return CredentialType::basic;
+    case 1:
+      return CredentialType::x509;
+  }
+
+  throw std::bad_variant_access();
+}
+
 SignaturePublicKey
 Credential::public_key() const
 {
