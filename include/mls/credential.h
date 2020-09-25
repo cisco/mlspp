@@ -55,7 +55,6 @@ struct X509Credential
   SignaturePublicKey public_key() const;
 
   std::vector<CertData> der_chain;
-
   static const CredentialType type;
 
 private:
