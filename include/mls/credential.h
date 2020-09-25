@@ -49,7 +49,6 @@ struct X509Credential
   };
 
   X509Credential() = default;
-
   explicit X509Credential(std::vector<CertData> der_chain_in);
 
   SignaturePublicKey public_key() const;
