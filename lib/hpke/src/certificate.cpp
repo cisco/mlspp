@@ -8,7 +8,7 @@
 namespace hpke {
 
 ///
-/// Certificate X509 Impl
+/// ParsedCertificate
 ///
 
 struct Certificate::ParsedCertificate
