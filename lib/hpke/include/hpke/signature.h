@@ -21,6 +21,7 @@ struct Signature
   template<Signature::ID id>
   static const Signature& get();
 
+  Signature(ID id_in);
   virtual ~Signature() = default;
 
   struct PublicKey
@@ -33,6 +34,8 @@ struct Signature
     virtual ~PrivateKey() = default;
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
+
+  const ID id;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(

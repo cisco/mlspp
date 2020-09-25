@@ -21,8 +21,26 @@ struct ConcreteSignature : public Signature
     std::unique_ptr<Group::PrivateKey> group_priv;
   };
 
+  static Signature::ID group_to_sig(Group::ID group_id) {
+    switch (group_id) {
+      case Group::ID::P256:
+        return Signature::ID::P256_SHA256;
+      case Group::ID::P384:
+        return Signature::ID::P384_SHA384;
+      case Group::ID::P521:
+        return Signature::ID::P521_SHA512;
+      case Group::ID::Ed25519:
+        return Signature::ID::Ed25519;
+      case Group::ID::Ed448:
+        return Signature::ID::Ed448;
+      default:
+        throw std::runtime_error("Unsupported group");
+    }
+  }
+
   explicit ConcreteSignature(const Group& group_in)
-    : group(group_in)
+    : Signature(group_to_sig(group_in.id))
+    , group(group_in)
   {}
 
   std::unique_ptr<Signature::PrivateKey> generate_key_pair() const override
@@ -140,6 +158,10 @@ Signature::get<Signature::ID::Ed448>()
 {
   return ConcreteSignature::instance<Signature::ID::Ed448>;
 }
+
+Signature::Signature(Signature::ID id_in)
+  : id(id_in)
+{}
 
 bytes
 Signature::serialize_private(const PrivateKey& /* unused */) const

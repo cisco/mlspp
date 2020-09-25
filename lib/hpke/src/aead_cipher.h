@@ -24,12 +24,11 @@ struct AEADCipher : public AEAD
   size_t nonce_size() const override;
 
 private:
-  const AEAD::ID cipher;
   const size_t nk;
   const size_t nn;
   const size_t tag_size;
 
-  AEADCipher(AEAD::ID cipher_in);
+  AEADCipher(AEAD::ID id_in);
   friend AEADCipher make_aead(AEAD::ID cipher_in);
 
   template<AEAD::ID id>

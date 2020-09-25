@@ -39,6 +39,8 @@ struct Group
 
   virtual ~Group() = default;
 
+  const ID id;
+
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
     const bytes& suite_id,
@@ -63,13 +65,12 @@ struct Group
   size_t sk_size() const;
 
 protected:
-  ID group_id;
   const KDF& kdf;
 
   friend struct DHKEM;
 
   Group(ID group_id_in, const KDF& kdf_in)
-    : group_id(group_id_in)
+    : id(group_id_in)
     , kdf(kdf_in)
   {}
 };

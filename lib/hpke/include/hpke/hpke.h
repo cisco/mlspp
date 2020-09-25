@@ -22,6 +22,7 @@ struct KEM
   template<KEM::ID>
   static const KEM& get();
 
+  KEM(ID id_in);
   virtual ~KEM() = default;
 
   struct PublicKey
@@ -34,6 +35,8 @@ struct KEM
     virtual ~PrivateKey() = default;
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
+
+  const ID id;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
@@ -75,7 +78,10 @@ struct KDF
   template<KDF::ID id>
   static const KDF& get();
 
+  KDF(ID id_in);
   virtual ~KDF() = default;
+
+  const ID id;
 
   virtual bytes extract(const bytes& salt, const bytes& ikm) const = 0;
   virtual bytes expand(const bytes& prk,
@@ -107,7 +113,10 @@ struct AEAD
   template<AEAD::ID id>
   static const AEAD& get();
 
+  AEAD(ID id_in);
   virtual ~AEAD() = default;
+
+  const ID id;
 
   virtual bytes seal(const bytes& key,
                      const bytes& nonce,
