@@ -48,7 +48,7 @@ struct X509Credential
     TLS_TRAITS(tls::vector<2>)
   };
 
-  X509Credential() {}
+  X509Credential() = default;
 
   explicit X509Credential(std::vector<CertData> der_chain_in);
 
