@@ -60,7 +60,6 @@ private:
   SignaturePublicKey _public_key;
 };
 
-// custom marshal/unmarshal operations
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj);
 
