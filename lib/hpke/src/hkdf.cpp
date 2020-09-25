@@ -58,6 +58,8 @@ digest_to_kdf(Digest::ID digest_id)
     case Digest::ID::SHA512:
       return KDF::ID::HKDF_SHA512;
   }
+
+  throw std::runtime_error("Unsupported algorithm");
 }
 
 HKDF::HKDF(const Digest& digest_in)

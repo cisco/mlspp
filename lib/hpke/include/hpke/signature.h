@@ -21,7 +21,6 @@ struct Signature
   template<Signature::ID id>
   static const Signature& get();
 
-  Signature(ID id_in);
   virtual ~Signature() = default;
 
   struct PublicKey
@@ -52,6 +51,9 @@ struct Signature
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+  protected:
+  Signature(ID id_in);
 };
 
 } // namespace hpke

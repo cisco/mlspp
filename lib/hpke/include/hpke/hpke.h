@@ -22,7 +22,6 @@ struct KEM
   template<KEM::ID>
   static const KEM& get();
 
-  KEM(ID id_in);
   virtual ~KEM() = default;
 
   struct PublicKey
@@ -64,6 +63,9 @@ struct KEM
   virtual size_t enc_size() const = 0;
   virtual size_t pk_size() const = 0;
   virtual size_t sk_size() const = 0;
+
+  protected:
+  KEM(ID id_in);
 };
 
 struct KDF
@@ -78,7 +80,6 @@ struct KDF
   template<KDF::ID id>
   static const KDF& get();
 
-  KDF(ID id_in);
   virtual ~KDF() = default;
 
   const ID id;
@@ -99,6 +100,9 @@ struct KDF
                        const bytes& label,
                        const bytes& info,
                        size_t size) const;
+
+  protected:
+  KDF(ID id_in);
 };
 
 struct AEAD
@@ -113,7 +117,6 @@ struct AEAD
   template<AEAD::ID id>
   static const AEAD& get();
 
-  AEAD(ID id_in);
   virtual ~AEAD() = default;
 
   const ID id;
@@ -129,6 +132,9 @@ struct AEAD
 
   virtual size_t key_size() const = 0;
   virtual size_t nonce_size() const = 0;
+
+  protected:
+  AEAD(ID id_in);
 };
 
 struct Context
