@@ -36,6 +36,10 @@ verify(const std::string& label, Session& alice, Session& bob)
     throw std::runtime_error(label + ": not equal");
   }
 
+  if (alice.roster() != bob.roster()) {
+    throw std::runtime_error(label + ": roster not equal");
+  }
+
   verify_send(label, alice, bob);
   verify_send(label, bob, alice);
 }

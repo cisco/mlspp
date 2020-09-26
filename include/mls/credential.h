@@ -68,6 +68,9 @@ operator<<(tls::ostream& str, const X509Credential& obj);
 tls::istream&
 operator>>(tls::istream& str, X509Credential& obj);
 
+bool
+operator==(const X509Credential& lhs, const X509Credential& rhs);
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {

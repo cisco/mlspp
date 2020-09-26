@@ -347,6 +347,12 @@ Session::do_export(const std::string& label,
   return inner->history.front().do_export(label, context, size);
 }
 
+std::vector<Credential>
+Session::roster() const
+{
+  return inner->history.front().get_leaf_credentials();
+}
+
 bytes
 Session::protect(const bytes& plaintext)
 {

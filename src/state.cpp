@@ -580,6 +580,21 @@ State::do_export(const std::string& label,
   return _suite.expand_with_label(secret, "exporter", context, size);
 }
 
+std::vector<Credential>
+State::get_leaf_credentials() const
+{
+  std::vector<Credential> creds;
+
+  for (uint32_t i = 0; i < _tree.size().val; i++) {
+    const auto& ln = _tree.node_at(LeafIndex{ i });
+    if (ln.node.has_value()) {
+      creds.push_back(ln.key_package().credential);
+    }
+  }
+
+  return creds;
+}
+
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {

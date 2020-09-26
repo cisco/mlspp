@@ -83,6 +83,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  std::vector<Credential> get_leaf_credentials() const;
 
   ///
   /// General encryption and decryption
