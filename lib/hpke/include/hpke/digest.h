@@ -19,14 +19,15 @@ struct Digest
   template<ID id>
   static const Digest& get();
 
+  const ID id;
+
   bytes hash(const bytes& data) const;
   bytes hmac(const bytes& key, const bytes& data) const;
 
   size_t hash_size() const;
 
 private:
-  ID id;
-  size_t output_size;
+  const size_t output_size;
 
   explicit Digest(ID id);
   friend Digest make_digest(ID id);

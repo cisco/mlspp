@@ -86,7 +86,8 @@ DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
 }
 
 DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
-  : group(group_in)
+  : KEM(kem_id_in)
+  , group(group_in)
   , kdf(kdf_in)
 {
   static const auto label_kem = to_bytes("KEM");

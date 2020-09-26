@@ -106,11 +106,11 @@ openssl_cipher(AEAD::ID cipher)
   }
 }
 
-AEADCipher::AEADCipher(AEAD::ID cipher_in)
-  : cipher(cipher_in)
-  , nk(cipher_key_size(cipher_in))
-  , nn(cipher_nonce_size(cipher_in))
-  , tag_size(cipher_tag_size(cipher_in))
+AEADCipher::AEADCipher(AEAD::ID id_in)
+  : AEAD(id_in)
+  , nk(cipher_key_size(id))
+  , nn(cipher_nonce_size(id))
+  , tag_size(cipher_tag_size(id))
 {}
 
 bytes
@@ -124,8 +124,8 @@ AEADCipher::seal(const bytes& key,
     throw openssl_error();
   }
 
-  const auto* ocipher = openssl_cipher(cipher);
-  if (1 != EVP_EncryptInit(ctx.get(), ocipher, key.data(), nonce.data())) {
+  const auto* cipher = openssl_cipher(id);
+  if (1 != EVP_EncryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
     throw openssl_error();
   }
 
@@ -174,8 +174,8 @@ AEADCipher::open(const bytes& key,
     throw openssl_error();
   }
 
-  const auto* ocipher = openssl_cipher(cipher);
-  if (1 != EVP_DecryptInit(ctx.get(), ocipher, key.data(), nonce.data())) {
+  const auto* cipher = openssl_cipher(id);
+  if (1 != EVP_DecryptInit(ctx.get(), cipher, key.data(), nonce.data())) {
     throw openssl_error();
   }
 

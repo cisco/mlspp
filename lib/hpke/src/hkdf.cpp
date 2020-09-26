@@ -47,8 +47,24 @@ HKDF::get<Digest::ID::SHA512>()
   return HKDF::instance<Digest::ID::SHA512>;
 }
 
+static KDF::ID
+digest_to_kdf(Digest::ID digest_id)
+{
+  switch (digest_id) {
+    case Digest::ID::SHA256:
+      return KDF::ID::HKDF_SHA256;
+    case Digest::ID::SHA384:
+      return KDF::ID::HKDF_SHA384;
+    case Digest::ID::SHA512:
+      return KDF::ID::HKDF_SHA512;
+  }
+
+  throw std::runtime_error("Unsupported algorithm");
+}
+
 HKDF::HKDF(const Digest& digest_in)
-  : digest(digest_in)
+  : KDF(digest_to_kdf(digest_in.id))
+  , digest(digest_in)
 {}
 
 bytes

@@ -34,6 +34,8 @@ struct Signature
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
 
+  const ID id;
+
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
     const bytes& ikm) const = 0;
@@ -49,6 +51,9 @@ struct Signature
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+protected:
+  Signature(ID id_in);
 };
 
 } // namespace hpke

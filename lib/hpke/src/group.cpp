@@ -283,7 +283,7 @@ private:
 
   uint8_t bitmask() const
   {
-    switch (group_id) {
+    switch (id) {
       case Group::ID::P256:
       case Group::ID::P384:
         return 0xff;
@@ -477,7 +477,7 @@ Group::get<Group::ID::Ed448>()
 size_t
 Group::dh_size() const
 {
-  switch (group_id) {
+  switch (id) {
     case Group::ID::P256:
       return 32;
     case Group::ID::P384:
@@ -497,7 +497,7 @@ Group::dh_size() const
 size_t
 Group::pk_size() const
 {
-  switch (group_id) {
+  switch (id) {
     case Group::ID::P256:
       return 65;
     case Group::ID::P384:
@@ -520,7 +520,7 @@ Group::pk_size() const
 size_t
 Group::sk_size() const
 {
-  switch (group_id) {
+  switch (id) {
     case Group::ID::P256:
       return 32;
     case Group::ID::P384:

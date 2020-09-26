@@ -90,12 +90,14 @@ operator>>(tls::istream& str, X509Credential& obj)
 /// Credential
 ///
 
-bytes
-Credential::identity() const
+CredentialType
+Credential::type() const
 {
   switch (_cred.index()) {
     case 0:
-      return std::get<BasicCredential>(_cred).identity;
+      return CredentialType::basic;
+    case 1:
+      return CredentialType::x509;
   }
 
   throw std::bad_variant_access();

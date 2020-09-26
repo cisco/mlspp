@@ -31,6 +31,10 @@ static const bytes label_secret = to_bytes("secret");
 /// Factory methods for primitives
 ///
 
+KEM::KEM(KEM::ID id_in)
+  : id(id_in)
+{}
+
 template<>
 const KEM&
 KEM::get<KEM::ID::DHKEM_P256_SHA256>()
@@ -114,6 +118,10 @@ KDF::get<KDF::ID::HKDF_SHA512>()
   return HKDF::get<Digest::ID::SHA512>();
 }
 
+KDF::KDF(KDF::ID id_in)
+  : id(id_in)
+{}
+
 bytes
 KDF::labeled_extract(const bytes& suite_id,
                      const bytes& salt,
@@ -155,6 +163,10 @@ AEAD::get<AEAD::ID::CHACHA20_POLY1305>()
 {
   return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
 }
+
+AEAD::AEAD(AEAD::ID id_in)
+  : id(id_in)
+{}
 
 ///
 /// Encryption Contexts

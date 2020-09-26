@@ -35,6 +35,8 @@ struct KEM
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
 
+  const ID id;
+
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
     const bytes& ikm) const = 0;
@@ -61,6 +63,9 @@ struct KEM
   virtual size_t enc_size() const = 0;
   virtual size_t pk_size() const = 0;
   virtual size_t sk_size() const = 0;
+
+protected:
+  KEM(ID id_in);
 };
 
 struct KDF
@@ -76,6 +81,8 @@ struct KDF
   static const KDF& get();
 
   virtual ~KDF() = default;
+
+  const ID id;
 
   virtual bytes extract(const bytes& salt, const bytes& ikm) const = 0;
   virtual bytes expand(const bytes& prk,
@@ -93,6 +100,9 @@ struct KDF
                        const bytes& label,
                        const bytes& info,
                        size_t size) const;
+
+protected:
+  KDF(ID id_in);
 };
 
 struct AEAD
@@ -109,6 +119,8 @@ struct AEAD
 
   virtual ~AEAD() = default;
 
+  const ID id;
+
   virtual bytes seal(const bytes& key,
                      const bytes& nonce,
                      const bytes& aad,
@@ -120,6 +132,9 @@ struct AEAD
 
   virtual size_t key_size() const = 0;
   virtual size_t nonce_size() const = 0;
+
+protected:
+  AEAD(ID id_in);
 };
 
 struct Context

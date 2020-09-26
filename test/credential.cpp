@@ -12,8 +12,10 @@ TEST_CASE("Basic Credential")
   auto pub = priv.public_key;
 
   auto cred = Credential::basic(user_id, pub);
-  REQUIRE(cred.identity() == user_id);
   REQUIRE(cred.public_key() == pub);
+
+  const auto& basic = cred.get<BasicCredential>();
+  REQUIRE(basic.identity == user_id);
 }
 
 TEST_CASE("X509 Credential Depth 2")
@@ -40,6 +42,9 @@ TEST_CASE("X509 Credential Depth 2")
 
   auto cred = Credential::x509(der_in);
   CHECK(cred.public_key().data.size() != 0);
+
+  auto x509 = cred.get<X509Credential>();
+  CHECK(x509.der_chain == der_in);
 }
 
 TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
@@ -70,6 +75,9 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
   CHECK(original.public_key() == unmarshaled.public_key());
+
+  auto x509 = unmarshaled.get<X509Credential>();
+  CHECK(x509.der_chain == der_in);
 }
 
 TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
@@ -92,4 +100,7 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
   CHECK(original.public_key() == unmarshaled.public_key());
+
+  auto x509 = unmarshaled.get<X509Credential>();
+  CHECK(x509.der_chain == der_in);
 }
