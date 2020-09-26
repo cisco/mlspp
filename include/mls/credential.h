@@ -60,6 +60,9 @@ struct X509Credential
 
 private:
   SignaturePublicKey _public_key;
+  hpke::Signature::ID _signature_algorithm;
+
+  friend struct KeyPackage;
 };
 
 tls::ostream&

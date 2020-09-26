@@ -104,6 +104,14 @@ KeyPackage::verify() const
 {
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
+
+  if (CredentialType::x509 == credential.type()) {
+    const auto& cred = credential.get<X509Credential>();
+    if (cred._signature_algorithm != cipher_suite.get().sig.id) {
+      throw std::runtime_error("Signature algorithm invalid");
+    }
+  }
+
   return identity_key.verify(cipher_suite, tbs, signature);
 }
 
