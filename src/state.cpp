@@ -156,7 +156,7 @@ State::remove(uint32_t roster_index) const
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
     const auto& kp = _tree.key_package(LeafIndex{ i });
-    if (kp.has_value() && i == roster_index) {
+    if (kp.has_value() && (i == roster_index)) {
       return sign({ Remove{ LeafIndex{ roster_index } } });
     }
   }
