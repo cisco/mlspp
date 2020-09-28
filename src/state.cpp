@@ -151,9 +151,17 @@ State::update(const bytes& leaf_secret)
 }
 
 MLSPlaintext
-State::remove(LeafIndex removed) const
+State::remove(uint32_t roster_index) const
 {
-  return sign({ Remove{ removed } });
+
+  for (uint32_t i = 0; i < _tree.size().val; i++) {
+    const auto& kp = _tree.key_package(LeafIndex{ i });
+    if (kp.has_value() && i == roster_index) {
+      return sign({ Remove{ LeafIndex{ roster_index } } });
+    }
+  }
+
+  throw InvalidParameterError("Leaf Index mismatch");
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
