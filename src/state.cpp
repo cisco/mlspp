@@ -583,15 +583,19 @@ State::do_export(const std::string& label,
 std::vector<Credential>
 State::get_leaf_credentials() const
 {
-  std::vector<Credential> creds;
+  std::vector<Credential> creds(_tree.size().val);
+  uint32_t leaf_count = 0;
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
-    const auto& ln = _tree.node_at(LeafIndex{ i });
-    if (ln.node.has_value()) {
-      creds.push_back(ln.key_package().credential);
+    const auto& kp = _tree.key_package(LeafIndex{ i });
+    if (!kp.has_value()) {
+      continue;
     }
+    creds[i] = kp->credential;
+    leaf_count++;
   }
 
+  creds.resize(leaf_count);
   return creds;
 }
 
