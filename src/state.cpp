@@ -151,13 +151,17 @@ State::update(const bytes& leaf_secret)
 }
 
 MLSPlaintext
-State::remove(uint32_t roster_index) const
+State::remove(LeafIndex removed) const
 {
+  uint32_t non_blank_leaves = 0;
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
     const auto& kp = _tree.key_package(LeafIndex{ i });
-    if (kp.has_value() && (i == roster_index)) {
-      return sign({ Remove{ LeafIndex{ roster_index } } });
+    if (kp.has_value()) {
+      if (non_blank_leaves == removed.val) {
+        return sign({ Remove{ LeafIndex{ i } } });
+      }
+      ++non_blank_leaves;
     }
   }
 

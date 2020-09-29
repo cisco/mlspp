@@ -64,7 +64,7 @@ public:
 
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
-  MLSPlaintext remove(uint32_t roster_index) const;
+  MLSPlaintext remove(LeafIndex removed) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret) const;
