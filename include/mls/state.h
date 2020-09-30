@@ -41,6 +41,7 @@ struct GroupContext
 class State
 {
 public:
+
   ///
   /// Constructors
   ///
@@ -64,6 +65,7 @@ public:
 
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
+  MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
@@ -83,7 +85,8 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  std::vector<Credential> get_leaf_credentials() const;
+  // Ordered list of credentials from non-blank leaves
+  std::vector<Credential> roster() const;
 
   ///
   /// General encryption and decryption
@@ -158,6 +161,9 @@ protected:
 
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
+
+  // Convert a Roster entry into LeafIndex
+  LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 };
 
 } // namespace mls

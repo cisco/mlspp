@@ -150,22 +150,34 @@ State::update(const bytes& leaf_secret)
   return pt;
 }
 
-MLSPlaintext
-State::remove(LeafIndex removed) const
+LeafIndex
+State::leaf_for_roster_entry(RosterIndex index) const
 {
   uint32_t non_blank_leaves = 0;
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
     const auto& kp = _tree.key_package(LeafIndex{ i });
     if (kp.has_value()) {
-      if (non_blank_leaves == removed.val) {
-        return sign({ Remove{ LeafIndex{ i } } });
+      if (non_blank_leaves == index.val) {
+        return  LeafIndex{ i };
       }
       ++non_blank_leaves;
     }
   }
 
   throw InvalidParameterError("Leaf Index mismatch");
+}
+
+MLSPlaintext
+State::remove(RosterIndex index) const
+{
+  return remove(leaf_for_roster_entry(index));
+}
+
+MLSPlaintext
+State::remove(LeafIndex removed) const
+{
+  return sign({ Remove{ removed } });
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
@@ -593,7 +605,7 @@ State::do_export(const std::string& label,
 }
 
 std::vector<Credential>
-State::get_leaf_credentials() const
+State::roster() const
 {
   std::vector<Credential> creds(_tree.size().val);
   uint32_t leaf_count = 0;
@@ -603,7 +615,7 @@ State::get_leaf_credentials() const
     if (!kp.has_value()) {
       continue;
     }
-    creds[i] = kp->credential;
+    creds[leaf_count] = kp->credential;
     leaf_count++;
   }
 

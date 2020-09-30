@@ -249,9 +249,9 @@ Session::update()
 }
 
 bytes
-Session::remove(uint32_t roster_index)
+Session::remove(uint32_t index)
 {
-  auto proposal = inner->history.front().remove(LeafIndex { roster_index });
+  auto proposal = inner->history.front().remove(RosterIndex { index });
   return inner->export_message(proposal);
 }
 
@@ -350,7 +350,7 @@ Session::do_export(const std::string& label,
 std::vector<Credential>
 Session::roster() const
 {
-  return inner->history.front().get_leaf_credentials();
+  return inner->history.front().roster();
 }
 
 bytes

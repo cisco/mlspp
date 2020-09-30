@@ -67,6 +67,12 @@ protected:
       REQUIRE(ref ==
               state.do_export(export_label, export_context, export_size));
     }
+
+    // Verify roster
+    auto roster_ref = states[0].roster();
+    for(const auto& state: states) {
+      REQUIRE(roster_ref == state.roster());
+    }
   }
 };
 
@@ -153,6 +159,67 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
     verify_group_functionality(states);
   }
 }
+
+TEST_CASE_FIXTURE(StateTest, "Roster Updates")
+{
+  // Initialize the creator's state
+  states.emplace_back(
+    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
+
+  // Each participant invites the next
+  for (size_t i = 1; i < group_size; i += 1) {
+    auto sender = i - 1;
+
+    auto add = states[sender].add(key_packages[i]);
+    states[sender].handle(add);
+
+    auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
+    for (size_t j = 0; j < states.size(); j += 1) {
+      if (j == sender) {
+        states[j] = new_state;
+      } else {
+        states[j].handle(add);
+        states[j] = states[j].handle(commit).value();
+      }
+    }
+
+    states.emplace_back(
+      init_privs[i], identity_privs[i], key_packages[i], welcome);
+
+    // Check that everyone ended up in the same place
+    for (const auto& state : states) {
+      REQUIRE(state == states[0]);
+    }
+
+    verify_group_functionality(states);
+  }
+
+  // remove member at position 1
+  auto remove_1 = states[0].remove(RosterIndex{ 1 });
+  states[0].handle(remove_1);
+
+  // remove member at position 2
+  auto remove_2 = states[0].remove(RosterIndex{ 2 });
+  states[0].handle(remove_2);
+
+  // commit to new state
+  auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
+  silence_unused(welcome);
+
+  auto roster_ref = new_state.roster();
+  REQUIRE(3 == roster_ref.size());
+
+  // handle remove by remaining clients and verify the roster
+  for (int i = 3; i < static_cast<int>(group_size); i += 1) {
+    states[i].handle(remove_1);
+    states[i].handle(remove_2);
+    states[i] = states[i].handle(commit).value();
+    auto roster = states[i].roster();
+    REQUIRE(roster_ref == roster);
+  }
+
+}
+
 
 class RunningGroupTest : public StateTest
 {
