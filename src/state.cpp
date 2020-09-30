@@ -159,7 +159,7 @@ State::leaf_for_roster_entry(RosterIndex index) const
     const auto& kp = _tree.key_package(LeafIndex{ i });
     if (kp.has_value()) {
       if (non_blank_leaves == index.val) {
-        return  LeafIndex{ i };
+        return LeafIndex{ i };
       }
       ++non_blank_leaves;
     }

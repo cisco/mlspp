@@ -251,7 +251,7 @@ Session::update()
 bytes
 Session::remove(uint32_t index)
 {
-  auto proposal = inner->history.front().remove(RosterIndex { index });
+  auto proposal = inner->history.front().remove(RosterIndex{ index });
   return inner->export_message(proposal);
 }
 

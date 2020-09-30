@@ -70,7 +70,7 @@ protected:
 
     // Verify roster
     auto roster_ref = states[0].roster();
-    for(const auto& state: states) {
+    for (const auto& state : states) {
       REQUIRE(roster_ref == state.roster());
     }
   }
@@ -217,9 +217,7 @@ TEST_CASE_FIXTURE(StateTest, "Roster Updates")
     auto roster = states[i].roster();
     REQUIRE(roster_ref == roster);
   }
-
 }
-
 
 class RunningGroupTest : public StateTest
 {

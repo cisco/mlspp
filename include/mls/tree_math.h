@@ -79,7 +79,8 @@ struct NodeIndex : public UInt32
 };
 
 // Index into the session roster
-struct RosterIndex : public UInt32 {
+struct RosterIndex : public UInt32
+{
   using UInt32::UInt32;
 };
 

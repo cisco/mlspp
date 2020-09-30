@@ -41,7 +41,6 @@ struct GroupContext
 class State
 {
 public:
-
   ///
   /// Constructors
   ///
