@@ -214,8 +214,7 @@ TEST_CASE_FIXTURE(StateTest, "Roster Updates")
     states[i].handle(remove_1);
     states[i].handle(remove_2);
     states[i] = states[i].handle(commit).value();
-    auto roster = states[i].roster();
-    REQUIRE(roster_ref == roster);
+    REQUIRE(roster_ref == states[i].roster());
   }
 }
 
