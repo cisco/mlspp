@@ -160,84 +160,6 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
   }
 }
 
-TEST_CASE_FIXTURE(StateTest, "Roster Updates")
-{
-  // Initialize the creator's state
-  states.emplace_back(
-    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
-
-  // Each participant invites the next
-  for (size_t i = 1; i < group_size; i += 1) {
-    auto sender = i - 1;
-
-    auto add = states[sender].add(key_packages[i]);
-    states[sender].handle(add);
-
-    auto [commit, welcome, new_state] = states[sender].commit(fresh_secret());
-    for (size_t j = 0; j < states.size(); j += 1) {
-      if (j == sender) {
-        states[j] = new_state;
-      } else {
-        states[j].handle(add);
-        states[j] = states[j].handle(commit).value();
-      }
-    }
-
-    states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
-
-    // Check that everyone ended up in the same place
-    for (const auto& state : states) {
-      REQUIRE(state == states[0]);
-    }
-
-    verify_group_functionality(states);
-  }
-
-  // remove member at position 1
-  auto remove_1 = states[0].remove(RosterIndex{ 1 });
-  states[0].handle(remove_1);
-  // commit to new state
-  auto [commit_1, welcome_1, new_state_1] = states[0].commit(fresh_secret());
-  silence_unused(welcome_1);
-  // roster should be 0, 2, 3, 4
-  auto expected_roster = std::vector<Credential>{
-    key_packages[0].credential,
-    key_packages[2].credential,
-    key_packages[3].credential,
-    key_packages[4].credential,
-  };
-  REQUIRE(expected_roster == new_state_1.roster());
-
-  // remove member at position 2
-  auto remove_2 = new_state_1.remove(RosterIndex{ 2 });
-  new_state_1.handle(remove_2);
-  // commit to new state
-  auto [commit_2, welcome_2, new_state_2] = new_state_1.commit(fresh_secret());
-  silence_unused(welcome_2);
-  // roster should be 0, 2, 3, 4
-  expected_roster = std::vector<Credential>{
-    key_packages[0].credential,
-    key_packages[2].credential,
-    key_packages[4].credential,
-  };
-  REQUIRE(expected_roster == new_state_2.roster());
-
-
-  // handle remove by remaining clients and verify the roster
-  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
-    if (i == 3 ) {
-      // skip since we removed
-      continue;
-    }
-    states[i].handle(remove_1);
-    states[i] = states[i].handle(commit_1).value();
-    states[i].handle(remove_2);
-    states[i] = states[i].handle(commit_2).value();
-    REQUIRE(expected_roster == states[i].roster());
-  }
-}
-
 class RunningGroupTest : public StateTest
 {
 protected:
@@ -315,5 +237,52 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
     }
 
     check_consistency();
+  }
+}
+
+TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
+{
+  // remove member at position 1
+  auto remove_1 = states[0].remove(RosterIndex{ 1 });
+  states[0].handle(remove_1);
+  // commit to new state
+  auto [commit_1, welcome_1, new_state_1] = states[0].commit(fresh_secret());
+  silence_unused(welcome_1);
+  // roster should be 0, 2, 3, 4
+  auto expected_roster = std::vector<Credential>{
+    key_packages[0].credential,
+    key_packages[2].credential,
+    key_packages[3].credential,
+    key_packages[4].credential,
+  };
+
+  REQUIRE(expected_roster == new_state_1.roster());
+
+  // remove member at position 2
+  auto remove_2 = new_state_1.remove(RosterIndex{ 2 });
+  new_state_1.handle(remove_2);
+  // commit to new state
+  auto [commit_2, welcome_2, new_state_2] = new_state_1.commit(fresh_secret());
+  silence_unused(welcome_2);
+  // roster should be 0, 2, 4
+  expected_roster = std::vector<Credential>{
+    key_packages[0].credential,
+    key_packages[2].credential,
+    key_packages[4].credential,
+  };
+
+  REQUIRE(expected_roster == new_state_2.roster());
+
+  // handle remove by remaining clients and verify the roster
+  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
+    if (i == 3) {
+      // skip since we removed
+      continue;
+    }
+    states[i].handle(remove_1);
+    states[i] = states[i].handle(commit_1).value();
+    states[i].handle(remove_2);
+    states[i] = states[i].handle(commit_2).value();
+    REQUIRE(expected_roster == states[i].roster());
   }
 }

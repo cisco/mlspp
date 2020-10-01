@@ -153,12 +153,16 @@ State::update(const bytes& leaf_secret)
 LeafIndex
 State::leaf_for_roster_entry(RosterIndex index) const
 {
-  auto non_blank_leaves = uint32_t (0);
+  auto non_blank_leaves = uint32_t(0);
 
-  for (auto i = LeafIndex{0}; i < _tree.size(); i.val++) {
+  for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
     const auto& kp = _tree.key_package(i);
-    if (!kp.has_value()) { continue; }
-    if (non_blank_leaves == index.val) { return i; }
+    if (!kp.has_value()) {
+      continue;
+    }
+    if (non_blank_leaves == index.val) {
+      return i;
+    }
     non_blank_leaves += 1;
   }
 
