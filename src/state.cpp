@@ -153,16 +153,13 @@ State::update(const bytes& leaf_secret)
 LeafIndex
 State::leaf_for_roster_entry(RosterIndex index) const
 {
-  uint32_t non_blank_leaves = 0;
+  auto non_blank_leaves = uint32_t (0);
 
-  for (uint32_t i = 0; i < _tree.size().val; i++) {
-    const auto& kp = _tree.key_package(LeafIndex{ i });
-    if (kp.has_value()) {
-      if (non_blank_leaves == index.val) {
-        return LeafIndex{ i };
-      }
-      ++non_blank_leaves;
-    }
+  for (auto i = LeafIndex{0}; i < _tree.size(); i.val++) {
+    const auto& kp = _tree.key_package(i);
+    if (!kp.has_value()) { continue; }
+    if (non_blank_leaves == index.val) { return i; }
+    non_blank_leaves += 1;
   }
 
   throw InvalidParameterError("Leaf Index mismatch");
@@ -615,7 +612,7 @@ State::roster() const
     if (!kp.has_value()) {
       continue;
     }
-    creds[leaf_count] = kp->credential;
+    creds.at(leaf_count) = kp->credential;
     leaf_count++;
   }
 

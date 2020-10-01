@@ -78,12 +78,6 @@ struct NodeIndex : public UInt32
   bool operator<(const NodeIndex other) const { return val < other.val; }
 };
 
-// Index into the session roster
-struct RosterIndex : public UInt32
-{
-  using UInt32::UInt32;
-};
-
 // Internal namespace to keep these generic names clean
 namespace tree_math {
 

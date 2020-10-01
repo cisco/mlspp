@@ -197,25 +197,44 @@ TEST_CASE_FIXTURE(StateTest, "Roster Updates")
   // remove member at position 1
   auto remove_1 = states[0].remove(RosterIndex{ 1 });
   states[0].handle(remove_1);
+  // commit to new state
+  auto [commit_1, welcome_1, new_state_1] = states[0].commit(fresh_secret());
+  silence_unused(welcome_1);
+  // roster should be 0, 2, 3, 4
+  auto expected_roster = std::vector<Credential>{
+    key_packages[0].credential,
+    key_packages[2].credential,
+    key_packages[3].credential,
+    key_packages[4].credential,
+  };
+  REQUIRE(expected_roster == new_state_1.roster());
 
   // remove member at position 2
-  auto remove_2 = states[0].remove(RosterIndex{ 2 });
-  states[0].handle(remove_2);
-
+  auto remove_2 = new_state_1.remove(RosterIndex{ 2 });
+  new_state_1.handle(remove_2);
   // commit to new state
-  auto [commit, welcome, new_state] = states[0].commit(fresh_secret());
-  silence_unused(welcome);
+  auto [commit_2, welcome_2, new_state_2] = new_state_1.commit(fresh_secret());
+  silence_unused(welcome_2);
+  // roster should be 0, 2, 3, 4
+  expected_roster = std::vector<Credential>{
+    key_packages[0].credential,
+    key_packages[2].credential,
+    key_packages[4].credential,
+  };
+  REQUIRE(expected_roster == new_state_2.roster());
 
-  auto roster_ref = new_state.roster();
-  REQUIRE(3 == roster_ref.size());
 
   // handle remove by remaining clients and verify the roster
-  for (int i = 3; i < static_cast<int>(group_size); i += 1) {
+  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
+    if (i == 3 ) {
+      // skip since we removed
+      continue;
+    }
     states[i].handle(remove_1);
+    states[i] = states[i].handle(commit_1).value();
     states[i].handle(remove_2);
-    states[i] = states[i].handle(commit).value();
-    auto roster = states[i].roster();
-    REQUIRE(roster_ref == roster);
+    states[i] = states[i].handle(commit_2).value();
+    REQUIRE(expected_roster == states[i].roster());
   }
 }
 

@@ -38,6 +38,12 @@ struct GroupContext
              tls::pass)
 };
 
+// Index into the session roster
+struct RosterIndex : public UInt32
+{
+  using UInt32::UInt32;
+};
+
 class State
 {
 public:
