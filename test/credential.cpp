@@ -74,7 +74,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
 
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
-  CHECK(original.public_key() == unmarshaled.public_key());
+  CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
   CHECK(x509.der_chain == der_in);
@@ -99,7 +99,7 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
 
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
-  CHECK(original.public_key() == unmarshaled.public_key());
+  CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
   CHECK(x509.der_chain == der_in);

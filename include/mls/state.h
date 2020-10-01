@@ -38,6 +38,12 @@ struct GroupContext
              tls::pass)
 };
 
+// Index into the session roster
+struct RosterIndex : public UInt32
+{
+  using UInt32::UInt32;
+};
+
 class State
 {
 public:
@@ -64,6 +70,7 @@ public:
 
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
+  MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
@@ -83,6 +90,8 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  // Ordered list of credentials from non-blank leaves
+  std::vector<Credential> roster() const;
 
   ///
   /// General encryption and decryption
@@ -157,6 +166,9 @@ protected:
 
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
+
+  // Convert a Roster entry into LeafIndex
+  LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 };
 
 } // namespace mls

@@ -87,6 +87,12 @@ operator>>(tls::istream& str, X509Credential& obj)
   return str;
 }
 
+bool
+operator==(const X509Credential& lhs, const X509Credential& rhs)
+{
+  return lhs.der_chain == rhs.der_chain;
+}
+
 ///
 /// Credential
 ///

@@ -150,6 +150,31 @@ State::update(const bytes& leaf_secret)
   return pt;
 }
 
+LeafIndex
+State::leaf_for_roster_entry(RosterIndex index) const
+{
+  auto non_blank_leaves = uint32_t(0);
+
+  for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
+    const auto& kp = _tree.key_package(i);
+    if (!kp.has_value()) {
+      continue;
+    }
+    if (non_blank_leaves == index.val) {
+      return i;
+    }
+    non_blank_leaves += 1;
+  }
+
+  throw InvalidParameterError("Leaf Index mismatch");
+}
+
+MLSPlaintext
+State::remove(RosterIndex index) const
+{
+  return remove(leaf_for_roster_entry(index));
+}
+
 MLSPlaintext
 State::remove(LeafIndex removed) const
 {
@@ -578,6 +603,25 @@ State::do_export(const std::string& label,
   // TODO(RLB): Align with latest spec
   auto secret = _suite.derive_secret(_keys.exporter_secret, label, context);
   return _suite.expand_with_label(secret, "exporter", context, size);
+}
+
+std::vector<Credential>
+State::roster() const
+{
+  std::vector<Credential> creds(_tree.size().val);
+  uint32_t leaf_count = 0;
+
+  for (uint32_t i = 0; i < _tree.size().val; i++) {
+    const auto& kp = _tree.key_package(LeafIndex{ i });
+    if (!kp.has_value()) {
+      continue;
+    }
+    creds.at(leaf_count) = kp->credential;
+    leaf_count++;
+  }
+
+  creds.resize(leaf_count);
+  return creds;
 }
 
 MLSCiphertext
