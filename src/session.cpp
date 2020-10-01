@@ -100,6 +100,10 @@ PendingJoin::Inner::create(CipherSuite suite,
   return PendingJoin(inner.release());
 }
 
+PendingJoin::PendingJoin(PendingJoin const& other)
+  : inner(std::make_unique<Inner>(*other.inner))
+{}
+
 PendingJoin::~PendingJoin() = default;
 
 PendingJoin::PendingJoin(Inner* inner_in)
