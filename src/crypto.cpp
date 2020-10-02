@@ -13,7 +13,7 @@ using hpke::Signature; // NOLINT(misc-unused-using-decls)
 namespace mls {
 
 SignatureScheme
-to_tls(Signature::ID id)
+tls_signature_scheme(Signature::ID id)
 {
   switch (id) {
     case Signature::ID::P256_SHA256:

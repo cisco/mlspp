@@ -22,7 +22,7 @@ enum struct SignatureScheme : uint16_t
 };
 
 SignatureScheme
-to_tls(hpke::Signature::ID id);
+tls_signature_scheme(hpke::Signature::ID id);
 
 /// Cipher suites
 
