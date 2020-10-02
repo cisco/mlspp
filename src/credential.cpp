@@ -37,6 +37,24 @@ find_signature(Signature::ID id)
   throw InvalidParameterError("Unsupported algorithm");
 }
 
+SignatureScheme
+get_tls_signature_scheme(Signature::ID id)
+{
+  switch (id) {
+    case Signature::ID::P256_SHA256:
+      return SignatureScheme::ecdsa_secp256r1_sha256;
+    case Signature::ID::P384_SHA384:
+      return SignatureScheme::ecdsa_secp384r1_sha384;
+    case Signature::ID::P521_SHA512:
+      return SignatureScheme::ecdsa_secp521r1_sha512;
+    case Signature::ID::Ed25519:
+      return SignatureScheme::ed25519;
+    case Signature::ID::Ed448:
+      return SignatureScheme::ed448;
+  }
+  throw InvalidParameterError("Unsupported algorithm");
+}
+
 X509Credential::X509Credential(
   std::vector<X509Credential::CertData> der_chain_in)
   : der_chain(std::move(der_chain_in))
@@ -54,7 +72,7 @@ X509Credential::X509Credential(
   // first element represents leaf cert
   const auto& sig = find_signature(parsed[0].public_key_algorithm);
   const auto pub_data = sig.serialize(*parsed[0].public_key);
-  _signature_algorithm =  parsed[0].public_key_algorithm;
+  _signature_scheme = get_tls_signature_scheme(parsed[0].public_key_algorithm);
   _public_key = SignaturePublicKey{ pub_data };
 
   // verify chain for valid signatures

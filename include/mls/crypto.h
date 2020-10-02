@@ -10,6 +10,15 @@
 #include <vector>
 
 namespace mls {
+/// Signature Code points
+enum struct SignatureScheme : uint16_t
+{
+  ecdsa_secp256r1_sha256 = 0x0403,
+  ecdsa_secp384r1_sha384 = 0x0805,
+  ecdsa_secp521r1_sha512 = 0x0603,
+  ed25519 = 0x0807,
+  ed448 = 0x0808,
+};
 
 /// Cipher suites
 

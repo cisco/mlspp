@@ -60,7 +60,7 @@ struct X509Credential
 
 private:
   SignaturePublicKey _public_key;
-  hpke::Signature::ID _signature_algorithm;
+  SignatureScheme _signature_scheme;
 
   friend struct KeyPackage;
 };
