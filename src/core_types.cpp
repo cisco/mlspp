@@ -1,25 +1,6 @@
 #include "mls/core_types.h"
 
 namespace mls {
-
-hpke::Signature::ID
-hpke_signature_algorithm(SignatureScheme scheme)
-{
-  switch (scheme) {
-    case SignatureScheme::ed448:
-      return hpke::Signature::ID::Ed448;
-    case SignatureScheme::ed25519:
-      return hpke::Signature::ID::Ed25519;
-    case SignatureScheme::ecdsa_secp256r1_sha256:
-      return hpke::Signature::ID::P521_SHA512;
-    case SignatureScheme::ecdsa_secp384r1_sha384:
-      return hpke::Signature::ID::P384_SHA384;
-    case SignatureScheme::ecdsa_secp521r1_sha512:
-      return hpke::Signature::ID::P521_SHA512;
-  }
-  throw InvalidParameterError("Unsupported algorithm");
-}
-
 ///
 /// Extensions
 ///
