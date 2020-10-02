@@ -125,8 +125,7 @@ KeyPackage::verify() const
 
   if (CredentialType::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
-    if (hpke_signature_algorithm(cred._signature_scheme) !=
-        cipher_suite.get().sig.id) {
+    if (cred._signature_scheme != to_tls(cipher_suite.get().sig.id)) {
       throw std::runtime_error("Signature algorithm invalid");
     }
   }

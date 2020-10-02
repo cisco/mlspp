@@ -10,7 +10,8 @@
 #include <vector>
 
 namespace mls {
-/// Signature Code points
+
+/// Signature Code points, borrowed from RFC 8446
 enum struct SignatureScheme : uint16_t
 {
   ecdsa_secp256r1_sha256 = 0x0403,
@@ -19,6 +20,9 @@ enum struct SignatureScheme : uint16_t
   ed25519 = 0x0807,
   ed448 = 0x0808,
 };
+
+SignatureScheme
+to_tls(hpke::Signature::ID id);
 
 /// Cipher suites
 
