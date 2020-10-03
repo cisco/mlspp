@@ -10,7 +10,7 @@ CLANG_FORMAT=clang-format -i
 TEST_VECTOR_DIR=./build/test
 TEST_GEN=./build/cmd/test_gen/test_gen
 
-.PHONY: all tidy test libs test-libs test-all gen example everything clean cclean format
+.PHONY: all tidy test libs test-libs test-all gen wrapper example everything clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
@@ -43,9 +43,15 @@ gen: ${BUILD_DIR}
 	mkdir -p ${TEST_VECTOR_DIR}
 	cd ${TEST_VECTOR_DIR} && ../../${TEST_GEN}
 
+
+wrapper: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR} --target mlspp-c
+
 example: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target api_example
 	./build/cmd/api_example/api_example
+	cmake --build ${BUILD_DIR} --target wrapper_example
+	./build/cmd/wrapper_example/wrapper_example
 
 everything: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
