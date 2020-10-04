@@ -29,6 +29,7 @@ private:
 class PendingJoin
 {
 public:
+  PendingJoin(const PendingJoin& other);
   ~PendingJoin();
   bytes key_package() const;
   Session complete(const bytes& welcome) const;
