@@ -347,8 +347,6 @@ generate_messages()
     // Construct Commit
     auto commit = Commit{
       { { tv.random }, { tv.random } },
-      { { tv.random }, { tv.random } },
-      { { tv.random }, { tv.random } },
       update_path,
     };
 

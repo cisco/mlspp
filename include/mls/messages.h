@@ -190,6 +190,8 @@ struct Proposal
 {
   std::variant<Add, Update, Remove> content;
 
+  ProposalType proposal_type() const;
+
   static const ContentType type;
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
@@ -203,20 +205,16 @@ struct ProposalID
 };
 
 // struct {
-//     ProposalID updates<0..2^16-1>;
-//     ProposalID removes<0..2^16-1>;
-//     ProposalID adds<0..2^16-1>;
-//     UpdatePath path;
+//     ProposalID proposals<0..2^32-1>;
+//     optional<UpdatePath> path;
 // } Commit;
 struct Commit
 {
-  std::vector<ProposalID> updates;
-  std::vector<ProposalID> removes;
-  std::vector<ProposalID> adds;
-  UpdatePath path;
+  std::vector<ProposalID> proposals;
+  std::optional<UpdatePath> path;
 
-  TLS_SERIALIZABLE(updates, removes, adds, path)
-  TLS_TRAITS(tls::vector<2>, tls::vector<2>, tls::vector<2>, tls::pass)
+  TLS_SERIALIZABLE(proposals, path)
+  TLS_TRAITS(tls::vector<4>, tls::pass)
 };
 
 // struct {
