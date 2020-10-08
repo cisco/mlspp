@@ -82,14 +82,14 @@ TEST_CASE("Messages Interop")
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 
-    // DirectPath
-    auto direct_path =
-      DirectPath{ key_package,
+    // UpdatePath
+    auto update_path =
+      UpdatePath{ key_package,
                   {
                     { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
                     { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
                   } };
-    tls_round_trip(tc.direct_path, direct_path, reproducible);
+    tls_round_trip(tc.update_path, update_path, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
     auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
@@ -136,7 +136,7 @@ TEST_CASE("Messages Interop")
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
-      direct_path,
+      update_path,
     };
     tls_round_trip(tc.commit, commit, true);
 

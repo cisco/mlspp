@@ -304,9 +304,9 @@ generate_messages()
     key_package.extensions = ext_list;
     key_package.signature = tv.random;
 
-    // Construct DirectPath
-    auto direct_path =
-      DirectPath{ key_package,
+    // Construct UpdatePath
+    auto update_path =
+      UpdatePath{ key_package,
                   {
                     { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
                     { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
@@ -349,7 +349,7 @@ generate_messages()
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
       { { tv.random }, { tv.random } },
-      direct_path,
+      update_path,
     };
 
     // Construct an MLSCiphertext
@@ -360,7 +360,7 @@ generate_messages()
 
     tv.cases.push_back({ suite,
                          tls::marshal(key_package),
-                         tls::marshal(direct_path),
+                         tls::marshal(update_path),
                          tls::marshal(group_info),
                          tls::marshal(group_secrets),
                          tls::marshal(encrypted_group_secrets),

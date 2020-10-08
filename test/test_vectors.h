@@ -308,7 +308,7 @@ struct MessagesTestVectors
     CipherSuite cipher_suite;
 
     bytes key_package;
-    bytes direct_path;
+    bytes update_path;
     bytes group_info;
     bytes group_secrets;
     bytes encrypted_group_secrets;
@@ -321,7 +321,7 @@ struct MessagesTestVectors
 
     TLS_SERIALIZABLE(cipher_suite,
                      key_package,
-                     direct_path,
+                     update_path,
                      group_info,
                      group_secrets,
                      encrypted_group_secrets,

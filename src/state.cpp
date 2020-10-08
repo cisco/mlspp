@@ -328,7 +328,7 @@ State::handle(const MLSPlaintext& pt)
   State next = *this;
   next.apply(commit_data.commit);
 
-  // Decapsulate and apply the DirectPath
+  // Decapsulate and apply the UpdatePath
   auto ctx = tls::marshal(GroupContext{
     next._group_id,
     next._epoch + 1,

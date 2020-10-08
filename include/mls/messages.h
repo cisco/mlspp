@@ -206,14 +206,14 @@ struct ProposalID
 //     ProposalID updates<0..2^16-1>;
 //     ProposalID removes<0..2^16-1>;
 //     ProposalID adds<0..2^16-1>;
-//     DirectPath path;
+//     UpdatePath path;
 // } Commit;
 struct Commit
 {
   std::vector<ProposalID> updates;
   std::vector<ProposalID> removes;
   std::vector<ProposalID> adds;
-  DirectPath path;
+  UpdatePath path;
 
   TLS_SERIALIZABLE(updates, removes, adds, path)
   TLS_TRAITS(tls::vector<2>, tls::vector<2>, tls::vector<2>, tls::pass)

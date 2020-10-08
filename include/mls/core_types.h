@@ -204,7 +204,7 @@ bool
 operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
 ///
-/// DirectPath
+/// UpdatePath
 ///
 
 // struct {
@@ -222,8 +222,8 @@ struct RatchetNode
 
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
-// } DirectPath;
-struct DirectPath
+// } UpdatePath;
+struct UpdatePath
 {
   KeyPackage leaf_key_package;
   std::vector<RatchetNode> nodes;

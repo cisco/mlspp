@@ -125,11 +125,11 @@ operator==(const KeyPackage& lhs, const KeyPackage& rhs)
 }
 
 ///
-/// DirectPath
+/// UpdatePath
 ///
 
 void
-DirectPath::sign(CipherSuite suite,
+UpdatePath::sign(CipherSuite suite,
                  const HPKEPublicKey& init_pub,
                  const SignaturePrivateKey& sig_priv,
                  const std::optional<KeyPackageOpts>& opts)
