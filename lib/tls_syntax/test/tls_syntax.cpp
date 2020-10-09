@@ -5,29 +5,24 @@
 using namespace bytes_ns;
 
 // An enum to test enum encoding, and as a type for variants
-enum struct IntSelector : uint16_t
+enum struct IntType : uint16_t
 {
   uint8 = 0xAAAA,
   uint16 = 0xBBBB,
 };
 
-struct Uint8
-{
-  uint8_t value;
-  static const IntSelector type;
-  TLS_SERIALIZABLE(value)
+struct IntSelector {
+  using selector = IntType;
+
+  template<typename T>
+  static const IntType type;
 };
 
-const IntSelector Uint8::type = IntSelector::uint8;
+template<>
+const IntType IntSelector::type<uint8_t> = IntType::uint8;
 
-struct Uint16
-{
-  uint16_t value;
-  static const IntSelector type;
-  TLS_SERIALIZABLE(value)
-};
-
-const IntSelector Uint16::type = IntSelector::uint16;
+template<>
+const IntType IntSelector::type<uint16_t> = IntType::uint16;
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -36,7 +31,7 @@ struct ExampleStruct
   std::array<uint32_t, 4> b{ 0, 0, 0, 0 };
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
-  std::variant<Uint8, Uint16> e;
+  std::variant<uint8_t, uint16_t> e;
 
   TLS_SERIALIZABLE(a, b, c, d, e)
   TLS_TRAITS(tls::pass,
@@ -79,7 +74,7 @@ protected:
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
     { 0x66 },
     { 0x77, 0x88 },
-    { Uint16{ 0x9999 } },
+    { uint16_t(0x9999) },
   };
   const bytes enc_struct =
     from_hex("111122222222333333334444444455555555016600027788BBBB9999");
@@ -90,7 +85,7 @@ protected:
   const std::optional<ExampleStruct> val_optional_null = std::nullopt;
   const bytes enc_optional_null = from_hex("00");
 
-  const IntSelector val_enum = IntSelector::uint8;
+  const IntType val_enum = IntType::uint8;
   const bytes enc_enum = from_hex("aaaa");
 
   const tls::opaque<2> val_opaque{ from_hex("bbbb") };
@@ -164,7 +159,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
   std::optional<ExampleStruct> data_optional_null;
   istream_test(val_optional_null, data_optional_null, enc_optional_null);
 
-  IntSelector data_enum;
+  IntType data_enum;
   istream_test(val_enum, data_enum, enc_enum);
 
   tls::opaque<2> data_opaque;

@@ -31,8 +31,6 @@ ExtensionList::has(ExtensionType type) const
 /// NodeType, ParentNode, and KeyPackage
 ///
 
-const NodeType KeyPackage::type = NodeType::leaf;
-
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
   , cipher_suite{ CipherSuite::ID::unknown }

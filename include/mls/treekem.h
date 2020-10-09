@@ -8,6 +8,17 @@
 
 namespace mls {
 
+struct NodeType {
+  enum class selector : uint8_t
+  {
+    leaf = 0x00,
+    parent = 0x01,
+  };
+
+  template<typename T>
+  static const selector type;
+};
+
 struct Node
 {
   std::variant<KeyPackage, ParentNode> node;
