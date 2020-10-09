@@ -9,10 +9,12 @@ namespace mls {
 ///
 
 template<>
-const CredentialType::selector CredentialType::type<BasicCredential> = CredentialType::selector::basic;
+const CredentialType::selector CredentialType::type<BasicCredential> =
+  CredentialType::selector::basic;
 
 template<>
-const CredentialType::selector CredentialType::type<X509Credential> = CredentialType::selector::x509;
+const CredentialType::selector CredentialType::type<X509Credential> =
+  CredentialType::selector::x509;
 
 ///
 /// X509Credential

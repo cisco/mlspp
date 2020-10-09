@@ -10,7 +10,8 @@ namespace mls {
 //     x509(1),
 //     (255)
 // } CredentialType;
-struct CredentialType {
+struct CredentialType
+{
   enum struct selector : uint8_t
   {
     basic = 0,

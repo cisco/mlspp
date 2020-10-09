@@ -11,7 +11,8 @@ enum struct IntType : uint16_t
   uint16 = 0xBBBB,
 };
 
-struct IntSelector {
+struct IntSelector
+{
   using selector = IntType;
 
   template<typename T>

@@ -417,7 +417,8 @@ State::find_proposal(const ProposalID& id)
 }
 
 std::vector<LeafIndex>
-State::apply(const std::vector<MLSPlaintext>& pts, ProposalType::selector required_type)
+State::apply(const std::vector<MLSPlaintext>& pts,
+             ProposalType::selector required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& pt : pts) {

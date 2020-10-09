@@ -8,7 +8,8 @@
 
 namespace mls {
 
-struct NodeType {
+struct NodeType
+{
   enum class selector : uint8_t
   {
     leaf = 0x00,

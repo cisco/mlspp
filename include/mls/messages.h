@@ -139,7 +139,8 @@ private:
 ///
 /// Proposals & Commit
 ///
-struct ProposalType {
+struct ProposalType
+{
   enum struct selector : uint8_t
   {
     invalid = 0,
@@ -176,7 +177,8 @@ struct Remove
 //     application(2),
 //     (255)
 // } ContentType;
-struct ContentType {
+struct ContentType
+{
   enum struct selector : uint8_t
   {
     invalid = 0,

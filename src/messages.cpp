@@ -148,13 +148,16 @@ Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 // MLSPlaintext
 
 template<>
-const ProposalType::selector ProposalType::type<Add> = ProposalType::selector::add;
+const ProposalType::selector ProposalType::type<Add> =
+  ProposalType::selector::add;
 
 template<>
-const ProposalType::selector ProposalType::type<Update> = ProposalType::selector::update;
+const ProposalType::selector ProposalType::type<Update> =
+  ProposalType::selector::update;
 
 template<>
-const ProposalType::selector ProposalType::type<Remove> = ProposalType::selector::remove;
+const ProposalType::selector ProposalType::type<Remove> =
+  ProposalType::selector::remove;
 
 ProposalType::selector
 Proposal::proposal_type() const
@@ -167,13 +170,16 @@ Proposal::proposal_type() const
 }
 
 template<>
-const ContentType::selector ContentType::type<Proposal> = ContentType::selector::proposal;
+const ContentType::selector ContentType::type<Proposal> =
+  ContentType::selector::proposal;
 
 template<>
-const ContentType::selector ContentType::type<CommitData> = ContentType::selector::commit;
+const ContentType::selector ContentType::type<CommitData> =
+  ContentType::selector::commit;
 
 template<>
-const ContentType::selector ContentType::type<ApplicationData> = ContentType::selector::application;
+const ContentType::selector ContentType::type<ApplicationData> =
+  ContentType::selector::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,

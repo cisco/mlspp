@@ -146,8 +146,9 @@ TEST_CASE("Messages Interop")
 
     // MLSCiphertext
     MLSCiphertext ciphertext{
-      tv.group_id, tv.epoch,  ContentType::selector::application, tv.random, tv.random,
-      tv.random,   tv.random,
+      tv.group_id, tv.epoch,  ContentType::selector::application,
+      tv.random,   tv.random, tv.random,
+      tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }
