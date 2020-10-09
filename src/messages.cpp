@@ -151,6 +151,13 @@ const ProposalType Add::type = ProposalType::add;
 const ProposalType Update::type = ProposalType::update;
 const ProposalType Remove::type = ProposalType::remove;
 
+ProposalType
+Proposal::proposal_type() const
+{
+  static auto get_type = [](auto&& v) -> ProposalType { return v.type; };
+  return std::visit(get_type, content);
+}
+
 const ContentType Proposal::type = ContentType::proposal;
 const ContentType CommitData::type = ContentType::commit;
 const ContentType ApplicationData::type = ContentType::application;

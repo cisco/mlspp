@@ -193,39 +193,51 @@ State::commit(const bytes& leaf_secret) const
   auto joiners = std::vector<KeyPackage>{};
   for (const auto& pt : _pending_proposals) {
     auto id = proposal_id(pt);
-    auto proposal = std::get<Proposal>(pt.content).content;
+    const auto& proposal = std::get<Proposal>(pt.content).content;
     if (std::holds_alternative<Add>(proposal)) {
-      commit.adds.push_back(id);
-      auto add = std::get<Add>(proposal);
+      const auto& add = std::get<Add>(proposal);
       joiners.push_back(add.key_package);
-    } else if (std::holds_alternative<Update>(proposal)) {
-      commit.updates.push_back(id);
-    } else if (std::holds_alternative<Remove>(proposal)) {
-      commit.removes.push_back(id);
     }
+
+    commit.proposals.push_back(id);
   }
 
   // Apply proposals
   State next = *this;
-  auto joiner_locations = next.apply(commit);
+  auto [has_updates, has_removes, joiner_locations] = next.apply(commit);
   next._pending_proposals.clear();
 
   // KEM new entropy to the group and the new joiners
-  auto ctx = tls::marshal(GroupContext{
-    next._group_id,
-    next._epoch + 1,
-    next._tree.root_hash(),
-    next._confirmed_transcript_hash,
-    next._extensions,
-  });
-  auto [new_priv, path] =
-    next._tree.encap(_index, ctx, leaf_secret, _identity_priv, std::nullopt);
-  next._tree_priv = new_priv;
-  commit.path = path;
+  auto path_required = has_updates || has_removes || commit.proposals.empty();
+  auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
+  auto path_secrets =
+    std::vector<std::optional<bytes>>(joiner_locations.size());
+  if (path_required) {
+    auto ctx = tls::marshal(GroupContext{
+      next._group_id,
+      next._epoch + 1,
+      next._tree.root_hash(),
+      next._confirmed_transcript_hash,
+      next._extensions,
+    });
+    auto [new_priv, path] =
+      next._tree.encap(_index, ctx, leaf_secret, _identity_priv, std::nullopt);
+    next._tree_priv = new_priv;
+    commit.path = path;
+    update_secret = new_priv.update_secret;
+
+    for (size_t i = 0; i < joiner_locations.size(); i++) {
+      auto [overlap, shared_path_secret, ok] =
+        new_priv.shared_path_secret(joiner_locations[i]);
+      silence_unused(overlap);
+      silence_unused(ok);
+
+      path_secrets[i] = shared_path_secret;
+    }
+  }
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt =
-    next.ratchet_and_sign(commit, new_priv.update_secret, group_context());
+  auto pt = next.ratchet_and_sign(commit, update_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
@@ -241,11 +253,7 @@ State::commit(const bytes& leaf_secret) const
 
   auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
-    auto [overlap, path_secret, ok] =
-      new_priv.shared_path_secret(joiner_locations[i]);
-    silence_unused(overlap);
-    silence_unused(ok);
-    welcome.encrypt(joiners[i], path_secret);
+    welcome.encrypt(joiners[i], path_secrets[i]);
   }
 
   return std::make_tuple(pt, welcome, next);
@@ -328,16 +336,21 @@ State::handle(const MLSPlaintext& pt)
   State next = *this;
   next.apply(commit_data.commit);
 
-  // Decapsulate and apply the DirectPath
-  auto ctx = tls::marshal(GroupContext{
-    next._group_id,
-    next._epoch + 1,
-    next._tree.root_hash(),
-    next._confirmed_transcript_hash,
-    next._extensions,
-  });
-  next._tree_priv.decap(sender, next._tree, ctx, commit_data.commit.path);
-  next._tree.merge(sender, commit_data.commit.path);
+  // Decapsulate and apply the UpdatePath, if provided
+  auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
+  if (commit_data.commit.path.has_value()) {
+    auto ctx = tls::marshal(GroupContext{
+      next._group_id,
+      next._epoch + 1,
+      next._tree.root_hash(),
+      next._confirmed_transcript_hash,
+      next._extensions,
+    });
+    const auto& path = commit_data.commit.path.value();
+    next._tree_priv.decap(sender, next._tree, ctx, path);
+    next._tree.merge(sender, path);
+    update_secret = next._tree_priv.update_secret;
+  }
 
   // Update the transcripts and advance the key schedule
   next._confirmed_transcript_hash = _suite.get().digest.hash(
@@ -346,7 +359,7 @@ State::handle(const MLSPlaintext& pt)
     next._confirmed_transcript_hash + pt.commit_auth_data());
 
   next._epoch += 1;
-  next.update_epoch_secrets(next._tree_priv.update_secret);
+  next.update_epoch_secrets(update_secret);
 
   // Verify the confirmation MAC
   if (!next.verify_confirmation(commit_data.confirmation)) {
@@ -404,53 +417,82 @@ State::find_proposal(const ProposalID& id)
 }
 
 std::vector<LeafIndex>
-State::apply(const std::vector<ProposalID>& ids)
+State::apply(const std::vector<MLSPlaintext>& pts, ProposalType required_type)
 {
-  auto joiner_locations = std::vector<LeafIndex>{};
-  for (const auto& id : ids) {
-    auto maybe_pt = find_proposal(id);
-    if (!maybe_pt.has_value()) {
-      throw ProtocolError("Commit of unknown proposal");
+  auto locations = std::vector<LeafIndex>{};
+  for (const auto& pt : pts) {
+    auto proposal = std::get<Proposal>(pt.content).content;
+    auto proposal_type = std::get<Proposal>(pt.content).proposal_type();
+    if (proposal_type != required_type) {
+      continue;
     }
 
-    auto pt = maybe_pt.value();
-    auto proposal = std::get<Proposal>(pt.content).content;
-    if (std::holds_alternative<Add>(proposal)) {
-      joiner_locations.push_back(apply(std::get<Add>(proposal)));
-    } else if (std::holds_alternative<Update>(proposal)) {
-      auto& update = std::get<Update>(proposal);
-      auto sender = LeafIndex(pt.sender.sender);
-      if (sender != _index) {
-        apply(sender, update);
+    switch (proposal_type) {
+      case ProposalType::add: {
+        locations.push_back(apply(std::get<Add>(proposal)));
         break;
       }
 
-      if (_update_secrets.count(id.id) == 0) {
-        throw ProtocolError("Self-update with no cached secret");
+      case ProposalType::update: {
+        auto& update = std::get<Update>(proposal);
+        auto sender = LeafIndex(pt.sender.sender);
+        if (sender != _index) {
+          apply(sender, update);
+          break;
+        }
+
+        auto id = proposal_id(pt);
+        if (_update_secrets.count(id.id) == 0) {
+          throw ProtocolError("Self-update with no cached secret");
+        }
+
+        apply(sender, update, _update_secrets[id.id]);
+        locations.push_back(sender);
+        break;
       }
 
-      apply(sender, update, _update_secrets[id.id]);
-    } else if (std::holds_alternative<Remove>(proposal)) {
-      apply(std::get<Remove>(proposal));
-    } else {
-      throw InvalidParameterError("Invalid proposal type");
+      case ProposalType::remove: {
+        const auto& remove = std::get<Remove>(proposal);
+        apply(remove);
+        locations.push_back(remove.removed);
+        break;
+      }
+
+      default:
+        throw ProtocolError("Unknown proposal type");
     }
   }
 
-  return joiner_locations;
+  return locations;
 }
 
-std::vector<LeafIndex>
+std::tuple<bool, bool, std::vector<LeafIndex>>
 State::apply(const Commit& commit)
 {
-  apply(commit.updates);
-  apply(commit.removes);
-  auto joiner_locations = apply(commit.adds);
+  auto pts = std::vector<MLSPlaintext>(commit.proposals.size());
+  std::transform(commit.proposals.begin(),
+                 commit.proposals.end(),
+                 pts.begin(),
+                 [&](auto& id) {
+                   auto maybe_pt = find_proposal(id);
+                   if (!maybe_pt.has_value()) {
+                     throw ProtocolError("Commit of unknown proposal");
+                   }
+
+                   return maybe_pt.value();
+                 });
+
+  auto update_locations = apply(pts, ProposalType::update);
+  auto remove_locations = apply(pts, ProposalType::remove);
+  auto joiner_locations = apply(pts, ProposalType::add);
+
+  auto has_updates = !update_locations.empty();
+  auto has_removes = !remove_locations.empty();
 
   _tree.truncate();
   _tree_priv.truncate(_tree.size());
   _tree.set_hash_all();
-  return joiner_locations;
+  return std::make_tuple(has_updates, has_removes, joiner_locations);
 }
 
 ///

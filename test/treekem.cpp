@@ -161,7 +161,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     auto index = LeafIndex(i);
     auto curr_size = LeafCount(i + 1);
 
-    auto path = DirectPath{ kp_path, {} };
+    auto path = UpdatePath{ kp_path, {} };
     auto dp = tree_math::dirpath(NodeIndex(index), NodeCount(curr_size));
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
