@@ -3,10 +3,15 @@
 namespace mls {
 
 ///
-/// ParentNode
+/// NodeType
 ///
 
-const NodeType ParentNode::type = NodeType::parent;
+template<>
+const NodeType::selector NodeType::type<KeyPackage> = NodeType::selector::leaf;
+
+template<>
+const NodeType::selector NodeType::type<ParentNode> =
+  NodeType::selector::parent;
 
 ///
 /// Node
@@ -181,7 +186,7 @@ void
 TreeKEMPrivateKey::decap(LeafIndex from,
                          const TreeKEMPublicKey& pub,
                          const bytes& context,
-                         const DirectPath& path)
+                         const UpdatePath& path)
 {
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
@@ -366,7 +371,7 @@ TreeKEMPublicKey::blank_path(LeafIndex index)
 }
 
 void
-TreeKEMPublicKey::merge(LeafIndex from, const DirectPath& path)
+TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
 {
   auto ni = NodeIndex(from);
   node_at(ni).node = Node{ path.leaf_key_package };
@@ -469,7 +474,7 @@ TreeKEMPublicKey::key_package(LeafIndex index) const
   return std::get<KeyPackage>(node.value().node);
 }
 
-std::tuple<TreeKEMPrivateKey, DirectPath>
+std::tuple<TreeKEMPrivateKey, UpdatePath>
 TreeKEMPublicKey::encap(LeafIndex from,
                         const bytes& context,
                         const bytes& leaf_secret,
@@ -482,13 +487,13 @@ TreeKEMPublicKey::encap(LeafIndex from,
     throw InvalidParameterError("Cannot encap from blank node");
   }
 
-  auto path = DirectPath{};
+  auto path = UpdatePath{};
   path.leaf_key_package = std::get<KeyPackage>(maybe_node.value().node);
 
   // Generate path secrets
   auto priv = TreeKEMPrivateKey::create(suite, size(), from, leaf_secret);
 
-  // Package into a DirectPath
+  // Package into a UpdatePath
   auto last = NodeIndex(from);
   for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
     auto path_secret = priv.path_secrets.at(n);
@@ -507,7 +512,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
     last = n;
   }
 
-  // Sign the DirectPath
+  // Sign the UpdatePath
   auto leaf_priv = priv.private_key(NodeIndex(from)).value();
   path.sign(suite, leaf_priv.public_key, sig_priv, opts);
 

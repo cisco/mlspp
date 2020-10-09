@@ -139,36 +139,35 @@ private:
 ///
 /// Proposals & Commit
 ///
-
-enum struct ProposalType : uint8_t
+struct ProposalType
 {
-  invalid = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
+  enum struct selector : uint8_t
+  {
+    invalid = 0,
+    add = 1,
+    update = 2,
+    remove = 3,
+  };
+
+  template<typename T>
+  static const selector type;
 };
 
 struct Add
 {
   KeyPackage key_package;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Update
 {
   KeyPackage key_package;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Remove
 {
   LeafIndex removed;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -178,19 +177,26 @@ struct Remove
 //     application(2),
 //     (255)
 // } ContentType;
-enum struct ContentType : uint8_t
+struct ContentType
 {
-  invalid = 0,
-  application = 1,
-  proposal = 2,
-  commit = 3,
+  enum struct selector : uint8_t
+  {
+    invalid = 0,
+    application = 1,
+    proposal = 2,
+    commit = 3,
+  };
+
+  template<typename T>
+  static const selector type;
 };
 
 struct Proposal
 {
   std::variant<Add, Update, Remove> content;
 
-  static const ContentType type;
+  ProposalType::selector proposal_type() const;
+
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
 };
@@ -203,20 +209,16 @@ struct ProposalID
 };
 
 // struct {
-//     ProposalID updates<0..2^16-1>;
-//     ProposalID removes<0..2^16-1>;
-//     ProposalID adds<0..2^16-1>;
-//     DirectPath path;
+//     ProposalID proposals<0..2^32-1>;
+//     optional<UpdatePath> path;
 // } Commit;
 struct Commit
 {
-  std::vector<ProposalID> updates;
-  std::vector<ProposalID> removes;
-  std::vector<ProposalID> adds;
-  DirectPath path;
+  std::vector<ProposalID> proposals;
+  std::optional<UpdatePath> path;
 
-  TLS_SERIALIZABLE(updates, removes, adds, path)
-  TLS_TRAITS(tls::vector<2>, tls::vector<2>, tls::vector<2>, tls::pass)
+  TLS_SERIALIZABLE(proposals, path)
+  TLS_TRAITS(tls::vector<4>, tls::pass)
 };
 
 // struct {
@@ -239,8 +241,6 @@ struct Commit
 struct ApplicationData
 {
   bytes data;
-
-  static const ContentType type;
   TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<4>)
 };
@@ -250,7 +250,6 @@ struct CommitData
   Commit commit;
   bytes confirmation;
 
-  static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation)
   TLS_TRAITS(tls::pass, tls::vector<1>)
 };
@@ -289,7 +288,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
-               ContentType content_type,
+               ContentType::selector content_type,
                bytes authenticated_data,
                const bytes& content);
 
@@ -343,7 +342,7 @@ struct MLSCiphertext
 {
   bytes group_id;
   epoch_t epoch;
-  ContentType content_type;
+  ContentType::selector content_type;
   bytes sender_data_nonce;
   bytes encrypted_sender_data;
   bytes authenticated_data;

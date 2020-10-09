@@ -126,19 +126,12 @@ struct ParentHashExtension
 /// NodeType, ParentNode, and KeyPackage
 ///
 
-enum class NodeType : uint8_t
-{
-  leaf = 0x00,
-  parent = 0x01,
-};
-
 struct ParentNode
 {
   HPKEPublicKey public_key;
   std::vector<LeafIndex> unmerged_leaves;
   bytes parent_hash;
 
-  static const NodeType type;
   TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash)
   TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>)
 };
@@ -180,7 +173,6 @@ struct KeyPackage
   bool verify_extension_support(const ExtensionList& ext_list) const;
   bool verify() const;
 
-  static const NodeType type;
   TLS_SERIALIZABLE(version,
                    cipher_suite,
                    init_key,
@@ -204,7 +196,7 @@ bool
 operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
 ///
-/// DirectPath
+/// UpdatePath
 ///
 
 // struct {
@@ -222,8 +214,8 @@ struct RatchetNode
 
 // struct {
 //    RatchetNode nodes<0..2^16-1>;
-// } DirectPath;
-struct DirectPath
+// } UpdatePath;
+struct UpdatePath
 {
   KeyPackage leaf_key_package;
   std::vector<RatchetNode> nodes;

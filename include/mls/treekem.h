@@ -8,6 +8,18 @@
 
 namespace mls {
 
+struct NodeType
+{
+  enum class selector : uint8_t
+  {
+    leaf = 0x00,
+    parent = 0x01,
+  };
+
+  template<typename T>
+  static const selector type;
+};
+
 struct Node
 {
   std::variant<KeyPackage, ParentNode> node;
@@ -78,7 +90,7 @@ struct TreeKEMPrivateKey
   void decap(LeafIndex from,
              const TreeKEMPublicKey& pub,
              const bytes& context,
-             const DirectPath& path);
+             const UpdatePath& path);
 
   void truncate(LeafCount size);
 
@@ -107,7 +119,7 @@ struct TreeKEMPublicKey
   void update_leaf(LeafIndex index, const KeyPackage& kp);
   void blank_path(LeafIndex index);
 
-  void merge(LeafIndex from, const DirectPath& path);
+  void merge(LeafIndex from, const UpdatePath& path);
   void set_hash_all();
   bytes root_hash() const;
   LeafCount size() const;
@@ -116,7 +128,7 @@ struct TreeKEMPublicKey
   std::optional<KeyPackage> key_package(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
-  std::tuple<TreeKEMPrivateKey, DirectPath> encap(
+  std::tuple<TreeKEMPrivateKey, UpdatePath> encap(
     LeafIndex from,
     const bytes& context,
     const bytes& leaf_secret,

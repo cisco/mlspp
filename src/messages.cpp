@@ -147,18 +147,44 @@ Welcome::group_info_key_nonce(const bytes& epoch_secret) const
 
 // MLSPlaintext
 
-const ProposalType Add::type = ProposalType::add;
-const ProposalType Update::type = ProposalType::update;
-const ProposalType Remove::type = ProposalType::remove;
+template<>
+const ProposalType::selector ProposalType::type<Add> =
+  ProposalType::selector::add;
 
-const ContentType Proposal::type = ContentType::proposal;
-const ContentType CommitData::type = ContentType::commit;
-const ContentType ApplicationData::type = ContentType::application;
+template<>
+const ProposalType::selector ProposalType::type<Update> =
+  ProposalType::selector::update;
+
+template<>
+const ProposalType::selector ProposalType::type<Remove> =
+  ProposalType::selector::remove;
+
+ProposalType::selector
+Proposal::proposal_type() const
+{
+  static auto get_type = [](auto&& v) {
+    using type = typename std::decay<decltype(v)>::type;
+    return ProposalType::template type<type>;
+  };
+  return std::visit(get_type, content);
+}
+
+template<>
+const ContentType::selector ContentType::type<Proposal> =
+  ContentType::selector::proposal;
+
+template<>
+const ContentType::selector ContentType::type<CommitData> =
+  ContentType::selector::commit;
+
+template<>
+const ContentType::selector ContentType::type<ApplicationData> =
+  ContentType::selector::application;
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
-                           ContentType content_type_in,
+                           ContentType::selector content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
@@ -169,19 +195,19 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 {
   tls::istream r(content_in);
   switch (content_type_in) {
-    case ContentType::application: {
+    case ContentType::selector::application: {
       auto& application_data = content.emplace<ApplicationData>();
       r >> application_data;
       break;
     }
 
-    case ContentType::proposal: {
+    case ContentType::selector::proposal: {
       auto& proposal = content.emplace<Proposal>();
       r >> proposal;
       break;
     }
 
-    case ContentType::commit: {
+    case ContentType::selector::commit: {
       auto& commit_data = content.emplace<CommitData>();
       r >> commit_data;
       break;
