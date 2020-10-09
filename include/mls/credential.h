@@ -10,10 +10,16 @@ namespace mls {
 //     x509(1),
 //     (255)
 // } CredentialType;
-enum struct CredentialType : uint8_t
+struct CredentialType
 {
-  basic = 0,
-  x509 = 1,
+  enum struct selector : uint8_t
+  {
+    basic = 0,
+    x509 = 1,
+  };
+
+  template<typename T>
+  static const selector type;
 };
 
 // struct {
@@ -34,8 +40,6 @@ struct BasicCredential
 
   TLS_SERIALIZABLE(identity, public_key)
   TLS_TRAITS(tls::vector<2>, tls::pass)
-
-  static const CredentialType type;
 };
 
 struct X509Credential
@@ -55,8 +59,6 @@ struct X509Credential
 
   // TODO(rlb) This should be const or exposed via a method
   std::vector<CertData> der_chain;
-
-  static const CredentialType type;
 
 private:
   SignaturePublicKey _public_key;
@@ -84,7 +86,7 @@ operator==(const X509Credential& lhs, const X509Credential& rhs);
 class Credential
 {
 public:
-  CredentialType type() const;
+  CredentialType::selector type() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 

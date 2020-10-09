@@ -139,36 +139,35 @@ private:
 ///
 /// Proposals & Commit
 ///
-
-enum struct ProposalType : uint8_t
+struct ProposalType
 {
-  invalid = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
+  enum struct selector : uint8_t
+  {
+    invalid = 0,
+    add = 1,
+    update = 2,
+    remove = 3,
+  };
+
+  template<typename T>
+  static const selector type;
 };
 
 struct Add
 {
   KeyPackage key_package;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Update
 {
   KeyPackage key_package;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(key_package)
 };
 
 struct Remove
 {
   LeafIndex removed;
-
-  static const ProposalType type;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -178,21 +177,26 @@ struct Remove
 //     application(2),
 //     (255)
 // } ContentType;
-enum struct ContentType : uint8_t
+struct ContentType
 {
-  invalid = 0,
-  application = 1,
-  proposal = 2,
-  commit = 3,
+  enum struct selector : uint8_t
+  {
+    invalid = 0,
+    application = 1,
+    proposal = 2,
+    commit = 3,
+  };
+
+  template<typename T>
+  static const selector type;
 };
 
 struct Proposal
 {
   std::variant<Add, Update, Remove> content;
 
-  ProposalType proposal_type() const;
+  ProposalType::selector proposal_type() const;
 
-  static const ContentType type;
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
 };
@@ -237,8 +241,6 @@ struct Commit
 struct ApplicationData
 {
   bytes data;
-
-  static const ContentType type;
   TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<4>)
 };
@@ -248,7 +250,6 @@ struct CommitData
   Commit commit;
   bytes confirmation;
 
-  static const ContentType type;
   TLS_SERIALIZABLE(commit, confirmation)
   TLS_TRAITS(tls::pass, tls::vector<1>)
 };
@@ -287,7 +288,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
-               ContentType content_type,
+               ContentType::selector content_type,
                bytes authenticated_data,
                const bytes& content);
 
@@ -341,7 +342,7 @@ struct MLSCiphertext
 {
   bytes group_id;
   epoch_t epoch;
-  ContentType content_type;
+  ContentType::selector content_type;
   bytes sender_data_nonce;
   bytes encrypted_sender_data;
   bytes authenticated_data;

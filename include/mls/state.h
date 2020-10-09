@@ -146,7 +146,7 @@ protected:
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
   std::vector<LeafIndex> apply(const std::vector<MLSPlaintext>& pts,
-                               ProposalType required_type);
+                               ProposalType::selector required_type);
   std::tuple<bool, bool, std::vector<LeafIndex>> apply(const Commit& commit);
 
   // Compute a proposal ID

@@ -5,16 +5,20 @@
 namespace mls {
 
 ///
-/// BasicCredential
+/// CredentialType
 ///
 
-const CredentialType BasicCredential::type = CredentialType::basic;
+template<>
+const CredentialType::selector CredentialType::type<BasicCredential> =
+  CredentialType::selector::basic;
+
+template<>
+const CredentialType::selector CredentialType::type<X509Credential> =
+  CredentialType::selector::x509;
 
 ///
 /// X509Credential
 ///
-
-const CredentialType X509Credential::type = CredentialType::x509;
 
 using hpke::Certificate; // NOLINT(misc-unused-using-decls)
 using hpke::Signature;   // NOLINT(misc-unused-using-decls)
@@ -96,14 +100,14 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 /// Credential
 ///
 
-CredentialType
+CredentialType::selector
 Credential::type() const
 {
   switch (_cred.index()) {
     case 0:
-      return CredentialType::basic;
+      return CredentialType::selector::basic;
     case 1:
-      return CredentialType::x509;
+      return CredentialType::selector::x509;
   }
 
   throw std::bad_variant_access();

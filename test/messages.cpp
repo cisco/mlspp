@@ -115,14 +115,14 @@ TEST_CASE("Messages Interop")
 
     // Proposals
     auto add_prop = Proposal{ Add{ key_package } };
-    CHECK(add_prop.proposal_type() == ProposalType::add);
+    CHECK(add_prop.proposal_type() == ProposalType::selector::add);
 
     auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
     tls_round_trip(tc.add_proposal, add_hs, true);
 
     auto update_prop = Proposal{ Update{ key_package } };
-    CHECK(update_prop.proposal_type() == ProposalType::update);
+    CHECK(update_prop.proposal_type() == ProposalType::selector::update);
 
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
@@ -130,7 +130,7 @@ TEST_CASE("Messages Interop")
     tls_round_trip(tc.update_proposal, update_hs, true);
 
     auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
-    CHECK(remove_prop.proposal_type() == ProposalType::remove);
+    CHECK(remove_prop.proposal_type() == ProposalType::selector::remove);
 
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
@@ -146,8 +146,9 @@ TEST_CASE("Messages Interop")
 
     // MLSCiphertext
     MLSCiphertext ciphertext{
-      tv.group_id, tv.epoch,  ContentType::application, tv.random, tv.random,
-      tv.random,   tv.random,
+      tv.group_id, tv.epoch,  ContentType::selector::application,
+      tv.random,   tv.random, tv.random,
+      tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }

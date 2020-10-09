@@ -417,7 +417,8 @@ State::find_proposal(const ProposalID& id)
 }
 
 std::vector<LeafIndex>
-State::apply(const std::vector<MLSPlaintext>& pts, ProposalType required_type)
+State::apply(const std::vector<MLSPlaintext>& pts,
+             ProposalType::selector required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& pt : pts) {
@@ -428,12 +429,12 @@ State::apply(const std::vector<MLSPlaintext>& pts, ProposalType required_type)
     }
 
     switch (proposal_type) {
-      case ProposalType::add: {
+      case ProposalType::selector::add: {
         locations.push_back(apply(std::get<Add>(proposal)));
         break;
       }
 
-      case ProposalType::update: {
+      case ProposalType::selector::update: {
         auto& update = std::get<Update>(proposal);
         auto sender = LeafIndex(pt.sender.sender);
         if (sender != _index) {
@@ -451,7 +452,7 @@ State::apply(const std::vector<MLSPlaintext>& pts, ProposalType required_type)
         break;
       }
 
-      case ProposalType::remove: {
+      case ProposalType::selector::remove: {
         const auto& remove = std::get<Remove>(proposal);
         apply(remove);
         locations.push_back(remove.removed);
@@ -482,9 +483,9 @@ State::apply(const Commit& commit)
                    return maybe_pt.value();
                  });
 
-  auto update_locations = apply(pts, ProposalType::update);
-  auto remove_locations = apply(pts, ProposalType::remove);
-  auto joiner_locations = apply(pts, ProposalType::add);
+  auto update_locations = apply(pts, ProposalType::selector::update);
+  auto remove_locations = apply(pts, ProposalType::selector::remove);
+  auto joiner_locations = apply(pts, ProposalType::selector::add);
 
   auto has_updates = !update_locations.empty();
   auto has_removes = !remove_locations.empty();
@@ -579,7 +580,7 @@ State::update_epoch_secrets(const bytes& update_secret)
 static bytes
 content_aad(const bytes& group_id,
             uint32_t epoch,
-            ContentType content_type,
+            ContentType::selector content_type,
             const bytes& authenticated_data,
             const bytes& sender_data_nonce,
             const bytes& encrypted_sender_data)
@@ -602,7 +603,7 @@ content_aad(const bytes& group_id,
 static bytes
 sender_data_aad(const bytes& group_id,
                 uint32_t epoch,
-                ContentType content_type,
+                ContentType::selector content_type,
                 const bytes& sender_data_nonce)
 {
   tls::ostream w;
@@ -672,16 +673,16 @@ State::encrypt(const MLSPlaintext& pt)
   // Pull from the key schedule
   uint32_t generation = 0;
   KeyAndNonce keys;
-  ContentType content_type;
+  ContentType::selector content_type;
   if (std::holds_alternative<ApplicationData>(pt.content)) {
     std::tie(generation, keys) = _keys.application_keys.next(_index);
-    content_type = ContentType::application;
+    content_type = ContentType::selector::application;
   } else if (std::holds_alternative<Proposal>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
-    content_type = ContentType::proposal;
+    content_type = ContentType::selector::proposal;
   } else if (std::holds_alternative<CommitData>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
-    content_type = ContentType::commit;
+    content_type = ContentType::selector::commit;
   } else {
     throw InvalidParameterError("Unknown content type");
   }
@@ -763,13 +764,13 @@ State::decrypt(const MLSCiphertext& ct)
   KeyAndNonce keys;
   switch (ct.content_type) {
     // TODO(rlb) Enable decryption of proposal / commit
-    case ContentType::application:
+    case ContentType::selector::application:
       keys = _keys.application_keys.get(sender, generation);
       _keys.application_keys.erase(sender, generation);
       break;
 
-    case ContentType::proposal:
-    case ContentType::commit:
+    case ContentType::selector::proposal:
+    case ContentType::selector::commit:
       keys = _keys.handshake_keys.get(sender, generation);
       _keys.handshake_keys.erase(sender, generation);
       break;

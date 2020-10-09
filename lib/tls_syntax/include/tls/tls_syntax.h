@@ -380,15 +380,9 @@ struct vector
 };
 
 // Variant encoding
-template<typename Te, typename Tv>
-Te variant_value;
-
-template<typename Te>
+template<typename Ts>
 struct variant
 {
-  template<typename Tv>
-  static Te value_for();
-
   template<size_t I = 0, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
   write_variant(tls::ostream&, const std::variant<Tp...>&)
@@ -403,7 +397,7 @@ struct variant
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
     if (std::holds_alternative<Tc>(v)) {
-      str << Tc::type << std::get<I>(v);
+      str << Ts::template type<Tc> << std::get<I>(v);
       return;
     }
 
@@ -417,21 +411,21 @@ struct variant
     return str;
   }
 
-  template<size_t I = 0, typename... Tp>
+  template<size_t I = 0, typename Te, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
   read_variant(tls::istream&, Te, std::variant<Tp...>&)
   {
     throw ReadError("Invalid variant type label");
   }
 
-  template<size_t I = 0, typename... Tp>
+  template<size_t I = 0, typename Te, typename... Tp>
     static inline typename std::enable_if <
     I<sizeof...(Tp), void>::type read_variant(tls::istream& str,
                                               Te target_type,
                                               std::variant<Tp...>& v)
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
-    if (Tc::type == target_type) {
+    if (Ts::template type<Tc> == target_type) {
       str >> v.template emplace<I>();
       return;
     }
@@ -442,7 +436,7 @@ struct variant
   template<typename... Tp>
   static istream& decode(istream& str, std::variant<Tp...>& data)
   {
-    Te target_type;
+    typename Ts::selector target_type;
     str >> target_type;
     read_variant(str, target_type, data);
     return str;
