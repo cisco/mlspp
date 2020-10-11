@@ -144,7 +144,7 @@ TEST_CASE("Messages Interop")
 
     // Commit
     auto commit = Commit{
-      { { tv.random }, { tv.random } },
+      { { ProposalRef{ tv.random } }, { ProposalRef{ tv.random } } },
       update_path,
     };
     auto commit_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, commit };

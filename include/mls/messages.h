@@ -207,11 +207,32 @@ struct Proposal
   TLS_TRAITS(tls::variant<ProposalType>)
 };
 
-struct ProposalID
+struct ProposalRef
 {
   bytes id;
   TLS_SERIALIZABLE(id)
   TLS_TRAITS(tls::vector<1>)
+};
+
+struct ProposalIDType
+{
+  enum struct selector : uint8_t
+  {
+    reserved = 0,
+    value = 1,
+    plaintext_hash = 2,
+  };
+
+  template<typename T>
+  static const selector type;
+};
+
+struct ProposalID
+{
+  std::variant<Proposal, ProposalRef> content;
+
+  TLS_SERIALIZABLE(content);
+  TLS_TRAITS(tls::variant<ProposalIDType>)
 };
 
 // struct {

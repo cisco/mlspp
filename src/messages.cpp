@@ -152,6 +152,7 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 
 // MLSPlaintext
 
+// ProposalType
 template<>
 const ProposalType::selector ProposalType::type<Add> =
   ProposalType::selector::add;
@@ -174,6 +175,16 @@ Proposal::proposal_type() const
   return std::visit(get_type, content);
 }
 
+// ProposalIDType
+template<>
+const ProposalIDType::selector ProposalIDType::type<Proposal> =
+  ProposalIDType::selector::value;
+
+template<>
+const ProposalIDType::selector ProposalIDType::type<ProposalRef> =
+  ProposalIDType::selector::plaintext_hash;
+
+// ContentType
 template<>
 const ContentType::selector ContentType::type<Proposal> =
   ContentType::selector::proposal;

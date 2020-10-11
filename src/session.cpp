@@ -289,7 +289,7 @@ Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
   auto [commit, welcome, new_state] =
-    inner->history.front().commit(commit_secret);
+    inner->history.front().commit(commit_secret, {});
 
   auto commit_msg = inner->export_message(commit);
   auto welcome_msg = tls::marshal(welcome);

@@ -112,8 +112,8 @@ State::sign(const Proposal& proposal) const
   return pt;
 }
 
-MLSPlaintext
-State::add(const KeyPackage& key_package) const
+Proposal
+State::add_proposal(const KeyPackage& key_package) const
 {
   // Check that the key package is validly signed
   if (!key_package.verify()) {
@@ -132,58 +132,60 @@ State::add(const KeyPackage& key_package) const
       "Key package does not support group's extensions");
   }
 
-  return sign({ Add{ key_package } });
+  return { Add{ key_package } };
 }
 
-MLSPlaintext
-State::update(const bytes& leaf_secret)
+Proposal
+State::update_proposal(const bytes& leaf_secret)
 {
   // TODO(RLB) Allow changing the signing key
   auto kp = _tree.key_package(_index).value();
   kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   kp.sign(_identity_priv, std::nullopt);
 
-  auto pt = sign({ Update{ kp } });
-
-  auto id = proposal_id(pt);
-  _update_secrets[id.id] = leaf_secret;
-
-  return pt;
+  _update_secrets[kp.hash()] = leaf_secret;
+  return { Update{ kp } };
 }
 
-LeafIndex
-State::leaf_for_roster_entry(RosterIndex index) const
+Proposal
+State::remove_proposal(RosterIndex index) const
 {
-  auto non_blank_leaves = uint32_t(0);
+  return remove_proposal(leaf_for_roster_entry(index));
+}
 
-  for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
-    const auto& kp = _tree.key_package(i);
-    if (!kp.has_value()) {
-      continue;
-    }
-    if (non_blank_leaves == index.val) {
-      return i;
-    }
-    non_blank_leaves += 1;
-  }
+Proposal
+State::remove_proposal(LeafIndex removed) const
+{
+  return { Remove{ removed } };
+}
 
-  throw InvalidParameterError("Leaf Index mismatch");
+MLSPlaintext
+State::add(const KeyPackage& key_package) const
+{
+  return sign(add_proposal(key_package));
+}
+
+MLSPlaintext
+State::update(const bytes& leaf_secret)
+{
+  return sign(update_proposal(leaf_secret));
 }
 
 MLSPlaintext
 State::remove(RosterIndex index) const
 {
-  return remove(leaf_for_roster_entry(index));
+  return sign(remove_proposal(index));
 }
 
 MLSPlaintext
 State::remove(LeafIndex removed) const
 {
-  return sign({ Remove{ removed } });
+  return sign(remove_proposal(removed));
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
-State::commit(const bytes& leaf_secret) const
+State::commit(const bytes& leaf_secret,
+              const std::vector<Proposal>& extra_proposals) const
 {
   // Construct a commit from cached proposals
   // TODO(rlb) ignore some proposals:
@@ -192,21 +194,29 @@ State::commit(const bytes& leaf_secret) const
   // * Remove after Remove
   Commit commit;
   auto joiners = std::vector<KeyPackage>{};
-  for (const auto& pt : _pending_proposals) {
-    auto id = proposal_id(pt);
-    const auto& proposal = std::get<Proposal>(pt.content).content;
-    if (std::holds_alternative<Add>(proposal)) {
-      const auto& add = std::get<Add>(proposal);
+  for (const auto& cached : _pending_proposals) {
+    if (std::holds_alternative<Add>(cached.proposal.content)) {
+      const auto& add = std::get<Add>(cached.proposal.content);
       joiners.push_back(add.key_package);
     }
 
-    commit.proposals.push_back(id);
+    commit.proposals.push_back({ ProposalRef{ cached.ref } });
+  }
+
+  // Add the extra proposals to those we had cached
+  for (const auto& proposal : extra_proposals) {
+    if (std::holds_alternative<Add>(proposal.content)) {
+      const auto& add = std::get<Add>(proposal.content);
+      joiners.push_back(add.key_package);
+    }
+
+    commit.proposals.push_back({ proposal });
   }
 
   // Apply proposals
-  State next = *this;
-  auto [has_updates, has_removes, joiner_locations] = next.apply(commit);
-  next._pending_proposals.clear();
+  State next = successor();
+  auto proposals = must_resolve(commit.proposals, _index);
+  auto [has_updates, has_removes, joiner_locations] = next.apply(proposals);
 
   // KEM new entropy to the group and the new joiners
   auto path_required = has_updates || has_removes || commit.proposals.empty();
@@ -221,8 +231,8 @@ State::commit(const bytes& leaf_secret) const
       next._confirmed_transcript_hash,
       next._extensions,
     });
-    auto [new_priv, path] =
-      next._tree.encap(_index, ctx, leaf_secret, _identity_priv, std::nullopt);
+    auto [new_priv, path] = next._tree.encap(
+      next._index, ctx, leaf_secret, _identity_priv, std::nullopt);
     next._tree_priv = new_priv;
     commit.path = path;
     update_secret = new_priv.update_secret;
@@ -250,7 +260,7 @@ State::commit(const bytes& leaf_secret) const
     next._extensions,
     pt.confirmation_tag.value().mac_value,
   };
-  group_info.sign(_index, _identity_priv);
+  group_info.sign(next._index, _identity_priv);
 
   auto welcome = Welcome{ _suite, next._keys.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
@@ -317,7 +327,7 @@ State::handle(const MLSPlaintext& pt)
 
   // Proposals get queued, do not result in a state transition
   if (std::holds_alternative<Proposal>(pt.content)) {
-    _pending_proposals.push_back(pt);
+    cache_proposal(pt);
     return std::nullopt;
   }
 
@@ -328,25 +338,23 @@ State::handle(const MLSPlaintext& pt)
   if (pt.sender.sender_type != SenderType::member) {
     throw ProtocolError("Commit must originate from within the group");
   }
-  auto sender = LeafIndex(pt.sender.sender);
 
+  auto sender = LeafIndex(pt.sender.sender);
   if (sender == _index) {
     throw InvalidParameterError("Handle own commits with caching");
   }
 
   // Apply the commit
   const auto& commit = std::get<Commit>(pt.content);
-  State next = *this;
-  next.apply(commit);
+  const auto proposals = must_resolve(commit.proposals, sender);
+
+  auto next = successor();
+  next.apply(proposals);
 
   // Decapsulate and apply the UpdatePath, if provided
+  // TODO(RLB) Verify that path is provided if required
   auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
   if (commit.path.has_value()) {
-    const auto& path = commit.path.value();
-    if (!path.parent_hash_valid(_suite)) {
-      throw ProtocolError("Commit path has invalid parent hash");
-    }
-
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
@@ -354,6 +362,7 @@ State::handle(const MLSPlaintext& pt)
       next._confirmed_transcript_hash,
       next._extensions,
     });
+    const auto& path = commit.path.value();
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;
@@ -405,66 +414,85 @@ State::apply(const Remove& remove)
   _tree.blank_path(remove.removed);
 }
 
-ProposalID
-State::proposal_id(const MLSPlaintext& pt) const
+void
+State::cache_proposal(const MLSPlaintext& pt)
 {
-  return ProposalID{ _suite.get().digest.hash(pt.commit_content()) };
+  _pending_proposals.push_back({
+    _suite.get().digest.hash(tls::marshal(pt)),
+    std::get<Proposal>(pt.content),
+    LeafIndex{ pt.sender.sender },
+  });
 }
 
-std::optional<MLSPlaintext>
-State::find_proposal(const ProposalID& id)
+std::optional<State::CachedProposal>
+State::resolve(const ProposalID& id, LeafIndex sender_index) const
 {
-  for (auto i = _pending_proposals.begin(); i != _pending_proposals.end();
-       i++) {
-    auto other_id = proposal_id(*i);
-    if (id == other_id) {
-      auto pt = *i;
-      _pending_proposals.erase(i);
-      return pt;
+  if (std::holds_alternative<Proposal>(id.content)) {
+    return CachedProposal{
+      {},
+      std::get<Proposal>(id.content),
+      sender_index,
+    };
+  }
+
+  const auto& ref = std::get<ProposalRef>(id.content);
+  for (const auto& cached : _pending_proposals) {
+    if (cached.ref == ref.id) {
+      return cached;
     }
   }
 
   return std::nullopt;
 }
 
+std::vector<State::CachedProposal>
+State::must_resolve(const std::vector<ProposalID>& ids,
+                    LeafIndex sender_index) const
+{
+  auto proposals = std::vector<CachedProposal>(ids.size());
+  auto must_resolve = [&](auto& id) {
+    return resolve(id, sender_index).value();
+  };
+  std::transform(ids.begin(), ids.end(), proposals.begin(), must_resolve);
+  return proposals;
+}
+
 std::vector<LeafIndex>
-State::apply(const std::vector<MLSPlaintext>& pts,
+State::apply(const std::vector<CachedProposal>& proposals,
              ProposalType::selector required_type)
 {
   auto locations = std::vector<LeafIndex>{};
-  for (const auto& pt : pts) {
-    auto proposal = std::get<Proposal>(pt.content).content;
-    auto proposal_type = std::get<Proposal>(pt.content).proposal_type();
+  for (const auto& cached : proposals) {
+    auto proposal_type = cached.proposal.proposal_type();
     if (proposal_type != required_type) {
       continue;
     }
 
     switch (proposal_type) {
       case ProposalType::selector::add: {
-        locations.push_back(apply(std::get<Add>(proposal)));
+        locations.push_back(apply(std::get<Add>(cached.proposal.content)));
         break;
       }
 
       case ProposalType::selector::update: {
-        auto& update = std::get<Update>(proposal);
-        auto sender = LeafIndex(pt.sender.sender);
-        if (sender != _index) {
-          apply(sender, update);
+        auto& update = std::get<Update>(cached.proposal.content);
+        if (cached.sender != _index) {
+          apply(cached.sender, update);
           break;
         }
 
-        auto id = proposal_id(pt);
-        if (_update_secrets.count(id.id) == 0) {
+        auto kp_hash = update.key_package.hash();
+        if (_update_secrets.count(kp_hash) == 0) {
           throw ProtocolError("Self-update with no cached secret");
         }
 
-        apply(sender, update, _update_secrets[id.id]);
-        locations.push_back(sender);
+        apply(cached.sender, update, _update_secrets[cached.ref]);
+        locations.push_back(cached.sender);
         break;
       }
 
       case ProposalType::selector::remove: {
-        const auto& remove = std::get<Remove>(proposal);
+        const auto& remove = std::get<Remove>(cached.proposal.content);
         apply(remove);
         locations.push_back(remove.removed);
         break;
@@ -479,24 +507,11 @@ State::apply(const std::vector<MLSPlaintext>& pts,
 }
 
 std::tuple<bool, bool, std::vector<LeafIndex>>
-State::apply(const Commit& commit)
+State::apply(const std::vector<CachedProposal>& proposals)
 {
-  auto pts = std::vector<MLSPlaintext>(commit.proposals.size());
-  std::transform(commit.proposals.begin(),
-                 commit.proposals.end(),
-                 pts.begin(),
-                 [&](auto& id) {
-                   auto maybe_pt = find_proposal(id);
-                   if (!maybe_pt.has_value()) {
-                     throw ProtocolError("Commit of unknown proposal");
-                   }
-
-                   return maybe_pt.value();
-                 });
-
-  auto update_locations = apply(pts, ProposalType::selector::update);
-  auto remove_locations = apply(pts, ProposalType::selector::remove);
-  auto joiner_locations = apply(pts, ProposalType::selector::add);
+  auto update_locations = apply(proposals, ProposalType::selector::update);
+  auto remove_locations = apply(proposals, ProposalType::selector::remove);
+  auto joiner_locations = apply(proposals, ProposalType::selector::add);
 
   auto has_updates = !update_locations.empty();
   auto has_removes = !remove_locations.empty();
@@ -583,13 +598,8 @@ State::update_epoch_secrets(const bytes& commit_secret)
 ///
 
 bool
-State::verify(const MLSPlaintext& pt) const
+State::verify_internal(const MLSPlaintext& pt) const
 {
-  if (pt.sender.sender_type != SenderType::member) {
-    // TODO(RLB) Support external senders
-    throw InvalidParameterError("External senders not supported");
-  }
-
   if (!pt.verify_membership_tag(
         _suite, group_context(), _keys.membership_key)) {
     return false;
@@ -600,8 +610,21 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("Signature from blank node");
   }
 
-  auto pub = maybe_kp.value().credential.public_key();
+  const auto& pub = maybe_kp.value().credential.public_key();
   return pt.verify(_suite, group_context(), pub);
+}
+
+bool
+State::verify(const MLSPlaintext& pt) const
+{
+  switch (pt.sender.sender_type) {
+    case SenderType::member:
+      return verify_internal(pt);
+
+    default:
+      // TODO(RLB) Support other sender types
+      throw NotImplementedError();
+  }
 }
 
 bool
@@ -823,6 +846,34 @@ State::decrypt(const MLSCiphertext& ct)
                        ct.content_type,
                        ct.authenticated_data,
                        content.value() };
+}
+
+LeafIndex
+State::leaf_for_roster_entry(RosterIndex index) const
+{
+  auto non_blank_leaves = uint32_t(0);
+
+  for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
+    const auto& kp = _tree.key_package(i);
+    if (!kp.has_value()) {
+      continue;
+    }
+    if (non_blank_leaves == index.val) {
+      return i;
+    }
+    non_blank_leaves += 1;
+  }
+
+  throw InvalidParameterError("Leaf Index mismatch");
+}
+
+State
+State::successor() const
+{
+  // Copy everything, then clear things that shouldn't be copied
+  auto next = *this;
+  next._pending_proposals.clear();
+  return next;
 }
 
 } // namespace mls
