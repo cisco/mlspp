@@ -6,7 +6,6 @@
 #include "mls/treekem.h"
 #include <list>
 #include <optional>
-#include <set>
 #include <vector>
 
 namespace mls {
@@ -64,6 +63,16 @@ public:
         SignaturePrivateKey sig_priv,
         const KeyPackage& kp,
         const Welcome& welcome);
+
+  // Join a group from outside
+  // XXX(RLB) For full generality, this should be capable of covering other
+  // proposals, and would need to return a Welcome as well as an MLSPlaintext,
+  // to cover any additional participants added in the Commit.
+  static std::tuple<MLSPlaintext, State> external_join(
+    const bytes& leaf_secret,
+    SignaturePrivateKey sig_priv,
+    const KeyPackage& kp,
+    const PublicGroupState& pgs);
 
   ///
   /// Message factories
@@ -150,10 +159,22 @@ protected:
   // Assemble a group context for this state
   GroupContext group_context() const;
 
+  // Assemble a preliminary, unjoined group state
+  State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs);
+
+  // Form a commit that can be either internal or external
+  std::tuple<MLSPlaintext, Welcome, State> commit(
+    const bytes& leaf_secret,
+    const std::vector<Proposal>& extra_proposals,
+    const std::optional<KeyPackage>& joiner_key_package,
+    const std::optional<HPKEPublicKey>& external_init_key) const;
+
   // Ratchet the key schedule forward and sign the commit that caused the
   // transition
-  MLSPlaintext ratchet_and_sign(const Commit& op,
+  MLSPlaintext ratchet_and_sign(const Sender& sender,
+                                const Commit& op,
                                 const bytes& update_secret,
+                                const std::optional<bytes>& force_init_secret,
                                 const GroupContext& prev_ctx);
 
   // Create an MLSPlaintext with a signature over some content
@@ -182,7 +203,8 @@ protected:
   friend bool operator!=(const State& lhs, const State& rhs);
 
   // Derive and set the secrets for an epoch, given some new entropy
-  void update_epoch_secrets(const bytes& commit_secret);
+  void update_epoch_secrets(const bytes& commit_secret,
+                            const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSPlaintext& pt) const;

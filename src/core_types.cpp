@@ -1,5 +1,7 @@
 #include "mls/core_types.h"
 
+#include <set>
+
 namespace mls {
 
 ///
@@ -37,6 +39,29 @@ ExtensionList::has(uint16_t type) const
     extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
       return ext.type == type;
     });
+}
+
+static const std::set<Extension::Type>&
+group_types()
+{
+  static const auto group_types = std::set<Extension::Type>{
+    ExtensionType::sframe_parameters,
+  };
+  return group_types;
+}
+
+ExtensionList
+ExtensionList::for_group() const
+{
+  auto group_ext = ExtensionList{};
+  for (const auto& ext : extensions) {
+    if (!group_types().count(ext.type)) {
+      continue;
+    }
+
+    group_ext.extensions.push_back(ext);
+  }
+  return group_ext;
 }
 
 ///
