@@ -269,7 +269,7 @@ struct Sender
   SenderType sender_type{ SenderType::invalid };
   uint32_t sender{ 0 };
 
-  TLS_SERIALIZABLE(sender_type, sender);
+  TLS_SERIALIZABLE(sender_type, sender)
 };
 
 struct MLSPlaintext
@@ -354,7 +354,7 @@ struct MLSCiphertext
                    sender_data_nonce,
                    encrypted_sender_data,
                    authenticated_data,
-                   ciphertext);
+                   ciphertext)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,

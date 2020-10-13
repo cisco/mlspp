@@ -200,7 +200,7 @@ struct TreeBaseKeySource : public BaseKeySource
     }
 
     return out;
-  };
+  }
 };
 
 ///

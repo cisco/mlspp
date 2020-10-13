@@ -188,7 +188,7 @@ struct KeyScheduleTestVectors
                      application_keys,
                      exporter_secret,
                      confirmation_key,
-                     init_secret);
+                     init_secret)
     TLS_TRAITS(tls::pass,
                tls::vector<1>,
                tls::vector<1>,
@@ -223,7 +223,7 @@ struct KeyScheduleTestVectors
                    target_generation,
                    base_init_secret,
                    base_group_context,
-                   cases);
+                   cases)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::vector<1>,
@@ -330,7 +330,7 @@ struct MessagesTestVectors
                      update_proposal,
                      remove_proposal,
                      commit,
-                     ciphertext);
+                     ciphertext)
     TLS_TRAITS(tls::pass,
                tls::vector<4>,
                tls::vector<4>,
@@ -366,7 +366,7 @@ struct MessagesTestVectors
                    dh_seed,
                    sig_seed,
                    random,
-                   cases);
+                   cases)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
