@@ -39,7 +39,7 @@ deterministic_signature_scheme(const CipherSuite& suite)
 /// File Handling
 ///
 
-bytes
+static bytes
 read_file(const std::string& filename)
 {
   std::ifstream file(filename, std::ios::binary);

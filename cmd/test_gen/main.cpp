@@ -8,7 +8,7 @@
 #include <fstream>
 #include <iostream>
 
-TreeMathTestVectors
+static TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
@@ -53,7 +53,7 @@ generate_tree_math()
   return tv;
 }
 
-CryptoTestVectors
+static CryptoTestVectors
 generate_crypto()
 {
   CryptoTestVectors tv;
@@ -92,7 +92,7 @@ generate_crypto()
   return tv;
 }
 
-HashRatchetTestVectors
+static HashRatchetTestVectors
 generate_hash_ratchet()
 {
   HashRatchetTestVectors tv;
@@ -126,7 +126,7 @@ generate_hash_ratchet()
   return tv;
 }
 
-KeyScheduleTestVectors
+static KeyScheduleTestVectors
 generate_key_schedule()
 {
   KeyScheduleTestVectors tv;
@@ -206,7 +206,7 @@ generate_key_schedule()
   return tv;
 }
 
-TreeKEMTestVectors
+static TreeKEMTestVectors
 generate_treekem()
 {
   TreeKEMTestVectors tv;
@@ -260,7 +260,7 @@ generate_treekem()
   return tv;
 }
 
-MessagesTestVectors
+static MessagesTestVectors
 generate_messages()
 {
   MessagesTestVectors tv;
