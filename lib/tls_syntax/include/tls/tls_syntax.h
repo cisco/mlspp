@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <variant>
 #include <vector>
 
