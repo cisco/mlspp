@@ -62,6 +62,9 @@ struct X509Credential
 
 private:
   SignaturePublicKey _public_key;
+  SignatureScheme _signature_scheme;
+
+  friend struct KeyPackage;
 };
 
 tls::ostream&

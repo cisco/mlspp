@@ -12,6 +12,24 @@ using hpke::Signature; // NOLINT(misc-unused-using-decls)
 
 namespace mls {
 
+SignatureScheme
+tls_signature_scheme(Signature::ID id)
+{
+  switch (id) {
+    case Signature::ID::P256_SHA256:
+      return SignatureScheme::ecdsa_secp256r1_sha256;
+    case Signature::ID::P384_SHA384:
+      return SignatureScheme::ecdsa_secp384r1_sha384;
+    case Signature::ID::P521_SHA512:
+      return SignatureScheme::ecdsa_secp521r1_sha512;
+    case Signature::ID::Ed25519:
+      return SignatureScheme::ed25519;
+    case Signature::ID::Ed448:
+      return SignatureScheme::ed448;
+  }
+  throw InvalidParameterError("Unsupported algorithm");
+}
+
 ///
 /// CipherSuites and details
 ///
