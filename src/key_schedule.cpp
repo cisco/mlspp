@@ -28,7 +28,7 @@ struct ApplicationContext
   TLS_SERIALIZABLE(node, generation)
 };
 
-bytes
+static bytes
 derive_app_secret(CipherSuite suite,
                   const bytes& secret,
                   const std::string& label,
@@ -200,7 +200,7 @@ struct TreeBaseKeySource : public BaseKeySource
     }
 
     return out;
-  };
+  }
 };
 
 ///

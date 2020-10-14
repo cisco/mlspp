@@ -23,7 +23,7 @@ const CredentialType::selector CredentialType::type<X509Credential> =
 using hpke::Certificate; // NOLINT(misc-unused-using-decls)
 using hpke::Signature;   // NOLINT(misc-unused-using-decls)
 
-const Signature&
+static const Signature&
 find_signature(Signature::ID id)
 {
   switch (id) {

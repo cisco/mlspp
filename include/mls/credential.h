@@ -48,7 +48,7 @@ struct X509Credential
   {
     bytes data;
 
-    TLS_SERIALIZABLE(data);
+    TLS_SERIALIZABLE(data)
     TLS_TRAITS(tls::vector<2>)
   };
 

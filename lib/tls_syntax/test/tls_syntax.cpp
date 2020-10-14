@@ -42,7 +42,7 @@ struct ExampleStruct
              tls::variant<IntSelector>)
 };
 
-bool
+static bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 {
   return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
