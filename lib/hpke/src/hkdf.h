@@ -20,10 +20,6 @@ private:
   const Digest& digest;
 
   explicit HKDF(const Digest& digest_in);
-  friend HKDF make_hkdf(const Digest& digest);
-
-  template<Digest::ID digest_id>
-  static const HKDF instance;
 };
 
 } // namespace hpke
