@@ -16,16 +16,75 @@ namespace hpke {
 /// Helper functions and constants
 ///
 
-static const bytes label_exp = to_bytes("exp");
-static const bytes label_hpke = to_bytes("HPKE");
-static const bytes label_hpke_05 = to_bytes("HPKE-05 ");
-static const bytes label_info_hash = to_bytes("info_hash");
-static const bytes label_key = to_bytes("key");
-static const bytes label_nonce = to_bytes("nonce");
-static const bytes label_psk_hash = to_bytes("psk_hash");
-static const bytes label_psk_id_hash = to_bytes("psk_id_hash");
-static const bytes label_sec = to_bytes("sec");
-static const bytes label_secret = to_bytes("secret");
+static const bytes&
+label_exp()
+{
+  static const bytes val = to_bytes("exp");
+  return val;
+}
+
+static const bytes&
+label_hpke()
+{
+  static const bytes val = to_bytes("HPKE");
+  return val;
+}
+
+static const bytes&
+label_hpke_05()
+{
+  static const bytes val = to_bytes("HPKE-05 ");
+  return val;
+}
+
+static const bytes&
+label_info_hash()
+{
+  static const bytes val = to_bytes("info_hash");
+  return val;
+}
+
+static const bytes&
+label_key()
+{
+  static const bytes val = to_bytes("key");
+  return val;
+}
+
+static const bytes&
+label_nonce()
+{
+  static const bytes val = to_bytes("nonce");
+  return val;
+}
+
+static const bytes&
+label_psk_hash()
+{
+  static const bytes val = to_bytes("psk_hash");
+  return val;
+}
+
+static const bytes&
+label_psk_id_hash()
+{
+  static const bytes val = to_bytes("psk_id_hash");
+  return val;
+}
+
+static const bytes&
+label_sec()
+{
+  static const bytes val = to_bytes("sec");
+  return val;
+}
+
+static const bytes&
+label_secret()
+{
+  static const bytes val = to_bytes("secret");
+  return val;
+}
 
 ///
 /// Factory methods for primitives
@@ -128,7 +187,7 @@ KDF::labeled_extract(const bytes& suite_id,
                      const bytes& label,
                      const bytes& ikm) const
 {
-  auto labeled_ikm = label_hpke_05 + suite_id + label + ikm;
+  auto labeled_ikm = label_hpke_05() + suite_id + label + ikm;
   return extract(salt, labeled_ikm);
 }
 
@@ -139,7 +198,8 @@ KDF::labeled_expand(const bytes& suite_id,
                     const bytes& info,
                     size_t size) const
 {
-  auto labeled_info = i2osp(size, 2) + label_hpke_05 + suite_id + label + info;
+  auto labeled_info =
+    i2osp(size, 2) + label_hpke_05() + suite_id + label + info;
   return expand(prk, labeled_info, size);
 }
 
@@ -176,7 +236,7 @@ bytes
 Context::do_export(const bytes& exporter_context, size_t size) const
 {
   return kdf.labeled_expand(
-    suite, exporter_secret, label_sec, exporter_context, size);
+    suite, exporter_secret, label_sec(), exporter_context, size);
 }
 
 bytes
@@ -257,7 +317,7 @@ static const bytes default_psk_id = {};
 static bytes
 suite_id(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
 {
-  return label_hpke + i2osp(static_cast<uint64_t>(kem_id), 2) +
+  return label_hpke() + i2osp(static_cast<uint64_t>(kem_id), 2) +
          i2osp(static_cast<uint64_t>(kdf_id), 2) +
          i2osp(static_cast<uint64_t>(aead_id), 2);
 }
@@ -433,21 +493,22 @@ HPKE::key_schedule(Mode mode,
     throw std::runtime_error("Invalid PSK inputs");
   }
 
-  auto psk_id_hash = kdf.labeled_extract(suite, {}, label_psk_id_hash, psk_id);
-  auto info_hash = kdf.labeled_extract(suite, {}, label_info_hash, info);
+  auto psk_id_hash =
+    kdf.labeled_extract(suite, {}, label_psk_id_hash(), psk_id);
+  auto info_hash = kdf.labeled_extract(suite, {}, label_info_hash(), info);
   auto mode_bytes = bytes{ uint8_t(mode) };
   auto key_schedule_context = mode_bytes + psk_id_hash + info_hash;
 
-  auto psk_hash = kdf.labeled_extract(suite, {}, label_psk_hash, psk);
+  auto psk_hash = kdf.labeled_extract(suite, {}, label_psk_hash(), psk);
   auto secret =
-    kdf.labeled_extract(suite, psk_hash, label_secret, shared_secret);
+    kdf.labeled_extract(suite, psk_hash, label_secret(), shared_secret);
 
   auto key = kdf.labeled_expand(
-    suite, secret, label_key, key_schedule_context, aead.key_size());
+    suite, secret, label_key(), key_schedule_context, aead.key_size());
   auto nonce = kdf.labeled_expand(
-    suite, secret, label_nonce, key_schedule_context, aead.nonce_size());
+    suite, secret, label_nonce(), key_schedule_context, aead.nonce_size());
   auto exporter_secret = kdf.labeled_expand(
-    suite, secret, label_exp, key_schedule_context, kdf.hash_size());
+    suite, secret, label_exp(), key_schedule_context, kdf.hash_size());
 
   return Context(suite, key, nonce, exporter_secret, kdf, aead);
 }

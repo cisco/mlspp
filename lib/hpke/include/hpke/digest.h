@@ -30,10 +30,6 @@ private:
   const size_t output_size;
 
   explicit Digest(ID id);
-  friend Digest make_digest(ID id);
-
-  template<Digest::ID id>
-  static const Digest instance;
 };
 
 } // namespace hpke
