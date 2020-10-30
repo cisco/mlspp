@@ -1,9 +1,7 @@
 #include "bytes/bytes.h"
 
 #include <iomanip>
-#include <iostream>
 #include <sstream>
-#include <stdexcept>
 
 namespace bytes_ns {
 

@@ -3,11 +3,8 @@
 #include <hpke/random.h>
 
 #include "common.h"
-#include "openssl_common.h"
 
 #include "openssl/ec.h"
-#include "openssl/evp.h"
-#include "openssl/obj_mac.h"
 
 namespace hpke {
 

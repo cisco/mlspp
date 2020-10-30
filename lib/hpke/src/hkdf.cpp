@@ -1,10 +1,4 @@
 #include "hkdf.h"
-#include "openssl_common.h"
-
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#include <stdexcept>
 
 namespace hpke {
 

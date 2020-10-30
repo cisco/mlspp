@@ -3,8 +3,6 @@
 
 #include "common.h"
 
-#include <vector>
-
 TEST_CASE("Signature Known-Answer")
 {
   struct KnownAnswerTest

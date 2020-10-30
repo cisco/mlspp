@@ -1,7 +1,6 @@
 #include "mls/crypto.h"
 
 #include <iostream>
-#include <string>
 
 using hpke::AEAD;      // NOLINT(misc-unused-using-decls)
 using hpke::Digest;    // NOLINT(misc-unused-using-decls)

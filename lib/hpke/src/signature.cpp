@@ -1,8 +1,5 @@
 #include "dhkem.h"
 
-#include "common.h"
-#include "group.h"
-
 namespace hpke {
 
 struct ConcreteSignature : public Signature

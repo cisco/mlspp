@@ -3,9 +3,6 @@
 
 #include "common.h"
 
-#include <memory>
-#include <vector>
-
 TEST_CASE("AEAD Known-Answer")
 {
   struct KnownAnswerTest

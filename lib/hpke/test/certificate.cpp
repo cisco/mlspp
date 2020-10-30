@@ -4,8 +4,6 @@
 #include "common.h"
 
 #include <fstream>
-#include <iostream>
-#include <vector>
 
 TEST_CASE("Certificate Known-Answer depth 2")
 {

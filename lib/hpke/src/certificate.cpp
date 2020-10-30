@@ -1,9 +1,7 @@
 #include <hpke/certificate.h>
-#include <hpke/signature.h>
 #include <openssl/x509.h>
 
 #include "group.h"
-#include "openssl_common.h"
 
 namespace hpke {
 

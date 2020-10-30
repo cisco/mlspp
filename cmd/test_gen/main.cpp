@@ -3,8 +3,6 @@
 
 #include "test_vectors.h"
 
-#include <hpke/random.h>
-
 #include <fstream>
 #include <iostream>
 
