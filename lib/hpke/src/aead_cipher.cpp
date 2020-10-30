@@ -132,14 +132,16 @@ AEADCipher::seal(const bytes& key,
   int outlen = 0;
   if (!aad.empty()) {
     if (1 != EVP_EncryptUpdate(
-               ctx.get(), nullptr, &outlen, aad.data(), aad.size())) {
+               ctx.get(), nullptr, &outlen, aad.data(),
+                               static_cast<int>(aad.size()))) {
       throw openssl_error();
     }
   }
 
   bytes ct(pt.size());
   if (1 !=
-      EVP_EncryptUpdate(ctx.get(), ct.data(), &outlen, pt.data(), pt.size())) {
+      EVP_EncryptUpdate(ctx.get(), ct.data(), &outlen, pt.data(),
+                             static_cast<int>(pt.size()))) {
     throw openssl_error();
   }
 
@@ -151,7 +153,7 @@ AEADCipher::seal(const bytes& key,
 
   bytes tag(tag_size);
   if (1 != EVP_CIPHER_CTX_ctrl(
-             ctx.get(), EVP_CTRL_GCM_GET_TAG, tag_size, tag.data())) {
+             ctx.get(), EVP_CTRL_GCM_GET_TAG, (int)tag_size, tag.data())) {
     throw openssl_error();
   }
 
@@ -182,21 +184,23 @@ AEADCipher::open(const bytes& key,
   auto inner_ct_size = ct.size() - tag_size;
   auto tag = bytes(ct.begin() + inner_ct_size, ct.end());
   if (1 != EVP_CIPHER_CTX_ctrl(
-             ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size, tag.data())) {
+             ctx.get(), EVP_CTRL_GCM_SET_TAG, (int)tag_size, tag.data())) {
     throw openssl_error();
   }
 
   int out_size = 0;
   if (!aad.empty()) {
     if (1 != EVP_DecryptUpdate(
-               ctx.get(), nullptr, &out_size, aad.data(), aad.size())) {
+               ctx.get(), nullptr, &out_size, aad.data(),
+                               static_cast<int>(aad.size()))) {
       throw openssl_error();
     }
   }
 
   bytes pt(inner_ct_size);
   if (1 != EVP_DecryptUpdate(
-             ctx.get(), pt.data(), &out_size, ct.data(), inner_ct_size)) {
+             ctx.get(), pt.data(), &out_size, ct.data(),
+                             static_cast<int>(inner_ct_size))) {
     throw openssl_error();
   }
 
