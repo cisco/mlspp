@@ -247,7 +247,7 @@ State::commit(const bytes& leaf_secret) const
     next._confirmed_transcript_hash,
     next._interim_transcript_hash,
     next._extensions,
-    std::get<CommitData>(pt.content).confirmation,
+    pt.confirmation_tag.value().mac_value,
   };
   group_info.sign(_index, _identity_priv);
 
@@ -279,16 +279,16 @@ State::ratchet_and_sign(const Commit& op,
 {
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
+  pt.sign(_suite, prev_ctx, _identity_priv);
 
   auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
   _confirmed_transcript_hash = _suite.get().digest.hash(confirmed_transcript);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto& commit_data = std::get<CommitData>(pt.content);
-  commit_data.confirmation = _suite.get().digest.hmac(
+  auto confirmation = _suite.get().digest.hmac(
     _keys.confirmation_key, _confirmed_transcript_hash);
-  pt.sign(_suite, prev_ctx, _identity_priv);
+  pt.confirmation_tag = { std::move(confirmation) };
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
   _interim_transcript_hash = _suite.get().digest.hash(interim_transcript);
@@ -318,7 +318,7 @@ State::handle(const MLSPlaintext& pt)
     return std::nullopt;
   }
 
-  if (!std::holds_alternative<CommitData>(pt.content)) {
+  if (!std::holds_alternative<Commit>(pt.content)) {
     throw InvalidParameterError("Incorrect content type");
   }
 
@@ -332,13 +332,13 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Apply the commit
-  const auto& commit_data = std::get<CommitData>(pt.content);
+  const auto& commit = std::get<Commit>(pt.content);
   State next = *this;
-  next.apply(commit_data.commit);
+  next.apply(commit);
 
   // Decapsulate and apply the UpdatePath, if provided
   auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
-  if (commit_data.commit.path.has_value()) {
+  if (commit.path.has_value()) {
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
@@ -346,7 +346,7 @@ State::handle(const MLSPlaintext& pt)
       next._confirmed_transcript_hash,
       next._extensions,
     });
-    const auto& path = commit_data.commit.path.value();
+    const auto& path = commit.path.value();
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;
@@ -362,7 +362,11 @@ State::handle(const MLSPlaintext& pt)
   next.update_epoch_secrets(update_secret);
 
   // Verify the confirmation MAC
-  if (!next.verify_confirmation(commit_data.confirmation)) {
+  if (!pt.confirmation_tag.has_value()) {
+    throw ProtocolError("Missing confirmation on Commit");
+  }
+
+  if (!next.verify_confirmation(pt.confirmation_tag.value().mac_value)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -680,7 +684,7 @@ State::encrypt(const MLSPlaintext& pt)
   } else if (std::holds_alternative<Proposal>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
     content_type = ContentType::selector::proposal;
-  } else if (std::holds_alternative<CommitData>(pt.content)) {
+  } else if (std::holds_alternative<Commit>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
     content_type = ContentType::selector::commit;
   } else {

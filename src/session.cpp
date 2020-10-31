@@ -300,7 +300,7 @@ Session::handle(const bytes& handshake_data)
     throw ProtocolError("External senders not supported");
   }
 
-  auto is_commit = std::holds_alternative<CommitData>(handshake.content);
+  auto is_commit = std::holds_alternative<Commit>(handshake.content);
   if (is_commit &&
       LeafIndex(handshake.sender.sender) == inner->history.front().index()) {
     if (!inner->outbound_cache.has_value()) {

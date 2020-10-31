@@ -245,15 +245,6 @@ struct ApplicationData
   TLS_TRAITS(tls::vector<4>)
 };
 
-struct CommitData
-{
-  Commit commit;
-  bytes confirmation;
-
-  TLS_SERIALIZABLE(commit, confirmation)
-  TLS_TRAITS(tls::pass, tls::vector<1>)
-};
-
 struct GroupContext;
 
 enum struct SenderType : uint8_t
@@ -272,14 +263,24 @@ struct Sender
   TLS_SERIALIZABLE(sender_type, sender)
 };
 
+struct MAC {
+  bytes mac_value;
+
+  TLS_SERIALIZABLE(mac_value)
+  TLS_TRAITS(tls::vector<1>)
+};
+
 struct MLSPlaintext
 {
   bytes group_id;
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
-  std::variant<ApplicationData, Proposal, CommitData> content;
+  std::variant<ApplicationData, Proposal, Commit> content;
+
   bytes signature;
+  std::optional<MAC> confirmation_tag;
+  // TODO membership_tag
 
   // Constructor for unmarshaling directly
   MLSPlaintext() = default;
@@ -301,7 +302,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
-               const Commit& commit);
+               Commit commit);
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -321,13 +322,15 @@ struct MLSPlaintext
                    sender,
                    authenticated_data,
                    content,
-                   signature)
+                   signature,
+                   confirmation_tag)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,
              tls::variant<ContentType>,
-             tls::vector<2>)
+             tls::vector<2>,
+             tls::pass)
 };
 
 // struct {
