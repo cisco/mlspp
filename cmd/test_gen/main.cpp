@@ -333,22 +333,29 @@ generate_messages()
     auto add_prop = Proposal{ Add{ key_package } };
     auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
+    add_hs.membership_tag = { tv.random };
 
     auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
     update_hs.signature = tv.random;
+    update_hs.membership_tag = { tv.random };
 
     auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
     remove_hs.signature = tv.random;
+    remove_hs.membership_tag = { tv.random };
 
     // Construct Commit
     auto commit = Commit{
       { { tv.random }, { tv.random } },
       update_path,
     };
+    auto commit_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, commit };
+    commit_hs.signature = tv.random;
+    commit_hs.confirmation_tag = { tv.random };
+    commit_hs.membership_tag = { tv.random };
 
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
@@ -367,7 +374,7 @@ generate_messages()
                          tls::marshal(add_hs),
                          tls::marshal(update_hs),
                          tls::marshal(remove_hs),
-                         tls::marshal(commit),
+                         tls::marshal(commit_hs),
                          tls::marshal(ciphertext) });
   }
 

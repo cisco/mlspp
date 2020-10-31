@@ -108,6 +108,7 @@ State::sign(const Proposal& proposal) const
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(_suite, group_context(), _identity_priv);
+  pt.set_membership_tag(_suite, group_context(), _keys.membership_key);
   return pt;
 }
 
@@ -277,6 +278,7 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
+  auto prev_membership_key = _keys.membership_key;
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
   pt.sign(_suite, prev_ctx, _identity_priv);
@@ -286,9 +288,10 @@ State::ratchet_and_sign(const Commit& op,
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto confirmation = _suite.get().digest.hmac(
-    _keys.confirmation_key, _confirmed_transcript_hash);
+  auto confirmation = _suite.get().digest.hmac(_keys.confirmation_key,
+                                               _confirmed_transcript_hash);
   pt.confirmation_tag = { std::move(confirmation) };
+  pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
   _interim_transcript_hash = _suite.get().digest.hash(interim_transcript);
@@ -401,7 +404,7 @@ State::apply(const Remove& remove)
 ProposalID
 State::proposal_id(const MLSPlaintext& pt) const
 {
-  return ProposalID{ _suite.get().digest.hash(tls::marshal(pt)) };
+  return ProposalID{ _suite.get().digest.hash(pt.commit_content()) };
 }
 
 std::optional<MLSPlaintext>
@@ -510,6 +513,7 @@ State::protect(const bytes& pt)
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(_suite, group_context(), _identity_priv);
+  mpt.set_membership_tag(_suite, group_context(), _keys.membership_key);
   return encrypt(mpt);
 }
 
@@ -623,6 +627,10 @@ State::verify(const MLSPlaintext& pt) const
   if (pt.sender.sender_type != SenderType::member) {
     // TODO(RLB) Support external senders
     throw InvalidParameterError("External senders not supported");
+  }
+
+  if (!pt.verify_membership_tag(_suite, group_context(), _keys.membership_key)) {
+    return false;
   }
 
   auto maybe_kp = _tree.key_package(LeafIndex(pt.sender.sender));

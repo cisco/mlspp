@@ -263,7 +263,8 @@ struct Sender
   TLS_SERIALIZABLE(sender_type, sender)
 };
 
-struct MAC {
+struct MAC
+{
   bytes mac_value;
 
   TLS_SERIALIZABLE(mac_value)
@@ -280,10 +281,10 @@ struct MLSPlaintext
 
   bytes signature;
   std::optional<MAC> confirmation_tag;
-  // TODO membership_tag
+  std::optional<MAC> membership_tag;
 
   // Constructor for unmarshaling directly
-  MLSPlaintext() = default;
+  MLSPlaintext();
 
   // Constructor for decrypting
   MLSPlaintext(bytes group_id,
@@ -299,10 +300,7 @@ struct MLSPlaintext
                Sender sender,
                ApplicationData application_data);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               Sender sender,
-               Commit commit);
+  MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -311,6 +309,14 @@ struct MLSPlaintext
   bool verify(const CipherSuite& suite,
               const GroupContext& context,
               const SignaturePublicKey& pub) const;
+
+  bytes membership_tag_input(const GroupContext& context) const;
+  void set_membership_tag(const CipherSuite& suite,
+                          const GroupContext& context,
+                          const bytes& mac_key);
+  bool verify_membership_tag(const CipherSuite& suite,
+                             const GroupContext& context,
+                             const bytes& mac_key) const;
 
   bytes marshal_content(size_t padding_size) const;
 
@@ -323,14 +329,21 @@ struct MLSPlaintext
                    authenticated_data,
                    content,
                    signature,
-                   confirmation_tag)
+                   confirmation_tag,
+                   membership_tag)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,
              tls::variant<ContentType>,
              tls::vector<2>,
+             tls::pass,
              tls::pass)
+
+  private:
+  // Not part of the struct, an indicator of whether this MLSPlaintext was
+  // constructed from an MLSCiphertext
+  bool decrypted;
 };
 
 // struct {

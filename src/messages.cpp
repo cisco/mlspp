@@ -181,6 +181,10 @@ template<>
 const ContentType::selector ContentType::type<ApplicationData> =
   ContentType::selector::application;
 
+MLSPlaintext::MLSPlaintext()
+  : decrypted(false)
+{}
+
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
@@ -192,6 +196,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
+  , decrypted(true)
 {
   tls::istream r(content_in);
   switch (content_type_in) {
@@ -231,6 +236,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(application_data_in))
+  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -241,6 +247,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(proposal))
+  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -251,6 +258,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(commit))
+  , decrypted(false)
 {}
 
 bytes
@@ -319,6 +327,42 @@ MLSPlaintext::verify(const CipherSuite& suite,
 {
   auto tbs = to_be_signed(context);
   return pub.verify(suite, tbs, signature);
+}
+
+bytes
+MLSPlaintext::membership_tag_input(const GroupContext& context) const
+{
+  tls::ostream w;
+  tls::vector<2>::encode(w, signature);
+  w << confirmation_tag;
+  return to_be_signed(context) + w.bytes();
+}
+
+void
+MLSPlaintext::set_membership_tag(const CipherSuite& suite,
+                          const GroupContext& context,
+                          const bytes& mac_key)
+{
+  auto tbm = membership_tag_input(context);
+  membership_tag = { suite.get().digest.hmac(mac_key, tbm) };
+}
+
+bool
+MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
+                             const GroupContext& context,
+                             const bytes& mac_key) const
+{
+  if (decrypted) {
+    return true;
+  }
+
+  if (!membership_tag.has_value()) {
+    return false;
+  }
+
+  auto tbm = membership_tag_input(context);
+  auto mac_value = suite.get().digest.hmac(mac_key, tbm);
+  return constant_time_eq(mac_value, membership_tag.value().mac_value);
 }
 
 } // namespace mls
