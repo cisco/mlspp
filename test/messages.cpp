@@ -115,7 +115,6 @@ TEST_CASE("Messages Interop")
 
     // MLSPlaintext
 
-
     // Proposals
     auto add_prop = Proposal{ Add{ key_package } };
     CHECK(add_prop.proposal_type() == ProposalType::selector::add);
@@ -158,7 +157,6 @@ TEST_CASE("Messages Interop")
     MLSCiphertext ciphertext{
       tv.group_id, tv.epoch,  ContentType::selector::application,
       tv.random,   tv.random, tv.random,
-      tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }

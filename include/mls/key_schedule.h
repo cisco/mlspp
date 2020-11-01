@@ -78,7 +78,6 @@ struct KeyScheduleEpoch
   bytes epoch_secret;
 
   bytes sender_data_secret;
-  bytes sender_data_key;
 
   bytes handshake_secret;
   GroupKeySource handshake_keys;
@@ -103,6 +102,8 @@ struct KeyScheduleEpoch
   KeyScheduleEpoch next(LeafCount size,
                         const bytes& update_secret,
                         const bytes& context) const;
+
+  KeyAndNonce sender_data(const bytes& ciphertext);
 };
 
 bool

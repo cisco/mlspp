@@ -340,8 +340,8 @@ MLSPlaintext::membership_tag_input(const GroupContext& context) const
 
 void
 MLSPlaintext::set_membership_tag(const CipherSuite& suite,
-                          const GroupContext& context,
-                          const bytes& mac_key)
+                                 const GroupContext& context,
+                                 const bytes& mac_key)
 {
   auto tbm = membership_tag_input(context);
   membership_tag = { suite.get().digest.hmac(mac_key, tbm) };
@@ -349,8 +349,8 @@ MLSPlaintext::set_membership_tag(const CipherSuite& suite,
 
 bool
 MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
-                             const GroupContext& context,
-                             const bytes& mac_key) const
+                                    const GroupContext& context,
+                                    const bytes& mac_key) const
 {
   if (decrypted) {
     return true;

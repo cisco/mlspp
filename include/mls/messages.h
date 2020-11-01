@@ -340,7 +340,7 @@ struct MLSPlaintext
              tls::pass,
              tls::pass)
 
-  private:
+private:
   // Not part of the struct, an indicator of whether this MLSPlaintext was
   // constructed from an MLSCiphertext
   bool decrypted;
@@ -350,7 +350,6 @@ struct MLSPlaintext
 //     opaque group_id<0..255>;
 //     uint32 epoch;
 //     ContentType content_type;
-//     opaque sender_data_nonce<0..255>;
 //     opaque encrypted_sender_data<0..255>;
 //     opaque ciphertext<0..2^32-1>;
 // } MLSCiphertext;
@@ -359,7 +358,6 @@ struct MLSCiphertext
   bytes group_id;
   epoch_t epoch;
   ContentType::selector content_type;
-  bytes sender_data_nonce;
   bytes encrypted_sender_data;
   bytes authenticated_data;
   bytes ciphertext;
@@ -367,14 +365,12 @@ struct MLSCiphertext
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    content_type,
-                   sender_data_nonce,
                    encrypted_sender_data,
                    authenticated_data,
                    ciphertext)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector<1>,
              tls::vector<1>,
              tls::vector<4>,
              tls::vector<4>)

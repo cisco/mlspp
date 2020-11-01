@@ -578,49 +578,6 @@ State::update_epoch_secrets(const bytes& update_secret)
 /// Message encryption and decryption
 ///
 
-// struct {
-//     opaque group_id<0..255>;
-//     uint32 epoch;
-//     ContentType content_type;
-//     opaque sender_data_nonce<0..255>;
-//     opaque encrypted_sender_data<0..255>;
-// } MLSCiphertextContentAAD;
-static bytes
-content_aad(const bytes& group_id,
-            uint32_t epoch,
-            ContentType::selector content_type,
-            const bytes& authenticated_data,
-            const bytes& sender_data_nonce,
-            const bytes& encrypted_sender_data)
-{
-  tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << content_type;
-  tls::vector<4>::encode(w, authenticated_data);
-  tls::vector<1>::encode(w, sender_data_nonce);
-  tls::vector<1>::encode(w, encrypted_sender_data);
-  return w.bytes();
-}
-
-// struct {
-//     opaque group_id<0..255>;
-//     uint32 epoch;
-//     ContentType content_type;
-//     opaque sender_data_nonce<0..255>;
-// } MLSCiphertextSenderDataAAD;
-static bytes
-sender_data_aad(const bytes& group_id,
-                uint32_t epoch,
-                ContentType::selector content_type,
-                const bytes& sender_data_nonce)
-{
-  tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << content_type;
-  tls::vector<1>::encode(w, sender_data_nonce);
-  return w.bytes();
-}
-
 bool
 State::verify(const MLSPlaintext& pt) const
 {
@@ -629,7 +586,8 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("External senders not supported");
   }
 
-  if (!pt.verify_membership_tag(_suite, group_context(), _keys.membership_key)) {
+  if (!pt.verify_membership_tag(
+        _suite, group_context(), _keys.membership_key)) {
     return false;
   }
 
@@ -679,6 +637,70 @@ State::roster() const
   return creds;
 }
 
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     ContentType content_type;
+//     opaque authenticated_data<0..2^32-1>;
+// } MLSCiphertextContentAAD;
+struct MLSCiphertextContentAAD
+{
+  const bytes& group_id;
+  const epoch_t epoch;
+  const ContentType::selector content_type;
+  const bytes& authenticated_data;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
+};
+
+using ReuseGuard = std::array<uint8_t, 4>;
+
+ReuseGuard
+new_reuse_guard()
+{
+  auto random = random_bytes(4);
+  auto guard = ReuseGuard();
+  std::copy(random.begin(), random.end(), guard.begin());
+  return guard;
+}
+
+void apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
+{
+  for (size_t i = 0; i < guard.size(); i++) {
+    nonce.at(i) ^= guard.at(i);
+  }
+}
+
+// struct {
+//     uint32 sender;
+//     uint32 generation;
+//     opaque reuse_guard[4];
+// } MLSSenderData;
+struct MLSSenderData
+{
+  uint32_t sender;
+  uint32_t generation;
+  ReuseGuard reuse_guard;
+
+  TLS_SERIALIZABLE(sender, generation, reuse_guard)
+};
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     ContentType content_type;
+// } MLSSenderDataAAD;
+struct MLSSenderDataAAD
+{
+  const bytes& group_id;
+  const epoch_t epoch;
+  const ContentType::selector content_type;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
+};
+
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
@@ -699,43 +721,37 @@ State::encrypt(const MLSPlaintext& pt)
     throw InvalidParameterError("Unknown content type");
   }
 
-  // Encrypt the sender data
-  tls::ostream sender_data;
-  sender_data << Sender{ SenderType::member, _index.val } << generation;
-
-  auto sender_data_nonce = random_bytes(_suite.get().hpke.aead.nonce_size());
-  auto sender_data_aad_val =
-    sender_data_aad(_group_id, _epoch, content_type, sender_data_nonce);
-
-  auto encrypted_sender_data =
-    _suite.get().hpke.aead.seal(_keys.sender_data_key,
-                                sender_data_nonce,
-                                sender_data_aad_val,
-                                sender_data.bytes());
-
-  // Compute the plaintext input and AAD
+  // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
   auto content = pt.marshal_content(0);
-  auto aad = content_aad(_group_id,
-                         _epoch,
-                         content_type,
-                         pt.authenticated_data,
-                         sender_data_nonce,
-                         encrypted_sender_data);
+  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
+    _group_id, _epoch, content_type, pt.authenticated_data });
 
-  // Encrypt the plaintext
-  auto ciphertext =
-    _suite.get().hpke.aead.seal(keys.key, keys.nonce, aad, content);
+  auto reuse_guard = new_reuse_guard();
+  apply_reuse_guard(reuse_guard, keys.nonce);
+
+  auto content_ct =
+    _suite.get().hpke.aead.seal(keys.key, keys.nonce, content_aad, content);
+
+  // Encrypt the sender data
+  auto sender_data_obj = MLSSenderData{ _index.val, generation, reuse_guard };
+  auto sender_data = tls::marshal(sender_data_obj);
+
+  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(content_ct);
+  auto sender_data_aad =
+    tls::marshal(MLSSenderDataAAD{ _group_id, _epoch, content_type });
+
+  auto encrypted_sender_data = _suite.get().hpke.aead.seal(
+    sender_data_key, sender_data_nonce, sender_data_aad, sender_data);
 
   // Assemble the MLSCiphertext
   MLSCiphertext ct;
   ct.group_id = _group_id;
   ct.epoch = _epoch;
   ct.content_type = content_type;
-  ct.sender_data_nonce = sender_data_nonce;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.authenticated_data = pt.authenticated_data;
-  ct.ciphertext = ciphertext;
+  ct.ciphertext = content_ct;
   return ct;
 }
 
@@ -752,63 +768,61 @@ State::decrypt(const MLSCiphertext& ct)
   }
 
   // Decrypt and parse the sender data
-  auto sender_data_aad_val = sender_data_aad(
-    ct.group_id, ct.epoch, ct.content_type, ct.sender_data_nonce);
-  auto sender_data = _suite.get().hpke.aead.open(_keys.sender_data_key,
-                                                 ct.sender_data_nonce,
-                                                 sender_data_aad_val,
-                                                 ct.encrypted_sender_data);
-  if (!sender_data.has_value()) {
+  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(ct.ciphertext);
+  auto sender_data_aad =
+    tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
+  auto sender_data_pt = _suite.get().hpke.aead.open(sender_data_key,
+                                                    sender_data_nonce,
+                                                    sender_data_aad,
+                                                    ct.encrypted_sender_data);
+  if (!sender_data_pt.has_value()) {
     throw ProtocolError("Sender data decryption failed");
   }
 
-  tls::istream r(sender_data.value());
-  Sender raw_sender;
-  uint32_t generation = 0;
-  r >> raw_sender >> generation;
-
-  if (raw_sender.sender_type != SenderType::member) {
-    throw InvalidParameterError("Encrypted message from non-member");
-  }
-  auto sender = LeafIndex(raw_sender.sender);
+  auto sender_data = tls::get<MLSSenderData>(sender_data_pt.value());
+  auto sender = LeafIndex(sender_data.sender);
 
   // Pull from the key schedule
   KeyAndNonce keys;
   switch (ct.content_type) {
     // TODO(rlb) Enable decryption of proposal / commit
     case ContentType::selector::application:
-      keys = _keys.application_keys.get(sender, generation);
-      _keys.application_keys.erase(sender, generation);
+      keys = _keys.application_keys.get(sender, sender_data.generation);
+      _keys.application_keys.erase(sender, sender_data.generation);
       break;
 
     case ContentType::selector::proposal:
     case ContentType::selector::commit:
-      keys = _keys.handshake_keys.get(sender, generation);
-      _keys.handshake_keys.erase(sender, generation);
+      keys = _keys.handshake_keys.get(sender, sender_data.generation);
+      _keys.handshake_keys.erase(sender, sender_data.generation);
       break;
 
     default:
       throw InvalidParameterError("Unknown content type");
   }
 
+  apply_reuse_guard(sender_data.reuse_guard, keys.nonce);
+
   // Compute the plaintext AAD and decrypt
-  auto aad = content_aad(ct.group_id,
-                         ct.epoch,
-                         ct.content_type,
-                         ct.authenticated_data,
-                         ct.sender_data_nonce,
-                         ct.encrypted_sender_data);
-  auto content =
-    _suite.get().hpke.aead.open(keys.key, keys.nonce, aad, ct.ciphertext);
+  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
+    ct.group_id,
+    ct.epoch,
+    ct.content_type,
+    ct.authenticated_data,
+  });
+  auto content = _suite.get().hpke.aead.open(
+    keys.key, keys.nonce, content_aad, ct.ciphertext);
   if (!content.has_value()) {
     throw ProtocolError("Content decryption failed");
   }
 
   // Set up a new plaintext based on the content
-  return MLSPlaintext{
-    _group_id,      _epoch, raw_sender, ct.content_type, ct.authenticated_data,
-    content.value()
-  };
+  return MLSPlaintext{ _group_id,
+                       _epoch,
+                       { SenderType::member, sender_data.sender },
+                       ct.content_type,
+                       ct.authenticated_data,
+                       content.value() };
 }
 
 } // namespace mls

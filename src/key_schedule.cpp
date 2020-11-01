@@ -296,10 +296,6 @@ KeyScheduleEpoch::create(CipherSuite suite,
     suite.derive_secret(epoch_secret, "membership", context);
   auto init_secret = suite.derive_secret(epoch_secret, "init", context);
 
-  auto key_size = suite.get().hpke.aead.key_size();
-  auto sender_data_key =
-    suite.expand_with_label(sender_data_secret, "sd key", {}, key_size);
-
   auto handshake_base =
     std::make_unique<NoFSBaseKeySource>(suite, handshake_secret);
   auto application_base =
@@ -308,7 +304,6 @@ KeyScheduleEpoch::create(CipherSuite suite,
   return KeyScheduleEpoch{ suite,
                            epoch_secret,
                            sender_data_secret,
-                           sender_data_key,
                            handshake_secret,
                            GroupKeySource{ handshake_base.release() },
                            application_secret,
@@ -329,6 +324,25 @@ KeyScheduleEpoch::next(LeafCount size,
   return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
 }
 
+KeyAndNonce
+KeyScheduleEpoch::sender_data(const bytes& ciphertext)
+{
+  auto sample_size = suite.get().digest.hash_size();
+  auto sample = bytes(sample_size);
+  if (ciphertext.size() < sample_size) {
+    sample = ciphertext;
+  } else {
+    sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
+  }
+
+  auto key_size = suite.get().hpke.aead.key_size();
+  auto nonce_size = suite.get().hpke.aead.nonce_size();
+  return {
+    suite.expand_with_label(sender_data_secret, "key", sample, key_size),
+    suite.expand_with_label(sender_data_secret, "nonce", sample, nonce_size),
+  };
+}
+
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 {
@@ -337,14 +351,13 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
   auto suite = (lhs.suite == rhs.suite);
   auto epoch_secret = (lhs.epoch_secret == rhs.epoch_secret);
   auto sender_data_secret = (lhs.sender_data_secret == rhs.sender_data_secret);
-  auto sender_data_key = (lhs.sender_data_key == rhs.sender_data_key);
   auto handshake_secret = (lhs.handshake_secret == rhs.handshake_secret);
   auto application_secret = (lhs.application_secret == rhs.application_secret);
   auto exporter_secret = (lhs.exporter_secret == rhs.exporter_secret);
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
 
-  return suite && epoch_secret && sender_data_secret && sender_data_key &&
+  return suite && epoch_secret && sender_data_secret &&
          handshake_secret && application_secret && exporter_secret &&
          confirmation_key && init_secret;
 }
