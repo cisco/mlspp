@@ -226,40 +226,57 @@ GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
 /// KeyScheduleEpoch
 ///
 
-KeyScheduleEpoch
-KeyScheduleEpoch::create(CipherSuite suite,
-                         LeafCount size,
-                         const bytes& epoch_secret,
-                         const bytes& context)
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
+  : suite(suite_in)
 {
-  auto sender_data_secret =
-    suite.derive_secret(epoch_secret, "sender data", context);
+  auto secret_size = suite.get().digest.hash_size();
+  epoch_secret = random_bytes(secret_size);
+  init_secrets(LeafCount{ 1 });
+}
 
-  auto encryption_secret =
-    suite.derive_secret(epoch_secret, "encryption", context);
-  auto keys = GroupKeySource(suite, size, encryption_secret);
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
+                                   const bytes& joiner_secret_in,
+                                   const bytes& psk_secret,
+                                   const bytes& context,
+                                   LeafCount size)
+  : suite(suite_in)
+  , joiner_secret(joiner_secret_in)
+{
+  auto joiner_expand = suite.derive_secret(joiner_secret, "member");
 
-  auto exporter_secret = suite.derive_secret(epoch_secret, "exporter", context);
-  auto confirmation_key = suite.derive_secret(epoch_secret, "confirm", context);
-  auto membership_key =
-    suite.derive_secret(epoch_secret, "membership", context);
-  auto init_secret = suite.derive_secret(epoch_secret, "init", context);
+  member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
 
-  return KeyScheduleEpoch{
-    suite,           epoch_secret,    sender_data_secret, encryption_secret,
-    std::move(keys), exporter_secret, confirmation_key,   membership_key,
-    init_secret
-  };
+  auto secret_size = suite.get().digest.hash_size();
+  epoch_secret =
+    suite.expand_with_label(member_secret, "epoch", context, secret_size);
+  init_secrets(size);
+}
+
+void
+KeyScheduleEpoch::init_secrets(LeafCount size)
+{
+  sender_data_secret = suite.derive_secret(epoch_secret, "sender data");
+  encryption_secret = suite.derive_secret(epoch_secret, "encryption");
+  exporter_secret = suite.derive_secret(epoch_secret, "exporter");
+  authentication_secret = suite.derive_secret(epoch_secret, "authentication");
+  external_secret = suite.derive_secret(epoch_secret, "external");
+  confirmation_key = suite.derive_secret(epoch_secret, "confirm");
+  membership_key = suite.derive_secret(epoch_secret, "membership");
+  resumption_secret = suite.derive_secret(epoch_secret, "resumption");
+  init_secret = suite.derive_secret(epoch_secret, "init");
+
+  external_priv = HPKEPrivateKey::derive(suite, external_secret);
+  keys = GroupKeySource(suite, size, encryption_secret);
 }
 
 KeyScheduleEpoch
-KeyScheduleEpoch::next(LeafCount size,
-                       const bytes& update_secret,
-                       const bytes& context) const
+KeyScheduleEpoch::next(const bytes& commit_secret,
+                       const bytes& psk_secret,
+                       const bytes& context,
+                       LeafCount size) const
 {
-  auto new_epoch_secret =
-    suite.get().hpke.kdf.extract(init_secret, update_secret);
-  return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
+  auto joiner_secret = suite.get().hpke.kdf.extract(init_secret, commit_secret);
+  return KeyScheduleEpoch(suite, joiner_secret, psk_secret, context, size);
 }
 
 KeyAndNonce

@@ -90,30 +90,47 @@ struct KeyScheduleEpoch;
 struct KeyScheduleEpoch
 {
   CipherSuite suite;
+
+  bytes joiner_secret;
+  bytes member_secret;
   bytes epoch_secret;
 
   bytes sender_data_secret;
-
   bytes encryption_secret;
-  GroupKeySource keys;
-
   bytes exporter_secret;
+  bytes authentication_secret;
+  bytes external_secret;
   bytes confirmation_key;
   bytes membership_key;
+  bytes resumption_secret;
   bytes init_secret;
 
-  static KeyScheduleEpoch first(CipherSuite suite,
-                                const bytes& init_secret,
-                                const bytes& context);
-  static KeyScheduleEpoch create(CipherSuite suite,
-                                 LeafCount size,
-                                 const bytes& epoch_secret,
-                                 const bytes& context);
-  KeyScheduleEpoch next(LeafCount size,
-                        const bytes& update_secret,
-                        const bytes& context) const;
+  HPKEPrivateKey external_priv;
+
+  GroupKeySource keys;
+
+  KeyScheduleEpoch() = default;
+
+  // Generate an initial random epoch
+  KeyScheduleEpoch(CipherSuite suite);
+
+  // Generate an epoch based on the joiner secret
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& joiner_secret_in,
+                   const bytes& psk_secret,
+                   const bytes& context,
+                   LeafCount size);
+
+  // Advance to the next epoch
+  KeyScheduleEpoch next(const bytes& commit_secret,
+                        const bytes& psk_secret,
+                        const bytes& context,
+                        LeafCount size) const;
 
   KeyAndNonce sender_data(const bytes& ciphertext);
+
+private:
+  void init_secrets(LeafCount size);
 };
 
 bool

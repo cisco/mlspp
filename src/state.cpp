@@ -15,18 +15,13 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
+  , _keys(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
-
-  // TODO(RLB): Align this to the latest spec
-  auto group_ctx = tls::marshal(group_context());
-  auto epoch_secret = bytes(suite.get().digest.hash_size(), 0);
-  _keys =
-    KeyScheduleEpoch::create(_suite, LeafCount(1), epoch_secret, group_ctx);
 }
 
 // Initialize a group from a Welcome
@@ -54,7 +49,7 @@ State::State(const HPKEPrivateKey& init_priv,
   auto secrets = tls::get<GroupSecrets>(secrets_data);
 
   // Decrypt the GroupInfo and fill in details
-  auto group_info = welcome.decrypt(secrets.epoch_secret);
+  auto group_info = welcome.decrypt(secrets.joiner_secret, {});
   group_info.tree.suite = kp.cipher_suite;
   group_info.tree.set_hash_all();
 
@@ -89,8 +84,8 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _keys = KeyScheduleEpoch::create(
-    _suite, LeafCount(_tree.size()), secrets.epoch_secret, group_ctx);
+  _keys = KeyScheduleEpoch(
+    _suite, secrets.joiner_secret, {}, group_ctx, LeafCount(_tree.size()));
 
   // Verify the confirmation
   if (!verify_confirmation(group_info.confirmation)) {
@@ -252,7 +247,7 @@ State::commit(const bytes& leaf_secret) const
   };
   group_info.sign(_index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
+  auto welcome = Welcome{ _suite, next._keys.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -562,7 +557,7 @@ operator!=(const State& lhs, const State& rhs)
 }
 
 void
-State::update_epoch_secrets(const bytes& update_secret)
+State::update_epoch_secrets(const bytes& commit_secret)
 {
   auto ctx = tls::marshal(GroupContext{
     _group_id,
@@ -571,7 +566,7 @@ State::update_epoch_secrets(const bytes& update_secret)
     _confirmed_transcript_hash,
     _extensions,
   });
-  _keys = _keys.next(LeafCount{ _tree.size() }, update_secret, ctx);
+  _keys = _keys.next(commit_secret, {}, ctx, LeafCount{ _tree.size() });
 }
 
 ///
@@ -613,9 +608,9 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  // TODO(RLB): Align with latest spec
-  auto secret = _suite.derive_secret(_keys.exporter_secret, label, context);
-  return _suite.expand_with_label(secret, "exporter", context, size);
+  auto secret = _suite.derive_secret(_keys.exporter_secret, label);
+  auto context_hash = _suite.get().digest.hash(context);
+  return _suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
 std::vector<Credential>

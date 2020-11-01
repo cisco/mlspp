@@ -80,13 +80,14 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 bytes epoch_secret,
+                 const bytes& joiner_secret,
+                 const bytes& psk_secret,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
-  , _epoch_secret(std::move(epoch_secret))
+  , _joiner_secret(joiner_secret)
 {
-  auto [key, nonce] = group_info_key_nonce(_epoch_secret);
+  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psk_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
     cipher_suite.get().hpke.aead.seal(key, nonce, {}, group_info_data);
@@ -107,7 +108,7 @@ Welcome::find(const KeyPackage& kp) const
 void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _epoch_secret, std::nullopt };
+  auto gs = GroupSecrets{ _joiner_secret, std::nullopt };
   if (path_secret.has_value()) {
     gs.path_secret = { path_secret.value() };
   }
@@ -118,9 +119,10 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& epoch_secret) const
+Welcome::decrypt(const bytes& joiner_secret,
+          const bytes& psk_secret) const
 {
-  auto [key, nonce] = group_info_key_nonce(epoch_secret);
+  auto [key, nonce] = group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
   auto group_info_data =
     cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data.has_value()) {
@@ -131,16 +133,18 @@ Welcome::decrypt(const bytes& epoch_secret) const
 }
 
 std::tuple<bytes, bytes>
-Welcome::group_info_key_nonce(const bytes& epoch_secret) const
+Welcome::group_info_key_nonce(CipherSuite suite, const bytes& joiner_secret,
+          const bytes& psk_secret)
 {
-  auto secret_size = cipher_suite.get().hpke.kdf.hash_size();
-  auto key_size = cipher_suite.get().hpke.aead.key_size();
-  auto nonce_size = cipher_suite.get().hpke.aead.nonce_size();
+  auto key_size = suite.get().hpke.aead.key_size();
+  auto nonce_size = suite.get().hpke.aead.nonce_size();
 
-  auto secret =
-    cipher_suite.expand_with_label(epoch_secret, "group info", {}, secret_size);
-  auto key = cipher_suite.expand_with_label(secret, "key", {}, key_size);
-  auto nonce = cipher_suite.expand_with_label(secret, "nonce", {}, nonce_size);
+  auto joiner_expand = suite.derive_secret(joiner_secret, "member");
+  auto member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
+
+  auto welcome_secret = suite.derive_secret(member_secret, "welcome");
+  auto key = suite.expand_with_label(welcome_secret, "key", {}, key_size);
+  auto nonce = suite.expand_with_label(welcome_secret, "nonce", {}, nonce_size);
 
   return std::make_tuple(key, nonce);
 }

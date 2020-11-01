@@ -74,8 +74,9 @@ public:
 };
 
 // struct {
-//   opaque epoch_secret<1..255>;
-//   opaque path_secret<1..255>;
+//   opaque joiner_secret<1..255>;
+//   optional<PathSecret> path_secret;
+//   optional<PreSharedKeys> psks;
 // } GroupSecrets;
 struct GroupSecrets
 {
@@ -87,10 +88,10 @@ struct GroupSecrets
     TLS_TRAITS(tls::vector<1>)
   };
 
-  bytes epoch_secret;
+  bytes joiner_secret;
   std::optional<PathSecret> path_secret;
 
-  TLS_SERIALIZABLE(epoch_secret, path_secret)
+  TLS_SERIALIZABLE(joiner_secret, path_secret)
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
@@ -121,19 +122,23 @@ struct Welcome
   bytes encrypted_group_info;
 
   Welcome();
-  Welcome(CipherSuite suite, bytes epoch_secret, const GroupInfo& group_info);
+  Welcome(CipherSuite suite,
+          const bytes& joiner_secret,
+          const bytes& psk_secret,
+          const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& epoch_secret) const;
+  GroupInfo decrypt(const bytes& joiner_secret,
+          const bytes& psk_secret) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
 private:
-  bytes _epoch_secret;
-  std::tuple<bytes, bytes> group_info_key_nonce(
-    const bytes& epoch_secret) const;
+  bytes _joiner_secret;
+  static std::tuple<bytes, bytes> group_info_key_nonce(CipherSuite suite, const bytes& joiner_secret,
+          const bytes& psk_secret);
 };
 
 ///
