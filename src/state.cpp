@@ -665,7 +665,8 @@ new_reuse_guard()
   return guard;
 }
 
-void apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
+void
+apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
 {
   for (size_t i = 0; i < guard.size(); i++) {
     nonce.at(i) ^= guard.at(i);
@@ -705,21 +706,22 @@ MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
-  uint32_t generation = 0;
-  KeyAndNonce keys;
+  GroupKeySource::RatchetType key_type;
   ContentType::selector content_type;
   if (std::holds_alternative<ApplicationData>(pt.content)) {
-    std::tie(generation, keys) = _keys.application_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::application;
     content_type = ContentType::selector::application;
   } else if (std::holds_alternative<Proposal>(pt.content)) {
-    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::handshake;
     content_type = ContentType::selector::proposal;
   } else if (std::holds_alternative<Commit>(pt.content)) {
-    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::handshake;
     content_type = ContentType::selector::commit;
   } else {
     throw InvalidParameterError("Unknown content type");
   }
+
+  auto [generation, keys] = _keys.keys.next(key_type, _index);
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
@@ -783,25 +785,14 @@ State::decrypt(const MLSCiphertext& ct)
   auto sender = LeafIndex(sender_data.sender);
 
   // Pull from the key schedule
-  KeyAndNonce keys;
-  switch (ct.content_type) {
-    // TODO(rlb) Enable decryption of proposal / commit
-    case ContentType::selector::application:
-      keys = _keys.application_keys.get(sender, sender_data.generation);
-      _keys.application_keys.erase(sender, sender_data.generation);
-      break;
-
-    case ContentType::selector::proposal:
-    case ContentType::selector::commit:
-      keys = _keys.handshake_keys.get(sender, sender_data.generation);
-      _keys.handshake_keys.erase(sender, sender_data.generation);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  auto key_type = GroupKeySource::RatchetType::handshake;
+  if (ct.content_type == ContentType::selector::application) {
+    key_type = GroupKeySource::RatchetType::application;
   }
 
-  apply_reuse_guard(sender_data.reuse_guard, keys.nonce);
+  auto [key, nonce] = _keys.keys.get(key_type, sender, sender_data.generation);
+  _keys.keys.erase(key_type, sender, sender_data.generation);
+  apply_reuse_guard(sender_data.reuse_guard, nonce);
 
   // Compute the plaintext AAD and decrypt
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
@@ -810,8 +801,8 @@ State::decrypt(const MLSCiphertext& ct)
     ct.content_type,
     ct.authenticated_data,
   });
-  auto content = _suite.get().hpke.aead.open(
-    keys.key, keys.nonce, content_aad, ct.ciphertext);
+  auto content =
+    _suite.get().hpke.aead.open(key, nonce, content_aad, ct.ciphertext);
   if (!content.has_value()) {
     throw ProtocolError("Content decryption failed");
   }

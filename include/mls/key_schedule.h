@@ -39,35 +39,50 @@ struct HashRatchet
   void erase(uint32_t generation);
 };
 
-struct BaseKeySource
+struct SecretTree
 {
+  SecretTree() = default;
+  SecretTree(CipherSuite suite_in,
+             LeafCount group_size,
+             bytes encryption_secret);
+
+  bytes get(LeafIndex sender);
+
+private:
   CipherSuite suite;
+  NodeIndex root;
+  NodeCount width;
+  std::vector<bytes> secrets;
   size_t secret_size;
-
-  BaseKeySource(CipherSuite suite_in);
-
-  virtual ~BaseKeySource() = default;
-  virtual BaseKeySource* dup() const = 0;
-  virtual bytes get(LeafIndex sender) = 0;
 };
 
 struct GroupKeySource
 {
-  CipherSuite suite;
-  std::unique_ptr<BaseKeySource> base_source;
-  std::map<LeafIndex, HashRatchet> chains;
+  enum struct RatchetType
+  {
+    handshake,
+    application,
+  };
 
-  GroupKeySource();
-  GroupKeySource(const GroupKeySource& other);
-  GroupKeySource& operator=(const GroupKeySource& other);
-  GroupKeySource(BaseKeySource* base_source_in);
+  GroupKeySource() = default;
+  GroupKeySource(CipherSuite suite_in,
+                 LeafCount group_size,
+                 bytes encryption_secret);
 
-  std::tuple<uint32_t, KeyAndNonce> next(LeafIndex sender);
-  KeyAndNonce get(LeafIndex sender, uint32_t generation);
-  void erase(LeafIndex sender, uint32_t generation);
+  std::tuple<uint32_t, KeyAndNonce> next(RatchetType type, LeafIndex sender);
+  KeyAndNonce get(RatchetType type, LeafIndex sender, uint32_t generation);
+  void erase(RatchetType type, LeafIndex sender, uint32_t generation);
 
 private:
-  HashRatchet& chain(LeafIndex sender);
+  CipherSuite suite;
+  SecretTree secret_tree;
+
+  using Key = std::tuple<RatchetType, LeafIndex>;
+  std::map<Key, HashRatchet> chains;
+
+  HashRatchet& chain(RatchetType type, LeafIndex sender);
+
+  static const std::array<RatchetType, 2> all_ratchet_types;
 };
 
 struct KeyScheduleEpoch;
@@ -79,18 +94,13 @@ struct KeyScheduleEpoch
 
   bytes sender_data_secret;
 
-  bytes handshake_secret;
-  GroupKeySource handshake_keys;
-
-  bytes application_secret;
-  GroupKeySource application_keys;
+  bytes encryption_secret;
+  GroupKeySource keys;
 
   bytes exporter_secret;
   bytes confirmation_key;
   bytes membership_key;
   bytes init_secret;
-
-  KeyScheduleEpoch() = default;
 
   static KeyScheduleEpoch first(CipherSuite suite,
                                 const bytes& init_secret,

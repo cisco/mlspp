@@ -166,10 +166,8 @@ struct KeyScheduleTestVectors
 
     bytes sender_data_secret;
 
-    bytes handshake_secret;
+    bytes encryption_secret;
     std::vector<KeyAndNonce> handshake_keys;
-
-    bytes application_secret;
     std::vector<KeyAndNonce> application_keys;
 
     bytes exporter_secret;
@@ -183,9 +181,8 @@ struct KeyScheduleTestVectors
                      update_secret,
                      epoch_secret,
                      sender_data_secret,
-                     handshake_secret,
+                     encryption_secret,
                      handshake_keys,
-                     application_secret,
                      application_keys,
                      exporter_secret,
                      confirmation_key,
@@ -198,7 +195,6 @@ struct KeyScheduleTestVectors
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<4>,
-               tls::vector<1>,
                tls::vector<4>,
                tls::vector<1>,
                tls::vector<1>,

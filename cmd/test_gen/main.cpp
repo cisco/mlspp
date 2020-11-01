@@ -171,23 +171,25 @@ generate_key_schedule()
       auto application_keys =
         std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
-        auto hs = epoch.handshake_keys.get(k, tv.target_generation);
+        auto hs = epoch.keys.get(
+          GroupKeySource::RatchetType::handshake, k, tv.target_generation);
         handshake_keys.push_back({ hs.key, hs.nonce });
 
-        auto app = epoch.application_keys.get(k, tv.target_generation);
+        auto app = epoch.keys.get(
+          GroupKeySource::RatchetType::application, k, tv.target_generation);
         application_keys.push_back({ app.key, app.nonce });
       }
 
-      auto [sender_data_key, sender_data_nonce] = epoch.sender_data(tv.ciphertext);
+      auto [sender_data_key, sender_data_nonce] =
+        epoch.sender_data(tv.ciphertext);
 
       tc.epochs.push_back({
         LeafCount{ n_members },
         update_secret,
         epoch.epoch_secret,
         epoch.sender_data_secret,
-        epoch.handshake_secret,
+        epoch.encryption_secret,
         handshake_keys,
-        epoch.application_secret,
         application_keys,
         epoch.exporter_secret,
         epoch.confirmation_key,
