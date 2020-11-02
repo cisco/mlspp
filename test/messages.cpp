@@ -115,7 +115,6 @@ TEST_CASE("Messages Interop")
 
     // MLSPlaintext
 
-
     // Proposals
     auto add_prop = Proposal{ Add{ key_package } };
     CHECK(add_prop.proposal_type() == ProposalType::selector::add);

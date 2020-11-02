@@ -340,7 +340,7 @@ struct MLSPlaintext
              tls::pass,
              tls::pass)
 
-  private:
+private:
   // Not part of the struct, an indicator of whether this MLSPlaintext was
   // constructed from an MLSCiphertext
   bool decrypted;

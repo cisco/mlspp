@@ -629,7 +629,8 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("External senders not supported");
   }
 
-  if (!pt.verify_membership_tag(_suite, group_context(), _keys.membership_key)) {
+  if (!pt.verify_membership_tag(
+        _suite, group_context(), _keys.membership_key)) {
     return false;
   }
 
