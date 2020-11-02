@@ -56,7 +56,7 @@ protected:
     // Initial add is different
     if (sessions.empty()) {
       auto creator = client.begin_session(group_id);
-      sessions.emplace_back(creator);
+      sessions.emplace_back(std::move(creator));
       return;
     }
 
@@ -74,9 +74,9 @@ protected:
 
     // Add-in-place vs. add-at-edge
     if (index == sessions.size()) {
-      sessions.emplace_back(next);
+      sessions.emplace_back(std::move(next));
     } else if (index < sessions.size()) {
-      sessions[index] = next;
+      sessions[index] = std::move(next);
     } else {
       throw InvalidParameterError("Index too large for group");
     }
