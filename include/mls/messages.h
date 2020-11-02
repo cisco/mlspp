@@ -129,16 +129,17 @@ struct Welcome
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& joiner_secret,
-          const bytes& psk_secret) const;
+  GroupInfo decrypt(const bytes& joiner_secret, const bytes& psk_secret) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
 private:
   bytes _joiner_secret;
-  static std::tuple<bytes, bytes> group_info_key_nonce(CipherSuite suite, const bytes& joiner_secret,
-          const bytes& psk_secret);
+  static std::tuple<bytes, bytes> group_info_key_nonce(
+    CipherSuite suite,
+    const bytes& joiner_secret,
+    const bytes& psk_secret);
 };
 
 ///

@@ -119,10 +119,10 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& joiner_secret,
-          const bytes& psk_secret) const
+Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
 {
-  auto [key, nonce] = group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
+  auto [key, nonce] =
+    group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
   auto group_info_data =
     cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data.has_value()) {
@@ -133,8 +133,9 @@ Welcome::decrypt(const bytes& joiner_secret,
 }
 
 std::tuple<bytes, bytes>
-Welcome::group_info_key_nonce(CipherSuite suite, const bytes& joiner_secret,
-          const bytes& psk_secret)
+Welcome::group_info_key_nonce(CipherSuite suite,
+                              const bytes& joiner_secret,
+                              const bytes& psk_secret)
 {
   auto key_size = suite.get().hpke.aead.key_size();
   auto nonce_size = suite.get().hpke.aead.nonce_size();
