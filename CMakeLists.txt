@@ -1,8 +1,23 @@
 cmake_minimum_required(VERSION 3.12)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+
+###
+###  Semantic versioning
+###
+include ( GetGitRevisionDescription )
+git_describe(VERSION --tags --dirty=-d)
+string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" MLSPP_VERSION_MAJOR "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_MINOR "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_PATCH "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+(.*)" "\\1" MLSPP_VERSION_SHA1 "${VERSION}")
+mark_as_advanced(MLSPP_VERSION_MAJOR MLSPP_VERSION_MINOR MLSPP_VERSION_PATCH)
+set ( MLSPP_VERSION "${MLSPP_VERSION_MAJOR}.${MLSPP_VERSION_MINOR}.${MLSPP_VERSION_PATCH}" )
+
 
 project(mlspp
-  VERSION 0.1
-  LANGUAGES CXX
+        VERSION "${MLSPP_VERSION}"
+        LANGUAGES CXX
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
