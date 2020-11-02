@@ -1,8 +1,6 @@
 #include "mls/tree_math.h"
 #include "mls/common.h"
 
-#include <algorithm>
-
 static uint32_t one = 0x01;
 
 namespace mls {

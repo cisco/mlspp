@@ -1,8 +1,5 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
-#include <hpke/random.h>
-#include <mls/common.h>
-#include <mls/treekem.h>
 
 using namespace mls;
 

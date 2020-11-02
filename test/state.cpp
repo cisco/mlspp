@@ -1,7 +1,5 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
-#include <hpke/random.h>
-#include <mls/state.h>
 
 using namespace mls;
 

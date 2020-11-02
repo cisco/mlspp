@@ -1,6 +1,5 @@
 #include "mls/credential.h"
 #include "hpke/certificate.h"
-#include <tls/tls_syntax.h>
 
 namespace mls {
 

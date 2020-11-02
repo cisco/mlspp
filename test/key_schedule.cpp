@@ -1,6 +1,5 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
-#include <mls/state.h>
 
 using namespace mls;
 

@@ -3,8 +3,6 @@
 
 #include "test_vectors.h"
 
-#include <string>
-
 using namespace mls;
 
 TEST_CASE("Crypto Interop")
