@@ -29,6 +29,8 @@ private:
 class PendingJoin
 {
 public:
+  PendingJoin(PendingJoin&& other);
+  PendingJoin& operator=(PendingJoin&& other);
   ~PendingJoin();
   bytes key_package() const;
   Session complete(const bytes& welcome) const;
@@ -44,8 +46,8 @@ private:
 class Session
 {
 public:
-  Session(const Session& other);
-  Session& operator=(const Session& other);
+  Session(Session&& other);
+  Session& operator=(Session&& other);
   ~Session();
 
   // Settings

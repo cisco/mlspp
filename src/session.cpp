@@ -100,6 +100,11 @@ PendingJoin::Inner::create(CipherSuite suite,
   return PendingJoin(inner.release());
 }
 
+PendingJoin::PendingJoin(PendingJoin&& other) = default;
+
+PendingJoin&
+PendingJoin::operator=(PendingJoin&& other) = default;
+
 PendingJoin::~PendingJoin() = default;
 
 PendingJoin::PendingJoin(Inner* inner_in)
@@ -207,18 +212,10 @@ Session::Inner::for_epoch(epoch_t epoch)
   throw MissingStateError("No state for epoch");
 }
 
-Session::Session(const Session& other)
-  : inner(std::make_unique<Inner>(*other.inner))
-{}
+Session::Session(Session&& other) = default;
 
 Session&
-Session::operator=(const Session& other)
-{
-  if (&other != this) {
-    inner = std::make_unique<Inner>(*other.inner);
-  }
-  return *this;
-}
+Session::operator=(Session&& other) = default;
 
 Session::~Session() = default;
 
