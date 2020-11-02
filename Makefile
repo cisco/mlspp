@@ -23,6 +23,14 @@ tidy:
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
+
+dtest: test
+	cd ${TEST_VECTOR_DIR} && ./mlspp_test
+
+dbtest: test
+	cd ${TEST_VECTOR_DIR} && lldb ./mlspp_test
+
+ctest: test
 	cd ${TEST_VECTOR_DIR} && ctest
 
 libs: ${BUILD_DIR}
@@ -36,7 +44,7 @@ test-libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target tls_syntax_test
 	cd build/lib/tls_syntax/test/ && ctest
 
-test-all: test-libs test
+test-all: test-libs ctest
 
 gen: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target test_gen
