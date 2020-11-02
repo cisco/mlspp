@@ -170,7 +170,7 @@ struct ECKeyGroup : public EVPGroup
       auto candidate =
         kdf.labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size());
       candidate[0] &= bitmask();
-      sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
+      sk.reset(BN_bin2bn(candidate.data(), static_cast<int>(candidate.size()), nullptr));
 
       counter += 1;
       if (counter > retry_limit) {
@@ -238,7 +238,7 @@ struct ECKeyGroup : public EVPGroup
     auto eckey = make_typed_unique(new_ec_key());
     const auto* group = EC_KEY_get0_group(eckey.get());
     const auto d =
-      make_typed_unique(BN_bin2bn(skm.data(), skm.size(), nullptr));
+      make_typed_unique(BN_bin2bn(skm.data(), static_cast<int>(skm.size()), nullptr));
     auto pt = make_typed_unique(EC_POINT_new(group));
 
     EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
