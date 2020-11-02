@@ -45,7 +45,6 @@ TEST_CASE("Key Schedule Interop")
       // Check the secrets
       REQUIRE(my_epoch.epoch_secret == epoch.epoch_secret);
       REQUIRE(my_epoch.sender_data_secret == epoch.sender_data_secret);
-      REQUIRE(my_epoch.sender_data_key == epoch.sender_data_key);
 
       REQUIRE(my_epoch.handshake_secret == epoch.handshake_secret);
       REQUIRE(my_epoch.application_secret == epoch.application_secret);
@@ -64,6 +63,11 @@ TEST_CASE("Key Schedule Interop")
         REQUIRE(app.key == epoch.application_keys[i.val].key);
         REQUIRE(app.nonce == epoch.application_keys[i.val].nonce);
       }
+
+      auto [sender_data_key, sender_data_nonce] =
+        my_epoch.sender_data(tv.ciphertext);
+      REQUIRE(sender_data_key == epoch.sender_data_key);
+      REQUIRE(sender_data_nonce == epoch.sender_data_nonce);
 
       group_context.epoch += 1;
     }

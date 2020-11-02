@@ -144,6 +144,7 @@ generate_key_schedule()
   tv.target_generation = 3;
   tv.base_init_secret = bytes(32, 0xA3);
   tv.base_group_context = tls::marshal(base_group_context);
+  tv.ciphertext = bytes(96, 0xA4);
 
   // Construct a test case for each suite
   for (auto suite : suites) {
@@ -177,12 +178,14 @@ generate_key_schedule()
         application_keys.push_back({ app.key, app.nonce });
       }
 
+      auto [sender_data_key, sender_data_nonce] =
+        epoch.sender_data(tv.ciphertext);
+
       tc.epochs.push_back({
         LeafCount{ n_members },
         update_secret,
         epoch.epoch_secret,
         epoch.sender_data_secret,
-        epoch.sender_data_key,
         epoch.handshake_secret,
         handshake_keys,
         epoch.application_secret,
@@ -190,6 +193,8 @@ generate_key_schedule()
         epoch.exporter_secret,
         epoch.confirmation_key,
         epoch.init_secret,
+        sender_data_key,
+        sender_data_nonce,
       });
 
       for (auto& val : update_secret) {
@@ -361,7 +366,6 @@ generate_messages()
     auto ciphertext = MLSCiphertext{
       tv.group_id, tv.epoch,  ContentType::selector::application,
       tv.random,   tv.random, tv.random,
-      tv.random,
     };
 
     tv.cases.push_back({ suite,
