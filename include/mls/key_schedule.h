@@ -88,6 +88,7 @@ struct KeyScheduleEpoch
 
   bytes exporter_secret;
   bytes confirmation_key;
+  bytes membership_key;
   bytes init_secret;
 
   KeyScheduleEpoch() = default;

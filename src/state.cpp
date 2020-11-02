@@ -108,6 +108,7 @@ State::sign(const Proposal& proposal) const
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(_suite, group_context(), _identity_priv);
+  pt.set_membership_tag(_suite, group_context(), _keys.membership_key);
   return pt;
 }
 
@@ -247,7 +248,7 @@ State::commit(const bytes& leaf_secret) const
     next._confirmed_transcript_hash,
     next._interim_transcript_hash,
     next._extensions,
-    std::get<CommitData>(pt.content).confirmation,
+    pt.confirmation_tag.value().mac_value,
   };
   group_info.sign(_index, _identity_priv);
 
@@ -277,18 +278,20 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
+  auto prev_membership_key = _keys.membership_key;
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
+  pt.sign(_suite, prev_ctx, _identity_priv);
 
   auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
   _confirmed_transcript_hash = _suite.get().digest.hash(confirmed_transcript);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto& commit_data = std::get<CommitData>(pt.content);
-  commit_data.confirmation = _suite.get().digest.hmac(
-    _keys.confirmation_key, _confirmed_transcript_hash);
-  pt.sign(_suite, prev_ctx, _identity_priv);
+  auto confirmation = _suite.get().digest.hmac(_keys.confirmation_key,
+                                               _confirmed_transcript_hash);
+  pt.confirmation_tag = { std::move(confirmation) };
+  pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
   _interim_transcript_hash = _suite.get().digest.hash(interim_transcript);
@@ -318,7 +321,7 @@ State::handle(const MLSPlaintext& pt)
     return std::nullopt;
   }
 
-  if (!std::holds_alternative<CommitData>(pt.content)) {
+  if (!std::holds_alternative<Commit>(pt.content)) {
     throw InvalidParameterError("Incorrect content type");
   }
 
@@ -332,13 +335,13 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Apply the commit
-  const auto& commit_data = std::get<CommitData>(pt.content);
+  const auto& commit = std::get<Commit>(pt.content);
   State next = *this;
-  next.apply(commit_data.commit);
+  next.apply(commit);
 
   // Decapsulate and apply the UpdatePath, if provided
   auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
-  if (commit_data.commit.path.has_value()) {
+  if (commit.path.has_value()) {
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
@@ -346,7 +349,7 @@ State::handle(const MLSPlaintext& pt)
       next._confirmed_transcript_hash,
       next._extensions,
     });
-    const auto& path = commit_data.commit.path.value();
+    const auto& path = commit.path.value();
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;
@@ -362,7 +365,11 @@ State::handle(const MLSPlaintext& pt)
   next.update_epoch_secrets(update_secret);
 
   // Verify the confirmation MAC
-  if (!next.verify_confirmation(commit_data.confirmation)) {
+  if (!pt.confirmation_tag.has_value()) {
+    throw ProtocolError("Missing confirmation on Commit");
+  }
+
+  if (!next.verify_confirmation(pt.confirmation_tag.value().mac_value)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -397,7 +404,7 @@ State::apply(const Remove& remove)
 ProposalID
 State::proposal_id(const MLSPlaintext& pt) const
 {
-  return ProposalID{ _suite.get().digest.hash(tls::marshal(pt)) };
+  return ProposalID{ _suite.get().digest.hash(pt.commit_content()) };
 }
 
 std::optional<MLSPlaintext>
@@ -506,6 +513,7 @@ State::protect(const bytes& pt)
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(_suite, group_context(), _identity_priv);
+  mpt.set_membership_tag(_suite, group_context(), _keys.membership_key);
   return encrypt(mpt);
 }
 
@@ -621,6 +629,11 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("External senders not supported");
   }
 
+  if (!pt.verify_membership_tag(
+        _suite, group_context(), _keys.membership_key)) {
+    return false;
+  }
+
   auto maybe_kp = _tree.key_package(LeafIndex(pt.sender.sender));
   if (!maybe_kp.has_value()) {
     throw InvalidParameterError("Signature from blank node");
@@ -680,7 +693,7 @@ State::encrypt(const MLSPlaintext& pt)
   } else if (std::holds_alternative<Proposal>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
     content_type = ContentType::selector::proposal;
-  } else if (std::holds_alternative<CommitData>(pt.content)) {
+  } else if (std::holds_alternative<Commit>(pt.content)) {
     std::tie(generation, keys) = _keys.handshake_keys.next(_index);
     content_type = ContentType::selector::commit;
   } else {

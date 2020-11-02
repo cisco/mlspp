@@ -292,6 +292,8 @@ KeyScheduleEpoch::create(CipherSuite suite,
   auto application_secret = suite.derive_secret(epoch_secret, "app", context);
   auto exporter_secret = suite.derive_secret(epoch_secret, "exporter", context);
   auto confirmation_key = suite.derive_secret(epoch_secret, "confirm", context);
+  auto membership_key =
+    suite.derive_secret(epoch_secret, "membership", context);
   auto init_secret = suite.derive_secret(epoch_secret, "init", context);
 
   auto key_size = suite.get().hpke.aead.key_size();
@@ -313,6 +315,7 @@ KeyScheduleEpoch::create(CipherSuite suite,
                            GroupKeySource{ application_base.release() },
                            exporter_secret,
                            confirmation_key,
+                           membership_key,
                            init_secret };
 }
 
