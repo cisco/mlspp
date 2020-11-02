@@ -64,7 +64,8 @@ TEST_CASE("Key Schedule Interop")
         REQUIRE(app.nonce == epoch.application_keys[i.val].nonce);
       }
 
-      auto [sender_data_key, sender_data_nonce] = my_epoch.sender_data(tv.ciphertext);
+      auto [sender_data_key, sender_data_nonce] =
+        my_epoch.sender_data(tv.ciphertext);
       REQUIRE(sender_data_key == epoch.sender_data_key);
       REQUIRE(sender_data_nonce == epoch.sender_data_nonce);
 

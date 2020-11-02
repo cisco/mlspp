@@ -656,7 +656,7 @@ struct MLSCiphertextContentAAD
 
 using ReuseGuard = std::array<uint8_t, 4>;
 
-ReuseGuard
+static ReuseGuard
 new_reuse_guard()
 {
   auto random = random_bytes(4);
@@ -665,7 +665,8 @@ new_reuse_guard()
   return guard;
 }
 
-void apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
+static void
+apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
 {
   for (size_t i = 0; i < guard.size(); i++) {
     nonce.at(i) ^= guard.at(i);

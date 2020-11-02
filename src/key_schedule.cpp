@@ -357,9 +357,9 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
 
-  return suite && epoch_secret && sender_data_secret &&
-         handshake_secret && application_secret && exporter_secret &&
-         confirmation_key && init_secret;
+  return suite && epoch_secret && sender_data_secret && handshake_secret &&
+         application_secret && exporter_secret && confirmation_key &&
+         init_secret;
 }
 
 } // namespace mls

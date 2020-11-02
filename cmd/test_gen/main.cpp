@@ -178,7 +178,8 @@ generate_key_schedule()
         application_keys.push_back({ app.key, app.nonce });
       }
 
-      auto [sender_data_key, sender_data_nonce] = epoch.sender_data(tv.ciphertext);
+      auto [sender_data_key, sender_data_nonce] =
+        epoch.sender_data(tv.ciphertext);
 
       tc.epochs.push_back({
         LeafCount{ n_members },
