@@ -15,18 +15,13 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
+  , _keys(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
-
-  // TODO(RLB): Align this to the latest spec
-  auto group_ctx = tls::marshal(group_context());
-  auto epoch_secret = bytes(suite.get().digest.hash_size(), 0);
-  _keys =
-    KeyScheduleEpoch::create(_suite, LeafCount(1), epoch_secret, group_ctx);
 }
 
 // Initialize a group from a Welcome
@@ -54,7 +49,7 @@ State::State(const HPKEPrivateKey& init_priv,
   auto secrets = tls::get<GroupSecrets>(secrets_data);
 
   // Decrypt the GroupInfo and fill in details
-  auto group_info = welcome.decrypt(secrets.epoch_secret);
+  auto group_info = welcome.decrypt(secrets.joiner_secret, {});
   group_info.tree.suite = kp.cipher_suite;
   group_info.tree.set_hash_all();
 
@@ -89,8 +84,8 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _keys = KeyScheduleEpoch::create(
-    _suite, LeafCount(_tree.size()), secrets.epoch_secret, group_ctx);
+  _keys = KeyScheduleEpoch(
+    _suite, secrets.joiner_secret, {}, group_ctx, LeafCount(_tree.size()));
 
   // Verify the confirmation
   if (!verify_confirmation(group_info.confirmation)) {
@@ -252,7 +247,7 @@ State::commit(const bytes& leaf_secret) const
   };
   group_info.sign(_index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, next._keys.epoch_secret, group_info };
+  auto welcome = Welcome{ _suite, next._keys.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -562,7 +557,7 @@ operator!=(const State& lhs, const State& rhs)
 }
 
 void
-State::update_epoch_secrets(const bytes& update_secret)
+State::update_epoch_secrets(const bytes& commit_secret)
 {
   auto ctx = tls::marshal(GroupContext{
     _group_id,
@@ -571,7 +566,7 @@ State::update_epoch_secrets(const bytes& update_secret)
     _confirmed_transcript_hash,
     _extensions,
   });
-  _keys = _keys.next(LeafCount{ _tree.size() }, update_secret, ctx);
+  _keys = _keys.next(commit_secret, {}, ctx, LeafCount{ _tree.size() });
 }
 
 ///
@@ -613,9 +608,9 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  // TODO(RLB): Align with latest spec
-  auto secret = _suite.derive_secret(_keys.exporter_secret, label, context);
-  return _suite.expand_with_label(secret, "exporter", context, size);
+  auto secret = _suite.derive_secret(_keys.exporter_secret, label);
+  auto context_hash = _suite.get().digest.hash(context);
+  return _suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
 std::vector<Credential>
@@ -706,21 +701,22 @@ MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
-  uint32_t generation = 0;
-  KeyAndNonce keys;
+  GroupKeySource::RatchetType key_type;
   ContentType::selector content_type;
   if (std::holds_alternative<ApplicationData>(pt.content)) {
-    std::tie(generation, keys) = _keys.application_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::application;
     content_type = ContentType::selector::application;
   } else if (std::holds_alternative<Proposal>(pt.content)) {
-    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::handshake;
     content_type = ContentType::selector::proposal;
   } else if (std::holds_alternative<Commit>(pt.content)) {
-    std::tie(generation, keys) = _keys.handshake_keys.next(_index);
+    key_type = GroupKeySource::RatchetType::handshake;
     content_type = ContentType::selector::commit;
   } else {
     throw InvalidParameterError("Unknown content type");
   }
+
+  auto [generation, keys] = _keys.keys.next(key_type, _index);
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
@@ -784,25 +780,14 @@ State::decrypt(const MLSCiphertext& ct)
   auto sender = LeafIndex(sender_data.sender);
 
   // Pull from the key schedule
-  KeyAndNonce keys;
-  switch (ct.content_type) {
-    // TODO(rlb) Enable decryption of proposal / commit
-    case ContentType::selector::application:
-      keys = _keys.application_keys.get(sender, sender_data.generation);
-      _keys.application_keys.erase(sender, sender_data.generation);
-      break;
-
-    case ContentType::selector::proposal:
-    case ContentType::selector::commit:
-      keys = _keys.handshake_keys.get(sender, sender_data.generation);
-      _keys.handshake_keys.erase(sender, sender_data.generation);
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
+  auto key_type = GroupKeySource::RatchetType::handshake;
+  if (ct.content_type == ContentType::selector::application) {
+    key_type = GroupKeySource::RatchetType::application;
   }
 
-  apply_reuse_guard(sender_data.reuse_guard, keys.nonce);
+  auto [key, nonce] = _keys.keys.get(key_type, sender, sender_data.generation);
+  _keys.keys.erase(key_type, sender, sender_data.generation);
+  apply_reuse_guard(sender_data.reuse_guard, nonce);
 
   // Compute the plaintext AAD and decrypt
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
@@ -811,8 +796,8 @@ State::decrypt(const MLSCiphertext& ct)
     ct.content_type,
     ct.authenticated_data,
   });
-  auto content = _suite.get().hpke.aead.open(
-    keys.key, keys.nonce, content_aad, ct.ciphertext);
+  auto content =
+    _suite.get().hpke.aead.open(key, nonce, content_aad, ct.ciphertext);
   if (!content.has_value()) {
     throw ProtocolError("Content decryption failed");
   }

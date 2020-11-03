@@ -54,9 +54,7 @@ struct CipherSuite
                           const std::string& label,
                           const bytes& context,
                           size_t length) const;
-  bytes derive_secret(const bytes& secret,
-                      const std::string& label,
-                      const bytes& context) const;
+  bytes derive_secret(const bytes& secret, const std::string& label) const;
 
   TLS_SERIALIZABLE(id)
 

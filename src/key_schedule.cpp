@@ -15,28 +15,23 @@ zeroize(bytes& data) // NOLINT(google-runtime-references)
 /// Key Derivation Functions
 ///
 
-struct ApplicationContext
+struct TreeContext
 {
   NodeIndex node;
   uint32_t generation;
-
-  ApplicationContext(NodeIndex node_in, uint32_t generation_in)
-    : node(node_in)
-    , generation(generation_in)
-  {}
 
   TLS_SERIALIZABLE(node, generation)
 };
 
 static bytes
-derive_app_secret(CipherSuite suite,
-                  const bytes& secret,
-                  const std::string& label,
-                  NodeIndex node,
-                  uint32_t generation,
-                  size_t length)
+derive_tree_secret(CipherSuite suite,
+                   const bytes& secret,
+                   const std::string& label,
+                   NodeIndex node,
+                   uint32_t generation,
+                   size_t length)
 {
-  auto ctx = tls::marshal(ApplicationContext{ node, generation });
+  auto ctx = tls::marshal(TreeContext{ node, generation });
   return suite.expand_with_label(secret, label, ctx, length);
 }
 
@@ -59,11 +54,11 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
 std::tuple<uint32_t, KeyAndNonce>
 HashRatchet::next()
 {
-  auto key = derive_app_secret(
+  auto key = derive_tree_secret(
     suite, next_secret, "app-key", node, next_generation, key_size);
-  auto nonce = derive_app_secret(
+  auto nonce = derive_tree_secret(
     suite, next_secret, "app-nonce", node, next_generation, nonce_size);
-  auto secret = derive_app_secret(
+  auto secret = derive_tree_secret(
     suite, next_secret, "app-secret", node, next_generation, secret_size);
 
   auto generation = next_generation;
@@ -114,214 +109,174 @@ HashRatchet::erase(uint32_t generation)
 }
 
 ///
-/// Base Key Sources
+/// SecretTree
 ///
 
-BaseKeySource::BaseKeySource(CipherSuite suite_in)
+SecretTree::SecretTree(CipherSuite suite_in,
+                       LeafCount group_size,
+                       bytes application_secret_in)
   : suite(suite_in)
+  , root(tree_math::root(NodeCount{ group_size }))
+  , width(NodeCount{ group_size })
+  , secrets(NodeCount{ group_size }.val)
   , secret_size(suite_in.get().hpke.kdf.hash_size())
-{}
-
-struct NoFSBaseKeySource : public BaseKeySource
 {
-  bytes root_secret;
+  secrets[root.val] = std::move(application_secret_in);
+}
 
-  NoFSBaseKeySource(CipherSuite suite_in, bytes root_secret_in)
-    : BaseKeySource(suite_in)
-    , root_secret(std::move(root_secret_in))
-  {}
-
-  BaseKeySource* dup() const override { return new NoFSBaseKeySource(*this); }
-
-  bytes get(LeafIndex sender) override
-  {
-    return derive_app_secret(
-      suite, root_secret, "hs-secret", NodeIndex{ sender }, 0, secret_size);
-  }
-};
-
-struct TreeBaseKeySource : public BaseKeySource
+bytes
+SecretTree::get(LeafIndex sender)
 {
-  NodeIndex root;
-  NodeCount width;
-  std::vector<bytes> secrets;
-  size_t secret_size;
-
-  TreeBaseKeySource(CipherSuite suite_in,
-                    LeafCount group_size,
-                    bytes application_secret_in)
-    : BaseKeySource(suite_in)
-    , root(tree_math::root(NodeCount{ group_size }))
-    , width(NodeCount{ group_size })
-    , secrets(NodeCount{ group_size }.val)
-    , secret_size(suite_in.get().hpke.kdf.hash_size())
-  {
-    secrets[root.val] = std::move(application_secret_in);
+  // Find an ancestor that is populated
+  auto dirpath = tree_math::dirpath(NodeIndex{ sender }, width);
+  dirpath.insert(dirpath.begin(), NodeIndex{ sender });
+  dirpath.push_back(tree_math::root(width));
+  uint32_t curr = 0;
+  for (; curr < dirpath.size(); ++curr) {
+    if (!secrets[dirpath[curr].val].empty()) {
+      break;
+    }
   }
 
-  BaseKeySource* dup() const override { return new TreeBaseKeySource(*this); }
-
-  bytes get(LeafIndex sender) override
-  {
-    // Find an ancestor that is populated
-    auto dirpath = tree_math::dirpath(NodeIndex{ sender }, width);
-    dirpath.insert(dirpath.begin(), NodeIndex{ sender });
-    dirpath.push_back(tree_math::root(width));
-    uint32_t curr = 0;
-    for (; curr < dirpath.size(); ++curr) {
-      if (!secrets[dirpath[curr].val].empty()) {
-        break;
-      }
-    }
-
-    if (curr > dirpath.size()) {
-      throw InvalidParameterError("No secret found to derive base key");
-    }
-
-    // Derive down
-    for (; curr > 0; --curr) {
-      auto node = dirpath[curr];
-      auto left = tree_math::left(node);
-      auto right = tree_math::right(node, width);
-
-      auto& secret = secrets[node.val];
-      secrets[left.val] =
-        derive_app_secret(suite, secret, "tree", left, 0, secret_size);
-      secrets[right.val] =
-        derive_app_secret(suite, secret, "tree", right, 0, secret_size);
-    }
-
-    // Copy the leaf
-    auto out = secrets[NodeIndex{ sender }.val];
-
-    // Zeroize along the direct path
-    for (auto i : dirpath) {
-      zeroize(secrets[i.val]);
-    }
-
-    return out;
+  if (curr > dirpath.size()) {
+    throw InvalidParameterError("No secret found to derive base key");
   }
-};
+
+  // Derive down
+  for (; curr > 0; --curr) {
+    auto node = dirpath[curr];
+    auto left = tree_math::left(node);
+    auto right = tree_math::right(node, width);
+
+    auto& secret = secrets[node.val];
+    secrets[left.val] =
+      derive_tree_secret(suite, secret, "tree", left, 0, secret_size);
+    secrets[right.val] =
+      derive_tree_secret(suite, secret, "tree", right, 0, secret_size);
+  }
+
+  // Copy the leaf
+  auto out = secrets[NodeIndex{ sender }.val];
+
+  // Zeroize along the direct path
+  for (auto i : dirpath) {
+    zeroize(secrets[i.val]);
+  }
+
+  return out;
+}
 
 ///
 /// GroupKeySource
 ///
 
-GroupKeySource::GroupKeySource()
-  : suite{ CipherSuite::ID::unknown }
-  , base_source(nullptr)
-{}
-
-GroupKeySource::GroupKeySource(const GroupKeySource& other)
-  : suite(other.suite)
-  , base_source(nullptr)
-  , chains(other.chains)
-{
-  if (other.base_source != nullptr) {
-    base_source.reset(other.base_source->dup());
-  }
-}
-
-GroupKeySource&
-GroupKeySource::operator=(const GroupKeySource& other)
-{
-  if (&other == this) {
-    return *this;
-  }
-
-  suite = other.suite;
-  if (other.base_source != nullptr) {
-    base_source.reset(other.base_source->dup());
-  } else {
-    base_source.reset(nullptr);
-  }
-  chains = other.chains;
-  return *this;
-}
-
-GroupKeySource::GroupKeySource(BaseKeySource* base_source_in)
-  : suite(base_source_in->suite)
-  , base_source(base_source_in)
+GroupKeySource::GroupKeySource(CipherSuite suite_in,
+                               LeafCount group_size,
+                               bytes encryption_secret)
+  : suite(suite_in)
+  , secret_tree(suite, group_size, encryption_secret)
 {}
 
 HashRatchet&
-GroupKeySource::chain(LeafIndex sender)
+GroupKeySource::chain(RatchetType type, LeafIndex sender)
 {
-  if (chains.count(sender) > 0) {
-    return chains[sender];
+  auto key = Key{ type, sender };
+  if (chains.count(key) > 0) {
+    return chains[key];
   }
 
-  auto base_secret = base_source->get(sender);
-  chains.emplace(sender,
-                 HashRatchet{ suite, NodeIndex{ sender }, base_secret });
-  return chains[sender];
+  auto sender_node = NodeIndex{ sender };
+  auto secret_size = suite.get().digest.hash_size();
+  auto leaf_secret = secret_tree.get(sender);
+
+  auto handshake_secret = derive_tree_secret(
+    suite, leaf_secret, "handshake", sender_node, 0, secret_size);
+  chains.emplace(
+    std::make_pair(Key{ RatchetType::handshake, sender },
+                   HashRatchet{ suite, sender_node, handshake_secret }));
+
+  auto application_secret = derive_tree_secret(
+    suite, leaf_secret, "application", sender_node, 0, secret_size);
+  chains.emplace(
+    std::make_pair(Key{ RatchetType::application, sender },
+                   HashRatchet{ suite, sender_node, application_secret }));
+
+  return chains[key];
 }
 
 std::tuple<uint32_t, KeyAndNonce>
-GroupKeySource::next(LeafIndex sender)
+GroupKeySource::next(RatchetType type, LeafIndex sender)
 {
-  return chain(sender).next();
+  return chain(type, sender).next();
 }
 
 KeyAndNonce
-GroupKeySource::get(LeafIndex sender, uint32_t generation)
+GroupKeySource::get(RatchetType type, LeafIndex sender, uint32_t generation)
 {
-  return chain(sender).get(generation);
+  return chain(type, sender).get(generation);
 }
 
 void
-GroupKeySource::erase(LeafIndex sender, uint32_t generation)
+GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
 {
-  return chain(sender).erase(generation);
+  return chain(type, sender).erase(generation);
 }
 
 ///
 /// KeyScheduleEpoch
 ///
 
-KeyScheduleEpoch
-KeyScheduleEpoch::create(CipherSuite suite,
-                         LeafCount size,
-                         const bytes& epoch_secret,
-                         const bytes& context)
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
+  : suite(suite_in)
 {
-  auto sender_data_secret =
-    suite.derive_secret(epoch_secret, "sender data", context);
-  auto handshake_secret =
-    suite.derive_secret(epoch_secret, "handshake", context);
-  auto application_secret = suite.derive_secret(epoch_secret, "app", context);
-  auto exporter_secret = suite.derive_secret(epoch_secret, "exporter", context);
-  auto confirmation_key = suite.derive_secret(epoch_secret, "confirm", context);
-  auto membership_key =
-    suite.derive_secret(epoch_secret, "membership", context);
-  auto init_secret = suite.derive_secret(epoch_secret, "init", context);
+  auto secret_size = suite.get().digest.hash_size();
+  epoch_secret = random_bytes(secret_size);
+  init_secrets(LeafCount{ 1 });
+}
 
-  auto handshake_base =
-    std::make_unique<NoFSBaseKeySource>(suite, handshake_secret);
-  auto application_base =
-    std::make_unique<TreeBaseKeySource>(suite, size, application_secret);
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
+                                   const bytes& joiner_secret_in,
+                                   const bytes& psk_secret,
+                                   const bytes& context,
+                                   LeafCount size)
+  : suite(suite_in)
+  , joiner_secret(joiner_secret_in)
+{
+  auto joiner_expand = suite.derive_secret(joiner_secret, "member");
 
-  return KeyScheduleEpoch{ suite,
-                           epoch_secret,
-                           sender_data_secret,
-                           handshake_secret,
-                           GroupKeySource{ handshake_base.release() },
-                           application_secret,
-                           GroupKeySource{ application_base.release() },
-                           exporter_secret,
-                           confirmation_key,
-                           membership_key,
-                           init_secret };
+  member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
+
+  auto secret_size = suite.get().digest.hash_size();
+  epoch_secret =
+    suite.expand_with_label(member_secret, "epoch", context, secret_size);
+  init_secrets(size);
+}
+
+void
+KeyScheduleEpoch::init_secrets(LeafCount size)
+{
+  sender_data_secret = suite.derive_secret(epoch_secret, "sender data");
+  encryption_secret = suite.derive_secret(epoch_secret, "encryption");
+  exporter_secret = suite.derive_secret(epoch_secret, "exporter");
+  authentication_secret = suite.derive_secret(epoch_secret, "authentication");
+  external_secret = suite.derive_secret(epoch_secret, "external");
+  confirmation_key = suite.derive_secret(epoch_secret, "confirm");
+  membership_key = suite.derive_secret(epoch_secret, "membership");
+  resumption_secret = suite.derive_secret(epoch_secret, "resumption");
+  init_secret = suite.derive_secret(epoch_secret, "init");
+
+  external_priv = HPKEPrivateKey::derive(suite, external_secret);
+  keys = GroupKeySource(suite, size, encryption_secret);
 }
 
 KeyScheduleEpoch
-KeyScheduleEpoch::next(LeafCount size,
-                       const bytes& update_secret,
-                       const bytes& context) const
+KeyScheduleEpoch::next(const bytes& commit_secret,
+                       const bytes& psk_secret,
+                       const bytes& context,
+                       LeafCount size) const
 {
-  auto new_epoch_secret =
-    suite.get().hpke.kdf.extract(init_secret, update_secret);
-  return KeyScheduleEpoch::create(suite, size, new_epoch_secret, context);
+  auto joiner_secret = suite.get().hpke.kdf.extract(init_secret, commit_secret);
+  return KeyScheduleEpoch(suite, joiner_secret, psk_secret, context, size);
 }
 
 KeyAndNonce
@@ -346,20 +301,18 @@ KeyScheduleEpoch::sender_data(const bytes& ciphertext)
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 {
-  // NB: Does not compare the GroupKeySource fields, since these are dynamically
+  // NB: Does not compare the GroupKeySource field, since these are dynamically
   // generated as needed.  Rather, we check the roots from which they started.
   auto suite = (lhs.suite == rhs.suite);
   auto epoch_secret = (lhs.epoch_secret == rhs.epoch_secret);
   auto sender_data_secret = (lhs.sender_data_secret == rhs.sender_data_secret);
-  auto handshake_secret = (lhs.handshake_secret == rhs.handshake_secret);
-  auto application_secret = (lhs.application_secret == rhs.application_secret);
+  auto encryption_secret = (lhs.encryption_secret == rhs.encryption_secret);
   auto exporter_secret = (lhs.exporter_secret == rhs.exporter_secret);
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
 
-  return suite && epoch_secret && sender_data_secret && handshake_secret &&
-         application_secret && exporter_secret && confirmation_key &&
-         init_secret;
+  return suite && epoch_secret && sender_data_secret && encryption_secret &&
+         exporter_secret && confirmation_key && init_secret;
 }
 
 } // namespace mls

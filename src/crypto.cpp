@@ -144,13 +144,10 @@ CipherSuite::expand_with_label(const bytes& secret,
 }
 
 bytes
-CipherSuite::derive_secret(const bytes& secret,
-                           const std::string& label,
-                           const bytes& context) const
+CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
 {
-  auto context_hash = get().digest.hash(context);
   auto size = get().digest.hash_size();
-  return expand_with_label(secret, label, context_hash, size);
+  return expand_with_label(secret, label, {}, size);
 }
 
 const std::array<CipherSuite::ID, 6> all_supported_suites = {

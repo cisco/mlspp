@@ -154,7 +154,7 @@ generate_key_schedule()
     auto secret_size = suite.get().hpke.kdf.hash_size();
 
     auto group_context = base_group_context;
-    auto update_secret = bytes(secret_size, 0);
+    auto commit_secret = bytes(secret_size, 0);
     uint32_t min_members = 5;
     uint32_t max_members = 20;
     auto n_members = min_members;
@@ -165,16 +165,18 @@ generate_key_schedule()
 
     for (size_t j = 0; j < tv.n_epochs; ++j) {
       auto ctx = tls::marshal(group_context);
-      epoch = epoch.next(LeafCount{ n_members }, update_secret, ctx);
+      epoch = epoch.next(commit_secret, {}, ctx, LeafCount{ n_members });
 
       auto handshake_keys = std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       auto application_keys =
         std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
-        auto hs = epoch.handshake_keys.get(k, tv.target_generation);
+        auto hs = epoch.keys.get(
+          GroupKeySource::RatchetType::handshake, k, tv.target_generation);
         handshake_keys.push_back({ hs.key, hs.nonce });
 
-        auto app = epoch.application_keys.get(k, tv.target_generation);
+        auto app = epoch.keys.get(
+          GroupKeySource::RatchetType::application, k, tv.target_generation);
         application_keys.push_back({ app.key, app.nonce });
       }
 
@@ -183,21 +185,25 @@ generate_key_schedule()
 
       tc.epochs.push_back({
         LeafCount{ n_members },
-        update_secret,
+        commit_secret,
         epoch.epoch_secret,
         epoch.sender_data_secret,
-        epoch.handshake_secret,
-        handshake_keys,
-        epoch.application_secret,
-        application_keys,
+        epoch.encryption_secret,
         epoch.exporter_secret,
+        epoch.authentication_secret,
+        epoch.external_secret,
         epoch.confirmation_key,
+        epoch.membership_key,
+        epoch.resumption_secret,
         epoch.init_secret,
+        epoch.external_priv.public_key,
+        handshake_keys,
+        application_keys,
         sender_data_key,
         sender_data_nonce,
       });
 
-      for (auto& val : update_secret) {
+      for (auto& val : commit_secret) {
         val += 1;
       }
       group_context.epoch += 1;

@@ -160,36 +160,43 @@ struct KeyScheduleTestVectors
   struct Epoch
   {
     LeafCount n_members;
-    bytes update_secret;
+    bytes commit_secret;
 
     bytes epoch_secret;
 
     bytes sender_data_secret;
-
-    bytes handshake_secret;
-    std::vector<KeyAndNonce> handshake_keys;
-
-    bytes application_secret;
-    std::vector<KeyAndNonce> application_keys;
-
+    bytes encryption_secret;
     bytes exporter_secret;
+    bytes authentication_secret;
+    bytes external_secret;
     bytes confirmation_key;
+    bytes membership_key;
+    bytes resumption_secret;
     bytes init_secret;
+
+    HPKEPublicKey external_pub;
+
+    std::vector<KeyAndNonce> handshake_keys;
+    std::vector<KeyAndNonce> application_keys;
 
     bytes sender_data_key;
     bytes sender_data_nonce;
 
     TLS_SERIALIZABLE(n_members,
-                     update_secret,
+                     commit_secret,
                      epoch_secret,
                      sender_data_secret,
-                     handshake_secret,
-                     handshake_keys,
-                     application_secret,
-                     application_keys,
+                     encryption_secret,
                      exporter_secret,
+                     authentication_secret,
+                     external_secret,
                      confirmation_key,
+                     membership_key,
+                     resumption_secret,
                      init_secret,
+                     external_pub,
+                     handshake_keys,
+                     application_keys,
                      sender_data_key,
                      sender_data_nonce)
     TLS_TRAITS(tls::pass,
@@ -197,12 +204,16 @@ struct KeyScheduleTestVectors
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::pass,
                tls::vector<4>,
-               tls::vector<1>,
                tls::vector<4>,
-               tls::vector<1>,
-               tls::vector<1>,
-               tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>)
   };
