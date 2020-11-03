@@ -1,0 +1,5 @@
+//the path to the version.h file is relative to your build directory.
+#include "../include/version.h"
+
+const char VERSION[] = "@VERSION@";
+const char VERSION_SHORT[] = "@VERSION_SHORT@";

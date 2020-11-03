@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "version.h"
+
 using namespace mls;
 
 static mls::Client
@@ -47,6 +49,8 @@ verify(const std::string& label, Session& alice, Session& bob)
 int
 main() // NOLINT(bugprone-exception-escape)
 {
+
+  std::cout << "Running library version:" << std::string(VERSION_SHORT) << std::endl;
   const auto suite =
     mls::CipherSuite{ mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
