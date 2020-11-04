@@ -4,4 +4,4 @@ file(GLOB APP_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${APP_NAME} ${APP_SOURCES} ${version_file})
 add_dependencies(${APP_NAME} ${LIB_NAME})
-target_link_libraries(${APP_NAME} ${LIB_NAME} OpenSSL::Crypto)
+target_link_libraries(${APP_NAME} PRIVATE ${LIB_NAME} OpenSSL::Crypto)

@@ -3,6 +3,15 @@ set(CURRENT_LIB_NAME hpke)
 ###
 ### Dependencies
 ###
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    find_package(OpenSSL)
+    IF (${OpenSSL_FOUND})
+        MESSAGE(STATUS "Found OpenSSL on Darwin")
+    ELSE (${OpenSSL_FOUND})
+        MESSAGE(STATUS "Could not locate OpenSSL on Darwin. Setting OPENSSL_ROOT_DIR to /usr/local/opt/openssl")
+        set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+    ENDIF (${OpenSSL_FOUND})
+endif()
 find_package(OpenSSL 1.1 REQUIRED)
 
 ###
