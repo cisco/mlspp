@@ -187,7 +187,8 @@ const ContentType::selector ContentType::type<ApplicationData> =
   ContentType::selector::application;
 
 MLSPlaintext::MLSPlaintext()
-  : decrypted(false)
+  : epoch(0)
+  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,

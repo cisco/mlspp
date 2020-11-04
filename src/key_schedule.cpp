@@ -18,7 +18,7 @@ zeroize(bytes& data) // NOLINT(google-runtime-references)
 struct TreeContext
 {
   NodeIndex node;
-  uint32_t generation;
+  uint32_t generation = 0;
 
   TLS_SERIALIZABLE(node, generation)
 };
@@ -174,7 +174,7 @@ GroupKeySource::GroupKeySource(CipherSuite suite_in,
                                LeafCount group_size,
                                bytes encryption_secret)
   : suite(suite_in)
-  , secret_tree(suite, group_size, encryption_secret)
+  , secret_tree(suite, group_size, std::move(encryption_secret))
 {}
 
 HashRatchet&
@@ -235,12 +235,12 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
-                                   const bytes& joiner_secret_in,
+                                   bytes joiner_secret_in,
                                    const bytes& psk_secret,
                                    const bytes& context,
                                    LeafCount size)
   : suite(suite_in)
-  , joiner_secret(joiner_secret_in)
+  , joiner_secret(std::move(joiner_secret_in))
 {
   auto joiner_expand = suite.derive_secret(joiner_secret, "member");
 
@@ -280,7 +280,7 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
 }
 
 KeyAndNonce
-KeyScheduleEpoch::sender_data(const bytes& ciphertext)
+KeyScheduleEpoch::sender_data(const bytes& ciphertext) const
 {
   auto sample_size = suite.get().digest.hash_size();
   auto sample = bytes(sample_size);

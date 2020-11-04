@@ -100,10 +100,10 @@ PendingJoin::Inner::create(CipherSuite suite,
   return PendingJoin(inner.release());
 }
 
-PendingJoin::PendingJoin(PendingJoin&& other) = default;
+PendingJoin::PendingJoin(PendingJoin&& other) noexcept = default;
 
 PendingJoin&
-PendingJoin::operator=(PendingJoin&& other) = default;
+PendingJoin::operator=(PendingJoin&& other) noexcept = default;
 
 PendingJoin::~PendingJoin() = default;
 
@@ -212,10 +212,10 @@ Session::Inner::for_epoch(epoch_t epoch)
   throw MissingStateError("No state for epoch");
 }
 
-Session::Session(Session&& other) = default;
+Session::Session(Session&& other) noexcept = default;
 
 Session&
-Session::operator=(Session&& other) = default;
+Session::operator=(Session&& other) noexcept = default;
 
 Session::~Session() = default;
 

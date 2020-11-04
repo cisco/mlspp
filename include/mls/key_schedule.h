@@ -44,7 +44,7 @@ struct SecretTree
   SecretTree() = default;
   SecretTree(CipherSuite suite_in,
              LeafCount group_size,
-             bytes encryption_secret);
+             bytes application_secret_in);
 
   bytes get(LeafIndex sender);
 
@@ -116,7 +116,7 @@ struct KeyScheduleEpoch
 
   // Generate an epoch based on the joiner secret
   KeyScheduleEpoch(CipherSuite suite_in,
-                   const bytes& joiner_secret_in,
+                   bytes joiner_secret_in,
                    const bytes& psk_secret,
                    const bytes& context,
                    LeafCount size);
@@ -127,7 +127,7 @@ struct KeyScheduleEpoch
                         const bytes& context,
                         LeafCount size) const;
 
-  KeyAndNonce sender_data(const bytes& ciphertext);
+  KeyAndNonce sender_data(const bytes& ciphertext) const;
 
 private:
   void init_secrets(LeafCount size);
