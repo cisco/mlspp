@@ -6,6 +6,6 @@ includedir=@includedir@
 Name: mlspplib
 Description: MLS Implementation
 URL: https://github.com/cisco/mlspp
-Version: @MLSPPLIB_VERSION@
+Version: @MLSPP_VERSION@
 Libs: -L${libdir} -llibmlspp
 Cflags: -I${includedir}
