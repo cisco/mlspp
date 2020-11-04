@@ -44,7 +44,7 @@ struct SecretTree
   SecretTree() = default;
   SecretTree(CipherSuite suite_in,
              LeafCount group_size,
-             bytes encryption_secret_in);
+             bytes application_secret);
 
   bytes get(LeafIndex sender);
 
