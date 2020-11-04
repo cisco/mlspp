@@ -1,8 +1,27 @@
 cmake_minimum_required(VERSION 3.12)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+
+###
+###  Semantic versioning
+###
+include ( GetGitRevisionDescription )
+git_describe(VERSION --tags)
+get_git_head_revision(REFSPEC HASHVAR)
+
+string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" MLSPP_VERSION_MAJOR "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_MINOR "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_PATCH "${VERSION}")
+string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+(.*)" "\\1" MLSPP_VERSION_SHA1 "${VERSION}")
+mark_as_advanced(MLSPP_VERSION_MAJOR MLSPP_VERSION_MINOR MLSPP_VERSION_PATCH)
+set ( MLSPP_VERSION "${MLSPP_VERSION_MAJOR}.${MLSPP_VERSION_MINOR}.${MLSPP_VERSION_PATCH}" )
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.c.in
+        ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 
 project(mlspp
-  VERSION 0.1
-  LANGUAGES CXX
+        VERSION "${MLSPP_VERSION}"
+        LANGUAGES CXX
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
@@ -52,6 +71,16 @@ endif()
 add_subdirectory(lib)
 
 # External libraries
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  find_package(OpenSSL)
+  IF (${OpenSSL_FOUND})
+    MESSAGE(STATUS "Found OpenSSL on Darwin")
+  ELSE (${OpenSSL_FOUND})
+    MESSAGE(STATUS "Could not locate OpenSSL on Darwin. Setting OPENSSL_ROOT_DIR to /usr/local/opt/openssl")
+    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+  ENDIF (${OpenSSL_FOUND})
+endif()
+
 find_package(OpenSSL 1.1 REQUIRED)
 
 ###
@@ -73,6 +102,28 @@ target_include_directories(${LIB_NAME}
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
+
+###
+###  Library packaging and install
+###
+#include ( CPack )
+set ( dist_dir    ${CMAKE_BINARY_DIR}/dist )
+set ( prefix      ${CMAKE_INSTALL_PREFIX} )
+set ( exec_prefix ${CMAKE_INSTALL_PREFIX}/bin )
+set ( libdir      ${CMAKE_INSTALL_PREFIX}/lib )
+set ( includedir  ${CMAKE_INSTALL_PREFIX}/include )
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libmlspp.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/libmlspp.pc @ONLY)
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/libmlspp.pc DESTINATION lib/pkgconfig )
+
+install ( TARGETS ${LIB_NAME}
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin)
+
+
+add_subdirectory(include)
+
 
 ###
 ### Tests
