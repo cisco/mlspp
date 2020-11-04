@@ -6,7 +6,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 ###  Semantic versioning
 ###
 include ( GetGitRevisionDescription )
-git_describe(VERSION --tags --dirty=-d)
+git_describe(VERSION)
+get_git_head_revision(REFSPEC HASHVAR)
+
 string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" MLSPP_VERSION_MAJOR "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_MINOR "${VERSION}")
 string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" MLSPP_VERSION_PATCH "${VERSION}")
@@ -69,9 +71,7 @@ endif()
 add_subdirectory(lib)
 
 # External libraries
-#include(FindOpenSSL)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  message("Darwin")
   find_package(OpenSSL)
   IF (${OpenSSL_FOUND})
     MESSAGE(STATUS "Found OpenSSL on Darwin")
@@ -82,8 +82,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 endif()
 
 find_package(OpenSSL 1.1 REQUIRED)
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(OpenSSL REQUIRED openssl)
 
 ###
 ### Library Config
