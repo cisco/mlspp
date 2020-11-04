@@ -114,14 +114,14 @@ HashRatchet::erase(uint32_t generation)
 
 SecretTree::SecretTree(CipherSuite suite_in,
                        LeafCount group_size,
-                       bytes application_secret_in)
+                       bytes encryption_secret_in)
   : suite(suite_in)
   , root(tree_math::root(NodeCount{ group_size }))
   , width(NodeCount{ group_size })
   , secrets(NodeCount{ group_size }.val)
   , secret_size(suite_in.get().hpke.kdf.hash_size())
 {
-  secrets[root.val] = std::move(application_secret_in);
+  secrets[root.val] = std::move(encryption_secret_in);
 }
 
 bytes
