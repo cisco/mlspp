@@ -160,7 +160,7 @@ protected:
   friend bool operator!=(const State& lhs, const State& rhs);
 
   // Derive and set the secrets for an epoch, given some new entropy
-  void update_epoch_secrets(const bytes& update_secret);
+  void update_epoch_secrets(const bytes& commit_secret);
 
   // Signature verification over a handshake message
   bool verify(const MLSPlaintext& pt) const;
