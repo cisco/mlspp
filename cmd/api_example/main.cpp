@@ -50,7 +50,8 @@ int
 main() // NOLINT(bugprone-exception-escape)
 {
 
-  std::cout << "Running library version:" << std::string(VERSION_SHORT) << std::endl;
+  std::cout << "Running library version:" << std::string(VERSION) << std::endl;
+  std::cout << "       git sha hash:" << std::string(HASHVAR) << std::endl;
   const auto suite =
     mls::CipherSuite{ mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 

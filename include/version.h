@@ -4,6 +4,6 @@
 
 /* Global version strings */
 extern const char VERSION[];
-extern const char VERSION_SHORT[];
+extern const char HASHVAR[];
 
 #endif /* VERSION_H */
