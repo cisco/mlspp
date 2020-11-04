@@ -6,18 +6,33 @@ project(mlspp
 )
 
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
+option(ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 
 ###
 ### Global Config
 ###
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+include(CheckCXXCompilerFlag)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  add_compile_options(-Wall -pedantic -Wextra -Werror)
+  add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
+  check_cxx_compiler_flag(-Wextra-semi COMPILER_SUPPORTS_EXTRA_SEMI_WARNING)
+  if (COMPILER_SUPPORTS_EXTRA_SEMI_WARNING)
+      add_compile_options("-Wextra-semi")
+  endif()
 elseif(MSVC)
   add_compile_options(/W4 /WX)
+endif()
+
+if (ADDRESS_SANITIZER)
+  set (CMAKE_C_FLAGS              "${CMAKE_C_FLAGS} -fsanitize=address")
+  set (CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS} -fsanitize=address")
+  set (CMAKE_EXE_LINKER_FLAGS     "${CMAKE_EXE_LINKER_FLAGS}    -fsanitize=address")
+  set (CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+  set (CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
 if(CLANG_TIDY)

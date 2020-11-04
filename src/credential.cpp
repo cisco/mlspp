@@ -23,7 +23,7 @@ const CredentialType::selector CredentialType::type<X509Credential> =
 using hpke::Certificate; // NOLINT(misc-unused-using-decls)
 using hpke::Signature;   // NOLINT(misc-unused-using-decls)
 
-const Signature&
+static const Signature&
 find_signature(Signature::ID id)
 {
   switch (id) {
@@ -58,7 +58,7 @@ X509Credential::X509Credential(
   // first element represents leaf cert
   const auto& sig = find_signature(parsed[0].public_key_algorithm);
   const auto pub_data = sig.serialize(*parsed[0].public_key);
-  _signature_algorithm =  parsed[0].public_key_algorithm;
+  _signature_scheme = tls_signature_scheme(parsed[0].public_key_algorithm);
   _public_key = SignaturePublicKey{ pub_data };
 
   // verify chain for valid signatures

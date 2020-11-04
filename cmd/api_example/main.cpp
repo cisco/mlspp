@@ -9,7 +9,7 @@
 
 using namespace mls;
 
-mls::Client
+static mls::Client
 create_client(CipherSuite suite, const std::string& name)
 {
   auto id = bytes(name.begin(), name.end());
@@ -18,7 +18,7 @@ create_client(CipherSuite suite, const std::string& name)
   return Client(suite, sig_priv, cred);
 }
 
-void
+static void
 verify_send(const std::string& label, Session& send, Session& recv)
 {
   auto plaintext = bytes{ 0, 1, 2, 3 };
@@ -29,7 +29,7 @@ verify_send(const std::string& label, Session& send, Session& recv)
   }
 }
 
-void
+static void
 verify(const std::string& label, Session& alice, Session& bob)
 {
   if (alice != bob) {

@@ -113,12 +113,15 @@ TEST_CASE("Messages Interop")
     welcome.encrypted_group_info = tv.random;
     tls_round_trip(tc.welcome, welcome, true);
 
+    // MLSPlaintext
+
     // Proposals
     auto add_prop = Proposal{ Add{ key_package } };
     CHECK(add_prop.proposal_type() == ProposalType::selector::add);
 
     auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
+    add_hs.membership_tag = { tv.random };
     tls_round_trip(tc.add_proposal, add_hs, true);
 
     auto update_prop = Proposal{ Update{ key_package } };
@@ -127,6 +130,7 @@ TEST_CASE("Messages Interop")
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
     update_hs.signature = tv.random;
+    update_hs.membership_tag = { tv.random };
     tls_round_trip(tc.update_proposal, update_hs, true);
 
     auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
@@ -135,6 +139,7 @@ TEST_CASE("Messages Interop")
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
     remove_hs.signature = tv.random;
+    remove_hs.membership_tag = { tv.random };
     tls_round_trip(tc.remove_proposal, remove_hs, true);
 
     // Commit
@@ -142,13 +147,16 @@ TEST_CASE("Messages Interop")
       { { tv.random }, { tv.random } },
       update_path,
     };
-    tls_round_trip(tc.commit, commit, true);
+    auto commit_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, commit };
+    commit_hs.signature = tv.random;
+    commit_hs.confirmation_tag = { tv.random };
+    commit_hs.membership_tag = { tv.random };
+    tls_round_trip(tc.commit, commit_hs, true);
 
     // MLSCiphertext
     MLSCiphertext ciphertext{
       tv.group_id, tv.epoch,  ContentType::selector::application,
       tv.random,   tv.random, tv.random,
-      tv.random,
     };
     tls_round_trip(tc.ciphertext, ciphertext, true);
   }

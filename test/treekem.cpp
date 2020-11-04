@@ -185,7 +185,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     found = pub.find(kp_path);
     REQUIRE(found.has_value());
     REQUIRE(found.value() == index);
-    for (const auto dpn : dp) {
+    for (const auto& dpn : dp) {
       REQUIRE(pub.node_at(dpn).node.has_value());
     }
 

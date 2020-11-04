@@ -11,6 +11,19 @@
 
 namespace mls {
 
+/// Signature Code points, borrowed from RFC 8446
+enum struct SignatureScheme : uint16_t
+{
+  ecdsa_secp256r1_sha256 = 0x0403,
+  ecdsa_secp384r1_sha384 = 0x0805,
+  ecdsa_secp521r1_sha512 = 0x0603,
+  ed25519 = 0x0807,
+  ed448 = 0x0808,
+};
+
+SignatureScheme
+tls_signature_scheme(hpke::Signature::ID id);
+
 /// Cipher suites
 
 struct CipherSuite
@@ -41,9 +54,7 @@ struct CipherSuite
                           const std::string& label,
                           const bytes& context,
                           size_t length) const;
-  bytes derive_secret(const bytes& secret,
-                      const std::string& label,
-                      const bytes& context) const;
+  bytes derive_secret(const bytes& secret, const std::string& label) const;
 
   TLS_SERIALIZABLE(id)
 

@@ -160,45 +160,60 @@ struct KeyScheduleTestVectors
   struct Epoch
   {
     LeafCount n_members;
-    bytes update_secret;
+    bytes commit_secret;
 
     bytes epoch_secret;
 
     bytes sender_data_secret;
-    bytes sender_data_key;
-
-    bytes handshake_secret;
-    std::vector<KeyAndNonce> handshake_keys;
-
-    bytes application_secret;
-    std::vector<KeyAndNonce> application_keys;
-
+    bytes encryption_secret;
     bytes exporter_secret;
+    bytes authentication_secret;
+    bytes external_secret;
     bytes confirmation_key;
+    bytes membership_key;
+    bytes resumption_secret;
     bytes init_secret;
 
+    HPKEPublicKey external_pub;
+
+    std::vector<KeyAndNonce> handshake_keys;
+    std::vector<KeyAndNonce> application_keys;
+
+    bytes sender_data_key;
+    bytes sender_data_nonce;
+
     TLS_SERIALIZABLE(n_members,
-                     update_secret,
+                     commit_secret,
                      epoch_secret,
                      sender_data_secret,
-                     sender_data_key,
-                     handshake_secret,
-                     handshake_keys,
-                     application_secret,
-                     application_keys,
+                     encryption_secret,
                      exporter_secret,
+                     authentication_secret,
+                     external_secret,
                      confirmation_key,
-                     init_secret);
+                     membership_key,
+                     resumption_secret,
+                     init_secret,
+                     external_pub,
+                     handshake_keys,
+                     application_keys,
+                     sender_data_key,
+                     sender_data_nonce)
     TLS_TRAITS(tls::pass,
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>,
                tls::vector<1>,
-               tls::vector<4>,
                tls::vector<1>,
-               tls::vector<4>,
                tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::vector<1>,
+               tls::pass,
+               tls::vector<4>,
+               tls::vector<4>,
                tls::vector<1>,
                tls::vector<1>)
   };
@@ -216,6 +231,7 @@ struct KeyScheduleTestVectors
   uint32_t target_generation;
   bytes base_init_secret;
   bytes base_group_context;
+  bytes ciphertext;
 
   std::vector<TestCase> cases;
 
@@ -223,9 +239,11 @@ struct KeyScheduleTestVectors
                    target_generation,
                    base_init_secret,
                    base_group_context,
-                   cases);
+                   ciphertext,
+                   cases)
   TLS_TRAITS(tls::pass,
              tls::pass,
+             tls::vector<1>,
              tls::vector<1>,
              tls::vector<4>,
              tls::vector<4>)
@@ -330,7 +348,7 @@ struct MessagesTestVectors
                      update_proposal,
                      remove_proposal,
                      commit,
-                     ciphertext);
+                     ciphertext)
     TLS_TRAITS(tls::pass,
                tls::vector<4>,
                tls::vector<4>,
@@ -366,7 +384,7 @@ struct MessagesTestVectors
                    dh_seed,
                    sig_seed,
                    random,
-                   cases);
+                   cases)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,

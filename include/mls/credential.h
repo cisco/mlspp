@@ -48,7 +48,7 @@ struct X509Credential
   {
     bytes data;
 
-    TLS_SERIALIZABLE(data);
+    TLS_SERIALIZABLE(data)
     TLS_TRAITS(tls::vector<2>)
   };
 
@@ -62,7 +62,7 @@ struct X509Credential
 
 private:
   SignaturePublicKey _public_key;
-  hpke::Signature::ID _signature_algorithm;
+  SignatureScheme _signature_scheme;
 
   friend struct KeyPackage;
 };

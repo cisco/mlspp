@@ -1,7 +1,6 @@
 #include "mls/core_types.h"
 
 namespace mls {
-
 ///
 /// Extensions
 ///
@@ -103,9 +102,10 @@ KeyPackage::verify() const
   auto tbs = to_be_signed();
   auto identity_key = credential.public_key();
 
-  if (CredentialType::x509 == credential.type()) {
+  if (CredentialType::selector::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
-    if (cred._signature_algorithm != cipher_suite.get().sig.id) {
+    if (cred._signature_scheme !=
+        tls_signature_scheme(cipher_suite.get().sig.id)) {
       throw std::runtime_error("Signature algorithm invalid");
     }
   }

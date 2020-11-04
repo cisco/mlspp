@@ -4,6 +4,7 @@
 #include <array>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <variant>
 #include <vector>
 
@@ -113,7 +114,15 @@ private:
   uint8_t next();
 
   template<typename T>
-  istream& read_uint(T& data, int length);
+  istream& read_uint(T& data, int length)
+  {
+    uint64_t value = 0;
+    for (int i = 0; i < length; i += 1) {
+      value = (value << unsigned(8)) + next();
+    }
+    data = value;
+    return *this;
+  }
 
   friend istream& operator>>(istream& in, bool& data);
   friend istream& operator>>(istream& in, uint8_t& data);

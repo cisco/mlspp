@@ -74,8 +74,9 @@ public:
 };
 
 // struct {
-//   opaque epoch_secret<1..255>;
-//   opaque path_secret<1..255>;
+//   opaque joiner_secret<1..255>;
+//   optional<PathSecret> path_secret;
+//   optional<PreSharedKeys> psks;
 // } GroupSecrets;
 struct GroupSecrets
 {
@@ -87,10 +88,10 @@ struct GroupSecrets
     TLS_TRAITS(tls::vector<1>)
   };
 
-  bytes epoch_secret;
+  bytes joiner_secret;
   std::optional<PathSecret> path_secret;
 
-  TLS_SERIALIZABLE(epoch_secret, path_secret)
+  TLS_SERIALIZABLE(joiner_secret, path_secret)
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
@@ -121,19 +122,24 @@ struct Welcome
   bytes encrypted_group_info;
 
   Welcome();
-  Welcome(CipherSuite suite, bytes epoch_secret, const GroupInfo& group_info);
+  Welcome(CipherSuite suite,
+          const bytes& joiner_secret,
+          const bytes& psk_secret,
+          const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& epoch_secret) const;
+  GroupInfo decrypt(const bytes& joiner_secret, const bytes& psk_secret) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
 private:
-  bytes _epoch_secret;
-  std::tuple<bytes, bytes> group_info_key_nonce(
-    const bytes& epoch_secret) const;
+  bytes _joiner_secret;
+  static std::tuple<bytes, bytes> group_info_key_nonce(
+    CipherSuite suite,
+    const bytes& joiner_secret,
+    const bytes& psk_secret);
 };
 
 ///
@@ -245,15 +251,6 @@ struct ApplicationData
   TLS_TRAITS(tls::vector<4>)
 };
 
-struct CommitData
-{
-  Commit commit;
-  bytes confirmation;
-
-  TLS_SERIALIZABLE(commit, confirmation)
-  TLS_TRAITS(tls::pass, tls::vector<1>)
-};
-
 struct GroupContext;
 
 enum struct SenderType : uint8_t
@@ -269,7 +266,15 @@ struct Sender
   SenderType sender_type{ SenderType::invalid };
   uint32_t sender{ 0 };
 
-  TLS_SERIALIZABLE(sender_type, sender);
+  TLS_SERIALIZABLE(sender_type, sender)
+};
+
+struct MAC
+{
+  bytes mac_value;
+
+  TLS_SERIALIZABLE(mac_value)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 struct MLSPlaintext
@@ -278,11 +283,14 @@ struct MLSPlaintext
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
-  std::variant<ApplicationData, Proposal, CommitData> content;
+  std::variant<ApplicationData, Proposal, Commit> content;
+
   bytes signature;
+  std::optional<MAC> confirmation_tag;
+  std::optional<MAC> membership_tag;
 
   // Constructor for unmarshaling directly
-  MLSPlaintext() = default;
+  MLSPlaintext();
 
   // Constructor for decrypting
   MLSPlaintext(bytes group_id,
@@ -298,10 +306,7 @@ struct MLSPlaintext
                Sender sender,
                ApplicationData application_data);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
-  MLSPlaintext(bytes group_id,
-               epoch_t epoch,
-               Sender sender,
-               const Commit& commit);
+  MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -310,6 +315,14 @@ struct MLSPlaintext
   bool verify(const CipherSuite& suite,
               const GroupContext& context,
               const SignaturePublicKey& pub) const;
+
+  bytes membership_tag_input(const GroupContext& context) const;
+  void set_membership_tag(const CipherSuite& suite,
+                          const GroupContext& context,
+                          const bytes& mac_key);
+  bool verify_membership_tag(const CipherSuite& suite,
+                             const GroupContext& context,
+                             const bytes& mac_key) const;
 
   bytes marshal_content(size_t padding_size) const;
 
@@ -321,20 +334,28 @@ struct MLSPlaintext
                    sender,
                    authenticated_data,
                    content,
-                   signature)
+                   signature,
+                   confirmation_tag,
+                   membership_tag)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,
              tls::variant<ContentType>,
-             tls::vector<2>)
+             tls::vector<2>,
+             tls::pass,
+             tls::pass)
+
+private:
+  // Not part of the struct, an indicator of whether this MLSPlaintext was
+  // constructed from an MLSCiphertext
+  bool decrypted;
 };
 
 // struct {
 //     opaque group_id<0..255>;
 //     uint32 epoch;
 //     ContentType content_type;
-//     opaque sender_data_nonce<0..255>;
 //     opaque encrypted_sender_data<0..255>;
 //     opaque ciphertext<0..2^32-1>;
 // } MLSCiphertext;
@@ -343,7 +364,6 @@ struct MLSCiphertext
   bytes group_id;
   epoch_t epoch;
   ContentType::selector content_type;
-  bytes sender_data_nonce;
   bytes encrypted_sender_data;
   bytes authenticated_data;
   bytes ciphertext;
@@ -351,14 +371,12 @@ struct MLSCiphertext
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    content_type,
-                   sender_data_nonce,
                    encrypted_sender_data,
                    authenticated_data,
-                   ciphertext);
+                   ciphertext)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector<1>,
              tls::vector<1>,
              tls::vector<4>,
              tls::vector<4>)

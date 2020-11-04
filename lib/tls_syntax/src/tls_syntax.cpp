@@ -68,17 +68,6 @@ istream::next()
 }
 
 // Primitive type readers
-template<typename T>
-istream&
-istream::read_uint(T& data, int length)
-{
-  uint64_t value = 0;
-  for (int i = 0; i < length; i += 1) {
-    value = (value << unsigned(8)) + next();
-  }
-  data = value;
-  return *this;
-}
 
 istream&
 operator>>(istream& in, bool& data)

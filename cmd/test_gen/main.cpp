@@ -8,7 +8,7 @@
 #include <fstream>
 #include <iostream>
 
-TreeMathTestVectors
+static TreeMathTestVectors
 generate_tree_math()
 {
   TreeMathTestVectors tv;
@@ -53,7 +53,7 @@ generate_tree_math()
   return tv;
 }
 
-CryptoTestVectors
+static CryptoTestVectors
 generate_crypto()
 {
   CryptoTestVectors tv;
@@ -92,7 +92,7 @@ generate_crypto()
   return tv;
 }
 
-HashRatchetTestVectors
+static HashRatchetTestVectors
 generate_hash_ratchet()
 {
   HashRatchetTestVectors tv;
@@ -126,7 +126,7 @@ generate_hash_ratchet()
   return tv;
 }
 
-KeyScheduleTestVectors
+static KeyScheduleTestVectors
 generate_key_schedule()
 {
   KeyScheduleTestVectors tv;
@@ -144,6 +144,7 @@ generate_key_schedule()
   tv.target_generation = 3;
   tv.base_init_secret = bytes(32, 0xA3);
   tv.base_group_context = tls::marshal(base_group_context);
+  tv.ciphertext = bytes(96, 0xA4);
 
   // Construct a test case for each suite
   for (auto suite : suites) {
@@ -153,7 +154,7 @@ generate_key_schedule()
     auto secret_size = suite.get().hpke.kdf.hash_size();
 
     auto group_context = base_group_context;
-    auto update_secret = bytes(secret_size, 0);
+    auto commit_secret = bytes(secret_size, 0);
     uint32_t min_members = 5;
     uint32_t max_members = 20;
     auto n_members = min_members;
@@ -164,35 +165,45 @@ generate_key_schedule()
 
     for (size_t j = 0; j < tv.n_epochs; ++j) {
       auto ctx = tls::marshal(group_context);
-      epoch = epoch.next(LeafCount{ n_members }, update_secret, ctx);
+      epoch = epoch.next(commit_secret, {}, ctx, LeafCount{ n_members });
 
       auto handshake_keys = std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       auto application_keys =
         std::vector<KeyScheduleTestVectors::KeyAndNonce>();
       for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
-        auto hs = epoch.handshake_keys.get(k, tv.target_generation);
+        auto hs = epoch.keys.get(
+          GroupKeySource::RatchetType::handshake, k, tv.target_generation);
         handshake_keys.push_back({ hs.key, hs.nonce });
 
-        auto app = epoch.application_keys.get(k, tv.target_generation);
+        auto app = epoch.keys.get(
+          GroupKeySource::RatchetType::application, k, tv.target_generation);
         application_keys.push_back({ app.key, app.nonce });
       }
 
+      auto [sender_data_key, sender_data_nonce] =
+        epoch.sender_data(tv.ciphertext);
+
       tc.epochs.push_back({
         LeafCount{ n_members },
-        update_secret,
+        commit_secret,
         epoch.epoch_secret,
         epoch.sender_data_secret,
-        epoch.sender_data_key,
-        epoch.handshake_secret,
-        handshake_keys,
-        epoch.application_secret,
-        application_keys,
+        epoch.encryption_secret,
         epoch.exporter_secret,
+        epoch.authentication_secret,
+        epoch.external_secret,
         epoch.confirmation_key,
+        epoch.membership_key,
+        epoch.resumption_secret,
         epoch.init_secret,
+        epoch.external_priv.public_key,
+        handshake_keys,
+        application_keys,
+        sender_data_key,
+        sender_data_nonce,
       });
 
-      for (auto& val : update_secret) {
+      for (auto& val : commit_secret) {
         val += 1;
       }
       group_context.epoch += 1;
@@ -206,7 +217,7 @@ generate_key_schedule()
   return tv;
 }
 
-TreeKEMTestVectors
+static TreeKEMTestVectors
 generate_treekem()
 {
   TreeKEMTestVectors tv;
@@ -260,7 +271,7 @@ generate_treekem()
   return tv;
 }
 
-MessagesTestVectors
+static MessagesTestVectors
 generate_messages()
 {
   MessagesTestVectors tv;
@@ -333,28 +344,34 @@ generate_messages()
     auto add_prop = Proposal{ Add{ key_package } };
     auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
     add_hs.signature = tv.random;
+    add_hs.membership_tag = { tv.random };
 
     auto update_prop = Proposal{ Update{ key_package } };
     auto update_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
     update_hs.signature = tv.random;
+    update_hs.membership_tag = { tv.random };
 
     auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
     auto remove_hs =
       MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
     remove_hs.signature = tv.random;
+    remove_hs.membership_tag = { tv.random };
 
     // Construct Commit
     auto commit = Commit{
       { { tv.random }, { tv.random } },
       update_path,
     };
+    auto commit_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, commit };
+    commit_hs.signature = tv.random;
+    commit_hs.confirmation_tag = { tv.random };
+    commit_hs.membership_tag = { tv.random };
 
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
       tv.group_id, tv.epoch,  ContentType::selector::application,
       tv.random,   tv.random, tv.random,
-      tv.random,
     };
 
     tv.cases.push_back({ suite,
@@ -367,7 +384,7 @@ generate_messages()
                          tls::marshal(add_hs),
                          tls::marshal(update_hs),
                          tls::marshal(remove_hs),
-                         tls::marshal(commit),
+                         tls::marshal(commit_hs),
                          tls::marshal(ciphertext) });
   }
 
