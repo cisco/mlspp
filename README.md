@@ -56,4 +56,10 @@ To get rid of most of the files (Some manual directory cleanup might be needed)
 
 Once installed there a pkgconfig file is installed so using this library from another cmake project could be done by:
 ```
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MLSPP REQUIRED libmlspp)
+...
+target_link_libraries(${TEST_APP_NAME} ${MLSPP_LIBRARY} ${LIB_NAME})
+
 ```
+Note that only static version is build for now.
