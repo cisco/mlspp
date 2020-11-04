@@ -6,7 +6,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 ###  Semantic versioning
 ###
 include ( GetGitRevisionDescription )
-git_describe(VERSION --tags)
+#git_describe(VERSION)
+git_get_exact_tag(VERSION)
+if(NOT VERSION)
+  message("No Git tag version found setting v0.0.0")
+  set(VERSION "v0.0.0")
+endif(NOT VERSION)
+
+
+message( ${VERSION})
+
+
 get_git_head_revision(REFSPEC HASHVAR)
 
 string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" MLSPP_VERSION_MAJOR "${VERSION}")

@@ -228,8 +228,8 @@ function(git_describe_working_tree _var)
 			OUTPUT_VARIABLE out
 			ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 	if(NOT res EQUAL 0)
-		#set(out "${out}-${res}-NOTFOUND")
-		set(out "0")
+		set(out "${out}-${res}-NOTFOUND")
+		#set(out "0")
 	endif()
 
 	set(${_var}
