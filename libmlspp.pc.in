@@ -7,5 +7,5 @@ Name: mlspplib
 Description: MLS Implementation
 URL: https://github.com/cisco/mlspp
 Version: @MLSPPLIB_VERSION@
-Libs: -L${libdir} -lmlspplib
+Libs: -L${libdir} -llibmlspp
 Cflags: -I${includedir}

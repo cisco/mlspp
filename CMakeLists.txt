@@ -94,11 +94,16 @@ target_include_directories(${LIB_NAME}
 ###
 ###  Library packaging and install
 ###
-include ( CPack )
+#include ( CPack )
+set ( dist_dir    ${CMAKE_BINARY_DIR}/dist )
+set ( prefix      ${CMAKE_INSTALL_PREFIX} )
+set ( exec_prefix ${CMAKE_INSTALL_PREFIX}/bin )
+set ( libdir      ${CMAKE_INSTALL_PREFIX}/lib )
+set ( includedir  ${CMAKE_INSTALL_PREFIX}/include )
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libmlspp.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/libmlspp.pc @ONLY)
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/libmlspp.pc DESTINATION lib/pkgconfig )
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mlspplib.pc.in
-        ${CMAKE_CURRENT_BINARY_DIR}/mlspplib.pc @ONLY)
-install (FILES ${CMAKE_CURRENT_BINARY_DIR}/mlspplib.pc DESTINATION lib/pkgconfig )
 install ( TARGETS ${LIB_NAME}
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
