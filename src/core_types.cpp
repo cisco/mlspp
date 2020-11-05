@@ -41,7 +41,8 @@ static const uint64_t default_not_after = 0xffffffffffffffff;
 KeyPackage::KeyPackage(CipherSuite suite_in,
                        HPKEPublicKey init_key_in,
                        Credential credential_in,
-                       const SignaturePrivateKey& sig_priv_in)
+                       const SignaturePrivateKey& sig_priv_in,
+                       const std::optional<KeyPackageOpts>& opts_in)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
   , init_key(std::move(init_key_in))
@@ -55,7 +56,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   // TODO(RLB) Set non-eternal lifetimes
   extensions.add(LifetimeExtension{ default_not_before, default_not_after });
 
-  sign(sig_priv_in, std::nullopt);
+  sign(sig_priv_in, opts_in);
 }
 
 bytes

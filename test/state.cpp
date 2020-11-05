@@ -16,7 +16,7 @@ public:
       auto credential = Credential::basic(user_id, identity_priv.public_key);
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
       auto key_package =
-        KeyPackage{ suite, init_priv.public_key, credential, identity_priv };
+        KeyPackage{ suite, init_priv.public_key, credential, identity_priv, std::nullopt };
 
       init_privs.push_back(init_priv);
       identity_privs.push_back(identity_priv);

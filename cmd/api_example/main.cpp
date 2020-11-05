@@ -9,7 +9,7 @@
 
 using namespace mls;
 
-static mls::Client
+static Client
 create_client(CipherSuite suite, const std::string& name)
 {
   auto id = bytes(name.begin(), name.end());
@@ -48,7 +48,7 @@ int
 main() // NOLINT(bugprone-exception-escape)
 {
   const auto suite =
-    mls::CipherSuite{ mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+    CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
   ////////// DRAMATIS PERSONAE ///////////
 

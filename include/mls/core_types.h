@@ -147,6 +147,7 @@ struct ParentNode
 struct KeyPackageOpts
 {
   // TODO: Things to change in a KeyPackage
+  ExtensionList extensions;
 };
 
 struct KeyPackage
@@ -162,7 +163,8 @@ struct KeyPackage
   KeyPackage(CipherSuite suite_in,
              HPKEPublicKey init_key_in,
              Credential credential_in,
-             const SignaturePrivateKey& sig_priv_in);
+             const SignaturePrivateKey& sig_priv_in,
+             const std::optional<KeyPackageOpts>& opts_in);
 
   bytes hash() const;
 
