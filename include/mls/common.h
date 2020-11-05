@@ -26,8 +26,13 @@ seconds_since_epoch();
 /// Easy construction of overloaded lambdas
 ///
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template<class... Ts>
+struct overloaded : Ts...
+{
+  using Ts::operator()...;
+};
+template<class... Ts>
+overloaded(Ts...)->overloaded<Ts...>;
 
 ///
 /// Auto-generate equality and inequality operators for TLS-serializable things
