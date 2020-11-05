@@ -9,16 +9,31 @@ const std::array<ProtocolVersion, 1> all_supported_versions = {
   ProtocolVersion::mls10
 };
 
-const ExtensionType SupportedVersionsExtension::type =
+const uint16_t SupportedVersionsExtension::type =
   ExtensionType::supported_versions;
-const ExtensionType SupportedCipherSuitesExtension::type =
+const uint16_t SupportedCipherSuitesExtension::type =
   ExtensionType::supported_ciphersuites;
-const ExtensionType LifetimeExtension::type = ExtensionType::lifetime;
-const ExtensionType KeyIDExtension::type = ExtensionType::key_id;
-const ExtensionType ParentHashExtension::type = ExtensionType::parent_hash;
+const uint16_t LifetimeExtension::type = ExtensionType::lifetime;
+const uint16_t KeyIDExtension::type = ExtensionType::key_id;
+const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
+
+void
+ExtensionList::add(uint16_t type, bytes data)
+{
+    auto curr = std::find_if(
+      extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
+        return ext.type == type;
+      });
+    if (curr != extensions.end()) {
+      curr->data = std::move(data);
+      return;
+    }
+
+    extensions.push_back({ type, std::move(data) });
+}
 
 bool
-ExtensionList::has(ExtensionType type) const
+ExtensionList::has(uint16_t type) const
 {
   return std::any_of(
     extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
@@ -69,8 +84,12 @@ void
 KeyPackage::sign(const SignaturePrivateKey& sig_priv,
                  const std::optional<KeyPackageOpts>& opts)
 {
-  // TODO(RLB): Apply opts
-  silence_unused(opts);
+  if (opts.has_value()) {
+    // Fill in application-provided extensions
+    for (const auto& ext : opts.value().extensions.extensions) {
+      extensions.add(ext.type, ext.data);
+    }
+  }
 
   auto tbs = to_be_signed();
   signature = sig_priv.sign(cipher_suite, tbs);

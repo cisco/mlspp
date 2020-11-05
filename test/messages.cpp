@@ -77,9 +77,7 @@ TEST_CASE("Messages Interop")
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
     auto key_package =
-      KeyPackage{ tc.cipher_suite, dh_priv.public_key, cred, sig_priv, std::nullopt };
-    // TODO(RLB): Apply extensions via opts
-    key_package.extensions = ext_list;
+      KeyPackage{ tc.cipher_suite, dh_priv.public_key, cred, sig_priv, {{ ext_list }} };
     key_package.signature = tv.random;
     tls_round_trip(tc.key_package, key_package, reproducible);
 

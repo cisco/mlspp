@@ -311,8 +311,7 @@ generate_messages()
     // Construct KeyPackage
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
-    auto key_package = KeyPackage{ suite, dh_priv.public_key, cred, sig_priv, std::nullopt };
-    key_package.extensions = ext_list;
+    auto key_package = KeyPackage{ suite, dh_priv.public_key, cred, sig_priv, {{ ext_list }} };
     key_package.signature = tv.random;
 
     // Construct UpdatePath
