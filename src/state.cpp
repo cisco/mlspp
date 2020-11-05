@@ -701,26 +701,19 @@ MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
-  GroupKeySource::RatchetType key_type;
-  ContentType::selector content_type;
-  if (std::holds_alternative<ApplicationData>(pt.content)) {
-    key_type = GroupKeySource::RatchetType::application;
-    content_type = ContentType::selector::application;
-  } else if (std::holds_alternative<Proposal>(pt.content)) {
-    key_type = GroupKeySource::RatchetType::handshake;
-    content_type = ContentType::selector::proposal;
-  } else if (std::holds_alternative<Commit>(pt.content)) {
-    key_type = GroupKeySource::RatchetType::handshake;
-    content_type = ContentType::selector::commit;
-  } else {
-    throw InvalidParameterError("Unknown content type");
-  }
+  static const auto get_key_type = overloaded{
+    [](const ApplicationData&) { return GroupKeySource::RatchetType::application; },
+    [](const Proposal&) { return GroupKeySource::RatchetType::handshake; },
+    [](const Commit&) { return GroupKeySource::RatchetType::handshake; },
+  };
 
+  auto key_type = std::visit(get_key_type, pt.content);
   auto [generation, keys] = _keys.keys.next(key_type, _index);
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
   auto content = pt.marshal_content(0);
+  auto content_type = pt.content_type();
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
     _group_id, _epoch, content_type, pt.authenticated_data });
 
