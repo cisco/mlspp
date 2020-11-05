@@ -267,19 +267,22 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , decrypted(false)
 {}
 
+ContentType::selector
+MLSPlaintext::content_type() const
+{
+  static const auto get_content_type = overloaded{
+    [](const ApplicationData&) { return ContentType::selector::application; },
+    [](const Proposal&) { return ContentType::selector::proposal; },
+    [](const Commit&) { return ContentType::selector::commit; },
+  };
+  return std::visit(get_content_type, content);
+}
+
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  if (std::holds_alternative<ApplicationData>(content)) {
-    w << std::get<ApplicationData>(content);
-  } else if (std::holds_alternative<Proposal>(content)) {
-    w << std::get<Proposal>(content);
-  } else if (std::holds_alternative<Commit>(content)) {
-    w << std::get<Commit>(content);
-  } else {
-    throw InvalidParameterError("Unknown content type");
-  }
+  std::visit([&](auto&& inner_content) { w << inner_content; }, content);
 
   bytes padding(padding_size, 0);
   tls::vector<2>::encode(w, signature);

@@ -262,13 +262,13 @@ std::tuple<bytes, bytes>
 Session::commit(const std::vector<bytes>& proposals)
 {
   for (const auto& proposal_data : proposals) {
-    const auto proposal = inner->import_message(proposal_data);
-    auto is_proposal = std::holds_alternative<Proposal>(proposal.content);
-    if (!is_proposal) {
+    const auto pt = inner->import_message(proposal_data);
+    const auto proposal = std::get_if<Proposal>(&pt.content);
+    if (!proposal) {
       throw ProtocolError("Only proposals can be committed");
     }
 
-    inner->history.front().handle(proposal);
+    inner->history.front().handle(pt);
   }
 
   return commit();
@@ -291,15 +291,15 @@ Session::commit()
 bool
 Session::handle(const bytes& handshake_data)
 {
-  auto handshake = inner->import_message(handshake_data);
+  auto pt = inner->import_message(handshake_data);
 
-  if (handshake.sender.sender_type != SenderType::member) {
+  if (pt.sender.sender_type != SenderType::member) {
     throw ProtocolError("External senders not supported");
   }
 
-  auto is_commit = std::holds_alternative<Commit>(handshake.content);
+  const auto is_commit = std::holds_alternative<Commit>(pt.content);
   if (is_commit &&
-      LeafIndex(handshake.sender.sender) == inner->history.front().index()) {
+      LeafIndex(pt.sender.sender) == inner->history.front().index()) {
     if (!inner->outbound_cache.has_value()) {
       throw ProtocolError("Received from self without sending");
     }
@@ -310,17 +310,17 @@ Session::handle(const bytes& handshake_data)
       throw ProtocolError("Received message different from cached");
     }
 
-    inner->add_state(handshake.epoch, next_state);
+    inner->add_state(pt.epoch, next_state);
     inner->outbound_cache = std::nullopt;
     return true;
   }
 
-  auto maybe_next_state = inner->history.front().handle(handshake);
+  auto maybe_next_state = inner->history.front().handle(pt);
   if (!maybe_next_state.has_value()) {
     return false;
   }
 
-  inner->add_state(handshake.epoch, maybe_next_state.value());
+  inner->add_state(pt.epoch, maybe_next_state.value());
   return true;
 }
 
