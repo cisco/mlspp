@@ -32,7 +32,7 @@ operator<<(ostream& out, bool data)
 }
 
 ostream&
-operator<<(ostream& out, uint8_t data)
+operator<<(ostream& out, uint8_t data) // NOLINT(llvmlibc-callee-namespace)
 {
   return out.write_uint(data, 1);
 }
@@ -87,7 +87,7 @@ operator>>(istream& in, bool& data)
 }
 
 istream&
-operator>>(istream& in, uint8_t& data)
+operator>>(istream& in, uint8_t& data) // NOLINT(llvmlibc-callee-namespace)
 {
   return in.read_uint(data, 1);
 }
