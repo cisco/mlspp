@@ -308,6 +308,8 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
+  ContentType::selector content_type() const;
+
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
             const GroupContext& context,

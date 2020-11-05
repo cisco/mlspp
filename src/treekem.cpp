@@ -20,10 +20,11 @@ const NodeType::selector NodeType::type<ParentNode> =
 const HPKEPublicKey&
 Node::public_key() const
 {
-  if (std::holds_alternative<KeyPackage>(node)) {
-    return std::get<KeyPackage>(node).init_key;
-  }
-  return std::get<ParentNode>(node).public_key;
+  static const auto get_key = overloaded {
+    [](const KeyPackage& kp) -> const HPKEPublicKey& { return kp.init_key; },
+    [](const ParentNode& node) -> const HPKEPublicKey& { return node.public_key; },
+  };
+  return std::visit(get_key, node);
 }
 
 ///
@@ -418,10 +419,11 @@ TreeKEMPublicKey::size() const
 std::vector<NodeIndex>
 TreeKEMPublicKey::resolve(NodeIndex index) const
 {
+  auto at_leaf = (tree_math::level(index) == 0);
   if (nodes[index.val].node.has_value()) {
     const auto& node = nodes[index.val].node.value();
     auto out = std::vector<NodeIndex>{ index };
-    if (std::holds_alternative<KeyPackage>(node.node)) {
+    if (at_leaf) {
       return out;
     }
 
@@ -435,7 +437,7 @@ TreeKEMPublicKey::resolve(NodeIndex index) const
     return out;
   }
 
-  if (tree_math::level(index) == 0) {
+  if (at_leaf) {
     return {};
   }
 
