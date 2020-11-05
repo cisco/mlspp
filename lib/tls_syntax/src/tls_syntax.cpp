@@ -1,6 +1,6 @@
 #include <tls/tls_syntax.h>
 
-//NOLINT(llvmlibc-implementation-in-namespace)
+// NOLINTNEXTLINE(llvmlibc-implementation-in-namespace)
 namespace tls {
 
 void
