@@ -92,7 +92,11 @@ PendingJoin::Inner::Inner(CipherSuite suite_in,
   : suite(suite_in)
   , init_priv(HPKEPrivateKey::generate(suite))
   , sig_priv(std::move(sig_priv_in))
-  , key_package(suite, init_priv.public_key, std::move(cred_in), sig_priv, opts_in)
+  , key_package(suite,
+                init_priv.public_key,
+                std::move(cred_in),
+                sig_priv,
+                opts_in)
 {}
 
 PendingJoin
@@ -101,8 +105,8 @@ PendingJoin::Inner::create(CipherSuite suite,
                            Credential cred,
                            const std::optional<KeyPackageOpts>& opts_in)
 {
-  auto inner =
-    std::make_unique<Inner>(suite, std::move(sig_priv), std::move(cred), opts_in);
+  auto inner = std::make_unique<Inner>(
+    suite, std::move(sig_priv), std::move(cred), opts_in);
   return PendingJoin(inner.release());
 }
 
@@ -350,7 +354,7 @@ Session::do_export(const std::string& label,
   return inner->history.front().do_export(label, context, size);
 }
 
-std::vector<Credential>
+std::vector<KeyPackage>
 Session::roster() const
 {
   return inner->history.front().roster();

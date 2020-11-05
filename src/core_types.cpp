@@ -20,16 +20,16 @@ const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
 void
 ExtensionList::add(uint16_t type, bytes data)
 {
-    auto curr = std::find_if(
-      extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
-        return ext.type == type;
-      });
-    if (curr != extensions.end()) {
-      curr->data = std::move(data);
-      return;
-    }
+  auto curr = std::find_if(
+    extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
+      return ext.type == type;
+    });
+  if (curr != extensions.end()) {
+    curr->data = std::move(data);
+    return;
+  }
 
-    extensions.push_back({ type, std::move(data) });
+  extensions.push_back({ type, std::move(data) });
 }
 
 bool

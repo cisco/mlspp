@@ -73,7 +73,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  std::vector<Credential> roster() const;
+  std::vector<KeyPackage> roster() const;
 
   // Application message protection
   bytes protect(const bytes& plaintext);

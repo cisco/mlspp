@@ -22,7 +22,8 @@ protected:
     auto init_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
-    auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
+    auto kp =
+      KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
     return std::make_tuple(init_priv, sig_priv, kp);
   }
 };
@@ -276,8 +277,9 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Interop")
       auto sig_priv =
         SignaturePrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key);
-      auto kp =
-        KeyPackage{ tc.cipher_suite, init_priv.public_key, cred, sig_priv, std::nullopt };
+      auto kp = KeyPackage{
+        tc.cipher_suite, init_priv.public_key, cred, sig_priv, std::nullopt
+      };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
