@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-static uint32_t one = 0x01;
+static const uint32_t one = 0x01;
 
 namespace mls {
 
