@@ -632,6 +632,12 @@ State::roster() const
   return kps;
 }
 
+bytes
+State::authentication_secret() const
+{
+  return _keys.authentication_secret;
+}
+
 // struct {
 //     opaque group_id<0..255>;
 //     uint64 epoch;

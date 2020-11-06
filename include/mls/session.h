@@ -74,6 +74,7 @@ public:
                   const bytes& context,
                   size_t size) const;
   std::vector<KeyPackage> roster() const;
+  bytes authentication_secret() const;
 
   // Application message protection
   bytes protect(const bytes& plaintext);
