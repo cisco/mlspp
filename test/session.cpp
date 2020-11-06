@@ -51,7 +51,7 @@ protected:
     auto id_priv = new_identity_key();
     auto init_priv = new_init_key();
     auto cred = Credential::basic(user_id, id_priv.public_key);
-    auto client = Client(suite, id_priv, cred);
+    auto client = Client(suite, id_priv, cred, std::nullopt);
 
     // Initial add is different
     if (sessions.empty()) {

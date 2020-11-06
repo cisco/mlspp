@@ -91,7 +91,7 @@ public:
                   const bytes& context,
                   size_t size) const;
   // Ordered list of credentials from non-blank leaves
-  std::vector<Credential> roster() const;
+  std::vector<KeyPackage> roster() const;
 
   ///
   /// General encryption and decryption

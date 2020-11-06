@@ -250,7 +250,8 @@ generate_treekem()
       auto sig_priv =
         SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
       auto cred = Credential::basic(context, sig_priv.public_key);
-      auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
+      auto kp =
+        KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
 
       auto index = tree.add_leaf(kp);
       tree.encap(
@@ -311,8 +312,8 @@ generate_messages()
     // Construct KeyPackage
     auto ext_list =
       ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
-    auto key_package = KeyPackage{ suite, dh_priv.public_key, cred, sig_priv };
-    key_package.extensions = ext_list;
+    auto key_package =
+      KeyPackage{ suite, dh_priv.public_key, cred, sig_priv, { { ext_list } } };
     key_package.signature = tv.random;
 
     // Construct UpdatePath

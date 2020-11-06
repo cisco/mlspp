@@ -9,13 +9,17 @@
 
 using namespace mls;
 
-static mls::Client
+static Client
 create_client(CipherSuite suite, const std::string& name)
 {
   auto id = bytes(name.begin(), name.end());
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto cred = Credential::basic(id, sig_priv.public_key);
-  return Client(suite, sig_priv, cred);
+
+  auto ext_list = ExtensionList{};
+  ext_list.add(KeyIDExtension{ bytes(name.begin(), name.end()) });
+
+  return Client(suite, sig_priv, cred, { { ext_list } });
 }
 
 static void
@@ -26,6 +30,26 @@ verify_send(const std::string& label, Session& send, Session& recv)
   auto decrypted = recv.unprotect(encrypted);
   if (plaintext != decrypted) {
     throw std::runtime_error(label + ": send/receive failure");
+  }
+}
+
+static void
+verify_roster(const std::vector<std::string>& roster, const Session& session)
+{
+  size_t i = 0;
+  for (const auto& kp : session.roster()) {
+    auto key_id = kp.extensions.find<KeyIDExtension>();
+    if (!key_id.has_value()) {
+      throw std::runtime_error("Missing KeyID extensions");
+    }
+
+    auto name_data = key_id.value().key_id;
+    auto name = std::string(name_data.begin(), name_data.end());
+    if (roster[i] != name) {
+      throw std::runtime_error("Roster mismatch");
+    }
+
+    i++;
   }
 }
 
@@ -48,7 +72,7 @@ int
 main() // NOLINT(bugprone-exception-escape)
 {
   const auto suite =
-    mls::CipherSuite{ mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+    CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
   ////////// DRAMATIS PERSONAE ///////////
 
@@ -81,6 +105,11 @@ main() // NOLINT(bugprone-exception-escape)
   verify("add A->C", alice_session, charlie_session);
   verify("add B->C", bob_session, charlie_session);
 
+  auto alice_bob_charlie = std::vector<std::string>{"alice", "bob", "charlie"};
+  verify_roster(alice_bob_charlie, alice_session);
+  verify_roster(alice_bob_charlie, bob_session);
+  verify_roster(alice_bob_charlie, charlie_session);
+
   ////////// ACT III: UPDATE ///////////
 
   // Bob updates his key
@@ -99,6 +128,10 @@ main() // NOLINT(bugprone-exception-escape)
   verify("update A->C", alice_session, charlie_session);
   verify("update B->C", bob_session, charlie_session);
 
+  verify_roster(alice_bob_charlie, alice_session);
+  verify_roster(alice_bob_charlie, bob_session);
+  verify_roster(alice_bob_charlie, charlie_session);
+
   ////////// ACT IV: REMOVE ///////////
 
   // Charlie removes Bob
@@ -112,6 +145,10 @@ main() // NOLINT(bugprone-exception-escape)
   alice_session.handle(remove_commit);
 
   verify("remove A->C", alice_session, charlie_session);
+
+  auto alice_charlie = std::vector<std::string>{"alice", "charlie"};
+  verify_roster(alice_charlie, alice_session);
+  verify_roster(alice_charlie, charlie_session);
 
   std::cout << "ok" << std::endl;
   return 0;

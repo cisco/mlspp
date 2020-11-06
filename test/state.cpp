@@ -15,8 +15,9 @@ public:
       auto identity_priv = SignaturePrivateKey::generate(suite);
       auto credential = Credential::basic(user_id, identity_priv.public_key);
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-      auto key_package =
-        KeyPackage{ suite, init_priv.public_key, credential, identity_priv };
+      auto key_package = KeyPackage{
+        suite, init_priv.public_key, credential, identity_priv, std::nullopt
+      };
 
       init_privs.push_back(init_priv);
       identity_privs.push_back(identity_priv);
@@ -248,41 +249,40 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // commit to new state
   auto [commit_1, welcome_1, new_state_1] = states[0].commit(fresh_secret());
   silence_unused(welcome_1);
+  silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
-  auto expected_roster = std::vector<Credential>{
+  auto expected_creds = std::vector<Credential>{
     key_packages[0].credential,
     key_packages[2].credential,
     key_packages[3].credential,
     key_packages[4].credential,
   };
-
-  REQUIRE(expected_roster == new_state_1.roster());
+  auto roster = new_state_1.roster();
+  auto roster_creds = std::vector<Credential>(roster.size());
+  std::transform(roster.begin(),
+                 roster.end(),
+                 roster_creds.begin(),
+                 [](const auto& kp) { return kp.credential; });
+  REQUIRE(expected_creds == roster_creds);
 
   // remove member at position 2
   auto remove_2 = new_state_1.remove(RosterIndex{ 2 });
   new_state_1.handle(remove_2);
   // commit to new state
   auto [commit_2, welcome_2, new_state_2] = new_state_1.commit(fresh_secret());
+  silence_unused(commit_2);
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
-  expected_roster = std::vector<Credential>{
+  expected_creds = std::vector<Credential>{
     key_packages[0].credential,
     key_packages[2].credential,
     key_packages[4].credential,
   };
-
-  REQUIRE(expected_roster == new_state_2.roster());
-
-  // handle remove by remaining clients and verify the roster
-  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
-    if (i == 3) {
-      // skip since we removed
-      continue;
-    }
-    states[i].handle(remove_1);
-    states[i] = states[i].handle(commit_1).value();
-    states[i].handle(remove_2);
-    states[i] = states[i].handle(commit_2).value();
-    REQUIRE(expected_roster == states[i].roster());
-  }
+  roster = new_state_2.roster();
+  roster_creds = std::vector<Credential>(roster.size());
+  std::transform(roster.begin(),
+                 roster.end(),
+                 roster_creds.begin(),
+                 [](const auto& kp) { return kp.credential; });
+  REQUIRE(expected_creds == roster_creds);
 }
