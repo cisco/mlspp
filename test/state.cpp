@@ -249,6 +249,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // commit to new state
   auto [commit_1, welcome_1, new_state_1] = states[0].commit(fresh_secret());
   silence_unused(welcome_1);
+  silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
   auto expected_creds = std::vector<Credential>{
     key_packages[0].credential,
@@ -269,6 +270,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   new_state_1.handle(remove_2);
   // commit to new state
   auto [commit_2, welcome_2, new_state_2] = new_state_1.commit(fresh_secret());
+  silence_unused(commit_2);
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
   expected_creds = std::vector<Credential>{
