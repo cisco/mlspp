@@ -20,9 +20,11 @@ const NodeType::selector NodeType::type<ParentNode> =
 const HPKEPublicKey&
 Node::public_key() const
 {
-  static const auto get_key = overloaded {
+  static const auto get_key = overloaded{
     [](const KeyPackage& kp) -> const HPKEPublicKey& { return kp.init_key; },
-    [](const ParentNode& node) -> const HPKEPublicKey& { return node.public_key; },
+    [](const ParentNode& node) -> const HPKEPublicKey& {
+      return node.public_key;
+    },
   };
   return std::visit(get_key, node);
 }

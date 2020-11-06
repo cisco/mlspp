@@ -702,9 +702,15 @@ State::encrypt(const MLSPlaintext& pt)
 {
   // Pull from the key schedule
   static const auto get_key_type = overloaded{
-    [](const ApplicationData&) { return GroupKeySource::RatchetType::application; },
-    [](const Proposal&) { return GroupKeySource::RatchetType::handshake; },
-    [](const Commit&) { return GroupKeySource::RatchetType::handshake; },
+    [](const ApplicationData& /*unused*/) {
+      return GroupKeySource::RatchetType::application;
+    },
+    [](const Proposal& /*unused*/) {
+      return GroupKeySource::RatchetType::handshake;
+    },
+    [](const Commit& /*unused*/) {
+      return GroupKeySource::RatchetType::handshake;
+    },
   };
 
   auto key_type = std::visit(get_key_type, pt.content);

@@ -263,8 +263,8 @@ Session::commit(const std::vector<bytes>& proposals)
 {
   for (const auto& proposal_data : proposals) {
     const auto pt = inner->import_message(proposal_data);
-    const auto proposal = std::get_if<Proposal>(&pt.content);
-    if (!proposal) {
+    const auto* const proposal = std::get_if<Proposal>(&pt.content);
+    if (proposal == nullptr) {
       throw ProtocolError("Only proposals can be committed");
     }
 
