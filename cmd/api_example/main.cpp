@@ -64,6 +64,10 @@ verify(const std::string& label, Session& alice, Session& bob)
     throw std::runtime_error(label + ": roster not equal");
   }
 
+  if (alice.authentication_secret() != bob.authentication_secret()) {
+    throw std::runtime_error(label + ": authenticaiton secret not equal");
+  }
+
   verify_send(label, alice, bob);
   verify_send(label, bob, alice);
 }

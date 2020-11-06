@@ -399,22 +399,6 @@ struct MessagesTestVectors
 
 /////
 
-namespace mls {
-
-class TestState : public State
-{
-public:
-  TestState(const State& other)
-    : State(other)
-  {}
-
-  KeyScheduleEpoch keys() const { return _keys; }
-};
-
-} // namespace mls
-
-/////
-
 template<typename T>
 struct TestLoader
 {

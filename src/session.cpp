@@ -361,6 +361,12 @@ Session::roster() const
 }
 
 bytes
+Session::authentication_secret() const
+{
+  return inner->history.front().authentication_secret();
+}
+
+bytes
 Session::protect(const bytes& plaintext)
 {
   auto ciphertext = inner->history.front().protect(plaintext);
