@@ -31,8 +31,13 @@ struct overloaded : Ts...
 {
   using Ts::operator()...;
 };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+
+// clang-format off
+// XXX(RLB): For some reason, different versions of clang-format disagree on how
+// this should be formatted.  Probably because it's new syntax with C++17?
+// Exempting it from clang-format for now.
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+// clang-format on
 
 ///
 /// Auto-generate equality and inequality operators for TLS-serializable things

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mls/common.h>
+#include <mls/core_types.h>
 #include <mls/credential.h>
 #include <mls/crypto.h>
 
@@ -14,7 +15,8 @@ class Client
 public:
   Client(CipherSuite suite_in,
          SignaturePrivateKey sig_priv_in,
-         Credential cred_in);
+         Credential cred_in,
+         std::optional<KeyPackageOpts> opts_in);
 
   Session begin_session(const bytes& group_id) const;
 
@@ -24,6 +26,7 @@ private:
   const CipherSuite suite;
   const SignaturePrivateKey sig_priv;
   const Credential cred;
+  const std::optional<KeyPackageOpts> opts;
 };
 
 class PendingJoin
@@ -70,7 +73,8 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  std::vector<Credential> roster() const;
+  std::vector<KeyPackage> roster() const;
+  bytes authentication_secret() const;
 
   // Application message protection
   bytes protect(const bytes& plaintext);

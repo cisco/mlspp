@@ -17,18 +17,18 @@ enum class ProtocolVersion : uint8_t
 
 extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
-enum struct ExtensionType : uint16_t
+struct ExtensionType
 {
-  supported_versions = 1,
-  supported_ciphersuites = 2,
-  lifetime = 3,
-  key_id = 4,
-  parent_hash = 5,
+  static const uint16_t supported_versions = 1;
+  static const uint16_t supported_ciphersuites = 2;
+  static const uint16_t lifetime = 3;
+  static const uint16_t key_id = 4;
+  static const uint16_t parent_hash = 5;
 };
 
 struct Extension
 {
-  ExtensionType type;
+  uint16_t type;
   bytes data;
 
   TLS_SERIALIZABLE(type, data)
@@ -46,18 +46,10 @@ struct ExtensionList
   inline void add(const T& obj)
   {
     auto data = tls::marshal(obj);
-
-    auto curr = std::find_if(
-      extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
-        return ext.type == T::type;
-      });
-    if (curr != extensions.end()) {
-      curr->data = std::move(data);
-      return;
-    }
-
-    extensions.push_back({ T::type, std::move(data) });
+    add(static_cast<uint16_t>(T::type), std::move(data));
   }
+
+  void add(uint16_t type, bytes data);
 
   template<typename T>
   std::optional<T> find() const
@@ -71,7 +63,7 @@ struct ExtensionList
     return std::nullopt;
   }
 
-  bool has(ExtensionType type) const;
+  bool has(uint16_t type) const;
 
   TLS_SERIALIZABLE(extensions)
   TLS_TRAITS(tls::vector<2>)
@@ -81,7 +73,7 @@ struct SupportedVersionsExtension
 {
   std::vector<ProtocolVersion> versions;
 
-  static const ExtensionType type;
+  static const uint16_t type;
   TLS_SERIALIZABLE(versions)
   TLS_TRAITS(tls::vector<1>)
 };
@@ -90,7 +82,7 @@ struct SupportedCipherSuitesExtension
 {
   std::vector<CipherSuite::ID> cipher_suites;
 
-  static const ExtensionType type;
+  static const uint16_t type;
   TLS_SERIALIZABLE(cipher_suites)
   TLS_TRAITS(tls::vector<1>)
 };
@@ -100,7 +92,7 @@ struct LifetimeExtension
   uint64_t not_before;
   uint64_t not_after;
 
-  static const ExtensionType type;
+  static const uint16_t type;
   TLS_SERIALIZABLE(not_before, not_after)
 };
 
@@ -108,7 +100,7 @@ struct KeyIDExtension
 {
   bytes key_id;
 
-  static const ExtensionType type;
+  static const uint16_t type;
   TLS_SERIALIZABLE(key_id)
   TLS_TRAITS(tls::vector<2>)
 };
@@ -117,7 +109,7 @@ struct ParentHashExtension
 {
   bytes parent_hash;
 
-  static const ExtensionType type;
+  static const uint16_t type;
   TLS_SERIALIZABLE(parent_hash)
   TLS_TRAITS(tls::vector<1>)
 };
@@ -147,6 +139,7 @@ struct ParentNode
 struct KeyPackageOpts
 {
   // TODO: Things to change in a KeyPackage
+  ExtensionList extensions;
 };
 
 struct KeyPackage
@@ -162,7 +155,8 @@ struct KeyPackage
   KeyPackage(CipherSuite suite_in,
              HPKEPublicKey init_key_in,
              Credential credential_in,
-             const SignaturePrivateKey& sig_priv_in);
+             const SignaturePrivateKey& sig_priv_in,
+             const std::optional<KeyPackageOpts>& opts_in);
 
   bytes hash() const;
 

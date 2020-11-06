@@ -20,11 +20,13 @@ struct PendingJoin::Inner
 
   Inner(CipherSuite suite_in,
         SignaturePrivateKey sig_priv_in,
-        Credential cred_in);
+        Credential cred_in,
+        const std::optional<KeyPackageOpts>& opts_in);
 
   static PendingJoin create(CipherSuite suite,
                             SignaturePrivateKey sig_priv,
-                            Credential cred);
+                            Credential cred,
+                            const std::optional<KeyPackageOpts>& opts_in);
 };
 
 struct Session::Inner
@@ -57,24 +59,26 @@ struct Session::Inner
 
 Client::Client(CipherSuite suite_in,
                SignaturePrivateKey sig_priv_in,
-               Credential cred_in)
+               Credential cred_in,
+               std::optional<KeyPackageOpts> opts_in)
   : suite(suite_in)
   , sig_priv(std::move(sig_priv_in))
   , cred(std::move(cred_in))
+  , opts(std::move(opts_in))
 {}
 
 Session
 Client::begin_session(const bytes& group_id) const
 {
   auto init_priv = HPKEPrivateKey::generate(suite);
-  auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv };
+  auto kp = KeyPackage{ suite, init_priv.public_key, cred, sig_priv, opts };
   return Session::Inner::begin(group_id, init_priv, sig_priv, kp);
 }
 
 PendingJoin
 Client::start_join() const
 {
-  return PendingJoin::Inner::create(suite, sig_priv, cred);
+  return PendingJoin::Inner::create(suite, sig_priv, cred, opts);
 }
 
 ///
@@ -83,20 +87,26 @@ Client::start_join() const
 
 PendingJoin::Inner::Inner(CipherSuite suite_in,
                           SignaturePrivateKey sig_priv_in,
-                          Credential cred_in)
+                          Credential cred_in,
+                          const std::optional<KeyPackageOpts>& opts_in)
   : suite(suite_in)
   , init_priv(HPKEPrivateKey::generate(suite))
   , sig_priv(std::move(sig_priv_in))
-  , key_package(suite, init_priv.public_key, std::move(cred_in), sig_priv)
+  , key_package(suite,
+                init_priv.public_key,
+                std::move(cred_in),
+                sig_priv,
+                opts_in)
 {}
 
 PendingJoin
 PendingJoin::Inner::create(CipherSuite suite,
                            SignaturePrivateKey sig_priv,
-                           Credential cred)
+                           Credential cred,
+                           const std::optional<KeyPackageOpts>& opts_in)
 {
-  auto inner =
-    std::make_unique<Inner>(suite, std::move(sig_priv), std::move(cred));
+  auto inner = std::make_unique<Inner>(
+    suite, std::move(sig_priv), std::move(cred), opts_in);
   return PendingJoin(inner.release());
 }
 
@@ -344,10 +354,16 @@ Session::do_export(const std::string& label,
   return inner->history.front().do_export(label, context, size);
 }
 
-std::vector<Credential>
+std::vector<KeyPackage>
 Session::roster() const
 {
   return inner->history.front().roster();
+}
+
+bytes
+Session::authentication_secret() const
+{
+  return inner->history.front().authentication_secret();
 }
 
 bytes

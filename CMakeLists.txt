@@ -85,3 +85,11 @@ add_subdirectory(test)
 ###
 
 add_subdirectory(cmd)
+
+
+###
+### Exports
+###
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+export(TARGETS mlspp tls_syntax hpke bytes NAMESPACE MLSPP:: FILE MLSPPConfig.cmake)
+export(PACKAGE MLSPP)

@@ -613,23 +613,29 @@ State::do_export(const std::string& label,
   return _suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
-std::vector<Credential>
+std::vector<KeyPackage>
 State::roster() const
 {
-  std::vector<Credential> creds(_tree.size().val);
-  uint32_t leaf_count = 0;
+  auto kps = std::vector<KeyPackage>(_tree.size().val);
+  auto leaf_count = uint32_t(0);
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
     const auto& kp = _tree.key_package(LeafIndex{ i });
     if (!kp.has_value()) {
       continue;
     }
-    creds.at(leaf_count) = kp->credential;
+    kps.at(leaf_count) = kp.value();
     leaf_count++;
   }
 
-  creds.resize(leaf_count);
-  return creds;
+  kps.resize(leaf_count);
+  return kps;
+}
+
+bytes
+State::authentication_secret() const
+{
+  return _keys.authentication_secret;
 }
 
 // struct {

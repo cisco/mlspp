@@ -42,6 +42,8 @@ public:
   void write_raw(const std::vector<uint8_t>& bytes);
 
   std::vector<uint8_t> bytes() const { return _buffer; }
+  size_t size() const { return _buffer.size(); }
+  bool empty() const { return _buffer.empty(); }
 
 private:
   std::vector<uint8_t> _buffer;
@@ -107,6 +109,9 @@ public:
     // So that we can use the constant-time pop_back
     std::reverse(_buffer.begin(), _buffer.end());
   }
+
+  size_t size() const { return _buffer.size(); }
+  bool empty() const { return _buffer.empty(); }
 
 private:
   istream() {}

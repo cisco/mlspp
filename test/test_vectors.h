@@ -275,7 +275,7 @@ struct TestTreeKEMPublicKey : public TreeKEMPublicKey
     auto init_pub = HPKEPrivateKey::derive(suite, secret).public_key;
     auto sig_priv = SignaturePrivateKey::derive(suite, secret);
     auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
-    auto kp = KeyPackage{ suite, init_pub, cred, sig_priv };
+    auto kp = KeyPackage{ suite, init_pub, cred, sig_priv, std::nullopt };
 
     // Correct for non-determinism in the signature algorithm
     kp.signature = secret;
@@ -396,22 +396,6 @@ struct MessagesTestVectors
              tls::vector<1>,
              tls::vector<4>)
 };
-
-/////
-
-namespace mls {
-
-class TestState : public State
-{
-public:
-  TestState(const State& other)
-    : State(other)
-  {}
-
-  KeyScheduleEpoch keys() const { return _keys; }
-};
-
-} // namespace mls
 
 /////
 
