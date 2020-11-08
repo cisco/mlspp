@@ -547,7 +547,7 @@ TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 }
 
 bytes
-TreeKEMPublicKey::get_hash(NodeIndex index)
+TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 {
   if (!node_at(index).hash.empty()) {
     return node_at(index).hash;
