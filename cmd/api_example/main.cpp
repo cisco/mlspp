@@ -109,7 +109,8 @@ main() // NOLINT(bugprone-exception-escape)
   verify("add A->C", alice_session, charlie_session);
   verify("add B->C", bob_session, charlie_session);
 
-  auto alice_bob_charlie = std::vector<std::string>{"alice", "bob", "charlie"};
+  auto alice_bob_charlie =
+    std::vector<std::string>{ "alice", "bob", "charlie" };
   verify_roster(alice_bob_charlie, alice_session);
   verify_roster(alice_bob_charlie, bob_session);
   verify_roster(alice_bob_charlie, charlie_session);
@@ -150,7 +151,7 @@ main() // NOLINT(bugprone-exception-escape)
 
   verify("remove A->C", alice_session, charlie_session);
 
-  auto alice_charlie = std::vector<std::string>{"alice", "charlie"};
+  auto alice_charlie = std::vector<std::string>{ "alice", "charlie" };
   verify_roster(alice_charlie, alice_session);
   verify_roster(alice_charlie, charlie_session);
 
