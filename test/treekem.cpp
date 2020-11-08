@@ -150,7 +150,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   // Construct a full tree using add_leaf and merge
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
-    // Construct a key package and a direct path
+    // Manually construct a key package and a direct path
     auto [init_priv_add, sig_priv_add, kp_add] = new_key_package();
     silence_unused(init_priv_add);
     silence_unused(sig_priv_add);
@@ -169,6 +169,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
       path.nodes.push_back({ node_pub, {} });
     }
 
+    path.sign(suite, init_priv_path.public_key, sig_priv_path, std::nullopt);
+
     // Add the key package as a leaf
     auto add_index = pub.add_leaf(kp_add);
     REQUIRE(add_index == index);
@@ -183,6 +185,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     // Merge the direct path
     pub.merge(index, path);
+    REQUIRE(pub.parent_hash_valid());
+
     found = pub.find(kp_path);
     REQUIRE(found.has_value());
     REQUIRE(found.value() == index);
@@ -236,7 +240,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto [new_adder_priv, path] =
       pub.encap(adder, context, leaf_secret, sig_privs.back(), std::nullopt);
     privs[i] = new_adder_priv;
-    // TODO(RLB) verify parent_hash_valid
+    REQUIRE(path.parent_hash_valid(suite));
 
     pub.merge(adder, path);
     REQUIRE(privs[i].consistent(pub));
