@@ -45,6 +45,12 @@ ExtensionList::has(uint16_t type) const
 /// NodeType, ParentNode, and KeyPackage
 ///
 
+bytes
+ParentNode::hash(CipherSuite suite) const
+{
+  return suite.get().digest.hash(tls::marshal(this));
+}
+
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
   , cipher_suite{ CipherSuite::ID::unknown }
@@ -154,14 +160,50 @@ operator==(const KeyPackage& lhs, const KeyPackage& rhs)
 /// UpdatePath
 ///
 
+std::vector<bytes>
+UpdatePath::parent_hashes(CipherSuite suite) const
+{
+  auto ph = std::vector<bytes>(nodes.size());
+  auto last_hash = bytes{};
+  for (int i = nodes.size() - 1; i >= 0; i--) {
+    auto parent = ParentNode{ nodes[i].public_key, {}, last_hash };
+    last_hash = parent.hash(suite);
+    ph[i] = last_hash;
+  }
+  return ph;
+}
+
+bool
+UpdatePath::parent_hash_valid(CipherSuite suite) const
+{
+  auto ph = parent_hashes(suite);
+  auto phe = leaf_key_package.extensions.find<ParentHashExtension>();
+
+  // If there are no nodes to hash, then ParentHash MUST be omitted
+  if (ph.empty()) {
+    return !phe.has_value();
+  }
+
+  return phe.has_value() && phe.value().parent_hash == ph[0];
+}
+
 void
 UpdatePath::sign(CipherSuite suite,
                  const HPKEPublicKey& init_pub,
                  const SignaturePrivateKey& sig_priv,
-                 const std::optional<KeyPackageOpts>& opts)
+                 const std::optional<KeyPackageOpts>& maybe_opts)
 {
-  // TODO(RLB) set parent hash extension
-  silence_unused(suite);
+  // Make a copy of the options that we can modify
+  auto opts = KeyPackageOpts{};
+  if (maybe_opts.has_value()) {
+    opts = maybe_opts.value();
+  }
+
+  // Add a ParentHash extension
+  auto ph = parent_hashes(suite);
+  if (!ph.empty()) {
+    opts.extensions.add(ParentHashExtension{ ph[0] });
+  }
 
   leaf_key_package.init_key = init_pub;
   leaf_key_package.sign(sig_priv, opts);

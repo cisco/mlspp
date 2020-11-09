@@ -58,6 +58,11 @@ State::State(const HPKEPrivateKey& init_priv,
     throw InvalidParameterError("Invalid GroupInfo");
   }
 
+  // Verify the incoming tree
+  if (!group_info.tree.parent_hash_valid()) {
+    throw InvalidParameterError("Invalid tree");
+  }
+
   // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
@@ -337,6 +342,11 @@ State::handle(const MLSPlaintext& pt)
   // Decapsulate and apply the UpdatePath, if provided
   auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
   if (commit.path.has_value()) {
+    const auto& path = commit.path.value();
+    if (!path.parent_hash_valid(_suite)) {
+      throw ProtocolError("Commit path has invalid parent hash");
+    }
+
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
@@ -344,7 +354,6 @@ State::handle(const MLSPlaintext& pt)
       next._confirmed_transcript_hash,
       next._extensions,
     });
-    const auto& path = commit.path.value();
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;

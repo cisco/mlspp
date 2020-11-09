@@ -124,6 +124,8 @@ struct ParentNode
   std::vector<LeafIndex> unmerged_leaves;
   bytes parent_hash;
 
+  bytes hash(CipherSuite suite) const;
+
   TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash)
   TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>)
 };
@@ -214,10 +216,13 @@ struct UpdatePath
   KeyPackage leaf_key_package;
   std::vector<RatchetNode> nodes;
 
+  std::vector<bytes> parent_hashes(CipherSuite suite) const;
+  bool parent_hash_valid(CipherSuite suite) const;
+
   void sign(CipherSuite suite,
             const HPKEPublicKey& init_pub,
             const SignaturePrivateKey& sig_priv,
-            const std::optional<KeyPackageOpts>& opts);
+            const std::optional<KeyPackageOpts>& maybe_opts);
 
   TLS_SERIALIZABLE(leaf_key_package, nodes)
   TLS_TRAITS(tls::pass, tls::vector<2>)

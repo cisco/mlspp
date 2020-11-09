@@ -25,6 +25,7 @@ struct Node
   std::variant<KeyPackage, ParentNode> node;
 
   const HPKEPublicKey& public_key() const;
+  bytes parent_hash() const;
 
   TLS_SERIALIZABLE(node)
   TLS_TRAITS(tls::variant<NodeType>)
@@ -34,6 +35,8 @@ struct OptionalNode
 {
   std::optional<Node> node;
   bytes hash;
+
+  bool blank() const { return !node.has_value(); }
 
   KeyPackage& key_package() { return std::get<KeyPackage>(node.value().node); }
   const KeyPackage& key_package() const
@@ -123,6 +126,7 @@ struct TreeKEMPublicKey
   void set_hash_all();
   bytes root_hash() const;
   LeafCount size() const;
+  bool parent_hash_valid() const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
   std::optional<KeyPackage> key_package(LeafIndex index) const;
