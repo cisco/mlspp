@@ -19,11 +19,11 @@ extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
 struct ExtensionType
 {
-  static const uint16_t supported_versions = 1;
-  static const uint16_t supported_ciphersuites = 2;
-  static const uint16_t lifetime = 3;
-  static const uint16_t key_id = 4;
-  static const uint16_t parent_hash = 5;
+  static constexpr uint16_t supported_versions = 1;
+  static constexpr uint16_t supported_ciphersuites = 2;
+  static constexpr uint16_t lifetime = 3;
+  static constexpr uint16_t key_id = 4;
+  static constexpr uint16_t parent_hash = 5;
 };
 
 struct Extension
