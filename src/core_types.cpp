@@ -9,13 +9,13 @@ const std::array<ProtocolVersion, 1> all_supported_versions = {
   ProtocolVersion::mls10
 };
 
-constexpr uint16_t SupportedVersionsExtension::type =
+const uint16_t SupportedVersionsExtension::type =
   ExtensionType::supported_versions;
-constexpr uint16_t SupportedCipherSuitesExtension::type =
+const uint16_t SupportedCipherSuitesExtension::type =
   ExtensionType::supported_ciphersuites;
-constexpr uint16_t LifetimeExtension::type = ExtensionType::lifetime;
-constexpr uint16_t KeyIDExtension::type = ExtensionType::key_id;
-constexpr uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
+const uint16_t LifetimeExtension::type = ExtensionType::lifetime;
+const uint16_t KeyIDExtension::type = ExtensionType::key_id;
+const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
 
 void
 ExtensionList::add(uint16_t type, bytes data)
