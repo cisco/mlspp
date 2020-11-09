@@ -271,9 +271,11 @@ ContentType::selector
 MLSPlaintext::content_type() const
 {
   static const auto get_content_type = overloaded{
-    [](const ApplicationData&) { return ContentType::selector::application; },
-    [](const Proposal&) { return ContentType::selector::proposal; },
-    [](const Commit&) { return ContentType::selector::commit; },
+    [](const ApplicationData& /*unused*/) {
+      return ContentType::selector::application;
+    },
+    [](const Proposal& /*unused*/) { return ContentType::selector::proposal; },
+    [](const Commit& /*unused*/) { return ContentType::selector::commit; },
   };
   return std::visit(get_content_type, content);
 }

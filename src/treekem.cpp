@@ -270,18 +270,16 @@ TreeKEMPrivateKey::consistent(const TreeKEMPrivateKey& other) const
     return false;
   }
 
-  for (const auto& entry : path_secrets) {
+  const auto match_if_present = [&](const auto& entry) {
     auto other_entry = other.path_secrets.find(entry.first);
     if (other_entry == other.path_secrets.end()) {
-      continue;
+      return true;
     }
 
-    if (entry.second != other_entry->second) {
-      return false;
-    }
-  }
-
-  return true;
+    return entry.second == other_entry->second;
+  };
+  return std::all_of(
+    path_secrets.begin(), path_secrets.end(), match_if_present);
 }
 
 bool
@@ -291,7 +289,7 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     return false;
   }
 
-  for (const auto& entry : path_secrets) {
+  const auto public_match = [&](const auto& entry) {
     auto n = entry.first;
     auto priv = private_key(n).value();
 
@@ -301,12 +299,9 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     }
 
     const auto& pub = opt_node.value().public_key();
-    if (priv.public_key != pub) {
-      return false;
-    }
-  }
-
-  return true;
+    return priv.public_key == pub;
+  };
+  return std::all_of(path_secrets.begin(), path_secrets.end(), public_match);
 }
 
 ///
@@ -419,7 +414,7 @@ TreeKEMPublicKey::size() const
 }
 
 std::vector<NodeIndex>
-TreeKEMPublicKey::resolve(NodeIndex index) const
+TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
 {
   auto at_leaf = (tree_math::level(index) == 0);
   if (nodes[index.val].node.has_value()) {
@@ -552,7 +547,7 @@ TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 }
 
 bytes
-TreeKEMPublicKey::get_hash(NodeIndex index)
+TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 {
   if (!node_at(index).hash.empty()) {
     return node_at(index).hash;

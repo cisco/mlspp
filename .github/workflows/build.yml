@@ -29,6 +29,10 @@ jobs:
         brew uninstall openssl
         brew install pkgconfig doctest
         brew reinstall openssl@1.1
+        brew install llvm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
   
     - name: dependencies (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
