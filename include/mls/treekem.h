@@ -38,13 +38,19 @@ struct OptionalNode
 
   bool blank() const { return !node.has_value(); }
 
-  KeyPackage& key_package() { return var::get<KeyPackage>(opt::get(node).node); }
+  KeyPackage& key_package()
+  {
+    return var::get<KeyPackage>(opt::get(node).node);
+  }
   const KeyPackage& key_package() const
   {
     return var::get<KeyPackage>(opt::get(node).node);
   }
 
-  ParentNode& parent_node() { return var::get<ParentNode>(opt::get(node).node); }
+  ParentNode& parent_node()
+  {
+    return var::get<ParentNode>(opt::get(node).node);
+  }
   const ParentNode& parent_node() const
   {
     return var::get<ParentNode>(opt::get(node).node);
