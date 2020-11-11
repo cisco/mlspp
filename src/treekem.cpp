@@ -402,10 +402,11 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
 
     auto parent_hash = bytes{};
     if (i < dp.size() - 1) {
-      parent_hash = ph[i+1];
+      parent_hash = ph[i + 1];
     }
 
-    node_at(n).node = { ParentNode{ path.nodes[i].public_key, {}, parent_hash } };
+    node_at(n).node = { ParentNode{
+      path.nodes[i].public_key, {}, parent_hash } };
   }
 
   clear_hash_path(from);

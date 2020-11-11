@@ -7,7 +7,6 @@
 #include "mls/treekem.h"
 #include <optional>
 #include <tls/tls_syntax.h>
-#include <variant>
 
 namespace mls {
 

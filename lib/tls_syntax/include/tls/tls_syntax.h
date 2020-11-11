@@ -5,12 +5,26 @@
 #include <map>
 #include <optional>
 #include <stdexcept>
-#include <variant>
 #include <vector>
 
-// Note: Different namespace because this is TLS-generic (might
-// want to pull it out later).  Also, avoids confusables ending up
-// in the global namespace, e.g., vector, istream, ostream.
+// To balance backward-compatibility with MacOS 10.11 with forward-compatibility
+// with future versions of C++, we use `mpark::variant`, but import it into
+// `namespace std`.
+//
+// XXX(RLB) For some reason, `using namespace mpark` did not work here.  I have
+// manually added what is needed for mlspp right now, but this list might need
+// to be updated in the future.
+#include <mpark/variant.hpp>
+namespace std {
+using mpark::bad_variant_access;
+using mpark::get;
+using mpark::get_if;
+using mpark::holds_alternative;
+using mpark::variant;
+using mpark::variant_alternative_t;
+using mpark::visit;
+}
+
 namespace tls {
 
 // For indicating no min or max in vector definitions
@@ -411,7 +425,7 @@ struct variant
   {
     using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
     if (std::holds_alternative<Tc>(v)) {
-      str << Ts::template type<Tc> << std::get<I>(v);
+      str << Ts::template type<Tc> << std::get<Tc>(v);
       return;
     }
 
