@@ -425,7 +425,7 @@ State::cache_proposal(const MLSPlaintext& pt)
 }
 
 std::optional<State::CachedProposal>
-State::resolve(const ProposalID& id, LeafIndex sender_index) const
+State::resolve(const ProposalOrRef& id, LeafIndex sender_index) const
 {
   if (std::holds_alternative<Proposal>(id.content)) {
     return CachedProposal{
@@ -446,7 +446,7 @@ State::resolve(const ProposalID& id, LeafIndex sender_index) const
 }
 
 std::vector<State::CachedProposal>
-State::must_resolve(const std::vector<ProposalID>& ids,
+State::must_resolve(const std::vector<ProposalOrRef>& ids,
                     LeafIndex sender_index) const
 {
   auto proposals = std::vector<CachedProposal>(ids.size());

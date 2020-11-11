@@ -175,14 +175,14 @@ Proposal::proposal_type() const
   return std::visit(get_type, content);
 }
 
-// ProposalIDType
+// ProposalOrRefType
 template<>
-const ProposalIDType::selector ProposalIDType::type<Proposal> =
-  ProposalIDType::selector::value;
+const ProposalOrRefType::selector ProposalOrRefType::type<Proposal> =
+  ProposalOrRefType::selector::value;
 
 template<>
-const ProposalIDType::selector ProposalIDType::type<ProposalRef> =
-  ProposalIDType::selector::plaintext_hash;
+const ProposalOrRefType::selector ProposalOrRefType::type<ProposalRef> =
+  ProposalOrRefType::selector::reference;
 
 // ContentType
 template<>

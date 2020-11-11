@@ -167,9 +167,9 @@ protected:
 
   // Extract a proposal from the cache
   void cache_proposal(const MLSPlaintext& pt);
-  std::optional<CachedProposal> resolve(const ProposalID& id,
+  std::optional<CachedProposal> resolve(const ProposalOrRef& id,
                                         LeafIndex sender_index) const;
-  std::vector<CachedProposal> must_resolve(const std::vector<ProposalID>& ids,
+  std::vector<CachedProposal> must_resolve(const std::vector<ProposalOrRef>& ids,
                                            LeafIndex sender_index) const;
 
   // Compare the **shared** attributes of the states

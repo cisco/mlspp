@@ -214,34 +214,34 @@ struct ProposalRef
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct ProposalIDType
+struct ProposalOrRefType
 {
   enum struct selector : uint8_t
   {
     reserved = 0,
     value = 1,
-    plaintext_hash = 2,
+    reference = 2,
   };
 
   template<typename T>
   static const selector type;
 };
 
-struct ProposalID
+struct ProposalOrRef
 {
   std::variant<Proposal, ProposalRef> content;
 
   TLS_SERIALIZABLE(content)
-  TLS_TRAITS(tls::variant<ProposalIDType>)
+  TLS_TRAITS(tls::variant<ProposalOrRefType>)
 };
 
 // struct {
-//     ProposalID proposals<0..2^32-1>;
+//     ProposalOrRef proposals<0..2^32-1>;
 //     optional<UpdatePath> path;
 // } Commit;
 struct Commit
 {
-  std::vector<ProposalID> proposals;
+  std::vector<ProposalOrRef> proposals;
   std::optional<UpdatePath> path;
 
   TLS_SERIALIZABLE(proposals, path)
