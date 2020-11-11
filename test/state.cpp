@@ -145,7 +145,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
         states[j] = new_state;
       } else {
         states[j].handle(add);
-        states[j] = states[j].handle(commit).value();
+        states[j] = opt::get(states[j].handle(commit));
       }
     }
 
@@ -211,7 +211,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
         state = new_state;
       } else {
         state.handle(update);
-        state = state.handle(commit).value();
+        state = opt::get(state.handle(commit));
       }
     }
 
@@ -233,7 +233,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
         state = new_state;
       } else {
         state.handle(remove);
-        state = state.handle(commit).value();
+        state = opt::get(state.handle(commit));
       }
     }
 

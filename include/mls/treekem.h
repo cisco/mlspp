@@ -22,7 +22,7 @@ struct NodeType
 
 struct Node
 {
-  std::variant<KeyPackage, ParentNode> node;
+  var::variant<KeyPackage, ParentNode> node;
 
   const HPKEPublicKey& public_key() const;
   bytes parent_hash() const;
@@ -38,16 +38,22 @@ struct OptionalNode
 
   bool blank() const { return !node.has_value(); }
 
-  KeyPackage& key_package() { return std::get<KeyPackage>(node.value().node); }
+  KeyPackage& key_package()
+  {
+    return var::get<KeyPackage>(opt::get(node).node);
+  }
   const KeyPackage& key_package() const
   {
-    return std::get<KeyPackage>(node.value().node);
+    return var::get<KeyPackage>(opt::get(node).node);
   }
 
-  ParentNode& parent_node() { return std::get<ParentNode>(node.value().node); }
+  ParentNode& parent_node()
+  {
+    return var::get<ParentNode>(opt::get(node).node);
+  }
   const ParentNode& parent_node() const
   {
-    return std::get<ParentNode>(node.value().node);
+    return var::get<ParentNode>(opt::get(node).node);
   }
 
   void set_leaf_hash(CipherSuite suite, NodeIndex index);

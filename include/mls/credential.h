@@ -96,7 +96,7 @@ public:
   template<typename T>
   const T& get() const
   {
-    return std::get<T>(_cred);
+    return var::get<T>(_cred);
   }
 
   static Credential basic(const bytes& identity,
@@ -109,7 +109,7 @@ public:
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  std::variant<BasicCredential, X509Credential> _cred;
+  var::variant<BasicCredential, X509Credential> _cred;
 };
 
 } // namespace mls

@@ -34,10 +34,10 @@ State::State(const HPKEPrivateKey& init_priv,
   , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
-  if (!maybe_kpi.has_value()) {
+  if (!maybe_kpi) {
     throw InvalidParameterError("Welcome not intended for key package");
   }
-  auto kpi = maybe_kpi.value();
+  auto kpi = opt::get(maybe_kpi);
 
   if (kp.cipher_suite != welcome.cipher_suite) {
     throw InvalidParameterError("Ciphersuite mismatch");
@@ -72,16 +72,16 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Construct TreeKEM private key from partrs provided
   auto maybe_index = _tree.find(kp);
-  if (!maybe_index.has_value()) {
+  if (!maybe_index) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
-  _index = maybe_index.value();
+  _index = opt::get(maybe_index);
 
   auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
   auto path_secret = std::optional<bytes>{};
-  if (secrets.path_secret.has_value()) {
-    path_secret = secrets.path_secret.value().secret;
+  if (secrets.path_secret) {
+    path_secret = opt::get(secrets.path_secret).secret;
   }
 
   _tree_priv = TreeKEMPrivateKey::joiner(
@@ -139,7 +139,7 @@ MLSPlaintext
 State::update(const bytes& leaf_secret)
 {
   // TODO(RLB) Allow changing the signing key
-  auto kp = _tree.key_package(_index).value();
+  auto kp = opt::get(_tree.key_package(_index));
   kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   kp.sign(_identity_priv, std::nullopt);
 
@@ -158,7 +158,7 @@ State::leaf_for_roster_entry(RosterIndex index) const
 
   for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
     const auto& kp = _tree.key_package(i);
-    if (!kp.has_value()) {
+    if (!kp) {
       continue;
     }
     if (non_blank_leaves == index.val) {
@@ -194,9 +194,9 @@ State::commit(const bytes& leaf_secret) const
   auto joiners = std::vector<KeyPackage>{};
   for (const auto& pt : _pending_proposals) {
     auto id = proposal_id(pt);
-    const auto& proposal = std::get<Proposal>(pt.content).content;
-    if (std::holds_alternative<Add>(proposal)) {
-      const auto& add = std::get<Add>(proposal);
+    const auto& proposal = var::get<Proposal>(pt.content).content;
+    if (var::holds_alternative<Add>(proposal)) {
+      const auto& add = var::get<Add>(proposal);
       joiners.push_back(add.key_package);
     }
 
@@ -248,7 +248,7 @@ State::commit(const bytes& leaf_secret) const
     next._confirmed_transcript_hash,
     next._interim_transcript_hash,
     next._extensions,
-    pt.confirmation_tag.value().mac_value,
+    opt::get(pt.confirmation_tag).mac_value,
   };
   group_info.sign(_index, _identity_priv);
 
@@ -316,12 +316,12 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Proposals get queued, do not result in a state transition
-  if (std::holds_alternative<Proposal>(pt.content)) {
+  if (var::holds_alternative<Proposal>(pt.content)) {
     _pending_proposals.push_back(pt);
     return std::nullopt;
   }
 
-  if (!std::holds_alternative<Commit>(pt.content)) {
+  if (!var::holds_alternative<Commit>(pt.content)) {
     throw InvalidParameterError("Incorrect content type");
   }
 
@@ -335,14 +335,14 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Apply the commit
-  const auto& commit = std::get<Commit>(pt.content);
+  const auto& commit = var::get<Commit>(pt.content);
   State next = *this;
   next.apply(commit);
 
   // Decapsulate and apply the UpdatePath, if provided
   auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
-  if (commit.path.has_value()) {
-    const auto& path = commit.path.value();
+  if (commit.path) {
+    const auto& path = opt::get(commit.path);
     if (!path.parent_hash_valid(_suite)) {
       throw ProtocolError("Commit path has invalid parent hash");
     }
@@ -369,11 +369,11 @@ State::handle(const MLSPlaintext& pt)
   next.update_epoch_secrets(update_secret);
 
   // Verify the confirmation MAC
-  if (!pt.confirmation_tag.has_value()) {
+  if (!pt.confirmation_tag) {
     throw ProtocolError("Missing confirmation on Commit");
   }
 
-  if (!next.verify_confirmation(pt.confirmation_tag.value().mac_value)) {
+  if (!next.verify_confirmation(opt::get(pt.confirmation_tag).mac_value)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -433,20 +433,20 @@ State::apply(const std::vector<MLSPlaintext>& pts,
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& pt : pts) {
-    auto proposal = std::get<Proposal>(pt.content).content;
-    auto proposal_type = std::get<Proposal>(pt.content).proposal_type();
+    auto proposal = var::get<Proposal>(pt.content).content;
+    auto proposal_type = var::get<Proposal>(pt.content).proposal_type();
     if (proposal_type != required_type) {
       continue;
     }
 
     switch (proposal_type) {
       case ProposalType::selector::add: {
-        locations.push_back(apply(std::get<Add>(proposal)));
+        locations.push_back(apply(var::get<Add>(proposal)));
         break;
       }
 
       case ProposalType::selector::update: {
-        auto& update = std::get<Update>(proposal);
+        auto& update = var::get<Update>(proposal);
         auto sender = LeafIndex(pt.sender.sender);
         if (sender != _index) {
           apply(sender, update);
@@ -464,7 +464,7 @@ State::apply(const std::vector<MLSPlaintext>& pts,
       }
 
       case ProposalType::selector::remove: {
-        const auto& remove = std::get<Remove>(proposal);
+        const auto& remove = var::get<Remove>(proposal);
         apply(remove);
         locations.push_back(remove.removed);
         break;
@@ -487,11 +487,11 @@ State::apply(const Commit& commit)
                  pts.begin(),
                  [&](auto& id) {
                    auto maybe_pt = find_proposal(id);
-                   if (!maybe_pt.has_value()) {
+                   if (!maybe_pt) {
                      throw ProtocolError("Commit of unknown proposal");
                    }
 
-                   return maybe_pt.value();
+                   return opt::get(maybe_pt);
                  });
 
   auto update_locations = apply(pts, ProposalType::selector::update);
@@ -530,12 +530,12 @@ State::unprotect(const MLSCiphertext& ct)
     throw ProtocolError("Invalid message signature");
   }
 
-  if (!std::holds_alternative<ApplicationData>(pt.content)) {
+  if (!var::holds_alternative<ApplicationData>(pt.content)) {
     throw ProtocolError("Unprotect of non-application message");
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-slicing)
-  return std::get<ApplicationData>(pt.content).data;
+  return var::get<ApplicationData>(pt.content).data;
 }
 
 ///
@@ -596,11 +596,11 @@ State::verify(const MLSPlaintext& pt) const
   }
 
   auto maybe_kp = _tree.key_package(LeafIndex(pt.sender.sender));
-  if (!maybe_kp.has_value()) {
+  if (!maybe_kp) {
     throw InvalidParameterError("Signature from blank node");
   }
 
-  auto pub = maybe_kp.value().credential.public_key();
+  auto pub = opt::get(maybe_kp).credential.public_key();
   return pt.verify(_suite, group_context(), pub);
 }
 
@@ -630,10 +630,10 @@ State::roster() const
 
   for (uint32_t i = 0; i < _tree.size().val; i++) {
     const auto& kp = _tree.key_package(LeafIndex{ i });
-    if (!kp.has_value()) {
+    if (!kp) {
       continue;
     }
-    kps.at(leaf_count) = kp.value();
+    kps.at(leaf_count) = opt::get(kp);
     leaf_count++;
   }
 
@@ -728,7 +728,7 @@ State::encrypt(const MLSPlaintext& pt)
     },
   };
 
-  auto key_type = std::visit(get_key_type, pt.content);
+  auto key_type = var::visit(get_key_type, pt.content);
   auto [generation, keys] = _keys.keys.next(key_type, _index);
 
   // Encrypt the content
@@ -786,11 +786,11 @@ State::decrypt(const MLSCiphertext& ct)
                                                     sender_data_nonce,
                                                     sender_data_aad,
                                                     ct.encrypted_sender_data);
-  if (!sender_data_pt.has_value()) {
+  if (!sender_data_pt) {
     throw ProtocolError("Sender data decryption failed");
   }
 
-  auto sender_data = tls::get<MLSSenderData>(sender_data_pt.value());
+  auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
   auto sender = LeafIndex(sender_data.sender);
 
   // Pull from the key schedule
@@ -812,7 +812,7 @@ State::decrypt(const MLSCiphertext& ct)
   });
   auto content =
     _suite.get().hpke.aead.open(key, nonce, content_aad, ct.ciphertext);
-  if (!content.has_value()) {
+  if (!content) {
     throw ProtocolError("Content decryption failed");
   }
 
@@ -822,7 +822,7 @@ State::decrypt(const MLSCiphertext& ct)
                        { SenderType::member, sender_data.sender },
                        ct.content_type,
                        ct.authenticated_data,
-                       content.value() };
+                       opt::get(content) };
 }
 
 } // namespace mls

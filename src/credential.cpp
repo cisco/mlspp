@@ -104,27 +104,25 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 CredentialType::selector
 Credential::type() const
 {
-  switch (_cred.index()) {
-    case 0:
+  static const auto get_type = overloaded{
+    [](const BasicCredential& /* unused */) {
       return CredentialType::selector::basic;
-    case 1:
+    },
+    [](const X509Credential& /* unused */) {
       return CredentialType::selector::x509;
-  }
-
-  throw std::bad_variant_access();
+    },
+  };
+  return var::visit(get_type, _cred);
 }
 
 SignaturePublicKey
 Credential::public_key() const
 {
-  switch (_cred.index()) {
-    case 0:
-      return std::get<BasicCredential>(_cred).public_key;
-    case 1:
-      return std::get<X509Credential>(_cred).public_key();
-  }
-
-  throw std::bad_variant_access();
+  static const auto get_public_key = overloaded{
+    [](const BasicCredential& cred) { return cred.public_key; },
+    [](const X509Credential& cred) { return cred.public_key(); },
+  };
+  return var::visit(get_public_key, _cred);
 }
 
 bool
