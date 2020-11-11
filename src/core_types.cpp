@@ -165,7 +165,7 @@ UpdatePath::parent_hashes(CipherSuite suite) const
 {
   auto ph = std::vector<bytes>(nodes.size());
   auto last_hash = bytes{};
-  for (int i = nodes.size() - 1; i >= 0; i--) {
+  for (int i = static_cast<int>(nodes.size()) - 1; i >= 0; i--) {
     auto parent = ParentNode{ nodes[i].public_key, {}, last_hash };
     last_hash = parent.hash(suite);
     ph[i] = last_hash;
