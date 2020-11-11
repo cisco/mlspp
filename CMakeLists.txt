@@ -53,12 +53,12 @@ find_package(OpenSSL 1.1 REQUIRED)
 # mpark-variant fetched from GitHub
 include( ExternalProject )
 find_package( Git REQUIRED )
-set( VARIANT_LITE_URL https://github.com/mpark/variant.git )
+set( MPARK_VARIANT_URL https://github.com/mpark/variant.git )
 set_directory_properties( PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/third_party )
 
 ExternalProject_Add(
     mpark-variant-extern
-    GIT_REPOSITORY ${VARIANT_LITE_URL}
+    GIT_REPOSITORY ${MPARK_VARIANT_URL}
     TIMEOUT 10
     UPDATE_COMMAND ${GIT_EXECUTABLE} pull
     CONFIGURE_COMMAND ""
@@ -68,11 +68,11 @@ ExternalProject_Add(
    )
 
 ExternalProject_Get_Property( mpark-variant-extern SOURCE_DIR )
-set( VARIANT_LITE_INCLUDE_DIR ${SOURCE_DIR}/include CACHE INTERNAL "Include folder for mpark-variant" )
+set( MPARK_VARIANT_INCLUDE_DIR ${SOURCE_DIR}/include CACHE INTERNAL "Include folder for mpark-variant" )
 
 add_library( mpark-variant INTERFACE )
 add_dependencies(mpark-variant mpark-variant-extern)
-target_include_directories( mpark-variant INTERFACE ${VARIANT_LITE_INCLUDE_DIR} )
+target_include_directories( mpark-variant INTERFACE ${MPARK_VARIANT_INCLUDE_DIR} )
 
 ###
 ### Library Config
