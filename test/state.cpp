@@ -233,7 +233,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
         state = new_state;
       } else {
         state.handle(remove);
-        state =  get(state.handle(commit));
+        state = get(state.handle(commit));
       }
     }
 

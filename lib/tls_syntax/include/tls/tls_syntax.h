@@ -28,7 +28,8 @@ using mpark::visit;
 // In a similar vein, we provide our own safe accessors for std::optional, since
 // std::optional::value() is not available on macOS 10.11.
 template<typename T>
-T& get(std::optional<T>& opt)
+T&
+get(std::optional<T>& opt)
 {
   if (!opt) {
     throw std::runtime_error("bad_optional_access");
@@ -37,7 +38,8 @@ T& get(std::optional<T>& opt)
 }
 
 template<typename T>
-const T& get(const std::optional<T>& opt)
+const T&
+get(const std::optional<T>& opt)
 {
   if (!opt) {
     throw std::runtime_error("bad_optional_access");
