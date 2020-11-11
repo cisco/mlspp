@@ -234,7 +234,7 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
     throw InvalidParameterError("HPKE decryption failure");
   }
 
-  return get(pt);
+  return opt::get(pt);
 }
 
 HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)

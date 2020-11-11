@@ -26,7 +26,7 @@ Node::public_key() const
       return node.public_key;
     },
   };
-  return std::visit(get_key, node);
+  return var::visit(get_key, node);
 }
 
 bytes
@@ -39,11 +39,11 @@ Node::parent_hash() const
         return bytes{};
       }
 
-      return get(maybe_phe).parent_hash;
+      return opt::get(maybe_phe).parent_hash;
     },
     [](const ParentNode& node) { return node.parent_hash; },
   };
-  return std::visit(get_key, node);
+  return var::visit(get_key, node);
 }
 
 ///
@@ -55,7 +55,7 @@ OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 {
   auto leaf = std::optional<KeyPackage>{};
   if (node) {
-    leaf = std::get<KeyPackage>(get(node).node);
+    leaf = var::get<KeyPackage>(opt::get(node).node);
   }
 
   tls::ostream w;
@@ -71,7 +71,7 @@ OptionalNode::set_parent_hash(CipherSuite suite,
 {
   auto parent = std::optional<ParentNode>{};
   if (node) {
-    parent = std::get<ParentNode>(get(node).node);
+    parent = var::get<ParentNode>(opt::get(node).node);
   }
 
   tls::ostream w;
@@ -117,7 +117,7 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
   priv.private_key_cache.insert({ NodeIndex(index), leaf_priv });
   if (path_secret) {
-    priv.implant(intersect, size, get(path_secret));
+    priv.implant(intersect, size, opt::get(path_secret));
   }
   return priv;
 }
@@ -179,7 +179,7 @@ TreeKEMPrivateKey::private_key(NodeIndex n)
 {
   auto priv = static_cast<const TreeKEMPrivateKey&>(*this).private_key(n);
   if (priv) {
-    private_key_cache.insert({ n, get(priv) });
+    private_key_cache.insert({ n, opt::get(priv) });
   }
   return priv;
 }
@@ -253,7 +253,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   }
 
   // Decrypt and implant
-  auto priv = get(private_key(res[resi]));
+  auto priv = opt::get(private_key(res[resi]));
   auto path_secret =
     priv.decrypt(suite, context, path.nodes[dpi].node_secrets[resi]);
   implant(overlap_node, LeafCount(size), path_secret);
@@ -308,14 +308,14 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
 
   const auto public_match = [&](const auto& entry) {
     auto n = entry.first;
-    auto priv = get(private_key(n));
+    auto priv = opt::get(private_key(n));
 
     const auto& opt_node = other.node_at(n).node;
     if (!opt_node) {
       return false;
     }
 
-    const auto& pub = get(opt_node).public_key();
+    const auto& pub = opt::get(opt_node).public_key();
     return priv.public_key == pub;
   };
   return std::all_of(path_secrets.begin(), path_secrets.end(), public_match);
@@ -353,7 +353,7 @@ TreeKEMPublicKey::add_leaf(const KeyPackage& kp)
       continue;
     }
 
-    auto& parent = std::get<ParentNode>(get(node_at(n).node).node);
+    auto& parent = var::get<ParentNode>(opt::get(node_at(n).node).node);
     parent.unmerged_leaves.push_back(index);
   }
 
@@ -450,11 +450,11 @@ TreeKEMPublicKey::parent_hash_valid() const
 
     auto l = tree_math::left(i);
     auto ln = nodes[l.val].node;
-    auto l_match = (ln && get(ln).parent_hash() == self_hash);
+    auto l_match = (ln && opt::get(ln).parent_hash() == self_hash);
 
     auto r = tree_math::right(i, NodeCount(size()));
     auto rn = nodes[r.val].node;
-    auto r_match = (rn && get(rn).parent_hash() == self_hash);
+    auto r_match = (rn && opt::get(rn).parent_hash() == self_hash);
 
     if (!l_match && !r_match) {
       return false;
@@ -468,13 +468,13 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
 {
   auto at_leaf = (tree_math::level(index) == 0);
   if (nodes[index.val].node) {
-    const auto& node = get(nodes[index.val].node);
+    const auto& node = opt::get(nodes[index.val].node);
     auto out = std::vector<NodeIndex>{ index };
     if (at_leaf) {
       return out;
     }
 
-    const auto& parent = std::get<ParentNode>(node.node);
+    const auto& parent = var::get<ParentNode>(node.node);
     const auto& unmerged = parent.unmerged_leaves;
     std::transform(unmerged.begin(),
                    unmerged.end(),
@@ -503,7 +503,7 @@ TreeKEMPublicKey::find(const KeyPackage& kp) const
       continue;
     }
 
-    const auto& node_kp = std::get<KeyPackage>(get(node).node);
+    const auto& node_kp = var::get<KeyPackage>(opt::get(node).node);
     if (kp == node_kp) {
       return i;
     }
@@ -520,7 +520,7 @@ TreeKEMPublicKey::key_package(LeafIndex index) const
     return std::nullopt;
   }
 
-  return std::get<KeyPackage>(get(node).node);
+  return var::get<KeyPackage>(opt::get(node).node);
 }
 
 std::tuple<TreeKEMPrivateKey, UpdatePath>
@@ -537,7 +537,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
   }
 
   auto path = UpdatePath{};
-  path.leaf_key_package = std::get<KeyPackage>(get(maybe_node).node);
+  path.leaf_key_package = var::get<KeyPackage>(opt::get(maybe_node).node);
 
   // Generate path secrets
   auto priv = TreeKEMPrivateKey::create(suite, size(), from, leaf_secret);
@@ -546,13 +546,13 @@ TreeKEMPublicKey::encap(LeafIndex from,
   auto last = NodeIndex(from);
   for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
     auto path_secret = priv.path_secrets.at(n);
-    auto node_priv = get(priv.private_key(n));
+    auto node_priv = opt::get(priv.private_key(n));
     auto node = RatchetNode{ node_priv.public_key, {} };
 
     auto copath = tree_math::sibling(last, NodeCount(size()));
     auto res = resolve(copath);
     for (auto nr : res) {
-      const auto& node_pub = get(node_at(nr).node).public_key();
+      const auto& node_pub = opt::get(node_at(nr).node).public_key();
       auto ct = node_pub.encrypt(suite, context, path_secret);
       node.node_secrets.push_back(ct);
     }
@@ -562,7 +562,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
   }
 
   // Sign the UpdatePath
-  auto leaf_priv = get(priv.private_key(NodeIndex(from)));
+  auto leaf_priv = opt::get(priv.private_key(NodeIndex(from)));
   path.sign(suite, leaf_priv.public_key, sig_priv, opts);
 
   // Update the pubic key itself

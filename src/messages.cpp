@@ -51,7 +51,7 @@ GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = get(maybe_kp).credential;
+  auto cred = opt::get(maybe_kp).credential;
   if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
@@ -68,7 +68,7 @@ GroupInfo::verify() const
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = get(maybe_kp).credential;
+  auto cred = opt::get(maybe_kp).credential;
   return cred.public_key().verify(suite, to_be_signed(), signature);
 }
 
@@ -110,7 +110,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
   auto gs = GroupSecrets{ _joiner_secret, std::nullopt };
   if (path_secret) {
-    gs.path_secret = { get(path_secret) };
+    gs.path_secret = { opt::get(path_secret) };
   }
 
   auto gs_data = tls::marshal(gs);
@@ -129,7 +129,7 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
     throw ProtocolError("Welcome decryption failed");
   }
 
-  return tls::get<GroupInfo>(get(group_info_data), cipher_suite);
+  return tls::get<GroupInfo>(opt::get(group_info_data), cipher_suite);
 }
 
 std::tuple<bytes, bytes>
@@ -171,7 +171,7 @@ Proposal::proposal_type() const
     using type = typename std::decay<decltype(v)>::type;
     return ProposalType::template type<type>;
   };
-  return std::visit(get_type, content);
+  return var::visit(get_type, content);
 }
 
 template<>
@@ -277,14 +277,14 @@ MLSPlaintext::content_type() const
     [](const Proposal& /*unused*/) { return ContentType::selector::proposal; },
     [](const Commit& /*unused*/) { return ContentType::selector::commit; },
   };
-  return std::visit(get_content_type, content);
+  return var::visit(get_content_type, content);
 }
 
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  std::visit([&](auto&& inner_content) { w << inner_content; }, content);
+  var::visit([&](auto&& inner_content) { w << inner_content; }, content);
 
   bytes padding(padding_size, 0);
   tls::vector<2>::encode(w, signature);
@@ -373,7 +373,7 @@ MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
 
   auto tbm = membership_tag_input(context);
   auto mac_value = suite.get().digest.hmac(mac_key, tbm);
-  return constant_time_eq(mac_value, get(membership_tag).mac_value);
+  return constant_time_eq(mac_value, opt::get(membership_tag).mac_value);
 }
 
 } // namespace mls

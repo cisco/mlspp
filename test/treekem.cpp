@@ -67,7 +67,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   auto parent = ParentNode{ init_priv.public_key, {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent }, {} };
   REQUIRE_THROWS_AS(opt_parent.set_leaf_hash(suite, node_index),
-                    std::bad_variant_access);
+                    var::bad_variant_access);
 
   opt_parent.set_parent_hash(suite, node_index, child_hash, child_hash);
   REQUIRE_FALSE(opt_parent.hash.empty());
@@ -75,7 +75,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   auto opt_leaf = OptionalNode{ Node{ kp }, {} };
   REQUIRE_THROWS_AS(
     opt_leaf.set_parent_hash(suite, node_index, child_hash, child_hash),
-    std::bad_variant_access);
+    var::bad_variant_access);
 
   opt_leaf.set_leaf_hash(suite, node_index);
   REQUIRE_FALSE(opt_leaf.hash.empty());

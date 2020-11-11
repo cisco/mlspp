@@ -6,10 +6,14 @@
 #include <stdexcept>
 #include <vector>
 
+// Expose the bytes library globally
 #include <bytes/bytes.h>
 using namespace bytes_ns;
 
-#include <tls/tls_syntax.h>
+// Expose the compatibility library globally
+#include <tls/compat.h>
+namespace var = tls::var;
+namespace opt = tls::opt;
 
 namespace mls {
 

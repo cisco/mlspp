@@ -112,7 +112,7 @@ Credential::type() const
       return CredentialType::selector::x509;
     },
   };
-  return std::visit(get_type, _cred);
+  return var::visit(get_type, _cred);
 }
 
 SignaturePublicKey
@@ -122,7 +122,7 @@ Credential::public_key() const
     [](const BasicCredential& cred) { return cred.public_key; },
     [](const X509Credential& cred) { return cred.public_key(); },
   };
-  return std::visit(get_public_key, _cred);
+  return var::visit(get_public_key, _cred);
 }
 
 bool

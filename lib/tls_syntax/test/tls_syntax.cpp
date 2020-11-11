@@ -32,7 +32,7 @@ struct ExampleStruct
   std::array<uint32_t, 4> b{ 0, 0, 0, 0 };
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
-  std::variant<uint8_t, uint16_t> e;
+  tls::var::variant<uint8_t, uint16_t> e;
 
   TLS_SERIALIZABLE(a, b, c, d, e)
   TLS_TRAITS(tls::pass,

@@ -92,7 +92,7 @@ KeyPackage::sign(const SignaturePrivateKey& sig_priv,
 {
   if (opts) {
     // Fill in application-provided extensions
-    for (const auto& ext : get(opts).extensions.extensions) {
+    for (const auto& ext : opt::get(opts).extensions.extensions) {
       extensions.add(ext.type, ext.data);
     }
   }
@@ -109,7 +109,7 @@ KeyPackage::verify_expiry(uint64_t now) const
     return false;
   }
 
-  auto& lt = get(maybe_lt);
+  auto& lt = opt::get(maybe_lt);
   return lt.not_before <= now && now <= lt.not_after;
 }
 
@@ -184,7 +184,7 @@ UpdatePath::parent_hash_valid(CipherSuite suite) const
     return !phe;
   }
 
-  return phe && get(phe).parent_hash == ph[0];
+  return phe && opt::get(phe).parent_hash == ph[0];
 }
 
 void
@@ -196,7 +196,7 @@ UpdatePath::sign(CipherSuite suite,
   // Make a copy of the options that we can modify
   auto opts = KeyPackageOpts{};
   if (maybe_opts) {
-    opts = get(maybe_opts);
+    opts = opt::get(maybe_opts);
   }
 
   // Add a ParentHash extension

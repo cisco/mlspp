@@ -198,7 +198,7 @@ struct ContentType
 
 struct Proposal
 {
-  std::variant<Add, Update, Remove> content;
+  var::variant<Add, Update, Remove> content;
 
   ProposalType::selector proposal_type() const;
 
@@ -282,7 +282,7 @@ struct MLSPlaintext
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
-  std::variant<ApplicationData, Proposal, Commit> content;
+  var::variant<ApplicationData, Proposal, Commit> content;
 
   bytes signature;
   std::optional<MAC> confirmation_tag;

@@ -273,8 +273,7 @@ Session::commit(const std::vector<bytes>& proposals)
 {
   for (const auto& proposal_data : proposals) {
     const auto pt = inner->import_message(proposal_data);
-    const auto* const proposal = std::get_if<Proposal>(&pt.content);
-    if (proposal == nullptr) {
+    if (!var::holds_alternative<Proposal>(pt.content)) {
       throw ProtocolError("Only proposals can be committed");
     }
 
@@ -307,14 +306,14 @@ Session::handle(const bytes& handshake_data)
     throw ProtocolError("External senders not supported");
   }
 
-  const auto is_commit = std::holds_alternative<Commit>(pt.content);
+  const auto is_commit = var::holds_alternative<Commit>(pt.content);
   if (is_commit &&
       LeafIndex(pt.sender.sender) == inner->history.front().index()) {
     if (!inner->outbound_cache) {
       throw ProtocolError("Received from self without sending");
     }
 
-    const auto& [msg, state] = get(inner->outbound_cache);
+    const auto& [msg, state] = opt::get(inner->outbound_cache);
     if (msg != handshake_data) {
       throw ProtocolError("Received message different from cached");
     }
@@ -329,7 +328,7 @@ Session::handle(const bytes& handshake_data)
     return false;
   }
 
-  inner->add_state(pt.epoch, get(maybe_next_state));
+  inner->add_state(pt.epoch, opt::get(maybe_next_state));
   return true;
 }
 

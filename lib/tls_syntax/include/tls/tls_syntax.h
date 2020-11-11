@@ -7,45 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-// To balance backward-compatibility with macOS 10.11 with forward-compatibility
-// with future versions of C++, we use `mpark::variant`, but import it into
-// `namespace std`.
-//
-// XXX(RLB) For some reason, `using namespace mpark` did not work here.  I have
-// manually added what is needed for mlspp right now, but this list might need
-// to be updated in the future.
-#include <mpark/variant.hpp>
-namespace std {
-using mpark::bad_variant_access;
-using mpark::get;
-using mpark::get_if;
-using mpark::holds_alternative;
-using mpark::variant;
-using mpark::variant_alternative_t;
-using mpark::visit;
-}
-
-// In a similar vein, we provide our own safe accessors for std::optional, since
-// std::optional::value() is not available on macOS 10.11.
-template<typename T>
-T&
-get(std::optional<T>& opt)
-{
-  if (!opt) {
-    throw std::runtime_error("bad_optional_access");
-  }
-  return *opt;
-}
-
-template<typename T>
-const T&
-get(const std::optional<T>& opt)
-{
-  if (!opt) {
-    throw std::runtime_error("bad_optional_access");
-  }
-  return *opt;
-}
+#include <tls/compat.h>
 
 namespace tls {
 
@@ -120,7 +82,7 @@ operator<<(tls::ostream& out, const std::optional<T>& opt)
     return out << uint8_t(0);
   }
 
-  return out << uint8_t(1) << get(opt);
+  return out << uint8_t(1) << opt::get(opt);
 }
 
 // Enum writer
@@ -206,7 +168,7 @@ operator>>(tls::istream& in, std::optional<T>& opt)
 
     case 1:
       opt.emplace();
-      return in >> get(opt);
+      return in >> opt::get(opt);
 
     default:
       throw std::invalid_argument("Malformed optional");
@@ -435,7 +397,7 @@ struct variant
 {
   template<size_t I = 0, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  write_variant(tls::ostream&, const std::variant<Tp...>&)
+  write_variant(tls::ostream&, const var::variant<Tp...>&)
   {
     throw WriteError("Empty variant");
   }
@@ -443,11 +405,11 @@ struct variant
   template<size_t I = 0, typename... Tp>
     static inline typename std::enable_if <
     I<sizeof...(Tp), void>::type write_variant(tls::ostream& str,
-                                               const std::variant<Tp...>& v)
+                                               const var::variant<Tp...>& v)
   {
-    using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
-    if (std::holds_alternative<Tc>(v)) {
-      str << Ts::template type<Tc> << std::get<Tc>(v);
+    using Tc = var::variant_alternative_t<I, var::variant<Tp...>>;
+    if (var::holds_alternative<Tc>(v)) {
+      str << Ts::template type<Tc> << get<Tc>(v);
       return;
     }
 
@@ -455,7 +417,7 @@ struct variant
   }
 
   template<typename... Tp>
-  static ostream& encode(ostream& str, const std::variant<Tp...>& data)
+  static ostream& encode(ostream& str, const var::variant<Tp...>& data)
   {
     write_variant(str, data);
     return str;
@@ -463,7 +425,7 @@ struct variant
 
   template<size_t I = 0, typename Te, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  read_variant(tls::istream&, Te, std::variant<Tp...>&)
+  read_variant(tls::istream&, Te, var::variant<Tp...>&)
   {
     throw ReadError("Invalid variant type label");
   }
@@ -472,9 +434,9 @@ struct variant
     static inline typename std::enable_if <
     I<sizeof...(Tp), void>::type read_variant(tls::istream& str,
                                               Te target_type,
-                                              std::variant<Tp...>& v)
+                                              var::variant<Tp...>& v)
   {
-    using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
+    using Tc = var::variant_alternative_t<I, var::variant<Tp...>>;
     if (Ts::template type<Tc> == target_type) {
       str >> v.template emplace<I>();
       return;
@@ -484,7 +446,7 @@ struct variant
   }
 
   template<typename... Tp>
-  static istream& decode(istream& str, std::variant<Tp...>& data)
+  static istream& decode(istream& str, var::variant<Tp...>& data)
   {
     typename Ts::selector target_type;
     str >> target_type;
