@@ -310,27 +310,26 @@ Session::handle(const bytes& handshake_data)
   const auto is_commit = std::holds_alternative<Commit>(pt.content);
   if (is_commit &&
       LeafIndex(pt.sender.sender) == inner->history.front().index()) {
-    if (!inner->outbound_cache.has_value()) {
+    if (!inner->outbound_cache) {
       throw ProtocolError("Received from self without sending");
     }
 
-    const auto& cached_msg = std::get<0>(inner->outbound_cache.value());
-    const auto& next_state = std::get<1>(inner->outbound_cache.value());
-    if (cached_msg != handshake_data) {
+    const auto& [msg, state] = get(inner->outbound_cache);
+    if (msg != handshake_data) {
       throw ProtocolError("Received message different from cached");
     }
 
-    inner->add_state(pt.epoch, next_state);
+    inner->add_state(pt.epoch, state);
     inner->outbound_cache = std::nullopt;
     return true;
   }
 
   auto maybe_next_state = inner->history.front().handle(pt);
-  if (!maybe_next_state.has_value()) {
+  if (!maybe_next_state) {
     return false;
   }
 
-  inner->add_state(pt.epoch, maybe_next_state.value());
+  inner->add_state(pt.epoch, get(maybe_next_state));
   return true;
 }
 

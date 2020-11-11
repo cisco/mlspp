@@ -47,11 +47,11 @@ void
 GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 {
   auto maybe_kp = tree.key_package(index);
-  if (!maybe_kp.has_value()) {
+  if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = maybe_kp.value().credential;
+  auto cred = get(maybe_kp).credential;
   if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
@@ -64,11 +64,11 @@ bool
 GroupInfo::verify() const
 {
   auto maybe_kp = tree.key_package(signer_index);
-  if (!maybe_kp.has_value()) {
+  if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = maybe_kp.value().credential;
+  auto cred = get(maybe_kp).credential;
   return cred.public_key().verify(suite, to_be_signed(), signature);
 }
 
@@ -109,8 +109,8 @@ void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
   auto gs = GroupSecrets{ _joiner_secret, std::nullopt };
-  if (path_secret.has_value()) {
-    gs.path_secret = { path_secret.value() };
+  if (path_secret) {
+    gs.path_secret = { get(path_secret) };
   }
 
   auto gs_data = tls::marshal(gs);
@@ -125,11 +125,11 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
     group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
   auto group_info_data =
     cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
-  if (!group_info_data.has_value()) {
+  if (!group_info_data) {
     throw ProtocolError("Welcome decryption failed");
   }
 
-  return tls::get<GroupInfo>(group_info_data.value(), cipher_suite);
+  return tls::get<GroupInfo>(get(group_info_data), cipher_suite);
 }
 
 std::tuple<bytes, bytes>
@@ -367,13 +367,13 @@ MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
     return true;
   }
 
-  if (!membership_tag.has_value()) {
+  if (!membership_tag) {
     return false;
   }
 
   auto tbm = membership_tag_input(context);
   auto mac_value = suite.get().digest.hmac(mac_key, tbm);
-  return constant_time_eq(mac_value, membership_tag.value().mac_value);
+  return constant_time_eq(mac_value, get(membership_tag).mac_value);
 }
 
 } // namespace mls

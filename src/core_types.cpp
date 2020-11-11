@@ -90,9 +90,9 @@ void
 KeyPackage::sign(const SignaturePrivateKey& sig_priv,
                  const std::optional<KeyPackageOpts>& opts)
 {
-  if (opts.has_value()) {
+  if (opts) {
     // Fill in application-provided extensions
-    for (const auto& ext : opts.value().extensions.extensions) {
+    for (const auto& ext : get(opts).extensions.extensions) {
       extensions.add(ext.type, ext.data);
     }
   }
@@ -105,11 +105,11 @@ bool
 KeyPackage::verify_expiry(uint64_t now) const
 {
   auto maybe_lt = extensions.find<LifetimeExtension>();
-  if (!maybe_lt.has_value()) {
+  if (!maybe_lt) {
     return false;
   }
 
-  auto& lt = maybe_lt.value();
+  auto& lt = get(maybe_lt);
   return lt.not_before <= now && now <= lt.not_after;
 }
 
@@ -181,10 +181,10 @@ UpdatePath::parent_hash_valid(CipherSuite suite) const
 
   // If there are no nodes to hash, then ParentHash MUST be omitted
   if (ph.empty()) {
-    return !phe.has_value();
+    return !phe;
   }
 
-  return phe.has_value() && phe.value().parent_hash == ph[0];
+  return phe && get(phe).parent_hash == ph[0];
 }
 
 void
@@ -195,8 +195,8 @@ UpdatePath::sign(CipherSuite suite,
 {
   // Make a copy of the options that we can modify
   auto opts = KeyPackageOpts{};
-  if (maybe_opts.has_value()) {
-    opts = maybe_opts.value();
+  if (maybe_opts) {
+    opts = get(maybe_opts);
   }
 
   // Add a ParentHash extension

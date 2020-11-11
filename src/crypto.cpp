@@ -230,11 +230,11 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
   auto skR = suite.get().hpke.kem.deserialize_private(data);
   auto ctx = suite.get().hpke.setup_base_r(ct.kem_output, *skR, {});
   auto pt = ctx.open(aad, ct.ciphertext);
-  if (!pt.has_value()) {
+  if (!pt) {
     throw InvalidParameterError("HPKE decryption failure");
   }
 
-  return pt.value();
+  return get(pt);
 }
 
 HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
