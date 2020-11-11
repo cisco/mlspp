@@ -255,6 +255,14 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 
 TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
 {
+  static const auto get_creds = [](const auto& kps) {
+    auto creds = std::vector<Credential>(kps.size());
+    std::transform(kps.begin(), kps.end(), creds.begin(), [](auto&& kp) {
+      return kp.credential;
+    });
+    return creds;
+  };
+
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
   auto [commit_1, welcome_1, new_state_1] =
@@ -268,13 +276,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
     key_packages[3].credential,
     key_packages[4].credential,
   };
-  auto roster = new_state_1.roster();
-  auto roster_creds = std::vector<Credential>(roster.size());
-  std::transform(roster.begin(),
-                 roster.end(),
-                 roster_creds.begin(),
-                 [](const auto& kp) { return kp.credential; });
-  REQUIRE(expected_creds == roster_creds);
+  REQUIRE(expected_creds == get_creds(new_state_1.roster()));
 
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
@@ -288,7 +290,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
     key_packages[4].credential,
   };
 
-  REQUIRE(expected_roster == new_state_2.roster());
+  REQUIRE(expected_creds == get_creds(new_state_2.roster()));
 
   // handle remove by remaining clients and verify the roster
   for (int i = 2; i < static_cast<int>(group_size); i += 1) {
@@ -298,6 +300,6 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
     }
     states[i] = states[i].handle(commit_1).value();
     states[i] = states[i].handle(commit_2).value();
-    REQUIRE(expected_roster == states[i].roster());
+    REQUIRE(expected_creds == get_creds(states[i].roster()));
   }
 }

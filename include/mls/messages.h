@@ -231,7 +231,7 @@ struct ProposalID
 {
   std::variant<Proposal, ProposalRef> content;
 
-  TLS_SERIALIZABLE(content);
+  TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalIDType>)
 };
 
