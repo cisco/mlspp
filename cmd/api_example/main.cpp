@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "version.h"
+
 using namespace mls;
 
 static Client
@@ -75,6 +77,9 @@ verify(const std::string& label, Session& alice, Session& bob)
 int
 main() // NOLINT(bugprone-exception-escape)
 {
+
+  std::cout << "Running library version:" << std::string(VERSION) << std::endl;
+  std::cout << "       git sha hash:" << std::string(HASHVAR) << std::endl;
   const auto suite =
     CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
