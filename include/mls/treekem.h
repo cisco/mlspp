@@ -8,16 +8,10 @@
 
 namespace mls {
 
-struct NodeType
+enum struct NodeType : uint8_t
 {
-  enum class selector : uint8_t
-  {
     leaf = 0x00,
     parent = 0x01,
-  };
-
-  template<typename T>
-  static const selector type;
 };
 
 struct Node
@@ -167,3 +161,12 @@ private:
 };
 
 } // namespace mls
+
+namespace tls {
+
+using namespace mls;
+
+TLS_VARIANT_MAP(NodeType, KeyPackage, leaf)
+TLS_VARIANT_MAP(NodeType, ParentNode, parent)
+
+} // namespace tls

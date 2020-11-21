@@ -144,20 +144,6 @@ private:
 ///
 /// Proposals & Commit
 ///
-struct ProposalType
-{
-  enum struct selector : uint8_t
-  {
-    invalid = 0,
-    add = 1,
-    update = 2,
-    remove = 3,
-  };
-
-  template<typename T>
-  static const selector type;
-};
-
 struct Add
 {
   KeyPackage key_package;
@@ -176,31 +162,19 @@ struct Remove
   TLS_SERIALIZABLE(removed)
 };
 
-// enum {
-//     invalid(0),
-//     handshake(1),
-//     application(2),
-//     (255)
-// } ContentType;
-struct ContentType
+enum struct ProposalType : uint8_t
 {
-  enum struct selector : uint8_t
-  {
     invalid = 0,
-    application = 1,
-    proposal = 2,
-    commit = 3,
-  };
-
-  template<typename T>
-  static const selector type;
+    add = 1,
+    update = 2,
+    remove = 3,
 };
 
 struct Proposal
 {
   var::variant<Add, Update, Remove> content;
 
-  ProposalType::selector proposal_type() const;
+  ProposalType proposal_type() const;
 
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
@@ -252,6 +226,14 @@ struct ApplicationData
 
 struct GroupContext;
 
+enum struct ContentType : uint8_t
+{
+    invalid = 0,
+    application = 1,
+    proposal = 2,
+    commit = 3,
+};
+
 enum struct SenderType : uint8_t
 {
   invalid = 0,
@@ -295,7 +277,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
-               ContentType::selector content_type,
+               ContentType content_type,
                bytes authenticated_data,
                const bytes& content);
 
@@ -307,7 +289,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
-  ContentType::selector content_type() const;
+  ContentType content_type() const;
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -364,7 +346,7 @@ struct MLSCiphertext
 {
   bytes group_id;
   epoch_t epoch;
-  ContentType::selector content_type;
+  ContentType content_type;
   bytes encrypted_sender_data;
   bytes authenticated_data;
   bytes ciphertext;
@@ -384,3 +366,17 @@ struct MLSCiphertext
 };
 
 } // namespace mls
+
+namespace tls {
+
+using namespace mls;
+
+TLS_VARIANT_MAP(ProposalType, Add, add)
+TLS_VARIANT_MAP(ProposalType, Update, update)
+TLS_VARIANT_MAP(ProposalType, Remove, remove)
+
+TLS_VARIANT_MAP(ContentType, ApplicationData, application)
+TLS_VARIANT_MAP(ContentType, Proposal, proposal)
+TLS_VARIANT_MAP(ContentType, Commit, commit)
+
+} // namespace tls

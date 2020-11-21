@@ -5,23 +5,6 @@
 
 namespace mls {
 
-// enum {
-//     basic(0),
-//     x509(1),
-//     (255)
-// } CredentialType;
-struct CredentialType
-{
-  enum struct selector : uint8_t
-  {
-    basic = 0,
-    x509 = 1,
-  };
-
-  template<typename T>
-  static const selector type;
-};
-
 // struct {
 //     opaque identity<0..2^16-1>;
 //     SignaturePublicKey public_key;
@@ -76,6 +59,17 @@ operator>>(tls::istream& str, X509Credential& obj);
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
 
+// enum {
+//     basic(0),
+//     x509(1),
+//     (255)
+// } CredentialType;
+enum struct CredentialType : uint8_t
+{
+  basic = 0,
+  x509 = 1,
+};
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
@@ -89,7 +83,7 @@ operator==(const X509Credential& lhs, const X509Credential& rhs);
 class Credential
 {
 public:
-  CredentialType::selector type() const;
+  CredentialType type() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 
@@ -113,3 +107,12 @@ private:
 };
 
 } // namespace mls
+
+namespace tls {
+
+using namespace mls;
+
+TLS_VARIANT_MAP(CredentialType, BasicCredential, basic)
+TLS_VARIANT_MAP(CredentialType, X509Credential, x509)
+
+} // namespace TLS

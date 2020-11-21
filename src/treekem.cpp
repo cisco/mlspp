@@ -3,17 +3,6 @@
 namespace mls {
 
 ///
-/// NodeType
-///
-
-template<>
-const NodeType::selector NodeType::type<KeyPackage> = NodeType::selector::leaf;
-
-template<>
-const NodeType::selector NodeType::type<ParentNode> =
-  NodeType::selector::parent;
-
-///
 /// Node
 ///
 

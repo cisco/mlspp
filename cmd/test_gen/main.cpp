@@ -371,7 +371,7 @@ generate_messages()
 
     // Construct an MLSCiphertext
     auto ciphertext = MLSCiphertext{
-      tv.group_id, tv.epoch,  ContentType::selector::application,
+      tv.group_id, tv.epoch,  ContentType::application,
       tv.random,   tv.random, tv.random,
     };
 
