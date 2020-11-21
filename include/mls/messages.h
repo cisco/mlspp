@@ -164,10 +164,10 @@ struct Remove
 
 enum struct ProposalType : uint8_t
 {
-  invalid = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
+    invalid = 0,
+    add = 1,
+    update = 2,
+    remove = 3,
 };
 
 struct Proposal
@@ -228,10 +228,10 @@ struct GroupContext;
 
 enum struct ContentType : uint8_t
 {
-  invalid = 0,
-  application = 1,
-  proposal = 2,
-  commit = 3,
+    invalid = 0,
+    application = 1,
+    proposal = 2,
+    commit = 3,
 };
 
 enum struct SenderType : uint8_t
