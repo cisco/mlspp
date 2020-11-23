@@ -10,8 +10,8 @@ namespace mls {
 
 enum struct NodeType : uint8_t
 {
-    leaf = 0x00,
-    parent = 0x01,
+  leaf = 0x00,
+  parent = 0x01,
 };
 
 struct Node

@@ -396,19 +396,19 @@ template<typename Ts, typename Tv>
 constexpr Ts
 variant_map();
 
-#define TLS_VARIANT_MAP(EnumType, MappedType, enum_value) \
-  template<> \
-  constexpr EnumType \
-  variant_map<EnumType, MappedType>() \
-  { \
-    return EnumType::enum_value; \
+#define TLS_VARIANT_MAP(EnumType, MappedType, enum_value)                      \
+  template<>                                                                   \
+  constexpr EnumType variant_map<EnumType, MappedType>()                       \
+  {                                                                            \
+    return EnumType::enum_value;                                               \
   }
 
 template<typename Ts>
 struct variant
 {
   template<typename... Tp>
-  static inline Ts type(const var::variant<Tp...>& data) {
+  static inline Ts type(const var::variant<Tp...>& data)
+  {
     static const auto get_type = [](const auto& v) {
       return variant_map<Ts, std::decay_t<decltype(v)>>();
     };
