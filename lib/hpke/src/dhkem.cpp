@@ -86,7 +86,7 @@ DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
 }
 
 DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
-  : KEM(kem_id_in)
+  : KEM(kem_id_in, kdf_in.hash_size, group_in.pk_size, group_in.pk_size, group_in.sk_size)
   , group(group_in)
   , kdf(kdf_in)
 {
@@ -210,30 +210,6 @@ DHKEM::auth_decap(const bytes& enc,
   return extract_and_expand(zz, kem_context);
 }
 
-size_t
-DHKEM::secret_size() const
-{
-  return kdf.hash_size();
-}
-
-size_t
-DHKEM::enc_size() const
-{
-  return group.pk_size();
-}
-
-size_t
-DHKEM::pk_size() const
-{
-  return group.pk_size();
-}
-
-size_t
-DHKEM::sk_size() const
-{
-  return group.sk_size();
-}
-
 bytes
 DHKEM::extract_and_expand(const bytes& dh, const bytes& kem_context) const
 {
@@ -242,7 +218,7 @@ DHKEM::extract_and_expand(const bytes& dh, const bytes& kem_context) const
 
   auto eae_prk = kdf.labeled_extract(suite_id, {}, label_eae_prk, dh);
   return kdf.labeled_expand(
-    suite_id, eae_prk, label_shared_secret, kem_context, secret_size());
+    suite_id, eae_prk, label_shared_secret, kem_context, secret_size);
 }
 
 } // namespace hpke

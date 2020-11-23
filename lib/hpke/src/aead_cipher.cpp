@@ -107,9 +107,7 @@ openssl_cipher(AEAD::ID cipher)
 }
 
 AEADCipher::AEADCipher(AEAD::ID id_in)
-  : AEAD(id_in)
-  , nk(cipher_key_size(id))
-  , nn(cipher_nonce_size(id))
+  : AEAD(id_in, cipher_key_size(id_in), cipher_nonce_size(id_in))
   , tag_size(cipher_tag_size(id))
 {}
 
@@ -207,18 +205,6 @@ AEADCipher::open(const bytes& key,
   }
 
   return pt;
-}
-
-size_t
-AEADCipher::key_size() const
-{
-  return nk;
-}
-
-size_t
-AEADCipher::nonce_size() const
-{
-  return nn;
 }
 
 } // namespace hpke

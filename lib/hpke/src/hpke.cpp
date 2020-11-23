@@ -90,8 +90,16 @@ label_secret()
 /// Factory methods for primitives
 ///
 
-KEM::KEM(KEM::ID id_in)
+KEM::KEM(ID id_in,
+      size_t secret_size_in,
+      size_t enc_size_in,
+      size_t pk_size_in,
+      size_t sk_size_in)
   : id(id_in)
+  , secret_size(secret_size_in)
+  , enc_size(enc_size_in)
+  , pk_size(pk_size_in)
+  , sk_size(sk_size_in)
 {}
 
 template<>
@@ -177,8 +185,9 @@ KDF::get<KDF::ID::HKDF_SHA512>()
   return HKDF::get<Digest::ID::SHA512>();
 }
 
-KDF::KDF(KDF::ID id_in)
+KDF::KDF(ID id_in, size_t hash_size_in)
   : id(id_in)
+  , hash_size(hash_size_in)
 {}
 
 bytes
@@ -224,8 +233,10 @@ AEAD::get<AEAD::ID::CHACHA20_POLY1305>()
   return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
 }
 
-AEAD::AEAD(AEAD::ID id_in)
+AEAD::AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in)
   : id(id_in)
+  , key_size(key_size_in)
+  , nonce_size(nonce_size_in)
 {}
 
 ///
@@ -242,7 +253,7 @@ Context::do_export(const bytes& exporter_context, size_t size) const
 bytes
 Context::current_nonce() const
 {
-  auto curr = i2osp(seq, aead.nonce_size());
+  auto curr = i2osp(seq, aead.nonce_size);
   return curr ^ nonce;
 }
 
@@ -504,11 +515,11 @@ HPKE::key_schedule(Mode mode,
     kdf.labeled_extract(suite, psk_hash, label_secret(), shared_secret);
 
   auto key = kdf.labeled_expand(
-    suite, secret, label_key(), key_schedule_context, aead.key_size());
+    suite, secret, label_key(), key_schedule_context, aead.key_size);
   auto nonce = kdf.labeled_expand(
-    suite, secret, label_nonce(), key_schedule_context, aead.nonce_size());
+    suite, secret, label_nonce(), key_schedule_context, aead.nonce_size);
   auto exporter_secret = kdf.labeled_expand(
-    suite, secret, label_exp(), key_schedule_context, kdf.hash_size());
+    suite, secret, label_exp(), key_schedule_context, kdf.hash_size);
 
   return Context(suite, key, nonce, exporter_secret, kdf, aead);
 }

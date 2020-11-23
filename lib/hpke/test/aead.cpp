@@ -101,8 +101,8 @@ TEST_CASE("AEAD Round-Trip")
 
   for (const auto& id : ids) {
     const auto& aead = select_aead(id);
-    auto key = bytes(aead.key_size(), 0xA0);
-    auto nonce = bytes(aead.nonce_size(), 0xA1);
+    auto key = bytes(aead.key_size, 0xA0);
+    auto nonce = bytes(aead.nonce_size, 0xA1);
 
     auto encrypted = aead.seal(key, nonce, aad, plaintext);
     auto decrypted = aead.open(key, nonce, aad, encrypted);
