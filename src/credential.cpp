@@ -113,10 +113,7 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 CredentialType
 Credential::type() const
 {
-  static const auto get_type = [](const auto& v) {
-    return tls::variant_map<CredentialType, std::decay_t<decltype(v)>>();
-  };
-  return var::visit(get_type, _cred);
+  return tls::variant<CredentialType>::type(_cred);
 }
 
 SignaturePublicKey
