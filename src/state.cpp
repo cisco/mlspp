@@ -210,7 +210,7 @@ State::commit(const bytes& leaf_secret) const
 
   // KEM new entropy to the group and the new joiners
   auto path_required = has_updates || has_removes || commit.proposals.empty();
-  auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
+  auto update_secret = bytes(_suite.secret_size(), 0);
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
@@ -340,7 +340,7 @@ State::handle(const MLSPlaintext& pt)
   next.apply(commit);
 
   // Decapsulate and apply the UpdatePath, if provided
-  auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
+  auto update_secret = bytes(_suite.secret_size(), 0);
   if (commit.path) {
     const auto& path = opt::get(commit.path);
     if (!path.parent_hash_valid(_suite)) {

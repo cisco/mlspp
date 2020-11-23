@@ -43,7 +43,7 @@ protected:
 
   bytes fresh_secret() const
   {
-    return random_bytes(suite.get().hpke.kdf.hash_size());
+    return random_bytes(suite.secret_size());
   }
 
   void verify_group_functionality(std::vector<State>& states)

@@ -137,8 +137,8 @@ Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
                               const bytes& psk_secret)
 {
-  auto key_size = suite.get().hpke.aead.key_size();
-  auto nonce_size = suite.get().hpke.aead.nonce_size();
+  auto key_size = suite.get().hpke.aead.key_size;
+  auto nonce_size = suite.get().hpke.aead.nonce_size;
 
   auto joiner_expand = suite.derive_secret(joiner_secret, "member");
   auto member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);

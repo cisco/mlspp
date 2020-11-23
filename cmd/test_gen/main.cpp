@@ -151,7 +151,7 @@ generate_key_schedule()
     KeyScheduleTestVectors::TestCase tc;
     tc.cipher_suite = suite;
 
-    auto secret_size = suite.get().hpke.kdf.hash_size();
+    auto secret_size = suite.secret_size();
 
     auto group_context = base_group_context;
     auto commit_secret = bytes(secret_size, 0);

@@ -49,6 +49,7 @@ struct CipherSuite
   ID id;
 
   const Ciphers& get() const;
+  size_t secret_size() const;
 
   bytes expand_with_label(const bytes& secret,
                           const std::string& label,

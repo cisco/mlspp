@@ -121,6 +121,12 @@ CipherSuite::get() const
   }
 }
 
+size_t
+CipherSuite::secret_size() const
+{
+  return get().digest.hash_size;
+}
+
 struct HKDFLabel
 {
   uint16_t length;
@@ -146,8 +152,7 @@ CipherSuite::expand_with_label(const bytes& secret,
 bytes
 CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
 {
-  auto size = get().digest.hash_size();
-  return expand_with_label(secret, label, {}, size);
+  return expand_with_label(secret, label, {}, secret_size());
 }
 
 const std::array<CipherSuite::ID, 6> all_supported_suites = {

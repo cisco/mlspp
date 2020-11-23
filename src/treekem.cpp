@@ -114,8 +114,7 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
 bytes
 TreeKEMPrivateKey::path_step(const bytes& path_secret) const
 {
-  auto secret_size = suite.get().digest.hash_size();
-  return suite.expand_with_label(path_secret, "path", {}, secret_size);
+  return suite.expand_with_label(path_secret, "path", {}, suite.secret_size());
 }
 
 void
