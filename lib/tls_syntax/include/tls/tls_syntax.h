@@ -413,7 +413,7 @@ struct variant
       return variant_map<Ts, std::decay_t<decltype(v)>>();
     };
     return var::visit(get_type, data);
-  };
+  }
 
   template<typename... Tp>
   static ostream& encode(ostream& str, const var::variant<Tp...>& data)
