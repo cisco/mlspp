@@ -13,8 +13,8 @@ enum struct IntType : uint16_t
 
 namespace tls {
 
-TLS_VARIANT_MAP(IntType, uint8_t, uint8);
-TLS_VARIANT_MAP(IntType, uint16_t, uint16);
+TLS_VARIANT_MAP(IntType, uint8_t, uint8)
+TLS_VARIANT_MAP(IntType, uint16_t, uint16)
 
 } // namespace tls
 
