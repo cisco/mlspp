@@ -428,8 +428,7 @@ State::find_proposal(const ProposalID& id)
 }
 
 std::vector<LeafIndex>
-State::apply(const std::vector<MLSPlaintext>& pts,
-             ProposalType::selector required_type)
+State::apply(const std::vector<MLSPlaintext>& pts, ProposalType required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& pt : pts) {
@@ -440,12 +439,12 @@ State::apply(const std::vector<MLSPlaintext>& pts,
     }
 
     switch (proposal_type) {
-      case ProposalType::selector::add: {
+      case ProposalType::add: {
         locations.push_back(apply(var::get<Add>(proposal)));
         break;
       }
 
-      case ProposalType::selector::update: {
+      case ProposalType::update: {
         auto& update = var::get<Update>(proposal);
         auto sender = LeafIndex(pt.sender.sender);
         if (sender != _index) {
@@ -463,7 +462,7 @@ State::apply(const std::vector<MLSPlaintext>& pts,
         break;
       }
 
-      case ProposalType::selector::remove: {
+      case ProposalType::remove: {
         const auto& remove = var::get<Remove>(proposal);
         apply(remove);
         locations.push_back(remove.removed);
@@ -494,9 +493,9 @@ State::apply(const Commit& commit)
                    return opt::get(maybe_pt);
                  });
 
-  auto update_locations = apply(pts, ProposalType::selector::update);
-  auto remove_locations = apply(pts, ProposalType::selector::remove);
-  auto joiner_locations = apply(pts, ProposalType::selector::add);
+  auto update_locations = apply(pts, ProposalType::update);
+  auto remove_locations = apply(pts, ProposalType::remove);
+  auto joiner_locations = apply(pts, ProposalType::add);
 
   auto has_updates = !update_locations.empty();
   auto has_removes = !remove_locations.empty();
@@ -657,7 +656,7 @@ struct MLSCiphertextContentAAD
 {
   const bytes& group_id;
   const epoch_t epoch;
-  const ContentType::selector content_type;
+  const ContentType content_type;
   const bytes& authenticated_data;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
@@ -706,7 +705,7 @@ struct MLSSenderDataAAD
 {
   const bytes& group_id;
   const epoch_t epoch;
-  const ContentType::selector content_type;
+  const ContentType content_type;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type)
   TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
@@ -795,7 +794,7 @@ State::decrypt(const MLSCiphertext& ct)
 
   // Pull from the key schedule
   auto key_type = GroupKeySource::RatchetType::handshake;
-  if (ct.content_type == ContentType::selector::application) {
+  if (ct.content_type == ContentType::application) {
     key_type = GroupKeySource::RatchetType::application;
   }
 

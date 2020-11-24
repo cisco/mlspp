@@ -151,40 +151,11 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // MLSPlaintext
-
-template<>
-const ProposalType::selector ProposalType::type<Add> =
-  ProposalType::selector::add;
-
-template<>
-const ProposalType::selector ProposalType::type<Update> =
-  ProposalType::selector::update;
-
-template<>
-const ProposalType::selector ProposalType::type<Remove> =
-  ProposalType::selector::remove;
-
-ProposalType::selector
+ProposalType
 Proposal::proposal_type() const
 {
-  static auto get_type = [](auto&& v) {
-    using type = typename std::decay<decltype(v)>::type;
-    return ProposalType::template type<type>;
-  };
-  return var::visit(get_type, content);
+  return tls::variant<ProposalType>::type(content);
 }
-
-template<>
-const ContentType::selector ContentType::type<Proposal> =
-  ContentType::selector::proposal;
-
-template<>
-const ContentType::selector ContentType::type<Commit> =
-  ContentType::selector::commit;
-
-template<>
-const ContentType::selector ContentType::type<ApplicationData> =
-  ContentType::selector::application;
 
 MLSPlaintext::MLSPlaintext()
   : epoch(0)
@@ -194,7 +165,7 @@ MLSPlaintext::MLSPlaintext()
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
-                           ContentType::selector content_type_in,
+                           ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
@@ -206,19 +177,19 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 {
   tls::istream r(content_in);
   switch (content_type_in) {
-    case ContentType::selector::application: {
+    case ContentType::application: {
       auto& application_data = content.emplace<ApplicationData>();
       r >> application_data;
       break;
     }
 
-    case ContentType::selector::proposal: {
+    case ContentType::proposal: {
       auto& proposal = content.emplace<Proposal>();
       r >> proposal;
       break;
     }
 
-    case ContentType::selector::commit: {
+    case ContentType::commit: {
       auto& commit = content.emplace<Commit>();
       r >> commit;
       break;
@@ -267,15 +238,13 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , decrypted(false)
 {}
 
-ContentType::selector
+ContentType
 MLSPlaintext::content_type() const
 {
   static const auto get_content_type = overloaded{
-    [](const ApplicationData& /*unused*/) {
-      return ContentType::selector::application;
-    },
-    [](const Proposal& /*unused*/) { return ContentType::selector::proposal; },
-    [](const Commit& /*unused*/) { return ContentType::selector::commit; },
+    [](const ApplicationData& /*unused*/) { return ContentType::application; },
+    [](const Proposal& /*unused*/) { return ContentType::proposal; },
+    [](const Commit& /*unused*/) { return ContentType::commit; },
   };
   return var::visit(get_content_type, content);
 }

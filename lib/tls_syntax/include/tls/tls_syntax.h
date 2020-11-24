@@ -392,34 +392,37 @@ struct vector
 };
 
 // Variant encoding
+template<typename Ts, typename Tv>
+constexpr Ts
+variant_map();
+
+#define TLS_VARIANT_MAP(EnumType, MappedType, enum_value)                      \
+  template<>                                                                   \
+  constexpr EnumType variant_map<EnumType, MappedType>()                       \
+  {                                                                            \
+    return EnumType::enum_value;                                               \
+  }
+
 template<typename Ts>
 struct variant
 {
-  template<size_t I = 0, typename... Tp>
-  static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  write_variant(tls::ostream&, const var::variant<Tp...>&)
+  template<typename... Tp>
+  static inline Ts type(const var::variant<Tp...>& data)
   {
-    throw WriteError("Empty variant");
-  }
-
-  template<size_t I = 0, typename... Tp>
-    static inline typename std::enable_if <
-    I<sizeof...(Tp), void>::type write_variant(tls::ostream& str,
-                                               const var::variant<Tp...>& v)
-  {
-    using Tc = var::variant_alternative_t<I, var::variant<Tp...>>;
-    if (var::holds_alternative<Tc>(v)) {
-      str << Ts::template type<Tc> << get<Tc>(v);
-      return;
-    }
-
-    write_variant<I + 1, Tp...>(str, v);
+    static const auto get_type = [](const auto& v) {
+      return variant_map<Ts, std::decay_t<decltype(v)>>();
+    };
+    return var::visit(get_type, data);
   }
 
   template<typename... Tp>
   static ostream& encode(ostream& str, const var::variant<Tp...>& data)
   {
-    write_variant(str, data);
+    const auto write_variant = [&str](auto&& v) {
+      using Tv = std::decay_t<decltype(v)>;
+      str << variant_map<Ts, Tv>() << v;
+    };
+    var::visit(write_variant, data);
     return str;
   }
 
@@ -437,7 +440,7 @@ struct variant
                                               var::variant<Tp...>& v)
   {
     using Tc = var::variant_alternative_t<I, var::variant<Tp...>>;
-    if (Ts::template type<Tc> == target_type) {
+    if (variant_map<Ts, Tc>() == target_type) {
       str >> v.template emplace<I>();
       return;
     }
@@ -448,7 +451,7 @@ struct variant
   template<typename... Tp>
   static istream& decode(istream& str, var::variant<Tp...>& data)
   {
-    typename Ts::selector target_type;
+    Ts target_type;
     str >> target_type;
     read_variant(str, target_type, data);
     return str;

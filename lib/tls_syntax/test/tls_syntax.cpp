@@ -11,19 +11,12 @@ enum struct IntType : uint16_t
   uint16 = 0xBBBB,
 };
 
-struct IntSelector
-{
-  using selector = IntType;
+namespace tls {
 
-  template<typename T>
-  static const IntType type;
-};
+TLS_VARIANT_MAP(IntType, uint8_t, uint8)
+TLS_VARIANT_MAP(IntType, uint16_t, uint16)
 
-template<>
-const IntType IntSelector::type<uint8_t> = IntType::uint8;
-
-template<>
-const IntType IntSelector::type<uint16_t> = IntType::uint16;
+} // namespace tls
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -39,7 +32,7 @@ struct ExampleStruct
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant<IntSelector>)
+             tls::variant<IntType>)
 };
 
 static bool

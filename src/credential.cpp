@@ -5,18 +5,6 @@
 namespace mls {
 
 ///
-/// CredentialType
-///
-
-template<>
-const CredentialType::selector CredentialType::type<BasicCredential> =
-  CredentialType::selector::basic;
-
-template<>
-const CredentialType::selector CredentialType::type<X509Credential> =
-  CredentialType::selector::x509;
-
-///
 /// X509Credential
 ///
 
@@ -101,18 +89,10 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 /// Credential
 ///
 
-CredentialType::selector
+CredentialType
 Credential::type() const
 {
-  static const auto get_type = overloaded{
-    [](const BasicCredential& /* unused */) {
-      return CredentialType::selector::basic;
-    },
-    [](const X509Credential& /* unused */) {
-      return CredentialType::selector::x509;
-    },
-  };
-  return var::visit(get_type, _cred);
+  return tls::variant<CredentialType>::type(_cred);
 }
 
 SignaturePublicKey
