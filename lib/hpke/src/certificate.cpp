@@ -1,6 +1,7 @@
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 #include "group.h"
 #include "openssl_common.h"
@@ -25,9 +26,60 @@ struct Certificate::ParsedCertificate
     return std::make_unique<ParsedCertificate>(cert.release());
   }
 
+  // Parse Subject Key Identifier Extension
+  static std::string parse_skid(X509* cert)
+  {
+    int loc = X509_get_ext_by_NID(cert, NID_subject_key_identifier, -1);
+    auto* ext = X509_get_ext(cert, loc);
+    std::string skid;
+    if (ext != nullptr) {
+      auto* ext_value = X509_EXTENSION_get_data(ext);
+      const auto* octet_str_data = ext_value->data;
+      long xlen = 0;
+      int tag = 0;
+      int xclass = 0;
+      int ret = ASN1_get_object(
+        &octet_str_data, &xlen, &tag, &xclass, ext_value->length);
+      if (ret == -1) {
+        throw openssl_error();
+      }
+      auto kid = std::make_unique<char*>(hex_to_string(octet_str_data, xlen));
+      if (kid == nullptr) {
+        throw openssl_error();
+      }
+      skid.assign(*kid);
+    }
+    return skid;
+  }
+
+  // Parse Authority Key Identifier
+  static std::string parse_akid(X509* cert)
+  {
+    int loc = X509_get_ext_by_NID(cert, NID_authority_key_identifier, -1);
+    auto* ext = X509_get_ext(cert, loc);
+    std::string akid;
+    if (ext != nullptr) {
+      auto ext_value = make_typed_unique(
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        reinterpret_cast<AUTHORITY_KEYID*>(X509V3_EXT_d2i(ext)));
+      auto* key_id = ext_value->keyid;
+      auto kid =
+        std::make_unique<char*>(hex_to_string(key_id->data, key_id->length));
+      if (kid == nullptr) {
+        throw openssl_error();
+      }
+      akid.assign(*kid);
+    }
+    return akid;
+  }
+
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
     , sig_id(signature_algorithm(x509.get()))
+    , issuer(X509_NAME_oneline(X509_get_issuer_name(x509_in), nullptr, 0))
+    , subject(X509_NAME_oneline(X509_get_subject_name(x509_in), nullptr, 0))
+    , skID(parse_skid(x509.get()))
+    , akID(parse_akid(x509.get()))
   {}
 
   ParsedCertificate(const ParsedCertificate& other)
@@ -59,8 +111,22 @@ struct Certificate::ParsedCertificate
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
+  bool is_ca() const
+  {
+    auto* bc = static_cast<BASIC_CONSTRAINTS*>(
+      X509_get_ext_d2i(x509.get(), NID_basic_constraints, nullptr, nullptr));
+    if (bc == nullptr) {
+      throw openssl_error();
+    }
+    return (0 != bc->ca);
+  }
+
   typed_unique_ptr<X509> x509;
   const Signature::ID sig_id;
+  const std::string issuer;
+  const std::string subject;
+  const std::string skID;
+  const std::string akID;
 };
 
 ///
@@ -90,6 +156,36 @@ Certificate::valid_from(const Certificate& parent)
 {
   auto pub = parent.parsed_cert->public_key();
   return (1 == X509_verify(parsed_cert->x509.get(), pub.get()));
+}
+
+std::string
+Certificate::issuer() const
+{
+  return parsed_cert->issuer;
+}
+
+std::string
+Certificate::subject() const
+{
+  return parsed_cert->subject;
+}
+
+bool
+Certificate::is_ca() const
+{
+  return parsed_cert->is_ca();
+}
+
+std::string
+Certificate::subject_key_id() const
+{
+  return parsed_cert->skID;
+}
+
+std::string
+Certificate::authority_key_id() const
+{
+  return parsed_cert->akID;
 }
 
 } // namespace hpke

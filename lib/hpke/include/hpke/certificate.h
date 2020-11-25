@@ -23,6 +23,13 @@ public:
 
   bool valid_from(const Certificate& parent);
 
+  // Accessors for parsed certificate elements
+  std::string issuer() const;
+  std::string subject() const;
+  bool is_ca() const;
+  std::string subject_key_id() const;
+  std::string authority_key_id() const;
+
   const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;
   const bytes raw;
