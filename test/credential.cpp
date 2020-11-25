@@ -38,13 +38,14 @@ TEST_CASE("X509 Credential Depth 2")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ { leaf_der }, { issuing_der } };
+  std::vector<bytes> der_in{ leaf_der, issuing_der };
 
   auto cred = Credential::x509(der_in);
   CHECK(cred.public_key().data.size() != 0);
 
   auto x509 = cred.get<X509Credential>();
-  CHECK(x509.der_chain == der_in);
+  const auto& x509_original = cred.get<X509Credential>();
+  CHECK(x509.der_chain == x509_original.der_chain);
 }
 
 TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
@@ -67,7 +68,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ { leaf_der }, { issuing_der } };
+  std::vector<bytes> der_in{ leaf_der, issuing_der };
 
   auto original = Credential::x509(der_in);
   CHECK(original.public_key().data.size() != 0);
@@ -77,7 +78,8 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
   CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
-  CHECK(x509.der_chain == der_in);
+  const auto& x509_original = original.get<X509Credential>();
+  CHECK(x509.der_chain == x509_original.der_chain);
 }
 
 TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
@@ -92,15 +94,15 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<X509Credential::CertData> der_in{ { leaf_der } };
+  std::vector<bytes> der_in{ { leaf_der } };
 
   auto original = Credential::x509(der_in);
   CHECK(original.public_key().data.size() != 0);
-
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
   CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
-  CHECK(x509.der_chain == der_in);
+  const auto& x509_original = original.get<X509Credential>();
+  CHECK(x509.der_chain == x509_original.der_chain);
 }
