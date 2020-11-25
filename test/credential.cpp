@@ -44,7 +44,7 @@ TEST_CASE("X509 Credential Depth 2")
   CHECK(cred.public_key().data.size() != 0);
 
   auto x509 = cred.get<X509Credential>();
-  auto& x509_original = cred.get<X509Credential>();
+  const auto& x509_original = cred.get<X509Credential>();
   CHECK(x509.der_chain == x509_original.der_chain);
 }
 
@@ -78,7 +78,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
   CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
-  auto& x509_original = original.get<X509Credential>();
+  const auto& x509_original = original.get<X509Credential>();
   CHECK(x509.der_chain == x509_original.der_chain);
 }
 
@@ -103,7 +103,6 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
   CHECK(original == unmarshaled);
 
   auto x509 = unmarshaled.get<X509Credential>();
-  auto& x509_original = original.get<X509Credential>();
-
+  const auto& x509_original = original.get<X509Credential>();
   CHECK(x509.der_chain == x509_original.der_chain);
 }
