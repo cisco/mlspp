@@ -29,9 +29,22 @@ find_signature(Signature::ID id)
   throw InvalidParameterError("Unsupported algorithm");
 }
 
-X509Credential::X509Credential(
-  std::vector<X509Credential::CertData> der_chain_in)
-  : der_chain(std::move(der_chain_in))
+static std::vector<mls::X509Credential::CertData>
+to_x509_credential_data(const std::vector<bytes>& data_in)
+{
+  std::vector<mls::X509Credential::CertData> data_out;
+  data_out.resize(data_in.size());
+  std::transform(data_in.begin(),
+                 data_in.end(),
+                 data_out.begin(),
+                 [](const bytes& der) -> mls::X509Credential::CertData {
+                   return mls::X509Credential::CertData{ der };
+                 });
+  return data_out;
+}
+
+X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
+  : der_chain(to_x509_credential_data(der_chain_in))
 {
   if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
@@ -75,7 +88,15 @@ operator>>(tls::istream& str, X509Credential& obj)
 {
   auto der_chain = std::vector<X509Credential::CertData>{};
   tls::vector<4>::decode(str, der_chain);
-  obj = X509Credential(der_chain);
+  std::vector<bytes> der_in;
+  der_in.resize(der_chain.size());
+
+  std::transform(der_chain.begin(),
+                 der_chain.end(),
+                 der_in.begin(),
+                 [](const auto& cert_data) { return cert_data.data; });
+  obj = X509Credential(der_in);
+
   return str;
 }
 
@@ -120,7 +141,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 }
 
 Credential
-Credential::x509(const std::vector<X509Credential::CertData>& der_chain)
+Credential::x509(const std::vector<bytes>& der_chain)
 {
   Credential cred;
   cred._cred = X509Credential{ der_chain };
