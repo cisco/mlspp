@@ -30,7 +30,7 @@ find_signature(Signature::ID id)
 }
 
 static std::vector<mls::X509Credential::CertData>
-to_x509_credential_data(const std::vector<bytes>& data_in)
+bytes_to_x509_credential_data(const std::vector<bytes>& data_in)
 {
   std::vector<mls::X509Credential::CertData> data_out;
   data_out.resize(data_in.size());
@@ -44,7 +44,7 @@ to_x509_credential_data(const std::vector<bytes>& data_in)
 }
 
 X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
-  : der_chain(to_x509_credential_data(der_chain_in))
+  : der_chain(bytes_to_x509_credential_data(der_chain_in))
 {
   if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
