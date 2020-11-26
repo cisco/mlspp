@@ -161,10 +161,17 @@ struct Certificate::ParsedCertificate
         return Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
         return Signature::ID::Ed448;
+      case NID_ecdsa_with_SHA256:
+        return Signature::ID::P256_SHA256;
+      case NID_ecdsa_with_SHA384:
+        return Signature::ID::P384_SHA384;
+      case NID_ecdsa_with_SHA512:
+        return Signature::ID::P521_SHA512;
       default:
-        // TODO (Suhas): Add support for ECDSA curves
         break;
     }
+    auto algo = X509_get_signature_nid(cert);
+    (void)algo;
     throw std::runtime_error("Unsupported signature algorithm");
   }
 
