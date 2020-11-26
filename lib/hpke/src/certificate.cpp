@@ -99,8 +99,8 @@ struct Certificate::ParsedCertificate
       const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
 
       if (current_name->type == GEN_DNS) {
-        const char* dns_name =
-          (const char*)(ASN1_STRING_get0_data(current_name->d.dNSName)); // NOLINT
+        const char* dns_name = (const char*)(ASN1_STRING_get0_data(
+          current_name->d.dNSName)); // NOLINT
 
         // Make sure there isn't an embedded NUL character in the DNS name
         if (ASN1_STRING_length(current_name->d.dNSName) != // NOLINT
