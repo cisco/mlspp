@@ -15,7 +15,7 @@ namespace hpke {
 
 struct ParsedSANInfo
 {
-  std::string email;
+  std::vector<std::string> email_addresses;
   std::vector<std::string> domains;
 };
 
@@ -120,7 +120,7 @@ struct Certificate::ParsedCertificate
             static_cast<int>(strlen(email))) {
           throw std::runtime_error("Malformed certificate");
         }
-        san_info.email = email;
+        san_info.email_addresses.emplace_back(email);
       }
     }
 
@@ -258,10 +258,18 @@ Certificate::authority_key_id() const
   return parsed_cert->akID;
 }
 
-std::string
-Certificate::email_address() const
+std::vector<std::string>
+Certificate::email_addresses() const
 {
-  return parsed_cert->san_info.email;
+  return parsed_cert->san_info.email_addresses;
 }
+
+std::vector<std::string>
+Certificate::dns_names() const
+{
+  return parsed_cert->san_info.domains;
+}
+
+
 
 } // namespace hpke

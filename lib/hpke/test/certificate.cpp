@@ -56,7 +56,7 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  CHECK_EQ(leaf.email_address(), "user@domain.com");
+  CHECK_EQ(leaf.email_addresses().at(0), "user@domain.com");
 
   // negative tests
   CHECK_FALSE(issuing.valid_from(leaf));
