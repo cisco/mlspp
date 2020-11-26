@@ -99,6 +99,7 @@ struct Certificate::ParsedCertificate
       const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
 
       if (current_name->type == GEN_DNS) {
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast)
         const char* dns_name = (const char*)(ASN1_STRING_get0_data(
           current_name->d.dNSName)); // NOLINT
 
@@ -110,6 +111,7 @@ struct Certificate::ParsedCertificate
         san_info.domains.emplace_back(std::string(dns_name));
       } else if (current_name->type == GEN_EMAIL) {
         const char* email =
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
           (const char*)ASN1_STRING_get0_data(current_name->d.dNSName); // NOLINT
 
         // Make sure there isn't an embedded NUL character in the DNS name
