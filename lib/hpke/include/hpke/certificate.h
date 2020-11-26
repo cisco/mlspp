@@ -11,6 +11,7 @@ namespace hpke {
 
 struct Certificate
 {
+
 private:
   struct ParsedCertificate;
   std::unique_ptr<ParsedCertificate> parsed_cert;
@@ -29,6 +30,7 @@ public:
   bool is_ca() const;
   std::string subject_key_id() const;
   std::string authority_key_id() const;
+  std::string email_address() const;
 
   const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;

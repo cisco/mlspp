@@ -5,9 +5,10 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
-	"math/big"
+    "math/big"
 	"time"
 	"fmt"
+
 )
 
 
@@ -58,6 +59,9 @@ func makeCert(template, parent *x509.Certificate, parentPriv crypto.Signer, addS
     template.SubjectKeyId = make([]byte, skiSize)
     rand.Read(template.SubjectKeyId)
   }
+
+  // Add Email SAN
+  template.EmailAddresses = []string{"user@domain.com"}
 
   // Generate and parse the certificate
   priv := parentPriv

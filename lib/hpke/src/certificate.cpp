@@ -12,6 +12,12 @@ namespace hpke {
 /// ParsedCertificate
 ///
 
+struct ParsedSANInfo
+{
+  std::string email;
+  std::vector<std::string> domains;
+};
+
 struct Certificate::ParsedCertificate
 {
 
@@ -35,6 +41,7 @@ struct Certificate::ParsedCertificate
     if (ext != nullptr) {
       auto* ext_value = X509_EXTENSION_get_data(ext);
       const auto* octet_str_data = ext_value->data;
+      // NOLINTNEXTLINE(google-runtime-int)
       long xlen = 0;
       int tag = 0;
       int xclass = 0;
@@ -73,6 +80,52 @@ struct Certificate::ParsedCertificate
     return akid;
   }
 
+  static ParsedSANInfo parse_san(X509* cert)
+  {
+    ParsedSANInfo san_info;
+    int san_names_nb = -1;
+    STACK_OF(GENERAL_NAME)* san_names = nullptr;
+
+    // Try to extract the names within the SAN extension from the certificate
+    san_names = static_cast<STACK_OF(GENERAL_NAME)*>(
+      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
+    if (san_names == nullptr) {
+      return san_info;
+    }
+    san_names_nb = sk_GENERAL_NAME_num(san_names);
+
+    // Check each name within the extension
+    for (int i = 0; i < san_names_nb; i++) {
+      const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
+
+      if (current_name->type == GEN_DNS) {
+        const char* dns_name =
+          (const char*)(ASN1_STRING_get0_data(current_name->d.dNSName)); // NOLINT
+
+        // Make sure there isn't an embedded NUL character in the DNS name
+        if (ASN1_STRING_length(current_name->d.dNSName) != // NOLINT
+            static_cast<int>(strlen(dns_name))) {
+          throw std::runtime_error("Malformed certificate");
+        }
+        san_info.domains.emplace_back(std::string(dns_name));
+      } else if (current_name->type == GEN_EMAIL) {
+        const char* email =
+          (const char*)ASN1_STRING_get0_data(current_name->d.dNSName); // NOLINT
+
+        // Make sure there isn't an embedded NUL character in the DNS name
+        if (ASN1_STRING_length(current_name->d.dNSName) != // NOLINT
+            static_cast<int>(strlen(email))) {
+          throw std::runtime_error("Malformed certificate");
+        }
+        san_info.email = email;
+      }
+    }
+
+    // Clean up
+    sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+    return san_info;
+  }
+
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
     , sig_id(signature_algorithm(x509.get()))
@@ -80,6 +133,7 @@ struct Certificate::ParsedCertificate
     , subject(X509_NAME_oneline(X509_get_subject_name(x509_in), nullptr, 0))
     , skID(parse_skid(x509.get()))
     , akID(parse_akid(x509.get()))
+    , san_info(parse_san(x509.get()))
   {}
 
   ParsedCertificate(const ParsedCertificate& other)
@@ -127,6 +181,7 @@ struct Certificate::ParsedCertificate
   const std::string subject;
   const std::string skID;
   const std::string akID;
+  const ParsedSANInfo san_info;
 };
 
 ///
@@ -186,6 +241,12 @@ std::string
 Certificate::authority_key_id() const
 {
   return parsed_cert->akID;
+}
+
+std::string
+Certificate::email_address() const
+{
+  return parsed_cert->san_info.email;
 }
 
 } // namespace hpke
