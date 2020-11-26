@@ -36,7 +36,7 @@ struct X509Credential
   };
 
   X509Credential() = default;
-  explicit X509Credential(std::vector<CertData> der_chain_in);
+  explicit X509Credential(const std::vector<bytes>& der_chain_in);
 
   SignaturePublicKey public_key() const;
 
@@ -96,8 +96,7 @@ public:
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  static Credential x509(
-    const std::vector<X509Credential::CertData>& der_chain);
+  static Credential x509(const std::vector<bytes>& der_chain);
 
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)
