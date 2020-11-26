@@ -22,7 +22,7 @@ public:
   Certificate(const Certificate& other);
   ~Certificate();
 
-  bool valid_from(const Certificate& parent);
+  bool valid_from(const Certificate& parent) const;
 
   // Accessors for parsed certificate elements
   std::string issuer() const;

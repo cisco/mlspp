@@ -142,6 +142,11 @@ struct Certificate::ParsedCertificate
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
     , sig_id(signature_algorithm(other.x509.get()))
+    , issuer(other.issuer)
+    , subject(other.subject)
+    , skID(other.skID)
+    , akID(other.akID)
+    , san_info(other.san_info)
   {
     if (1 != X509_up_ref(other.x509.get())) {
       throw openssl_error();
@@ -210,7 +215,7 @@ Certificate::Certificate(const Certificate& other)
 Certificate::~Certificate() = default;
 
 bool
-Certificate::valid_from(const Certificate& parent)
+Certificate::valid_from(const Certificate& parent) const
 {
   auto pub = parent.parsed_cert->public_key();
   return (1 == X509_verify(parsed_cert->x509.get(), pub.get()));
