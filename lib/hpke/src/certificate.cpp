@@ -3,11 +3,26 @@
 #include <cstring>
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
+#include <iostream>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
-
 namespace hpke {
+///
+/// Utility functions
+///
+
+static std::optional<bytes>
+asn1_octet_string_to_bytes(const ASN1_OCTET_STRING* octets)
+{
+  if (octets == nullptr) {
+    return std::nullopt;
+  }
+  const auto* ptr = ASN1_STRING_get0_data(octets);
+  const auto len = ASN1_STRING_length(octets);
+  // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  return bytes(ptr, ptr + len);
+}
 
 ///
 /// ParsedCertificate
@@ -40,88 +55,67 @@ struct Certificate::ParsedCertificate
   }
 
   // Parse Subject Key Identifier Extension
-  static bytes parse_skid(X509* cert)
+  static std::optional<bytes> parse_skid(X509* cert)
   {
-    const auto* asn_skid = X509_get0_subject_key_id(cert);
-    if (asn_skid == nullptr) {
-      return bytes{};
-    }
-    const auto* octet_skid = ASN1_STRING_get0_data(asn_skid);
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    std::string skid_str(reinterpret_cast<const char*>(octet_skid));
-    return bytes(skid_str.begin(), skid_str.end());
+    return asn1_octet_string_to_bytes(X509_get0_subject_key_id(cert));
   }
 
   // Parse Authority Key Identifier
-  static bytes parse_akid(X509* cert)
+  static std::optional<bytes> parse_akid(X509* cert)
   {
-    const auto* asn_akid = X509_get0_authority_key_id(cert);
-    if (asn_akid == nullptr) {
-      return bytes{};
+    return asn1_octet_string_to_bytes(X509_get0_authority_key_id(cert));
+  }
+
+  static std::string asn1_string_to_std_string(
+    const asn1_string_st* asn1_string)
+  {
+    const auto* data = ASN1_STRING_get0_data(asn1_string);
+    const auto data_size = static_cast<size_t>(ASN1_STRING_length(asn1_string));
+    auto str =
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      std::string(reinterpret_cast<const char*>(data));
+    if (str.size() != data_size) {
+      throw std::runtime_error("Malformed certificate");
     }
-    const auto* octet_akid = ASN1_STRING_get0_data(asn_akid);
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    std::string akid_str(reinterpret_cast<const char*>(octet_akid));
-    return bytes(akid_str.begin(), akid_str.end());
+    return str;
   }
 
   static std::vector<GeneralName> parse_san(X509* cert)
   {
-    std::vector<GeneralName> san_info;
+    std::vector<GeneralName> names;
     int san_names_nb = -1;
 
-    const auto san_names =
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-      make_typed_unique(reinterpret_cast<STACK_OF(GENERAL_NAME)*>(
-        X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+    auto* ext_ptr =
+      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* san_ptr = reinterpret_cast<STACK_OF(GENERAL_NAME)*>(ext_ptr);
+    const auto san_names = make_typed_unique(san_ptr);
     san_names_nb = sk_GENERAL_NAME_num(san_names.get());
 
     // Check each name within the extension
     for (int i = 0; i < san_names_nb; i++) {
       auto* current_name = sk_GENERAL_NAME_value(san_names.get(), i);
-
       if (current_name->type == GEN_DNS) {
-        const char* dns_name =
-          // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<const char*>((ASN1_STRING_get0_data(
-            current_name->d
-              .dNSName))); // NOLINT(cppcoreguidelines-pro-type-union-access)
-
-        // Make sure there isn't an embedded NUL character in the DNS name
-        if (ASN1_STRING_length(
-              current_name->d
-                .dNSName) != // NOLINT(cppcoreguidelines-pro-type-union-access)
-            static_cast<int>(strlen(dns_name))) {
-          throw std::runtime_error("Malformed certificate");
-        }
-        san_info.emplace_back(DNSName{ dns_name });
-
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const auto dns_name =
+          asn1_string_to_std_string(current_name->d.dNSName);
+        names.emplace_back(DNSName{ dns_name });
       } else if (current_name->type == GEN_EMAIL) {
-        const char* email =
-          // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<const char*>(ASN1_STRING_get0_data(
-            current_name->d
-              .dNSName)); // NOLINT(cppcoreguidelines-pro-type-union-access)
-
-        // Make sure there isn't an embedded NUL character in the DNS name
-        if (ASN1_STRING_length(
-              current_name->d
-                .dNSName) != // NOLINT(cppcoreguidelines-pro-type-union-access)
-            static_cast<int>(strlen(email))) {
-          throw std::runtime_error("Malformed certificate");
-        }
-        san_info.emplace_back(RFC822Name{ email });
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access
+        const auto email =
+          asn1_string_to_std_string(current_name->d.rfc822Name);
+        names.emplace_back(RFC822Name{ email });
       }
     }
 
-    return san_info;
+    return names;
   }
 
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
     , sig_id(signature_algorithm(x509.get()))
-    , issuer(X509_NAME_oneline(X509_get_issuer_name(x509.get()), nullptr, 0))
-    , subject(X509_NAME_oneline(X509_get_subject_name(x509.get()), nullptr, 0))
+    , issuer(X509_issuer_name_hash(x509.get()))
+    , subject(X509_subject_name_hash(x509.get()))
     , subject_key_id(parse_skid(x509.get()))
     , authority_key_id(parse_akid(x509.get()))
     , san_info(parse_san(x509.get()))
@@ -170,10 +164,10 @@ struct Certificate::ParsedCertificate
 
   typed_unique_ptr<X509> x509;
   const Signature::ID sig_id;
-  const std::string issuer;
-  const std::string subject;
-  const bytes subject_key_id;
-  const bytes authority_key_id;
+  const uint64_t issuer;
+  const uint64_t subject;
+  const std::optional<bytes> subject_key_id;
+  const std::optional<bytes> authority_key_id;
   const std::vector<GeneralName> san_info;
   const bool is_ca;
 };
@@ -207,16 +201,16 @@ Certificate::valid_from(const Certificate& parent) const
   return (1 == X509_verify(parsed_cert->x509.get(), pub.get()));
 }
 
-bytes
+uint64_t
 Certificate::issuer() const
 {
-  return to_bytes(parsed_cert->issuer);
+  return parsed_cert->issuer;
 }
 
-bytes
+uint64_t
 Certificate::subject() const
 {
-  return to_bytes(parsed_cert->subject);
+  return parsed_cert->subject;
 }
 
 bool
@@ -225,13 +219,13 @@ Certificate::is_ca() const
   return parsed_cert->is_ca;
 }
 
-bytes
+std::optional<bytes>
 Certificate::subject_key_id() const
 {
   return parsed_cert->subject_key_id;
 }
 
-bytes
+std::optional<bytes>
 Certificate::authority_key_id() const
 {
   return parsed_cert->authority_key_id;

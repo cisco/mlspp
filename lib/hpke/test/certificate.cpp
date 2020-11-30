@@ -58,7 +58,7 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  REQUIRE(to_hex(root.subject()) == "2f434e3d746573742e636d6f6d");
+  REQUIRE(root.subject() == 1072860458);
   REQUIRE(issuing.issuer() == root.subject());
   REQUIRE(leaf.issuer() == issuing.subject());
 
@@ -115,11 +115,21 @@ TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
   CHECK(issuing.valid_from(root));
   CHECK(root.valid_from(root));
 
-  CHECK_EQ(to_hex(leaf.subject_key_id()), leaf_skid);
-  CHECK_EQ(to_hex(leaf.authority_key_id()), to_hex(issuing.subject_key_id()));
-  CHECK_EQ(to_hex(issuing.subject_key_id()), issuing_skid);
-  CHECK_EQ(to_hex(issuing.authority_key_id()), to_hex(root.subject_key_id()));
-  CHECK_EQ(to_hex(root.subject_key_id()), root_skid);
+  REQUIRE(leaf.subject_key_id().has_value());
+  REQUIRE(leaf.authority_key_id().has_value());
+
+  REQUIRE(issuing.subject_key_id().has_value());
+  REQUIRE(issuing.authority_key_id().has_value());
+
+  REQUIRE(root.subject_key_id().has_value());
+
+  CHECK_EQ(to_hex(leaf.subject_key_id().value()), leaf_skid);
+  CHECK_EQ(to_hex(leaf.authority_key_id().value()),
+           to_hex(issuing.subject_key_id().value()));
+  CHECK_EQ(to_hex(issuing.subject_key_id().value()), issuing_skid);
+  CHECK_EQ(to_hex(issuing.authority_key_id().value()),
+           to_hex(root.subject_key_id().value()));
+  CHECK_EQ(to_hex(root.subject_key_id().value()), root_skid);
 }
 
 TEST_CASE("Certificate Known-Answer depth 2 with SAN RFC822Name")
