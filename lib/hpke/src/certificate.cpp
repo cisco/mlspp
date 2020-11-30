@@ -32,7 +32,7 @@ asn1_string_to_std_string(const asn1_string_st* asn1_string)
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   auto str = std::string(reinterpret_cast<const char*>(data));
   if (str.size() != data_size) {
-    throw std::runtime_error("Malformed certificate");
+    throw std::runtime_error("Malformed ASN.1 string");
   }
   return str;
 }
