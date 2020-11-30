@@ -29,9 +29,8 @@ asn1_string_to_std_string(const asn1_string_st* asn1_string)
 {
   const auto* data = ASN1_STRING_get0_data(asn1_string);
   const auto data_size = static_cast<size_t>(ASN1_STRING_length(asn1_string));
-  auto str =
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    std::string(reinterpret_cast<const char*>(data));
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+  auto str = std::string(reinterpret_cast<const char*>(data));
   if (str.size() != data_size) {
     throw std::runtime_error("Malformed certificate");
   }
