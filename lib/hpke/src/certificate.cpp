@@ -117,7 +117,7 @@ struct Certificate::ParsedCertificate
     , subject(X509_subject_name_hash(x509.get()))
     , subject_key_id(parse_skid(x509.get()))
     , authority_key_id(parse_akid(x509.get()))
-    , san_info(parse_san(x509.get()))
+    , sub_alt_names(parse_san(x509.get()))
     , is_ca(X509_check_ca(x509.get()) != 0)
   {}
 
@@ -128,7 +128,7 @@ struct Certificate::ParsedCertificate
     , subject(other.subject)
     , subject_key_id(other.subject_key_id)
     , authority_key_id(other.authority_key_id)
-    , san_info(other.san_info)
+    , sub_alt_names(other.sub_alt_names)
     , is_ca(other.is_ca)
   {
     if (1 != X509_up_ref(other.x509.get())) {
@@ -167,7 +167,7 @@ struct Certificate::ParsedCertificate
   const uint64_t subject;
   const std::optional<bytes> subject_key_id;
   const std::optional<bytes> authority_key_id;
-  const std::vector<GeneralName> san_info;
+  const std::vector<GeneralName> sub_alt_names;
   const bool is_ca;
 };
 
@@ -234,7 +234,7 @@ std::vector<std::string>
 Certificate::email_addresses() const
 {
   std::vector<std::string> emails;
-  for (const auto& name : parsed_cert->san_info) {
+  for (const auto& name : parsed_cert->sub_alt_names) {
     if (tls::var::holds_alternative<RFC822Name>(name)) {
       emails.emplace_back(tls::var::get<RFC822Name>(name).value);
     }
@@ -246,9 +246,9 @@ std::vector<std::string>
 Certificate::dns_names() const
 {
   std::vector<std::string> domains;
-  for (const auto& name : parsed_cert->san_info) {
+  for (const auto& name : parsed_cert->sub_alt_names) {
     if (tls::var::holds_alternative<DNSName>(name)) {
-      domains.emplace_back(tls::var::get<RFC822Name>(name).value);
+      domains.emplace_back(tls::var::get<DNSName>(name).value);
     }
   }
 
