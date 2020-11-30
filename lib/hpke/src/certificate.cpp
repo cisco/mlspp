@@ -25,7 +25,7 @@ asn1_octet_string_to_bytes(const ASN1_OCTET_STRING* octets)
 }
 
 static std::string
-asn1_string_to_std_string(const asn1_string_st* asn1_string)
+asn1_string_to_std_string(const ASN1_STRING* asn1_string)
 {
   const auto* data = ASN1_STRING_get0_data(asn1_string);
   const auto data_size = static_cast<size_t>(ASN1_STRING_length(asn1_string));
