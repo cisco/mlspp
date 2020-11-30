@@ -5,9 +5,10 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
-	"math/big"
+    "math/big"
 	"time"
 	"fmt"
+
 )
 
 
@@ -52,12 +53,15 @@ func makeCert(template, parent *x509.Certificate, parentPriv crypto.Signer, addS
   chk(err)
   template.SerialNumber = serialNumber
 
-  // Add random SKI if requried
+  // Add random SKI if required
   template.SubjectKeyId = nil
   if addSKI {
     template.SubjectKeyId = make([]byte, skiSize)
     rand.Read(template.SubjectKeyId)
   }
+
+  // Add Email SAN
+  template.EmailAddresses = []string{"user@domain.com"}
 
   // Generate and parse the certificate
   priv := parentPriv
@@ -105,7 +109,7 @@ func makeCertChain(rootPriv crypto.Signer, depth int, addSKI bool) ([]byte, []by
 func main() {
   depth := 2
   rootPriv := newEd25519()
-  myPriv, rootCertRaw, _, chainRaw := makeCertChain(rootPriv, depth, false)
+  myPriv, rootCertRaw, _, chainRaw := makeCertChain(rootPriv, depth, true)
 
   fmt.Printf("{\n")
   fmt.Printf("  root_priv,\n")

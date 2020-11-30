@@ -1,9 +1,9 @@
 #pragma once
+#include <memory>
+#include <optional>
 
 #include <bytes/bytes.h>
 #include <hpke/signature.h>
-
-#include <memory>
 
 using namespace bytes_ns;
 
@@ -21,7 +21,16 @@ public:
   Certificate(const Certificate& other);
   ~Certificate();
 
-  bool valid_from(const Certificate& parent);
+  bool valid_from(const Certificate& parent) const;
+
+  // Accessors for parsed certificate elements
+  uint64_t issuer() const;
+  uint64_t subject() const;
+  bool is_ca() const;
+  std::optional<bytes> subject_key_id() const;
+  std::optional<bytes> authority_key_id() const;
+  std::vector<std::string> email_addresses() const;
+  std::vector<std::string> dns_names() const;
 
   const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;
