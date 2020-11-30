@@ -24,6 +24,20 @@ asn1_octet_string_to_bytes(const ASN1_OCTET_STRING* octets)
   return bytes(ptr, ptr + len);
 }
 
+static std::string
+asn1_string_to_std_string(const asn1_string_st* asn1_string)
+{
+  const auto* data = ASN1_STRING_get0_data(asn1_string);
+  const auto data_size = static_cast<size_t>(ASN1_STRING_length(asn1_string));
+  auto str =
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    std::string(reinterpret_cast<const char*>(data));
+  if (str.size() != data_size) {
+    throw std::runtime_error("Malformed certificate");
+  }
+  return str;
+}
+
 ///
 /// ParsedCertificate
 ///
@@ -66,20 +80,6 @@ struct Certificate::ParsedCertificate
     return asn1_octet_string_to_bytes(X509_get0_authority_key_id(cert));
   }
 
-  static std::string asn1_string_to_std_string(
-    const asn1_string_st* asn1_string)
-  {
-    const auto* data = ASN1_STRING_get0_data(asn1_string);
-    const auto data_size = static_cast<size_t>(ASN1_STRING_length(asn1_string));
-    auto str =
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-      std::string(reinterpret_cast<const char*>(data));
-    if (str.size() != data_size) {
-      throw std::runtime_error("Malformed certificate");
-    }
-    return str;
-  }
-
   static std::vector<GeneralName> parse_san(X509* cert)
   {
     std::vector<GeneralName> names;
@@ -96,13 +96,13 @@ struct Certificate::ParsedCertificate
     for (int i = 0; i < san_names_nb; i++) {
       auto* current_name = sk_GENERAL_NAME_value(san_names.get(), i);
       if (current_name->type == GEN_DNS) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
         const auto dns_name =
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
           asn1_string_to_std_string(current_name->d.dNSName);
         names.emplace_back(DNSName{ dns_name });
       } else if (current_name->type == GEN_EMAIL) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access
         const auto email =
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access
           asn1_string_to_std_string(current_name->d.rfc822Name);
         names.emplace_back(RFC822Name{ email });
       }
