@@ -63,3 +63,57 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK_FALSE(root.valid_from(issuing));
   CHECK_FALSE(root.valid_from(leaf));
 }
+
+TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
+{
+  const auto root_der = from_hex(
+    "308201183081cba0030201020211009561abf361bd738664041a79d918f602300506032b"
+    "657030143112301006035504031309746573742e636d6f6d301e170d3230313030363035"
+    "303433365a170d3230313030373035303433365a30143112301006035504031309746573"
+    "742e636d6f6d302a300506032b657003210047f0149110ed81e2beaabbc3699527bdb8b7"
+    "45da010da7fb8301d06fff8239e4a3323030300e0603551d0f0101ff0404030202a4300f"
+    "0603551d130101ff040530030101ff300d0603551d0e04060404b9e672b8300506032b65"
+    "70034100e15b54d50d1354f44017c5f8a037228546256c5fa1d750758fdf76f7e1dc246e"
+    "7c67c18226ffd6704327bbae9a0cf5bd209facdcb524dc7efa517d1155487a0e");
+  const auto issuing_der = from_hex(
+    "3082012e3081e1a003020102021100919fc6cb4ea1a73766c95ada9a476aee300506032b"
+    "657030143112301006035504031309746573742e636d6f6d301e170d3230313030363035"
+    "303433365a170d3230313030373035303433365a30193117301506035504030c0e022e69"
+    "6e742e746573742e636f6d302a300506032b6570032100c0a9d461880d82db662e984a8c"
+    "06f74479817952070ea8cd0010971bc793ab9ca3433041300e0603551d0f0101ff040403"
+    "0202a4300f0603551d130101ff040530030101ff300d0603551d0e0406040475ecb84430"
+    "0f0603551d23040830068004b9e672b8300506032b6570034100e72bf92a39bab96649ab"
+    "bd619c47b054bf7b071ceb24710ad253682d1df7690b0a1ef28ef8a2f76c3b8f2fed9d11"
+    "3a61c98768db30d16fe6d9a36595775d110e");
+  const auto leaf_der = from_hex(
+    "308201163081c9a0030201020210291fb8fb96d2c215cb2d532f252d80e4300506032b65"
+    "7030193117301506035504030c0e022e696e742e746573742e636f6d301e170d32303130"
+    "30363035303433365a170d3230313030373035303433365a3000302a300506032b657003"
+    "210032e4be5553d2141ace4da105fdf632da3467f013581f57dbd4f09706fa99949da340"
+    "303e300e0603551d0f0101ff0404030202a4300c0603551d130101ff04023000300d0603"
+    "551d0e04060404dd3b0790300f0603551d2304083006800475ecb844300506032b657003"
+    "4100314a485d01df4c7852ec5720b2af34f5620b2a32a50c4ee0481d013ebbfd8e243784"
+    "123a0cfe4d59b1fb09a1738ee9bc2aab59a2b4af2c3ee60ce19afbe1eb03");
+
+  const auto root_skid = std::string("b9e672b8");
+  const auto issuing_skid = std::string("75ecb844");
+  const auto leaf_skid = std::string("dd3b0790");
+
+  auto root = Certificate{ root_der };
+  auto issuing = Certificate{ issuing_der };
+  auto leaf = Certificate{ leaf_der };
+
+  CHECK(root.raw == root_der);
+  CHECK(issuing.raw == issuing_der);
+  CHECK(leaf.raw == leaf_der);
+
+  CHECK(leaf.valid_from(issuing));
+  CHECK(issuing.valid_from(root));
+  CHECK(root.valid_from(root));
+
+  CHECK_EQ(to_hex(leaf.subject_key_id()), leaf_skid);
+  CHECK_EQ(to_hex(leaf.authority_key_id()), to_hex(issuing.subject_key_id()));
+  CHECK_EQ(to_hex(issuing.subject_key_id()), issuing_skid);
+  CHECK_EQ(to_hex(issuing.authority_key_id()), to_hex(root.subject_key_id()));
+  CHECK_EQ(to_hex(root.subject_key_id()), root_skid);
+}

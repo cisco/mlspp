@@ -28,8 +28,8 @@ public:
   std::string issuer() const;
   std::string subject() const;
   bool is_ca() const;
-  std::string subject_key_id() const;
-  std::string authority_key_id() const;
+  bytes subject_key_id() const;
+  bytes authority_key_id() const;
   std::vector<std::string> email_addresses() const;
   std::vector<std::string> dns_names() const;
 

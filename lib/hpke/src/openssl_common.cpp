@@ -65,10 +65,9 @@ typed_delete(X509* ptr)
 }
 
 template<>
-void
-typed_delete(AUTHORITY_KEYID* ptr)
+void typed_delete(STACK_OF(GENERAL_NAME) * ptr)
 {
-  AUTHORITY_KEYID_free(ptr);
+  sk_GENERAL_NAME_pop_free(ptr, GENERAL_NAME_free);
 }
 
 ///

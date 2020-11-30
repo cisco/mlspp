@@ -1,11 +1,11 @@
+#include "group.h"
+#include "openssl_common.h"
 #include <cstring>
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-
-#include "group.h"
-#include "openssl_common.h"
+#include <tls/compat.h>
 
 namespace hpke {
 
@@ -13,11 +13,17 @@ namespace hpke {
 /// ParsedCertificate
 ///
 
-struct ParsedSANInfo
+struct RFC822Name
 {
-  std::vector<std::string> email_addresses;
-  std::vector<std::string> domains;
+  std::string value;
 };
+
+struct DNSName
+{
+  std::string value;
+};
+
+using GeneralName = tls::var::variant<RFC822Name, DNSName>;
 
 struct Certificate::ParsedCertificate
 {
@@ -34,109 +40,92 @@ struct Certificate::ParsedCertificate
   }
 
   // Parse Subject Key Identifier Extension
-  static std::string parse_skid(X509* cert)
+  static bytes parse_skid(X509* cert)
   {
-    int loc = X509_get_ext_by_NID(cert, NID_subject_key_identifier, -1);
-    auto* ext = X509_get_ext(cert, loc);
-    std::string skid;
-    if (ext != nullptr) {
-      auto* ext_value = X509_EXTENSION_get_data(ext);
-      const auto* octet_str_data = ext_value->data;
-      // NOLINTNEXTLINE(google-runtime-int)
-      long xlen = 0;
-      int tag = 0;
-      int xclass = 0;
-      int ret = ASN1_get_object(
-        &octet_str_data, &xlen, &tag, &xclass, ext_value->length);
-      if (ret == -1) {
-        throw openssl_error();
-      }
-      auto kid = std::make_unique<char*>(hex_to_string(octet_str_data, xlen));
-      if (kid == nullptr) {
-        throw openssl_error();
-      }
-      skid.assign(*kid);
+    const auto* asn_skid = X509_get0_subject_key_id(cert);
+    if (asn_skid == nullptr) {
+      return bytes{};
     }
-    return skid;
+    const auto* octet_skid = ASN1_STRING_get0_data(asn_skid);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    std::string skid_str(reinterpret_cast<const char*>(octet_skid));
+    return bytes(skid_str.begin(), skid_str.end());
   }
 
   // Parse Authority Key Identifier
-  static std::string parse_akid(X509* cert)
+  static bytes parse_akid(X509* cert)
   {
-    int loc = X509_get_ext_by_NID(cert, NID_authority_key_identifier, -1);
-    auto* ext = X509_get_ext(cert, loc);
-    std::string akid;
-    if (ext != nullptr) {
-      auto ext_value = make_typed_unique(
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-        reinterpret_cast<AUTHORITY_KEYID*>(X509V3_EXT_d2i(ext)));
-      auto* key_id = ext_value->keyid;
-      auto kid =
-        std::make_unique<char*>(hex_to_string(key_id->data, key_id->length));
-      if (kid == nullptr) {
-        throw openssl_error();
-      }
-      akid.assign(*kid);
+    const auto* asn_akid = X509_get0_authority_key_id(cert);
+    if (asn_akid == nullptr) {
+      return bytes{};
     }
-    return akid;
+    const auto* octet_akid = ASN1_STRING_get0_data(asn_akid);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    std::string akid_str(reinterpret_cast<const char*>(octet_akid));
+    return bytes(akid_str.begin(), akid_str.end());
   }
 
-  static ParsedSANInfo parse_san(X509* cert)
+  static std::vector<GeneralName> parse_san(X509* cert)
   {
-    ParsedSANInfo san_info;
+    std::vector<GeneralName> san_info;
     int san_names_nb = -1;
-    STACK_OF(GENERAL_NAME)* san_names = nullptr;
 
-    // Try to extract the names within the SAN extension from the certificate
-    san_names = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
-    if (san_names == nullptr) {
-      return san_info;
-    }
-    san_names_nb = sk_GENERAL_NAME_num(san_names);
+    const auto san_names =
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+      make_typed_unique(reinterpret_cast<STACK_OF(GENERAL_NAME)*>(
+        X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+    san_names_nb = sk_GENERAL_NAME_num(san_names.get());
 
     // Check each name within the extension
     for (int i = 0; i < san_names_nb; i++) {
-      const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
+      auto* current_name = sk_GENERAL_NAME_value(san_names.get(), i);
 
       if (current_name->type == GEN_DNS) {
-        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast)
-        const char* dns_name = (const char*)(ASN1_STRING_get0_data(
-          current_name->d.dNSName)); // NOLINT
+        const char* dns_name =
+          // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<const char*>((ASN1_STRING_get0_data(
+            current_name->d
+              .dNSName))); // NOLINT(cppcoreguidelines-pro-type-union-access)
 
         // Make sure there isn't an embedded NUL character in the DNS name
-        if (ASN1_STRING_length(current_name->d.dNSName) != // NOLINT
+        if (ASN1_STRING_length(
+              current_name->d
+                .dNSName) != // NOLINT(cppcoreguidelines-pro-type-union-access)
             static_cast<int>(strlen(dns_name))) {
           throw std::runtime_error("Malformed certificate");
         }
-        san_info.domains.emplace_back(std::string(dns_name));
+        san_info.emplace_back(DNSName{ dns_name });
+
       } else if (current_name->type == GEN_EMAIL) {
         const char* email =
-          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-          (const char*)ASN1_STRING_get0_data(current_name->d.dNSName); // NOLINT
+          // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<const char*>(ASN1_STRING_get0_data(
+            current_name->d
+              .dNSName)); // NOLINT(cppcoreguidelines-pro-type-union-access)
 
         // Make sure there isn't an embedded NUL character in the DNS name
-        if (ASN1_STRING_length(current_name->d.dNSName) != // NOLINT
+        if (ASN1_STRING_length(
+              current_name->d
+                .dNSName) != // NOLINT(cppcoreguidelines-pro-type-union-access)
             static_cast<int>(strlen(email))) {
           throw std::runtime_error("Malformed certificate");
         }
-        san_info.email_addresses.emplace_back(email);
+        san_info.emplace_back(RFC822Name{ email });
       }
     }
 
-    // Clean up
-    sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
     return san_info;
   }
 
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
     , sig_id(signature_algorithm(x509.get()))
-    , issuer(X509_NAME_oneline(X509_get_issuer_name(x509_in), nullptr, 0))
-    , subject(X509_NAME_oneline(X509_get_subject_name(x509_in), nullptr, 0))
-    , skID(parse_skid(x509.get()))
-    , akID(parse_akid(x509.get()))
+    , issuer(X509_NAME_oneline(X509_get_issuer_name(x509.get()), nullptr, 0))
+    , subject(X509_NAME_oneline(X509_get_subject_name(x509.get()), nullptr, 0))
+    , subject_key_id(parse_skid(x509.get()))
+    , authority_key_id(parse_akid(x509.get()))
     , san_info(parse_san(x509.get()))
+    , is_ca(X509_check_ca(x509.get()) != 0)
   {}
 
   ParsedCertificate(const ParsedCertificate& other)
@@ -144,9 +133,10 @@ struct Certificate::ParsedCertificate
     , sig_id(signature_algorithm(other.x509.get()))
     , issuer(other.issuer)
     , subject(other.subject)
-    , skID(other.skID)
-    , akID(other.akID)
+    , subject_key_id(other.subject_key_id)
+    , authority_key_id(other.authority_key_id)
     , san_info(other.san_info)
+    , is_ca(other.is_ca)
   {
     if (1 != X509_up_ref(other.x509.get())) {
       throw openssl_error();
@@ -170,8 +160,6 @@ struct Certificate::ParsedCertificate
       default:
         break;
     }
-    auto algo = X509_get_signature_nid(cert);
-    (void)algo;
     throw std::runtime_error("Unsupported signature algorithm");
   }
 
@@ -180,23 +168,14 @@ struct Certificate::ParsedCertificate
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
-  bool is_ca() const
-  {
-    auto* bc = static_cast<BASIC_CONSTRAINTS*>(
-      X509_get_ext_d2i(x509.get(), NID_basic_constraints, nullptr, nullptr));
-    if (bc == nullptr) {
-      throw openssl_error();
-    }
-    return (0 != bc->ca);
-  }
-
   typed_unique_ptr<X509> x509;
   const Signature::ID sig_id;
   const std::string issuer;
   const std::string subject;
-  const std::string skID;
-  const std::string akID;
-  const ParsedSANInfo san_info;
+  const bytes subject_key_id;
+  const bytes authority_key_id;
+  const std::vector<GeneralName> san_info;
+  const bool is_ca;
 };
 
 ///
@@ -243,33 +222,44 @@ Certificate::subject() const
 bool
 Certificate::is_ca() const
 {
-  return parsed_cert->is_ca();
+  return parsed_cert->is_ca;
 }
 
-std::string
+bytes
 Certificate::subject_key_id() const
 {
-  return parsed_cert->skID;
+  return parsed_cert->subject_key_id;
 }
 
-std::string
+bytes
 Certificate::authority_key_id() const
 {
-  return parsed_cert->akID;
+  return parsed_cert->authority_key_id;
 }
 
 std::vector<std::string>
 Certificate::email_addresses() const
 {
-  return parsed_cert->san_info.email_addresses;
+  std::vector<std::string> emails;
+  for (const auto& name : parsed_cert->san_info) {
+    if (tls::var::holds_alternative<RFC822Name>(name)) {
+      emails.emplace_back(tls::var::get<RFC822Name>(name).value);
+    }
+  }
+  return emails;
 }
 
 std::vector<std::string>
 Certificate::dns_names() const
 {
-  return parsed_cert->san_info.domains;
+  std::vector<std::string> domains;
+  for (const auto& name : parsed_cert->san_info) {
+    if (tls::var::holds_alternative<DNSName>(name)) {
+      domains.emplace_back(tls::var::get<RFC822Name>(name).value);
+    }
+  }
+
+  return domains;
 }
-
-
 
 } // namespace hpke
