@@ -207,16 +207,16 @@ Certificate::valid_from(const Certificate& parent) const
   return (1 == X509_verify(parsed_cert->x509.get(), pub.get()));
 }
 
-std::string
+bytes
 Certificate::issuer() const
 {
-  return parsed_cert->issuer;
+  return to_bytes(parsed_cert->issuer);
 }
 
-std::string
+bytes
 Certificate::subject() const
 {
-  return parsed_cert->subject;
+  return to_bytes(parsed_cert->subject);
 }
 
 bool

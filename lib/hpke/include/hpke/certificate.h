@@ -25,8 +25,8 @@ public:
   bool valid_from(const Certificate& parent) const;
 
   // Accessors for parsed certificate elements
-  std::string issuer() const;
-  std::string subject() const;
+  bytes issuer() const;
+  bytes subject() const;
   bool is_ca() const;
   bytes subject_key_id() const;
   bytes authority_key_id() const;
