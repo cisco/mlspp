@@ -6,6 +6,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
+
 namespace hpke {
 ///
 /// Utility functions
