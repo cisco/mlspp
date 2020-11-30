@@ -3,7 +3,6 @@
 #include <cstring>
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
-#include <iostream>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
