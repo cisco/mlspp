@@ -67,6 +67,17 @@ struct Certificate::ParsedCertificate
     return std::make_unique<ParsedCertificate>(cert.release());
   }
 
+  static bytes compute_digest(const X509* cert)
+  {
+    const auto* md = EVP_sha256();
+    auto digest = bytes(EVP_MD_size(md));
+    unsigned int out_size = 0;
+    if (1 != X509_digest(cert, md, digest.data(), &out_size)) {
+      throw openssl_error();
+    }
+    return digest;
+  }
+
   // Parse Subject Key Identifier Extension
   static std::optional<bytes> parse_skid(X509* cert)
   {
@@ -119,6 +130,7 @@ struct Certificate::ParsedCertificate
     , authority_key_id(parse_akid(x509.get()))
     , sub_alt_names(parse_san(x509.get()))
     , is_ca(X509_check_ca(x509.get()) != 0)
+    , hash(compute_digest(x509.get()))
   {}
 
   ParsedCertificate(const ParsedCertificate& other)
@@ -130,6 +142,7 @@ struct Certificate::ParsedCertificate
     , authority_key_id(other.authority_key_id)
     , sub_alt_names(other.sub_alt_names)
     , is_ca(other.is_ca)
+    , hash(other.hash)
   {
     if (1 != X509_up_ref(other.x509.get())) {
       throw openssl_error();
@@ -169,6 +182,7 @@ struct Certificate::ParsedCertificate
   const std::optional<bytes> authority_key_id;
   const std::vector<GeneralName> sub_alt_names;
   const bool is_ca;
+  const bytes hash;
 };
 
 ///
@@ -255,4 +269,9 @@ Certificate::dns_names() const
   return domains;
 }
 
+bytes
+Certificate::hash() const
+{
+  return parsed_cert->hash;
+}
 } // namespace hpke

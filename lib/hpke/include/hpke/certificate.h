@@ -31,6 +31,7 @@ public:
   std::optional<bytes> authority_key_id() const;
   std::vector<std::string> email_addresses() const;
   std::vector<std::string> dns_names() const;
+  bytes hash() const;
 
   const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;

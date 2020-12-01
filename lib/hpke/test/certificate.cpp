@@ -46,6 +46,10 @@ TEST_CASE("Certificate Known-Answer depth 2")
   auto issuing = Certificate{ issuing_der };
   auto leaf = Certificate{ leaf_der };
 
+  REQUIRE(!root.hash().empty());
+  REQUIRE(!leaf.hash().empty());
+  REQUIRE(!issuing.hash().empty());
+
   CHECK(root.raw == root_der);
   CHECK(issuing.raw == issuing_der);
   CHECK(leaf.raw == leaf_der);
