@@ -37,12 +37,15 @@ libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target bytes
 	cmake --build ${BUILD_DIR} --target hpke
 	cmake --build ${BUILD_DIR} --target tls_syntax
+	cmake --build ${BUILD_DIR} --target mls_vectors 
 
 test-libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target hpke_test
 	cd build/lib/hpke/test/ && ctest
 	cmake --build ${BUILD_DIR} --target tls_syntax_test
 	cd build/lib/tls_syntax/test/ && ctest
+	cmake --build ${BUILD_DIR} --target mls_vectors_test
+	cd build/lib/mls_vectors/test/ && ctest
 
 test-all: test-libs ctest
 
@@ -69,4 +72,4 @@ format:
 	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find lib -iname "*.h" -or -iname "*.cpp" |  grep -v test-vectors.cpp | xargs ${CLANG_FORMAT}
+	find lib -iname "*.h" -or -iname "*.cpp" |  xargs ${CLANG_FORMAT}
