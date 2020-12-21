@@ -42,7 +42,7 @@ protected:
 
   void broadcast_add()
   {
-    auto size = sessions.size();
+    const auto size = static_cast<uint32_t>(sessions.size());
     broadcast_add(size - 1, size);
   }
 

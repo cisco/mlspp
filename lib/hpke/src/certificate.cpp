@@ -59,7 +59,7 @@ struct Certificate::ParsedCertificate
   static std::unique_ptr<ParsedCertificate> parse(const bytes& der)
   {
     const auto* buf = der.data();
-    auto cert = make_typed_unique(d2i_X509(nullptr, &buf, der.size()));
+    auto cert = make_typed_unique(d2i_X509(nullptr, &buf, static_cast<int>(der.size())));
     if (cert == nullptr) {
       throw openssl_error();
     }

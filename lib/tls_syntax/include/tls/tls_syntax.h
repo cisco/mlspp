@@ -12,7 +12,7 @@
 namespace tls {
 
 // For indicating no min or max in vector definitions
-const size_t none = -1;
+const size_t none = std::numeric_limits<size_t>::max();
 
 class WriteError : public std::invalid_argument
 {
@@ -35,7 +35,7 @@ public:
 class ostream
 {
 public:
-  static const size_t none = -1;
+  static const size_t none = std::numeric_limits<size_t>::max();
 
   void write_raw(const std::vector<uint8_t>& bytes);
 
@@ -123,7 +123,7 @@ private:
     for (int i = 0; i < length; i += 1) {
       value = (value << unsigned(8)) + next();
     }
-    data = value;
+    data = static_cast<T>(value);
     return *this;
   }
 
@@ -291,7 +291,7 @@ struct vector
   static ostream& encode(ostream& str, const std::vector<T>& data)
   {
     // Vectors with no header are written directly
-    if (head == 0) {
+    if constexpr (head == 0) {
       for (const auto& item : data) {
         str << item;
       }
@@ -326,9 +326,9 @@ struct vector
     uint64_t size = temp._buffer.size();
     if (size > head_max) {
       throw WriteError("Data too large for header size");
-    } else if ((max != none) && (size > max)) {
+    } else if constexpr ((max != none) && (size > max)) {
       throw WriteError("Data too large for declared max");
-    } else if ((min != none) && (size < min)) {
+    } else if constexpr ((min != none) && (size < min)) {
       throw WriteError("Data too small for declared min");
     }
 
@@ -356,16 +356,16 @@ struct vector
     // Read the size of the vector, if provided; otherwise consume all remaining
     // data in the buffer
     uint64_t size = str._buffer.size();
-    if (head > 0) {
+    if constexpr (head > 0) {
       str.read_uint(size, head);
     }
 
     // Check the size against the declared constraints
     if (size > str._buffer.size()) {
       throw ReadError("Declared size exceeds available data size");
-    } else if ((max != none) && (size > max)) {
+    } else if constexpr ((max != none) && (size > max)) {
       throw ReadError("Data too large for declared max");
-    } else if ((min != none) && (size < min)) {
+    } else if constexpr ((min != none) && (size < min)) {
       throw ReadError("Data too small for declared min");
     }
 
