@@ -10,11 +10,15 @@ using namespace mls;
 /// Assertions for verifying test vectors
 ///
 
-std::ostream& operator<<(std::ostream& str, const NodeIndex& obj) {
+std::ostream&
+operator<<(std::ostream& str, const NodeIndex& obj)
+{
   return str << obj.val;
 }
 
-std::ostream& operator<<(std::ostream& str, const bytes& obj) {
+std::ostream&
+operator<<(std::ostream& str, const bytes& obj)
+{
   return str << to_hex(obj);
 }
 
@@ -39,48 +43,43 @@ verify_equal(std::string label, const T& actual, const T& expected)
 ///
 /// TreeMathTestVector
 ///
-TreeMathTestVector
-TreeMathTestVector::create(uint32_t n_leaves)
+TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
+  : n_leaves(n_leaves_in)
+  , root(n_leaves_in - 1)
+  , left(NodeCount(n_leaves).val)
+  , right(NodeCount(n_leaves).val)
+  , parent(NodeCount(n_leaves).val)
+  , sibling(NodeCount(n_leaves).val)
 {
-  TreeMathTestVector tv;
-  tv.n_leaves = LeafCount(n_leaves);
-
   // Root is special
-  tv.root.resize(n_leaves - 1);
-  for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
-    tv.root[n.val - 1] = tree_math::root(n);
+  for (LeafCount n{ 1 }; n.val <= n_leaves_in; n.val++) {
+    root[n.val - 1] = tree_math::root(n);
   }
 
   // Left, right, parent, sibling are relative
-  auto w = NodeCount(tv.n_leaves);
-  tv.left.resize(w.val);
-  tv.right.resize(w.val);
-  tv.parent.resize(w.val);
-  tv.sibling.resize(w.val);
+  auto w = NodeCount(n_leaves);
   for (NodeIndex x{ 0 }; x.val < w.val; x.val++) {
-    tv.left[x.val] = tree_math::left(x);
-    tv.right[x.val] = tree_math::right(x, tv.n_leaves);
-    tv.parent[x.val] = tree_math::parent(x, tv.n_leaves);
-    tv.sibling[x.val] = tree_math::sibling(x, tv.n_leaves);
+    left[x.val] = tree_math::left(x);
+    right[x.val] = tree_math::right(x, n_leaves);
+    parent[x.val] = tree_math::parent(x, n_leaves);
+    sibling[x.val] = tree_math::sibling(x, n_leaves);
   }
-
-  return tv;
 }
 
 std::optional<std::string>
-TreeMathTestVector::verify(const TreeMathTestVector& tv)
+TreeMathTestVector::verify() const
 {
   auto ss = std::stringstream();
-  for (LeafCount n{ 1 }; n.val <= tv.n_leaves.val; n.val++) {
-    VERIFY_EQUAL("root", tv.root[n.val - 1], tree_math::root(n));
+  for (LeafCount n{ 1 }; n.val <= n_leaves.val; n.val++) {
+    VERIFY_EQUAL("root", root[n.val - 1], tree_math::root(n));
   }
 
-  auto w = NodeCount(tv.n_leaves);
+  auto w = NodeCount(n_leaves);
   for (NodeIndex x{ 0 }; x.val < w.val; x.val++) {
-    VERIFY_EQUAL("left", tv.left[x.val], tree_math::left(x));
-    VERIFY_EQUAL("right", tv.right[x.val], tree_math::right(x, tv.n_leaves));
-    VERIFY_EQUAL("parent", tv.parent[x.val], tree_math::parent(x, tv.n_leaves));
-    VERIFY_EQUAL("sibling", tv.sibling[x.val], tree_math::sibling(x, tv.n_leaves));
+    VERIFY_EQUAL("left", left[x.val], tree_math::left(x));
+    VERIFY_EQUAL("right", right[x.val], tree_math::right(x, n_leaves));
+    VERIFY_EQUAL("parent", parent[x.val], tree_math::parent(x, n_leaves));
+    VERIFY_EQUAL("sibling", sibling[x.val], tree_math::sibling(x, n_leaves));
   }
 
   return std::nullopt;
@@ -90,66 +89,62 @@ TreeMathTestVector::verify(const TreeMathTestVector& tv)
 /// EncryptionKeyTestVector
 ///
 
-EncryptionKeyTestVector EncryptionKeyTestVector::create(CipherSuite suite,
-  uint32_t n_leaves,
-  uint32_t n_generations)
+EncryptionKeyTestVector::EncryptionKeyTestVector(CipherSuite suite_in,
+                                                 uint32_t n_leaves,
+                                                 uint32_t n_generations)
+  : suite(suite_in)
+  , encryption_secret{ bytes(suite.get().digest.hash_size(), 0xA0) }
 {
-  EncryptionKeyTestVector tv;
-  tv.suite = suite;
-  tv.encryption_secret.data = random_bytes(suite.get().digest.hash_size());
-
   auto leaf_count = LeafCount{ n_leaves };
-  auto src = GroupKeySource(tv.suite, leaf_count, tv.encryption_secret.data);
+  auto src = GroupKeySource(suite, leaf_count, encryption_secret.data);
 
   auto handshake = GroupKeySource::RatchetType::handshake;
   auto application = GroupKeySource::RatchetType::application;
-  tv.handshake_keys.resize(n_leaves);
-  tv.application_keys.resize(n_leaves);
+  handshake_keys.resize(n_leaves);
+  application_keys.resize(n_leaves);
   for (uint32_t i = 0; i < n_leaves; i++) {
-    tv.handshake_keys[i].steps.resize(n_generations);
-    tv.application_keys[i].steps.resize(n_generations);
+    handshake_keys[i].steps.resize(n_generations);
+    application_keys[i].steps.resize(n_generations);
 
     for (uint32_t j = 0; j < n_generations; ++j) {
-      auto hs_key_nonce = src.get(handshake, LeafIndex{j}, j);
-      tv.handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
-      tv.handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
+      auto hs_key_nonce = src.get(handshake, LeafIndex{ j }, j);
+      handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
+      handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
 
-      auto app_key_nonce = src.get(application, LeafIndex{j}, j);
-      tv.application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
-      tv.application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
+      auto app_key_nonce = src.get(application, LeafIndex{ j }, j);
+      application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
+      application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
     }
   }
-
-  return tv;
 }
 
 std::optional<std::string>
-EncryptionKeyTestVector::verify(const EncryptionKeyTestVector& tv)
+EncryptionKeyTestVector::verify() const
 {
-  if (tv.handshake_keys.size() != tv.application_keys.size()) {
+  if (handshake_keys.size() != application_keys.size()) {
     return "Malformed test vector";
   }
 
   auto handshake = GroupKeySource::RatchetType::handshake;
   auto application = GroupKeySource::RatchetType::application;
-  auto leaf_count = LeafCount{ static_cast<uint32_t>(tv.handshake_keys.size()) };
-  auto src = GroupKeySource(tv.suite, leaf_count, tv.encryption_secret.data);
+  auto leaf_count = LeafCount{ static_cast<uint32_t>(handshake_keys.size()) };
+  auto src = GroupKeySource(suite, leaf_count, encryption_secret.data);
 
-  for (uint32_t i = 0; i < tv.application_keys.size(); i++) {
-    for (uint32_t j = 0; j < tv.handshake_keys[i].steps.size(); j++) {
+  for (uint32_t i = 0; i < application_keys.size(); i++) {
+    for (uint32_t j = 0; j < handshake_keys[i].steps.size(); j++) {
       const auto key_nonce = src.get(handshake, LeafIndex(i), j);
-      const auto& key = tv.handshake_keys[i].steps[j].key.data;
-      const auto& nonce = tv.handshake_keys[i].steps[j].nonce.data;
+      const auto& key = handshake_keys[i].steps[j].key.data;
+      const auto& nonce = handshake_keys[i].steps[j].nonce.data;
       VERIFY_EQUAL("key", key, key_nonce.key);
       VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
     }
   }
 
-  for (uint32_t i = 0; i < tv.application_keys.size(); i++) {
-    for (uint32_t j = 0; j < tv.application_keys[i].steps.size(); j++) {
+  for (uint32_t i = 0; i < application_keys.size(); i++) {
+    for (uint32_t j = 0; j < application_keys[i].steps.size(); j++) {
       const auto key_nonce = src.get(application, LeafIndex(i), j);
-      const auto& key = tv.application_keys[i].steps[j].key.data;
-      const auto& nonce = tv.application_keys[i].steps[j].nonce.data;
+      const auto& key = application_keys[i].steps[j].key.data;
+      const auto& nonce = application_keys[i].steps[j].nonce.data;
       VERIFY_EQUAL("key", key, key_nonce.key);
       VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
     }
@@ -162,14 +157,12 @@ EncryptionKeyTestVector::verify(const EncryptionKeyTestVector& tv)
 /// KeyScheduleTestVector
 ///
 
-KeyScheduleTestVector KeyScheduleTestVector::create(CipherSuite /* suite */,
-                                                    uint32_t /* n_epochs */)
-{
-  return {};
-}
+KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite /* suite */,
+                                             uint32_t /* n_epochs */)
+{}
 
 std::optional<std::string>
-KeyScheduleTestVector::verify(const KeyScheduleTestVector& /* tv */)
+KeyScheduleTestVector::verify() const
 {
   return std::nullopt;
 }
@@ -178,14 +171,12 @@ KeyScheduleTestVector::verify(const KeyScheduleTestVector& /* tv */)
 /// TreeHashingTestVector
 ///
 
-TreeHashingTestVector TreeHashingTestVector::create(CipherSuite /* suite */,
-                                                    uint32_t /* n_leaves */)
-{
-  return {};
-}
+TreeHashingTestVector::TreeHashingTestVector(CipherSuite /* suite */,
+                                             uint32_t /* n_leaves */)
+{}
 
 std::optional<std::string>
-TreeHashingTestVector::verify(const TreeHashingTestVector& /* tv */)
+TreeHashingTestVector::verify() const
 {
   return std::nullopt;
 }
@@ -194,14 +185,10 @@ TreeHashingTestVector::verify(const TreeHashingTestVector& /* tv */)
 /// MessagesTestVector
 ///
 
-MessagesTestVector
-MessagesTestVector::create()
-{
-  return {};
-}
+MessagesTestVector::MessagesTestVector() {}
 
 std::optional<std::string>
-MessagesTestVector::verify(const MessagesTestVector& /* tv */)
+MessagesTestVector::verify() const
 {
   return std::nullopt;
 }

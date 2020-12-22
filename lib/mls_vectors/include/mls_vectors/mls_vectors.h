@@ -1,11 +1,11 @@
 #pragma once
 
-#include <mls/tree_math.h>
+#include <bytes/bytes.h>
 #include <mls/crypto.h>
 #include <mls/messages.h>
+#include <mls/tree_math.h>
 #include <mls/treekem.h>
 #include <tls/tls_syntax.h>
-#include <bytes/bytes.h>
 #include <vector>
 
 namespace mls_vectors {
@@ -27,8 +27,8 @@ struct TreeMathTestVector
              tls::vector<4>,
              tls::vector<4>)
 
-  static TreeMathTestVector create(uint32_t n_leaves);
-  static std::optional<std::string> verify(const TreeMathTestVector& tv);
+  TreeMathTestVector(uint32_t n_leaves_in);
+  std::optional<std::string> verify() const;
 };
 
 struct CryptoValue
@@ -62,10 +62,10 @@ struct EncryptionKeyTestVector
   TLS_SERIALIZABLE(suite, encryption_secret, handshake_keys, application_keys)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
-  static EncryptionKeyTestVector create(mls::CipherSuite suite,
-                                      uint32_t n_leaves,
-                                      uint32_t n_generations);
-  static std::optional<std::string> verify(const EncryptionKeyTestVector& tv);
+  EncryptionKeyTestVector(mls::CipherSuite suite_in,
+                          uint32_t n_leaves,
+                          uint32_t n_generations);
+  std::optional<std::string> verify() const;
 };
 
 struct KeyScheduleTestVector
@@ -127,8 +127,8 @@ struct KeyScheduleTestVector
   TLS_SERIALIZABLE(suite, group_id, base_init_secret, epochs)
   TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
-  static KeyScheduleTestVector create(mls::CipherSuite suite, uint32_t n_epochs);
-  static std::optional<std::string> verify(const KeyScheduleTestVector& tv);
+  KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
+  std::optional<std::string> verify() const;
 };
 
 struct TreeHashingTestVector
@@ -139,8 +139,8 @@ struct TreeHashingTestVector
 
   TLS_SERIALIZABLE(suite, tree_hash, ratchet_tree)
 
-  static TreeHashingTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
-  static std::optional<std::string> verify(const TreeHashingTestVector& tv);
+  TreeHashingTestVector(mls::CipherSuite suite, uint32_t n_leaves);
+  std::optional<std::string> verify() const;
 };
 
 struct MessagesTestVector
@@ -191,8 +191,8 @@ struct MessagesTestVector
                    commit,
                    mls_ciphertext)
 
-  static MessagesTestVector create();
-  static std::optional<std::string> verify(const MessagesTestVector& tv);
+  MessagesTestVector();
+  std::optional<std::string> verify() const;
 };
 
 } // namespace mls_vectors

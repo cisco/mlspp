@@ -9,14 +9,14 @@ using namespace mls;
 /// Ciphersuites
 ///
 
-std::array<CipherSuite, 6> all_cipher_suites = {{
+std::array<CipherSuite, 6> all_cipher_suites = { {
   { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
   { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
   { CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519 },
   { CipherSuite::ID::X448_AES256GCM_SHA512_Ed448 },
   { CipherSuite::ID::P521_AES256GCM_SHA512_P521 },
   { CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448 },
-}};
+} };
 
 ///
 /// File names

@@ -9,8 +9,8 @@ using namespace mls_vectors;
 TEST_CASE("Encryption Keys Interop")
 {
   for (auto suite : all_cipher_suites) {
-    auto tv = EncryptionKeyTestVector::create(suite, 15, 10);
-    REQUIRE(!EncryptionKeyTestVector::verify(tv));
+    const auto tv = EncryptionKeyTestVector(suite, 15, 10);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 

@@ -8,6 +8,6 @@ using namespace mls_vectors;
 
 TEST_CASE("Tree Math Test Vectors")
 {
-  auto tv = TreeMathTestVector::create(256);
-  REQUIRE(!TreeMathTestVector::verify(tv));
+  const auto tv = TreeMathTestVector(256);
+  REQUIRE(tv.verify() == std::nullopt);
 }
