@@ -87,27 +87,36 @@ TreeMathTestVector::verify(const TreeMathTestVector& tv)
 }
 
 ///
-/// HashRatchetTestVector
+/// EncryptionKeyTestVector
 ///
 
-HashRatchetTestVector HashRatchetTestVector::create(
-  CipherSuite suite,
+EncryptionKeyTestVector EncryptionKeyTestVector::create(CipherSuite suite,
   uint32_t n_leaves,
   uint32_t n_generations)
 {
-  HashRatchetTestVector tv;
+  EncryptionKeyTestVector tv;
   tv.suite = suite;
-  tv.base_secret.data = random_bytes(suite.get().digest.hash_size());
+  tv.encryption_secret.data = random_bytes(suite.get().digest.hash_size());
 
-  tv.chains.resize(n_leaves);
+  auto leaf_count = LeafCount{ n_leaves };
+  auto src = GroupKeySource(tv.suite, leaf_count, tv.encryption_secret.data);
+
+  auto handshake = GroupKeySource::RatchetType::handshake;
+  auto application = GroupKeySource::RatchetType::application;
+  tv.handshake_keys.resize(n_leaves);
+  tv.application_keys.resize(n_leaves);
   for (uint32_t i = 0; i < n_leaves; i++) {
-    HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ i } }, tv.base_secret.data };
+    tv.handshake_keys[i].steps.resize(n_generations);
+    tv.application_keys[i].steps.resize(n_generations);
 
-    tv.chains[i].steps.resize(n_generations);
     for (uint32_t j = 0; j < n_generations; ++j) {
-      auto key_nonce = ratchet.get(j);
-      tv.chains[i].steps[j].key = { std::move(key_nonce.key) };
-      tv.chains[i].steps[j].nonce = { std::move(key_nonce.nonce) };
+      auto hs_key_nonce = src.get(handshake, LeafIndex{j}, j);
+      tv.handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
+      tv.handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
+
+      auto app_key_nonce = src.get(application, LeafIndex{j}, j);
+      tv.application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
+      tv.application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
     }
   }
 
@@ -115,35 +124,37 @@ HashRatchetTestVector HashRatchetTestVector::create(
 }
 
 std::optional<std::string>
-HashRatchetTestVector::verify(const HashRatchetTestVector& tv)
+EncryptionKeyTestVector::verify(const EncryptionKeyTestVector& tv)
 {
-  for (uint32_t i = 0; i < tv.chains.size(); i++) {
-    HashRatchet ratchet{ tv.suite, NodeIndex{ LeafIndex{ i } }, tv.base_secret.data };
-    for (uint32_t j = 0; j < tv.chains[i].steps.size(); ++j) {
-      const auto key_nonce = ratchet.get(j);
-      const auto& key = tv.chains[i].steps[j].key.data;
-      const auto& nonce = tv.chains[i].steps[j].nonce.data;
+  if (tv.handshake_keys.size() != tv.application_keys.size()) {
+    return "Malformed test vector";
+  }
+
+  auto handshake = GroupKeySource::RatchetType::handshake;
+  auto application = GroupKeySource::RatchetType::application;
+  auto leaf_count = LeafCount{ static_cast<uint32_t>(tv.handshake_keys.size()) };
+  auto src = GroupKeySource(tv.suite, leaf_count, tv.encryption_secret.data);
+
+  for (uint32_t i = 0; i < tv.application_keys.size(); i++) {
+    for (uint32_t j = 0; j < tv.handshake_keys[i].steps.size(); j++) {
+      const auto key_nonce = src.get(handshake, LeafIndex(i), j);
+      const auto& key = tv.handshake_keys[i].steps[j].key.data;
+      const auto& nonce = tv.handshake_keys[i].steps[j].nonce.data;
       VERIFY_EQUAL("key", key, key_nonce.key);
       VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
     }
   }
 
-  return std::nullopt;
-}
+  for (uint32_t i = 0; i < tv.application_keys.size(); i++) {
+    for (uint32_t j = 0; j < tv.application_keys[i].steps.size(); j++) {
+      const auto key_nonce = src.get(application, LeafIndex(i), j);
+      const auto& key = tv.application_keys[i].steps[j].key.data;
+      const auto& nonce = tv.application_keys[i].steps[j].nonce.data;
+      VERIFY_EQUAL("key", key, key_nonce.key);
+      VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
+    }
+  }
 
-///
-/// SecretTreeTestVector
-///
-
-SecretTreeTestVector SecretTreeTestVector::create(CipherSuite /* suite */,
-                                                  uint32_t /* n_leaves */)
-{
-  return {};
-}
-
-std::optional<std::string>
-SecretTreeTestVector::verify(const SecretTreeTestVector& /* tv */)
-{
   return std::nullopt;
 }
 

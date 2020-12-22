@@ -38,7 +38,7 @@ struct CryptoValue
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct HashRatchetTestVector
+struct EncryptionKeyTestVector
 {
   struct KeyAndNonce
   {
@@ -55,29 +55,17 @@ struct HashRatchetTestVector
   };
 
   mls::CipherSuite suite;
-  CryptoValue base_secret;
-  std::vector<HashRatchetSequence> chains;
+  CryptoValue encryption_secret;
+  std::vector<HashRatchetSequence> handshake_keys;
+  std::vector<HashRatchetSequence> application_keys;
 
-  TLS_SERIALIZABLE(suite, base_secret, chains)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
+  TLS_SERIALIZABLE(suite, encryption_secret, handshake_keys, application_keys)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
-  static HashRatchetTestVector create(mls::CipherSuite suite,
+  static EncryptionKeyTestVector create(mls::CipherSuite suite,
                                       uint32_t n_leaves,
                                       uint32_t n_generations);
-  static std::optional<std::string> verify(const HashRatchetTestVector& tv);
-};
-
-struct SecretTreeTestVector
-{
-  mls::CipherSuite suite;
-  CryptoValue base_secret;
-  std::vector<CryptoValue> tree_node_secrets;
-
-  TLS_SERIALIZABLE(suite, base_secret, tree_node_secrets)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
-
-  static SecretTreeTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
-  static std::optional<std::string> verify(const SecretTreeTestVector& tv);
+  static std::optional<std::string> verify(const EncryptionKeyTestVector& tv);
 };
 
 struct KeyScheduleTestVector

@@ -6,11 +6,11 @@
 using namespace mls;
 using namespace mls_vectors;
 
-TEST_CASE("Hash Ratchet Interop")
+TEST_CASE("Encryption Keys Interop")
 {
   for (auto suite : all_cipher_suites) {
-    auto tv = HashRatchetTestVector::create(suite, 15, 10);
-    REQUIRE(!HashRatchetTestVector::verify(tv));
+    auto tv = EncryptionKeyTestVector::create(suite, 15, 10);
+    REQUIRE(!EncryptionKeyTestVector::verify(tv));
   }
 }
 

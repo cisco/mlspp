@@ -127,9 +127,11 @@ SecretTree::SecretTree(CipherSuite suite_in,
 bytes
 SecretTree::get(LeafIndex sender)
 {
+  auto node = NodeIndex(sender);
+
   // Find an ancestor that is populated
-  auto dirpath = tree_math::dirpath(NodeIndex{ sender }, group_size);
-  dirpath.insert(dirpath.begin(), NodeIndex{ sender });
+  auto dirpath = tree_math::dirpath(node, group_size);
+  dirpath.insert(dirpath.begin(), node);
   dirpath.push_back(root);
   uint32_t curr = 0;
   for (; curr < dirpath.size(); ++curr) {
@@ -156,7 +158,7 @@ SecretTree::get(LeafIndex sender)
   }
 
   // Copy the leaf
-  auto out = secrets[NodeIndex{ sender }.val];
+  auto out = secrets[node.val];
 
   // Zeroize along the direct path
   for (auto i : dirpath) {

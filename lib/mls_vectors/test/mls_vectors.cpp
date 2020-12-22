@@ -18,19 +18,11 @@ TEST_CASE("Tree Math")
   REQUIRE(!TreeMathTestVector::verify(tv));
 }
 
-TEST_CASE("Hash Ratchet")
+TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    auto tv = HashRatchetTestVector::create(suite, 15, 15);
-    REQUIRE(!HashRatchetTestVector::verify(tv));
-  }
-}
-
-TEST_CASE("Secret Tree")
-{
-  for (auto suite : supported_suites) {
-    auto tv = SecretTreeTestVector::create(suite, 15);
-    REQUIRE(!SecretTreeTestVector::verify(tv));
+    auto tv = EncryptionKeyTestVector::create(suite, 15, 10);
+    REQUIRE(!EncryptionKeyTestVector::verify(tv));
   }
 }
 
