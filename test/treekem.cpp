@@ -143,7 +143,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 {
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
-  const auto root = tree_math::root(NodeCount(size));
+  const auto root = tree_math::root(size);
   const auto root_resolution =
     std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 8 } };
 
@@ -163,7 +163,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     auto curr_size = LeafCount(i + 1);
 
     auto path = UpdatePath{ kp_path, {} };
-    auto dp = tree_math::dirpath(NodeIndex(index), NodeCount(curr_size));
+    auto dp = tree_math::dirpath(NodeIndex(index), curr_size);
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });

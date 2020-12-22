@@ -1,5 +1,4 @@
 #include <mls/crypto.h>
-#include <mls/tree_math.h>
 
 #include "test_vectors.h"
 
@@ -7,51 +6,6 @@
 
 #include <fstream>
 #include <iostream>
-
-static TreeMathTestVectors
-generate_tree_math()
-{
-  TreeMathTestVectors tv;
-  tv.n_leaves = LeafCount{ 63 };
-
-  for (uint32_t n = 1; n <= tv.n_leaves.val; ++n) {
-    auto w = NodeCount{ LeafCount{ n } };
-    auto val = tree_math::root(w);
-    tv.root.push_back(val);
-  }
-
-  auto w = NodeCount{ tv.n_leaves };
-  for (uint32_t x = 0; x < w.val; ++x) {
-    auto left = tree_math::left(NodeIndex{ x });
-    tv.left.push_back(left);
-
-    auto right = tree_math::right(NodeIndex{ x }, w);
-    tv.right.push_back(right);
-
-    auto parent = tree_math::parent(NodeIndex{ x }, w);
-    tv.parent.push_back(parent);
-
-    auto sibling = tree_math::sibling(NodeIndex{ x }, w);
-    tv.sibling.push_back(sibling);
-
-    auto dirpath = tree_math::dirpath(NodeIndex{ x }, w);
-    tv.dirpath.push_back(TreeMathTestVectors::NodeVector{ dirpath });
-
-    auto copath = tree_math::copath(NodeIndex{ x }, w);
-    tv.copath.push_back(TreeMathTestVectors::NodeVector{ copath });
-
-    for (uint32_t l = 0; l < tv.n_leaves.val - 1; ++l) {
-      auto ancestors = std::vector<NodeIndex>();
-      for (uint32_t r = l + 1; r < tv.n_leaves.val; ++r) {
-        auto a = tree_math::ancestor(LeafIndex(l), LeafIndex(r));
-        ancestors.push_back(a);
-      }
-      tv.ancestor.emplace_back(TreeMathTestVectors::NodeVector{ ancestors });
-    }
-  }
-
-  return tv;
-}
 
 static CryptoTestVectors
 generate_crypto()
@@ -432,9 +386,6 @@ verify_reproducible(const F& generator)
 int
 main() // NOLINT(bugprone-exception-escape)
 {
-  auto tree_math = generate_tree_math();
-  write_test_vectors(tree_math);
-
   auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
@@ -452,13 +403,11 @@ main() // NOLINT(bugprone-exception-escape)
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
-  verify_reproducible(generate_tree_math);
   verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
 
   // Verify that the test vectors load
   try {
-    TestLoader<TreeMathTestVectors>::get();
     TestLoader<CryptoTestVectors>::get();
     TestLoader<HashRatchetTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();

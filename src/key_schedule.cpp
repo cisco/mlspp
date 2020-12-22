@@ -113,11 +113,11 @@ HashRatchet::erase(uint32_t generation)
 ///
 
 SecretTree::SecretTree(CipherSuite suite_in,
-                       LeafCount group_size,
+                       LeafCount group_size_in,
                        bytes encryption_secret_in)
   : suite(suite_in)
-  , root(tree_math::root(NodeCount{ group_size }))
-  , width(NodeCount{ group_size })
+  , root(tree_math::root(group_size_in))
+  , group_size(group_size_in)
   , secrets(NodeCount{ group_size }.val)
   , secret_size(suite_in.get().hpke.kdf.hash_size())
 {
@@ -128,9 +128,9 @@ bytes
 SecretTree::get(LeafIndex sender)
 {
   // Find an ancestor that is populated
-  auto dirpath = tree_math::dirpath(NodeIndex{ sender }, width);
+  auto dirpath = tree_math::dirpath(NodeIndex{ sender }, group_size);
   dirpath.insert(dirpath.begin(), NodeIndex{ sender });
-  dirpath.push_back(tree_math::root(width));
+  dirpath.push_back(root);
   uint32_t curr = 0;
   for (; curr < dirpath.size(); ++curr) {
     if (!secrets[dirpath[curr].val].empty()) {
@@ -146,7 +146,7 @@ SecretTree::get(LeafIndex sender)
   for (; curr > 0; --curr) {
     auto node = dirpath[curr];
     auto left = tree_math::left(node);
-    auto right = tree_math::right(node, width);
+    auto right = tree_math::right(node, group_size);
 
     auto& secret = secrets[node.val];
     secrets[left.val] =

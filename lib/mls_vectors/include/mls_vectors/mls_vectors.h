@@ -1,18 +1,23 @@
 #pragma once
 
+#include <mls/tree_math.h>
+#include <mls/crypto.h>
 #include <mls/messages.h>
+#include <mls/treekem.h>
 #include <tls/tls_syntax.h>
+#include <bytes/bytes.h>
+#include <vector>
 
-using namespace mls;
+namespace mls_vectors {
 
 struct TreeMathTestVector
 {
-  uint32_t n_leaves;
-  std::vector<NodeIndex> root;
-  std::vector<NodeIndex> left;
-  std::vector<NodeIndex> right;
-  std::vector<NodeIndex> parent;
-  std::vector<NodeIndex> sibling;
+  mls::LeafCount n_leaves;
+  std::vector<mls::NodeIndex> root;
+  std::vector<mls::NodeIndex> left;
+  std::vector<mls::NodeIndex> right;
+  std::vector<mls::NodeIndex> parent;
+  std::vector<mls::NodeIndex> sibling;
 
   TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling)
   TLS_TRAITS(tls::pass,
@@ -55,7 +60,7 @@ struct HashRatchetTestVector
   TLS_SERIALIZABLE(base_secret, chains)
   TLS_TRAITS(tls::pass, tls::vector<4>)
 
-  static HashRatchetTestVector create(CipherSuite suite,
+  static HashRatchetTestVector create(mls::CipherSuite suite,
                                       uint32_t n_leaves,
                                       uint32_t n_generations);
   static std::optional<std::string> verify(const HashRatchetTestVector& tv);
@@ -69,7 +74,7 @@ struct SecretTreeTestVector
   TLS_SERIALIZABLE(base_secret, tree_node_secrets)
   TLS_TRAITS(tls::pass, tls::vector<4>)
 
-  static SecretTreeTestVector create(CipherSuite suite, uint32_t n_leaves);
+  static SecretTreeTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
   static std::optional<std::string> verify(const SecretTreeTestVector& tv);
 };
 
@@ -78,7 +83,7 @@ struct KeyScheduleTestVector
   struct Epoch
   {
     CryptoValue tree_hash;
-    MLSPlaintext commit;
+    mls::MLSPlaintext commit;
 
     CryptoValue confirmed_transcript_hash;
     CryptoValue interim_transcript_hash;
@@ -101,7 +106,7 @@ struct KeyScheduleTestVector
     CryptoValue membership_key;
     CryptoValue resumption_secret;
 
-    HPKEPublicKey external_pub;
+    mls::HPKEPublicKey external_pub;
 
     TLS_SERIALIZABLE(tree_hash,
                      commit,
@@ -131,18 +136,18 @@ struct KeyScheduleTestVector
   TLS_SERIALIZABLE(group_id, base_init_secret, epochs)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
 
-  static KeyScheduleTestVector create(CipherSuite suite, uint32_t n_epochs);
+  static KeyScheduleTestVector create(mls::CipherSuite suite, uint32_t n_epochs);
   static std::optional<std::string> verify(const KeyScheduleTestVector& tv);
 };
 
 struct TreeHashingTestVector
 {
   CryptoValue tree_hash;
-  TreeKEMPublicKey ratchet_tree;
+  mls::TreeKEMPublicKey ratchet_tree;
 
   TLS_SERIALIZABLE(tree_hash, ratchet_tree)
 
-  static TreeHashingTestVector create(CipherSuite suite, uint32_t n_leaves);
+  static TreeHashingTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
   static std::optional<std::string> verify(const TreeHashingTestVector& tv);
 };
 
@@ -197,3 +202,5 @@ struct MessagesTestVector
   static MessagesTestVector create();
   static std::optional<std::string> verify(const MessagesTestVector& tv);
 };
+
+} // namespace mls_vectors

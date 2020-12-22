@@ -43,7 +43,7 @@ struct SecretTree
 {
   SecretTree() = default;
   SecretTree(CipherSuite suite_in,
-             LeafCount group_size,
+             LeafCount group_size_in,
              bytes encryption_secret_in);
 
   bytes get(LeafIndex sender);
@@ -51,7 +51,7 @@ struct SecretTree
 private:
   CipherSuite suite;
   NodeIndex root;
-  NodeCount width;
+  LeafCount group_size;
   std::vector<bytes> secrets;
   size_t secret_size;
 };

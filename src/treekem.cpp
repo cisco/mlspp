@@ -124,14 +124,14 @@ TreeKEMPrivateKey::implant(NodeIndex start,
                            const bytes& path_secret)
 {
   auto n = start;
-  auto r = tree_math::root(NodeCount(size));
+  auto r = tree_math::root(size);
   auto secret = path_secret;
 
   while (n != r) {
     path_secrets[n] = secret;
     private_key_cache.erase(n);
 
-    n = tree_math::parent(n, NodeCount(size));
+    n = tree_math::parent(n, size);
     secret = path_step(secret);
   }
 
@@ -199,7 +199,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
 {
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
-  auto size = NodeCount(pub.size());
+  auto size = pub.size();
   auto dp = tree_math::dirpath(NodeIndex(from), size);
   if (dp.size() != path.nodes.size()) {
     throw ProtocolError("Malformed direct path");
@@ -337,7 +337,7 @@ TreeKEMPublicKey::add_leaf(const KeyPackage& kp)
   node_at(ni).node = Node{ kp };
 
   // Update the unmerged list
-  for (auto& n : tree_math::dirpath(ni, NodeCount(size()))) {
+  for (auto& n : tree_math::dirpath(ni, size())) {
     if (!node_at(n).node) {
       continue;
     }
@@ -367,7 +367,7 @@ TreeKEMPublicKey::blank_path(LeafIndex index)
 
   auto ni = NodeIndex(index);
   node_at(ni).node.reset();
-  for (auto n : tree_math::dirpath(ni, NodeCount(size()))) {
+  for (auto n : tree_math::dirpath(ni, size())) {
     node_at(n).node.reset();
   }
 
@@ -380,7 +380,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
   auto ni = NodeIndex(from);
   node_at(ni).node = Node{ path.leaf_key_package };
 
-  auto dp = tree_math::dirpath(ni, NodeCount(size()));
+  auto dp = tree_math::dirpath(ni, size());
   if (dp.size() != path.nodes.size()) {
     throw ProtocolError("Malformed direct path");
   }
@@ -405,14 +405,14 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
 void
 TreeKEMPublicKey::set_hash_all()
 {
-  auto r = tree_math::root(NodeCount(size()));
+  auto r = tree_math::root(size());
   get_hash(r);
 }
 
 bytes
 TreeKEMPublicKey::root_hash() const
 {
-  auto r = tree_math::root(NodeCount(size()));
+  auto r = tree_math::root(size());
   auto hash = node_at(r).hash;
   if (hash.empty()) {
     throw InvalidParameterError("Root hash not set");
@@ -441,7 +441,7 @@ TreeKEMPublicKey::parent_hash_valid() const
     auto ln = nodes[l.val].node;
     auto l_match = (ln && opt::get(ln).parent_hash() == self_hash);
 
-    auto r = tree_math::right(i, NodeCount(size()));
+    auto r = tree_math::right(i, size());
     auto rn = nodes[r.val].node;
     auto r_match = (rn && opt::get(rn).parent_hash() == self_hash);
 
@@ -478,7 +478,7 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
   }
 
   auto l = resolve(tree_math::left(index));
-  auto r = resolve(tree_math::right(index, NodeCount(size())));
+  auto r = resolve(tree_math::right(index, size()));
   l.insert(l.end(), r.begin(), r.end());
   return l;
 }
@@ -533,12 +533,12 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Package into a UpdatePath
   auto last = NodeIndex(from);
-  for (auto n : tree_math::dirpath(NodeIndex(from), NodeCount(size()))) {
+  for (auto n : tree_math::dirpath(NodeIndex(from), size())) {
     auto path_secret = priv.path_secrets.at(n);
     auto node_priv = opt::get(priv.private_key(n));
     auto node = RatchetNode{ node_priv.public_key, {} };
 
-    auto copath = tree_math::sibling(last, NodeCount(size()));
+    auto copath = tree_math::sibling(last, size());
     auto res = resolve(copath);
     for (auto nr : res) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
@@ -578,7 +578,7 @@ TreeKEMPublicKey::clear_hash_all()
 void
 TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 {
-  auto dp = tree_math::dirpath(NodeIndex(index), NodeCount(size()));
+  auto dp = tree_math::dirpath(NodeIndex(index), size());
   node_at(NodeIndex(index)).hash.resize(0);
   for (auto n : dp) {
     node_at(n).hash.resize(0);
@@ -598,7 +598,7 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   }
 
   auto lh = get_hash(tree_math::left(index));
-  auto rh = get_hash(tree_math::right(index, NodeCount(size())));
+  auto rh = get_hash(tree_math::right(index, size()));
   node_at(index).set_parent_hash(suite, index, lh, rh);
   return node_at(index).hash;
 }

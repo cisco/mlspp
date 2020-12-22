@@ -86,25 +86,25 @@ level(NodeIndex x);
 
 // Node relationships
 NodeIndex
-root(NodeCount w);
+root(LeafCount n);
 
 NodeIndex
 left(NodeIndex x);
 
 NodeIndex
-right(NodeIndex x, NodeCount w);
+right(NodeIndex x, LeafCount n);
 
 NodeIndex
-parent(NodeIndex x, NodeCount w);
+parent(NodeIndex x, LeafCount n);
 
 NodeIndex
-sibling(NodeIndex x, NodeCount w);
+sibling(NodeIndex x, LeafCount n);
 
 std::vector<NodeIndex>
-dirpath(NodeIndex x, NodeCount w);
+dirpath(NodeIndex x, LeafCount n);
 
 std::vector<NodeIndex>
-copath(NodeIndex x, NodeCount w);
+copath(NodeIndex x, LeafCount n);
 
 bool
 in_path(NodeIndex x, NodeIndex y);

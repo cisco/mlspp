@@ -56,8 +56,9 @@ level(NodeIndex x)
 }
 
 NodeIndex
-root(NodeCount w)
+root(LeafCount n)
 {
+  auto w = NodeCount(n);
   return NodeIndex{ (one << log2(w.val)) - 1 };
 }
 
@@ -72,12 +73,13 @@ left(NodeIndex x)
 }
 
 NodeIndex
-right(NodeIndex x, NodeCount w)
+right(NodeIndex x, LeafCount n)
 {
   if (level(x) == 0) {
     return x;
   }
 
+  auto w = NodeCount(n);
   NodeIndex r{ x.val ^ (uint32_t(0x03) << (level(x) - 1)) };
   while (r.val >= w.val) {
     r = left(r);
@@ -93,13 +95,14 @@ parent_step(NodeIndex x)
 }
 
 NodeIndex
-parent(NodeIndex x, NodeCount w)
+parent(NodeIndex x, LeafCount n)
 {
-  if (x == root(w)) {
+  if (x == root(n)) {
     return x;
   }
 
   auto p = parent_step(x);
+  auto w = NodeCount(n);
   while (p.val >= w.val) {
     p = parent_step(p);
   }
@@ -107,11 +110,11 @@ parent(NodeIndex x, NodeCount w)
 }
 
 NodeIndex
-sibling(NodeIndex x, NodeCount w)
+sibling(NodeIndex x, LeafCount n)
 {
-  auto p = parent(x, w);
+  auto p = parent(x, n);
   if (x.val < p.val) {
-    return right(p, w);
+    return right(p, n);
   }
 
   if (x.val > p.val) {
@@ -123,15 +126,15 @@ sibling(NodeIndex x, NodeCount w)
 }
 
 std::vector<NodeIndex>
-dirpath(NodeIndex x, NodeCount w)
+dirpath(NodeIndex x, LeafCount n)
 {
   std::vector<NodeIndex> d;
 
-  auto p = parent(x, w);
-  auto r = root(w);
+  auto p = parent(x, n);
+  auto r = root(n);
   while (p.val != r.val) {
     d.push_back(p);
-    p = parent(p, w);
+    p = parent(p, n);
   }
 
   if (x.val != r.val) {
@@ -142,9 +145,9 @@ dirpath(NodeIndex x, NodeCount w)
 }
 
 std::vector<NodeIndex>
-copath(NodeIndex x, NodeCount w)
+copath(NodeIndex x, LeafCount n)
 {
-  auto d = dirpath(x, w);
+  auto d = dirpath(x, n);
   if (d.empty()) {
     return std::vector<NodeIndex>();
   }
@@ -158,7 +161,7 @@ copath(NodeIndex x, NodeCount w)
 
   std::vector<NodeIndex> c(path.size());
   for (size_t i = 0; i < path.size(); ++i) {
-    c[i] = sibling(path[i], w);
+    c[i] = sibling(path[i], n);
   }
 
   return c;
