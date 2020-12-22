@@ -1,3 +1,4 @@
+#include <mls/key_schedule.h>
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
@@ -11,6 +12,10 @@ using namespace mls;
 
 std::ostream& operator<<(std::ostream& str, const NodeIndex& obj) {
   return str << obj.val;
+}
+
+std::ostream& operator<<(std::ostream& str, const bytes& obj) {
+  return str << to_hex(obj);
 }
 
 template<typename T>
@@ -86,16 +91,43 @@ TreeMathTestVector::verify(const TreeMathTestVector& tv)
 ///
 
 HashRatchetTestVector HashRatchetTestVector::create(
-  CipherSuite /* suite */,
-  uint32_t /* n_leaves */,
-  uint32_t /* n_generations */)
+  CipherSuite suite,
+  uint32_t n_leaves,
+  uint32_t n_generations)
 {
-  return {};
+  HashRatchetTestVector tv;
+  tv.suite = suite;
+  tv.base_secret.data = random_bytes(suite.get().digest.hash_size());
+
+  tv.chains.resize(n_leaves);
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ i } }, tv.base_secret.data };
+
+    tv.chains[i].steps.resize(n_generations);
+    for (uint32_t j = 0; j < n_generations; ++j) {
+      auto key_nonce = ratchet.get(j);
+      tv.chains[i].steps[j].key = { std::move(key_nonce.key) };
+      tv.chains[i].steps[j].nonce = { std::move(key_nonce.nonce) };
+    }
+  }
+
+  return tv;
 }
 
 std::optional<std::string>
-HashRatchetTestVector::verify(const HashRatchetTestVector& /* tv */)
+HashRatchetTestVector::verify(const HashRatchetTestVector& tv)
 {
+  for (uint32_t i = 0; i < tv.chains.size(); i++) {
+    HashRatchet ratchet{ tv.suite, NodeIndex{ LeafIndex{ i } }, tv.base_secret.data };
+    for (uint32_t j = 0; j < tv.chains[i].steps.size(); ++j) {
+      const auto key_nonce = ratchet.get(j);
+      const auto& key = tv.chains[i].steps[j].key.data;
+      const auto& nonce = tv.chains[i].steps[j].nonce.data;
+      VERIFY_EQUAL("key", key, key_nonce.key);
+      VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
+    }
+  }
+
   return std::nullopt;
 }
 

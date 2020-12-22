@@ -8,48 +8,7 @@
 
 using namespace mls;
 
-/////
-
-struct TreeMathTestVectors
-{
-  static const std::string file_name;
-
-  struct NodeVector
-  {
-    std::vector<NodeIndex> nodes;
-    TLS_SERIALIZABLE(nodes)
-    TLS_TRAITS(tls::vector<4>)
-  };
-
-  LeafCount n_leaves{ 255 };
-  std::vector<NodeIndex> root;
-  std::vector<NodeIndex> left;
-  std::vector<NodeIndex> right;
-  std::vector<NodeIndex> parent;
-  std::vector<NodeIndex> sibling;
-  std::vector<NodeVector> dirpath;
-  std::vector<NodeVector> copath;
-  std::vector<NodeVector> ancestor;
-
-  TLS_SERIALIZABLE(n_leaves,
-                   root,
-                   left,
-                   right,
-                   parent,
-                   sibling,
-                   dirpath,
-                   copath,
-                   ancestor)
-  TLS_TRAITS(tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>)
-};
+extern std::array<CipherSuite, 6> all_cipher_suites;
 
 /////
 
@@ -99,47 +58,6 @@ struct CryptoTestVectors
              tls::vector<1>,
              tls::vector<1>,
              tls::vector<4>)
-};
-
-/////
-
-struct HashRatchetTestVectors
-{
-  static const std::string file_name;
-
-  struct Step
-  {
-    bytes key;
-    bytes nonce;
-
-    TLS_SERIALIZABLE(key, nonce)
-    TLS_TRAITS(tls::vector<1>, tls::vector<1>)
-  };
-
-  struct KeySequence
-  {
-    std::vector<Step> steps;
-    TLS_SERIALIZABLE(steps)
-    TLS_TRAITS(tls::vector<4>)
-  };
-
-  struct TestCase
-  {
-    CipherSuite cipher_suite;
-    std::vector<KeySequence> key_sequences;
-
-    TLS_SERIALIZABLE(cipher_suite, key_sequences)
-    TLS_TRAITS(tls::pass, tls::vector<4>)
-  };
-
-  uint32_t n_members;
-  uint32_t n_generations;
-  bytes base_secret;
-
-  std::vector<TestCase> cases;
-
-  TLS_SERIALIZABLE(n_members, n_generations, base_secret, cases)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 /////

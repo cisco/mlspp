@@ -54,11 +54,12 @@ struct HashRatchetTestVector
     TLS_TRAITS(tls::vector<4>)
   };
 
+  mls::CipherSuite suite;
   CryptoValue base_secret;
   std::vector<HashRatchetSequence> chains;
 
-  TLS_SERIALIZABLE(base_secret, chains)
-  TLS_TRAITS(tls::pass, tls::vector<4>)
+  TLS_SERIALIZABLE(suite, base_secret, chains)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
 
   static HashRatchetTestVector create(mls::CipherSuite suite,
                                       uint32_t n_leaves,
@@ -68,11 +69,12 @@ struct HashRatchetTestVector
 
 struct SecretTreeTestVector
 {
+  mls::CipherSuite suite;
   CryptoValue base_secret;
   std::vector<CryptoValue> tree_node_secrets;
 
-  TLS_SERIALIZABLE(base_secret, tree_node_secrets)
-  TLS_TRAITS(tls::pass, tls::vector<4>)
+  TLS_SERIALIZABLE(suite, base_secret, tree_node_secrets)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
 
   static SecretTreeTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
   static std::optional<std::string> verify(const SecretTreeTestVector& tv);
@@ -129,12 +131,13 @@ struct KeyScheduleTestVector
                      resumption_secret)
   };
 
+  mls::CipherSuite suite;
   CryptoValue group_id;
   CryptoValue base_init_secret;
   std::vector<Epoch> epochs;
 
-  TLS_SERIALIZABLE(group_id, base_init_secret, epochs)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>)
+  TLS_SERIALIZABLE(suite, group_id, base_init_secret, epochs)
+  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
   static KeyScheduleTestVector create(mls::CipherSuite suite, uint32_t n_epochs);
   static std::optional<std::string> verify(const KeyScheduleTestVector& tv);
@@ -142,10 +145,11 @@ struct KeyScheduleTestVector
 
 struct TreeHashingTestVector
 {
+  mls::CipherSuite suite;
   CryptoValue tree_hash;
   mls::TreeKEMPublicKey ratchet_tree;
 
-  TLS_SERIALIZABLE(tree_hash, ratchet_tree)
+  TLS_SERIALIZABLE(suite, tree_hash, ratchet_tree)
 
   static TreeHashingTestVector create(mls::CipherSuite suite, uint32_t n_leaves);
   static std::optional<std::string> verify(const TreeHashingTestVector& tv);

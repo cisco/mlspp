@@ -6,12 +6,23 @@
 using namespace mls;
 
 ///
+/// Ciphersuites
+///
+
+std::array<CipherSuite, 6> all_cipher_suites = {{
+  { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
+  { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+  { CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519 },
+  { CipherSuite::ID::X448_AES256GCM_SHA512_Ed448 },
+  { CipherSuite::ID::P521_AES256GCM_SHA512_P521 },
+  { CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448 },
+}};
+
+///
 /// File names
 ///
 
-const std::string TreeMathTestVectors::file_name = "./tree_math.bin";
 const std::string CryptoTestVectors::file_name = "./crypto.bin";
-const std::string HashRatchetTestVectors::file_name = "./hash_ratchet.bin";
 const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
 const std::string TreeKEMTestVectors::file_name = "./treekem.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
@@ -90,9 +101,7 @@ TestLoader<T>::get()
   return _vectors;
 }
 
-template struct TestLoader<TreeMathTestVectors>;
 template struct TestLoader<CryptoTestVectors>;
-template struct TestLoader<HashRatchetTestVectors>;
 template struct TestLoader<KeyScheduleTestVectors>;
 template struct TestLoader<TreeKEMTestVectors>;
 template struct TestLoader<MessagesTestVectors>;

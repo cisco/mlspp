@@ -46,40 +46,6 @@ generate_crypto()
   return tv;
 }
 
-static HashRatchetTestVectors
-generate_hash_ratchet()
-{
-  HashRatchetTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
-  };
-
-  tv.n_members = 16;
-  tv.n_generations = 16;
-  tv.base_secret = bytes(32, 0xA0);
-
-  for (auto suite : suites) {
-    HashRatchetTestVectors::TestCase tc;
-    tc.cipher_suite = suite;
-    tc.key_sequences.resize(tv.n_members);
-
-    for (uint32_t j = 0; j < tv.n_members; ++j) {
-      HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
-      for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto key_nonce = ratchet.get(k);
-        tc.key_sequences.at(j).steps.push_back(
-          { key_nonce.key, key_nonce.nonce });
-      }
-    }
-
-    tv.cases.push_back(tc);
-  }
-
-  return tv;
-}
-
 static KeyScheduleTestVectors
 generate_key_schedule()
 {
@@ -389,9 +355,6 @@ main() // NOLINT(bugprone-exception-escape)
   auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  auto hash_ratchet = generate_hash_ratchet();
-  write_test_vectors(hash_ratchet);
-
   auto key_schedule = generate_key_schedule();
   write_test_vectors(key_schedule);
 
@@ -403,13 +366,11 @@ main() // NOLINT(bugprone-exception-escape)
 
   // Verify that the test vectors are reproducible (to the extent
   // possible)
-  verify_reproducible(generate_hash_ratchet);
   verify_reproducible(generate_key_schedule);
 
   // Verify that the test vectors load
   try {
     TestLoader<CryptoTestVectors>::get();
-    TestLoader<HashRatchetTestVectors>::get();
     TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();

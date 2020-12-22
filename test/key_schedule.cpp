@@ -1,25 +1,16 @@
 #include "test_vectors.h"
 #include <doctest/doctest.h>
 #include <mls/state.h>
+#include <mls_vectors/mls_vectors.h>
 
 using namespace mls;
+using namespace mls_vectors;
 
 TEST_CASE("Hash Ratchet Interop")
 {
-  const auto& tv = TestLoader<HashRatchetTestVectors>::get();
-
-  for (const auto& tc : tv.cases) {
-    auto suite = tc.cipher_suite;
-    REQUIRE(tc.key_sequences.size() == tv.n_members);
-    for (uint32_t j = 0; j < tv.n_members; ++j) {
-      HashRatchet ratchet{ suite, NodeIndex{ LeafIndex{ j } }, tv.base_secret };
-      REQUIRE(tc.key_sequences[j].steps.size() == tv.n_generations);
-      for (uint32_t k = 0; k < tv.n_generations; ++k) {
-        auto kn = ratchet.get(k);
-        REQUIRE(tc.key_sequences[j].steps[k].key == kn.key);
-        REQUIRE(tc.key_sequences[j].steps[k].nonce == kn.nonce);
-      }
-    }
+  for (auto suite : all_cipher_suites) {
+    auto tv = HashRatchetTestVector::create(suite, 15, 10);
+    REQUIRE(!HashRatchetTestVector::verify(tv));
   }
 }
 
