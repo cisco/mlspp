@@ -284,17 +284,17 @@ State::ratchet_and_sign(const Commit& op,
   pt.sign(_suite, prev_ctx, _identity_priv);
 
   auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
-  _confirmed_transcript_hash = _suite.get().digest.hash(confirmed_transcript);
+  _confirmed_transcript_hash = _suite.digest().hash(confirmed_transcript);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto confirmation = _suite.get().digest.hmac(_keys.confirmation_key,
+  auto confirmation = _suite.digest().hmac(_keys.confirmation_key,
                                                _confirmed_transcript_hash);
   pt.confirmation_tag = { std::move(confirmation) };
   pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
 
   auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
-  _interim_transcript_hash = _suite.get().digest.hash(interim_transcript);
+  _interim_transcript_hash = _suite.digest().hash(interim_transcript);
 
   return pt;
 }
@@ -360,9 +360,9 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash = _suite.get().digest.hash(
+  next._confirmed_transcript_hash = _suite.digest().hash(
     next._interim_transcript_hash + pt.commit_content());
-  next._interim_transcript_hash = _suite.get().digest.hash(
+  next._interim_transcript_hash = _suite.digest().hash(
     next._confirmed_transcript_hash + pt.commit_auth_data());
 
   next._epoch += 1;
@@ -408,7 +408,7 @@ State::apply(const Remove& remove)
 ProposalID
 State::proposal_id(const MLSPlaintext& pt) const
 {
-  return ProposalID{ _suite.get().digest.hash(pt.commit_content()) };
+  return ProposalID{ _suite.digest().hash(pt.commit_content()) };
 }
 
 std::optional<MLSPlaintext>
@@ -606,7 +606,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = _suite.get().digest.hmac(_keys.confirmation_key,
+  auto confirm = _suite.digest().hmac(_keys.confirmation_key,
                                           _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
@@ -617,7 +617,7 @@ State::do_export(const std::string& label,
                  size_t size) const
 {
   auto secret = _suite.derive_secret(_keys.exporter_secret, label);
-  auto context_hash = _suite.get().digest.hash(context);
+  auto context_hash = _suite.digest().hash(context);
   return _suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
@@ -741,7 +741,7 @@ State::encrypt(const MLSPlaintext& pt)
   apply_reuse_guard(reuse_guard, keys.nonce);
 
   auto content_ct =
-    _suite.get().hpke.aead.seal(keys.key, keys.nonce, content_aad, content);
+    _suite.hpke().aead.seal(keys.key, keys.nonce, content_aad, content);
 
   // Encrypt the sender data
   auto sender_data_obj = MLSSenderData{ _index.val, generation, reuse_guard };
@@ -751,7 +751,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ _group_id, _epoch, content_type });
 
-  auto encrypted_sender_data = _suite.get().hpke.aead.seal(
+  auto encrypted_sender_data = _suite.hpke().aead.seal(
     sender_data_key, sender_data_nonce, sender_data_aad, sender_data);
 
   // Assemble the MLSCiphertext
@@ -781,7 +781,7 @@ State::decrypt(const MLSCiphertext& ct)
   auto [sender_data_key, sender_data_nonce] = _keys.sender_data(ct.ciphertext);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
-  auto sender_data_pt = _suite.get().hpke.aead.open(sender_data_key,
+  auto sender_data_pt = _suite.hpke().aead.open(sender_data_key,
                                                     sender_data_nonce,
                                                     sender_data_aad,
                                                     ct.encrypted_sender_data);
@@ -810,7 +810,7 @@ State::decrypt(const MLSCiphertext& ct)
     ct.authenticated_data,
   });
   auto content =
-    _suite.get().hpke.aead.open(key, nonce, content_aad, ct.ciphertext);
+    _suite.hpke().aead.open(key, nonce, content_aad, ct.ciphertext);
   if (!content) {
     throw ProtocolError("Content decryption failed");
   }

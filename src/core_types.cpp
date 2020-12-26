@@ -48,12 +48,12 @@ ExtensionList::has(uint16_t type) const
 bytes
 ParentNode::hash(CipherSuite suite) const
 {
-  return suite.get().digest.hash(tls::marshal(this));
+  return suite.digest().hash(tls::marshal(this));
 }
 
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
-  , cipher_suite{ CipherSuite::ID::unknown }
+  , cipher_suite(CipherSuite::ID::unknown)
 {}
 
 static const uint64_t default_not_before = 0x0000000000000000;
@@ -83,7 +83,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
 bytes
 KeyPackage::hash() const
 {
-  return cipher_suite.get().digest.hash(tls::marshal(*this));
+  return cipher_suite.digest().hash(tls::marshal(*this));
 }
 
 void
@@ -131,7 +131,7 @@ KeyPackage::verify() const
   if (CredentialType::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
     if (cred._signature_scheme !=
-        tls_signature_scheme(cipher_suite.get().sig.id)) {
+        tls_signature_scheme(cipher_suite.sig().id)) {
       throw std::runtime_error("Signature algorithm invalid");
     }
   }

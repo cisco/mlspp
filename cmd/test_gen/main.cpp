@@ -75,7 +75,7 @@ generate_crypto()
   for (auto suite : suites) {
     // kdf-Extract
     auto kdf_extract_out =
-      suite.get().hpke.kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
+      suite.hpke().kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);

@@ -46,8 +46,8 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , node(node_in)
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
-  , key_size(suite.get().hpke.aead.key_size)
-  , nonce_size(suite.get().hpke.aead.key_size)
+  , key_size(suite.hpke().aead.key_size)
+  , nonce_size(suite.hpke().aead.key_size)
   , secret_size(suite.secret_size())
 {}
 
@@ -243,7 +243,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
 {
   auto joiner_expand = suite.derive_secret(joiner_secret, "member");
 
-  member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
+  member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
 
   epoch_secret =
     suite.expand_with_label(member_secret, "epoch", context, suite.secret_size());
@@ -273,7 +273,7 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& context,
                        LeafCount size) const
 {
-  auto joiner_secret = suite.get().hpke.kdf.extract(init_secret, commit_secret);
+  auto joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
   return KeyScheduleEpoch(suite, joiner_secret, psk_secret, context, size);
 }
 
@@ -288,8 +288,8 @@ KeyScheduleEpoch::sender_data(const bytes& ciphertext) const
     sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
   }
 
-  auto key_size = suite.get().hpke.aead.key_size;
-  auto nonce_size = suite.get().hpke.aead.nonce_size;
+  auto key_size = suite.hpke().aead.key_size;
+  auto nonce_size = suite.hpke().aead.nonce_size;
   return {
     suite.expand_with_label(sender_data_secret, "key", sample, key_size),
     suite.expand_with_label(sender_data_secret, "nonce", sample, nonce_size),

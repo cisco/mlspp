@@ -49,7 +49,7 @@ OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 
   tls::ostream w;
   w << index << leaf;
-  hash = suite.get().digest.hash(w.bytes());
+  hash = suite.digest().hash(w.bytes());
 }
 
 void
@@ -67,7 +67,7 @@ OptionalNode::set_parent_hash(CipherSuite suite,
   w << index << parent;
   tls::vector<1>::encode(w, left);
   tls::vector<1>::encode(w, right);
-  hash = suite.get().digest.hash(w.bytes());
+  hash = suite.digest().hash(w.bytes());
 }
 
 ///
