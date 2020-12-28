@@ -62,7 +62,8 @@ protected:
     }
 
     // Verify that they produce the same value for export
-    auto ref = group_states[0].do_export(export_label, export_context, export_size);
+    auto ref =
+      group_states[0].do_export(export_label, export_context, export_size);
     REQUIRE(ref.size() == export_size);
     for (auto& state : group_states) {
       REQUIRE(ref ==
