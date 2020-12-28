@@ -218,8 +218,8 @@ struct ECKeyGroup : public EVPGroup
     if (nullptr ==
         o2i_ECPublicKey(&eckey_ptr,
                         &data_ptr,
-                        static_cast<long>(
-                          enc.size()))) { // NOLINTNEXTLINE(google-runtime-int)
+                        static_cast<long>( // NOLINTNEXTLINE(google-runtime-int)
+                          enc.size()))) {
       throw openssl_error();
     }
 
