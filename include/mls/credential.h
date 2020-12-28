@@ -5,23 +5,6 @@
 
 namespace mls {
 
-// enum {
-//     basic(0),
-//     x509(1),
-//     (255)
-// } CredentialType;
-struct CredentialType
-{
-  enum struct selector : uint8_t
-  {
-    basic = 0,
-    x509 = 1,
-  };
-
-  template<typename T>
-  static const selector type;
-};
-
 // struct {
 //     opaque identity<0..2^16-1>;
 //     SignaturePublicKey public_key;
@@ -53,7 +36,7 @@ struct X509Credential
   };
 
   X509Credential() = default;
-  explicit X509Credential(std::vector<CertData> der_chain_in);
+  explicit X509Credential(const std::vector<bytes>& der_chain_in);
 
   SignaturePublicKey public_key() const;
 
@@ -76,6 +59,17 @@ operator>>(tls::istream& str, X509Credential& obj);
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
 
+// enum {
+//     basic(0),
+//     x509(1),
+//     (255)
+// } CredentialType;
+enum struct CredentialType : uint8_t
+{
+  basic = 0,
+  x509 = 1,
+};
+
 // struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
@@ -89,27 +83,35 @@ operator==(const X509Credential& lhs, const X509Credential& rhs);
 class Credential
 {
 public:
-  CredentialType::selector type() const;
+  CredentialType type() const;
   SignaturePublicKey public_key() const;
   bool valid_for(const SignaturePrivateKey& priv) const;
 
   template<typename T>
   const T& get() const
   {
-    return std::get<T>(_cred);
+    return var::get<T>(_cred);
   }
 
   static Credential basic(const bytes& identity,
                           const SignaturePublicKey& public_key);
 
-  static Credential x509(
-    const std::vector<X509Credential::CertData>& der_chain);
+  static Credential x509(const std::vector<bytes>& der_chain);
 
   TLS_SERIALIZABLE(_cred)
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  std::variant<BasicCredential, X509Credential> _cred;
+  var::variant<BasicCredential, X509Credential> _cred;
 };
 
 } // namespace mls
+
+namespace tls {
+
+using namespace mls;
+
+TLS_VARIANT_MAP(CredentialType, BasicCredential, basic)
+TLS_VARIANT_MAP(CredentialType, X509Credential, x509)
+
+} // namespace TLS

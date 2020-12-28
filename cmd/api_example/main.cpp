@@ -43,7 +43,7 @@ verify_roster(const std::vector<std::string>& roster, const Session& session)
       throw std::runtime_error("Missing KeyID extensions");
     }
 
-    auto name_data = key_id.value().key_id;
+    auto name_data = opt::get(key_id).key_id;
     auto name = std::string(name_data.begin(), name_data.end());
     if (roster[i] != name) {
       throw std::runtime_error("Roster mismatch");

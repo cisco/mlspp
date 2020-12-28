@@ -11,19 +11,12 @@ enum struct IntType : uint16_t
   uint16 = 0xBBBB,
 };
 
-struct IntSelector
-{
-  using selector = IntType;
+namespace tls {
 
-  template<typename T>
-  static const IntType type;
-};
+TLS_VARIANT_MAP(IntType, uint8_t, uint8)
+TLS_VARIANT_MAP(IntType, uint16_t, uint16)
 
-template<>
-const IntType IntSelector::type<uint8_t> = IntType::uint8;
-
-template<>
-const IntType IntSelector::type<uint16_t> = IntType::uint16;
+} // namespace tls
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -32,14 +25,14 @@ struct ExampleStruct
   std::array<uint32_t, 4> b{ 0, 0, 0, 0 };
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
-  std::variant<uint8_t, uint16_t> e;
+  tls::var::variant<uint8_t, uint16_t> e;
 
   TLS_SERIALIZABLE(a, b, c, d, e)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant<IntSelector>)
+             tls::variant<IntType>)
 };
 
 static bool
@@ -73,7 +66,7 @@ protected:
   const ExampleStruct val_struct{
     0x1111,
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
-    { 0x66 },
+    { uint8_t(0x66) },
     { 0x77, 0x88 },
     { uint16_t(0x9999) },
   };

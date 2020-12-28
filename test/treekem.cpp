@@ -67,7 +67,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   auto parent = ParentNode{ init_priv.public_key, {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent }, {} };
   REQUIRE_THROWS_AS(opt_parent.set_leaf_hash(suite, node_index),
-                    std::bad_variant_access);
+                    var::bad_variant_access);
 
   opt_parent.set_parent_hash(suite, node_index, child_hash, child_hash);
   REQUIRE_FALSE(opt_parent.hash.empty());
@@ -75,7 +75,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   auto opt_leaf = OptionalNode{ Node{ kp }, {} };
   REQUIRE_THROWS_AS(
     opt_leaf.set_parent_hash(suite, node_index, child_hash, child_hash),
-    std::bad_variant_access);
+    var::bad_variant_access);
 
   opt_leaf.set_leaf_hash(suite, node_index);
   REQUIRE_FALSE(opt_leaf.hash.empty());
@@ -105,7 +105,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   // but not the direct path in the middle
   auto priv_joiner =
     TreeKEMPrivateKey::joiner(suite, size, index, priv, intersect, random);
-  REQUIRE(priv_joiner.private_key(NodeIndex(4)).has_value());
+  REQUIRE(priv_joiner.private_key(NodeIndex(4)));
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(7)) !=
@@ -127,12 +127,12 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   // private_key() generates and caches a private key where a path secret
   // exists, and returns nullopt where one doesn't
   auto priv_yes = priv_joiner.private_key(NodeIndex(3));
-  REQUIRE(priv_yes.has_value());
+  REQUIRE(priv_yes);
   REQUIRE(priv_joiner.private_key_cache.find(NodeIndex(3)) !=
           priv_joiner.private_key_cache.end());
 
   auto priv_no = priv_joiner.private_key(NodeIndex(1));
-  REQUIRE_FALSE(priv_no.has_value());
+  REQUIRE_FALSE(priv_no);
 }
 
 //        _
@@ -176,32 +176,32 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     REQUIRE(add_index == index);
 
     auto found = pub.find(kp_add);
-    REQUIRE(found.has_value());
-    REQUIRE(found.value() == index);
+    REQUIRE(found);
+    REQUIRE(found == index);
 
     auto found_kp = pub.key_package(index);
-    REQUIRE(found_kp.has_value());
-    REQUIRE(found_kp.value() == kp_add);
+    REQUIRE(found_kp);
+    REQUIRE(found_kp == kp_add);
 
     // Merge the direct path
     pub.merge(index, path);
     REQUIRE(pub.parent_hash_valid());
 
     found = pub.find(kp_path);
-    REQUIRE(found.has_value());
-    REQUIRE(found.value() == index);
+    REQUIRE(found);
+    REQUIRE(found == index);
     for (const auto& dpn : dp) {
-      REQUIRE(pub.node_at(dpn).node.has_value());
+      REQUIRE(pub.node_at(dpn).node);
     }
 
     found_kp = pub.key_package(index);
-    REQUIRE(found_kp.has_value());
-    REQUIRE(found_kp.value() == kp_path);
+    REQUIRE(found_kp);
+    REQUIRE(found_kp == kp_path);
   }
 
   // Remove a node and verify that the resolution comes out right
   pub.blank_path(removed);
-  REQUIRE_FALSE(pub.key_package(removed).has_value());
+  REQUIRE_FALSE(pub.key_package(removed));
   REQUIRE(root_resolution == pub.resolve(root));
 }
 

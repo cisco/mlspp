@@ -36,6 +36,10 @@ struct KEM
   };
 
   const ID id;
+  const size_t secret_size;
+  const size_t enc_size;
+  const size_t pk_size;
+  const size_t sk_size;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
@@ -59,13 +63,12 @@ struct KEM
                            const PublicKey& pkS,
                            const PrivateKey& skR) const;
 
-  virtual size_t secret_size() const = 0;
-  virtual size_t enc_size() const = 0;
-  virtual size_t pk_size() const = 0;
-  virtual size_t sk_size() const = 0;
-
 protected:
-  KEM(ID id_in);
+  KEM(ID id_in,
+      size_t secret_size_in,
+      size_t enc_size_in,
+      size_t pk_size_in,
+      size_t sk_size_in);
 };
 
 struct KDF
@@ -83,13 +86,12 @@ struct KDF
   virtual ~KDF() = default;
 
   const ID id;
+  const size_t hash_size;
 
   virtual bytes extract(const bytes& salt, const bytes& ikm) const = 0;
   virtual bytes expand(const bytes& prk,
                        const bytes& info,
                        size_t size) const = 0;
-
-  virtual size_t hash_size() const = 0;
 
   bytes labeled_extract(const bytes& suite_id,
                         const bytes& salt,
@@ -102,7 +104,7 @@ struct KDF
                        size_t size) const;
 
 protected:
-  KDF(ID id_in);
+  KDF(ID id_in, size_t hash_size_in);
 };
 
 struct AEAD
@@ -120,6 +122,8 @@ struct AEAD
   virtual ~AEAD() = default;
 
   const ID id;
+  const size_t key_size;
+  const size_t nonce_size;
 
   virtual bytes seal(const bytes& key,
                      const bytes& nonce,
@@ -130,11 +134,8 @@ struct AEAD
                                     const bytes& aad,
                                     const bytes& ct) const = 0;
 
-  virtual size_t key_size() const = 0;
-  virtual size_t nonce_size() const = 0;
-
 protected:
-  AEAD(ID id_in);
+  AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in);
 };
 
 struct Context

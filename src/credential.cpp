@@ -5,18 +5,6 @@
 namespace mls {
 
 ///
-/// CredentialType
-///
-
-template<>
-const CredentialType::selector CredentialType::type<BasicCredential> =
-  CredentialType::selector::basic;
-
-template<>
-const CredentialType::selector CredentialType::type<X509Credential> =
-  CredentialType::selector::x509;
-
-///
 /// X509Credential
 ///
 
@@ -41,9 +29,22 @@ find_signature(Signature::ID id)
   throw InvalidParameterError("Unsupported algorithm");
 }
 
-X509Credential::X509Credential(
-  std::vector<X509Credential::CertData> der_chain_in)
-  : der_chain(std::move(der_chain_in))
+static std::vector<mls::X509Credential::CertData>
+bytes_to_x509_credential_data(const std::vector<bytes>& data_in)
+{
+  std::vector<mls::X509Credential::CertData> data_out;
+  data_out.resize(data_in.size());
+  std::transform(data_in.begin(),
+                 data_in.end(),
+                 data_out.begin(),
+                 [](const bytes& der) -> mls::X509Credential::CertData {
+                   return mls::X509Credential::CertData{ der };
+                 });
+  return data_out;
+}
+
+X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
+  : der_chain(bytes_to_x509_credential_data(der_chain_in))
 {
   if (der_chain.empty()) {
     throw std::invalid_argument("empty certificate chain");
@@ -87,7 +88,15 @@ operator>>(tls::istream& str, X509Credential& obj)
 {
   auto der_chain = std::vector<X509Credential::CertData>{};
   tls::vector<4>::decode(str, der_chain);
-  obj = X509Credential(der_chain);
+  std::vector<bytes> der_in;
+  der_in.resize(der_chain.size());
+
+  std::transform(der_chain.begin(),
+                 der_chain.end(),
+                 der_in.begin(),
+                 [](const auto& cert_data) { return cert_data.data; });
+  obj = X509Credential(der_in);
+
   return str;
 }
 
@@ -101,30 +110,20 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 /// Credential
 ///
 
-CredentialType::selector
+CredentialType
 Credential::type() const
 {
-  switch (_cred.index()) {
-    case 0:
-      return CredentialType::selector::basic;
-    case 1:
-      return CredentialType::selector::x509;
-  }
-
-  throw std::bad_variant_access();
+  return tls::variant<CredentialType>::type(_cred);
 }
 
 SignaturePublicKey
 Credential::public_key() const
 {
-  switch (_cred.index()) {
-    case 0:
-      return std::get<BasicCredential>(_cred).public_key;
-    case 1:
-      return std::get<X509Credential>(_cred).public_key();
-  }
-
-  throw std::bad_variant_access();
+  static const auto get_public_key = overloaded{
+    [](const BasicCredential& cred) { return cred.public_key; },
+    [](const X509Credential& cred) { return cred.public_key(); },
+  };
+  return var::visit(get_public_key, _cred);
 }
 
 bool
@@ -142,7 +141,7 @@ Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
 }
 
 Credential
-Credential::x509(const std::vector<X509Credential::CertData>& der_chain)
+Credential::x509(const std::vector<bytes>& der_chain)
 {
   Credential cred;
   cred._cred = X509Credential{ der_chain };

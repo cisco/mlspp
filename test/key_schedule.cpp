@@ -29,7 +29,7 @@ TEST_CASE("Key Schedule Interop")
 
   for (const auto& tc : tv.cases) {
     auto suite = tc.cipher_suite;
-    auto secret_size = suite.get().hpke.kdf.hash_size();
+    auto secret_size = suite.secret_size();
     bytes init_secret(secret_size, 0);
 
     auto group_context = tls::get<GroupContext>(tv.base_group_context);

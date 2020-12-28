@@ -41,37 +41,35 @@ protected:
   std::vector<KeyPackage> key_packages;
   std::vector<State> states;
 
-  bytes fresh_secret() const
-  {
-    return random_bytes(suite.get().hpke.kdf.hash_size());
-  }
+  bytes fresh_secret() const { return random_bytes(suite.secret_size()); }
 
-  void verify_group_functionality(std::vector<State>& states)
+  void verify_group_functionality(std::vector<State>& group_states)
   {
-    if (states.empty()) {
+    if (group_states.empty()) {
       return;
     }
 
     // Verify that they can all send and be received
-    for (auto& state : states) {
+    for (auto& state : group_states) {
       auto encrypted = state.protect(test_message);
-      for (auto& other : states) {
+      for (auto& other : group_states) {
         auto decrypted = other.unprotect(encrypted);
         REQUIRE(decrypted == test_message);
       }
     }
 
     // Verify that they produce the same value for export
-    auto ref = states[0].do_export(export_label, export_context, export_size);
+    auto ref =
+      group_states[0].do_export(export_label, export_context, export_size);
     REQUIRE(ref.size() == export_size);
-    for (auto& state : states) {
+    for (auto& state : group_states) {
       REQUIRE(ref ==
               state.do_export(export_label, export_context, export_size));
     }
 
     // Verify roster
-    auto roster_ref = states[0].roster();
-    for (const auto& state : states) {
+    auto roster_ref = group_states[0].roster();
+    for (const auto& state : group_states) {
       REQUIRE(roster_ref == state.roster());
     }
   }
@@ -140,7 +138,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
       if (j == sender) {
         states[j] = new_state;
       } else {
-        states[j] = states[j].handle(commit).value();
+        states[j] = opt::get(states[j].handle(commit));
       }
     }
 
@@ -224,7 +222,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
       if (state.index().val == i) {
         state = new_state;
       } else {
-        state = state.handle(commit).value();
+        state = opt::get(state.handle(commit));
       }
     }
 
@@ -245,7 +243,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
       if (state.index().val == size_t(i)) {
         state = new_state;
       } else {
-        state = state.handle(commit).value();
+          state = opt::get(state.handle(commit));
       }
     }
 

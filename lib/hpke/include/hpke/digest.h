@@ -24,11 +24,9 @@ struct Digest
   bytes hash(const bytes& data) const;
   bytes hmac(const bytes& key, const bytes& data) const;
 
-  size_t hash_size() const;
+  const size_t hash_size;
 
 private:
-  const size_t output_size;
-
   explicit Digest(ID id);
 };
 

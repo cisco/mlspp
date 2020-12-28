@@ -47,11 +47,11 @@ void
 GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 {
   auto maybe_kp = tree.key_package(index);
-  if (!maybe_kp.has_value()) {
+  if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = maybe_kp.value().credential;
+  auto cred = opt::get(maybe_kp).credential;
   if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
@@ -64,11 +64,11 @@ bool
 GroupInfo::verify() const
 {
   auto maybe_kp = tree.key_package(signer_index);
-  if (!maybe_kp.has_value()) {
+  if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = maybe_kp.value().credential;
+  auto cred = opt::get(maybe_kp).credential;
   return cred.public_key().verify(suite, to_be_signed(), signature);
 }
 
@@ -76,7 +76,7 @@ GroupInfo::verify() const
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
-  , cipher_suite{ CipherSuite::ID::unknown }
+  , cipher_suite(CipherSuite::ID::unknown)
 {}
 
 Welcome::Welcome(CipherSuite suite,
@@ -90,7 +90,7 @@ Welcome::Welcome(CipherSuite suite,
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psk_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
-    cipher_suite.get().hpke.aead.seal(key, nonce, {}, group_info_data);
+    cipher_suite.hpke().aead.seal(key, nonce, {}, group_info_data);
 }
 
 std::optional<int>
@@ -99,7 +99,7 @@ Welcome::find(const KeyPackage& kp) const
   auto hash = kp.hash();
   for (size_t i = 0; i < secrets.size(); i++) {
     if (hash == secrets[i].key_package_hash) {
-      return i;
+      return static_cast<int>(i);
     }
   }
   return std::nullopt;
@@ -109,8 +109,8 @@ void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
   auto gs = GroupSecrets{ _joiner_secret, std::nullopt };
-  if (path_secret.has_value()) {
-    gs.path_secret = { path_secret.value() };
+  if (path_secret) {
+    gs.path_secret = { opt::get(path_secret) };
   }
 
   auto gs_data = tls::marshal(gs);
@@ -124,12 +124,12 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
   auto [key, nonce] =
     group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
   auto group_info_data =
-    cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
-  if (!group_info_data.has_value()) {
+    cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
+  if (!group_info_data) {
     throw ProtocolError("Welcome decryption failed");
   }
 
-  return tls::get<GroupInfo>(group_info_data.value(), cipher_suite);
+  return tls::get<GroupInfo>(opt::get(group_info_data), cipher_suite);
 }
 
 std::tuple<bytes, bytes>
@@ -137,11 +137,11 @@ Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
                               const bytes& psk_secret)
 {
-  auto key_size = suite.get().hpke.aead.key_size();
-  auto nonce_size = suite.get().hpke.aead.nonce_size();
+  auto key_size = suite.hpke().aead.key_size;
+  auto nonce_size = suite.hpke().aead.nonce_size;
 
   auto joiner_expand = suite.derive_secret(joiner_secret, "member");
-  auto member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
+  auto member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
 
   auto welcome_secret = suite.derive_secret(member_secret, "welcome");
   auto key = suite.expand_with_label(welcome_secret, "key", {}, key_size);
@@ -151,28 +151,10 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // MLSPlaintext
-
-// ProposalType
-template<>
-const ProposalType::selector ProposalType::type<Add> =
-  ProposalType::selector::add;
-
-template<>
-const ProposalType::selector ProposalType::type<Update> =
-  ProposalType::selector::update;
-
-template<>
-const ProposalType::selector ProposalType::type<Remove> =
-  ProposalType::selector::remove;
-
-ProposalType::selector
+ProposalType
 Proposal::proposal_type() const
 {
-  static auto get_type = [](auto&& v) {
-    using type = typename std::decay<decltype(v)>::type;
-    return ProposalType::template type<type>;
-  };
-  return std::visit(get_type, content);
+  return tls::variant<ProposalType>::type(content);
 }
 
 // ProposalOrRefType
@@ -205,7 +187,7 @@ MLSPlaintext::MLSPlaintext()
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
-                           ContentType::selector content_type_in,
+                           ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
@@ -217,19 +199,19 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 {
   tls::istream r(content_in);
   switch (content_type_in) {
-    case ContentType::selector::application: {
+    case ContentType::application: {
       auto& application_data = content.emplace<ApplicationData>();
       r >> application_data;
       break;
     }
 
-    case ContentType::selector::proposal: {
+    case ContentType::proposal: {
       auto& proposal = content.emplace<Proposal>();
       r >> proposal;
       break;
     }
 
-    case ContentType::selector::commit: {
+    case ContentType::commit: {
       auto& commit = content.emplace<Commit>();
       r >> commit;
       break;
@@ -278,24 +260,22 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , decrypted(false)
 {}
 
-ContentType::selector
+ContentType
 MLSPlaintext::content_type() const
 {
   static const auto get_content_type = overloaded{
-    [](const ApplicationData& /*unused*/) {
-      return ContentType::selector::application;
-    },
-    [](const Proposal& /*unused*/) { return ContentType::selector::proposal; },
-    [](const Commit& /*unused*/) { return ContentType::selector::commit; },
+    [](const ApplicationData& /*unused*/) { return ContentType::application; },
+    [](const Proposal& /*unused*/) { return ContentType::proposal; },
+    [](const Commit& /*unused*/) { return ContentType::commit; },
   };
-  return std::visit(get_content_type, content);
+  return var::visit(get_content_type, content);
 }
 
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
   tls::ostream w;
-  std::visit([&](auto&& inner_content) { w << inner_content; }, content);
+  var::visit([&](auto&& inner_content) { w << inner_content; }, content);
 
   bytes padding(padding_size, 0);
   tls::vector<2>::encode(w, signature);
@@ -366,7 +346,7 @@ MLSPlaintext::set_membership_tag(const CipherSuite& suite,
                                  const bytes& mac_key)
 {
   auto tbm = membership_tag_input(context);
-  membership_tag = { suite.get().digest.hmac(mac_key, tbm) };
+  membership_tag = { suite.digest().hmac(mac_key, tbm) };
 }
 
 bool
@@ -378,13 +358,13 @@ MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
     return true;
   }
 
-  if (!membership_tag.has_value()) {
+  if (!membership_tag) {
     return false;
   }
 
   auto tbm = membership_tag_input(context);
-  auto mac_value = suite.get().digest.hmac(mac_key, tbm);
-  return constant_time_eq(mac_value, membership_tag.value().mac_value);
+  auto mac_value = suite.digest().hmac(mac_key, tbm);
+  return constant_time_eq(mac_value, opt::get(membership_tag).mac_value);
 }
 
 } // namespace mls

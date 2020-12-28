@@ -39,7 +39,7 @@ EVPGroup::PrivateKey::public_key() const
 std::unique_ptr<Group::PrivateKey>
 EVPGroup::generate_key_pair() const
 {
-  return derive_key_pair({}, random_bytes(sk_size()));
+  return derive_key_pair({}, random_bytes(sk_size));
 }
 
 bytes
@@ -171,9 +171,10 @@ struct ECKeyGroup : public EVPGroup
     while (BN_is_zero(sk.get()) != 0 || BN_cmp(sk.get(), order.get()) != -1) {
       auto ctr = i2osp(counter, 1);
       auto candidate =
-        kdf.labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size());
+        kdf.labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size);
       candidate[0] &= bitmask();
-      sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
+      sk.reset(BN_bin2bn(
+        candidate.data(), static_cast<int>(candidate.size()), nullptr));
 
       counter += 1;
       if (counter > retry_limit) {
@@ -196,7 +197,7 @@ struct ECKeyGroup : public EVPGroup
     auto* pub = EVP_PKEY_get0_EC_KEY(rpk.pkey.get());
 
     auto len = i2o_ECPublicKey(pub, nullptr);
-    if (len != static_cast<int>(pk_size())) {
+    if (len != static_cast<int>(pk_size)) {
       throw openssl_error();
     }
 
@@ -214,7 +215,11 @@ struct ECKeyGroup : public EVPGroup
     auto eckey = make_typed_unique(new_ec_key());
     auto* eckey_ptr = eckey.get();
     const auto* data_ptr = enc.data();
-    if (nullptr == o2i_ECPublicKey(&eckey_ptr, &data_ptr, enc.size())) {
+    if (nullptr ==
+        o2i_ECPublicKey(&eckey_ptr,
+                        &data_ptr,
+                        static_cast<long>( // NOLINTNEXTLINE(google-runtime-int)
+                          enc.size()))) {
       throw openssl_error();
     }
 
@@ -240,8 +245,8 @@ struct ECKeyGroup : public EVPGroup
   {
     auto eckey = make_typed_unique(new_ec_key());
     const auto* group = EC_KEY_get0_group(eckey.get());
-    const auto d =
-      make_typed_unique(BN_bin2bn(skm.data(), skm.size(), nullptr));
+    const auto d = make_typed_unique(
+      BN_bin2bn(skm.data(), static_cast<int>(skm.size()), nullptr));
     auto pt = make_typed_unique(EC_POINT_new(group));
 
     EC_POINT_mul(group, pt.get(), d.get(), nullptr, nullptr, nullptr);
@@ -316,14 +321,14 @@ struct RawKeyGroup : public EVPGroup
     static const auto label_sk = to_bytes("sk");
 
     auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
-    auto skm = kdf.labeled_expand(suite_id, dkp_prk, label_sk, {}, sk_size());
+    auto skm = kdf.labeled_expand(suite_id, dkp_prk, label_sk, {}, sk_size);
     return deserialize_private(skm);
   }
 
   bytes serialize(const Group::PublicKey& pk) const override
   {
     const auto& rpk = dynamic_cast<const PublicKey&>(pk);
-    auto raw = bytes(pk_size());
+    auto raw = bytes(pk_size);
     auto* data_ptr = raw.data();
     auto data_len = raw.size();
     if (1 != EVP_PKEY_get_raw_public_key(rpk.pkey.get(), data_ptr, &data_len)) {
@@ -347,7 +352,7 @@ struct RawKeyGroup : public EVPGroup
   bytes serialize_private(const Group::PrivateKey& sk) const override
   {
     const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
-    auto raw = bytes(sk_size());
+    auto raw = bytes(sk_size);
     auto* data_ptr = raw.data();
     auto data_len = raw.size();
     if (1 !=
@@ -460,10 +465,10 @@ Group::get<Group::ID::Ed448>()
   return instance;
 }
 
-size_t
-Group::dh_size() const
+static inline size_t
+group_dh_size(Group::ID group_id)
 {
-  switch (id) {
+  switch (group_id) {
     case Group::ID::P256:
       return 32;
     case Group::ID::P384:
@@ -475,15 +480,20 @@ Group::dh_size() const
     case Group::ID::X448:
       return 56;
 
+    // Non-DH groups
+    case Group::ID::Ed25519:
+    case Group::ID::Ed448:
+      return 0;
+
     default:
-      throw std::runtime_error("Unknown or non-DH group");
+      throw std::runtime_error("Unknown group");
   }
 }
 
-size_t
-Group::pk_size() const
+static inline size_t
+group_pk_size(Group::ID group_id)
 {
-  switch (id) {
+  switch (group_id) {
     case Group::ID::P256:
       return 65;
     case Group::ID::P384:
@@ -503,10 +513,10 @@ Group::pk_size() const
   }
 }
 
-size_t
-Group::sk_size() const
+static inline size_t
+group_sk_size(Group::ID group_id)
 {
-  switch (id) {
+  switch (group_id) {
     case Group::ID::P256:
       return 32;
     case Group::ID::P384:
@@ -525,5 +535,13 @@ Group::sk_size() const
       throw std::runtime_error("Unknown group");
   }
 }
+
+Group::Group(ID group_id_in, const KDF& kdf_in)
+  : id(group_id_in)
+  , dh_size(group_dh_size(group_id_in))
+  , pk_size(group_pk_size(group_id_in))
+  , sk_size(group_sk_size(group_id_in))
+  , kdf(kdf_in)
+{}
 
 } // namespace hpke

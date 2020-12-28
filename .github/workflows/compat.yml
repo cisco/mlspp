@@ -1,0 +1,31 @@
+name: Build for older MacOS
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
+  MACOSX_DEPLOYMENT_TARGET: 10.11
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: dependencies
+      run: |
+        brew reinstall openssl@1.1
+        brew install pkgconfig doctest llvm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: build the library
+      run: make

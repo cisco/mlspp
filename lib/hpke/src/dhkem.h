@@ -41,11 +41,6 @@ struct DHKEM : public KEM
                    const KEM::PublicKey& pkS,
                    const KEM::PrivateKey& skR) const override;
 
-  size_t secret_size() const override;
-  size_t enc_size() const override;
-  size_t pk_size() const override;
-  size_t sk_size() const override;
-
 private:
   const Group& group;
   const KDF& kdf;

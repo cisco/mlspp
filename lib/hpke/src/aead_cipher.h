@@ -20,12 +20,7 @@ struct AEADCipher : public AEAD
                             const bytes& aad,
                             const bytes& ct) const override;
 
-  size_t key_size() const override;
-  size_t nonce_size() const override;
-
 private:
-  const size_t nk;
-  const size_t nn;
   const size_t tag_size;
 
   AEADCipher(AEAD::ID id_in);

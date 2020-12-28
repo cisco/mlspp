@@ -5,16 +5,14 @@
 #include <map>
 #include <optional>
 #include <stdexcept>
-#include <variant>
 #include <vector>
 
-// Note: Different namespace because this is TLS-generic (might
-// want to pull it out later).  Also, avoids confusables ending up
-// in the global namespace, e.g., vector, istream, ostream.
+#include <tls/compat.h>
+
 namespace tls {
 
 // For indicating no min or max in vector definitions
-const size_t none = -1;
+const size_t none = std::numeric_limits<size_t>::max();
 
 class WriteError : public std::invalid_argument
 {
@@ -37,7 +35,7 @@ public:
 class ostream
 {
 public:
-  static const size_t none = -1;
+  static const size_t none = std::numeric_limits<size_t>::max();
 
   void write_raw(const std::vector<uint8_t>& bytes);
 
@@ -80,11 +78,11 @@ template<typename T>
 tls::ostream&
 operator<<(tls::ostream& out, const std::optional<T>& opt)
 {
-  if (!opt.has_value()) {
+  if (!opt) {
     return out << uint8_t(0);
   }
 
-  return out << uint8_t(1) << opt.value();
+  return out << uint8_t(1) << opt::get(opt);
 }
 
 // Enum writer
@@ -125,7 +123,7 @@ private:
     for (int i = 0; i < length; i += 1) {
       value = (value << unsigned(8)) + next();
     }
-    data = value;
+    data = static_cast<T>(value);
     return *this;
   }
 
@@ -170,7 +168,7 @@ operator>>(tls::istream& in, std::optional<T>& opt)
 
     case 1:
       opt.emplace();
-      return in >> opt.value();
+      return in >> opt::get(opt);
 
     default:
       throw std::invalid_argument("Malformed optional");
@@ -293,7 +291,7 @@ struct vector
   static ostream& encode(ostream& str, const std::vector<T>& data)
   {
     // Vectors with no header are written directly
-    if (head == 0) {
+    if constexpr (head == 0) {
       for (const auto& item : data) {
         str << item;
       }
@@ -328,9 +326,9 @@ struct vector
     uint64_t size = temp._buffer.size();
     if (size > head_max) {
       throw WriteError("Data too large for header size");
-    } else if ((max != none) && (size > max)) {
+    } else if constexpr ((max != none) && (size > max)) {
       throw WriteError("Data too large for declared max");
-    } else if ((min != none) && (size < min)) {
+    } else if constexpr ((min != none) && (size < min)) {
       throw WriteError("Data too small for declared min");
     }
 
@@ -358,16 +356,16 @@ struct vector
     // Read the size of the vector, if provided; otherwise consume all remaining
     // data in the buffer
     uint64_t size = str._buffer.size();
-    if (head > 0) {
+    if constexpr (head > 0) {
       str.read_uint(size, head);
     }
 
     // Check the size against the declared constraints
     if (size > str._buffer.size()) {
       throw ReadError("Declared size exceeds available data size");
-    } else if ((max != none) && (size > max)) {
+    } else if constexpr ((max != none) && (size > max)) {
       throw ReadError("Data too large for declared max");
-    } else if ((min != none) && (size < min)) {
+    } else if constexpr ((min != none) && (size < min)) {
       throw ReadError("Data too small for declared min");
     }
 
@@ -394,40 +392,43 @@ struct vector
 };
 
 // Variant encoding
+template<typename Ts, typename Tv>
+constexpr Ts
+variant_map();
+
+#define TLS_VARIANT_MAP(EnumType, MappedType, enum_value)                      \
+  template<>                                                                   \
+  constexpr EnumType variant_map<EnumType, MappedType>()                       \
+  {                                                                            \
+    return EnumType::enum_value;                                               \
+  }
+
 template<typename Ts>
 struct variant
 {
-  template<size_t I = 0, typename... Tp>
-  static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  write_variant(tls::ostream&, const std::variant<Tp...>&)
+  template<typename... Tp>
+  static inline Ts type(const var::variant<Tp...>& data)
   {
-    throw WriteError("Empty variant");
-  }
-
-  template<size_t I = 0, typename... Tp>
-    static inline typename std::enable_if <
-    I<sizeof...(Tp), void>::type write_variant(tls::ostream& str,
-                                               const std::variant<Tp...>& v)
-  {
-    using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
-    if (std::holds_alternative<Tc>(v)) {
-      str << Ts::template type<Tc> << std::get<I>(v);
-      return;
-    }
-
-    write_variant<I + 1, Tp...>(str, v);
+    static const auto get_type = [](const auto& v) {
+      return variant_map<Ts, std::decay_t<decltype(v)>>();
+    };
+    return var::visit(get_type, data);
   }
 
   template<typename... Tp>
-  static ostream& encode(ostream& str, const std::variant<Tp...>& data)
+  static ostream& encode(ostream& str, const var::variant<Tp...>& data)
   {
-    write_variant(str, data);
+    const auto write_variant = [&str](auto&& v) {
+      using Tv = std::decay_t<decltype(v)>;
+      str << variant_map<Ts, Tv>() << v;
+    };
+    var::visit(write_variant, data);
     return str;
   }
 
   template<size_t I = 0, typename Te, typename... Tp>
   static inline typename std::enable_if<I == sizeof...(Tp), void>::type
-  read_variant(tls::istream&, Te, std::variant<Tp...>&)
+  read_variant(tls::istream&, Te, var::variant<Tp...>&)
   {
     throw ReadError("Invalid variant type label");
   }
@@ -436,10 +437,10 @@ struct variant
     static inline typename std::enable_if <
     I<sizeof...(Tp), void>::type read_variant(tls::istream& str,
                                               Te target_type,
-                                              std::variant<Tp...>& v)
+                                              var::variant<Tp...>& v)
   {
-    using Tc = std::variant_alternative_t<I, std::variant<Tp...>>;
-    if (Ts::template type<Tc> == target_type) {
+    using Tc = var::variant_alternative_t<I, var::variant<Tp...>>;
+    if (variant_map<Ts, Tc>() == target_type) {
       str >> v.template emplace<I>();
       return;
     }
@@ -448,9 +449,9 @@ struct variant
   }
 
   template<typename... Tp>
-  static istream& decode(istream& str, std::variant<Tp...>& data)
+  static istream& decode(istream& str, var::variant<Tp...>& data)
   {
-    typename Ts::selector target_type;
+    Ts target_type;
     str >> target_type;
     read_variant(str, target_type, data);
     return str;
