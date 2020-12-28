@@ -187,22 +187,16 @@ struct ProposalRef
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct ProposalOrRefType
+enum struct ProposalOrRefType : uint8_t
 {
-  enum struct selector : uint8_t
-  {
-    reserved = 0,
-    value = 1,
-    reference = 2,
-  };
-
-  template<typename T>
-  static const selector type;
+  reserved = 0,
+  value = 1,
+  reference = 2,
 };
 
 struct ProposalOrRef
 {
-  std::variant<Proposal, ProposalRef> content;
+  var::variant<Proposal, ProposalRef> content;
 
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalOrRefType>)
@@ -391,6 +385,9 @@ struct MLSCiphertext
 namespace tls {
 
 using namespace mls;
+
+TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value);
+TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference);
 
 TLS_VARIANT_MAP(ProposalType, Add, add)
 TLS_VARIANT_MAP(ProposalType, Update, update)

@@ -171,25 +171,6 @@ State::update(const bytes& leaf_secret)
   return sign(update_proposal(leaf_secret));
 }
 
-    LeafIndex
-    State::leaf_for_roster_entry(RosterIndex index) const
-    {
-        auto non_blank_leaves = uint32_t(0);
-        
-        for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
-            const auto& kp = _tree.key_package(i);
-            if (!kp) {
-                continue;
-            }
-            if (non_blank_leaves == index.val) {
-                return i;
-            }
-            non_blank_leaves += 1;
-        }
-        
-        throw InvalidParameterError("Leaf Index mismatch");
-}
-
 MLSPlaintext
 State::remove(RosterIndex index) const
 {
@@ -214,8 +195,8 @@ State::commit(const bytes& leaf_secret,
   Commit commit;
   auto joiners = std::vector<KeyPackage>{};
   for (const auto& cached : _pending_proposals) {
-    if (std::holds_alternative<Add>(cached.proposal.content)) {
-      const auto& add = std::get<Add>(cached.proposal.content);
+    if (var::holds_alternative<Add>(cached.proposal.content)) {
+      const auto& add = var::get<Add>(cached.proposal.content);
       joiners.push_back(add.key_package);
     }
 
@@ -224,8 +205,8 @@ State::commit(const bytes& leaf_secret,
 
   // Add the extra proposals to those we had cached
   for (const auto& proposal : extra_proposals) {
-    if (std::holds_alternative<Add>(proposal.content)) {
-      const auto& add = std::get<Add>(proposal.content);
+    if (var::holds_alternative<Add>(proposal.content)) {
+      const auto& add = var::get<Add>(proposal.content);
       joiners.push_back(add.key_package);
     }
 
@@ -364,7 +345,7 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Apply the commit
-  const auto& commit = std::get<Commit>(pt.content);
+  const auto& commit = var::get<Commit>(pt.content);
   const auto proposals = must_resolve(commit.proposals, sender);
 
   auto next = successor();
@@ -372,7 +353,7 @@ State::handle(const MLSPlaintext& pt)
 
   // Decapsulate and apply the UpdatePath, if provided
   // TODO(RLB) Verify that path is provided if required
-  auto update_secret = bytes(_suite.get().hpke.kdf.hash_size(), 0);
+  auto update_secret = bytes(_suite.secret_size(), 0);
   if (commit.path.has_value()) {
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
@@ -437,8 +418,8 @@ void
 State::cache_proposal(const MLSPlaintext& pt)
 {
   _pending_proposals.push_back({
-    _suite.get().digest.hash(tls::marshal(pt)),
-    std::get<Proposal>(pt.content),
+    _suite.digest().hash(tls::marshal(pt)),
+    var::get<Proposal>(pt.content),
     LeafIndex{ pt.sender.sender },
   });
 }
@@ -446,15 +427,15 @@ State::cache_proposal(const MLSPlaintext& pt)
 std::optional<State::CachedProposal>
 State::resolve(const ProposalOrRef& id, LeafIndex sender_index) const
 {
-  if (std::holds_alternative<Proposal>(id.content)) {
+  if (var::holds_alternative<Proposal>(id.content)) {
     return CachedProposal{
       {},
-      std::get<Proposal>(id.content),
+      var::get<Proposal>(id.content),
       sender_index,
     };
   }
 
-  const auto& ref = std::get<ProposalRef>(id.content);
+  const auto& ref = var::get<ProposalRef>(id.content);
   for (const auto& cached : _pending_proposals) {
     if (cached.ref == ref.id) {
       return cached;
@@ -528,9 +509,9 @@ State::apply(const std::vector<CachedProposal>& proposals,
 std::tuple<bool, bool, std::vector<LeafIndex>>
 State::apply(const std::vector<CachedProposal>& proposals)
 {
-  auto update_locations = apply(proposals, ProposalType::selector::update);
-  auto remove_locations = apply(proposals, ProposalType::selector::remove);
-  auto joiner_locations = apply(proposals, ProposalType::selector::add);
+  auto update_locations = apply(proposals, ProposalType::update);
+  auto remove_locations = apply(proposals, ProposalType::remove);
+  auto joiner_locations = apply(proposals, ProposalType::add);
 
   auto has_updates = !update_locations.empty();
   auto has_removes = !remove_locations.empty();

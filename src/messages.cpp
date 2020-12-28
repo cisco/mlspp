@@ -157,28 +157,6 @@ Proposal::proposal_type() const
   return tls::variant<ProposalType>::type(content);
 }
 
-// ProposalOrRefType
-template<>
-const ProposalOrRefType::selector ProposalOrRefType::type<Proposal> =
-  ProposalOrRefType::selector::value;
-
-template<>
-const ProposalOrRefType::selector ProposalOrRefType::type<ProposalRef> =
-  ProposalOrRefType::selector::reference;
-
-// ContentType
-template<>
-const ContentType::selector ContentType::type<Proposal> =
-  ContentType::selector::proposal;
-
-template<>
-const ContentType::selector ContentType::type<Commit> =
-  ContentType::selector::commit;
-
-template<>
-const ContentType::selector ContentType::type<ApplicationData> =
-  ContentType::selector::application;
-
 MLSPlaintext::MLSPlaintext()
   : epoch(0)
   , decrypted(false)
