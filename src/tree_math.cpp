@@ -184,8 +184,8 @@ ancestor(LeafIndex l, LeafIndex r)
 
   uint8_t k = 0;
   while (ln != rn) {
-    ln.val = ln.val >> 1;
-    rn.val = rn.val >> 1;
+    ln.val = ln.val >> 1u;
+    rn.val = rn.val >> 1u;
     k += 1;
   }
 
