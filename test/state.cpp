@@ -41,10 +41,7 @@ protected:
   std::vector<KeyPackage> key_packages;
   std::vector<State> states;
 
-  bytes fresh_secret() const
-  {
-    return random_bytes(suite.secret_size());
-  }
+  bytes fresh_secret() const { return random_bytes(suite.secret_size()); }
 
   void verify_group_functionality(std::vector<State>& group_states)
   {

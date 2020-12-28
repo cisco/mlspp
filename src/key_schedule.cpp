@@ -245,8 +245,8 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
 
   member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
 
-  epoch_secret =
-    suite.expand_with_label(member_secret, "epoch", context, suite.secret_size());
+  epoch_secret = suite.expand_with_label(
+    member_secret, "epoch", context, suite.secret_size());
   init_secrets(size);
 }
 
@@ -273,7 +273,8 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& context,
                        LeafCount size) const
 {
-  auto temp_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
+  auto temp_joiner_secret =
+    suite.hpke().kdf.extract(init_secret, commit_secret);
   return KeyScheduleEpoch(suite, temp_joiner_secret, psk_secret, context, size);
 }
 

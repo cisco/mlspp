@@ -45,53 +45,53 @@ CipherSuite::CipherSuite(ID id_in)
 const CipherSuite::Ciphers&
 CipherSuite::get() const
 {
-  static const auto ciphers_X25519_AES128GCM_SHA256_Ed25519 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_X25519_SHA256,
-         KDF::ID::HKDF_SHA256,
-         AEAD::ID::AES_128_GCM),
-    Digest::get<Digest::ID::SHA256>(),
-    Signature::get<Signature::ID::Ed25519>(),
-  };
+  static const auto ciphers_X25519_AES128GCM_SHA256_Ed25519 =
+    CipherSuite::Ciphers{
+      HPKE(KEM::ID::DHKEM_X25519_SHA256,
+           KDF::ID::HKDF_SHA256,
+           AEAD::ID::AES_128_GCM),
+      Digest::get<Digest::ID::SHA256>(),
+      Signature::get<Signature::ID::Ed25519>(),
+    };
 
   static const auto ciphers_P256_AES128GCM_SHA256_P256 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_P256_SHA256,
-         KDF::ID::HKDF_SHA256,
-         AEAD::ID::AES_128_GCM),
+    HPKE(
+      KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256, AEAD::ID::AES_128_GCM),
     Digest::get<Digest::ID::SHA256>(),
     Signature::get<Signature::ID::P256_SHA256>(),
   };
 
-  static const auto ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_X448_SHA512,
-         KDF::ID::HKDF_SHA512,
-         AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA512>(),
-    Signature::get<Signature::ID::Ed448>(),
-  };
+  static const auto ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519 =
+    CipherSuite::Ciphers{
+      HPKE(KEM::ID::DHKEM_X448_SHA512,
+           KDF::ID::HKDF_SHA512,
+           AEAD::ID::AES_256_GCM),
+      Digest::get<Digest::ID::SHA512>(),
+      Signature::get<Signature::ID::Ed448>(),
+    };
 
   static const auto ciphers_X448_AES256GCM_SHA512_Ed448 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_X448_SHA512,
-         KDF::ID::HKDF_SHA512,
-         AEAD::ID::AES_256_GCM),
+    HPKE(
+      KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
     Digest::get<Digest::ID::SHA512>(),
     Signature::get<Signature::ID::Ed448>(),
   };
 
   static const auto ciphers_P521_AES256GCM_SHA512_P521 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_P521_SHA512,
-         KDF::ID::HKDF_SHA512,
-         AEAD::ID::AES_256_GCM),
+    HPKE(
+      KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
     Digest::get<Digest::ID::SHA512>(),
     Signature::get<Signature::ID::P521_SHA512>(),
   };
 
-  static const auto ciphers_X448_CHACHA20POLY1305_SHA512_Ed448 = CipherSuite::Ciphers{
-    HPKE(KEM::ID::DHKEM_X448_SHA512,
-         KDF::ID::HKDF_SHA512,
-         AEAD::ID::CHACHA20_POLY1305),
-    Digest::get<Digest::ID::SHA512>(),
-    Signature::get<Signature::ID::Ed448>(),
-  };
+  static const auto ciphers_X448_CHACHA20POLY1305_SHA512_Ed448 =
+    CipherSuite::Ciphers{
+      HPKE(KEM::ID::DHKEM_X448_SHA512,
+           KDF::ID::HKDF_SHA512,
+           AEAD::ID::CHACHA20_POLY1305),
+      Digest::get<Digest::ID::SHA512>(),
+      Signature::get<Signature::ID::Ed448>(),
+    };
 
   switch (id) {
     case ID::unknown:

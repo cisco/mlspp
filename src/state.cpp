@@ -288,8 +288,8 @@ State::ratchet_and_sign(const Commit& op,
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto confirmation = _suite.digest().hmac(_keys.confirmation_key,
-                                               _confirmed_transcript_hash);
+  auto confirmation =
+    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
   pt.confirmation_tag = { std::move(confirmation) };
   pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
 
@@ -360,8 +360,8 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash = _suite.digest().hash(
-    next._interim_transcript_hash + pt.commit_content());
+  next._confirmed_transcript_hash =
+    _suite.digest().hash(next._interim_transcript_hash + pt.commit_content());
   next._interim_transcript_hash = _suite.digest().hash(
     next._confirmed_transcript_hash + pt.commit_auth_data());
 
@@ -606,8 +606,8 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = _suite.digest().hmac(_keys.confirmation_key,
-                                          _confirmed_transcript_hash);
+  auto confirm =
+    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
   return constant_time_eq(confirm, confirmation);
 }
 
@@ -782,9 +782,9 @@ State::decrypt(const MLSCiphertext& ct)
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
   auto sender_data_pt = _suite.hpke().aead.open(sender_data_key,
-                                                    sender_data_nonce,
-                                                    sender_data_aad,
-                                                    ct.encrypted_sender_data);
+                                                sender_data_nonce,
+                                                sender_data_aad,
+                                                ct.encrypted_sender_data);
   if (!sender_data_pt) {
     throw ProtocolError("Sender data decryption failed");
   }

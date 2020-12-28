@@ -91,10 +91,10 @@ label_secret()
 ///
 
 KEM::KEM(ID id_in,
-      size_t secret_size_in,
-      size_t enc_size_in,
-      size_t pk_size_in,
-      size_t sk_size_in)
+         size_t secret_size_in,
+         size_t enc_size_in,
+         size_t pk_size_in,
+         size_t sk_size_in)
   : id(id_in)
   , secret_size(secret_size_in)
   , enc_size(enc_size_in)
