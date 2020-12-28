@@ -35,7 +35,7 @@ from_hex(const std::string& hex)
   bytes out(len);
   for (int i = 0; i < len; i += 1) {
     std::string byte = hex.substr(2 * i, 2);
-    out[i] = strtol(byte.c_str(), nullptr, 16);
+    out[i] = static_cast<bytes::value_type>(strtol(byte.c_str(), nullptr, 16));
   }
 
   return out;

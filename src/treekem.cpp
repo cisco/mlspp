@@ -423,7 +423,7 @@ TreeKEMPublicKey::root_hash() const
 LeafCount
 TreeKEMPublicKey::size() const
 {
-  return LeafCount(NodeCount(nodes.size()));
+  return LeafCount(NodeCount(static_cast<uint32_t>(nodes.size())));
 }
 
 bool

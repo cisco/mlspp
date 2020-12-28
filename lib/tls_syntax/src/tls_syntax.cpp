@@ -15,8 +15,8 @@ ostream::write_raw(const std::vector<uint8_t>& bytes)
 ostream&
 ostream::write_uint(uint64_t value, int length)
 {
-  for (int i = length - 1; i >= 0; i -= 1) {
-    _buffer.push_back(value >> unsigned(8 * i));
+  for (int i = length - 1; i >= 0; --i) {
+    _buffer.push_back(static_cast<uint8_t>(value >> unsigned(8 * i)));
   }
   return *this;
 }

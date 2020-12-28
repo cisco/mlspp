@@ -273,8 +273,8 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& context,
                        LeafCount size) const
 {
-  auto joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
-  return KeyScheduleEpoch(suite, joiner_secret, psk_secret, context, size);
+  auto temp_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
+  return KeyScheduleEpoch(suite, temp_joiner_secret, psk_secret, context, size);
 }
 
 KeyAndNonce

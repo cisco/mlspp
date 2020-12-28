@@ -76,9 +76,9 @@ Digest::hmac(const bytes& key, const bytes& data) const
   const auto* type = openssl_digest_type(id);
   if (nullptr == HMAC(type,
                       key.data(),
-                      key.size(),
+                      static_cast<int>(key.size()),
                       data.data(),
-                      data.size(),
+                      static_cast<int>(data.size()),
                       md.data(),
                       &size)) {
     throw openssl_error();
