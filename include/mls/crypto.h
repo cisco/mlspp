@@ -39,16 +39,14 @@ struct CipherSuite
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
   };
 
-  struct Ciphers
-  {
-    hpke::HPKE hpke;
-    const hpke::Digest& digest;
-    const hpke::Signature& sig;
-  };
+  CipherSuite();
+  CipherSuite(ID id_in);
 
-  ID id;
-
-  const Ciphers& get() const;
+  ID cipher_suite() const { return id; }
+  size_t secret_size() const { return get().digest.hash_size; }
+  const hpke::HPKE& hpke() const { return get().hpke; }
+  const hpke::Digest& digest() const { return get().digest; }
+  const hpke::Signature& sig() const { return get().sig; }
 
   bytes expand_with_label(const bytes& secret,
                           const std::string& label,
@@ -59,8 +57,16 @@ struct CipherSuite
   TLS_SERIALIZABLE(id)
 
 private:
-  template<CipherSuite::ID>
-  static const Ciphers ciphers;
+  ID id;
+
+  struct Ciphers
+  {
+    hpke::HPKE hpke;
+    const hpke::Digest& digest;
+    const hpke::Signature& sig;
+  };
+
+  const Ciphers& get() const;
 };
 
 extern const std::array<CipherSuite::ID, 6> all_supported_suites;

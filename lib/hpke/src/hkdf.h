@@ -14,7 +14,6 @@ struct HKDF : public KDF
 
   bytes extract(const bytes& salt, const bytes& ikm) const override;
   bytes expand(const bytes& prk, const bytes& info, size_t size) const override;
-  size_t hash_size() const override;
 
 private:
   const Digest& digest;

@@ -15,7 +15,7 @@ TEST_CASE("Crypto Interop")
     auto suite = tc.cipher_suite;
 
     auto kdf_extract_out =
-      suite.get().hpke.kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
+      suite.hpke().kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
     REQUIRE(kdf_extract_out == tc.kdf_extract_out);
 
     auto derive_key_pair_priv =

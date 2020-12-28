@@ -76,7 +76,7 @@ GroupInfo::verify() const
 
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
-  , cipher_suite{ CipherSuite::ID::unknown }
+  , cipher_suite(CipherSuite::ID::unknown)
 {}
 
 Welcome::Welcome(CipherSuite suite,
@@ -90,7 +90,7 @@ Welcome::Welcome(CipherSuite suite,
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psk_secret);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
-    cipher_suite.get().hpke.aead.seal(key, nonce, {}, group_info_data);
+    cipher_suite.hpke().aead.seal(key, nonce, {}, group_info_data);
 }
 
 std::optional<int>
@@ -124,7 +124,7 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
   auto [key, nonce] =
     group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
   auto group_info_data =
-    cipher_suite.get().hpke.aead.open(key, nonce, {}, encrypted_group_info);
+    cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data) {
     throw ProtocolError("Welcome decryption failed");
   }
@@ -137,11 +137,11 @@ Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
                               const bytes& psk_secret)
 {
-  auto key_size = suite.get().hpke.aead.key_size();
-  auto nonce_size = suite.get().hpke.aead.nonce_size();
+  auto key_size = suite.hpke().aead.key_size;
+  auto nonce_size = suite.hpke().aead.nonce_size;
 
   auto joiner_expand = suite.derive_secret(joiner_secret, "member");
-  auto member_secret = suite.get().hpke.kdf.extract(joiner_expand, psk_secret);
+  auto member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
 
   auto welcome_secret = suite.derive_secret(member_secret, "welcome");
   auto key = suite.expand_with_label(welcome_secret, "key", {}, key_size);
@@ -324,7 +324,7 @@ MLSPlaintext::set_membership_tag(const CipherSuite& suite,
                                  const bytes& mac_key)
 {
   auto tbm = membership_tag_input(context);
-  membership_tag = { suite.get().digest.hmac(mac_key, tbm) };
+  membership_tag = { suite.digest().hmac(mac_key, tbm) };
 }
 
 bool
@@ -341,7 +341,7 @@ MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
   }
 
   auto tbm = membership_tag_input(context);
-  auto mac_value = suite.get().digest.hmac(mac_key, tbm);
+  auto mac_value = suite.digest().hmac(mac_key, tbm);
   return constant_time_eq(mac_value, opt::get(membership_tag).mac_value);
 }
 

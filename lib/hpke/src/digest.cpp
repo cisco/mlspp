@@ -51,13 +51,13 @@ Digest::get<Digest::ID::SHA512>()
 
 Digest::Digest(Digest::ID id_in)
   : id(id_in)
-  , output_size(EVP_MD_size(openssl_digest_type(id_in)))
+  , hash_size(EVP_MD_size(openssl_digest_type(id_in)))
 {}
 
 bytes
 Digest::hash(const bytes& data) const
 {
-  auto md = bytes(output_size);
+  auto md = bytes(hash_size);
   unsigned int size = 0;
   const auto* type = openssl_digest_type(id);
   if (1 !=
@@ -71,7 +71,7 @@ Digest::hash(const bytes& data) const
 bytes
 Digest::hmac(const bytes& key, const bytes& data) const
 {
-  auto md = bytes(output_size);
+  auto md = bytes(hash_size);
   unsigned int size = 0;
   const auto* type = openssl_digest_type(id);
   if (nullptr == HMAC(type,
@@ -85,12 +85,6 @@ Digest::hmac(const bytes& key, const bytes& data) const
   }
 
   return md;
-}
-
-size_t
-Digest::hash_size() const
-{
-  return output_size;
 }
 
 } // namespace hpke

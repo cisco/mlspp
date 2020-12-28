@@ -75,7 +75,7 @@ generate_crypto()
   for (auto suite : suites) {
     // kdf-Extract
     auto kdf_extract_out =
-      suite.get().hpke.kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
+      suite.hpke().kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
 
     // Derive-Key-Pair
     auto priv = HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
@@ -151,7 +151,7 @@ generate_key_schedule()
     KeyScheduleTestVectors::TestCase tc;
     tc.cipher_suite = suite;
 
-    auto secret_size = suite.get().hpke.kdf.hash_size();
+    auto secret_size = suite.secret_size();
 
     auto group_context = base_group_context;
     auto commit_secret = bytes(secret_size, 0);
