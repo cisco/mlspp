@@ -183,15 +183,14 @@ ancestor(LeafIndex l, LeafIndex r)
   }
 
   uint8_t k = 0;
-  uint8_t one = 1;
   while (ln != rn) {
-    ln.val = ln.val >> one;
-    rn.val = rn.val >> one;
+    ln.val = ln.val >> 1U;
+    rn.val = rn.val >> 1U;
     k += 1;
   }
 
   uint32_t prefix = ln.val << k;
-  uint32_t stop = (one << uint8_t(k - 1));
+  uint32_t stop = (1U << uint8_t(k - 1));
   return NodeIndex(prefix + (stop - 1));
 }
 

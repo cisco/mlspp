@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stdexcept>
 
 const Signature&
 select_signature(Signature::ID id)
