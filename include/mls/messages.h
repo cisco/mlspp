@@ -386,8 +386,8 @@ namespace tls {
 
 using namespace mls;
 
-TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value);
-TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference);
+TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value)
+TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference)
 
 TLS_VARIANT_MAP(ProposalType, Add, add)
 TLS_VARIANT_MAP(ProposalType, Update, update)

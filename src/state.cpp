@@ -156,6 +156,10 @@ State::remove_proposal(RosterIndex index) const
 Proposal
 State::remove_proposal(LeafIndex removed) const
 {
+  if (!_tree.key_package(removed)) {
+    throw InvalidParameterError("Remove on blank leaf");
+  }
+
   return { Remove{ removed } };
 }
 
@@ -362,7 +366,7 @@ State::handle(const MLSPlaintext& pt)
       next._confirmed_transcript_hash,
       next._extensions,
     });
-    const auto& path = commit.path.value();
+    const auto& path = opt::get(commit.path);
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;
@@ -451,7 +455,7 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
 {
   auto proposals = std::vector<CachedProposal>(ids.size());
   auto must_resolve = [&](auto& id) {
-    return resolve(id, sender_index).value();
+    return opt::get(resolve(id, sender_index));
   };
   std::transform(ids.begin(), ids.end(), proposals.begin(), must_resolve);
   return proposals;
@@ -475,7 +479,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
       }
 
       case ProposalType::update: {
-        auto& update = var::get<Update>(cached.proposal.content);
+        const auto& update = var::get<Update>(cached.proposal.content);
         if (cached.sender != _index) {
           apply(cached.sender, update);
           break;
