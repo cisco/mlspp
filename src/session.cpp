@@ -172,8 +172,7 @@ bytes
 Session::Inner::fresh_secret() const
 {
   const auto suite = history.front().cipher_suite();
-  const auto secret_size = suite.get().hpke.kdf.hash_size();
-  return random_bytes(secret_size);
+  return random_bytes(suite.secret_size());
 }
 
 bytes

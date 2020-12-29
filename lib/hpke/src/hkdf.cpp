@@ -48,7 +48,7 @@ digest_to_kdf(Digest::ID digest_id)
 }
 
 HKDF::HKDF(const Digest& digest_in)
-  : KDF(digest_to_kdf(digest_in.id))
+  : KDF(digest_to_kdf(digest_in.id), digest_in.hash_size)
   , digest(digest_in)
 {}
 
@@ -74,12 +74,6 @@ HKDF::expand(const bytes& prk, const bytes& info, size_t size) const
 
   okm.resize(size);
   return okm;
-}
-
-size_t
-HKDF::hash_size() const
-{
-  return digest.hash_size();
 }
 
 } // namespace hpke

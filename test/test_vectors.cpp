@@ -34,7 +34,7 @@ const std::string MessagesTestVectors::file_name = "./messages.bin";
 bool
 deterministic_signature_scheme(const CipherSuite& suite)
 {
-  switch (suite.id) {
+  switch (suite.cipher_suite()) {
     case CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519:
     case CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
     case CipherSuite::ID::X448_AES256GCM_SHA512_Ed448:

@@ -27,13 +27,13 @@ TEST_CASE("KEM round-trip")
     auto pkR = skR->public_key();
 
     auto pkSm = kem.serialize(*pkS);
-    REQUIRE(pkSm.size() == kem.pk_size());
+    REQUIRE(pkSm.size() == kem.pk_size);
 
     SUBCASE("Encap/Decap")
     {
       auto [secretS, enc] = kem.encap(*pkR);
-      REQUIRE(enc.size() == kem.enc_size());
-      REQUIRE(secretS.size() == kem.secret_size());
+      REQUIRE(enc.size() == kem.enc_size);
+      REQUIRE(secretS.size() == kem.secret_size);
 
       auto secretR = kem.decap(enc, *skR);
       REQUIRE(secretR == secretS);
@@ -42,8 +42,8 @@ TEST_CASE("KEM round-trip")
     SUBCASE("AuthEncap/AuthDecap")
     {
       auto [secretS, enc] = kem.auth_encap(*pkR, *skS);
-      REQUIRE(enc.size() == kem.enc_size());
-      REQUIRE(secretS.size() == kem.secret_size());
+      REQUIRE(enc.size() == kem.enc_size);
+      REQUIRE(secretS.size() == kem.secret_size);
 
       auto secretR = kem.auth_decap(enc, *pkS, *skR);
       REQUIRE(secretR == secretS);

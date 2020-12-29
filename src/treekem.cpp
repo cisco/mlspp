@@ -49,7 +49,7 @@ OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 
   tls::ostream w;
   w << index << leaf;
-  hash = suite.get().digest.hash(w.bytes());
+  hash = suite.digest().hash(w.bytes());
 }
 
 void
@@ -67,7 +67,7 @@ OptionalNode::set_parent_hash(CipherSuite suite,
   w << index << parent;
   tls::vector<1>::encode(w, left);
   tls::vector<1>::encode(w, right);
-  hash = suite.get().digest.hash(w.bytes());
+  hash = suite.digest().hash(w.bytes());
 }
 
 ///
@@ -114,8 +114,7 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
 bytes
 TreeKEMPrivateKey::path_step(const bytes& path_secret) const
 {
-  auto secret_size = suite.get().digest.hash_size();
-  return suite.expand_with_label(path_secret, "path", {}, secret_size);
+  return suite.expand_with_label(path_secret, "path", {}, suite.secret_size());
 }
 
 void
@@ -424,7 +423,7 @@ TreeKEMPublicKey::root_hash() const
 LeafCount
 TreeKEMPublicKey::size() const
 {
-  return LeafCount(NodeCount(nodes.size()));
+  return LeafCount(NodeCount(static_cast<uint32_t>(nodes.size())));
 }
 
 bool

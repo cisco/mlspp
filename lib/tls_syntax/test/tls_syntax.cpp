@@ -66,7 +66,7 @@ protected:
   const ExampleStruct val_struct{
     0x1111,
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
-    { 0x66 },
+    { uint8_t(0x66) },
     { 0x77, 0x88 },
     { uint16_t(0x9999) },
   };
