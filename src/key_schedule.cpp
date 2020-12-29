@@ -228,53 +228,73 @@ GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
 /// KeyScheduleEpoch
 ///
 
-KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
-  : suite(suite_in)
+static bytes
+make_joiner_secret(CipherSuite suite,
+                   const bytes& init_secret,
+                   const bytes& commit_secret)
 {
-  epoch_secret = random_bytes(suite.secret_size());
-  init_secrets();
+  auto pre_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
+  return suite.derive_secret(pre_joiner_secret, "joiner");
+}
+
+static bytes
+make_epoch_secret(CipherSuite suite,
+                  const bytes& joiner_secret,
+                  const bytes& psk_secret,
+                  const bytes& context)
+{
+  auto member_secret = suite.hpke().kdf.extract(joiner_secret, psk_secret);
+  return suite.expand_with_label(
+    member_secret, "epoch", context, suite.secret_size());
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
-                                   bytes joiner_secret_in,
+                                   const bytes& joiner_secret,
                                    const bytes& psk_secret,
                                    const bytes& context)
   : suite(suite_in)
-  , joiner_secret(std::move(joiner_secret_in))
-{
-  auto joiner_expand = suite.derive_secret(joiner_secret, "member");
+  , joiner_secret(joiner_secret)
+  , epoch_secret(
+      make_epoch_secret(suite_in, joiner_secret, psk_secret, context))
+  , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
+  , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
+  , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))
+  , authentication_secret(suite.derive_secret(epoch_secret, "authentication"))
+  , external_secret(suite.derive_secret(epoch_secret, "external"))
+  , confirmation_key(suite.derive_secret(epoch_secret, "confirm"))
+  , membership_key(suite.derive_secret(epoch_secret, "membership"))
+  , resumption_secret(suite.derive_secret(epoch_secret, "resumption"))
+  , init_secret(suite.derive_secret(epoch_secret, "init"))
+  , external_priv(HPKEPrivateKey::derive(suite, external_secret))
+{}
 
-  member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
+                                   const bytes& init_secret,
+                                   const bytes& context)
+  : KeyScheduleEpoch(suite_in,
+                     make_joiner_secret(suite_in, init_secret, suite_in.zero()),
+                     suite_in.zero(),
+                     context)
+{}
 
-  epoch_secret = suite.expand_with_label(
-    member_secret, "epoch", context, suite.secret_size());
-  init_secrets();
-}
-
-void
-KeyScheduleEpoch::init_secrets()
-{
-  sender_data_secret = suite.derive_secret(epoch_secret, "sender data");
-  encryption_secret = suite.derive_secret(epoch_secret, "encryption");
-  exporter_secret = suite.derive_secret(epoch_secret, "exporter");
-  authentication_secret = suite.derive_secret(epoch_secret, "authentication");
-  external_secret = suite.derive_secret(epoch_secret, "external");
-  confirmation_key = suite.derive_secret(epoch_secret, "confirm");
-  membership_key = suite.derive_secret(epoch_secret, "membership");
-  resumption_secret = suite.derive_secret(epoch_secret, "resumption");
-  init_secret = suite.derive_secret(epoch_secret, "init");
-
-  external_priv = HPKEPrivateKey::derive(suite, external_secret);
-}
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
+                                   const bytes& init_secret,
+                                   const bytes& commit_secret,
+                                   const bytes& psk_secret,
+                                   const bytes& context)
+  : KeyScheduleEpoch(suite_in,
+                     make_joiner_secret(suite_in, init_secret, commit_secret),
+                     psk_secret,
+                     context)
+{}
 
 KeyScheduleEpoch
 KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& psk_secret,
                        const bytes& context) const
 {
-  auto temp_joiner_secret =
-    suite.hpke().kdf.extract(init_secret, commit_secret);
-  return KeyScheduleEpoch(suite, temp_joiner_secret, psk_secret, context);
+  return KeyScheduleEpoch(
+    suite, init_secret, commit_secret, psk_secret, context);
 }
 
 GroupKeySource
@@ -316,12 +336,19 @@ KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
   return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
 }
 
+bytes
+KeyScheduleEpoch::do_export(const std::string& label,
+                            const bytes& context,
+                            size_t size) const
+{
+  auto secret = suite.derive_secret(exporter_secret, label);
+  auto context_hash = suite.digest().hash(context);
+  return suite.expand_with_label(secret, "exporter", context_hash, size);
+}
+
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 {
-  // NB: Does not compare the GroupKeySource field, since these are dynamically
-  // generated as needed.  Rather, we check the roots from which they started.
-  auto suite = (lhs.suite == rhs.suite);
   auto epoch_secret = (lhs.epoch_secret == rhs.epoch_secret);
   auto sender_data_secret = (lhs.sender_data_secret == rhs.sender_data_secret);
   auto encryption_secret = (lhs.encryption_secret == rhs.encryption_secret);
@@ -329,7 +356,7 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
 
-  return suite && epoch_secret && sender_data_secret && encryption_secret &&
+  return epoch_secret && sender_data_secret && encryption_secret &&
          exporter_secret && confirmation_key && init_secret;
 }
 

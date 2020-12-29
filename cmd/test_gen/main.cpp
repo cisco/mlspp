@@ -79,26 +79,12 @@ generate_key_schedule()
     uint32_t max_members = 20;
     auto n_members = min_members;
 
-    KeyScheduleEpoch epoch;
-    epoch.suite = suite;
-    epoch.init_secret = tv.base_init_secret;
+    KeyScheduleEpoch epoch(
+      suite, tv.base_init_secret, tls::marshal(group_context));
 
     for (size_t j = 0; j < tv.n_epochs; ++j) {
       auto ctx = tls::marshal(group_context);
-      epoch = epoch.next(commit_secret, {}, ctx, LeafCount{ n_members });
-
-      auto handshake_keys = std::vector<KeyScheduleTestVectors::KeyAndNonce>();
-      auto application_keys =
-        std::vector<KeyScheduleTestVectors::KeyAndNonce>();
-      for (LeafIndex k{ 0 }; k.val < n_members; ++k.val) {
-        auto hs = epoch.keys.get(
-          GroupKeySource::RatchetType::handshake, k, tv.target_generation);
-        handshake_keys.push_back({ hs.key, hs.nonce });
-
-        auto app = epoch.keys.get(
-          GroupKeySource::RatchetType::application, k, tv.target_generation);
-        application_keys.push_back({ app.key, app.nonce });
-      }
+      epoch = epoch.next(commit_secret, {}, ctx);
 
       auto [sender_data_key, sender_data_nonce] =
         epoch.sender_data(tv.ciphertext);
@@ -117,8 +103,8 @@ generate_key_schedule()
         epoch.resumption_secret,
         epoch.init_secret,
         epoch.external_priv.public_key,
-        handshake_keys,
-        application_keys,
+        {},
+        {},
         sender_data_key,
         sender_data_nonce,
       });

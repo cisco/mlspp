@@ -16,13 +16,17 @@ State::State(bytes group_id,
   , _epoch(0)
   , _tree(suite)
   , _transcript_hash(suite)
-  , _key_schedule(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
+
+  // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
+  auto ctx = tls::marshal(group_context());
+  _key_schedule =
+    KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
@@ -92,7 +96,8 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _key_schedule = KeyScheduleEpoch(_suite, secrets.joiner_secret, {}, group_ctx);
+  _key_schedule =
+    KeyScheduleEpoch(_suite, secrets.joiner_secret, {}, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
@@ -213,7 +218,7 @@ State::commit(const bytes& leaf_secret) const
 
   // KEM new entropy to the group and the new joiners
   auto path_required = has_updates || has_removes || commit.proposals.empty();
-  auto update_secret = bytes(_suite.secret_size(), 0);
+  auto update_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
@@ -255,7 +260,8 @@ State::commit(const bytes& leaf_secret) const
   };
   group_info.sign(_index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };
+  auto welcome =
+    Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -291,7 +297,8 @@ State::ratchet_and_sign(const Commit& op,
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  pt.confirmation_tag = { _key_schedule.confirmation_tag(_transcript_hash.confirmed) };
+  pt.confirmation_tag = { _key_schedule.confirmation_tag(
+    _transcript_hash.confirmed) };
   pt.membership_tag = { prev_key_schedule.membership_tag(prev_ctx, pt) };
 
   _transcript_hash.update_interim(pt);
@@ -340,7 +347,7 @@ State::handle(const MLSPlaintext& pt)
   next.apply(commit);
 
   // Decapsulate and apply the UpdatePath, if provided
-  auto update_secret = bytes(_suite.secret_size(), 0);
+  auto update_secret = _suite.zero();
   if (commit.path) {
     const auto& path = opt::get(commit.path);
     if (!path.parent_hash_valid(_suite)) {
@@ -608,9 +615,7 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  auto secret = _suite.derive_secret(_key_schedule.exporter_secret, label);
-  auto context_hash = _suite.digest().hash(context);
-  return _suite.expand_with_label(secret, "exporter", context_hash, size);
+  return _key_schedule.do_export(label, context, size);
 }
 
 std::vector<KeyPackage>
@@ -739,7 +744,8 @@ State::encrypt(const MLSPlaintext& pt)
   auto sender_data_obj = MLSSenderData{ _index.val, generation, reuse_guard };
   auto sender_data = tls::marshal(sender_data_obj);
 
-  auto [sender_data_key, sender_data_nonce] = _key_schedule.sender_data(content_ct);
+  auto [sender_data_key, sender_data_nonce] =
+    _key_schedule.sender_data(content_ct);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ _group_id, _epoch, content_type });
 
@@ -770,7 +776,8 @@ State::decrypt(const MLSCiphertext& ct)
   }
 
   // Decrypt and parse the sender data
-  auto [sender_data_key, sender_data_nonce] = _key_schedule.sender_data(ct.ciphertext);
+  auto [sender_data_key, sender_data_nonce] =
+    _key_schedule.sender_data(ct.ciphertext);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
   auto sender_data_pt = _suite.hpke().aead.open(sender_data_key,

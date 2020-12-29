@@ -25,9 +25,8 @@ TEST_CASE("Key Schedule Interop")
 
     auto group_context = tls::get<GroupContext>(tv.base_group_context);
 
-    KeyScheduleEpoch my_epoch;
-    my_epoch.suite = suite;
-    my_epoch.init_secret = tv.base_init_secret;
+    KeyScheduleEpoch my_epoch(
+      suite, tv.base_init_secret, tls::marshal(group_context));
 
     for (const auto& epoch : tc.epochs) {
       auto ctx = tls::marshal(group_context);

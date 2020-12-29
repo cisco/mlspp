@@ -44,6 +44,7 @@ struct CipherSuite
 
   ID cipher_suite() const { return id; }
   size_t secret_size() const { return get().digest.hash_size; }
+  bytes zero() const { return bytes(secret_size(), 0); }
   const hpke::HPKE& hpke() const { return get().hpke; }
   const hpke::Digest& digest() const { return get().digest; }
   const hpke::Signature& sig() const { return get().sig; }
