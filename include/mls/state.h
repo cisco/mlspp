@@ -169,8 +169,9 @@ protected:
   void cache_proposal(const MLSPlaintext& pt);
   std::optional<CachedProposal> resolve(const ProposalOrRef& id,
                                         LeafIndex sender_index) const;
-  std::vector<CachedProposal> must_resolve(const std::vector<ProposalOrRef>& ids,
-                                           LeafIndex sender_index) const;
+  std::vector<CachedProposal> must_resolve(
+    const std::vector<ProposalOrRef>& ids,
+    LeafIndex sender_index) const;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);

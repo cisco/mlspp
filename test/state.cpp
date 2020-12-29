@@ -243,7 +243,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
       if (state.index().val == size_t(i)) {
         state = new_state;
       } else {
-          state = opt::get(state.handle(commit));
+        state = opt::get(state.handle(commit));
       }
     }
 
