@@ -93,7 +93,7 @@ EncryptionKeyTestVector::EncryptionKeyTestVector(CipherSuite suite_in,
                                                  uint32_t n_leaves,
                                                  uint32_t n_generations)
   : suite(suite_in)
-  , encryption_secret{ bytes(suite.get().digest.hash_size(), 0xA0) }
+  , encryption_secret{ bytes(suite.secret_size(), 0xA0) }
 {
   auto leaf_count = LeafCount{ n_leaves };
   auto src = GroupKeySource(suite, leaf_count, encryption_secret.data);
@@ -164,6 +164,27 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite /* suite */,
 std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
+#if 0
+  auto epoch = KeyScheduleEpoch(/* TODO */);
+  auto transcript_hash =  TranscriptHash(/* TODO */);
+
+  for (const auto& tve : tv.epochs) {
+    VERIFY_EQUAL("membership tag",
+                 epoch.membership_tag(tve.commit),
+                 tve.commit.membership_tag);
+
+    epoch = epoch.next(/* TODO */);
+    // TODO verify outputs
+
+    transcript_hash.update(tve.commit);
+    // TODO verify transcript hashes
+
+    VERIFY_EQUAL("confirmation_tag",
+                 epoch.confirmation_tag(transcript_hash.confirmed),
+                 tve.commit.confirmation_tag);
+  }
+#endif // 0
+
   return std::nullopt;
 }
 

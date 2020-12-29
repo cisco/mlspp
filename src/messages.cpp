@@ -318,19 +318,8 @@ MLSPlaintext::membership_tag_input(const GroupContext& context) const
   return to_be_signed(context) + w.bytes();
 }
 
-void
-MLSPlaintext::set_membership_tag(const CipherSuite& suite,
-                                 const GroupContext& context,
-                                 const bytes& mac_key)
-{
-  auto tbm = membership_tag_input(context);
-  membership_tag = { suite.digest().hmac(mac_key, tbm) };
-}
-
 bool
-MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
-                                    const GroupContext& context,
-                                    const bytes& mac_key) const
+MLSPlaintext::verify_membership_tag(const bytes& tag) const
 {
   if (decrypted) {
     return true;
@@ -340,9 +329,7 @@ MLSPlaintext::verify_membership_tag(const CipherSuite& suite,
     return false;
   }
 
-  auto tbm = membership_tag_input(context);
-  auto mac_value = suite.digest().hmac(mac_key, tbm);
-  return constant_time_eq(mac_value, opt::get(membership_tag).mac_value);
+  return constant_time_eq(tag, opt::get(membership_tag).mac_value);
 }
 
 } // namespace mls

@@ -299,6 +299,19 @@ KeyScheduleEpoch::sender_data(const bytes& ciphertext) const
   };
 }
 
+bytes
+KeyScheduleEpoch::membership_tag(const GroupContext& context, const MLSPlaintext& pt) const
+{
+  auto tbm = pt.membership_tag_input(context);
+  return suite.digest().hmac(membership_key, tbm);
+}
+
+bytes
+KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
+{
+  return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
+}
+
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 {
@@ -314,6 +327,39 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 
   return suite && epoch_secret && sender_data_secret && encryption_secret &&
          exporter_secret && confirmation_key && init_secret;
+}
+
+TranscriptHash::TranscriptHash(CipherSuite suite_in)
+  : suite(suite_in)
+{}
+
+void
+TranscriptHash::update(const MLSPlaintext& pt)
+{
+  update_confirmed(pt);
+  update_interim(pt);
+}
+
+void
+TranscriptHash::update_confirmed(const MLSPlaintext& pt)
+{
+  const auto transcript = interim + pt.commit_content();
+  confirmed = suite.digest().hash(transcript);
+}
+
+void
+TranscriptHash::update_interim(const MLSPlaintext& pt)
+{
+  const auto transcript = confirmed + pt.commit_auth_data();
+  interim = suite.digest().hash(transcript);
+}
+
+bool
+operator==(const TranscriptHash& lhs, const TranscriptHash& rhs)
+{
+  auto confirmed = (lhs.confirmed == rhs.confirmed);
+  auto interim = (lhs.interim == rhs.interim);
+  return confirmed && interim;
 }
 
 } // namespace mls

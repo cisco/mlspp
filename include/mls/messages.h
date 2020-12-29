@@ -300,12 +300,7 @@ struct MLSPlaintext
               const SignaturePublicKey& pub) const;
 
   bytes membership_tag_input(const GroupContext& context) const;
-  void set_membership_tag(const CipherSuite& suite,
-                          const GroupContext& context,
-                          const bytes& mac_key);
-  bool verify_membership_tag(const CipherSuite& suite,
-                             const GroupContext& context,
-                             const bytes& mac_key) const;
+  bool verify_membership_tag(const bytes& tag) const;
 
   bytes marshal_content(size_t padding_size) const;
 

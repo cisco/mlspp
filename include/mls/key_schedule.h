@@ -1,8 +1,9 @@
 #pragma once
 
-#include "mls/common.h"
-#include "mls/crypto.h"
-#include "mls/tree_math.h"
+#include <mls/common.h>
+#include <mls/crypto.h>
+#include <mls/tree_math.h>
+#include <mls/messages.h>
 #include <map>
 
 namespace mls {
@@ -128,6 +129,8 @@ struct KeyScheduleEpoch
                         LeafCount size) const;
 
   KeyAndNonce sender_data(const bytes& ciphertext) const;
+  bytes membership_tag(const GroupContext& context, const MLSPlaintext& pt) const;
+  bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
 
 private:
   void init_secrets(LeafCount size);
@@ -135,5 +138,21 @@ private:
 
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs);
+
+struct TranscriptHash
+{
+  CipherSuite suite;
+  bytes confirmed;
+  bytes interim;
+
+  TranscriptHash(CipherSuite suite_in);
+
+  void update(const MLSPlaintext& pt);
+  void update_confirmed(const MLSPlaintext& pt);
+  void update_interim(const MLSPlaintext& pt);
+};
+
+bool
+operator==(const TranscriptHash& lhs, const TranscriptHash& rhs);
 
 } // namespace mls

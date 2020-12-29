@@ -29,21 +29,21 @@ TEST_CASE("Encryption Keys")
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    auto tv = KeyScheduleTestVector::create(suite, 15);
-    REQUIRE(!KeyScheduleTestVector::verify(tv));
+    auto tv = KeyScheduleTestVector(suite, 15);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 
 TEST_CASE("Tree Hashing")
 {
   for (auto suite : supported_suites) {
-    auto tv = TreeHashingTestVector::create(suite, 10);
-    REQUIRE(!TreeHashingTestVector::verify(tv));
+    auto tv = TreeHashingTestVector(suite, 10);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 
 TEST_CASE("Messages")
 {
-  auto tv = MessagesTestVector::create();
-  REQUIRE(!MessagesTestVector::verify(tv));
+  auto tv = MessagesTestVector();
+  REQUIRE(tv.verify() == std::nullopt);
 }

@@ -116,8 +116,7 @@ protected:
   epoch_t _epoch;
   TreeKEMPublicKey _tree;
   TreeKEMPrivateKey _tree_priv;
-  bytes _confirmed_transcript_hash;
-  bytes _interim_transcript_hash;
+  TranscriptHash _transcript_hash;
   ExtensionList _extensions;
 
   // Shared secret state

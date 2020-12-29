@@ -44,6 +44,7 @@ struct EncryptionKeyTestVector
   {
     CryptoValue key;
     CryptoValue nonce;
+    // TODO(RLB): Include an encrypted message to decrypt
     TLS_SERIALIZABLE(key, nonce);
   };
 

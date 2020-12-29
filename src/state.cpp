@@ -15,6 +15,7 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
+  , _transcript_hash(suite)
   , _keys(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
@@ -31,6 +32,7 @@ State::State(const HPKEPrivateKey& init_priv,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
+  , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
@@ -67,8 +69,8 @@ State::State(const HPKEPrivateKey& init_priv,
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
   _tree = group_info.tree;
-  _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
-  _interim_transcript_hash = group_info.interim_transcript_hash;
+  _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
+  _transcript_hash.interim = group_info.interim_transcript_hash;
 
   // Construct TreeKEM private key from partrs provided
   auto maybe_index = _tree.find(kp);
@@ -108,7 +110,7 @@ State::sign(const Proposal& proposal) const
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(_suite, group_context(), _identity_priv);
-  pt.set_membership_tag(_suite, group_context(), _keys.membership_key);
+  pt.membership_tag = { _keys.membership_tag(group_context(), pt) };
   return pt;
 }
 
@@ -218,7 +220,7 @@ State::commit(const bytes& leaf_secret) const
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
-      next._confirmed_transcript_hash,
+      next._transcript_hash.confirmed,
       next._extensions,
     });
     auto [new_priv, path] =
@@ -245,8 +247,8 @@ State::commit(const bytes& leaf_secret) const
     next._group_id,
     next._epoch,
     next._tree,
-    next._confirmed_transcript_hash,
-    next._interim_transcript_hash,
+    next._transcript_hash.confirmed,
+    next._transcript_hash.interim,
     next._extensions,
     opt::get(pt.confirmation_tag).mac_value,
   };
@@ -268,7 +270,7 @@ GroupContext
 State::group_context() const
 {
   return GroupContext{
-    _group_id,   _epoch, _tree.root_hash(), _confirmed_transcript_hash,
+    _group_id,   _epoch, _tree.root_hash(), _transcript_hash.confirmed,
     _extensions,
   };
 }
@@ -278,23 +280,20 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
-  auto prev_membership_key = _keys.membership_key;
+  auto prev_keys = _keys;
+
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
   pt.sign(_suite, prev_ctx, _identity_priv);
 
-  auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
-  _confirmed_transcript_hash = _suite.digest().hash(confirmed_transcript);
+  _transcript_hash.update_confirmed(pt);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto confirmation =
-    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
-  pt.confirmation_tag = { std::move(confirmation) };
-  pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
+  pt.confirmation_tag = { _keys.confirmation_tag(_transcript_hash.confirmed) };
+  pt.membership_tag = { prev_keys.membership_tag(prev_ctx, pt) };
 
-  auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
-  _interim_transcript_hash = _suite.digest().hash(interim_transcript);
+  _transcript_hash.update_interim(pt);
 
   return pt;
 }
@@ -351,7 +350,7 @@ State::handle(const MLSPlaintext& pt)
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
-      next._confirmed_transcript_hash,
+      next._transcript_hash.confirmed,
       next._extensions,
     });
     next._tree_priv.decap(sender, next._tree, ctx, path);
@@ -360,11 +359,7 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash =
-    _suite.digest().hash(next._interim_transcript_hash + pt.commit_content());
-  next._interim_transcript_hash = _suite.digest().hash(
-    next._confirmed_transcript_hash + pt.commit_auth_data());
-
+  next._transcript_hash.update(pt);
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
 
@@ -516,7 +511,7 @@ State::protect(const bytes& pt)
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(_suite, group_context(), _identity_priv);
-  mpt.set_membership_tag(_suite, group_context(), _keys.membership_key);
+  mpt.membership_tag = { _keys.membership_tag(group_context(), mpt) };
   return encrypt(mpt);
 }
 
@@ -548,14 +543,10 @@ operator==(const State& lhs, const State& rhs)
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
   auto tree = (lhs._tree == rhs._tree);
-  auto confirmed_transcript_hash =
-    (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
-  auto interim_transcript_hash =
-    (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
+  auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
   auto keys = (lhs._keys == rhs._keys);
 
-  return suite && group_id && epoch && tree && confirmed_transcript_hash &&
-         interim_transcript_hash && keys;
+  return suite && group_id && epoch && tree && transcript_hash && keys;
 }
 
 bool
@@ -571,7 +562,7 @@ State::update_epoch_secrets(const bytes& commit_secret)
     _group_id,
     _epoch,
     _tree.root_hash(),
-    _confirmed_transcript_hash,
+    _transcript_hash.confirmed,
     _extensions,
   });
   _keys = _keys.next(commit_secret, {}, ctx, LeafCount{ _tree.size() });
@@ -589,8 +580,8 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("External senders not supported");
   }
 
-  if (!pt.verify_membership_tag(
-        _suite, group_context(), _keys.membership_key)) {
+  auto membership_tag = _keys.membership_tag(group_context(), pt);
+  if (!pt.verify_membership_tag(membership_tag)) {
     return false;
   }
 
@@ -606,8 +597,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm =
-    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
+  auto confirm = _keys.confirmation_tag(_transcript_hash.confirmed);
   return constant_time_eq(confirm, confirmation);
 }
 
