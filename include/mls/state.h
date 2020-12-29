@@ -120,7 +120,8 @@ protected:
   ExtensionList _extensions;
 
   // Shared secret state
-  KeyScheduleEpoch _keys;
+  KeyScheduleEpoch _key_schedule;
+  GroupKeySource _keys;
 
   // Per-participant state
   LeafIndex _index;

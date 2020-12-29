@@ -1,10 +1,10 @@
 #pragma once
 
+#include <map>
 #include <mls/common.h>
 #include <mls/crypto.h>
-#include <mls/tree_math.h>
 #include <mls/messages.h>
-#include <map>
+#include <mls/tree_math.h>
 
 namespace mls {
 
@@ -108,32 +108,75 @@ struct KeyScheduleEpoch
 
   HPKEPrivateKey external_priv;
 
-  GroupKeySource keys;
+#if 0
+  // Full initializer, used by joiner
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& joiner_secret,
+                   const bytes& psk_secret,
+                   const bytes& context,
+                   LeafCount size)
+    : suite(suite_in)
+    , joiner_secret(joiner_secret)
+    , member_secret(suite.hpke().kdf.extract(joiner_secret, psk_secret))
+    , epoch_secret(suite.expand_with_label(member_secret, "epoch", context, suite.secret_size()))
+    // TODO other secrets
+  {}
+
+  static bytes zero(CipherSuite suite);
+  static bytes make_joiner_secret(CipherSuite suite, const bytes& init, const bytes& commit);
+
+  // Initial epoch
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& init_secret,
+                   const bytes& context)
+    : KeyScheduleEpoch(suite_in,
+                       make_joiner_secret(suite_in, init_secret, zero(suite_in)),
+                       zero(suite_in),
+                       context,
+                       {1})
+  {}
+
+  // Subsequent epochs
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& init_secret,
+                   const bytes& commit_secret,
+                   const bytes& psk_secret,
+                   const bytes& context,
+                   LeafCount size)
+    : KeyScheduleEpoch(suite_in,
+                       make_joiner_secret(suite_in, init_secret, commit_secret),
+                       psk_secret,
+                       context,
+                       size)
+  {}
+#endif // 0
 
   KeyScheduleEpoch() = default;
 
   // Generate an initial random epoch
   KeyScheduleEpoch(CipherSuite suite);
+  KeyScheduleEpoch(CipherSuite suite, bytes initial_init_secret);
 
   // Generate an epoch based on the joiner secret
   KeyScheduleEpoch(CipherSuite suite_in,
                    bytes joiner_secret_in,
                    const bytes& psk_secret,
-                   const bytes& context,
-                   LeafCount size);
+                   const bytes& context);
 
   // Advance to the next epoch
   KeyScheduleEpoch next(const bytes& commit_secret,
                         const bytes& psk_secret,
-                        const bytes& context,
-                        LeafCount size) const;
+                        const bytes& context) const;
 
+  GroupKeySource encryption_keys(LeafCount size) const;
   KeyAndNonce sender_data(const bytes& ciphertext) const;
-  bytes membership_tag(const GroupContext& context, const MLSPlaintext& pt) const;
+  bytes membership_tag(const GroupContext& context,
+                       const MLSPlaintext& pt) const;
   bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
 
 private:
-  void init_secrets(LeafCount size);
+  bytes zero;
+  void init_secrets();
 };
 
 bool

@@ -1,4 +1,5 @@
 #include <mls/key_schedule.h>
+#include <mls/state.h>
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
@@ -165,23 +166,30 @@ std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
 #if 0
-  auto epoch = KeyScheduleEpoch(/* TODO */);
-  auto transcript_hash =  TranscriptHash(/* TODO */);
+  auto epoch = KeyScheduleEpoch(suite, initial_init_secret);
+  auto transcript_hash = TranscriptHash(suite);
 
-  for (const auto& tve : tv.epochs) {
-    VERIFY_EQUAL("membership tag",
-                 epoch.membership_tag(tve.commit),
-                 tve.commit.membership_tag);
+  auto group_context = GroupContext{
+    group_id, 0, initial_tree_hash, transcript_hash.confirmed, {}
+  };
 
-    epoch = epoch.next(/* TODO */);
-    // TODO verify outputs
+  for (size_t i = 0; i < epochs.size(); i++) {
+    // Verify the membership tag on the commit
+    auto membership_tag = epoch.membership_tag(group_context, epochs[i].commit);
+    VERIFY_EQUAL(
+      "membership", membership_tag, epochs[i].commit.membership_tag.mac_value);
 
-    transcript_hash.update(tve.commit);
-    // TODO verify transcript hashes
+    // Update the transcript hash with the commit
+    transcript_hash.update(epochs[i].commit);
+    VERIFY_EQUAL("confirmed",
+                 transcript_hash.confirmed,
+                 epochs[i].confirmed_transcript_hash);
+    VERIFY_EQUAL(
+      "interim", transcript_hash.interim, epochs[i].interim_transcript_hash);
 
-    VERIFY_EQUAL("confirmation_tag",
-                 epoch.confirmation_tag(transcript_hash.confirmed),
-                 tve.commit.confirmation_tag);
+    // Ratchet forward the key schedule
+    // Verify the confirmation tag on the Commit
+    // Verify the rest of the epoch
   }
 #endif // 0
 

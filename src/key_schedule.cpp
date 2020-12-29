@@ -232,14 +232,13 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
   : suite(suite_in)
 {
   epoch_secret = random_bytes(suite.secret_size());
-  init_secrets(LeafCount{ 1 });
+  init_secrets();
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    bytes joiner_secret_in,
                                    const bytes& psk_secret,
-                                   const bytes& context,
-                                   LeafCount size)
+                                   const bytes& context)
   : suite(suite_in)
   , joiner_secret(std::move(joiner_secret_in))
 {
@@ -249,11 +248,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
 
   epoch_secret = suite.expand_with_label(
     member_secret, "epoch", context, suite.secret_size());
-  init_secrets(size);
+  init_secrets();
 }
 
 void
-KeyScheduleEpoch::init_secrets(LeafCount size)
+KeyScheduleEpoch::init_secrets()
 {
   sender_data_secret = suite.derive_secret(epoch_secret, "sender data");
   encryption_secret = suite.derive_secret(epoch_secret, "encryption");
@@ -266,18 +265,22 @@ KeyScheduleEpoch::init_secrets(LeafCount size)
   init_secret = suite.derive_secret(epoch_secret, "init");
 
   external_priv = HPKEPrivateKey::derive(suite, external_secret);
-  keys = GroupKeySource(suite, size, encryption_secret);
 }
 
 KeyScheduleEpoch
 KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& psk_secret,
-                       const bytes& context,
-                       LeafCount size) const
+                       const bytes& context) const
 {
   auto temp_joiner_secret =
     suite.hpke().kdf.extract(init_secret, commit_secret);
-  return KeyScheduleEpoch(suite, temp_joiner_secret, psk_secret, context, size);
+  return KeyScheduleEpoch(suite, temp_joiner_secret, psk_secret, context);
+}
+
+GroupKeySource
+KeyScheduleEpoch::encryption_keys(LeafCount size) const
+{
+  return GroupKeySource(suite, size, encryption_secret);
 }
 
 KeyAndNonce
@@ -300,7 +303,8 @@ KeyScheduleEpoch::sender_data(const bytes& ciphertext) const
 }
 
 bytes
-KeyScheduleEpoch::membership_tag(const GroupContext& context, const MLSPlaintext& pt) const
+KeyScheduleEpoch::membership_tag(const GroupContext& context,
+                                 const MLSPlaintext& pt) const
 {
   auto tbm = pt.membership_tag_input(context);
   return suite.digest().hmac(membership_key, tbm);

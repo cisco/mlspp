@@ -16,13 +16,14 @@ State::State(bytes group_id,
   , _epoch(0)
   , _tree(suite)
   , _transcript_hash(suite)
-  , _keys(suite)
+  , _key_schedule(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
 // Initialize a group from a Welcome
@@ -91,8 +92,8 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _keys = KeyScheduleEpoch(
-    _suite, secrets.joiner_secret, {}, group_ctx, LeafCount(_tree.size()));
+  _key_schedule = KeyScheduleEpoch(_suite, secrets.joiner_secret, {}, group_ctx);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
   if (!verify_confirmation(group_info.confirmation)) {
@@ -110,7 +111,7 @@ State::sign(const Proposal& proposal) const
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(_suite, group_context(), _identity_priv);
-  pt.membership_tag = { _keys.membership_tag(group_context(), pt) };
+  pt.membership_tag = { _key_schedule.membership_tag(group_context(), pt) };
   return pt;
 }
 
@@ -254,7 +255,7 @@ State::commit(const bytes& leaf_secret) const
   };
   group_info.sign(_index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, next._keys.joiner_secret, {}, group_info };
+  auto welcome = Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -280,7 +281,7 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
-  auto prev_keys = _keys;
+  auto prev_key_schedule = _key_schedule;
 
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
@@ -290,8 +291,8 @@ State::ratchet_and_sign(const Commit& op,
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  pt.confirmation_tag = { _keys.confirmation_tag(_transcript_hash.confirmed) };
-  pt.membership_tag = { prev_keys.membership_tag(prev_ctx, pt) };
+  pt.confirmation_tag = { _key_schedule.confirmation_tag(_transcript_hash.confirmed) };
+  pt.membership_tag = { prev_key_schedule.membership_tag(prev_ctx, pt) };
 
   _transcript_hash.update_interim(pt);
 
@@ -511,7 +512,7 @@ State::protect(const bytes& pt)
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(_suite, group_context(), _identity_priv);
-  mpt.membership_tag = { _keys.membership_tag(group_context(), mpt) };
+  mpt.membership_tag = { _key_schedule.membership_tag(group_context(), mpt) };
   return encrypt(mpt);
 }
 
@@ -544,9 +545,9 @@ operator==(const State& lhs, const State& rhs)
   auto epoch = (lhs._epoch == rhs._epoch);
   auto tree = (lhs._tree == rhs._tree);
   auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
-  auto keys = (lhs._keys == rhs._keys);
+  auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
 
-  return suite && group_id && epoch && tree && transcript_hash && keys;
+  return suite && group_id && epoch && tree && transcript_hash && key_schedule;
 }
 
 bool
@@ -565,7 +566,8 @@ State::update_epoch_secrets(const bytes& commit_secret)
     _transcript_hash.confirmed,
     _extensions,
   });
-  _keys = _keys.next(commit_secret, {}, ctx, LeafCount{ _tree.size() });
+  _key_schedule = _key_schedule.next(commit_secret, {}, ctx);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
 ///
@@ -580,7 +582,7 @@ State::verify(const MLSPlaintext& pt) const
     throw InvalidParameterError("External senders not supported");
   }
 
-  auto membership_tag = _keys.membership_tag(group_context(), pt);
+  auto membership_tag = _key_schedule.membership_tag(group_context(), pt);
   if (!pt.verify_membership_tag(membership_tag)) {
     return false;
   }
@@ -597,7 +599,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm = _keys.confirmation_tag(_transcript_hash.confirmed);
+  auto confirm = _key_schedule.confirmation_tag(_transcript_hash.confirmed);
   return constant_time_eq(confirm, confirmation);
 }
 
@@ -606,7 +608,7 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  auto secret = _suite.derive_secret(_keys.exporter_secret, label);
+  auto secret = _suite.derive_secret(_key_schedule.exporter_secret, label);
   auto context_hash = _suite.digest().hash(context);
   return _suite.expand_with_label(secret, "exporter", context_hash, size);
 }
@@ -633,7 +635,7 @@ State::roster() const
 bytes
 State::authentication_secret() const
 {
-  return _keys.authentication_secret;
+  return _key_schedule.authentication_secret;
 }
 
 // struct {
@@ -718,7 +720,7 @@ State::encrypt(const MLSPlaintext& pt)
   };
 
   auto key_type = var::visit(get_key_type, pt.content);
-  auto [generation, keys] = _keys.keys.next(key_type, _index);
+  auto [generation, keys] = _keys.next(key_type, _index);
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
@@ -737,7 +739,7 @@ State::encrypt(const MLSPlaintext& pt)
   auto sender_data_obj = MLSSenderData{ _index.val, generation, reuse_guard };
   auto sender_data = tls::marshal(sender_data_obj);
 
-  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(content_ct);
+  auto [sender_data_key, sender_data_nonce] = _key_schedule.sender_data(content_ct);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ _group_id, _epoch, content_type });
 
@@ -768,7 +770,7 @@ State::decrypt(const MLSCiphertext& ct)
   }
 
   // Decrypt and parse the sender data
-  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(ct.ciphertext);
+  auto [sender_data_key, sender_data_nonce] = _key_schedule.sender_data(ct.ciphertext);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
   auto sender_data_pt = _suite.hpke().aead.open(sender_data_key,
@@ -788,8 +790,8 @@ State::decrypt(const MLSCiphertext& ct)
     key_type = GroupKeySource::RatchetType::application;
   }
 
-  auto [key, nonce] = _keys.keys.get(key_type, sender, sender_data.generation);
-  _keys.keys.erase(key_type, sender, sender_data.generation);
+  auto [key, nonce] = _keys.get(key_type, sender, sender_data.generation);
+  _keys.erase(key_type, sender, sender_data.generation);
   apply_reuse_guard(sender_data.reuse_guard, nonce);
 
   // Compute the plaintext AAD and decrypt

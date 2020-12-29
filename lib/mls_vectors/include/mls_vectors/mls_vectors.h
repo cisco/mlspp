@@ -122,10 +122,15 @@ struct KeyScheduleTestVector
 
   mls::CipherSuite suite;
   CryptoValue group_id;
-  CryptoValue base_init_secret;
+  CryptoValue initial_tree_hash;
+  CryptoValue initial_init_secret;
   std::vector<Epoch> epochs;
 
-  TLS_SERIALIZABLE(suite, group_id, base_init_secret, epochs)
+  TLS_SERIALIZABLE(suite,
+                   group_id,
+                   initial_tree_hash,
+                   initial_init_secret,
+                   epochs)
   TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
   KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
