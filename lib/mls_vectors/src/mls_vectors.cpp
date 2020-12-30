@@ -61,27 +61,34 @@ verify_equal(std::string label, const T& actual, const T& expected)
 ///
 /// TreeMathTestVector
 ///
-TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
-  : n_leaves(n_leaves_in)
-  , root(n_leaves_in)
-  , left(NodeCount(n_leaves).val)
-  , right(NodeCount(n_leaves).val)
-  , parent(NodeCount(n_leaves).val)
-  , sibling(NodeCount(n_leaves).val)
+TreeMathTestVector
+TreeMathTestVector::create(uint32_t n_leaves)
 {
+  auto tv = TreeMathTestVector{};
+  tv.n_leaves = LeafCount{n_leaves};
+  tv.root.resize(n_leaves);
+
+  auto width = NodeCount(tv.n_leaves).val;
+  tv.left.resize(width);
+  tv.right.resize(width);
+  tv.parent.resize(width);
+  tv.sibling.resize(width);
+
+
   // Root is special
-  for (LeafCount n{ 1 }; n.val <= n_leaves_in; n.val++) {
-    root[n.val - 1] = tree_math::root(n);
+  for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
+    tv.root[n.val - 1] = tree_math::root(n);
   }
 
   // Left, right, parent, sibling are relative
-  auto w = NodeCount(n_leaves);
-  for (NodeIndex x{ 0 }; x.val < w.val; x.val++) {
-    left[x.val] = tree_math::left(x);
-    right[x.val] = tree_math::right(x, n_leaves);
-    parent[x.val] = tree_math::parent(x, n_leaves);
-    sibling[x.val] = tree_math::sibling(x, n_leaves);
+  for (NodeIndex x{ 0 }; x.val < width; x.val++) {
+    tv.left[x.val] = tree_math::left(x);
+    tv.right[x.val] = tree_math::right(x, tv.n_leaves);
+    tv.parent[x.val] = tree_math::parent(x, tv.n_leaves);
+    tv.sibling[x.val] = tree_math::sibling(x, tv.n_leaves);
   }
+
+  return tv;
 }
 
 std::optional<std::string>
@@ -107,33 +114,38 @@ TreeMathTestVector::verify() const
 /// EncryptionKeyTestVector
 ///
 
-EncryptionKeyTestVector::EncryptionKeyTestVector(CipherSuite suite_in,
+EncryptionKeyTestVector
+EncryptionKeyTestVector::create(CipherSuite suite,
                                                  uint32_t n_leaves,
                                                  uint32_t n_generations)
-  : suite(suite_in)
-  , encryption_secret{ bytes(suite.secret_size(), 0xA0) }
 {
+  auto tv = EncryptionKeyTestVector{};
+  tv.suite = suite;
+  tv.encryption_secret = { random_bytes(suite.secret_size()) };
+
   auto leaf_count = LeafCount{ n_leaves };
-  auto src = GroupKeySource(suite, leaf_count, encryption_secret.data);
+  auto src = GroupKeySource(suite, leaf_count, tv.encryption_secret.data);
 
   auto handshake = GroupKeySource::RatchetType::handshake;
   auto application = GroupKeySource::RatchetType::application;
-  handshake_keys.resize(n_leaves);
-  application_keys.resize(n_leaves);
+  tv.handshake_keys.resize(n_leaves);
+  tv.application_keys.resize(n_leaves);
   for (uint32_t i = 0; i < n_leaves; i++) {
-    handshake_keys[i].steps.resize(n_generations);
-    application_keys[i].steps.resize(n_generations);
+    tv.handshake_keys[i].steps.resize(n_generations);
+    tv.application_keys[i].steps.resize(n_generations);
 
     for (uint32_t j = 0; j < n_generations; ++j) {
       auto hs_key_nonce = src.get(handshake, LeafIndex{ i }, j);
-      handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
-      handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
+      tv.handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
+      tv.handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
 
       auto app_key_nonce = src.get(application, LeafIndex{ i }, j);
-      application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
-      application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
+      tv.application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
+      tv.application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
     }
   }
+
+  return tv;
 }
 
 std::optional<std::string>
@@ -175,23 +187,26 @@ EncryptionKeyTestVector::verify() const
 /// KeyScheduleTestVector
 ///
 
-KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite_in,
+KeyScheduleTestVector
+KeyScheduleTestVector::create(CipherSuite suite,
                                              uint32_t n_epochs)
-  : suite(suite_in)
-  , group_id{ from_hex("00010203") }
-  , initial_tree_hash{ random_bytes(suite.digest().hash_size) }
-  , initial_init_secret{ random_bytes(suite.secret_size()) }
 {
+  auto tv = KeyScheduleTestVector{};
+  tv.suite = suite;
+  tv.group_id = { from_hex("00010203") };
+  tv.initial_tree_hash = { random_bytes(suite.digest().hash_size) };
+  tv.initial_init_secret = { random_bytes(suite.secret_size()) };
+
   auto group_context =
-    GroupContext{ group_id.data, 0, initial_tree_hash.data, {}, {} };
+    GroupContext{ tv.group_id.data, 0, tv.initial_tree_hash.data, {}, {} };
   auto ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, ctx, initial_init_secret.data);
+  auto epoch = KeyScheduleEpoch(suite, ctx, tv.initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
   for (size_t i = 0; i < n_epochs; i++) {
     auto tree_hash = random_bytes(suite.digest().hash_size);
     auto commit = MLSPlaintext{
-      group_id.data, group_context.epoch, { SenderType::member, 0 }, Commit{}
+      tv.group_id.data, group_context.epoch, { SenderType::member, 0 }, Commit{}
     };
     auto commit_secret = random_bytes(suite.secret_size());
     auto psk_secret = random_bytes(suite.secret_size());
@@ -215,7 +230,7 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite_in,
     auto welcome_secret =
       KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psk_secret);
 
-    epochs.push_back({
+    tv.epochs.push_back({
       commit,
       { tree_hash },
       { commit_secret },
@@ -242,6 +257,8 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite_in,
       epoch.external_priv.public_key,
     });
   }
+
+  return tv;
 }
 
 std::optional<std::string>
@@ -340,18 +357,21 @@ new_key_package(CipherSuite suite)
   return { sig_priv, kp };
 }
 
-TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite_in, size_t n_leaves)
-  : suite(suite_in)
+TreeKEMTestVector
+TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 {
+  auto tv = TreeKEMTestVector{};
+  tv.suite = suite;
+
   // Make a plan
-  add_sender = LeafIndex{ 0 };
-  update_sender = LeafIndex{ 0 };
+  tv.add_sender = LeafIndex{ 0 };
+  tv.update_sender = LeafIndex{ 0 };
   auto my_index = std::optional<LeafIndex>();
   if (n_leaves > 4) {
     // Make things more interesting if we have space
     my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
-    add_sender.val = (n_leaves / 2) - 2;
-    update_sender.val = n_leaves - 2;
+    tv.add_sender.val = (n_leaves / 2) - 2;
+    tv.update_sender.val = n_leaves - 2;
   }
 
   // Construct a full ratchet tree with the required number of leaves
@@ -378,7 +398,7 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite_in, size_t n_leaves)
   auto [test_sig_priv, test_kp] = new_key_package(suite);
   auto test_index = pub.add_leaf(test_kp);
   auto [add_priv, add_path] = pub.encap(
-    add_sender, {}, add_secret, sig_privs[add_sender.val], std::nullopt);
+    tv.add_sender, {}, add_secret, sig_privs[tv.add_sender.val], std::nullopt);
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
   silence_unused(add_path);
@@ -387,25 +407,27 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite_in, size_t n_leaves)
 
   pub.set_hash_all();
 
-  tree_before = pub;
-  tree_hash_before = { pub.root_hash() };
-  my_key_package = test_kp;
-  my_path_secret = { path_secret };
+  tv.tree_before = pub;
+  tv.tree_hash_before = { pub.root_hash() };
+  tv.my_key_package = test_kp;
+  tv.my_path_secret = { path_secret };
 
   // Do a second update that the test participant should be able to process
   auto update_secret = random_bytes(suite.secret_size());
-  auto [update_priv, update_path_] = pub.encap(update_sender,
+  auto [update_priv, update_path_] = pub.encap(tv.update_sender,
                                                {},
                                                update_secret,
-                                               sig_privs[update_sender.val],
+                                               sig_privs[tv.update_sender.val],
                                                std::nullopt);
-  pub.merge(update_sender, update_path_);
+  pub.merge(tv.update_sender, update_path_);
   pub.set_hash_all();
 
-  update_path = update_path_;
-  root_secret = { update_priv.update_secret };
-  tree_after = pub;
-  tree_hash_after = { pub.root_hash() };
+  tv.update_path = update_path_;
+  tv.root_secret = { update_priv.update_secret };
+  tv.tree_after = pub;
+  tv.tree_hash_after = { pub.root_hash() };
+
+  return tv;
 }
 
 void
@@ -463,24 +485,15 @@ TreeKEMTestVector::verify() const
 }
 
 ///
-/// TreeHashingTestVector
-///
-
-TreeHashingTestVector::TreeHashingTestVector(CipherSuite /* suite */,
-                                             uint32_t /* n_leaves */)
-{}
-
-std::optional<std::string>
-TreeHashingTestVector::verify() const
-{
-  return std::nullopt;
-}
-
-///
 /// MessagesTestVector
 ///
 
-MessagesTestVector::MessagesTestVector() {}
+MessagesTestVector
+MessagesTestVector::create()
+{
+  auto tv = MessagesTestVector{};
+  return tv;
+}
 
 std::optional<std::string>
 MessagesTestVector::verify() const

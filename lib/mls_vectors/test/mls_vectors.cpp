@@ -23,7 +23,7 @@ tls_round_trip(const T& value)
 
 TEST_CASE("Tree Math")
 {
-  const auto tv_in = TreeMathTestVector(256);
+  const auto tv_in = TreeMathTestVector::create(256);
   const auto tv_out = tls_round_trip(tv_in);
   REQUIRE(tv_out.verify() == std::nullopt);
 }
@@ -31,7 +31,7 @@ TEST_CASE("Tree Math")
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = EncryptionKeyTestVector(suite, 15, 10);
+    const auto tv_in = EncryptionKeyTestVector::create(suite, 15, 10);
     const auto tv_out = tls_round_trip(tv_in);
     REQUIRE(tv_out.verify() == std::nullopt);
   }
@@ -40,7 +40,7 @@ TEST_CASE("Encryption Keys")
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = KeyScheduleTestVector(suite, 15);
+    const auto tv_in = KeyScheduleTestVector::create(suite, 15);
     const auto tv_out = tls_round_trip(tv_in);
     REQUIRE(tv_out.verify() == std::nullopt);
   }
@@ -49,7 +49,7 @@ TEST_CASE("Key Schedule")
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = TreeKEMTestVector(suite, 10);
+    const auto tv_in = TreeKEMTestVector::create(suite, 10);
     auto tv_out = tls_round_trip(tv_in);
     tv_out.initialize_trees();
     REQUIRE(tv_out.verify() == std::nullopt);
@@ -58,7 +58,7 @@ TEST_CASE("TreeKEM")
 
 TEST_CASE("Messages")
 {
-  auto tv_in = MessagesTestVector();
+  auto tv_in = MessagesTestVector::create();
   const auto tv_out = tls_round_trip(tv_in);
   REQUIRE(tv_out.verify() == std::nullopt);
 }

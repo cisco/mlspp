@@ -27,8 +27,7 @@ struct TreeMathTestVector
              tls::vector<4>,
              tls::vector<4>)
 
-  TreeMathTestVector() = default;
-  TreeMathTestVector(uint32_t n_leaves_in);
+  static TreeMathTestVector create(uint32_t n_leaves);
   std::optional<std::string> verify() const;
 };
 
@@ -64,8 +63,7 @@ struct EncryptionKeyTestVector
   TLS_SERIALIZABLE(suite, encryption_secret, handshake_keys, application_keys)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
-  EncryptionKeyTestVector() = default;
-  EncryptionKeyTestVector(mls::CipherSuite suite_in,
+  static EncryptionKeyTestVector create(mls::CipherSuite suite,
                           uint32_t n_leaves,
                           uint32_t n_generations);
   std::optional<std::string> verify() const;
@@ -135,8 +133,7 @@ struct KeyScheduleTestVector
                    epochs)
   TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
-  KeyScheduleTestVector() = default;
-  KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
+  static KeyScheduleTestVector create(mls::CipherSuite suite, uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
@@ -169,8 +166,7 @@ struct TreeKEMTestVector
                    tree_after,
                    tree_hash_after);
 
-  TreeKEMTestVector() = default;
-  TreeKEMTestVector(mls::CipherSuite suite_in, size_t n_leaves);
+  static TreeKEMTestVector create(mls::CipherSuite suite, size_t n_leaves);
   void initialize_trees();
   std::optional<std::string> verify() const;
 };
@@ -186,7 +182,6 @@ struct MessagesTestVector
 
   Message key_package;
   Message capabilities;
-  Message ratchet_tree;
 
   Message group_info;
   Message group_secrets;
@@ -208,7 +203,6 @@ struct MessagesTestVector
 
   TLS_SERIALIZABLE(key_package,
                    capabilities,
-                   ratchet_tree,
                    group_info,
                    group_secrets,
                    welcome,
@@ -223,7 +217,7 @@ struct MessagesTestVector
                    commit,
                    mls_ciphertext)
 
-  MessagesTestVector();
+  static MessagesTestVector create();
   std::optional<std::string> verify() const;
 };
 
