@@ -81,7 +81,7 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
-  _transcript_hash.interim = group_info.interim_transcript_hash;
+  _transcript_hash.update_interim(group_info.confirmation_tag);
 
   // Construct TreeKEM private key from partrs provided
   auto maybe_index = _tree.find(kp);
@@ -107,7 +107,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
-  if (!verify_confirmation(group_info.confirmation)) {
+  if (!verify_confirmation(group_info.confirmation_tag.mac_value)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 }
@@ -261,9 +261,8 @@ State::commit(const bytes& leaf_secret) const
     next._epoch,
     next._tree.root_hash(),
     next._transcript_hash.confirmed,
-    next._transcript_hash.interim,
     next._extensions,
-    opt::get(pt.confirmation_tag).mac_value,
+    opt::get(pt.confirmation_tag),
   };
   group_info.extensions.add(RatchetTreeExtension{next._tree});
   group_info.sign(next._tree, _index, _identity_priv);

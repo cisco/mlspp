@@ -150,6 +150,7 @@ struct TranscriptHash
 
   void update(const MLSPlaintext& pt);
   void update_confirmed(const MLSPlaintext& pt);
+  void update_interim(const MAC& confirmation_tag);
   void update_interim(const MLSPlaintext& pt);
 };
 

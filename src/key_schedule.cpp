@@ -388,6 +388,13 @@ TranscriptHash::update_confirmed(const MLSPlaintext& pt)
 }
 
 void
+TranscriptHash::update_interim(const MAC& confirmation_tag)
+{
+  const auto transcript = confirmed + tls::marshal(confirmation_tag);
+  interim = suite.digest().hash(transcript);
+}
+
+void
 TranscriptHash::update_interim(const MLSPlaintext& pt)
 {
   const auto transcript = confirmed + pt.commit_auth_data();

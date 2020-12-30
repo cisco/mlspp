@@ -21,17 +21,15 @@ GroupInfo::GroupInfo(CipherSuite suite_in,
                      epoch_t epoch_in,
                      bytes tree_hash_in,
                      bytes confirmed_transcript_hash_in,
-                     bytes interim_transcript_hash_in,
                      ExtensionList extensions_in,
-                     bytes confirmation_in)
+                     MAC confirmation_tag_in)
   : suite(suite_in)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
-  , interim_transcript_hash(std::move(interim_transcript_hash_in))
   , extensions(std::move(extensions_in))
-  , confirmation(std::move(confirmation_in))
+  , confirmation_tag(std::move(confirmation_tag_in))
 {}
 
 bytes
@@ -42,9 +40,7 @@ GroupInfo::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
-  tls::vector<1>::encode(w, interim_transcript_hash);
-  tls::vector<1>::encode(w, confirmation);
-  w << signer_index;
+  w << confirmation_tag << signer_index;
   return w.bytes();
 }
 
@@ -277,7 +273,11 @@ MLSPlaintext::commit_content() const
 bytes
 MLSPlaintext::commit_auth_data() const
 {
-  return tls::marshal(confirmation_tag);
+  // XXX(RLB): This construction means that the hashed transcript differs from
+  // the wire transcript by one byte -- the optional indicator on the
+  // confirmation tag is missing.  It's always 0x01, so it shouldn't matter, but
+  // it might be clearer to fix this.
+  return tls::marshal(opt::get(confirmation_tag));
 }
 
 bytes

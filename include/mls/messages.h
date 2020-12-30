@@ -18,6 +18,14 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
+struct MAC
+{
+  bytes mac_value;
+
+  TLS_SERIALIZABLE(mac_value)
+  TLS_TRAITS(tls::vector<1>)
+};
+
 // struct {
 //     CipherSuite cipher_suite;
 //     opaque group_id<0..255>;
@@ -66,10 +74,9 @@ public:
   bytes tree_hash;
 
   bytes confirmed_transcript_hash;
-  bytes interim_transcript_hash; // XXX(RLB) This is not in the defined struct; can we do without?
   ExtensionList extensions;
 
-  bytes confirmation;
+  MAC confirmation_tag;
   LeafIndex signer_index;
   bytes signature;
 
@@ -79,9 +86,8 @@ public:
             epoch_t epoch_in,
             bytes tree_hash_in,
             bytes confirmed_transcript_hash_in,
-            bytes interim_transcript_hash_in,
             ExtensionList extensions_in,
-            bytes confirmation_in);
+            MAC confirmation_tag_in);
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv);
@@ -91,18 +97,16 @@ public:
                    epoch,
                    tree_hash,
                    confirmed_transcript_hash,
-                   interim_transcript_hash,
                    extensions,
-                   confirmation,
+                   confirmation_tag,
                    signer_index,
                    signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::vector<1>,
              tls::vector<1>,
-             tls::vector<1>,
              tls::pass,
-             tls::vector<1>,
+             tls::pass,
              tls::pass,
              tls::vector<2>)
 };
@@ -362,14 +366,6 @@ struct Sender
   uint32_t sender{ 0 };
 
   TLS_SERIALIZABLE(sender_type, sender)
-};
-
-struct MAC
-{
-  bytes mac_value;
-
-  TLS_SERIALIZABLE(mac_value)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 struct MLSPlaintext
