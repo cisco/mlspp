@@ -35,6 +35,21 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
   return str << "[TreeKEMPublicKey]";
 }
 
+#define VERIFY(label, test)                                                    \
+  if (!(test)) {                                                               \
+    return std::string(label);                                                 \
+  }
+
+#define VERIFY_EQUAL(label, actual, expected)                                  \
+  if (auto err = verify_equal(label, actual, expected)) {                      \
+    return err;                                                                \
+  }
+
+#define VERIFY_TLS_RTT(label, Type, expected)                                  \
+  if (auto err = verify_round_trip<Type>(label, expected)) {                   \
+    return err;                                                                \
+  }
+
 template<typename T>
 static std::optional<std::string>
 verify_equal(std::string label, const T& actual, const T& expected)
@@ -48,15 +63,15 @@ verify_equal(std::string label, const T& actual, const T& expected)
   return ss.str();
 }
 
-#define VERIFY(label, test)                                                    \
-  if (!(test)) {                                                               \
-    return std::string(label);                                                 \
-  }
-
-#define VERIFY_EQUAL(label, actual, expected)                                  \
-  if (auto err = verify_equal(label, actual, expected)) {                      \
-    return err;                                                                \
-  }
+template<typename T>
+static std::optional<std::string>
+verify_round_trip(std::string label, const bytes& expected)
+{
+  auto obj = tls::get<T>(expected);
+  auto actual = tls::marshal(obj);
+  VERIFY_EQUAL(label, actual, expected);
+  return std::nullopt;
+}
 
 ///
 /// TreeMathTestVector
@@ -492,12 +507,46 @@ MessagesTestVector
 MessagesTestVector::create()
 {
   auto tv = MessagesTestVector{};
+
+
+
   return tv;
 }
 
 std::optional<std::string>
 MessagesTestVector::verify() const
 {
+  auto dummy_ciphersuite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+
+  VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package.data);
+  VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities.data);
+  VERIFY_TLS_RTT("RatchetTree", TreeKEMPublicKey, ratchet_tree.data);
+
+  // GroupInfo is not default-constructible
+  auto group_info_obj = tls::get<GroupInfo>(group_info.data, dummy_ciphersuite);
+  auto group_info_actual = tls::marshal(group_info_obj);
+  VERIFY_EQUAL("GroupInfo", group_info_actual, group_info.data);
+
+  VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets.data);
+  VERIFY_TLS_RTT("Welcome", Welcome, welcome.data);
+
+  VERIFY_TLS_RTT("PublicGroupState", PublicGroupState, public_group_state.data);
+
+  VERIFY_TLS_RTT("Add", Add, add_proposal.data);
+  VERIFY_TLS_RTT("Update", Update, update_proposal.data);
+  VERIFY_TLS_RTT("Remove", Remove, remove_proposal.data);
+  // TODO VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal.data);
+  // TODO VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal.data);
+  // TODO VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal.data);
+  // TODO VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal.data);
+
+  VERIFY_TLS_RTT("Commit", Commit, commit.data);
+
+  VERIFY_TLS_RTT("MLSPlaintext/App", MLSPlaintext, mls_plaintext_application.data);
+  VERIFY_TLS_RTT("MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal.data);
+  VERIFY_TLS_RTT("MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit.data);
+  VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext.data);
+
   return std::nullopt;
 }
 

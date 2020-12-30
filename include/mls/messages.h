@@ -11,6 +11,33 @@
 namespace mls {
 
 // struct {
+//     CipherSuite cipher_suite;
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     opaque tree_hash<0..255>;
+//     opaque interim_transcript_hash<0..255>;
+//     Extension extensions<0..2^32-1>;
+//     HPKEPublicKey external_pub;
+//     uint32 signer_index;
+//     opaque signature<0..2^16-1>;
+// } PublicGroupState;
+struct PublicGroupState {
+  CipherSuite cipher_suite;
+  bytes group_id;
+  epoch_t epoch;
+  bytes tree_hash;
+  bytes interim_transcript_hash;
+  ExtensionList extensions;
+  HPKEPublicKey external_pub;
+  uint32_t signer_index;
+  bytes signature;
+
+  TLS_SERIALIZABLE(cipher_suite, group_id, epoch, tree_hash, interim_transcript_hash, extensions, external_pub, signer_index, signature)
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>, tls::pass, tls::pass, tls::pass, tls::vector<2>)
+};
+
+
+// struct {
 //   opaque group_id<0..255>;
 //   uint64 epoch;
 //   optional<Node> tree<1..2^32-1>;
@@ -143,22 +170,98 @@ private:
 ///
 /// Proposals & Commit
 ///
+
+// Add
 struct Add
 {
   KeyPackage key_package;
   TLS_SERIALIZABLE(key_package)
 };
 
+// Update
 struct Update
 {
   KeyPackage key_package;
   TLS_SERIALIZABLE(key_package)
 };
 
+// Remove
 struct Remove
 {
   LeafIndex removed;
   TLS_SERIALIZABLE(removed)
+};
+
+// PreSharedKey
+enum struct PSKType : uint8_t
+{
+  reserved = 0,
+  external = 1,
+  reinit = 2,
+  branch = 3,
+};
+
+struct ExternalPSKID {
+  bytes psk_id;
+  TLS_SERIALIZABLE(psk_id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+struct ReInitPSKID {
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct BranchPSKID {
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct PreSharedKeyID {
+  var::variant<ExternalPSKID, ReInitPSKID, BranchPSKID> content;
+  TLS_SERIALIZABLE(content)
+  TLS_TRAITS(tls::variant<PSKType>)
+};
+
+struct PreSharedKey {
+  PreSharedKeyID psk;
+  TLS_SERIALIZABLE(psk)
+};
+
+// ReInit
+struct ReInit {
+  bytes group_id;
+  ProtocolVersion version;
+  CipherSuite cipher_suite;
+  ExtensionList extensions;
+
+  TLS_SERIALIZABLE(group_id, version, cipher_suite, extensions)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::pass)
+};
+
+// ExternalInit
+struct ExternalInit {
+  bytes kem_output;
+  TLS_SERIALIZABLE(kem_output)
+  TLS_TRAITS(tls::vector<2>)
+};
+
+// AppAck
+struct MessageRange {
+  uint32_t sender;
+  uint32_t first_generation;
+  uint32_t last_generation;
+  TLS_SERIALIZABLE(sender, first_generation, last_generation);
+};
+
+struct AppAck {
+  std::vector<MessageRange> received_ranges;
+  TLS_SERIALIZABLE(received_ranges)
+  TLS_TRAITS(tls::vector<4>)
 };
 
 enum struct ProposalType : uint8_t
@@ -167,6 +270,10 @@ enum struct ProposalType : uint8_t
   add = 1,
   update = 2,
   remove = 3,
+  psk = 4,
+  reinit = 5,
+  external_init = 6,
+  app_ack = 7,
 };
 
 struct Proposal

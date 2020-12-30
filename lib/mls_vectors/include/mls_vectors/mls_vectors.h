@@ -182,6 +182,7 @@ struct MessagesTestVector
 
   Message key_package;
   Message capabilities;
+  Message ratchet_tree;
 
   Message group_info;
   Message group_secrets;
@@ -199,10 +200,14 @@ struct MessagesTestVector
 
   Message commit;
 
+  Message mls_plaintext_application;
+  Message mls_plaintext_proposal;
+  Message mls_plaintext_commit;
   Message mls_ciphertext;
 
   TLS_SERIALIZABLE(key_package,
                    capabilities,
+                   ratchet_tree,
                    group_info,
                    group_secrets,
                    welcome,
