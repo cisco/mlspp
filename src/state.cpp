@@ -264,7 +264,7 @@ State::commit(const bytes& leaf_secret) const
     next._extensions,
     opt::get(pt.confirmation_tag),
   };
-  group_info.extensions.add(RatchetTreeExtension{next._tree});
+  group_info.extensions.add(RatchetTreeExtension{ next._tree });
   group_info.sign(next._tree, _index, _identity_priv);
 
   auto welcome =

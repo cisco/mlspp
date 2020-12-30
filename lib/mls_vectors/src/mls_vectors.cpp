@@ -80,7 +80,7 @@ TreeMathTestVector
 TreeMathTestVector::create(uint32_t n_leaves)
 {
   auto tv = TreeMathTestVector{};
-  tv.n_leaves = LeafCount{n_leaves};
+  tv.n_leaves = LeafCount{ n_leaves };
   tv.root.resize(n_leaves);
 
   auto width = NodeCount(tv.n_leaves).val;
@@ -88,7 +88,6 @@ TreeMathTestVector::create(uint32_t n_leaves)
   tv.right.resize(width);
   tv.parent.resize(width);
   tv.sibling.resize(width);
-
 
   // Root is special
   for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
@@ -131,8 +130,8 @@ TreeMathTestVector::verify() const
 
 EncryptionKeyTestVector
 EncryptionKeyTestVector::create(CipherSuite suite,
-                                                 uint32_t n_leaves,
-                                                 uint32_t n_generations)
+                                uint32_t n_leaves,
+                                uint32_t n_generations)
 {
   auto tv = EncryptionKeyTestVector{};
   tv.suite = suite;
@@ -156,7 +155,8 @@ EncryptionKeyTestVector::create(CipherSuite suite,
 
       auto app_key_nonce = src.get(application, LeafIndex{ i }, j);
       tv.application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
-      tv.application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
+      tv.application_keys[i].steps[j].nonce = { std::move(
+        app_key_nonce.nonce) };
     }
   }
 
@@ -203,8 +203,7 @@ EncryptionKeyTestVector::verify() const
 ///
 
 KeyScheduleTestVector
-KeyScheduleTestVector::create(CipherSuite suite,
-                                             uint32_t n_epochs)
+KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 {
   auto tv = KeyScheduleTestVector{};
   tv.suite = suite;

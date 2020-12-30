@@ -45,7 +45,9 @@ GroupInfo::to_be_signed() const
 }
 
 void
-GroupInfo::sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv)
+GroupInfo::sign(const TreeKEMPublicKey& tree,
+                LeafIndex index,
+                const SignaturePrivateKey& priv)
 {
   auto maybe_kp = tree.key_package(index);
   if (!maybe_kp) {

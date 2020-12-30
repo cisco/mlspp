@@ -64,8 +64,8 @@ struct EncryptionKeyTestVector
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
   static EncryptionKeyTestVector create(mls::CipherSuite suite,
-                          uint32_t n_leaves,
-                          uint32_t n_generations);
+                                        uint32_t n_leaves,
+                                        uint32_t n_generations);
   std::optional<std::string> verify() const;
 };
 
@@ -133,7 +133,8 @@ struct KeyScheduleTestVector
                    epochs)
   TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
-  static KeyScheduleTestVector create(mls::CipherSuite suite, uint32_t n_epochs);
+  static KeyScheduleTestVector create(mls::CipherSuite suite,
+                                      uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 

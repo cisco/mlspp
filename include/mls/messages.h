@@ -37,7 +37,8 @@ struct MAC
 //     uint32 signer_index;
 //     opaque signature<0..2^16-1>;
 // } PublicGroupState;
-struct PublicGroupState {
+struct PublicGroupState
+{
   CipherSuite cipher_suite;
   bytes group_id;
   epoch_t epoch;
@@ -48,10 +49,25 @@ struct PublicGroupState {
   uint32_t signer_index;
   bytes signature;
 
-  TLS_SERIALIZABLE(cipher_suite, group_id, epoch, tree_hash, interim_transcript_hash, extensions, external_pub, signer_index, signature)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>, tls::pass, tls::pass, tls::pass, tls::vector<2>)
+  TLS_SERIALIZABLE(cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   interim_transcript_hash,
+                   extensions,
+                   external_pub,
+                   signer_index,
+                   signature)
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>)
 };
-
 
 // struct {
 //   opaque group_id<0..255>;
@@ -90,7 +106,9 @@ public:
             MAC confirmation_tag_in);
 
   bytes to_be_signed() const;
-  void sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv);
+  void sign(const TreeKEMPublicKey& tree,
+            LeafIndex index,
+            const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
   TLS_SERIALIZABLE(group_id,
@@ -213,39 +231,45 @@ enum struct PSKType : uint8_t
   branch = 3,
 };
 
-struct ExternalPSK {
+struct ExternalPSK
+{
   bytes psk_id;
   TLS_SERIALIZABLE(psk_id)
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct ReInitPSK {
+struct ReInitPSK
+{
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
-struct BranchPSK {
+struct BranchPSK
+{
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
-struct PreSharedKeyID {
+struct PreSharedKeyID
+{
   var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<PSKType>)
 };
 
-struct PreSharedKey {
+struct PreSharedKey
+{
   PreSharedKeyID psk;
   TLS_SERIALIZABLE(psk)
 };
 
 // ReInit
-struct ReInit {
+struct ReInit
+{
   bytes group_id;
   ProtocolVersion version;
   CipherSuite cipher_suite;
@@ -256,21 +280,24 @@ struct ReInit {
 };
 
 // ExternalInit
-struct ExternalInit {
+struct ExternalInit
+{
   bytes kem_output;
   TLS_SERIALIZABLE(kem_output)
   TLS_TRAITS(tls::vector<2>)
 };
 
 // AppAck
-struct MessageRange {
+struct MessageRange
+{
   uint32_t sender;
   uint32_t first_generation;
   uint32_t last_generation;
   TLS_SERIALIZABLE(sender, first_generation, last_generation);
 };
 
-struct AppAck {
+struct AppAck
+{
   std::vector<MessageRange> received_ranges;
   TLS_SERIALIZABLE(received_ranges)
   TLS_TRAITS(tls::vector<4>)
@@ -290,7 +317,8 @@ enum struct ProposalType : uint8_t
 
 struct Proposal
 {
-  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck> content;
+  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
+    content;
 
   ProposalType proposal_type() const;
 
