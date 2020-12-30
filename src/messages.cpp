@@ -132,22 +132,18 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
   return tls::get<GroupInfo>(opt::get(group_info_data), cipher_suite);
 }
 
-std::tuple<bytes, bytes>
+KeyAndNonce
 Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
                               const bytes& psk_secret)
 {
-  auto key_size = suite.hpke().aead.key_size;
-  auto nonce_size = suite.hpke().aead.nonce_size;
-
-  auto joiner_expand = suite.derive_secret(joiner_secret, "member");
-  auto member_secret = suite.hpke().kdf.extract(joiner_expand, psk_secret);
-
-  auto welcome_secret = suite.derive_secret(member_secret, "welcome");
-  auto key = suite.expand_with_label(welcome_secret, "key", {}, key_size);
-  auto nonce = suite.expand_with_label(welcome_secret, "nonce", {}, nonce_size);
-
-  return std::make_tuple(key, nonce);
+  auto welcome_secret =
+    KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psk_secret);
+  auto key =
+    suite.expand_with_label(welcome_secret, "key", {}, suite.key_size());
+  auto nonce =
+    suite.expand_with_label(welcome_secret, "nonce", {}, suite.nonce_size());
+  return { std::move(key), std::move(nonce) };
 }
 
 // MLSPlaintext

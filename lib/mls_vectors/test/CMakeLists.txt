@@ -7,8 +7,8 @@ find_package(doctest REQUIRED)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_executable(${TEST_APP_NAME} ${TEST_SOURCES})
-add_dependencies(${TEST_APP_NAME} ${CURRENT_LIB_NAME})
-target_link_libraries(${TEST_APP_NAME} ${CURRENT_LIB_NAME} bytes doctest::doctest)
+add_dependencies(${TEST_APP_NAME} ${CURRENT_LIB_NAME} bytes tls_syntax)
+target_link_libraries(${TEST_APP_NAME} ${CURRENT_LIB_NAME} bytes tls_syntax doctest::doctest)
 
 # Enable CTest
 include(doctest)

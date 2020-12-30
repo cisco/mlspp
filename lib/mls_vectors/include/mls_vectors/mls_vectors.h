@@ -27,6 +27,7 @@ struct TreeMathTestVector
              tls::vector<4>,
              tls::vector<4>)
 
+  TreeMathTestVector() = default;
   TreeMathTestVector(uint32_t n_leaves_in);
   std::optional<std::string> verify() const;
 };
@@ -63,6 +64,7 @@ struct EncryptionKeyTestVector
   TLS_SERIALIZABLE(suite, encryption_secret, handshake_keys, application_keys)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
+  EncryptionKeyTestVector() = default;
   EncryptionKeyTestVector(mls::CipherSuite suite_in,
                           uint32_t n_leaves,
                           uint32_t n_generations);
@@ -73,15 +75,14 @@ struct KeyScheduleTestVector
 {
   struct Epoch
   {
-    CryptoValue tree_hash;
     mls::MLSPlaintext commit;
+    CryptoValue tree_hash;
+    CryptoValue commit_secret;
+    CryptoValue psk_secret;
 
     CryptoValue confirmed_transcript_hash;
     CryptoValue interim_transcript_hash;
     CryptoValue group_context;
-
-    CryptoValue commit_secret;
-    CryptoValue psk_secret;
 
     CryptoValue joiner_secret;
     CryptoValue welcome_secret;
@@ -99,13 +100,13 @@ struct KeyScheduleTestVector
 
     mls::HPKEPublicKey external_pub;
 
-    TLS_SERIALIZABLE(tree_hash,
-                     commit,
+    TLS_SERIALIZABLE(commit,
+                     tree_hash,
+                     commit_secret,
+                     psk_secret,
                      confirmed_transcript_hash,
                      interim_transcript_hash,
                      group_context,
-                     commit_secret,
-                     psk_secret,
                      joiner_secret,
                      welcome_secret,
                      epoch_secret,
@@ -131,8 +132,9 @@ struct KeyScheduleTestVector
                    initial_tree_hash,
                    initial_init_secret,
                    epochs)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::vector<4>)
+  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<4>)
 
+  KeyScheduleTestVector() = default;
   KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
@@ -145,6 +147,7 @@ struct TreeHashingTestVector
 
   TLS_SERIALIZABLE(suite, tree_hash, ratchet_tree)
 
+  TreeHashingTestVector() = default;
   TreeHashingTestVector(mls::CipherSuite suite, uint32_t n_leaves);
   std::optional<std::string> verify() const;
 };

@@ -23,7 +23,6 @@ std::array<CipherSuite, 6> all_cipher_suites = { {
 ///
 
 const std::string CryptoTestVectors::file_name = "./crypto.bin";
-const std::string KeyScheduleTestVectors::file_name = "./key_schedule.bin";
 const std::string TreeKEMTestVectors::file_name = "./treekem.bin";
 const std::string MessagesTestVectors::file_name = "./messages.bin";
 
@@ -102,6 +101,5 @@ TestLoader<T>::get()
 }
 
 template struct TestLoader<CryptoTestVectors>;
-template struct TestLoader<KeyScheduleTestVectors>;
 template struct TestLoader<TreeKEMTestVectors>;
 template struct TestLoader<MessagesTestVectors>;

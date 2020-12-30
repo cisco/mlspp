@@ -46,83 +46,6 @@ generate_crypto()
   return tv;
 }
 
-static KeyScheduleTestVectors
-generate_key_schedule()
-{
-  KeyScheduleTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
-  };
-
-  GroupContext base_group_context{
-    { 0xA0, 0xA0, 0xA0, 0xA0 }, 0, bytes(32, 0xA1), bytes(32, 0xA2), {},
-  };
-
-  tv.n_epochs = 50;
-  tv.target_generation = 3;
-  tv.base_init_secret = bytes(32, 0xA3);
-  tv.base_group_context = tls::marshal(base_group_context);
-  tv.ciphertext = bytes(96, 0xA4);
-
-  // Construct a test case for each suite
-  for (auto suite : suites) {
-    KeyScheduleTestVectors::TestCase tc;
-    tc.cipher_suite = suite;
-
-    auto secret_size = suite.secret_size();
-
-    auto group_context = base_group_context;
-    auto commit_secret = bytes(secret_size, 0);
-    uint32_t min_members = 5;
-    uint32_t max_members = 20;
-    auto n_members = min_members;
-
-    KeyScheduleEpoch epoch(
-      suite, tv.base_init_secret, tls::marshal(group_context));
-
-    for (size_t j = 0; j < tv.n_epochs; ++j) {
-      auto ctx = tls::marshal(group_context);
-      epoch = epoch.next(commit_secret, {}, ctx);
-
-      auto [sender_data_key, sender_data_nonce] =
-        epoch.sender_data(tv.ciphertext);
-
-      tc.epochs.push_back({
-        LeafCount{ n_members },
-        commit_secret,
-        epoch.epoch_secret,
-        epoch.sender_data_secret,
-        epoch.encryption_secret,
-        epoch.exporter_secret,
-        epoch.authentication_secret,
-        epoch.external_secret,
-        epoch.confirmation_key,
-        epoch.membership_key,
-        epoch.resumption_secret,
-        epoch.init_secret,
-        epoch.external_priv.public_key,
-        {},
-        {},
-        sender_data_key,
-        sender_data_nonce,
-      });
-
-      for (auto& val : commit_secret) {
-        val += 1;
-      }
-      group_context.epoch += 1;
-      n_members =
-        ((n_members - min_members) % (max_members - min_members)) + min_members;
-    }
-
-    tv.cases.push_back(tc);
-  }
-
-  return tv;
-}
-
 static TreeKEMTestVectors
 generate_treekem()
 {
@@ -341,23 +264,15 @@ main() // NOLINT(bugprone-exception-escape)
   auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  auto key_schedule = generate_key_schedule();
-  write_test_vectors(key_schedule);
-
   auto tree = generate_treekem();
   write_test_vectors(tree);
 
   auto messages = generate_messages();
   write_test_vectors(messages);
 
-  // Verify that the test vectors are reproducible (to the extent
-  // possible)
-  verify_reproducible(generate_key_schedule);
-
   // Verify that the test vectors load
   try {
     TestLoader<CryptoTestVectors>::get();
-    TestLoader<KeyScheduleTestVectors>::get();
     TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
   } catch (...) {

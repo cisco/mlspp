@@ -8,15 +8,6 @@
 
 namespace mls {
 
-struct BaseKeySource;
-struct HashRatchet;
-
-struct KeyAndNonce
-{
-  bytes key;
-  bytes nonce;
-};
-
 struct HashRatchet
 {
   CipherSuite suite;
@@ -86,8 +77,6 @@ private:
   static const std::array<RatchetType, 2> all_ratchet_types;
 };
 
-struct KeyScheduleEpoch;
-
 struct KeyScheduleEpoch
 {
 private:
@@ -142,6 +131,10 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+
+  static bytes welcome_secret(CipherSuite suite,
+                              const bytes& commit_secret,
+                              const bytes& psk_secret);
 };
 
 bool

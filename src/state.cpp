@@ -97,7 +97,7 @@ State::State(const HPKEPrivateKey& init_priv,
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
   _key_schedule =
-    KeyScheduleEpoch(_suite, secrets.joiner_secret, {}, group_ctx);
+    KeyScheduleEpoch(_suite, secrets.joiner_secret, _suite.zero(), group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
@@ -573,7 +573,7 @@ State::update_epoch_secrets(const bytes& commit_secret)
     _transcript_hash.confirmed,
     _extensions,
   });
-  _key_schedule = _key_schedule.next(commit_secret, {}, ctx);
+  _key_schedule = _key_schedule.next(commit_secret, _suite.zero(), ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 

@@ -346,6 +346,15 @@ KeyScheduleEpoch::do_export(const std::string& label,
   return suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
+bytes
+KeyScheduleEpoch::welcome_secret(CipherSuite suite,
+                                 const bytes& joiner_secret,
+                                 const bytes& psk_secret)
+{
+  auto extract = suite.hpke().kdf.extract(joiner_secret, psk_secret);
+  return suite.derive_secret(extract, "welcome");
+}
+
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 {

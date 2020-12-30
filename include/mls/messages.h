@@ -135,10 +135,9 @@ struct Welcome
 
 private:
   bytes _joiner_secret;
-  static std::tuple<bytes, bytes> group_info_key_nonce(
-    CipherSuite suite,
-    const bytes& joiner_secret,
-    const bytes& psk_secret);
+  static KeyAndNonce group_info_key_nonce(CipherSuite suite,
+                                          const bytes& joiner_secret,
+                                          const bytes& psk_secret);
 };
 
 ///
