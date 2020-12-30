@@ -139,6 +139,41 @@ struct KeyScheduleTestVector
   std::optional<std::string> verify() const;
 };
 
+struct TreeKEMTestVector
+{
+  mls::CipherSuite suite;
+
+  mls::TreeKEMPublicKey tree_before;
+  CryptoValue tree_hash_before;
+
+  mls::LeafIndex add_sender;
+  mls::KeyPackage my_key_package;
+  CryptoValue my_path_secret;
+
+  mls::LeafIndex update_sender;
+  mls::UpdatePath update_path;
+
+  CryptoValue root_secret;
+  mls::TreeKEMPublicKey tree_after;
+  CryptoValue tree_hash_after;
+
+  TLS_SERIALIZABLE(suite,
+                   tree_before,
+                   tree_hash_before,
+                   my_key_package,
+                   my_path_secret,
+                   update_sender,
+                   update_path,
+                   root_secret,
+                   tree_after,
+                   tree_hash_after);
+
+  TreeKEMTestVector() = default;
+  TreeKEMTestVector(mls::CipherSuite suite_in, size_t n_leaves);
+  void initialize_trees();
+  std::optional<std::string> verify() const;
+};
+
 struct TreeHashingTestVector
 {
   mls::CipherSuite suite;

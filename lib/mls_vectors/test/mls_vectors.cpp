@@ -40,17 +40,18 @@ TEST_CASE("Encryption Keys")
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    auto tv_in = KeyScheduleTestVector(suite, 15);
+    const auto tv_in = KeyScheduleTestVector(suite, 15);
     const auto tv_out = tls_round_trip(tv_in);
     REQUIRE(tv_out.verify() == std::nullopt);
   }
 }
 
-TEST_CASE("Tree Hashing")
+TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
-    auto tv_in = TreeHashingTestVector(suite, 10);
-    const auto tv_out = tls_round_trip(tv_in);
+    const auto tv_in = TreeKEMTestVector(suite, 10);
+    auto tv_out = tls_round_trip(tv_in);
+    tv_out.initialize_trees();
     REQUIRE(tv_out.verify() == std::nullopt);
   }
 }

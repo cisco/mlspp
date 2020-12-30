@@ -3,19 +3,15 @@
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/treekem.h>
+#include <mls_vectors/mls_vectors.h>
 
 using namespace mls;
+using namespace mls_vectors;
 
 class TreeKEMTest
 {
 protected:
   const CipherSuite suite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
-
-  const TreeKEMTestVectors tv;
-
-  TreeKEMTest()
-    : tv(TestLoader<TreeKEMTestVectors>::get())
-  {}
 
   std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage> new_key_package()
   {
@@ -264,38 +260,11 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
   }
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Interop")
+TEST_CASE("TreeKEM Interop")
 {
-  for (size_t i = 0; i < tv.cases.size(); ++i) {
-    const auto& tc = tv.cases[i];
-
-    TreeKEMPublicKey tree{ tc.cipher_suite };
-
-    // Add the leaves
-    uint32_t tci = 0;
-    auto n_leaves = tv.leaf_secrets.size();
-    for (uint32_t j = 0; j < n_leaves; ++j, ++tci) {
-      auto context = bytes{ uint8_t(i), uint8_t(j) };
-      auto init_priv =
-        HPKEPrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
-      auto sig_priv =
-        SignaturePrivateKey::derive(tc.cipher_suite, tv.init_secrets[j].data);
-      auto cred = Credential::basic(context, sig_priv.public_key);
-      auto kp = KeyPackage{
-        tc.cipher_suite, init_priv.public_key, cred, sig_priv, std::nullopt
-      };
-
-      auto index = tree.add_leaf(kp);
-      tree.encap(
-        index, context, tv.leaf_secrets[j].data, sig_priv, std::nullopt);
-
-      REQUIRE(tc.trees[tci] == tree);
-    }
-
-    // Blank out even-numbered leaves
-    for (uint32_t j = 0; j < n_leaves; j += 2, ++tci) {
-      tree.blank_path(LeafIndex{ j });
-      REQUIRE(tc.trees[tci] == tree);
-    }
+  for (auto suite : all_supported_suites) {
+    auto tv = TreeKEMTestVector(suite, 10);
+    tv.initialize_trees();
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }

@@ -46,61 +46,6 @@ generate_crypto()
   return tv;
 }
 
-static TreeKEMTestVectors
-generate_treekem()
-{
-  TreeKEMTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
-  };
-
-  size_t n_leaves = 10;
-  tv.init_secrets.resize(n_leaves);
-  tv.leaf_secrets.resize(n_leaves);
-  for (size_t i = 0; i < n_leaves; ++i) {
-    tv.init_secrets[i].data = hpke::random_bytes(32);
-    tv.leaf_secrets[i].data = hpke::random_bytes(32);
-  }
-
-  for (size_t i = 0; i < suites.size(); ++i) {
-    auto suite = suites[i];
-
-    TreeKEMTestVectors::TestCase tc;
-    tc.cipher_suite = suite;
-
-    TreeKEMPublicKey tree{ suite };
-
-    // Add the leaves
-    for (uint32_t j = 0; j < n_leaves; ++j) {
-      auto context = bytes{ uint8_t(i), uint8_t(j) };
-      auto init_priv = HPKEPrivateKey::derive(suite, tv.init_secrets[j].data);
-      auto sig_priv =
-        SignaturePrivateKey::derive(suite, tv.init_secrets[j].data);
-      auto cred = Credential::basic(context, sig_priv.public_key);
-      auto kp =
-        KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
-
-      auto index = tree.add_leaf(kp);
-      tree.encap(
-        index, context, tv.leaf_secrets[j].data, sig_priv, std::nullopt);
-
-      tc.trees.push_back(tree);
-    }
-
-    // Blank out even-numbered leaves
-    for (uint32_t j = 0; j < n_leaves; j += 2) {
-      tree.blank_path(LeafIndex{ j });
-      tc.trees.push_back(tree);
-    }
-
-    tv.cases.push_back(tc);
-  }
-
-  return tv;
-}
-
 static MessagesTestVectors
 generate_messages()
 {
@@ -264,16 +209,12 @@ main() // NOLINT(bugprone-exception-escape)
   auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  auto tree = generate_treekem();
-  write_test_vectors(tree);
-
   auto messages = generate_messages();
   write_test_vectors(messages);
 
   // Verify that the test vectors load
   try {
     TestLoader<CryptoTestVectors>::get();
-    TestLoader<TreeKEMTestVectors>::get();
     TestLoader<MessagesTestVectors>::get();
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;

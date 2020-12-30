@@ -29,6 +29,12 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
   return str << to_hex(tls::marshal(obj));
 }
 
+std::ostream&
+operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
+{
+  return str << "[TreeKEMPublicKey]";
+}
+
 template<typename T>
 static std::optional<std::string>
 verify_equal(std::string label, const T& actual, const T& expected)
@@ -42,6 +48,12 @@ verify_equal(std::string label, const T& actual, const T& expected)
   return ss.str();
 }
 
+#define VERIFY(label, test)                                                    \
+  if (!(test)) {                                                               \
+    return std::string(label);                                                 \
+  }
+
+// XXX(RLB) This seems backwards!
 #define VERIFY_EQUAL(label, actual, expected)                                  \
   if (auto eq = verify_equal(label, actual, expected); !eq) {                  \
     return eq;                                                                 \
@@ -308,6 +320,143 @@ KeyScheduleTestVector::verify() const
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
   }
+
+  return std::nullopt;
+}
+
+///
+/// TreeKEMTestVector
+///
+
+static std::tuple<SignaturePrivateKey, KeyPackage>
+new_key_package(CipherSuite suite)
+{
+  auto init_priv = HPKEPrivateKey::generate(suite);
+  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
+  auto kp =
+    KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
+  return { sig_priv, kp };
+}
+
+TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite_in, size_t n_leaves)
+  : suite(suite_in)
+{
+  // Make a plan
+  add_sender = LeafIndex{ 0 };
+  update_sender = LeafIndex{ 0 };
+  auto my_index = std::optional<LeafIndex>();
+  if (n_leaves > 4) {
+    // Make things more interesting if we have space
+    my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
+    add_sender.val = (n_leaves / 2) - 2;
+    update_sender.val = n_leaves - 2;
+  }
+
+  // Construct a full ratchet tree with the required number of leaves
+  auto sig_privs = std::vector<SignaturePrivateKey>{};
+  auto pub = TreeKEMPublicKey{ suite };
+  for (size_t i = 0; i < n_leaves; i++) {
+    auto [sig_priv, key_package] = new_key_package(suite);
+    sig_privs.push_back(sig_priv);
+
+    auto leaf_secret = random_bytes(suite.secret_size());
+    auto added = pub.add_leaf(key_package);
+    auto [new_adder_priv, path] =
+      pub.encap(added, {}, leaf_secret, sig_priv, std::nullopt);
+    silence_unused(new_adder_priv);
+    pub.merge(added, path);
+  }
+
+  if (my_index) {
+    pub.blank_path(opt::get(my_index));
+  }
+
+  // Add the test participant
+  auto add_secret = random_bytes(suite.secret_size());
+  auto [test_sig_priv, test_kp] = new_key_package(suite);
+  auto test_index = pub.add_leaf(test_kp);
+  auto [add_priv, add_path] = pub.encap(
+    add_sender, {}, add_secret, sig_privs[add_sender.val], std::nullopt);
+  auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
+  silence_unused(test_sig_priv);
+  silence_unused(add_path);
+  silence_unused(overlap);
+  silence_unused(ok);
+
+  pub.set_hash_all();
+
+  tree_before = pub;
+  tree_hash_before = { pub.root_hash() };
+  my_key_package = test_kp;
+  my_path_secret = { path_secret };
+
+  // Do a second update that the test participant should be able to process
+  auto update_secret = random_bytes(suite.secret_size());
+  auto [update_priv, update_path_] = pub.encap(update_sender,
+                                               {},
+                                               update_secret,
+                                               sig_privs[update_sender.val],
+                                               std::nullopt);
+  pub.merge(update_sender, update_path_);
+  pub.set_hash_all();
+
+  update_path = update_path_;
+  root_secret = { update_priv.update_secret };
+  tree_after = pub;
+  tree_hash_after = { pub.root_hash() };
+}
+
+void
+TreeKEMTestVector::initialize_trees()
+{
+  tree_before.suite = suite;
+  tree_before.set_hash_all();
+
+  tree_after.suite = suite;
+  tree_after.set_hash_all();
+}
+
+std::optional<std::string>
+TreeKEMTestVector::verify() const
+{
+  // Verify that the trees provided are valid
+  VERIFY_EQUAL(
+    "tree hash before", tree_before.root_hash(), tree_hash_before.data);
+  VERIFY("tree before parent hash valid", tree_before.parent_hash_valid());
+
+  VERIFY("update path parent hash valid", update_path.parent_hash_valid(suite));
+
+  VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after.data);
+  VERIFY("tree after parent hash valid", tree_after.parent_hash_valid());
+
+  // Find ourselves in the tree
+  auto maybe_index = tree_before.find(my_key_package);
+  if (!maybe_index) {
+    return "Error: key package not found in ratchet tree";
+  }
+
+  auto my_index = opt::get(maybe_index);
+  auto ancestor = tree_math::ancestor(my_index, add_sender);
+
+  // Establish a TreeKEMPrivate Key
+  auto dummy_leaf_priv = HPKEPrivateKey::generate(suite);
+  auto priv = TreeKEMPrivateKey::joiner(suite,
+                                        tree_before.size(),
+                                        my_index,
+                                        dummy_leaf_priv,
+                                        ancestor,
+                                        my_path_secret.data);
+
+  // Process the UpdatePath
+  priv.decap(update_sender, tree_before, {}, update_path);
+
+  auto my_tree_after = tree_before;
+  my_tree_after.merge(update_sender, update_path);
+
+  // Verify that we ended up in the right place
+  VERIFY_EQUAL("root secret", priv.update_secret, root_secret.data);
+  VERIFY_EQUAL("tree after", my_tree_after, tree_after);
 
   return std::nullopt;
 }
