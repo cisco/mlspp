@@ -24,33 +24,34 @@ tls_round_trip(const bytes& vector,
 
 TEST_CASE("Extensions")
 {
-  auto sv0 = SupportedVersionsExtension{ { ProtocolVersion::mls10 } };
-  auto sc0 = SupportedCipherSuitesExtension{ {
-    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
-  } };
+  auto cap0 = CapabilitiesExtension{
+    { ProtocolVersion::mls10 },
+    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    {},
+  };
   auto lt0 = LifetimeExtension{ 0xA0A0A0A0A0A0A0A0, 0xB0B0B0B0B0B0B0B0 };
   auto kid0 = KeyIDExtension{ { 0, 1, 2, 3 } };
   auto ph0 = ParentHashExtension{ { 4, 5, 6, 7 } };
+  auto tree0 = RatchetTreeExtension{};
 
   ExtensionList exts;
-  exts.add(sv0);
-  exts.add(sc0);
+  exts.add(cap0);
   exts.add(lt0);
   exts.add(kid0);
   exts.add(ph0);
+  exts.add(tree0);
 
-  auto sv1 = exts.find<SupportedVersionsExtension>();
-  auto sc1 = exts.find<SupportedCipherSuitesExtension>();
+  auto cap1 = exts.find<CapabilitiesExtension>();
   auto lt1 = exts.find<LifetimeExtension>();
   auto kid1 = exts.find<KeyIDExtension>();
   auto ph1 = exts.find<ParentHashExtension>();
+  auto tree1 = exts.find<RatchetTreeExtension>();
 
-  REQUIRE(sv0 == sv1);
-  REQUIRE(sc0 == sc1);
+  REQUIRE(cap0 == cap1);
   REQUIRE(lt0 == lt1);
   REQUIRE(kid0 == kid1);
   REQUIRE(ph0 == ph1);
+  REQUIRE(tree0 == tree1);
 }
 
 TEST_CASE("Messages Interop")
@@ -72,6 +73,7 @@ TEST_CASE("Messages Interop")
       TestTreeKEMPublicKey{ tc.cipher_suite,
                             { tv.random, tv.random, tv.random, tv.random } };
     tree.blank_path(LeafIndex{ 2 });
+    tree.set_hash_all();
 
     // KeyPackage
     auto ext_list =
@@ -92,7 +94,7 @@ TEST_CASE("Messages Interop")
     tls_round_trip(tc.update_path, update_path, reproducible);
 
     // GroupInfo, GroupSecrets, EncryptedGroupSecrets, and Welcome
-    auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
+    auto group_info = GroupInfo{ tc.cipher_suite, tv.group_id, tv.epoch, tree.root_hash(),     tv.random,
                                  tv.random,   ext_list, tv.random };
     group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;

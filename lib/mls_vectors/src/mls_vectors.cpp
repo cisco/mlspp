@@ -535,10 +535,10 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Add", Add, add_proposal.data);
   VERIFY_TLS_RTT("Update", Update, update_proposal.data);
   VERIFY_TLS_RTT("Remove", Remove, remove_proposal.data);
-  // TODO VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal.data);
-  // TODO VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal.data);
-  // TODO VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal.data);
-  // TODO VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal.data);
+  VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal.data);
+  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal.data);
+  VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal.data);
+  VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal.data);
 
   VERIFY_TLS_RTT("Commit", Commit, commit.data);
 

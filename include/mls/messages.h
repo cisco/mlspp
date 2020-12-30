@@ -10,6 +10,14 @@
 
 namespace mls {
 
+struct RatchetTreeExtension
+{
+  TreeKEMPublicKey tree;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(tree)
+};
+
 // struct {
 //     CipherSuite cipher_suite;
 //     opaque group_id<0..255>;
@@ -40,11 +48,10 @@ struct PublicGroupState {
 // struct {
 //   opaque group_id<0..255>;
 //   uint64 epoch;
-//   optional<Node> tree<1..2^32-1>;
+//   opaque tree_hash<0..255>;
 //   opaque confirmed_transcript_hash<0..255>;
-//   opaque interim_transcript_hash<0..255>;
-//   Extension extensions<0..2^16-1>;
-//   opaque confirmation<0..255>
+//   Extension extensions<0..2^32-1>;
+//   MAC confirmation_tag;
 //   uint32 signer_index;
 //   opaque signature<0..2^16-1>;
 // } GroupInfo;
@@ -56,10 +63,10 @@ private:
 public:
   bytes group_id;
   epoch_t epoch;
-  TreeKEMPublicKey tree;
+  bytes tree_hash;
 
   bytes confirmed_transcript_hash;
-  bytes interim_transcript_hash;
+  bytes interim_transcript_hash; // XXX(RLB) This is not in the defined struct; can we do without?
   ExtensionList extensions;
 
   bytes confirmation;
@@ -67,21 +74,22 @@ public:
   bytes signature;
 
   GroupInfo(CipherSuite suite);
-  GroupInfo(bytes group_id_in,
+  GroupInfo(CipherSuite suite_in,
+            bytes group_id_in,
             epoch_t epoch_in,
-            TreeKEMPublicKey tree_in,
+            bytes tree_hash_in,
             bytes confirmed_transcript_hash_in,
             bytes interim_transcript_hash_in,
             ExtensionList extensions_in,
             bytes confirmation_in);
 
   bytes to_be_signed() const;
-  void sign(LeafIndex index, const SignaturePrivateKey& priv);
-  bool verify() const;
+  void sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv);
+  bool verify(const TreeKEMPublicKey& tree) const;
 
   TLS_SERIALIZABLE(group_id,
                    epoch,
-                   tree,
+                   tree_hash,
                    confirmed_transcript_hash,
                    interim_transcript_hash,
                    extensions,
@@ -90,7 +98,7 @@ public:
                    signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
-             tls::pass,
+             tls::vector<1>,
              tls::vector<1>,
              tls::vector<1>,
              tls::pass,
@@ -201,20 +209,20 @@ enum struct PSKType : uint8_t
   branch = 3,
 };
 
-struct ExternalPSKID {
+struct ExternalPSK {
   bytes psk_id;
   TLS_SERIALIZABLE(psk_id)
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct ReInitPSKID {
+struct ReInitPSK {
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
   TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
-struct BranchPSKID {
+struct BranchPSK {
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
@@ -222,7 +230,7 @@ struct BranchPSKID {
 };
 
 struct PreSharedKeyID {
-  var::variant<ExternalPSKID, ReInitPSKID, BranchPSKID> content;
+  var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<PSKType>)
 };
@@ -278,7 +286,7 @@ enum struct ProposalType : uint8_t
 
 struct Proposal
 {
-  var::variant<Add, Update, Remove> content;
+  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck> content;
 
   ProposalType proposal_type() const;
 
@@ -472,9 +480,17 @@ namespace tls {
 
 using namespace mls;
 
+TLS_VARIANT_MAP(PSKType, ExternalPSK, external)
+TLS_VARIANT_MAP(PSKType, ReInitPSK, reinit)
+TLS_VARIANT_MAP(PSKType, BranchPSK, branch)
+
 TLS_VARIANT_MAP(ProposalType, Add, add)
 TLS_VARIANT_MAP(ProposalType, Update, update)
 TLS_VARIANT_MAP(ProposalType, Remove, remove)
+TLS_VARIANT_MAP(ProposalType, PreSharedKey, psk)
+TLS_VARIANT_MAP(ProposalType, ReInit, reinit)
+TLS_VARIANT_MAP(ProposalType, ExternalInit, external_init)
+TLS_VARIANT_MAP(ProposalType, AppAck, app_ack)
 
 TLS_VARIANT_MAP(ContentType, ApplicationData, application)
 TLS_VARIANT_MAP(ContentType, Proposal, proposal)

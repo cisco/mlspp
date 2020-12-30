@@ -55,25 +55,31 @@ State::State(const HPKEPrivateKey& init_priv,
   auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
 
-  // Decrypt the GroupInfo and fill in details
+  // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, {});
-  group_info.tree.suite = kp.cipher_suite;
-  group_info.tree.set_hash_all();
-
-  // Verify the signature on the GroupInfo
-  if (!group_info.verify()) {
-    throw InvalidParameterError("Invalid GroupInfo");
+  auto maybe_tree_extn = group_info.extensions.find<RatchetTreeExtension>();
+  if (!maybe_tree_extn) {
+    throw InvalidParameterError("Ratchet tree not provided in GroupInfo");
   }
 
-  // Verify the incoming tree
-  if (!group_info.tree.parent_hash_valid()) {
-    throw InvalidParameterError("Invalid tree");
+  auto& group_info_tree = opt::get(maybe_tree_extn).tree;
+
+  // Verify the signature on the GroupInfo
+  if (!group_info.verify(group_info_tree)) {
+    throw InvalidParameterError("Invalid GroupInfo");
   }
 
   // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
-  _tree = group_info.tree;
+
+  _tree = group_info_tree;
+  _tree.suite = _suite;
+  _tree.set_hash_all();
+  if (!_tree.parent_hash_valid()) {
+    throw InvalidParameterError("Invalid tree");
+  }
+
   _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
   _transcript_hash.interim = group_info.interim_transcript_hash;
 
@@ -250,15 +256,17 @@ State::commit(const bytes& leaf_secret) const
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
+    next._suite,
     next._group_id,
     next._epoch,
-    next._tree,
+    next._tree.root_hash(),
     next._transcript_hash.confirmed,
     next._transcript_hash.interim,
     next._extensions,
     opt::get(pt.confirmation_tag).mac_value,
   };
-  group_info.sign(_index, _identity_priv);
+  group_info.extensions.add(RatchetTreeExtension{next._tree});
+  group_info.sign(next._tree, _index, _identity_priv);
 
   auto welcome =
     Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };

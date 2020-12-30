@@ -5,25 +5,29 @@
 
 namespace mls {
 
+// Extensions
+
+const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+
 // GroupInfo
 
 GroupInfo::GroupInfo(CipherSuite suite)
   : suite(suite)
   , epoch(0)
-  , tree(suite)
 {}
 
-GroupInfo::GroupInfo(bytes group_id_in,
+GroupInfo::GroupInfo(CipherSuite suite_in,
+                     bytes group_id_in,
                      epoch_t epoch_in,
-                     TreeKEMPublicKey tree_in,
+                     bytes tree_hash_in,
                      bytes confirmed_transcript_hash_in,
                      bytes interim_transcript_hash_in,
                      ExtensionList extensions_in,
                      bytes confirmation_in)
-  : suite(tree_in.suite)
+  : suite(suite_in)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , tree(std::move(tree_in))
+  , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
   , extensions(std::move(extensions_in))
@@ -35,7 +39,8 @@ GroupInfo::to_be_signed() const
 {
   tls::ostream w;
   tls::vector<1>::encode(w, group_id);
-  w << epoch << tree;
+  w << epoch;
+  tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
   tls::vector<1>::encode(w, interim_transcript_hash);
   tls::vector<1>::encode(w, confirmation);
@@ -44,7 +49,7 @@ GroupInfo::to_be_signed() const
 }
 
 void
-GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
+GroupInfo::sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv)
 {
   auto maybe_kp = tree.key_package(index);
   if (!maybe_kp) {
@@ -61,7 +66,7 @@ GroupInfo::sign(LeafIndex index, const SignaturePrivateKey& priv)
 }
 
 bool
-GroupInfo::verify() const
+GroupInfo::verify(const TreeKEMPublicKey& tree) const
 {
   auto maybe_kp = tree.key_package(signer_index);
   if (!maybe_kp) {

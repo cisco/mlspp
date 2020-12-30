@@ -82,6 +82,7 @@ generate_messages()
       { tv.random, tv.random, tv.random, tv.random },
     };
     tree.blank_path(LeafIndex{ 2 });
+    tree.set_hash_all();
 
     // Construct KeyPackage
     auto ext_list =
@@ -99,7 +100,7 @@ generate_messages()
                   } };
 
     // Construct Welcome
-    auto group_info = GroupInfo{ tv.group_id, tv.epoch, tree,     tv.random,
+    auto group_info = GroupInfo{ suite, tv.group_id, tv.epoch, tree.root_hash(),     tv.random,
                                  tv.random,   ext_list, tv.random };
     group_info.signer_index = LeafIndex(tv.sender.sender);
     group_info.signature = tv.random;

@@ -263,7 +263,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 TEST_CASE("TreeKEM Interop")
 {
   for (auto suite : all_supported_suites) {
-    auto tv = TreeKEMTestVector(suite, 10);
+    auto tv = TreeKEMTestVector::create(suite, 10);
     tv.initialize_trees();
     REQUIRE(tv.verify() == std::nullopt);
   }

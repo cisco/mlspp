@@ -107,15 +107,6 @@ struct ParentHashExtension
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct RatchetTreeExtension
-{
-  // TODO(RLB): This should contain a TreeKEMPublicKey, but as it is now, this
-  // would introduce a circular dependency.  Perhaps these extenson definitions
-  // should move to <mls/messages.h>.
-
-  static const uint16_t type;
-};
-
 ///
 /// NodeType, ParentNode, and KeyPackage
 ///

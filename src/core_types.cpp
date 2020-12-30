@@ -1,19 +1,19 @@
 #include "mls/core_types.h"
 
 namespace mls {
+
 ///
 /// Extensions
 ///
-
-const std::array<ProtocolVersion, 1> all_supported_versions = {
-  ProtocolVersion::mls10
-};
 
 const uint16_t CapabilitiesExtension::type = ExtensionType::capabilities;
 const uint16_t LifetimeExtension::type = ExtensionType::lifetime;
 const uint16_t KeyIDExtension::type = ExtensionType::key_id;
 const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
-const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+
+const std::array<ProtocolVersion, 1> all_supported_versions = {
+  ProtocolVersion::mls10
+};
 
 void
 ExtensionList::add(uint16_t type, bytes data)
