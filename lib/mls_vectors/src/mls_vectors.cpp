@@ -53,10 +53,9 @@ verify_equal(std::string label, const T& actual, const T& expected)
     return std::string(label);                                                 \
   }
 
-// XXX(RLB) This seems backwards!
 #define VERIFY_EQUAL(label, actual, expected)                                  \
-  if (auto eq = verify_equal(label, actual, expected); !eq) {                  \
-    return eq;                                                                 \
+  if (auto err = verify_equal(label, actual, expected)) {                      \
+    return err;                                                                \
   }
 
 ///
@@ -64,7 +63,7 @@ verify_equal(std::string label, const T& actual, const T& expected)
 ///
 TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
   : n_leaves(n_leaves_in)
-  , root(n_leaves_in - 1)
+  , root(n_leaves_in)
   , left(NodeCount(n_leaves).val)
   , right(NodeCount(n_leaves).val)
   , parent(NodeCount(n_leaves).val)
@@ -126,11 +125,11 @@ EncryptionKeyTestVector::EncryptionKeyTestVector(CipherSuite suite_in,
     application_keys[i].steps.resize(n_generations);
 
     for (uint32_t j = 0; j < n_generations; ++j) {
-      auto hs_key_nonce = src.get(handshake, LeafIndex{ j }, j);
+      auto hs_key_nonce = src.get(handshake, LeafIndex{ i }, j);
       handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
       handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
 
-      auto app_key_nonce = src.get(application, LeafIndex{ j }, j);
+      auto app_key_nonce = src.get(application, LeafIndex{ i }, j);
       application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
       application_keys[i].steps[j].nonce = { std::move(app_key_nonce.nonce) };
     }
@@ -151,7 +150,7 @@ EncryptionKeyTestVector::verify() const
 
   for (uint32_t i = 0; i < application_keys.size(); i++) {
     for (uint32_t j = 0; j < handshake_keys[i].steps.size(); j++) {
-      const auto key_nonce = src.get(handshake, LeafIndex(i), j);
+      const auto key_nonce = src.get(handshake, LeafIndex{ i }, j);
       const auto& key = handshake_keys[i].steps[j].key.data;
       const auto& nonce = handshake_keys[i].steps[j].nonce.data;
       VERIFY_EQUAL("key", key, key_nonce.key);
@@ -161,7 +160,7 @@ EncryptionKeyTestVector::verify() const
 
   for (uint32_t i = 0; i < application_keys.size(); i++) {
     for (uint32_t j = 0; j < application_keys[i].steps.size(); j++) {
-      const auto key_nonce = src.get(application, LeafIndex(i), j);
+      const auto key_nonce = src.get(application, LeafIndex{ i }, j);
       const auto& key = application_keys[i].steps[j].key.data;
       const auto& nonce = application_keys[i].steps[j].nonce.data;
       VERIFY_EQUAL("key", key, key_nonce.key);
@@ -199,6 +198,7 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite_in,
 
     transcript_hash.update_confirmed(commit);
 
+    auto prior_group_context = group_context;
     group_context.epoch += 1;
     group_context.tree_hash = tree_hash;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
@@ -207,7 +207,8 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite_in,
 
     commit.confirmation_tag = { next_epoch.confirmation_tag(
       transcript_hash.confirmed) };
-    commit.membership_tag = { epoch.membership_tag(group_context, commit) };
+    commit.membership_tag = { epoch.membership_tag(prior_group_context,
+                                                   commit) };
     transcript_hash.update_interim(commit);
     epoch = next_epoch;
 

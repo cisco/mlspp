@@ -118,7 +118,8 @@ struct KeyScheduleTestVector
                      external_secret,
                      confirmation_key,
                      membership_key,
-                     resumption_secret)
+                     resumption_secret,
+                     external_pub)
   };
 
   mls::CipherSuite suite;
