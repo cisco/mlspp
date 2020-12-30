@@ -175,19 +175,6 @@ struct TreeKEMTestVector
   std::optional<std::string> verify() const;
 };
 
-struct TreeHashingTestVector
-{
-  mls::CipherSuite suite;
-  CryptoValue tree_hash;
-  mls::TreeKEMPublicKey ratchet_tree;
-
-  TLS_SERIALIZABLE(suite, tree_hash, ratchet_tree)
-
-  TreeHashingTestVector() = default;
-  TreeHashingTestVector(mls::CipherSuite suite, uint32_t n_leaves);
-  std::optional<std::string> verify() const;
-};
-
 struct MessagesTestVector
 {
   struct Message
