@@ -224,6 +224,190 @@ GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
   return chain(type, sender).erase(generation);
 }
 
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     ContentType content_type;
+//     opaque authenticated_data<0..2^32-1>;
+// } MLSCiphertextContentAAD;
+struct MLSCiphertextContentAAD
+{
+  const bytes& group_id;
+  const epoch_t epoch;
+  const ContentType content_type;
+  const bytes& authenticated_data;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
+};
+
+using ReuseGuard = std::array<uint8_t, 4>;
+
+static ReuseGuard
+new_reuse_guard()
+{
+  auto random = random_bytes(4);
+  auto guard = ReuseGuard();
+  std::copy(random.begin(), random.end(), guard.begin());
+  return guard;
+}
+
+static void
+apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
+{
+  for (size_t i = 0; i < guard.size(); i++) {
+    nonce.at(i) ^= guard.at(i);
+  }
+}
+
+// struct {
+//     uint32 sender;
+//     uint32 generation;
+//     opaque reuse_guard[4];
+// } MLSSenderData;
+struct MLSSenderData
+{
+  uint32_t sender;
+  uint32_t generation;
+  ReuseGuard reuse_guard;
+
+  TLS_SERIALIZABLE(sender, generation, reuse_guard)
+};
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     ContentType content_type;
+// } MLSSenderDataAAD;
+struct MLSSenderDataAAD
+{
+  const bytes& group_id;
+  const epoch_t epoch;
+  const ContentType content_type;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
+};
+
+MLSCiphertext
+GroupKeySource::encrypt(LeafIndex index,
+                        const bytes& sender_data_secret,
+                        const MLSPlaintext& pt)
+{
+  // Pull from the key schedule
+  static const auto get_key_type = overloaded{
+    [](const ApplicationData& /*unused*/) {
+      return GroupKeySource::RatchetType::application;
+    },
+    [](const Proposal& /*unused*/) {
+      return GroupKeySource::RatchetType::handshake;
+    },
+    [](const Commit& /*unused*/) {
+      return GroupKeySource::RatchetType::handshake;
+    },
+  };
+
+  auto key_type = var::visit(get_key_type, pt.content);
+  auto [generation, content_keys] = next(key_type, index);
+
+  // Encrypt the content
+  // XXX(rlb@ipv.sx): Apply padding?
+  auto content = pt.marshal_content(0);
+  auto content_type_val = pt.content_type();
+  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
+    pt.group_id, pt.epoch, content_type_val, pt.authenticated_data });
+
+  auto reuse_guard = new_reuse_guard();
+  apply_reuse_guard(reuse_guard, content_keys.nonce);
+
+  auto content_ct = suite.hpke().aead.seal(
+    content_keys.key, content_keys.nonce, content_aad, content);
+
+  // Encrypt the sender data
+  auto sender_data_obj = MLSSenderData{ index.val, generation, reuse_guard };
+  auto sender_data = tls::marshal(sender_data_obj);
+
+  auto sender_data_keys =
+    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, content_ct);
+  auto sender_data_aad =
+    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, content_type_val });
+
+  auto encrypted_sender_data = suite.hpke().aead.seal(
+    sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
+
+  // Assemble the MLSCiphertext
+  MLSCiphertext ct;
+  ct.group_id = pt.group_id;
+  ct.epoch = pt.epoch;
+  ct.content_type = content_type_val;
+  ct.encrypted_sender_data = encrypted_sender_data;
+  ct.authenticated_data = pt.authenticated_data;
+  ct.ciphertext = content_ct;
+  return ct;
+}
+
+MLSPlaintext
+GroupKeySource::decrypt(const bytes& sender_data_secret,
+                        const MLSCiphertext& ct)
+{
+  // Decrypt and parse the sender data
+  auto sender_data_keys = KeyScheduleEpoch::sender_data_keys(
+    suite, sender_data_secret, ct.ciphertext);
+  auto sender_data_aad =
+    tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
+  auto sender_data_pt = suite.hpke().aead.open(sender_data_keys.key,
+                                               sender_data_keys.nonce,
+                                               sender_data_aad,
+                                               ct.encrypted_sender_data);
+  if (!sender_data_pt) {
+    throw ProtocolError("Sender data decryption failed");
+  }
+
+  auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
+  auto sender = LeafIndex(sender_data.sender);
+
+  // Pull from the key schedule
+  auto key_type = GroupKeySource::RatchetType::handshake;
+  switch (ct.content_type) {
+    case ContentType::proposal:
+    case ContentType::commit:
+      key_type = GroupKeySource::RatchetType::handshake;
+      break;
+
+    case ContentType::application:
+      key_type = GroupKeySource::RatchetType::application;
+      break;
+
+    default:
+      throw ProtocolError("Unsupported content type");
+  }
+
+  auto content_keys = get(key_type, sender, sender_data.generation);
+  erase(key_type, sender, sender_data.generation);
+  apply_reuse_guard(sender_data.reuse_guard, content_keys.nonce);
+
+  // Compute the plaintext AAD and decrypt
+  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
+    ct.group_id,
+    ct.epoch,
+    ct.content_type,
+    ct.authenticated_data,
+  });
+  auto content = suite.hpke().aead.open(
+    content_keys.key, content_keys.nonce, content_aad, ct.ciphertext);
+  if (!content) {
+    throw ProtocolError("Content decryption failed");
+  }
+
+  // Set up a new plaintext based on the content
+  return MLSPlaintext{ ct.group_id,
+                       ct.epoch,
+                       { SenderType::member, sender_data.sender },
+                       ct.content_type,
+                       ct.authenticated_data,
+                       opt::get(content) };
+}
+
 ///
 /// KeyScheduleEpoch
 ///
@@ -303,25 +487,6 @@ KeyScheduleEpoch::encryption_keys(LeafCount size) const
   return GroupKeySource(suite, size, encryption_secret);
 }
 
-KeyAndNonce
-KeyScheduleEpoch::sender_data(const bytes& ciphertext) const
-{
-  auto sample_size = suite.secret_size();
-  auto sample = bytes(sample_size);
-  if (ciphertext.size() < sample_size) {
-    sample = ciphertext;
-  } else {
-    sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
-  }
-
-  auto key_size = suite.hpke().aead.key_size;
-  auto nonce_size = suite.hpke().aead.nonce_size;
-  return {
-    suite.expand_with_label(sender_data_secret, "key", sample, key_size),
-    suite.expand_with_label(sender_data_secret, "nonce", sample, nonce_size),
-  };
-}
-
 bytes
 KeyScheduleEpoch::membership_tag(const GroupContext& context,
                                  const MLSPlaintext& pt) const
@@ -353,6 +518,27 @@ KeyScheduleEpoch::welcome_secret(CipherSuite suite,
 {
   auto extract = suite.hpke().kdf.extract(joiner_secret, psk_secret);
   return suite.derive_secret(extract, "welcome");
+}
+
+KeyAndNonce
+KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
+                                   const bytes& sender_data_secret,
+                                   const bytes& ciphertext)
+{
+  auto sample_size = suite.secret_size();
+  auto sample = bytes(sample_size);
+  if (ciphertext.size() < sample_size) {
+    sample = ciphertext;
+  } else {
+    sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
+  }
+
+  auto key_size = suite.hpke().aead.key_size;
+  auto nonce_size = suite.hpke().aead.nonce_size;
+  return {
+    suite.expand_with_label(sender_data_secret, "key", sample, key_size),
+    suite.expand_with_label(sender_data_secret, "nonce", sample, nonce_size),
+  };
 }
 
 bool

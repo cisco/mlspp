@@ -160,6 +160,25 @@ EncryptionKeyTestVector::create(CipherSuite suite,
     }
   }
 
+  tv.sender_data_secret = { random_bytes(suite.secret_size()) };
+  auto sender_index = LeafIndex{ n_leaves / 2 };
+  auto sender = Sender{ SenderType::member, sender_index.val };
+  auto group_id = bytes{ 0, 1, 2, 3 };
+  auto epoch = epoch_t(0x0001020304050607);
+
+  auto hs_pt = MLSPlaintext{
+    group_id, epoch, sender, Proposal{ Remove{ LeafIndex{ 0 } } }
+  };
+  tv.handshake_message =
+    src.encrypt(sender_index, tv.sender_data_secret.data, hs_pt);
+
+  auto app_message = std::string("Hello, test vector verifier!");
+  auto app_data =
+    ApplicationData{ bytes(app_message.begin(), app_message.end()) };
+  auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
+  tv.application_message =
+    src.encrypt(sender_index, tv.sender_data_secret.data, app_pt);
+
   return tv;
 }
 
@@ -194,6 +213,9 @@ EncryptionKeyTestVector::verify() const
       VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
     }
   }
+
+  src.decrypt(sender_data_secret.data, handshake_message);
+  src.decrypt(sender_data_secret.data, application_message);
 
   return std::nullopt;
 }

@@ -65,6 +65,12 @@ struct GroupKeySource
   KeyAndNonce get(RatchetType type, LeafIndex sender, uint32_t generation);
   void erase(RatchetType type, LeafIndex sender, uint32_t generation);
 
+  MLSCiphertext encrypt(LeafIndex index,
+                        const bytes& sender_data_secret,
+                        const MLSPlaintext& pt);
+  MLSPlaintext decrypt(const bytes& sender_data_secret,
+                       const MLSCiphertext& pt);
+
 private:
   CipherSuite suite;
   SecretTree secret_tree;
@@ -124,7 +130,6 @@ public:
                         const bytes& context) const;
 
   GroupKeySource encryption_keys(LeafCount size) const;
-  KeyAndNonce sender_data(const bytes& ciphertext) const;
   bytes membership_tag(const GroupContext& context,
                        const MLSPlaintext& pt) const;
   bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
@@ -135,6 +140,9 @@ public:
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& commit_secret,
                               const bytes& psk_secret);
+  static KeyAndNonce sender_data_keys(CipherSuite suite,
+                                      const bytes& sender_data_secret,
+                                      const bytes& ciphertext);
 };
 
 bool

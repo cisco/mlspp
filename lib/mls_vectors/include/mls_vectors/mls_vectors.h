@@ -60,8 +60,24 @@ struct EncryptionKeyTestVector
   std::vector<HashRatchetSequence> handshake_keys;
   std::vector<HashRatchetSequence> application_keys;
 
-  TLS_SERIALIZABLE(suite, encryption_secret, handshake_keys, application_keys)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
+  CryptoValue sender_data_secret;
+  mls::MLSCiphertext handshake_message;
+  mls::MLSCiphertext application_message;
+
+  TLS_SERIALIZABLE(suite,
+                   encryption_secret,
+                   handshake_keys,
+                   application_keys,
+                   sender_data_secret,
+                   handshake_message,
+                   application_message)
+  TLS_TRAITS(tls::pass,
+             tls::pass,
+             tls::vector<4>,
+             tls::vector<4>,
+             tls::pass,
+             tls::pass,
+             tls::pass)
 
   static EncryptionKeyTestVector create(mls::CipherSuite suite,
                                         uint32_t n_leaves,
