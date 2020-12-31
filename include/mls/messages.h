@@ -81,9 +81,6 @@ struct PublicGroupState
 // } GroupInfo;
 struct GroupInfo
 {
-private:
-  CipherSuite suite;
-
 public:
   bytes group_id;
   epoch_t epoch;
@@ -96,9 +93,8 @@ public:
   LeafIndex signer_index;
   bytes signature;
 
-  GroupInfo(CipherSuite suite);
-  GroupInfo(CipherSuite suite_in,
-            bytes group_id_in,
+  GroupInfo() = default;
+  GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
             bytes tree_hash_in,
             bytes confirmed_transcript_hash_in,

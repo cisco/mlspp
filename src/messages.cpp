@@ -11,20 +11,13 @@ const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
 
 // GroupInfo
 
-GroupInfo::GroupInfo(CipherSuite suite)
-  : suite(suite)
-  , epoch(0)
-{}
-
-GroupInfo::GroupInfo(CipherSuite suite_in,
-                     bytes group_id_in,
+GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
                      bytes tree_hash_in,
                      bytes confirmed_transcript_hash_in,
                      ExtensionList extensions_in,
                      MAC confirmation_tag_in)
-  : suite(suite_in)
-  , group_id(std::move(group_id_in))
+  : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
@@ -60,7 +53,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
   }
 
   signer_index = index;
-  signature = priv.sign(suite, to_be_signed());
+  signature = priv.sign(tree.suite, to_be_signed());
 }
 
 bool
@@ -72,7 +65,7 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
   }
 
   auto cred = opt::get(maybe_kp).credential;
-  return cred.public_key().verify(suite, to_be_signed(), signature);
+  return cred.public_key().verify(tree.suite, to_be_signed(), signature);
 }
 
 // Welcome
@@ -132,7 +125,7 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
     throw ProtocolError("Welcome decryption failed");
   }
 
-  return tls::get<GroupInfo>(opt::get(group_info_data), cipher_suite);
+  return tls::get<GroupInfo>(opt::get(group_info_data));
 }
 
 KeyAndNonce

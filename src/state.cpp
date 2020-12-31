@@ -63,6 +63,8 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   auto& group_info_tree = opt::get(maybe_tree_extn).tree;
+  group_info_tree.suite = _suite;
+  group_info_tree.set_hash_all();
 
   // Verify the signature on the GroupInfo
   if (!group_info.verify(group_info_tree)) {
@@ -74,8 +76,6 @@ State::State(const HPKEPrivateKey& init_priv,
   _group_id = group_info.group_id;
 
   _tree = group_info_tree;
-  _tree.suite = _suite;
-  _tree.set_hash_all();
   if (!_tree.parent_hash_valid()) {
     throw InvalidParameterError("Invalid tree");
   }
@@ -256,7 +256,6 @@ State::commit(const bytes& leaf_secret) const
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
-    next._suite,
     next._group_id,
     next._epoch,
     next._tree.root_hash(),
