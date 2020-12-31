@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 #include <mls/messages.h>
-#include <tls/tls_syntax.h>
 #include <mls_vectors/mls_vectors.h>
+#include <tls/tls_syntax.h>
 
 using namespace mls;
 using namespace mls_vectors;

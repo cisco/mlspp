@@ -107,7 +107,9 @@ struct PublicGroupState
                    HPKEPublicKey external_pub_in);
 
   bytes to_be_signed() const;
-  void sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv);
+  void sign(const TreeKEMPublicKey& tree,
+            LeafIndex index,
+            const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
   TLS_SERIALIZABLE(cipher_suite,

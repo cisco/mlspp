@@ -569,8 +569,9 @@ MessagesTestVector::create()
   welcome.encrypt(key_package, opaque);
 
   // PublicGroupState
-  auto public_group_state = PublicGroupState{ suite, group_id, epoch, opaque, opaque, {}, hpke_pub };
-  public_group_state.sign(tree, LeafIndex{1}, sig_priv);
+  auto public_group_state =
+    PublicGroupState{ suite, group_id, epoch, opaque, opaque, {}, hpke_pub };
+  public_group_state.sign(tree, LeafIndex{ 1 }, sig_priv);
 
   // Proposals
   auto add = Add{ key_package };
