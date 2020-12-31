@@ -1,4 +1,3 @@
-#include "test_vectors.h"
 #include <doctest/doctest.h>
 #include <mls/messages.h>
 #include <tls/tls_syntax.h>
@@ -6,23 +5,6 @@
 
 using namespace mls;
 using namespace mls_vectors;
-
-template<typename T, typename... Tp>
-void
-tls_round_trip(const bytes& vector,
-               T& constructed,
-               bool reproducible,
-               Tp... args)
-{
-  auto marshaled = tls::marshal(constructed);
-  if (reproducible) {
-    REQUIRE(vector == marshaled);
-  }
-
-  auto unmarshaled = tls::get<T>(vector, args...);
-  REQUIRE(constructed == unmarshaled);
-  REQUIRE(tls::marshal(unmarshaled) == vector);
-}
 
 TEST_CASE("Extensions")
 {

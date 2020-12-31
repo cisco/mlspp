@@ -1,33 +1,9 @@
 #include <doctest/doctest.h>
 #include <mls/crypto.h>
 
-#include "test_vectors.h"
-
 #include <string>
 
 using namespace mls;
-
-TEST_CASE("Crypto Interop")
-{
-  const auto& tv = TestLoader<CryptoTestVectors>::get();
-
-  for (const auto& tc : tv.cases) {
-    auto suite = tc.cipher_suite;
-
-    auto kdf_extract_out =
-      suite.hpke().kdf.extract(tv.kdf_extract_salt, tv.kdf_extract_ikm);
-    REQUIRE(kdf_extract_out == tc.kdf_extract_out);
-
-    auto derive_key_pair_priv =
-      HPKEPrivateKey::derive(suite, tv.derive_key_pair_seed);
-    auto derive_key_pair_pub = derive_key_pair_priv.public_key;
-    REQUIRE(derive_key_pair_pub == tc.derive_key_pair_pub);
-
-    auto hpke_plaintext =
-      derive_key_pair_priv.decrypt(suite, tv.hpke_aad, tc.hpke_out);
-    REQUIRE(hpke_plaintext == tv.hpke_plaintext);
-  }
-}
 
 TEST_CASE("Basic HPKE")
 {
