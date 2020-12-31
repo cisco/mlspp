@@ -90,6 +90,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  PublicGroupState public_group_state() const;
 
   // Ordered list of credentials from non-blank leaves
   std::vector<KeyPackage> roster() const;

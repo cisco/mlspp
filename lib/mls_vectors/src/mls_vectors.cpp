@@ -527,11 +527,117 @@ TreeKEMTestVector::verify() const
 MessagesTestVector
 MessagesTestVector::create()
 {
-  auto tv = MessagesTestVector{};
+  auto epoch = epoch_t(0xA0A1A2A3A4A5A6A7);
+  auto index = LeafIndex{ 0xB0B1B2B3 };
+  auto sender = Sender{ SenderType::member, index.val };
+  auto user_id = bytes(16, 0xD1);
+  auto group_id = bytes(16, 0xD2);
+  auto opaque = bytes(32, 0xD3);
+  auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
+  auto mac = MAC{ bytes(32, 0xD5) };
 
-  // TODO: Create objects
+  auto version = ProtocolVersion::mls10;
+  auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+  auto hpke_priv = HPKEPrivateKey::generate(suite);
+  auto hpke_pub = hpke_priv.public_key;
+  auto hpke_ct = HPKECiphertext{ opaque, opaque };
+  auto sig_priv = SignaturePrivateKey::generate(suite);
 
-  return tv;
+  // KeyPackage and extensions
+  auto cred = Credential::basic(user_id, sig_priv.public_key);
+  auto key_package =
+    KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
+
+  auto lifetime = LifetimeExtension{ 0xA0A1A2A3A4A5A6A7, 0xB0B1B2B3B4B5B6B7 };
+  auto capabilities = CapabilitiesExtension{ { version },
+                                             { suite.cipher_suite() },
+                                             { ExtensionType::ratchet_tree } };
+  auto tree = TreeKEMPublicKey{ suite };
+  tree.add_leaf(key_package);
+  tree.add_leaf(key_package);
+  auto ratchet_tree = RatchetTreeExtension{ tree };
+
+  // Welcome and its substituents
+  auto group_info = GroupInfo{ group_id, epoch, opaque, opaque, {}, mac };
+  auto group_secrets = GroupSecrets{ opaque,
+                                     { { opaque } },
+                                     PreSharedKeys{ {
+                                       { psk_id },
+                                       { psk_id },
+                                     } } };
+  auto welcome = Welcome{ suite, opaque, opaque, group_info };
+  welcome.encrypt(key_package, opaque);
+
+  // PublicGroupState
+  auto public_group_state = PublicGroupState{ suite, group_id, epoch, opaque, opaque, {}, hpke_pub };
+  public_group_state.sign(tree, LeafIndex{1}, sig_priv);
+
+  // Proposals
+  auto add = Add{ key_package };
+  auto update = Update{ key_package };
+  auto remove = Remove{ index };
+  auto pre_shared_key = PreSharedKey{ psk_id };
+  auto reinit = ReInit{ group_id, version, suite, {} };
+  auto external_init = ExternalInit{ opaque };
+  auto app_ack = AppAck{ { { index.val, 0, 5 }, { index.val, 7, 10 } } };
+
+  // Commit
+  auto commit = Commit{ {
+                          ProposalID{ opaque }, ProposalID{ opaque },
+                          // TODO inline some proposals
+                        },
+                        UpdatePath{
+                          key_package,
+                          {
+                            { hpke_pub, { hpke_ct, hpke_ct } },
+                            { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
+                          },
+                        } };
+
+  // MLSPlaintext and MLSCiphertext
+  auto pt_application =
+    MLSPlaintext{ group_id, epoch, sender, ApplicationData{} };
+  pt_application.membership_tag = mac;
+
+  auto pt_proposal =
+    MLSPlaintext{ group_id, epoch, sender, Proposal{ remove } };
+  pt_proposal.membership_tag = mac;
+
+  auto pt_commit = MLSPlaintext{ group_id, epoch, sender, commit };
+  pt_commit.confirmation_tag = mac;
+  pt_commit.membership_tag = mac;
+
+  auto ct = MLSCiphertext{
+    group_id, epoch, ContentType::application, opaque, opaque, opaque,
+  };
+
+  return MessagesTestVector{
+    { tls::marshal(key_package) },
+    { tls::marshal(lifetime) },
+    { tls::marshal(capabilities) },
+    { tls::marshal(ratchet_tree) },
+
+    { tls::marshal(group_info) },
+    { tls::marshal(group_secrets) },
+    { tls::marshal(welcome) },
+
+    { tls::marshal(public_group_state) },
+
+    { tls::marshal(add) },
+    { tls::marshal(update) },
+    { tls::marshal(remove) },
+    { tls::marshal(pre_shared_key) },
+    { tls::marshal(reinit) },
+    { tls::marshal(external_init) },
+    { tls::marshal(app_ack) },
+
+    { tls::marshal(commit) },
+
+    { tls::marshal(pt_application) },
+    { tls::marshal(pt_proposal) },
+    { tls::marshal(pt_commit) },
+    { tls::marshal(ct) },
+  };
 }
 
 std::optional<std::string>
@@ -542,13 +648,10 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package.data);
   VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities.data);
-  VERIFY_TLS_RTT("RatchetTree", TreeKEMPublicKey, ratchet_tree.data);
+  VERIFY_TLS_RTT("Lifetime", LifetimeExtension, lifetime.data);
+  VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree.data);
 
-  // GroupInfo is not default-constructible
-  auto group_info_obj = tls::get<GroupInfo>(group_info.data, dummy_ciphersuite);
-  auto group_info_actual = tls::marshal(group_info_obj);
-  VERIFY_EQUAL("GroupInfo", group_info_actual, group_info.data);
-
+  VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info.data);
   VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets.data);
   VERIFY_TLS_RTT("Welcome", Welcome, welcome.data);
 

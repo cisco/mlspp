@@ -46,128 +46,6 @@ generate_crypto()
   return tv;
 }
 
-static MessagesTestVectors
-generate_messages()
-{
-  MessagesTestVectors tv;
-
-  std::vector<CipherSuite> suites{
-    { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-    { CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
-  };
-
-  // Set the inputs
-  tv.epoch = 0xA0A1A2A3;
-  tv.sender = Sender{ SenderType::member, 0xB0B1B2B3 };
-  tv.removed = LeafIndex{ 0xC0C1C2C3 };
-  tv.user_id = bytes(16, 0xD1);
-  tv.group_id = bytes(16, 0xD2);
-  tv.key_package_id = bytes(16, 0xD3);
-  tv.dh_seed = bytes(32, 0xD4);
-  tv.sig_seed = bytes(32, 0xD5);
-  tv.random = bytes(32, 0xD6);
-
-  // Construct a test case for each suite
-  for (auto suite : suites) {
-    // Miscellaneous data items we need to construct messages
-    auto dh_priv = HPKEPrivateKey::derive(suite, tv.dh_seed);
-    auto dh_key = dh_priv.public_key;
-    auto sig_priv = SignaturePrivateKey::derive(suite, tv.sig_seed);
-    auto sig_key = sig_priv.public_key;
-    auto cred = Credential::basic(tv.user_id, sig_priv.public_key);
-    auto fake_hpke_ciphertext = HPKECiphertext{ tv.random, tv.random };
-
-    auto tree = TestTreeKEMPublicKey{
-      suite,
-      { tv.random, tv.random, tv.random, tv.random },
-    };
-    tree.blank_path(LeafIndex{ 2 });
-    tree.set_hash_all();
-
-    // Construct KeyPackage
-    auto ext_list =
-      ExtensionList{ { { ExtensionType::lifetime, bytes(8, 0) } } };
-    auto key_package =
-      KeyPackage{ suite, dh_priv.public_key, cred, sig_priv, { { ext_list } } };
-    key_package.signature = tv.random;
-
-    // Construct UpdatePath
-    auto update_path =
-      UpdatePath{ key_package,
-                  {
-                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-                    { dh_key, { fake_hpke_ciphertext, fake_hpke_ciphertext } },
-                  } };
-
-    // Construct Welcome
-    auto group_info =
-      GroupInfo{ suite,     tv.group_id, tv.epoch,     tree.root_hash(),
-                 tv.random, ext_list,    { tv.random } };
-    group_info.signer_index = LeafIndex(tv.sender.sender);
-    group_info.signature = tv.random;
-
-    auto group_secrets = GroupSecrets{ tv.random, std::nullopt };
-    auto encrypted_group_secrets =
-      EncryptedGroupSecrets{ tv.random,
-                             HPKECiphertext{ tv.random, tv.random } };
-
-    Welcome welcome;
-    welcome.version = ProtocolVersion::mls10;
-    welcome.cipher_suite = suite;
-    welcome.secrets = { encrypted_group_secrets, encrypted_group_secrets };
-    welcome.encrypted_group_info = tv.random;
-
-    // Construct Proposals
-    auto add_prop = Proposal{ Add{ key_package } };
-    auto add_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, add_prop };
-    add_hs.signature = tv.random;
-    add_hs.membership_tag = { tv.random };
-
-    auto update_prop = Proposal{ Update{ key_package } };
-    auto update_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, update_prop };
-    update_hs.signature = tv.random;
-    update_hs.membership_tag = { tv.random };
-
-    auto remove_prop = Proposal{ Remove{ LeafIndex(tv.sender.sender) } };
-    auto remove_hs =
-      MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, remove_prop };
-    remove_hs.signature = tv.random;
-    remove_hs.membership_tag = { tv.random };
-
-    // Construct Commit
-    auto commit = Commit{
-      { { tv.random }, { tv.random } },
-      update_path,
-    };
-    auto commit_hs = MLSPlaintext{ tv.group_id, tv.epoch, tv.sender, commit };
-    commit_hs.signature = tv.random;
-    commit_hs.confirmation_tag = { tv.random };
-    commit_hs.membership_tag = { tv.random };
-
-    // Construct an MLSCiphertext
-    auto ciphertext = MLSCiphertext{
-      tv.group_id, tv.epoch,  ContentType::application,
-      tv.random,   tv.random, tv.random,
-    };
-
-    tv.cases.push_back({ suite,
-                         tls::marshal(key_package),
-                         tls::marshal(update_path),
-                         tls::marshal(group_info),
-                         tls::marshal(group_secrets),
-                         tls::marshal(encrypted_group_secrets),
-                         tls::marshal(welcome),
-                         tls::marshal(add_hs),
-                         tls::marshal(update_hs),
-                         tls::marshal(remove_hs),
-                         tls::marshal(commit_hs),
-                         tls::marshal(ciphertext) });
-  }
-
-  return tv;
-}
-
 template<typename T>
 void
 write_test_vectors(const T& vectors)
@@ -211,13 +89,9 @@ main() // NOLINT(bugprone-exception-escape)
   auto crypto = generate_crypto();
   write_test_vectors(crypto);
 
-  auto messages = generate_messages();
-  write_test_vectors(messages);
-
   // Verify that the test vectors load
   try {
     TestLoader<CryptoTestVectors>::get();
-    TestLoader<MessagesTestVectors>::get();
   } catch (...) {
     std::cerr << "Error: Generated test vectors failed to load" << std::endl;
   }

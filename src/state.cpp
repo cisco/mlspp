@@ -54,6 +54,9 @@ State::State(const HPKEPrivateKey& init_priv,
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
   auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
+  if (secrets.psks) {
+    throw NotImplementedError(/* PSKs are not supported */);
+  }
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, {});
@@ -256,12 +259,9 @@ State::commit(const bytes& leaf_secret) const
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
-    next._group_id,
-    next._epoch,
-    next._tree.root_hash(),
-    next._transcript_hash.confirmed,
-    next._extensions,
-    opt::get(pt.confirmation_tag),
+    next._group_id,         next._epoch,
+    next._tree.root_hash(), next._transcript_hash.confirmed,
+    next._extensions,       opt::get(pt.confirmation_tag),
   };
   group_info.extensions.add(RatchetTreeExtension{ next._tree });
   group_info.sign(next._tree, _index, _identity_priv);
@@ -622,6 +622,23 @@ State::do_export(const std::string& label,
                  size_t size) const
 {
   return _key_schedule.do_export(label, context, size);
+}
+
+PublicGroupState
+State::public_group_state() const
+{
+  auto pgs = PublicGroupState{
+    _suite,
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _transcript_hash.interim,
+    _extensions,
+    _key_schedule.external_priv.public_key,
+  };
+  pgs.extensions.add(RatchetTreeExtension{ _tree });
+  pgs.sign(_tree, _index, _identity_priv);
+  return pgs;
 }
 
 std::vector<KeyPackage>

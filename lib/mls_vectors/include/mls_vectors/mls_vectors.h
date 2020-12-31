@@ -198,6 +198,7 @@ struct MessagesTestVector
   };
 
   Message key_package;
+  Message lifetime;
   Message capabilities;
   Message ratchet_tree;
 

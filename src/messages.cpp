@@ -9,6 +9,72 @@ namespace mls {
 
 const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
 
+// PublicGroupState
+
+PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
+                                   bytes group_id_in,
+                                   epoch_t epoch_in,
+                                   bytes tree_hash_in,
+                                   bytes interim_transcript_hash_in,
+                                   ExtensionList extensions_in,
+                                   HPKEPublicKey external_pub_in)
+  : cipher_suite(cipher_suite_in)
+  , group_id(group_id_in)
+  , epoch(epoch_in)
+  , tree_hash(tree_hash_in)
+  , interim_transcript_hash(interim_transcript_hash_in)
+  , extensions(extensions_in)
+  , external_pub(external_pub_in)
+{}
+
+bytes
+PublicGroupState::to_be_signed() const
+{
+  tls::ostream w;
+  w << cipher_suite;
+  tls::vector<1>::encode(w, group_id);
+  w << epoch;
+  tls::vector<1>::encode(w, tree_hash);
+  tls::vector<1>::encode(w, interim_transcript_hash);
+  w << extensions << external_pub << signer_index;
+  return w.bytes();
+}
+
+void
+PublicGroupState::sign(const TreeKEMPublicKey& tree,
+                       LeafIndex index,
+                       const SignaturePrivateKey& priv)
+{
+  auto maybe_kp = tree.key_package(index);
+  if (!maybe_kp) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = opt::get(maybe_kp).credential;
+  if (cred.public_key() != priv.public_key) {
+    throw InvalidParameterError("Bad key for index");
+  }
+
+  signer_index = index;
+  signature = priv.sign(tree.suite, to_be_signed());
+}
+
+bool
+PublicGroupState::verify(const TreeKEMPublicKey& tree) const
+{
+  if (tree.suite != cipher_suite) {
+    throw InvalidParameterError("Cipher suite mismatch");
+  }
+
+  auto maybe_kp = tree.key_package(signer_index);
+  if (!maybe_kp) {
+    throw InvalidParameterError("Cannot sign from a blank leaf");
+  }
+
+  auto cred = opt::get(maybe_kp).credential;
+  return cred.public_key().verify(cipher_suite, to_be_signed(), signature);
+}
+
 // GroupInfo
 
 GroupInfo::GroupInfo(bytes group_id_in,
@@ -104,7 +170,7 @@ Welcome::find(const KeyPackage& kp) const
 void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _joiner_secret, std::nullopt };
+  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, std::nullopt };
   if (path_secret) {
     gs.path_secret = { opt::get(path_secret) };
   }

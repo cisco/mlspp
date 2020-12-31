@@ -26,6 +26,54 @@ struct MAC
   TLS_TRAITS(tls::vector<1>)
 };
 
+///
+/// PSKs
+///
+enum struct PSKType : uint8_t
+{
+  reserved = 0,
+  external = 1,
+  reinit = 2,
+  branch = 3,
+};
+
+struct ExternalPSK
+{
+  bytes psk_id;
+  TLS_SERIALIZABLE(psk_id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+struct ReInitPSK
+{
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct BranchPSK
+{
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct PreSharedKeyID
+{
+  var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
+  TLS_SERIALIZABLE(content)
+  TLS_TRAITS(tls::variant<PSKType>)
+};
+
+struct PreSharedKeys
+{
+  std::vector<PreSharedKeyID> psks;
+  TLS_SERIALIZABLE(psks)
+  TLS_TRAITS(tls::vector<2>)
+};
+
 // struct {
 //     CipherSuite cipher_suite;
 //     opaque group_id<0..255>;
@@ -46,8 +94,21 @@ struct PublicGroupState
   bytes interim_transcript_hash;
   ExtensionList extensions;
   HPKEPublicKey external_pub;
-  uint32_t signer_index;
+  LeafIndex signer_index;
   bytes signature;
+
+  PublicGroupState() = default;
+  PublicGroupState(CipherSuite cipher_suite_in,
+                   bytes group_id_in,
+                   epoch_t epoch_in,
+                   bytes tree_hash_in,
+                   bytes interim_transcript_hash_in,
+                   ExtensionList extensions_in,
+                   HPKEPublicKey external_pub_in);
+
+  bytes to_be_signed() const;
+  void sign(const TreeKEMPublicKey& tree, LeafIndex index, const SignaturePrivateKey& priv);
+  bool verify(const TreeKEMPublicKey& tree) const;
 
   TLS_SERIALIZABLE(cipher_suite,
                    group_id,
@@ -142,6 +203,7 @@ struct GroupSecrets
 
   bytes joiner_secret;
   std::optional<PathSecret> path_secret;
+  std::optional<PreSharedKeys> psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret)
   TLS_TRAITS(tls::vector<1>, tls::pass)
@@ -219,44 +281,6 @@ struct Remove
 };
 
 // PreSharedKey
-enum struct PSKType : uint8_t
-{
-  reserved = 0,
-  external = 1,
-  reinit = 2,
-  branch = 3,
-};
-
-struct ExternalPSK
-{
-  bytes psk_id;
-  TLS_SERIALIZABLE(psk_id)
-  TLS_TRAITS(tls::vector<1>)
-};
-
-struct ReInitPSK
-{
-  bytes group_id;
-  epoch_t psk_epoch;
-  TLS_SERIALIZABLE(group_id, psk_epoch)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
-};
-
-struct BranchPSK
-{
-  bytes group_id;
-  epoch_t psk_epoch;
-  TLS_SERIALIZABLE(group_id, psk_epoch)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
-};
-
-struct PreSharedKeyID
-{
-  var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
-  TLS_SERIALIZABLE(content)
-  TLS_TRAITS(tls::variant<PSKType>)
-};
-
 struct PreSharedKey
 {
   PreSharedKeyID psk;
