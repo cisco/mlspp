@@ -125,15 +125,15 @@ TreeMathTestVector::verify() const
 }
 
 ///
-/// EncryptionKeyTestVector
+/// EncryptionTestVector
 ///
 
-EncryptionKeyTestVector
-EncryptionKeyTestVector::create(CipherSuite suite,
+EncryptionTestVector
+EncryptionTestVector::create(CipherSuite suite,
                                 uint32_t n_leaves,
                                 uint32_t n_generations)
 {
-  auto tv = EncryptionKeyTestVector{};
+  auto tv = EncryptionTestVector{};
   tv.suite = suite;
   tv.encryption_secret = { random_bytes(suite.secret_size()) };
 
@@ -183,7 +183,7 @@ EncryptionKeyTestVector::create(CipherSuite suite,
 }
 
 std::optional<std::string>
-EncryptionKeyTestVector::verify() const
+EncryptionTestVector::verify() const
 {
   if (handshake_keys.size() != application_keys.size()) {
     return "Malformed test vector";
@@ -584,8 +584,8 @@ MessagesTestVector::create()
 
   // Commit
   auto commit = Commit{ {
-                          ProposalID{ opaque }, ProposalID{ opaque },
-                          // TODO inline some proposals
+                          { ProposalRef { opaque } },
+                          { Proposal { add } },
                         },
                         UpdatePath{
                           key_package,

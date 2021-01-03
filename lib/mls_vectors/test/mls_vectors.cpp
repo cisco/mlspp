@@ -31,7 +31,7 @@ TEST_CASE("Tree Math")
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = EncryptionKeyTestVector::create(suite, 15, 10);
+    const auto tv_in = EncryptionTestVector::create(suite, 15, 10);
     const auto tv_out = tls_round_trip(tv_in);
     REQUIRE(tv_out.verify() == std::nullopt);
   }
