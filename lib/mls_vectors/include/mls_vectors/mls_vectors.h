@@ -38,7 +38,7 @@ struct CryptoValue
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct EncryptionKeyTestVector
+struct EncryptionTestVector
 {
   struct KeyAndNonce
   {
@@ -57,29 +57,30 @@ struct EncryptionKeyTestVector
 
   mls::CipherSuite suite;
   CryptoValue encryption_secret;
+  CryptoValue sender_data_secret;
+
   std::vector<HashRatchetSequence> handshake_keys;
   std::vector<HashRatchetSequence> application_keys;
 
-  CryptoValue sender_data_secret;
   mls::MLSCiphertext handshake_message;
   mls::MLSCiphertext application_message;
 
   TLS_SERIALIZABLE(suite,
                    encryption_secret,
+                   sender_data_secret,
                    handshake_keys,
                    application_keys,
-                   sender_data_secret,
                    handshake_message,
                    application_message)
   TLS_TRAITS(tls::pass,
              tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
              tls::pass,
+             tls::vector<4>,
+             tls::vector<4>,
              tls::pass,
              tls::pass)
 
-  static EncryptionKeyTestVector create(mls::CipherSuite suite,
+  static EncryptionTestVector create(mls::CipherSuite suite,
                                         uint32_t n_leaves,
                                         uint32_t n_generations);
   std::optional<std::string> verify() const;
@@ -91,6 +92,7 @@ struct KeyScheduleTestVector
   {
     mls::MLSPlaintext commit;
     CryptoValue tree_hash;
+
     CryptoValue commit_secret;
     CryptoValue psk_secret;
 
@@ -198,8 +200,8 @@ struct MessagesTestVector
   };
 
   Message key_package;
-  Message lifetime;
   Message capabilities;
+  Message lifetime;
   Message ratchet_tree;
 
   Message group_info;
@@ -225,6 +227,7 @@ struct MessagesTestVector
 
   TLS_SERIALIZABLE(key_package,
                    capabilities,
+                   lifetime,
                    ratchet_tree,
                    group_info,
                    group_secrets,
