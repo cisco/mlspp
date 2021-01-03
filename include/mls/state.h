@@ -68,13 +68,19 @@ public:
   /// Message factories
   ///
 
+  Proposal add_proposal(const KeyPackage& key_package) const;
+  Proposal update_proposal(const bytes& leaf_secret);
+  Proposal remove_proposal(RosterIndex index) const;
+  Proposal remove_proposal(LeafIndex removed) const;
+
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
   MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
-    const bytes& leaf_secret) const;
+    const bytes& leaf_secret,
+    const std::vector<Proposal>& extra_proposals) const;
 
   ///
   /// Generic handshake message handler
@@ -129,7 +135,13 @@ protected:
   SignaturePrivateKey _identity_priv;
 
   // Cache of Proposals and update secrets
-  std::list<MLSPlaintext> _pending_proposals;
+  struct CachedProposal
+  {
+    bytes ref;
+    Proposal proposal;
+    LeafIndex sender;
+  };
+  std::list<CachedProposal> _pending_proposals;
   std::map<bytes, bytes> _update_secrets;
 
   // Assemble a group context for this state
@@ -149,15 +161,18 @@ protected:
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
-  std::vector<LeafIndex> apply(const std::vector<MLSPlaintext>& pts,
+  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                ProposalType required_type);
-  std::tuple<bool, bool, std::vector<LeafIndex>> apply(const Commit& commit);
-
-  // Compute a proposal ID
-  ProposalID proposal_id(const MLSPlaintext& pt) const;
+  std::tuple<bool, bool, std::vector<LeafIndex>> apply(
+    const std::vector<CachedProposal>& proposals);
 
   // Extract a proposal from the cache
-  std::optional<MLSPlaintext> find_proposal(const ProposalID& id);
+  void cache_proposal(const MLSPlaintext& pt);
+  std::optional<CachedProposal> resolve(const ProposalOrRef& id,
+                                        LeafIndex sender_index) const;
+  std::vector<CachedProposal> must_resolve(
+    const std::vector<ProposalOrRef>& ids,
+    LeafIndex sender_index) const;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
@@ -167,6 +182,8 @@ protected:
   void update_epoch_secrets(const bytes& commit_secret);
 
   // Signature verification over a handshake message
+  bool verify_internal(const MLSPlaintext& pt) const;
+  bool verify_external_commit(const MLSPlaintext& pt) const;
   bool verify(const MLSPlaintext& pt) const;
 
   // Verification of the confirmation MAC
@@ -174,6 +191,9 @@ protected:
 
   // Convert a Roster entry into LeafIndex
   LeafIndex leaf_for_roster_entry(RosterIndex index) const;
+
+  // Create a draft successor state
+  State successor() const;
 };
 
 } // namespace mls

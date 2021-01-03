@@ -348,20 +348,35 @@ struct Proposal
   TLS_TRAITS(tls::variant<ProposalType>)
 };
 
-struct ProposalID
+struct ProposalRef
 {
   bytes id;
   TLS_SERIALIZABLE(id)
   TLS_TRAITS(tls::vector<1>)
 };
 
+enum struct ProposalOrRefType : uint8_t
+{
+  reserved = 0,
+  value = 1,
+  reference = 2,
+};
+
+struct ProposalOrRef
+{
+  var::variant<Proposal, ProposalRef> content;
+
+  TLS_SERIALIZABLE(content)
+  TLS_TRAITS(tls::variant<ProposalOrRefType>)
+};
+
 // struct {
-//     ProposalID proposals<0..2^32-1>;
+//     ProposalOrRef proposals<0..2^32-1>;
 //     optional<UpdatePath> path;
 // } Commit;
 struct Commit
 {
-  std::vector<ProposalID> proposals;
+  std::vector<ProposalOrRef> proposals;
   std::optional<UpdatePath> path;
 
   TLS_SERIALIZABLE(proposals, path)
@@ -529,6 +544,9 @@ using namespace mls;
 TLS_VARIANT_MAP(PSKType, ExternalPSK, external)
 TLS_VARIANT_MAP(PSKType, ReInitPSK, reinit)
 TLS_VARIANT_MAP(PSKType, BranchPSK, branch)
+
+TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value)
+TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference)
 
 TLS_VARIANT_MAP(ProposalType, Add, add)
 TLS_VARIANT_MAP(ProposalType, Update, update)
