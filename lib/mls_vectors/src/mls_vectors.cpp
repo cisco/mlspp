@@ -645,9 +645,6 @@ MessagesTestVector::create()
 std::optional<std::string>
 MessagesTestVector::verify() const
 {
-  auto dummy_ciphersuite =
-    CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
-
   VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package.data);
   VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities.data);
   VERIFY_TLS_RTT("Lifetime", LifetimeExtension, lifetime.data);
