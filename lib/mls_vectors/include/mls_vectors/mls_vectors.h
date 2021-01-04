@@ -81,8 +81,8 @@ struct EncryptionTestVector
              tls::pass)
 
   static EncryptionTestVector create(mls::CipherSuite suite,
-                                        uint32_t n_leaves,
-                                        uint32_t n_generations);
+                                     uint32_t n_leaves,
+                                     uint32_t n_generations);
   std::optional<std::string> verify() const;
 };
 
@@ -229,10 +229,13 @@ struct MessagesTestVector
                    capabilities,
                    lifetime,
                    ratchet_tree,
+
                    group_info,
                    group_secrets,
                    welcome,
+
                    public_group_state,
+
                    add_proposal,
                    update_proposal,
                    remove_proposal,
@@ -240,7 +243,12 @@ struct MessagesTestVector
                    re_init_proposal,
                    external_init_proposal,
                    app_ack_proposal,
+
                    commit,
+
+                   mls_plaintext_application,
+                   mls_plaintext_proposal,
+                   mls_plaintext_commit,
                    mls_ciphertext)
 
   static MessagesTestVector create();

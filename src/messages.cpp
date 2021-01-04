@@ -19,12 +19,12 @@ PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
                                    ExtensionList extensions_in,
                                    HPKEPublicKey external_pub_in)
   : cipher_suite(cipher_suite_in)
-  , group_id(group_id_in)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , tree_hash(tree_hash_in)
-  , interim_transcript_hash(interim_transcript_hash_in)
-  , extensions(extensions_in)
-  , external_pub(external_pub_in)
+  , tree_hash(std::move(tree_hash_in))
+  , interim_transcript_hash(std::move(interim_transcript_hash_in))
+  , extensions(std::move(extensions_in))
+  , external_pub(std::move(external_pub_in))
 {}
 
 bytes

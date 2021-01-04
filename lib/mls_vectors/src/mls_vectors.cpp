@@ -11,40 +11,43 @@ using namespace mls;
 /// Assertions for verifying test vectors
 ///
 
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const NodeIndex& obj)
 {
   return str << obj.val;
 }
 
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const bytes& obj)
 {
   return str << to_hex(obj);
 }
 
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const HPKEPublicKey& obj)
 {
   return str << to_hex(tls::marshal(obj));
 }
 
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
 {
   return str << "[TreeKEMPublicKey]";
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY(label, test)                                                    \
   if (!(test)) {                                                               \
     return std::string(label);                                                 \
   }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY_EQUAL(label, actual, expected)                                  \
   if (auto err = verify_equal(label, actual, expected)) {                      \
     return err;                                                                \
   }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY_TLS_RTT(label, Type, expected)                                  \
   if (auto err = verify_round_trip<Type>(label, expected)) {                   \
     return err;                                                                \
@@ -52,7 +55,7 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
 
 template<typename T>
 static std::optional<std::string>
-verify_equal(std::string label, const T& actual, const T& expected)
+verify_equal(const std::string& label, const T& actual, const T& expected)
 {
   if (actual == expected) {
     return std::nullopt;
@@ -65,7 +68,7 @@ verify_equal(std::string label, const T& actual, const T& expected)
 
 template<typename T>
 static std::optional<std::string>
-verify_round_trip(std::string label, const bytes& expected)
+verify_round_trip(const std::string& label, const bytes& expected)
 {
   auto obj = tls::get<T>(expected);
   auto actual = tls::marshal(obj);
@@ -130,8 +133,8 @@ TreeMathTestVector::verify() const
 
 EncryptionTestVector
 EncryptionTestVector::create(CipherSuite suite,
-                                uint32_t n_leaves,
-                                uint32_t n_generations)
+                             uint32_t n_leaves,
+                             uint32_t n_generations)
 {
   auto tv = EncryptionTestVector{};
   tv.suite = suite;
@@ -306,9 +309,7 @@ KeyScheduleTestVector::verify() const
   auto epoch = KeyScheduleEpoch(suite, ctx, initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
-  for (size_t i = 0; i < epochs.size(); i++) {
-    const auto& tve = epochs[i];
-
+  for (const auto& tve : epochs) {
     // Verify the membership tag on the commit
     auto actual_membership_tag =
       epoch.membership_tag(group_context, tve.commit);
@@ -318,7 +319,7 @@ KeyScheduleTestVector::verify() const
       "membership tag", actual_membership_tag, expected_membership_tag);
 
     // Update the transcript hash with the commit
-    transcript_hash.update(epochs[i].commit);
+    transcript_hash.update(tve.commit);
     VERIFY_EQUAL("confirmed transcript hash",
                  transcript_hash.confirmed,
                  tve.confirmed_transcript_hash.data);
@@ -328,7 +329,7 @@ KeyScheduleTestVector::verify() const
 
     // Ratchet forward the key schedule
     group_context.epoch += 1;
-    group_context.tree_hash = epochs[i].tree_hash.data;
+    group_context.tree_hash = tve.tree_hash.data;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("context", ctx, tve.group_context.data);
@@ -584,8 +585,8 @@ MessagesTestVector::create()
 
   // Commit
   auto commit = Commit{ {
-                          { ProposalRef { opaque } },
-                          { Proposal { add } },
+                          { ProposalRef{ opaque } },
+                          { Proposal{ add } },
                         },
                         UpdatePath{
                           key_package,
@@ -614,8 +615,8 @@ MessagesTestVector::create()
 
   return MessagesTestVector{
     { tls::marshal(key_package) },
-    { tls::marshal(lifetime) },
     { tls::marshal(capabilities) },
+    { tls::marshal(lifetime) },
     { tls::marshal(ratchet_tree) },
 
     { tls::marshal(group_info) },
@@ -644,8 +645,8 @@ MessagesTestVector::create()
 std::optional<std::string>
 MessagesTestVector::verify() const
 {
-#if 0
-  auto dummy_ciphersuite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+  auto dummy_ciphersuite =
+    CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
 
   VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package.data);
   VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities.data);
@@ -668,11 +669,13 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("Commit", Commit, commit.data);
 
-  VERIFY_TLS_RTT("MLSPlaintext/App", MLSPlaintext, mls_plaintext_application.data);
-  VERIFY_TLS_RTT("MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal.data);
-  VERIFY_TLS_RTT("MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit.data);
+  VERIFY_TLS_RTT(
+    "MLSPlaintext/App", MLSPlaintext, mls_plaintext_application.data);
+  VERIFY_TLS_RTT(
+    "MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal.data);
+  VERIFY_TLS_RTT(
+    "MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit.data);
   VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext.data);
-#endif // 0
 
   return std::nullopt;
 }

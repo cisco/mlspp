@@ -69,7 +69,7 @@ struct GroupKeySource
                         const bytes& sender_data_secret,
                         const MLSPlaintext& pt);
   MLSPlaintext decrypt(const bytes& sender_data_secret,
-                       const MLSCiphertext& pt);
+                       const MLSCiphertext& ct);
 
 private:
   CipherSuite suite;
@@ -138,7 +138,7 @@ public:
                   size_t size) const;
 
   static bytes welcome_secret(CipherSuite suite,
-                              const bytes& commit_secret,
+                              const bytes& joiner_secret,
                               const bytes& psk_secret);
   static KeyAndNonce sender_data_keys(CipherSuite suite,
                                       const bytes& sender_data_secret,
