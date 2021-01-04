@@ -26,7 +26,8 @@ find_package(gRPC CONFIG REQUIRED)
 find_package(gflags REQUIRED)
 
 # mlspp
-find_package(mlspp REQUIRED)
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+find_package(MLSPP REQUIRED)
 
 
 ###
@@ -80,4 +81,7 @@ add_custom_command(
 file(GLOB_RECURSE BIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_executable(${APP_NAME} ${BIN_SOURCES} ${PB_SRC} ${GRPC_SRC})
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(${APP_NAME} gflags gRPC::grpc++ protobuf::libprotobuf)
+target_link_libraries(${APP_NAME} 
+  gflags 
+  gRPC::grpc++ protobuf::libprotobuf 
+  MLSPP::mlspp MLSPP::mls_vectors MLSPP::tls_syntax)

@@ -8,7 +8,7 @@ all: ${BUILD_DIR}/${APP_NAME}
 ${BUILD_DIR}:
 	cmake -B${BUILD_DIR} .
 
-${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR}
+${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR} src/*.cpp
 	cmake --build ${BUILD_DIR} --target ${APP_NAME}
 
 run: ${BUILD_DIR}/${APP_NAME}
