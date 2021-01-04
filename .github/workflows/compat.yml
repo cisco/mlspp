@@ -25,5 +25,8 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
+    - name: submodules
+      run: git submodule update --init
+
     - name: build the library
       run: make
