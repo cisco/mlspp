@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.12)
 
+###
+### vcpkg toolchain
+### 
+set(CMAKE_TOOLCHAIN_FILE 
+  ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake
+  CACHE STRING "vcpkg toolchain file")
+
 project(mlspp
   VERSION 0.1
   LANGUAGES CXX
