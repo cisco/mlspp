@@ -33,6 +33,16 @@ string_to_bytes(const std::string& str) {
 
 class MLSClientImpl final : public MLSClient::Service
 {
+  // Map C++ exceptions to gRPC errors
+  Status catch_wrap(std::function<Status()>&& f) {
+    try {
+      return f();
+    } catch (const std::exception& e) {
+      return Status(StatusCode::INTERNAL, e.what());
+    }
+  }
+
+  // gRPC methods
   Status Name(ServerContext* /* context */,
               const NameRequest* /* request */,
               NameResponse* reply) override
@@ -56,31 +66,46 @@ class MLSClientImpl final : public MLSClient::Service
               const GenerateTestVectorRequest* request,
               GenerateTestVectorResponse* reply) override
   {
-    std::vector<uint8_t> tv_data;
-    switch (request->test_vector_type()) {
-      case TestVectorType::TREE_MATH: {
-          auto tv = mls_vectors::TreeMathTestVector::create(request->n_leaves());
-          tv_data = tls::marshal(tv);
-          break;
-      }
-
-      default:
-        return Status(StatusCode::INVALID_ARGUMENT, "Invalid test vector type");
-    }
-
-    reply->set_test_vector(bytes_to_string(tv_data));
-    return Status::OK;
+    return catch_wrap([=]() { return generate_test_vector(request, reply); });
   }
 
   Status VerifyTestVector(ServerContext* /* context */,
               const VerifyTestVectorRequest* request,
               VerifyTestVectorResponse* /* reply */) override
   {
+    return catch_wrap([=]() { return verify_test_vector(request); });
+  }
+
+  // Fallible method implementations, wrapped before being exposed to gRPC
+  Status verify_test_vector(const VerifyTestVectorRequest* request)
+  {
     auto tv_data = string_to_bytes(request->test_vector());
     auto error = std::optional<std::string>();
     switch (request->test_vector_type()) {
       case TestVectorType::TREE_MATH: {
           error = tls::get<mls_vectors::TreeMathTestVector>(tv_data).verify();
+          break;
+      }
+
+      case TestVectorType::ENCRYPTION: {
+          error = tls::get<mls_vectors::EncryptionTestVector>(tv_data).verify();
+          break;
+      }
+
+      case TestVectorType::KEY_SCHEDULE: {
+          error = tls::get<mls_vectors::KeyScheduleTestVector>(tv_data).verify();
+          break;
+      }
+
+      case TestVectorType::TREEKEM: {
+          auto tv = tls::get<mls_vectors::TreeKEMTestVector>(tv_data);
+          tv.initialize_trees();
+          error = tv.verify();
+          break;
+      }
+
+      case TestVectorType::MESSAGES: {
+          error = tls::get<mls_vectors::MessagesTestVector>(tv_data).verify();
           break;
       }
 
@@ -95,6 +120,51 @@ class MLSClientImpl final : public MLSClient::Service
     return Status::OK;
   }
 
+  Status generate_test_vector(const GenerateTestVectorRequest* request,
+              GenerateTestVectorResponse* reply)
+  {
+    std::vector<uint8_t> tv_data;
+    switch (request->test_vector_type()) {
+      case TestVectorType::TREE_MATH: {
+          auto tv = mls_vectors::TreeMathTestVector::create(request->n_leaves());
+          tv_data = tls::marshal(tv);
+          break;
+      }
+
+      case TestVectorType::ENCRYPTION: {
+          auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
+          auto tv = mls_vectors::EncryptionTestVector::create(suite, request->n_leaves(), request->n_generations());
+          tv_data = tls::marshal(tv);
+          break;
+      }
+
+      case TestVectorType::KEY_SCHEDULE: {
+          auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
+          auto tv = mls_vectors::KeyScheduleTestVector::create(suite, request->n_epochs());
+          tv_data = tls::marshal(tv);
+          break;
+      }
+
+      case TestVectorType::TREEKEM: {
+          auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
+          auto tv = mls_vectors::TreeKEMTestVector::create(suite, request->n_leaves());
+          tv_data = tls::marshal(tv);
+          break;
+      }
+
+      case TestVectorType::MESSAGES: {
+          auto tv = mls_vectors::MessagesTestVector::create();
+          tv_data = tls::marshal(tv);
+          break;
+      }
+
+      default:
+        return Status(StatusCode::INVALID_ARGUMENT, "Invalid test vector type");
+    }
+
+    reply->set_test_vector(bytes_to_string(tv_data));
+    return Status::OK;
+  }
 };
 
 DEFINE_uint64(port, 50051, "Port to listen on");

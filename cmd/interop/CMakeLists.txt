@@ -80,6 +80,7 @@ add_custom_command(
 ###
 file(GLOB_RECURSE BIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_executable(${APP_NAME} ${BIN_SOURCES} ${PB_SRC} ${GRPC_SRC})
+add_dependencies(${APP_NAME} mls-interop-extern)
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(${APP_NAME} 
   gflags 
