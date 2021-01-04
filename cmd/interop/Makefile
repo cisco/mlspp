@@ -15,7 +15,7 @@ run: ${BUILD_DIR}/${APP_NAME}
 	./${BUILD_DIR}/${APP_NAME} -port 50002
 
 format:
-	clang-format -i -style=Mozilla *.cpp
+	clang-format -i -style=Mozilla src/*.cpp
 
 clean: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target clean
