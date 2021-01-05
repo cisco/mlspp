@@ -96,6 +96,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  PublicGroupState public_group_state() const;
 
   // Ordered list of credentials from non-blank leaves
   std::vector<KeyPackage> roster() const;
@@ -122,12 +123,12 @@ protected:
   epoch_t _epoch;
   TreeKEMPublicKey _tree;
   TreeKEMPrivateKey _tree_priv;
-  bytes _confirmed_transcript_hash;
-  bytes _interim_transcript_hash;
+  TranscriptHash _transcript_hash;
   ExtensionList _extensions;
 
   // Shared secret state
-  KeyScheduleEpoch _keys;
+  KeyScheduleEpoch _key_schedule;
+  GroupKeySource _keys;
 
   // Per-participant state
   LeafIndex _index;

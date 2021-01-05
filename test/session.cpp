@@ -1,4 +1,3 @@
-#include "test_vectors.h"
 #include <doctest/doctest.h>
 #include <hpke/random.h>
 #include <mls/session.h>

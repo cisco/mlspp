@@ -26,6 +26,12 @@ tls_signature_scheme(hpke::Signature::ID id);
 
 /// Cipher suites
 
+struct KeyAndNonce
+{
+  bytes key;
+  bytes nonce;
+};
+
 struct CipherSuite
 {
   enum struct ID : uint16_t
@@ -43,7 +49,12 @@ struct CipherSuite
   CipherSuite(ID id_in);
 
   ID cipher_suite() const { return id; }
+
   size_t secret_size() const { return get().digest.hash_size; }
+  size_t key_size() const { return get().hpke.aead.key_size; }
+  size_t nonce_size() const { return get().hpke.aead.nonce_size; }
+
+  bytes zero() const { return bytes(secret_size(), 0); }
   const hpke::HPKE& hpke() const { return get().hpke; }
   const hpke::Digest& digest() const { return get().digest; }
   const hpke::Signature& sig() const { return get().sig; }

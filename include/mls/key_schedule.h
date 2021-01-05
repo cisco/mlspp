@@ -1,20 +1,12 @@
 #pragma once
 
-#include "mls/common.h"
-#include "mls/crypto.h"
-#include "mls/tree_math.h"
 #include <map>
+#include <mls/common.h>
+#include <mls/crypto.h>
+#include <mls/messages.h>
+#include <mls/tree_math.h>
 
 namespace mls {
-
-struct BaseKeySource;
-struct HashRatchet;
-
-struct KeyAndNonce
-{
-  bytes key;
-  bytes nonce;
-};
 
 struct HashRatchet
 {
@@ -43,7 +35,7 @@ struct SecretTree
 {
   SecretTree() = default;
   SecretTree(CipherSuite suite_in,
-             LeafCount group_size,
+             LeafCount group_size_in,
              bytes encryption_secret_in);
 
   bytes get(LeafIndex sender);
@@ -51,7 +43,7 @@ struct SecretTree
 private:
   CipherSuite suite;
   NodeIndex root;
-  NodeCount width;
+  LeafCount group_size;
   std::vector<bytes> secrets;
   size_t secret_size;
 };
@@ -73,6 +65,12 @@ struct GroupKeySource
   KeyAndNonce get(RatchetType type, LeafIndex sender, uint32_t generation);
   void erase(RatchetType type, LeafIndex sender, uint32_t generation);
 
+  MLSCiphertext encrypt(LeafIndex index,
+                        const bytes& sender_data_secret,
+                        const MLSPlaintext& pt);
+  MLSPlaintext decrypt(const bytes& sender_data_secret,
+                       const MLSCiphertext& ct);
+
 private:
   CipherSuite suite;
   SecretTree secret_tree;
@@ -85,14 +83,13 @@ private:
   static const std::array<RatchetType, 2> all_ratchet_types;
 };
 
-struct KeyScheduleEpoch;
-
 struct KeyScheduleEpoch
 {
+private:
   CipherSuite suite;
 
+public:
   bytes joiner_secret;
-  bytes member_secret;
   bytes epoch_secret;
 
   bytes sender_data_secret;
@@ -107,33 +104,65 @@ struct KeyScheduleEpoch
 
   HPKEPrivateKey external_priv;
 
-  GroupKeySource keys;
-
   KeyScheduleEpoch() = default;
 
-  // Generate an initial random epoch
-  KeyScheduleEpoch(CipherSuite suite);
-
-  // Generate an epoch based on the joiner secret
+  // Full initializer, used by joiner
   KeyScheduleEpoch(CipherSuite suite_in,
-                   bytes joiner_secret_in,
+                   const bytes& joiner_secret,
                    const bytes& psk_secret,
-                   const bytes& context,
-                   LeafCount size);
+                   const bytes& context);
+
+  // Initial epoch
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& init_secret,
+                   const bytes& context);
+
+  // Subsequent epochs
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& init_secret,
+                   const bytes& commit_secret,
+                   const bytes& psk_secret,
+                   const bytes& context);
 
   // Advance to the next epoch
   KeyScheduleEpoch next(const bytes& commit_secret,
                         const bytes& psk_secret,
-                        const bytes& context,
-                        LeafCount size) const;
+                        const bytes& context) const;
 
-  KeyAndNonce sender_data(const bytes& ciphertext) const;
+  GroupKeySource encryption_keys(LeafCount size) const;
+  bytes membership_tag(const GroupContext& context,
+                       const MLSPlaintext& pt) const;
+  bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
+  bytes do_export(const std::string& label,
+                  const bytes& context,
+                  size_t size) const;
 
-private:
-  void init_secrets(LeafCount size);
+  static bytes welcome_secret(CipherSuite suite,
+                              const bytes& joiner_secret,
+                              const bytes& psk_secret);
+  static KeyAndNonce sender_data_keys(CipherSuite suite,
+                                      const bytes& sender_data_secret,
+                                      const bytes& ciphertext);
 };
 
 bool
 operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs);
+
+struct TranscriptHash
+{
+  CipherSuite suite;
+  bytes confirmed;
+  bytes interim;
+
+  TranscriptHash(CipherSuite suite_in);
+
+  void update(const MLSPlaintext& pt);
+  void update_confirmed(const MLSPlaintext& pt);
+  void update_interim(const MAC& confirmation_tag);
+  void update_interim(const MLSPlaintext& pt);
+};
+
+bool
+operator==(const TranscriptHash& lhs, const TranscriptHash& rhs);
 
 } // namespace mls
