@@ -85,7 +85,7 @@ TEST_CASE("Signature Round-Trip")
   const std::vector<Signature::ID> ids{
     Signature::ID::P256_SHA256, Signature::ID::P384_SHA384,
     Signature::ID::P521_SHA512, Signature::ID::Ed25519,
-    Signature::ID::Ed448,
+    Signature::ID::Ed448,       Signature::ID::RSA_SHA256,
   };
 
   const auto data = from_hex("00010203");
@@ -93,7 +93,13 @@ TEST_CASE("Signature Round-Trip")
   for (const auto& id : ids) {
     const auto& sig = select_signature(id);
 
-    auto priv = sig.generate_key_pair();
+    auto priv = std::unique_ptr<Signature::PrivateKey>(nullptr);
+    if (id == Signature::ID::RSA_SHA256) {
+      priv = Signature::generate_rsa(2048);
+    } else {
+      priv = sig.generate_key_pair();
+    };
+
     auto pub = priv->public_key();
 
     auto signature = sig.sign(data, *priv);

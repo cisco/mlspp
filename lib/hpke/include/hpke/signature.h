@@ -16,6 +16,7 @@ struct Signature
     P521_SHA512,
     Ed25519,
     Ed448,
+    RSA_SHA256,
   };
 
   template<Signature::ID id>
@@ -51,6 +52,8 @@ struct Signature
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+  static std::unique_ptr<PrivateKey> generate_rsa(size_t bits);
 
 protected:
   Signature(ID id_in);
