@@ -218,7 +218,7 @@ struct RSASignature : public Signature
       throw openssl_error();
     }
 
-    static const size_t max_sig_size = 200;
+    static const size_t max_sig_size = 256;
     auto siglen = max_sig_size;
     bytes sig(siglen);
     if (1 != EVP_DigestSign(
