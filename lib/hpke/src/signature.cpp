@@ -119,7 +119,6 @@ struct RSASignature : public Signature
     ~PublicKey() override = default;
 
     typed_unique_ptr<EVP_PKEY> pkey;
-    size_t key_size;
   };
 
   struct PrivateKey : public Signature::PrivateKey
@@ -135,13 +134,10 @@ struct RSASignature : public Signature
       if (1 != EVP_PKEY_up_ref(pkey.get())) {
         throw openssl_error();
       }
-      auto pub_key = std::make_unique<PublicKey>(pkey.get());
-      pub_key->key_size = key_size;
-      return pub_key;
+      return std::make_unique<PublicKey>(pkey.get());
     }
 
     typed_unique_ptr<EVP_PKEY> pkey;
-    size_t key_size;
   };
 
   explicit RSASignature(Digest::ID digest)
@@ -181,9 +177,7 @@ struct RSASignature : public Signature
       throw openssl_error();
     }
 
-    auto priv_key = std::make_unique<PrivateKey>(pkey);
-    priv_key->key_size = (bits / 8);
-    return priv_key;
+    return std::make_unique<PrivateKey>(pkey);
   }
 
   // TODO(rlb): Implement derive() with sizes
