@@ -18,12 +18,6 @@ operator<<(std::ostream& str, const NodeIndex& obj)
 }
 
 static std::ostream&
-operator<<(std::ostream& str, const bytes& obj)
-{
-  return str << to_hex(obj);
-}
-
-static std::ostream&
 operator<<(std::ostream& str, const HPKEPublicKey& obj)
 {
   return str << to_hex(tls::marshal(obj));

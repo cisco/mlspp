@@ -41,6 +41,12 @@ from_hex(const std::string& hex)
   return out;
 }
 
+} // namespace bytes_ns
+
+namespace std {
+
+using namespace bytes_ns;
+
 bytes&
 operator+=(bytes& lhs, const bytes& rhs)
 {
@@ -85,4 +91,4 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(abbrev) << "...";
 }
 
-} // namespace bytes_ns
+} // namespace std

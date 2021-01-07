@@ -1,4 +1,5 @@
-#include "mls/crypto.h"
+#include <mls/crypto.h>
+#include <mls/log.h>
 
 #include <iostream>
 #include <string>
@@ -9,6 +10,9 @@ using hpke::HPKE;      // NOLINT(misc-unused-using-decls)
 using hpke::KDF;       // NOLINT(misc-unused-using-decls)
 using hpke::KEM;       // NOLINT(misc-unused-using-decls)
 using hpke::Signature; // NOLINT(misc-unused-using-decls)
+
+using mls::log::Log;
+static const char log_mod[] = "crypto";
 
 namespace mls {
 
@@ -139,14 +143,20 @@ CipherSuite::expand_with_label(const bytes& secret,
   auto mls_label = to_bytes(std::string("mls10 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
-  auto result = get().hpke.kdf.expand(secret, label_bytes, length);
+  auto derived = get().hpke.kdf.expand(secret, label_bytes, length);
 
-  return result;
+  Log::crypto(log_mod, "=== ExpandWithLabel ===");
+  Log::crypto(log_mod, "  secret ", secret);
+  Log::crypto(log_mod, "  label  ", to_hex(label_bytes));
+  Log::crypto(log_mod, "  length ", length);
+
+  return derived;
 }
 
 bytes
 CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
 {
+  Log::crypto(log_mod, "=== DeriveSecret ===");
   return expand_with_label(secret, label, {}, secret_size());
 }
 

@@ -23,31 +23,41 @@ struct Log
   template<typename... Ts>
   static void fatal(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->fatal(mod, print(vals...));
+    }
   }
 
   template<typename... Ts>
   static void error(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->error(mod, print(vals...));
+    }
   }
 
   template<typename... Ts>
   static void info(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->info(mod, print(vals...));
+    }
   }
 
   template<typename... Ts>
   static void warn(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->warn(mod, print(vals...));
+    }
   }
 
   template<typename... Ts>
   static void debug(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->debug(mod, print(vals...));
+    }
   }
 
 // TODO(rlb) Enable this value to be configured
@@ -56,7 +66,9 @@ struct Log
   template<typename... Ts>
   static void crypto(const std::string& mod, const Ts&... vals)
   {
+    if (sink) {
     sink->crypto(mod, print(vals...));
+    }
   }
 #else
   template<typename... Ts>
@@ -67,11 +79,27 @@ struct Log
 private:
   static std::shared_ptr<Sink> sink;
 
+  // XXX(RLB) C++17 parameter pack expansion (str << ... << vals) causes errors
+  // when used with custom operator<<, as for bytes.  So we define our own
+  // expansion routine here.
+  template<typename T>
+  static void concat(std::ostream& str, const T& val)
+  {
+    str << val;
+  }
+
+  template<typename T, typename... Ts>
+  static void concat(std::ostream& str, const T& val, const Ts&... more)
+  {
+    str << val;
+    concat(str, more...);
+  }
+
   template<typename... Ts>
   static std::string print(const Ts&... vals)
   {
     auto ss = std::stringstream();
-    (ss << ... << vals);
+    concat(ss, vals...);
     return ss.str();
   }
 };
