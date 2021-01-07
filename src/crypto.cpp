@@ -139,7 +139,9 @@ CipherSuite::expand_with_label(const bytes& secret,
   auto mls_label = to_bytes(std::string("mls10 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
-  return get().hpke.kdf.expand(secret, label_bytes, length);
+  auto result = get().hpke.kdf.expand(secret, label_bytes, length);
+
+  return result;
 }
 
 bytes
