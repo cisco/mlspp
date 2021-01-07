@@ -4,7 +4,6 @@
 #include "common.h"
 
 #include <vector>
-
 TEST_CASE("Signature Known-Answer")
 {
   struct KnownAnswerTest
@@ -101,8 +100,20 @@ TEST_CASE("Signature Round-Trip")
     };
 
     auto pub = priv->public_key();
-
     auto signature = sig.sign(data, *priv);
     CHECK(sig.verify(data, signature, *pub));
+
+    // serialize/deserialize private key
+    auto priv_enc = sig.serialize_private(*priv);
+    auto priv2 = sig.deserialize_private(priv_enc);
+    auto pub2 = priv->public_key();
+
+    auto signature2 = sig.sign(data, *priv2);
+    CHECK(sig.verify(data, signature2, *pub2));
+
+    // serialize/deserialize public key
+    auto pub_enc = sig.serialize(*pub);
+    auto pub3 = sig.deserialize(pub_enc);
+    CHECK(sig.verify(data, signature2, *pub3));
   }
 }

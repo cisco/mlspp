@@ -119,6 +119,7 @@ struct RSASignature : public Signature
     ~PublicKey() override = default;
 
     typed_unique_ptr<EVP_PKEY> pkey;
+    size_t key_size;
   };
 
   struct PrivateKey : public Signature::PrivateKey
@@ -134,10 +135,13 @@ struct RSASignature : public Signature
       if (1 != EVP_PKEY_up_ref(pkey.get())) {
         throw openssl_error();
       }
-      return std::make_unique<PublicKey>(pkey.get());
+      auto pub_key = std::make_unique<PublicKey>(pkey.get());
+      pub_key->key_size = key_size;
+      return pub_key;
     }
 
     typed_unique_ptr<EVP_PKEY> pkey;
+    size_t key_size;
   };
 
   explicit RSASignature(Digest::ID digest)
@@ -177,31 +181,58 @@ struct RSASignature : public Signature
       throw openssl_error();
     }
 
-    return std::make_unique<PrivateKey>(pkey);
+    auto priv_key = std::make_unique<PrivateKey>(pkey);
+    priv_key->key_size = (bits / 8);
+    return priv_key;
   }
 
   // TODO(rlb): Implement derive() with sizes
 
-  bytes serialize(const Signature::PublicKey& /*pk*/) const override
+  bytes serialize(const Signature::PublicKey& pk) const override
   {
-    return {}; // TODO(rlb)
+    const auto& rpk = dynamic_cast<const PublicKey&>(pk);
+    int len = i2d_PublicKey(rpk.pkey.get(), nullptr);
+    auto raw = bytes(len);
+    auto* data_ptr = raw.data();
+    if (len != i2d_PublicKey(rpk.pkey.get(), &data_ptr)) {
+      throw openssl_error();
+    }
+    return raw;
   }
 
   std::unique_ptr<Signature::PublicKey> deserialize(
-    const bytes& /*enc*/) const override
+    const bytes& enc) const override
   {
-    return nullptr; // TODO(rlb)
+    const auto* data_ptr = enc.data();
+    auto* pkey = d2i_PublicKey(EVP_PKEY_RSA, nullptr, &data_ptr, enc.size());
+    if (pkey == nullptr) {
+      throw openssl_error();
+    }
+    return std::make_unique<RSASignature::PublicKey>(pkey);
   }
 
-  bytes serialize_private(const Signature::PrivateKey& /*sk*/) const override
+  bytes serialize_private(const Signature::PrivateKey& sk) const override
   {
-    return {}; // TODO(rlb)
+    const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
+    int len = i2d_PrivateKey(rsk.pkey.get(), nullptr);
+    auto raw = bytes(len);
+    auto* data_ptr = raw.data();
+    if (len != i2d_PrivateKey(rsk.pkey.get(), &data_ptr)) {
+      throw openssl_error();
+    }
+
+    return raw;
   }
 
   std::unique_ptr<Signature::PrivateKey> deserialize_private(
-    const bytes& /*skm*/) const override
+    const bytes& skm) const override
   {
-    return nullptr; // TODO(rlb)
+    const auto* data_ptr = skm.data();
+    auto* pkey = d2i_PrivateKey(EVP_PKEY_RSA, nullptr, &data_ptr, skm.size());
+    if (pkey == nullptr) {
+      throw openssl_error();
+    }
+    return std::make_unique<RSASignature::PrivateKey>(pkey);
   }
 
   bytes sign(const bytes& data, const Signature::PrivateKey& sk) const override
@@ -241,8 +272,8 @@ struct RSASignature : public Signature
       throw openssl_error();
     }
 
-    if (1 != EVP_DigestVerifyInit(
-               ctx.get(), nullptr, md, nullptr, rpk.pkey.get())) {
+    if (1 !=
+        EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, rpk.pkey.get())) {
       throw openssl_error();
     }
 

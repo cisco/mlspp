@@ -19,6 +19,7 @@ enum struct SignatureScheme : uint16_t
   ecdsa_secp521r1_sha512 = 0x0603,
   ed25519 = 0x0807,
   ed448 = 0x0808,
+  rsa_pkcs1_sha256 = 0x0401,
 };
 
 SignatureScheme

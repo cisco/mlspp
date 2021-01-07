@@ -25,6 +25,8 @@ find_signature(Signature::ID id)
       return Signature::get<Signature::ID::Ed25519>();
     case Signature::ID::Ed448:
       return Signature::get<Signature::ID::Ed448>();
+    case Signature::ID::RSA_SHA256:
+      return Signature::get<Signature::ID::RSA_SHA256>();
   }
   throw InvalidParameterError("Unsupported algorithm");
 }

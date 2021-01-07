@@ -26,6 +26,8 @@ tls_signature_scheme(Signature::ID id)
       return SignatureScheme::ed25519;
     case Signature::ID::Ed448:
       return SignatureScheme::ed448;
+    case Signature::ID::RSA_SHA256:
+      return SignatureScheme::rsa_pkcs1_sha256;
   }
   throw InvalidParameterError("Unsupported algorithm");
 }
