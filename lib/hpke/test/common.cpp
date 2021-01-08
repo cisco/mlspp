@@ -20,6 +20,9 @@ select_signature(Signature::ID id)
     case Signature::ID::Ed448:
       return Signature::get<Signature::ID::Ed448>();
 
+    case Signature::ID::RSA_SHA256:
+      return Signature::get<Signature::ID::RSA_SHA256>();
+
     default:
       throw std::runtime_error("Unknown algorithm");
   }
