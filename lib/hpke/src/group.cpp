@@ -149,8 +149,8 @@ struct ECKeyGroup : public EVPGroup
     const bytes& ikm) const override
   {
     static const int retry_limit = 255;
-    static const auto label_dkp_prk = to_bytes("dkp_prk");
-    static const auto label_candidate = to_bytes("candidate");
+    static const auto label_dkp_prk = from_ascii("dkp_prk");
+    static const auto label_candidate = from_ascii("candidate");
 
     auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
 
@@ -317,8 +317,8 @@ struct RawKeyGroup : public EVPGroup
     const bytes& suite_id,
     const bytes& ikm) const override
   {
-    static const auto label_dkp_prk = to_bytes("dkp_prk");
-    static const auto label_sk = to_bytes("sk");
+    static const auto label_dkp_prk = from_ascii("dkp_prk");
+    static const auto label_sk = from_ascii("sk");
 
     auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
     auto skm = kdf.labeled_expand(suite_id, dkp_prk, label_sk, {}, sk_size);

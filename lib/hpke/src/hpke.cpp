@@ -1,6 +1,8 @@
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 
+#include <bytes/operators.h>
+
 #include "aead_cipher.h"
 #include "common.h"
 #include "dhkem.h"
@@ -19,70 +21,70 @@ namespace hpke {
 static const bytes&
 label_exp()
 {
-  static const bytes val = to_bytes("exp");
+  static const bytes val = from_ascii("exp");
   return val;
 }
 
 static const bytes&
 label_hpke()
 {
-  static const bytes val = to_bytes("HPKE");
+  static const bytes val = from_ascii("HPKE");
   return val;
 }
 
 static const bytes&
 label_hpke_05()
 {
-  static const bytes val = to_bytes("HPKE-05 ");
+  static const bytes val = from_ascii("HPKE-05 ");
   return val;
 }
 
 static const bytes&
 label_info_hash()
 {
-  static const bytes val = to_bytes("info_hash");
+  static const bytes val = from_ascii("info_hash");
   return val;
 }
 
 static const bytes&
 label_key()
 {
-  static const bytes val = to_bytes("key");
+  static const bytes val = from_ascii("key");
   return val;
 }
 
 static const bytes&
 label_nonce()
 {
-  static const bytes val = to_bytes("nonce");
+  static const bytes val = from_ascii("nonce");
   return val;
 }
 
 static const bytes&
 label_psk_hash()
 {
-  static const bytes val = to_bytes("psk_hash");
+  static const bytes val = from_ascii("psk_hash");
   return val;
 }
 
 static const bytes&
 label_psk_id_hash()
 {
-  static const bytes val = to_bytes("psk_id_hash");
+  static const bytes val = from_ascii("psk_id_hash");
   return val;
 }
 
 static const bytes&
 label_sec()
 {
-  static const bytes val = to_bytes("sec");
+  static const bytes val = from_ascii("sec");
   return val;
 }
 
 static const bytes&
 label_secret()
 {
-  static const bytes val = to_bytes("secret");
+  static const bytes val = from_ascii("secret");
   return val;
 }
 

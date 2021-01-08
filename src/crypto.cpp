@@ -140,13 +140,13 @@ CipherSuite::expand_with_label(const bytes& secret,
                                const bytes& context,
                                size_t length) const
 {
-  auto mls_label = to_bytes(std::string("mls10 ") + label);
+  auto mls_label = from_ascii(std::string("mls10 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
   auto derived = get().hpke.kdf.expand(secret, label_bytes, length);
 
   Log::crypto(log_mod, "=== ExpandWithLabel ===");
-  Log::crypto(log_mod, "  secret ", secret);
+  Log::crypto(log_mod, "  secret ", to_hex(secret));
   Log::crypto(log_mod, "  label  ", to_hex(label_bytes));
   Log::crypto(log_mod, "  length ", length);
 

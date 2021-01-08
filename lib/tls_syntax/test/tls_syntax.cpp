@@ -1,4 +1,5 @@
 #include <bytes/bytes.h>
+#include <bytes/operators.h>
 #include <doctest/doctest.h>
 #include <tls/tls_syntax.h>
 

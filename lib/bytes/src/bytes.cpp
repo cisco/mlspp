@@ -1,4 +1,5 @@
-#include "bytes/bytes.h"
+#include <bytes/bytes.h>
+#include <bytes/operators.h>
 
 #include <iomanip>
 #include <iostream>
@@ -8,7 +9,7 @@
 namespace bytes_ns {
 
 bytes
-to_bytes(const std::string& ascii)
+from_ascii(const std::string& ascii)
 {
   return bytes(ascii.begin(), ascii.end());
 }
@@ -42,8 +43,6 @@ from_hex(const std::string& hex)
 }
 
 } // namespace bytes_ns
-
-namespace std {
 
 using namespace bytes_ns;
 
@@ -90,5 +89,3 @@ operator<<(std::ostream& out, const bytes& data)
   bytes abbrev(data.begin(), data.begin() + threshold);
   return out << to_hex(abbrev) << "...";
 }
-
-} // namespace std

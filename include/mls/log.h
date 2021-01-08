@@ -24,7 +24,7 @@ struct Log
   static void fatal(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->fatal(mod, print(vals...));
+      sink->fatal(mod, print(vals...));
     }
   }
 
@@ -32,7 +32,7 @@ struct Log
   static void error(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->error(mod, print(vals...));
+      sink->error(mod, print(vals...));
     }
   }
 
@@ -40,7 +40,7 @@ struct Log
   static void info(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->info(mod, print(vals...));
+      sink->info(mod, print(vals...));
     }
   }
 
@@ -48,7 +48,7 @@ struct Log
   static void warn(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->warn(mod, print(vals...));
+      sink->warn(mod, print(vals...));
     }
   }
 
@@ -56,7 +56,7 @@ struct Log
   static void debug(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->debug(mod, print(vals...));
+      sink->debug(mod, print(vals...));
     }
   }
 
@@ -67,7 +67,7 @@ struct Log
   static void crypto(const std::string& mod, const Ts&... vals)
   {
     if (sink) {
-    sink->crypto(mod, print(vals...));
+      sink->crypto(mod, print(vals...));
     }
   }
 #else

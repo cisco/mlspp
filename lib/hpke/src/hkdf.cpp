@@ -6,6 +6,8 @@
 #include <openssl/hmac.h>
 #include <stdexcept>
 
+#include <bytes/operators.h>
+
 namespace hpke {
 
 template<>
