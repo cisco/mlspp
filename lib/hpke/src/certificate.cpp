@@ -154,8 +154,7 @@ struct Certificate::ParsedCertificate
 
   static Signature::ID signature_algorithm(X509* cert)
   {
-    auto sig = X509_get_signature_nid(cert);
-    switch (sig) {
+    switch (X509_get_signature_nid(cert)) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
@@ -199,9 +198,9 @@ signature_key(EVP_PKEY* pkey, Signature::ID sig_id)
 {
   if (sig_id == Signature::ID::RSA_SHA256) {
     return std::make_unique<RSASignature::PublicKey>(pkey);
-  } else {
-    return std::make_unique<EVPGroup::PublicKey>(pkey);
   }
+
+  return std::make_unique<EVPGroup::PublicKey>(pkey);
 }
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
