@@ -1,8 +1,9 @@
 #include "group.h"
 #include "openssl_common.h"
-#include <cstring>
+#include "rsa.h"
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
+#include <memory>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
@@ -153,7 +154,8 @@ struct Certificate::ParsedCertificate
 
   static Signature::ID signature_algorithm(X509* cert)
   {
-    switch (X509_get_signature_nid(cert)) {
+    auto sig = X509_get_signature_nid(cert);
+    switch (sig) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
@@ -164,6 +166,8 @@ struct Certificate::ParsedCertificate
         return Signature::ID::P384_SHA384;
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
+      case NID_sha256WithRSAEncryption:
+        return Signature::ID::RSA_SHA256;
       default:
         break;
     }
@@ -190,19 +194,28 @@ struct Certificate::ParsedCertificate
 /// Certificate
 ///
 
+static std::unique_ptr<Signature::PublicKey>
+signature_key(EVP_PKEY* pkey, Signature::ID sig_id)
+{
+  if (sig_id == Signature::ID::RSA_SHA256) {
+    return std::make_unique<RSASignature::PublicKey>(pkey);
+  } else {
+    return std::make_unique<EVPGroup::PublicKey>(pkey);
+  }
+}
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
   , public_key_algorithm(parsed_cert->sig_id)
-  , public_key(std::make_unique<EVPGroup::PublicKey>(
-      parsed_cert->public_key().release()))
+  , public_key(
+      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
   , public_key_algorithm(parsed_cert->sig_id)
-  , public_key(std::make_unique<EVPGroup::PublicKey>(
-      parsed_cert->public_key().release()))
+  , public_key(
+      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
   , raw(other.raw)
 {}
 

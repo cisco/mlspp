@@ -98,8 +98,7 @@ EVPGroup::sign(const bytes& data, const Group::PrivateKey& sk) const
     throw openssl_error();
   }
 
-  static const size_t max_sig_size = 200;
-  auto siglen = max_sig_size;
+  size_t siglen = EVP_PKEY_size(rsk.pkey.get());
   bytes sig(siglen);
   if (1 != EVP_DigestSign(
              ctx.get(), sig.data(), &siglen, data.data(), data.size())) {
