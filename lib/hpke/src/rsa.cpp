@@ -146,6 +146,7 @@ RSASignature::verify(const bytes& data,
 const EVP_MD*
 RSASignature::digest_to_md(Digest::ID digest)
 {
+  // NOLINTNEXTLINE(hicpp-multiway-paths-covered)
   switch (digest) {
     case Digest::ID::SHA256:
       return EVP_sha256();
@@ -157,6 +158,7 @@ RSASignature::digest_to_md(Digest::ID digest)
 Signature::ID
 RSASignature::digest_to_sig(Digest::ID digest)
 {
+  // NOLINTNEXTLINE(hicpp-multiway-paths-covered)
   switch (digest) {
     case Digest::ID::SHA256:
       return Signature::ID::RSA_SHA256;
