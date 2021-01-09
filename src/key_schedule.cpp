@@ -1,8 +1,6 @@
 #include <mls/key_schedule.h>
 #include <mls/log.h>
 
-#include <bytes/operators.h>
-
 using mls::log::Log;
 static const auto log_mod = "key_schedule"s;
 

@@ -1,5 +1,4 @@
 #include <bytes/bytes.h>
-#include <bytes/operators.h>
 
 #include <iomanip>
 #include <iostream>
@@ -42,9 +41,7 @@ from_hex(const std::string& hex)
   return out;
 }
 
-} // namespace bytes_ns
-
-using namespace bytes_ns;
+namespace operators {
 
 bytes&
 operator+=(bytes& lhs, const bytes& rhs)
@@ -89,3 +86,6 @@ operator<<(std::ostream& out, const bytes& data)
   bytes abbrev(data.begin(), data.begin() + threshold);
   return out << to_hex(abbrev) << "...";
 }
+
+} // namespace operators
+} // namespace bytes_ns

@@ -1,8 +1,6 @@
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 
-#include <bytes/operators.h>
-
 #include "aead_cipher.h"
 #include "common.h"
 #include "dhkem.h"
@@ -13,6 +11,8 @@
 #include <string>
 
 namespace hpke {
+
+using namespace bytes_ns::operators;
 
 ///
 /// Helper functions and constants

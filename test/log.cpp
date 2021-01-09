@@ -1,11 +1,13 @@
 #include <doctest/doctest.h>
 #include <mls/log.h>
 
+using namespace std::literals::string_literals;
 using namespace mls;
 using log::Log;
 
 enum struct Level
 {
+  invalid,
   fatal,
   error,
   info,
@@ -16,9 +18,9 @@ enum struct Level
 
 struct TestSink : public log::Sink
 {
-  Level last_level;
-  std::string last_mod;
-  std::string last_message;
+  Level last_level = Level::invalid;
+  std::string last_mod = "";
+  std::string last_message = "";
 
   ~TestSink() override = default;
 
@@ -29,6 +31,7 @@ struct TestSink : public log::Sink
     last_message = message;
   }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define TEST_SINK_METHOD(level)                                                \
   void level(const std::string& mod, const std::string& message) override      \
   {                                                                            \
@@ -45,10 +48,11 @@ struct TestSink : public log::Sink
 
 TEST_CASE("Logging")
 {
-  auto mod = "test";
+  const auto mod = "test"s;
   auto sink = std::make_shared<TestSink>();
   Log::set_sink(sink);
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define TEST_LOG_LEVEL(level)                                                  \
   {                                                                            \
     auto message = std::string(#level);                                        \

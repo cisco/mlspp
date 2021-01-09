@@ -3,8 +3,6 @@
 #include <mls/state.h>
 #include <mls/treekem.h>
 
-#include <bytes/operators.h>
-
 namespace mls {
 
 // Extensions

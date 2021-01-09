@@ -6,9 +6,9 @@
 #include <openssl/hmac.h>
 #include <stdexcept>
 
-#include <bytes/operators.h>
-
 namespace hpke {
+
+using namespace bytes_ns::operators;
 
 template<>
 const HKDF&
