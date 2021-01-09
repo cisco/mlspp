@@ -8,12 +8,12 @@ namespace log {
 struct Sink
 {
   virtual ~Sink() = default;
-  virtual void fatal(const std::string& mod, const std::string& message) = 0;
-  virtual void error(const std::string& mod, const std::string& message) = 0;
-  virtual void info(const std::string& mod, const std::string& message) = 0;
-  virtual void warn(const std::string& mod, const std::string& message) = 0;
-  virtual void debug(const std::string& mod, const std::string& message) = 0;
-  virtual void crypto(const std::string& mod, const std::string& message) = 0;
+  virtual void fatal(const std::string& /*mod*/, const std::string& /*msg*/) {}
+  virtual void error(const std::string& /*mod*/, const std::string& /*msg*/) {}
+  virtual void info(const std::string& /*mod*/, const std::string& /*msg*/) {}
+  virtual void warn(const std::string& /*mod*/, const std::string& /*msg*/) {}
+  virtual void debug(const std::string& /*mod*/, const std::string& /*msg*/) {}
+  virtual void crypto(const std::string& /*mod*/, const std::string& /*msg*/) {}
 };
 
 struct Log
