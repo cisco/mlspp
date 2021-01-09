@@ -17,7 +17,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      buildDir: '${{ github.workspace }}/build/'
+        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+
 
     steps:
     - uses: lukka/get-cmake@latest    
@@ -38,7 +39,9 @@ jobs:
 #        setupOnly: true
 #        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
 #        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-#        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
+#        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: build the library
-      run: make
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug .
