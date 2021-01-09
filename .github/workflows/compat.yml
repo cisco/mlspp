@@ -18,6 +18,7 @@ jobs:
     
     env:
         CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
     steps:
     - uses: lukka/get-cmake@latest    
@@ -32,15 +33,15 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-#    - name: Restore artifacts, or setup vcpkg (do not install any package)
-#      uses: lukka/run-vcpkg@v6
-#      with:
-#        setupOnly: true
-#        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-#        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-#        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+    - name: Restore artifacts, or setup vcpkg (do not install any package)
+      uses: lukka/run-vcpkg@v6
+      with:
+        setupOnly: true
+        vcpkgDirectory: '${{ env.VCPKG_ROOT }}'
+        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: build the library
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
