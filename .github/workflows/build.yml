@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
       fail-fast: false
     
     steps:
@@ -29,10 +29,13 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: submodules
-      run: git submodule update --init
+    - name: Run vcpkg
+      uses: lukka/run-vcpkg@v4
+      with:
+        vcpkgArguments: 'openssl doctest'
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
 
-    - name: configure to use clang-tidy
+    - name: configure to use clang-tidy        
       run: make tidy
 
     - name: build
