@@ -5,6 +5,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+#include <string>
+
+using namespace std::literals::string_literals;
 
 // Expose the bytes library globally
 #include <bytes/bytes.h>
