@@ -19,8 +19,8 @@ enum struct Level
 struct TestSink : public log::Sink
 {
   Level last_level = Level::invalid;
-  std::string last_mod = "";
-  std::string last_message = "";
+  std::string last_mod;
+  std::string last_message;
 
   ~TestSink() override = default;
 

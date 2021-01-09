@@ -1,5 +1,6 @@
 #include <sstream>
 #include <string>
+#include <memory>
 
 namespace mls {
 namespace log {
@@ -17,6 +18,18 @@ struct Sink
 
 struct Log
 {
+private:
+  static std::shared_ptr<Sink> sink;
+
+  template<typename... Ts>
+  static std::string print(const Ts&... vals)
+  {
+    auto ss = std::stringstream();
+    (ss << ... << vals);
+    return ss.str();
+  }
+
+public:
   static void set_sink(std::shared_ptr<Sink> sink_in);
   static void remove_sink();
 
@@ -75,33 +88,6 @@ struct Log
   static void crypto(const std::string& /*mod*/, const Ts&... /*vals*/)
   {}
 #endif
-
-private:
-  static std::shared_ptr<Sink> sink;
-
-  // XXX(RLB) C++17 parameter pack expansion (str << ... << vals) causes errors
-  // when used with custom operator<<, as for bytes.  So we define our own
-  // expansion routine here.
-  template<typename T>
-  static void concat(std::ostream& str, const T& val)
-  {
-    str << val;
-  }
-
-  template<typename T, typename... Ts>
-  static void concat(std::ostream& str, const T& val, const Ts&... more)
-  {
-    str << val;
-    concat(str, more...);
-  }
-
-  template<typename... Ts>
-  static std::string print(const Ts&... vals)
-  {
-    auto ss = std::stringstream();
-    concat(ss, vals...);
-    return ss.str();
-  }
 };
 
 } // namespace log
