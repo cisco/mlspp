@@ -1,3 +1,0 @@
-repository='https://github.com/mpark/variant.git'
-module=''
-tag='origin'

@@ -20,9 +20,7 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
      
     env:
-      CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-      TEST_DIR: ${{ github.workspace }}/build/test
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      buildDir: '${{ github.workspace }}/build/'
 
     steps:
     - uses: lukka/get-cmake@latest    
@@ -44,31 +42,14 @@ jobs:
         setupOnly: true
         vcpkgDirectory: '${{ github.workspace }}/vcpkg'
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
+      run: make tidy
 
     - name: build
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+      run: make everything
 
-    - name: hpke tests
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target hpke_test
-        cd build/lib/hpke/test/ && ctest
+    - name: run tests
+      run: make test-all
 
-    - name: tls_syntax tests
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target tls_syntax_test
-        cd build/lib/tls_syntax/test/ && ctest
-
-    - name: mls_vectors tests
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mls_vectors_test
-        cd build/lib/mls_vectors/test/ && ctest
-        
-    - name: tests
-      run: |
-        cd "${{ env.TEST_DIR }}" && ctest

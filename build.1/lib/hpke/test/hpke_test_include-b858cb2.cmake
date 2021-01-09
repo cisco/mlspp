@@ -1,5 +1,0 @@
-if(EXISTS "D:/work/github/mlspp/build/lib/hpke/test/hpke_test_tests-b858cb2.cmake")
-  include("D:/work/github/mlspp/build/lib/hpke/test/hpke_test_tests-b858cb2.cmake")
-else()
-  add_test(hpke_test_NOT_BUILT-b858cb2 hpke_test_NOT_BUILT-b858cb2)
-endif()
