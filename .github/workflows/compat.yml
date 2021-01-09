@@ -16,8 +16,15 @@ jobs:
   build:
     runs-on: macos-latest
     
+    env:
+      buildDir: '${{ github.workspace }}/build/'
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: lukka/get-cmake@latest    
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
     
     - name: dependencies
       run: |
@@ -25,8 +32,13 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: submodules
-      run: git submodule update --init
+    - name: Restore artifacts, or setup vcpkg (do not install any package)
+      uses: lukka/run-vcpkg@v6
+      with:
+        setupOnly: true
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
 
     - name: build the library
       run: make

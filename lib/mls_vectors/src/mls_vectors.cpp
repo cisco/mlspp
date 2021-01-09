@@ -256,8 +256,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
     group_context.epoch += 1;
     group_context.tree_hash = tree_hash;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
-    auto ctx = tls::marshal(group_context);
-    auto next_epoch = epoch.next(commit_secret, psk_secret, ctx);
+    auto epoch_ctx = tls::marshal(group_context);
+    auto next_epoch = epoch.next(commit_secret, psk_secret, epoch_ctx);
 
     commit.confirmation_tag = { next_epoch.confirmation_tag(
       transcript_hash.confirmed) };
@@ -331,10 +331,10 @@ KeyScheduleTestVector::verify() const
     group_context.epoch += 1;
     group_context.tree_hash = tve.tree_hash.data;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
-    auto ctx = tls::marshal(group_context);
-    VERIFY_EQUAL("context", ctx, tve.group_context.data);
+    auto epoch_ctx = tls::marshal(group_context);
+    VERIFY_EQUAL("context", epoch_ctx, tve.group_context.data);
 
-    epoch = epoch.next(tve.commit_secret.data, tve.psk_secret.data, ctx);
+    epoch = epoch.next(tve.commit_secret.data, tve.psk_secret.data, epoch_ctx);
 
     // Verify the confirmation tag on the Commit
     auto actual_confirmation_tag =
@@ -407,8 +407,8 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   if (n_leaves > 4) {
     // Make things more interesting if we have space
     my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
-    tv.add_sender.val = (n_leaves / 2) - 2;
-    tv.update_sender.val = n_leaves - 2;
+    tv.add_sender.val = static_cast<uint32_t>(n_leaves / 2) - 2;
+    tv.update_sender.val = static_cast<uint32_t>(n_leaves) - 2;
   }
 
   // Construct a full ratchet tree with the required number of leaves

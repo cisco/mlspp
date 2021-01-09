@@ -146,9 +146,9 @@ SecretTree::get(LeafIndex sender)
 
   // Derive down
   for (; curr > 0; --curr) {
-    auto node = dirpath[curr];
-    auto left = tree_math::left(node);
-    auto right = tree_math::right(node, group_size);
+    auto curr_node = dirpath[curr];
+    auto left = tree_math::left(curr_node);
+    auto right = tree_math::right(curr_node, group_size);
 
     auto& secret = secrets[node.val];
     secrets[left.val] =
