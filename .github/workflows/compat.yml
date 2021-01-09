@@ -32,13 +32,13 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v6
-      with:
-        setupOnly: true
-        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
+#    - name: Restore artifacts, or setup vcpkg (do not install any package)
+#      uses: lukka/run-vcpkg@v6
+#      with:
+#        setupOnly: true
+#        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+#        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+#        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
 
     - name: build the library
       run: make
