@@ -15,13 +15,20 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-      fail-fast: false
-    
+     
+    env:
+      buildDir: '${{ github.workspace }}/build/'
+
     steps:
+    - uses: lukka/get-cmake@latest    
+
     - uses: actions/checkout@v1
-    
+      with:
+        submodules: true
+
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
@@ -29,11 +36,13 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Run vcpkg
-      uses: lukka/run-vcpkg@v4
+    - name: Restore artifacts, or setup vcpkg (do not install any package)
+      uses: lukka/run-vcpkg@v6
       with:
-        vcpkgArguments: 'openssl doctest'
+        setupOnly: true
         vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
       run: make tidy
