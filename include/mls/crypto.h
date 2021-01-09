@@ -19,12 +19,19 @@ enum struct SignatureScheme : uint16_t
   ecdsa_secp521r1_sha512 = 0x0603,
   ed25519 = 0x0807,
   ed448 = 0x0808,
+  rsa_pkcs1_sha256 = 0x0401,
 };
 
 SignatureScheme
 tls_signature_scheme(hpke::Signature::ID id);
 
 /// Cipher suites
+
+struct KeyAndNonce
+{
+  bytes key;
+  bytes nonce;
+};
 
 struct CipherSuite
 {
@@ -43,7 +50,12 @@ struct CipherSuite
   CipherSuite(ID id_in);
 
   ID cipher_suite() const { return id; }
+
   size_t secret_size() const { return get().digest.hash_size; }
+  size_t key_size() const { return get().hpke.aead.key_size; }
+  size_t nonce_size() const { return get().hpke.aead.nonce_size; }
+
+  bytes zero() const { return bytes(secret_size(), 0); }
   const hpke::HPKE& hpke() const { return get().hpke; }
   const hpke::Digest& digest() const { return get().digest; }
   const hpke::Signature& sig() const { return get().sig; }

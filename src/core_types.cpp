@@ -1,21 +1,19 @@
 #include "mls/core_types.h"
 
 namespace mls {
+
 ///
 /// Extensions
 ///
 
-const std::array<ProtocolVersion, 1> all_supported_versions = {
-  ProtocolVersion::mls10
-};
-
-const uint16_t SupportedVersionsExtension::type =
-  ExtensionType::supported_versions;
-const uint16_t SupportedCipherSuitesExtension::type =
-  ExtensionType::supported_ciphersuites;
+const uint16_t CapabilitiesExtension::type = ExtensionType::capabilities;
 const uint16_t LifetimeExtension::type = ExtensionType::lifetime;
 const uint16_t KeyIDExtension::type = ExtensionType::key_id;
 const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
+
+const std::array<ProtocolVersion, 1> all_supported_versions = {
+  ProtocolVersion::mls10
+};
 
 void
 ExtensionList::add(uint16_t type, bytes data)
@@ -69,10 +67,11 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , init_key(std::move(init_key_in))
   , credential(std::move(credential_in))
 {
-  extensions.add(SupportedVersionsExtension{
-    { all_supported_versions.begin(), all_supported_versions.end() } });
-  extensions.add(SupportedCipherSuitesExtension{
-    { all_supported_suites.begin(), all_supported_suites.end() } });
+  extensions.add(CapabilitiesExtension{
+    { all_supported_versions.begin(), all_supported_versions.end() },
+    { all_supported_suites.begin(), all_supported_suites.end() },
+    {},
+  });
 
   // TODO(RLB) Set non-eternal lifetimes
   extensions.add(LifetimeExtension{ default_not_before, default_not_after });

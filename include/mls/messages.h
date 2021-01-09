@@ -10,64 +10,180 @@
 
 namespace mls {
 
+struct RatchetTreeExtension
+{
+  TreeKEMPublicKey tree;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(tree)
+};
+
+struct MAC
+{
+  bytes mac_value;
+
+  TLS_SERIALIZABLE(mac_value)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+///
+/// PSKs
+///
+enum struct PSKType : uint8_t
+{
+  reserved = 0,
+  external = 1,
+  reinit = 2,
+  branch = 3,
+};
+
+struct ExternalPSK
+{
+  bytes psk_id;
+  TLS_SERIALIZABLE(psk_id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+struct ReInitPSK
+{
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct BranchPSK
+{
+  bytes group_id;
+  epoch_t psk_epoch;
+  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_TRAITS(tls::vector<1>, tls::pass)
+};
+
+struct PreSharedKeyID
+{
+  var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
+  TLS_SERIALIZABLE(content)
+  TLS_TRAITS(tls::variant<PSKType>)
+};
+
+struct PreSharedKeys
+{
+  std::vector<PreSharedKeyID> psks;
+  TLS_SERIALIZABLE(psks)
+  TLS_TRAITS(tls::vector<2>)
+};
+
+// struct {
+//     CipherSuite cipher_suite;
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     opaque tree_hash<0..255>;
+//     opaque interim_transcript_hash<0..255>;
+//     Extension extensions<0..2^32-1>;
+//     HPKEPublicKey external_pub;
+//     uint32 signer_index;
+//     opaque signature<0..2^16-1>;
+// } PublicGroupState;
+struct PublicGroupState
+{
+  CipherSuite cipher_suite;
+  bytes group_id;
+  epoch_t epoch;
+  bytes tree_hash;
+  bytes interim_transcript_hash;
+  ExtensionList extensions;
+  HPKEPublicKey external_pub;
+  LeafIndex signer_index;
+  bytes signature;
+
+  PublicGroupState() = default;
+  PublicGroupState(CipherSuite cipher_suite_in,
+                   bytes group_id_in,
+                   epoch_t epoch_in,
+                   bytes tree_hash_in,
+                   bytes interim_transcript_hash_in,
+                   ExtensionList extensions_in,
+                   HPKEPublicKey external_pub_in);
+
+  bytes to_be_signed() const;
+  void sign(const TreeKEMPublicKey& tree,
+            LeafIndex index,
+            const SignaturePrivateKey& priv);
+  bool verify(const TreeKEMPublicKey& tree) const;
+
+  TLS_SERIALIZABLE(cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   interim_transcript_hash,
+                   extensions,
+                   external_pub,
+                   signer_index,
+                   signature)
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>)
+};
+
 // struct {
 //   opaque group_id<0..255>;
 //   uint64 epoch;
-//   optional<Node> tree<1..2^32-1>;
+//   opaque tree_hash<0..255>;
 //   opaque confirmed_transcript_hash<0..255>;
-//   opaque interim_transcript_hash<0..255>;
-//   Extension extensions<0..2^16-1>;
-//   opaque confirmation<0..255>
+//   Extension extensions<0..2^32-1>;
+//   MAC confirmation_tag;
 //   uint32 signer_index;
 //   opaque signature<0..2^16-1>;
 // } GroupInfo;
 struct GroupInfo
 {
-private:
-  CipherSuite suite;
-
 public:
   bytes group_id;
   epoch_t epoch;
-  TreeKEMPublicKey tree;
+  bytes tree_hash;
 
   bytes confirmed_transcript_hash;
-  bytes interim_transcript_hash;
   ExtensionList extensions;
 
-  bytes confirmation;
+  MAC confirmation_tag;
   LeafIndex signer_index;
   bytes signature;
 
-  GroupInfo(CipherSuite suite);
+  GroupInfo() = default;
   GroupInfo(bytes group_id_in,
             epoch_t epoch_in,
-            TreeKEMPublicKey tree_in,
+            bytes tree_hash_in,
             bytes confirmed_transcript_hash_in,
-            bytes interim_transcript_hash_in,
             ExtensionList extensions_in,
-            bytes confirmation_in);
+            MAC confirmation_tag_in);
 
   bytes to_be_signed() const;
-  void sign(LeafIndex index, const SignaturePrivateKey& priv);
-  bool verify() const;
+  void sign(const TreeKEMPublicKey& tree,
+            LeafIndex index,
+            const SignaturePrivateKey& priv);
+  bool verify(const TreeKEMPublicKey& tree) const;
 
   TLS_SERIALIZABLE(group_id,
                    epoch,
-                   tree,
+                   tree_hash,
                    confirmed_transcript_hash,
-                   interim_transcript_hash,
                    extensions,
-                   confirmation,
+                   confirmation_tag,
                    signer_index,
                    signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
-             tls::pass,
              tls::vector<1>,
              tls::vector<1>,
              tls::pass,
-             tls::vector<1>,
+             tls::pass,
              tls::pass,
              tls::vector<2>)
 };
@@ -89,6 +205,7 @@ struct GroupSecrets
 
   bytes joiner_secret;
   std::optional<PathSecret> path_secret;
+  std::optional<PreSharedKeys> psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret)
   TLS_TRAITS(tls::vector<1>, tls::pass)
@@ -135,31 +252,77 @@ struct Welcome
 
 private:
   bytes _joiner_secret;
-  static std::tuple<bytes, bytes> group_info_key_nonce(
-    CipherSuite suite,
-    const bytes& joiner_secret,
-    const bytes& psk_secret);
+  static KeyAndNonce group_info_key_nonce(CipherSuite suite,
+                                          const bytes& joiner_secret,
+                                          const bytes& psk_secret);
 };
 
 ///
 /// Proposals & Commit
 ///
+
+// Add
 struct Add
 {
   KeyPackage key_package;
   TLS_SERIALIZABLE(key_package)
 };
 
+// Update
 struct Update
 {
   KeyPackage key_package;
   TLS_SERIALIZABLE(key_package)
 };
 
+// Remove
 struct Remove
 {
   LeafIndex removed;
   TLS_SERIALIZABLE(removed)
+};
+
+// PreSharedKey
+struct PreSharedKey
+{
+  PreSharedKeyID psk;
+  TLS_SERIALIZABLE(psk)
+};
+
+// ReInit
+struct ReInit
+{
+  bytes group_id;
+  ProtocolVersion version;
+  CipherSuite cipher_suite;
+  ExtensionList extensions;
+
+  TLS_SERIALIZABLE(group_id, version, cipher_suite, extensions)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::pass)
+};
+
+// ExternalInit
+struct ExternalInit
+{
+  bytes kem_output;
+  TLS_SERIALIZABLE(kem_output)
+  TLS_TRAITS(tls::vector<2>)
+};
+
+// AppAck
+struct MessageRange
+{
+  uint32_t sender;
+  uint32_t first_generation;
+  uint32_t last_generation;
+  TLS_SERIALIZABLE(sender, first_generation, last_generation);
+};
+
+struct AppAck
+{
+  std::vector<MessageRange> received_ranges;
+  TLS_SERIALIZABLE(received_ranges)
+  TLS_TRAITS(tls::vector<4>)
 };
 
 enum struct ProposalType : uint8_t
@@ -168,11 +331,16 @@ enum struct ProposalType : uint8_t
   add = 1,
   update = 2,
   remove = 3,
+  psk = 4,
+  reinit = 5,
+  external_init = 6,
+  app_ack = 7,
 };
 
 struct Proposal
 {
-  var::variant<Add, Update, Remove> content;
+  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
+    content;
 
   ProposalType proposal_type() const;
 
@@ -265,14 +433,6 @@ struct Sender
   TLS_SERIALIZABLE(sender_type, sender)
 };
 
-struct MAC
-{
-  bytes mac_value;
-
-  TLS_SERIALIZABLE(mac_value)
-  TLS_TRAITS(tls::vector<1>)
-};
-
 struct MLSPlaintext
 {
   bytes group_id;
@@ -315,12 +475,7 @@ struct MLSPlaintext
               const SignaturePublicKey& pub) const;
 
   bytes membership_tag_input(const GroupContext& context) const;
-  void set_membership_tag(const CipherSuite& suite,
-                          const GroupContext& context,
-                          const bytes& mac_key);
-  bool verify_membership_tag(const CipherSuite& suite,
-                             const GroupContext& context,
-                             const bytes& mac_key) const;
+  bool verify_membership_tag(const bytes& tag) const;
 
   bytes marshal_content(size_t padding_size) const;
 
@@ -386,12 +541,20 @@ namespace tls {
 
 using namespace mls;
 
+TLS_VARIANT_MAP(PSKType, ExternalPSK, external)
+TLS_VARIANT_MAP(PSKType, ReInitPSK, reinit)
+TLS_VARIANT_MAP(PSKType, BranchPSK, branch)
+
 TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value)
 TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference)
 
 TLS_VARIANT_MAP(ProposalType, Add, add)
 TLS_VARIANT_MAP(ProposalType, Update, update)
 TLS_VARIANT_MAP(ProposalType, Remove, remove)
+TLS_VARIANT_MAP(ProposalType, PreSharedKey, psk)
+TLS_VARIANT_MAP(ProposalType, ReInit, reinit)
+TLS_VARIANT_MAP(ProposalType, ExternalInit, external_init)
+TLS_VARIANT_MAP(ProposalType, AppAck, app_ack)
 
 TLS_VARIANT_MAP(ContentType, ApplicationData, application)
 TLS_VARIANT_MAP(ContentType, Proposal, proposal)

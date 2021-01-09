@@ -15,13 +15,19 @@ State::State(bytes group_id,
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
-  , _keys(suite)
+  , _transcript_hash(suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
+
+  // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
+  auto ctx = tls::marshal(group_context());
+  _key_schedule =
+    KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
 // Initialize a group from a Welcome
@@ -31,6 +37,7 @@ State::State(const HPKEPrivateKey& init_priv,
              const Welcome& welcome)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
+  , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
@@ -47,28 +54,37 @@ State::State(const HPKEPrivateKey& init_priv,
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
   auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
-
-  // Decrypt the GroupInfo and fill in details
-  auto group_info = welcome.decrypt(secrets.joiner_secret, {});
-  group_info.tree.suite = kp.cipher_suite;
-  group_info.tree.set_hash_all();
-
-  // Verify the signature on the GroupInfo
-  if (!group_info.verify()) {
-    throw InvalidParameterError("Invalid GroupInfo");
+  if (secrets.psks) {
+    throw NotImplementedError(/* PSKs are not supported */);
   }
 
-  // Verify the incoming tree
-  if (!group_info.tree.parent_hash_valid()) {
-    throw InvalidParameterError("Invalid tree");
+  // Decrypt the GroupInfo
+  auto group_info = welcome.decrypt(secrets.joiner_secret, {});
+  auto maybe_tree_extn = group_info.extensions.find<RatchetTreeExtension>();
+  if (!maybe_tree_extn) {
+    throw InvalidParameterError("Ratchet tree not provided in GroupInfo");
+  }
+
+  auto& group_info_tree = opt::get(maybe_tree_extn).tree;
+  group_info_tree.suite = _suite;
+  group_info_tree.set_hash_all();
+
+  // Verify the signature on the GroupInfo
+  if (!group_info.verify(group_info_tree)) {
+    throw InvalidParameterError("Invalid GroupInfo");
   }
 
   // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
-  _tree = group_info.tree;
-  _confirmed_transcript_hash = group_info.confirmed_transcript_hash;
-  _interim_transcript_hash = group_info.interim_transcript_hash;
+
+  _tree = group_info_tree;
+  if (!_tree.parent_hash_valid()) {
+    throw InvalidParameterError("Invalid tree");
+  }
+
+  _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
+  _transcript_hash.update_interim(group_info.confirmation_tag);
 
   // Construct TreeKEM private key from partrs provided
   auto maybe_index = _tree.find(kp);
@@ -89,11 +105,12 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _keys = KeyScheduleEpoch(
-    _suite, secrets.joiner_secret, {}, group_ctx, LeafCount(_tree.size()));
+  _key_schedule =
+    KeyScheduleEpoch(_suite, secrets.joiner_secret, _suite.zero(), group_ctx);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
-  if (!verify_confirmation(group_info.confirmation)) {
+  if (!verify_confirmation(group_info.confirmation_tag.mac_value)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 }
@@ -108,7 +125,7 @@ State::sign(const Proposal& proposal) const
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, proposal };
   pt.sign(_suite, group_context(), _identity_priv);
-  pt.set_membership_tag(_suite, group_context(), _keys.membership_key);
+  pt.membership_tag = { _key_schedule.membership_tag(group_context(), pt) };
   return pt;
 }
 
@@ -224,7 +241,7 @@ State::commit(const bytes& leaf_secret,
 
   // KEM new entropy to the group and the new joiners
   auto path_required = has_updates || has_removes || commit.proposals.empty();
-  auto update_secret = bytes(_suite.secret_size(), 0);
+  auto update_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
@@ -232,7 +249,7 @@ State::commit(const bytes& leaf_secret,
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
-      next._confirmed_transcript_hash,
+      next._transcript_hash.confirmed,
       next._extensions,
     });
     auto [new_priv, path] = next._tree.encap(
@@ -256,17 +273,15 @@ State::commit(const bytes& leaf_secret,
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
-    next._group_id,
-    next._epoch,
-    next._tree,
-    next._confirmed_transcript_hash,
-    next._interim_transcript_hash,
-    next._extensions,
-    opt::get(pt.confirmation_tag).mac_value,
+    next._group_id,         next._epoch,
+    next._tree.root_hash(), next._transcript_hash.confirmed,
+    next._extensions,       opt::get(pt.confirmation_tag),
   };
-  group_info.sign(next._index, _identity_priv);
+  group_info.extensions.add(RatchetTreeExtension{ next._tree });
+  group_info.sign(next._tree, _index, _identity_priv);
 
-  auto welcome = Welcome{ _suite, next._keys.joiner_secret, {}, group_info };
+  auto welcome =
+    Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -282,7 +297,7 @@ GroupContext
 State::group_context() const
 {
   return GroupContext{
-    _group_id,   _epoch, _tree.root_hash(), _confirmed_transcript_hash,
+    _group_id,   _epoch, _tree.root_hash(), _transcript_hash.confirmed,
     _extensions,
   };
 }
@@ -292,23 +307,21 @@ State::ratchet_and_sign(const Commit& op,
                         const bytes& update_secret,
                         const GroupContext& prev_ctx)
 {
-  auto prev_membership_key = _keys.membership_key;
+  auto prev_key_schedule = _key_schedule;
+
   auto sender = Sender{ SenderType::member, _index.val };
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
   pt.sign(_suite, prev_ctx, _identity_priv);
 
-  auto confirmed_transcript = _interim_transcript_hash + pt.commit_content();
-  _confirmed_transcript_hash = _suite.digest().hash(confirmed_transcript);
+  _transcript_hash.update_confirmed(pt);
   _epoch += 1;
   update_epoch_secrets(update_secret);
 
-  auto confirmation =
-    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
-  pt.confirmation_tag = { std::move(confirmation) };
-  pt.set_membership_tag(_suite, prev_ctx, prev_membership_key);
+  pt.confirmation_tag = { _key_schedule.confirmation_tag(
+    _transcript_hash.confirmed) };
+  pt.membership_tag = { prev_key_schedule.membership_tag(prev_ctx, pt) };
 
-  auto interim_transcript = _confirmed_transcript_hash + pt.commit_auth_data();
-  _interim_transcript_hash = _suite.digest().hash(interim_transcript);
+  _transcript_hash.update_interim(pt);
 
   return pt;
 }
@@ -357,27 +370,27 @@ State::handle(const MLSPlaintext& pt)
 
   // Decapsulate and apply the UpdatePath, if provided
   // TODO(RLB) Verify that path is provided if required
-  auto update_secret = bytes(_suite.secret_size(), 0);
-  if (commit.path.has_value()) {
+  auto update_secret = _suite.zero();
+  if (commit.path) {
+    const auto& path = opt::get(commit.path);
+    if (!path.parent_hash_valid(_suite)) {
+      throw ProtocolError("Commit path has invalid parent hash");
+    }
+
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
-      next._confirmed_transcript_hash,
+      next._transcript_hash.confirmed,
       next._extensions,
     });
-    const auto& path = opt::get(commit.path);
     next._tree_priv.decap(sender, next._tree, ctx, path);
     next._tree.merge(sender, path);
     update_secret = next._tree_priv.update_secret;
   }
 
   // Update the transcripts and advance the key schedule
-  next._confirmed_transcript_hash =
-    _suite.digest().hash(next._interim_transcript_hash + pt.commit_content());
-  next._interim_transcript_hash = _suite.digest().hash(
-    next._confirmed_transcript_hash + pt.commit_auth_data());
-
+  next._transcript_hash.update(pt);
   next._epoch += 1;
   next.update_epoch_secrets(update_secret);
 
@@ -536,7 +549,7 @@ State::protect(const bytes& pt)
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
   mpt.sign(_suite, group_context(), _identity_priv);
-  mpt.set_membership_tag(_suite, group_context(), _keys.membership_key);
+  mpt.membership_tag = { _key_schedule.membership_tag(group_context(), mpt) };
   return encrypt(mpt);
 }
 
@@ -568,14 +581,10 @@ operator==(const State& lhs, const State& rhs)
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
   auto tree = (lhs._tree == rhs._tree);
-  auto confirmed_transcript_hash =
-    (lhs._confirmed_transcript_hash == rhs._confirmed_transcript_hash);
-  auto interim_transcript_hash =
-    (lhs._interim_transcript_hash == rhs._interim_transcript_hash);
-  auto keys = (lhs._keys == rhs._keys);
+  auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
+  auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
 
-  return suite && group_id && epoch && tree && confirmed_transcript_hash &&
-         interim_transcript_hash && keys;
+  return suite && group_id && epoch && tree && transcript_hash && key_schedule;
 }
 
 bool
@@ -591,10 +600,11 @@ State::update_epoch_secrets(const bytes& commit_secret)
     _group_id,
     _epoch,
     _tree.root_hash(),
-    _confirmed_transcript_hash,
+    _transcript_hash.confirmed,
     _extensions,
   });
-  _keys = _keys.next(commit_secret, {}, ctx, LeafCount{ _tree.size() });
+  _key_schedule = _key_schedule.next(commit_secret, _suite.zero(), ctx);
+  _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
 ///
@@ -604,8 +614,13 @@ State::update_epoch_secrets(const bytes& commit_secret)
 bool
 State::verify_internal(const MLSPlaintext& pt) const
 {
-  if (!pt.verify_membership_tag(
-        _suite, group_context(), _keys.membership_key)) {
+  if (pt.sender.sender_type != SenderType::member) {
+    // TODO(RLB) Support external senders
+    throw InvalidParameterError("External senders not supported");
+  }
+
+  auto membership_tag = _key_schedule.membership_tag(group_context(), pt);
+  if (!pt.verify_membership_tag(membership_tag)) {
     return false;
   }
 
@@ -634,8 +649,7 @@ State::verify(const MLSPlaintext& pt) const
 bool
 State::verify_confirmation(const bytes& confirmation) const
 {
-  auto confirm =
-    _suite.digest().hmac(_keys.confirmation_key, _confirmed_transcript_hash);
+  auto confirm = _key_schedule.confirmation_tag(_transcript_hash.confirmed);
   return constant_time_eq(confirm, confirmation);
 }
 
@@ -644,9 +658,24 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  auto secret = _suite.derive_secret(_keys.exporter_secret, label);
-  auto context_hash = _suite.digest().hash(context);
-  return _suite.expand_with_label(secret, "exporter", context_hash, size);
+  return _key_schedule.do_export(label, context, size);
+}
+
+PublicGroupState
+State::public_group_state() const
+{
+  auto pgs = PublicGroupState{
+    _suite,
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _transcript_hash.interim,
+    _extensions,
+    _key_schedule.external_priv.public_key,
+  };
+  pgs.extensions.add(RatchetTreeExtension{ _tree });
+  pgs.sign(_tree, _index, _identity_priv);
+  return pgs;
 }
 
 std::vector<KeyPackage>
@@ -671,126 +700,13 @@ State::roster() const
 bytes
 State::authentication_secret() const
 {
-  return _keys.authentication_secret;
+  return _key_schedule.authentication_secret;
 }
-
-// struct {
-//     opaque group_id<0..255>;
-//     uint64 epoch;
-//     ContentType content_type;
-//     opaque authenticated_data<0..2^32-1>;
-// } MLSCiphertextContentAAD;
-struct MLSCiphertextContentAAD
-{
-  const bytes& group_id;
-  const epoch_t epoch;
-  const ContentType content_type;
-  const bytes& authenticated_data;
-
-  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
-};
-
-using ReuseGuard = std::array<uint8_t, 4>;
-
-static ReuseGuard
-new_reuse_guard()
-{
-  auto random = random_bytes(4);
-  auto guard = ReuseGuard();
-  std::copy(random.begin(), random.end(), guard.begin());
-  return guard;
-}
-
-static void
-apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
-{
-  for (size_t i = 0; i < guard.size(); i++) {
-    nonce.at(i) ^= guard.at(i);
-  }
-}
-
-// struct {
-//     uint32 sender;
-//     uint32 generation;
-//     opaque reuse_guard[4];
-// } MLSSenderData;
-struct MLSSenderData
-{
-  uint32_t sender;
-  uint32_t generation;
-  ReuseGuard reuse_guard;
-
-  TLS_SERIALIZABLE(sender, generation, reuse_guard)
-};
-
-// struct {
-//     opaque group_id<0..255>;
-//     uint64 epoch;
-//     ContentType content_type;
-// } MLSSenderDataAAD;
-struct MLSSenderDataAAD
-{
-  const bytes& group_id;
-  const epoch_t epoch;
-  const ContentType content_type;
-
-  TLS_SERIALIZABLE(group_id, epoch, content_type)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
-};
 
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
-  // Pull from the key schedule
-  static const auto get_key_type = overloaded{
-    [](const ApplicationData& /*unused*/) {
-      return GroupKeySource::RatchetType::application;
-    },
-    [](const Proposal& /*unused*/) {
-      return GroupKeySource::RatchetType::handshake;
-    },
-    [](const Commit& /*unused*/) {
-      return GroupKeySource::RatchetType::handshake;
-    },
-  };
-
-  auto key_type = var::visit(get_key_type, pt.content);
-  auto [generation, keys] = _keys.keys.next(key_type, _index);
-
-  // Encrypt the content
-  // XXX(rlb@ipv.sx): Apply padding?
-  auto content = pt.marshal_content(0);
-  auto content_type = pt.content_type();
-  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    _group_id, _epoch, content_type, pt.authenticated_data });
-
-  auto reuse_guard = new_reuse_guard();
-  apply_reuse_guard(reuse_guard, keys.nonce);
-
-  auto content_ct =
-    _suite.hpke().aead.seal(keys.key, keys.nonce, content_aad, content);
-
-  // Encrypt the sender data
-  auto sender_data_obj = MLSSenderData{ _index.val, generation, reuse_guard };
-  auto sender_data = tls::marshal(sender_data_obj);
-
-  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(content_ct);
-  auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ _group_id, _epoch, content_type });
-
-  auto encrypted_sender_data = _suite.hpke().aead.seal(
-    sender_data_key, sender_data_nonce, sender_data_aad, sender_data);
-
-  // Assemble the MLSCiphertext
-  MLSCiphertext ct;
-  ct.group_id = _group_id;
-  ct.epoch = _epoch;
-  ct.content_type = content_type;
-  ct.encrypted_sender_data = encrypted_sender_data;
-  ct.authenticated_data = pt.authenticated_data;
-  ct.ciphertext = content_ct;
-  return ct;
+  return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt);
 }
 
 MLSPlaintext
@@ -805,51 +721,7 @@ State::decrypt(const MLSCiphertext& ct)
     throw InvalidParameterError("Ciphertext not from this epoch");
   }
 
-  // Decrypt and parse the sender data
-  auto [sender_data_key, sender_data_nonce] = _keys.sender_data(ct.ciphertext);
-  auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
-  auto sender_data_pt = _suite.hpke().aead.open(sender_data_key,
-                                                sender_data_nonce,
-                                                sender_data_aad,
-                                                ct.encrypted_sender_data);
-  if (!sender_data_pt) {
-    throw ProtocolError("Sender data decryption failed");
-  }
-
-  auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  auto sender = LeafIndex(sender_data.sender);
-
-  // Pull from the key schedule
-  auto key_type = GroupKeySource::RatchetType::handshake;
-  if (ct.content_type == ContentType::application) {
-    key_type = GroupKeySource::RatchetType::application;
-  }
-
-  auto [key, nonce] = _keys.keys.get(key_type, sender, sender_data.generation);
-  _keys.keys.erase(key_type, sender, sender_data.generation);
-  apply_reuse_guard(sender_data.reuse_guard, nonce);
-
-  // Compute the plaintext AAD and decrypt
-  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    ct.group_id,
-    ct.epoch,
-    ct.content_type,
-    ct.authenticated_data,
-  });
-  auto content =
-    _suite.hpke().aead.open(key, nonce, content_aad, ct.ciphertext);
-  if (!content) {
-    throw ProtocolError("Content decryption failed");
-  }
-
-  // Set up a new plaintext based on the content
-  return MLSPlaintext{ _group_id,
-                       _epoch,
-                       { SenderType::member, sender_data.sender },
-                       ct.content_type,
-                       ct.authenticated_data,
-                       opt::get(content) };
+  return _keys.decrypt(_key_schedule.sender_data_secret, ct);
 }
 
 LeafIndex

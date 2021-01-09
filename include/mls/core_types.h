@@ -19,11 +19,11 @@ extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
 struct ExtensionType
 {
-  static constexpr uint16_t supported_versions = 1;
-  static constexpr uint16_t supported_ciphersuites = 2;
-  static constexpr uint16_t lifetime = 3;
-  static constexpr uint16_t key_id = 4;
-  static constexpr uint16_t parent_hash = 5;
+  static constexpr uint16_t capabilities = 1;
+  static constexpr uint16_t lifetime = 2;
+  static constexpr uint16_t key_id = 3;
+  static constexpr uint16_t parent_hash = 4;
+  static constexpr uint16_t ratchet_tree = 5;
 };
 
 struct Extension
@@ -69,22 +69,15 @@ struct ExtensionList
   TLS_TRAITS(tls::vector<2>)
 };
 
-struct SupportedVersionsExtension
+struct CapabilitiesExtension
 {
   std::vector<ProtocolVersion> versions;
-
-  static const uint16_t type;
-  TLS_SERIALIZABLE(versions)
-  TLS_TRAITS(tls::vector<1>)
-};
-
-struct SupportedCipherSuitesExtension
-{
   std::vector<CipherSuite::ID> cipher_suites;
+  std::vector<uint16_t> extensions;
 
   static const uint16_t type;
-  TLS_SERIALIZABLE(cipher_suites)
-  TLS_TRAITS(tls::vector<1>)
+  TLS_SERIALIZABLE(versions, cipher_suites, extensions)
+  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>)
 };
 
 struct LifetimeExtension

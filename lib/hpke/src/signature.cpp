@@ -1,11 +1,17 @@
+#include <hpke/digest.h>
+#include <hpke/signature.h>
+
 #include "dhkem.h"
 
 #include "common.h"
 #include "group.h"
+#include "rsa.h"
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
 
 namespace hpke {
 
-struct ConcreteSignature : public Signature
+struct GroupSignature : public Signature
 {
   struct PrivateKey : public Signature::PrivateKey
   {
@@ -39,7 +45,7 @@ struct ConcreteSignature : public Signature
     }
   }
 
-  explicit ConcreteSignature(const Group& group_in)
+  explicit GroupSignature(const Group& group_in)
     : Signature(group_to_sig(group_in.id))
     , group(group_in)
   {}
@@ -95,69 +101,56 @@ struct ConcreteSignature : public Signature
     return group.verify(data, sig, rpk);
   }
 
-  template<Signature::ID id>
-  static const ConcreteSignature instance;
-
 private:
   const Group& group;
 };
 
 template<>
-const ConcreteSignature
-  ConcreteSignature::instance<Signature::ID::P256_SHA256> =
-    ConcreteSignature(Group::get<Group::ID::P256>());
-
-template<>
-const ConcreteSignature
-  ConcreteSignature::instance<Signature::ID::P384_SHA384> =
-    ConcreteSignature(Group::get<Group::ID::P384>());
-
-template<>
-const ConcreteSignature
-  ConcreteSignature::instance<Signature::ID::P521_SHA512> =
-    ConcreteSignature(Group::get<Group::ID::P521>());
-
-template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed25519> =
-  ConcreteSignature(Group::get<Group::ID::Ed25519>());
-
-template<>
-const ConcreteSignature ConcreteSignature::instance<Signature::ID::Ed448> =
-  ConcreteSignature(Group::get<Group::ID::Ed448>());
-
-template<>
 const Signature&
 Signature::get<Signature::ID::P256_SHA256>()
 {
-  return ConcreteSignature::instance<Signature::ID::P256_SHA256>;
+  static const auto instance = GroupSignature(Group::get<Group::ID::P256>());
+  return instance;
 }
 
 template<>
 const Signature&
 Signature::get<Signature::ID::P384_SHA384>()
 {
-  return ConcreteSignature::instance<Signature::ID::P384_SHA384>;
+  static const auto instance = GroupSignature(Group::get<Group::ID::P384>());
+  return instance;
 }
 
 template<>
 const Signature&
 Signature::get<Signature::ID::P521_SHA512>()
 {
-  return ConcreteSignature::instance<Signature::ID::P521_SHA512>;
+  static const auto instance = GroupSignature(Group::get<Group::ID::P521>());
+  return instance;
 }
 
 template<>
 const Signature&
 Signature::get<Signature::ID::Ed25519>()
 {
-  return ConcreteSignature::instance<Signature::ID::Ed25519>;
+  static const auto instance = GroupSignature(Group::get<Group::ID::Ed25519>());
+  return instance;
 }
 
 template<>
 const Signature&
 Signature::get<Signature::ID::Ed448>()
 {
-  return ConcreteSignature::instance<Signature::ID::Ed448>;
+  static const auto instance = GroupSignature(Group::get<Group::ID::Ed448>());
+  return instance;
+}
+
+template<>
+const Signature&
+Signature::get<Signature::ID::RSA_SHA256>()
+{
+  static const auto instance = RSASignature(Digest::ID::SHA256);
+  return instance;
 }
 
 Signature::Signature(Signature::ID id_in)
@@ -174,6 +167,12 @@ std::unique_ptr<Signature::PrivateKey>
 Signature::deserialize_private(const bytes& /* unused */) const
 {
   throw std::runtime_error("Not implemented");
+}
+
+std::unique_ptr<Signature::PrivateKey>
+Signature::generate_rsa(size_t bits)
+{
+  return RSASignature::generate_key_pair(bits);
 }
 
 } // namespace hpke

@@ -50,9 +50,6 @@ jobs:
     - name: build
       run: make everything
 
-    - name: generate test vectors
-      run: make gen
-
     - name: run tests
       run: make test-all
 
