@@ -1,6 +1,6 @@
+#include <memory>
 #include <sstream>
 #include <string>
-#include <memory>
 
 namespace mls {
 namespace log {

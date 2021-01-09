@@ -4,8 +4,8 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
-#include <vector>
 #include <string>
+#include <vector>
 
 using namespace std::literals::string_literals;
 
