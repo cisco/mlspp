@@ -238,8 +238,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 
   auto group_context =
     GroupContext{ tv.group_id.data, 0, tv.initial_tree_hash.data, {}, {} };
-  auto ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, ctx, tv.initial_init_secret.data);
+  auto base_ctx = tls::marshal(group_context);
+  auto epoch = KeyScheduleEpoch(suite, base_ctx, tv.initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
   for (size_t i = 0; i < n_epochs; i++) {
@@ -256,8 +256,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
     group_context.epoch += 1;
     group_context.tree_hash = tree_hash;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
-    auto epoch_ctx = tls::marshal(group_context);
-    auto next_epoch = epoch.next(commit_secret, psk_secret, epoch_ctx);
+    auto ctx = tls::marshal(group_context);
+    auto next_epoch = epoch.next(commit_secret, psk_secret, ctx);
 
     commit.confirmation_tag = { next_epoch.confirmation_tag(
       transcript_hash.confirmed) };
@@ -305,8 +305,8 @@ KeyScheduleTestVector::verify() const
 {
   auto group_context =
     GroupContext{ group_id.data, 0, initial_tree_hash.data, {}, {} };
-  auto ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, ctx, initial_init_secret.data);
+  auto base_ctx = tls::marshal(group_context);
+  auto epoch = KeyScheduleEpoch(suite, base_ctx, initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
   for (const auto& tve : epochs) {
@@ -331,10 +331,10 @@ KeyScheduleTestVector::verify() const
     group_context.epoch += 1;
     group_context.tree_hash = tve.tree_hash.data;
     group_context.confirmed_transcript_hash = transcript_hash.confirmed;
-    auto epoch_ctx = tls::marshal(group_context);
-    VERIFY_EQUAL("context", epoch_ctx, tve.group_context.data);
+    auto ctx = tls::marshal(group_context);
+    VERIFY_EQUAL("context", ctx, tve.group_context.data);
 
-    epoch = epoch.next(tve.commit_secret.data, tve.psk_secret.data, epoch_ctx);
+    epoch = epoch.next(tve.commit_secret.data, tve.psk_secret.data, ctx);
 
     // Verify the confirmation tag on the Commit
     auto actual_confirmation_tag =
