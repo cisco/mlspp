@@ -1,0 +1,13 @@
+# Target labels
+ mpark-variant-extern
+# Source files and their labels
+D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern
+D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern.rule
+D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern-complete.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-install.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-mkdir.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-download.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-update.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-patch.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-configure.rule
+D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-build.rule

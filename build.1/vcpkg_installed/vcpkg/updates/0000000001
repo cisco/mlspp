@@ -1,0 +1,8 @@
+Package: doctest
+Version: 2.4.0
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 953f37cf1e5ae86ba82e2a697ebe5dbadee9acfb
+Description: The fastest feature-rich C++ single-header testing framework for unit tests and TDD
+Type: Port
+Status: install ok installed

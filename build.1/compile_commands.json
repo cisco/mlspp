@@ -1,0 +1,242 @@
+[
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\common.cpp.obj -c D:\\work\\github\\mlspp\\src\\common.cpp",
+  "file": "D:/work/github/mlspp/src/common.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\core_types.cpp.obj -c D:\\work\\github\\mlspp\\src\\core_types.cpp",
+  "file": "D:/work/github/mlspp/src/core_types.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\credential.cpp.obj -c D:\\work\\github\\mlspp\\src\\credential.cpp",
+  "file": "D:/work/github/mlspp/src/credential.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\crypto.cpp.obj -c D:\\work\\github\\mlspp\\src\\crypto.cpp",
+  "file": "D:/work/github/mlspp/src/crypto.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\key_schedule.cpp.obj -c D:\\work\\github\\mlspp\\src\\key_schedule.cpp",
+  "file": "D:/work/github/mlspp/src/key_schedule.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\messages.cpp.obj -c D:\\work\\github\\mlspp\\src\\messages.cpp",
+  "file": "D:/work/github/mlspp/src/messages.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\session.cpp.obj -c D:\\work\\github\\mlspp\\src\\session.cpp",
+  "file": "D:/work/github/mlspp/src/session.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\state.cpp.obj -c D:\\work\\github\\mlspp\\src\\state.cpp",
+  "file": "D:/work/github/mlspp/src/state.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\tree_math.cpp.obj -c D:\\work\\github\\mlspp\\src\\tree_math.cpp",
+  "file": "D:/work/github/mlspp/src/tree_math.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -Ivcpkg_installed/x64-windows/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o CMakeFiles\\mlspp.dir\\src\\treekem.cpp.obj -c D:\\work\\github\\mlspp\\src\\treekem.cpp",
+  "file": "D:/work/github/mlspp/src/treekem.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/bytes/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\bytes\\CMakeFiles\\bytes.dir\\src\\bytes.cpp.obj -c D:\\work\\github\\mlspp\\lib\\bytes\\src\\bytes.cpp",
+  "file": "D:/work/github/mlspp/lib/bytes/src/bytes.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\aead_cipher.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\aead_cipher.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/aead_cipher.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\certificate.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\certificate.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/certificate.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\common.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\common.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/common.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\dhkem.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\dhkem.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/dhkem.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\digest.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\digest.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/digest.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\group.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\group.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/group.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\hkdf.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\hkdf.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/hkdf.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\hpke.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\hpke.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/hpke.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\openssl_common.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\openssl_common.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/openssl_common.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\random.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\random.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/random.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\CMakeFiles\\hpke.dir\\src\\signature.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\src\\signature.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/src/signature.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\aead.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\aead.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/aead.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\certificate.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\certificate.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/certificate.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\common.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\common.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/common.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\hpke.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\hpke.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/hpke.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\kdf.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\kdf.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/kdf.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\kem.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\kem.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/kem.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\main.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\main.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/main.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\random.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\random.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/random.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\signature.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\signature.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/signature.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/hpke/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\hpke\\test\\CMakeFiles\\hpke_test.dir\\test_vectors.cpp.obj -c D:\\work\\github\\mlspp\\lib\\hpke\\test\\test_vectors.cpp",
+  "file": "D:/work/github/mlspp/lib/hpke/test/test_vectors.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\tls_syntax\\CMakeFiles\\tls_syntax.dir\\src\\tls_syntax.cpp.obj -c D:\\work\\github\\mlspp\\lib\\tls_syntax\\src\\tls_syntax.cpp",
+  "file": "D:/work/github/mlspp/lib/tls_syntax/src/tls_syntax.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\tls_syntax\\test\\CMakeFiles\\tls_syntax_test.dir\\main.cpp.obj -c D:\\work\\github\\mlspp\\lib\\tls_syntax\\test\\main.cpp",
+  "file": "D:/work/github/mlspp/lib/tls_syntax/test/main.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/bytes/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o lib\\tls_syntax\\test\\CMakeFiles\\tls_syntax_test.dir\\tls_syntax.cpp.obj -c D:\\work\\github\\mlspp\\lib\\tls_syntax\\test\\tls_syntax.cpp",
+  "file": "D:/work/github/mlspp/lib/tls_syntax/test/tls_syntax.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\credential.cpp.obj -c D:\\work\\github\\mlspp\\test\\credential.cpp",
+  "file": "D:/work/github/mlspp/test/credential.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\crypto.cpp.obj -c D:\\work\\github\\mlspp\\test\\crypto.cpp",
+  "file": "D:/work/github/mlspp/test/crypto.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\key_schedule.cpp.obj -c D:\\work\\github\\mlspp\\test\\key_schedule.cpp",
+  "file": "D:/work/github/mlspp/test/key_schedule.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\main.cpp.obj -c D:\\work\\github\\mlspp\\test\\main.cpp",
+  "file": "D:/work/github/mlspp/test/main.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\messages.cpp.obj -c D:\\work\\github\\mlspp\\test\\messages.cpp",
+  "file": "D:/work/github/mlspp/test/messages.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\session.cpp.obj -c D:\\work\\github\\mlspp\\test\\session.cpp",
+  "file": "D:/work/github/mlspp/test/session.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\state.cpp.obj -c D:\\work\\github\\mlspp\\test\\state.cpp",
+  "file": "D:/work/github/mlspp/test/state.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\test_vectors.cpp.obj -c D:\\work\\github\\mlspp\\test\\test_vectors.cpp",
+  "file": "D:/work/github/mlspp/test/test_vectors.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\tree_math.cpp.obj -c D:\\work\\github\\mlspp\\test\\tree_math.cpp",
+  "file": "D:/work/github/mlspp/test/tree_math.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o test\\CMakeFiles\\mlspp_test.dir\\treekem.cpp.obj -c D:\\work\\github\\mlspp\\test\\treekem.cpp",
+  "file": "D:/work/github/mlspp/test/treekem.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o cmd\\api_example\\CMakeFiles\\api_example.dir\\main.cpp.obj -c D:\\work\\github\\mlspp\\cmd\\api_example\\main.cpp",
+  "file": "D:/work/github/mlspp/cmd/api_example/main.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../test -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o cmd\\test_gen\\CMakeFiles\\test_gen.dir\\main.cpp.obj -c D:\\work\\github\\mlspp\\cmd\\test_gen\\main.cpp",
+  "file": "D:/work/github/mlspp/cmd/test_gen/main.cpp"
+},
+{
+  "directory": "D:/work/github/mlspp/build",
+  "command": "D:\\PROGRA~1\\MICROS~2\\2019\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe -I../test -I../include -I../lib/bytes/include -I../lib/tls_syntax/include -Ithird_party/src/mpark-variant-extern/include -I../lib/hpke/include -isystem vcpkg_installed/x64-windows/include -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Wall -pedantic -Wextra -Werror -Wmissing-declarations -std=gnu++17 -o cmd\\test_gen\\CMakeFiles\\test_gen.dir\\__\\__\\test\\test_vectors.cpp.obj -c D:\\work\\github\\mlspp\\test\\test_vectors.cpp",
+  "file": "D:/work/github/mlspp/test/test_vectors.cpp"
+}
+]

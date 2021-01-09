@@ -1,0 +1,5 @@
+if(EXISTS "D:/work/github/mlspp/build/test/mlspp_test_tests-b858cb2.cmake")
+  include("D:/work/github/mlspp/build/test/mlspp_test_tests-b858cb2.cmake")
+else()
+  add_test(mlspp_test_NOT_BUILT-b858cb2 mlspp_test_NOT_BUILT-b858cb2)
+endif()

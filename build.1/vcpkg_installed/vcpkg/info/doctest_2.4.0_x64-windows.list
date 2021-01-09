@@ -1,0 +1,13 @@
+x64-windows/
+x64-windows/include/
+x64-windows/include/doctest/
+x64-windows/include/doctest/doctest.h
+x64-windows/share/
+x64-windows/share/doctest/
+x64-windows/share/doctest/copyright
+x64-windows/share/doctest/doctest.cmake
+x64-windows/share/doctest/doctestAddTests.cmake
+x64-windows/share/doctest/doctestConfig.cmake
+x64-windows/share/doctest/doctestConfigVersion.cmake
+x64-windows/share/doctest/doctestTargets.cmake
+x64-windows/share/doctest/vcpkg_abi_info.txt

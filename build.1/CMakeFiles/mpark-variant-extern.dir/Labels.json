@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/CMakeFiles/mpark-variant-extern-complete.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-install.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-mkdir.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-download.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-update.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-patch.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-configure.rule"
+		},
+		{
+			"file" : "D:/work/github/mlspp/build/third_party/src/mpark-variant-extern-stamp/mpark-variant-extern-build.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"mpark-variant-extern"
+		],
+		"name" : "mpark-variant-extern"
+	}
+}

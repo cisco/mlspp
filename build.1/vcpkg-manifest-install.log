@@ -1,0 +1,22 @@
+Waiting to take filesystem lock on D:\dev\vcpkg\.vcpkg-root...
+Detecting compiler hash for triplet x64-windows...
+The following packages will be built and installed:
+    doctest[core]:x64-windows -> 2.4.0
+    openssl[core]:x64-windows -> 1.1.1h#4
+Using cached binary package: C:\Users\Dima Rusyy\AppData\Local\vcpkg\archives\95\953f37cf1e5ae86ba82e2a697ebe5dbadee9acfb.zip
+Using cached binary package: C:\Users\Dima Rusyy\AppData\Local\vcpkg\archives\25\2560ed2a8a970174a9c4d572e263c662064cf7eb.zip
+Starting package 1/2: doctest:x64-windows
+Building package doctest[core]:x64-windows...
+Building package doctest[core]:x64-windows... done
+Installing package doctest[core]:x64-windows...
+Installing package doctest[core]:x64-windows... done
+Elapsed time for package doctest:x64-windows: 69.58 ms
+Starting package 2/2: openssl:x64-windows
+Building package openssl[core]:x64-windows...
+Building package openssl[core]:x64-windows... done
+Installing package openssl[core]:x64-windows...
+Installing package openssl[core]:x64-windows... done
+Elapsed time for package openssl:x64-windows: 708.5 ms
+
+Total elapsed time: 1.335 s
+

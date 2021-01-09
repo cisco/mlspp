@@ -10,7 +10,7 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "D:\\dev\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      "cmakeToolchain": "",
       "variables": []
     }
   ]

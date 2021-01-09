@@ -1,0 +1,7 @@
+add_test( [==[TLS ostream]==] D:/work/github/mlspp/build/lib/tls_syntax/test/tls_syntax_test.exe [==[--test-case=TLS ostream]==])
+set_tests_properties( [==[TLS ostream]==] PROPERTIES WORKING_DIRECTORY D:/work/github/mlspp/build/lib/tls_syntax/test)
+add_test( [==[TLS istream]==] D:/work/github/mlspp/build/lib/tls_syntax/test/tls_syntax_test.exe [==[--test-case=TLS istream]==])
+set_tests_properties( [==[TLS istream]==] PROPERTIES WORKING_DIRECTORY D:/work/github/mlspp/build/lib/tls_syntax/test)
+add_test( [==[TLS abbreviations]==] D:/work/github/mlspp/build/lib/tls_syntax/test/tls_syntax_test.exe [==[--test-case=TLS abbreviations]==])
+set_tests_properties( [==[TLS abbreviations]==] PROPERTIES WORKING_DIRECTORY D:/work/github/mlspp/build/lib/tls_syntax/test)
+set( tls_syntax_test_TESTS [==[TLS ostream]==] [==[TLS istream]==] [==[TLS abbreviations]==])

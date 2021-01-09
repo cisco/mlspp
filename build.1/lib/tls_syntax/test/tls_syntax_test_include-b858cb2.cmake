@@ -1,0 +1,5 @@
+if(EXISTS "D:/work/github/mlspp/build/lib/tls_syntax/test/tls_syntax_test_tests-b858cb2.cmake")
+  include("D:/work/github/mlspp/build/lib/tls_syntax/test/tls_syntax_test_tests-b858cb2.cmake")
+else()
+  add_test(tls_syntax_test_NOT_BUILT-b858cb2 tls_syntax_test_NOT_BUILT-b858cb2)
+endif()
