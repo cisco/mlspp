@@ -19,7 +19,6 @@ jobs:
     env:
         CMAKE_BUILD_DIR: ${{ github.workspace }}/build
 
-
     steps:
     - uses: lukka/get-cmake@latest    
 
@@ -43,5 +42,5 @@ jobs:
 
     - name: build the library
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug .
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
