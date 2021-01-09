@@ -4,7 +4,7 @@
 #include <bytes/operators.h>
 
 using mls::log::Log;
-static const char log_mod[] = "key_schedule";
+static const char* log_mod = "key_schedule";
 
 namespace mls {
 

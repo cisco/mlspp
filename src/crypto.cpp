@@ -12,7 +12,7 @@ using hpke::KEM;       // NOLINT(misc-unused-using-decls)
 using hpke::Signature; // NOLINT(misc-unused-using-decls)
 
 using mls::log::Log;
-static const char log_mod[] = "crypto";
+static const char* log_mod = "crypto";
 
 namespace mls {
 
