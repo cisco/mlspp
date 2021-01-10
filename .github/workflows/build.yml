@@ -26,9 +26,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Check vcpkg
-      run: ls -al "{{ env.VCPKG_INSTALLATION_ROOT }}"
-
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
@@ -40,13 +37,13 @@ jobs:
       uses: lukka/run-vcpkg@v6
       with:
         setupOnly: true
-        vcpkgDirectory: '${{ env.VCPKG_INSTALLATION_ROOT }}'
+        vcpkgDirectory: "$Env.VCPKG_INSTALLATION_ROOT"
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="$Env.VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" .
 
     - name: build
       run: |
