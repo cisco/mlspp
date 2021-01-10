@@ -18,10 +18,17 @@ jobs:
     
     env:
         CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        VCPKG_ROOT: $env:VCPKG_INSTALLATION_ROOT
 
     steps:
     - uses: actions/checkout@v2
      
+    - uses: lukka/get-cmake@latest   
+
+    - name: check vcpkg
+      run: |
+        echo "{{env.VCPKG_ROOT}}"  
+
     - name: dependencies
       run: |
         brew install llvm
@@ -32,11 +39,11 @@ jobs:
       uses: lukka/run-vcpkg@v6
       with:
         setupOnly: true
-        vcpkgDirectory: "$Env.VCPKG_INSTALLATION_ROOT"
+        vcpkgDirectory: '${{ env.VCPKG_ROOT }}'
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: build the library
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="$Env.VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
