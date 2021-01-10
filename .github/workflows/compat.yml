@@ -28,14 +28,12 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v6
+    - name: Cache vcpkg_installed
+      uses: actions/cache@v2
       with:
-        setupOnly: true
-        doNotUpdateVcpkg: true
-        vcpkgDirectory: "$VCPKG_INSTALLATION_ROOT"
-        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: build the library
       run: |

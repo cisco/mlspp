@@ -34,11 +34,6 @@ jobs:
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
 
     steps:
-    - name: echo path
-      run: |
-        echo ${{ matrix.vcpkg-cmake-file }}
-        echo ${{ matrix.vcpkg-root }}
-
     - uses: actions/checkout@v2
 
     - name: dependencies (macos)
@@ -48,14 +43,12 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v6
+    - name: Cache vcpkg_installed
+      uses: actions/cache@v2
       with:
-        setupOnly: true
-        doNotUpdateVcpkg: true
-        vcpkgDirectory: '${{ matrix.vcpkg-root }}'
-        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
     - name: configure to use clang-tidy        
       run: |
