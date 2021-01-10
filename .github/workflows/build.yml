@@ -18,20 +18,30 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              vcpkg-root: "$env:VCPKG_INSTALLATION_ROOT"
+              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+            - os: ubuntu-latest
+              vcpkg-root: "VCPKG_INSTALLATION_ROOT"
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+            - os: macos-latest
+              vcpkg-root: "VCPKG_INSTALLATION_ROOT"
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
      
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-      TEST_DIR: ${{ github.workspace }}/build/test
-      VCPKG_ROOT: $env:VCPKG_INSTALLATION_ROOT
+      CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
 
     steps:
+    - name: echo path
+      run: |
+        echo ${{ matrix.vcpkg-cmake-file }}
+        echo ${{ matrix.vcpkg-root }}
+
     - uses: actions/checkout@v2
 
     - uses: lukka/get-cmake@latest   
-
-    - name: check vcpkg
-      run: |
-        echo "{{env.VCPKG_ROOT}}"  
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -44,13 +54,13 @@ jobs:
       uses: lukka/run-vcpkg@v6
       with:
         setupOnly: true
-        vcpkgDirectory: '{{ env.VCPKG_ROOT }}'
+        vcpkgDirectory: '{{ matrix.vcpkg-root }}'
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE={{ matrix.vcpkg-cmake-file}} .
 
     - name: build
       run: |
@@ -64,4 +74,4 @@ jobs:
         cd build/lib/tls_syntax/test/ && ctest
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mls_vectors_test
         cd build/lib/mls_vectors/test/ && ctest
-        cd "${{ env.TEST_DIR }}" && ctest
+        cd "${{ env.CMAKE_TEST_DIR }}" && ctest
