@@ -22,11 +22,8 @@ jobs:
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       TEST_DIR: ${{ github.workspace }}/build/test
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
     steps:
-    - uses: lukka/get-cmake@latest    
-
     - uses: actions/checkout@v2
       with:
         submodules: true
@@ -42,33 +39,24 @@ jobs:
       uses: lukka/run-vcpkg@v6
       with:
         setupOnly: true
-        vcpkgDirectory: '${{ env.VCPKG_ROOT }}'
+        vcpkgDirectory: '${{ env.VCPKG_INSTALLATION_ROOT }}'
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
 
     - name: build
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
-    - name: hpke tests
+    - name: Unit tests
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target hpke_test
         cd build/lib/hpke/test/ && ctest
-
-    - name: tls_syntax tests
-      run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target tls_syntax_test
         cd build/lib/tls_syntax/test/ && ctest
-
-    - name: mls_vectors tests
-      run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mls_vectors_test
         cd build/lib/mls_vectors/test/ && ctest
-        
-    - name: tests
-      run: |
         cd "${{ env.TEST_DIR }}" && ctest
