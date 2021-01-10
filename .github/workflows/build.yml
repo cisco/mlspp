@@ -20,13 +20,10 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
             - os: windows-latest
-              vcpkg-root: "$env:VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
             - os: ubuntu-latest
-              vcpkg-root: "$VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
             - os: macos-latest
-              vcpkg-root: "$VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
      
     env:
