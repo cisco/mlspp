@@ -23,10 +23,10 @@ jobs:
               vcpkg-root: "$env:VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
             - os: ubuntu-latest
-              vcpkg-root: "VCPKG_INSTALLATION_ROOT"
+              vcpkg-root: "$VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
             - os: macos-latest
-              vcpkg-root: "VCPKG_INSTALLATION_ROOT"
+              vcpkg-root: "$VCPKG_INSTALLATION_ROOT"
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
      
     env:
@@ -40,8 +40,6 @@ jobs:
         echo ${{ matrix.vcpkg-root }}
 
     - uses: actions/checkout@v2
-
-    - uses: lukka/get-cmake@latest   
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -60,7 +58,7 @@ jobs:
 
     - name: configure to use clang-tidy        
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE={{ matrix.vcpkg-cmake-file}} .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="{{ matrix.vcpkg-cmake-file}}" .
 
     - name: build
       run: |
