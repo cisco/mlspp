@@ -97,7 +97,7 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-
+enable_testing()
 add_subdirectory(test)
 
 ###

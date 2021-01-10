@@ -57,10 +57,4 @@ jobs:
 
     - name: Unit tests
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target hpke_test
-        cd build/lib/hpke/test/ && ctest
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target tls_syntax_test
-        cd build/lib/tls_syntax/test/ && ctest
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mls_vectors_test
-        cd build/lib/mls_vectors/test/ && ctest
-        cd "${{ env.CMAKE_TEST_DIR }}" && ctest
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
