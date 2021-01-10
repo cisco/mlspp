@@ -21,10 +21,13 @@ jobs:
         include:
             - os: windows-latest
               vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+              ctest-target: RUN_TESTS
             - os: ubuntu-latest
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ctest-target: test
             - os: macos-latest
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ctest-target: test
      
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
@@ -40,7 +43,7 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Cache vcpkg_installed
+    - name: Restore cache
       uses: actions/cache@v2
       with:
         path: |
@@ -57,4 +60,4 @@ jobs:
 
     - name: Unit tests
       run: |
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
