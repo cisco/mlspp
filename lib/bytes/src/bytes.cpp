@@ -1,4 +1,4 @@
-#include "bytes/bytes.h"
+#include <bytes/bytes.h>
 
 #include <iomanip>
 #include <iostream>
@@ -8,7 +8,7 @@
 namespace bytes_ns {
 
 bytes
-to_bytes(const std::string& ascii)
+from_ascii(const std::string& ascii)
 {
   return bytes(ascii.begin(), ascii.end());
 }
@@ -40,6 +40,8 @@ from_hex(const std::string& hex)
 
   return out;
 }
+
+namespace operators {
 
 bytes&
 operator+=(bytes& lhs, const bytes& rhs)
@@ -85,4 +87,5 @@ operator<<(std::ostream& out, const bytes& data)
   return out << to_hex(abbrev) << "...";
 }
 
+} // namespace operators
 } // namespace bytes_ns

@@ -11,3 +11,9 @@ add_library(${CURRENT_LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+###
+### Tests
+###
+
+add_subdirectory(test)

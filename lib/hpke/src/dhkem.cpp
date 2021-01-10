@@ -4,6 +4,8 @@
 
 namespace hpke {
 
+using namespace bytes_ns::operators;
+
 DHKEM::PrivateKey::PrivateKey(Group::PrivateKey* group_priv_in)
   : group_priv(group_priv_in)
 {}
@@ -94,7 +96,7 @@ DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
   , group(group_in)
   , kdf(kdf_in)
 {
-  static const auto label_kem = to_bytes("KEM");
+  static const auto label_kem = from_ascii("KEM");
   suite_id = label_kem + i2osp(uint16_t(kem_id_in), 2);
 }
 
@@ -217,8 +219,8 @@ DHKEM::auth_decap(const bytes& enc,
 bytes
 DHKEM::extract_and_expand(const bytes& dh, const bytes& kem_context) const
 {
-  static const auto label_eae_prk = to_bytes("eae_prk");
-  static const auto label_shared_secret = to_bytes("shared_secret");
+  static const auto label_eae_prk = from_ascii("eae_prk");
+  static const auto label_shared_secret = from_ascii("shared_secret");
 
   auto eae_prk = kdf.labeled_extract(suite_id, {}, label_eae_prk, dh);
   return kdf.labeled_expand(

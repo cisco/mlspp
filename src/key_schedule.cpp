@@ -1,4 +1,8 @@
-#include "mls/key_schedule.h"
+#include <mls/key_schedule.h>
+#include <mls/log.h>
+
+using mls::log::Log;
+static const auto log_mod = "key_schedule"s;
 
 namespace mls {
 
@@ -32,7 +36,16 @@ derive_tree_secret(CipherSuite suite,
                    size_t length)
 {
   auto ctx = tls::marshal(TreeContext{ node, generation });
-  return suite.expand_with_label(secret, label, ctx, length);
+  auto derived = suite.expand_with_label(secret, label, ctx, length);
+
+  Log::crypto(log_mod, "=== DeriveTreeSecret ===");
+  Log::crypto(log_mod, "  secret       ", to_hex(secret));
+  Log::crypto(log_mod, "  label        ", label);
+  Log::crypto(log_mod, "  node         ", node.val);
+  Log::crypto(log_mod, "  generation   ", generation);
+  Log::crypto(log_mod, "  tree_context ", to_hex(ctx));
+
+  return derived;
 }
 
 ///

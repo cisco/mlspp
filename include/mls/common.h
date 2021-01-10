@@ -4,7 +4,10 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
+
+using namespace std::literals::string_literals;
 
 // Expose the bytes library globally
 #include <bytes/bytes.h>
@@ -16,6 +19,9 @@ namespace var = tls::var;
 namespace opt = tls::opt;
 
 namespace mls {
+
+// Expose bytes operators for code within this namespace
+using namespace bytes_ns::operators;
 
 using epoch_t = uint64_t;
 

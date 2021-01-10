@@ -38,6 +38,8 @@ libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mls_vectors 
 
 test-libs: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR} --target bytes_test
+	cd build/lib/bytes/test/ && ctest
 	cmake --build ${BUILD_DIR} --target hpke_test
 	cd build/lib/hpke/test/ && ctest
 	cmake --build ${BUILD_DIR} --target tls_syntax_test

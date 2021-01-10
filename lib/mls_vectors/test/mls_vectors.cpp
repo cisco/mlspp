@@ -13,52 +13,38 @@ static const std::vector<mls::CipherSuite> supported_suites{
   { mls::CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448 },
 };
 
-template<typename T>
-T
-tls_round_trip(const T& value)
-{
-  auto marshaled = tls::marshal(value);
-  return tls::get<T>(marshaled);
-}
-
 TEST_CASE("Tree Math")
 {
-  const auto tv_in = TreeMathTestVector::create(256);
-  const auto tv_out = tls_round_trip(tv_in);
-  REQUIRE(tv_out.verify() == std::nullopt);
+  const auto tv = TreeMathTestVector::create(256);
+  REQUIRE(tv.verify() == std::nullopt);
 }
 
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = EncryptionTestVector::create(suite, 15, 10);
-    const auto tv_out = tls_round_trip(tv_in);
-    REQUIRE(tv_out.verify() == std::nullopt);
+    const auto tv = EncryptionTestVector::create(suite, 15, 10);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = KeyScheduleTestVector::create(suite, 15);
-    const auto tv_out = tls_round_trip(tv_in);
-    REQUIRE(tv_out.verify() == std::nullopt);
+    const auto tv = KeyScheduleTestVector::create(suite, 15);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
-    const auto tv_in = TreeKEMTestVector::create(suite, 10);
-    auto tv_out = tls_round_trip(tv_in);
-    tv_out.initialize_trees();
-    REQUIRE(tv_out.verify() == std::nullopt);
+    const auto tv = TreeKEMTestVector::create(suite, 10);
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }
 
 TEST_CASE("Messages")
 {
-  auto tv_in = MessagesTestVector::create();
-  const auto tv_out = tls_round_trip(tv_in);
-  REQUIRE(tv_out.verify() == std::nullopt);
+  auto tv = MessagesTestVector::create();
+  REQUIRE(tv.verify() == std::nullopt);
 }
