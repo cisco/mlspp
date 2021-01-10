@@ -22,18 +22,12 @@ jobs:
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       TEST_DIR: ${{ github.workspace }}/build/test
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        submodules: true
 
-    - name: Environment
-      run: env
-
-    - name: ls vcpkg
-      run: dir C:\vcpkg
+    - name: Check vcpkg
+      run: ls -al "{{ env.VCPKG_INSTALLATION_ROOT }}"
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -46,13 +40,13 @@ jobs:
       uses: lukka/run-vcpkg@v6
       with:
         setupOnly: true
-        vcpkgDirectory: '${{ env.VCPKG_ROOT }}'
+        vcpkgDirectory: '${{ env.VCPKG_INSTALLATION_ROOT }}'
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
 
     - name: configure to use clang-tidy        
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -GNinja -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake" .
 
     - name: build
       run: |
