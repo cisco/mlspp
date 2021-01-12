@@ -93,7 +93,8 @@ struct TreeKEMPrivateKey
   void decap(LeafIndex from,
              const TreeKEMPublicKey& pub,
              const bytes& context,
-             const UpdatePath& path);
+             const UpdatePath& path,
+             const std::vector<LeafIndex>& except);
 
   void truncate(LeafCount size);
 
@@ -137,6 +138,7 @@ struct TreeKEMPublicKey
     const bytes& context,
     const bytes& leaf_secret,
     const SignaturePrivateKey& sig_priv,
+    const std::vector<LeafIndex>& except,
     const std::optional<KeyPackageOpts>& opts);
 
   void truncate();

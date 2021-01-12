@@ -2,6 +2,20 @@
 
 namespace mls {
 
+// Utility method used for removing leaves from a resolution
+static void
+remove_leaves(std::vector<NodeIndex>& res, const std::vector<LeafIndex>& except)
+{
+  for (const auto leaf : except) {
+    auto it = std::find(res.begin(), res.end(), NodeIndex(leaf));
+    if (it == res.end()) {
+      continue;
+    }
+
+    res.erase(it);
+  }
+}
+
 ///
 /// Node
 ///
@@ -194,7 +208,8 @@ void
 TreeKEMPrivateKey::decap(LeafIndex from,
                          const TreeKEMPublicKey& pub,
                          const bytes& context,
-                         const UpdatePath& path)
+                         const UpdatePath& path,
+                         const std::vector<LeafIndex>& except)
 {
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
@@ -224,6 +239,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
 
   // Identify which node in the resolution of the copath we will use to decrypt
   auto res = pub.resolve(copath_node);
+  remove_leaves(res, except);
   if (res.size() != path.nodes[dpi].node_secrets.size()) {
     throw ProtocolError("Malformed direct path node");
   }
@@ -516,6 +532,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const bytes& context,
                         const bytes& leaf_secret,
                         const SignaturePrivateKey& sig_priv,
+                        const std::vector<LeafIndex>& except,
                         const std::optional<KeyPackageOpts>& opts)
 {
   // Grab information about the sender
@@ -539,6 +556,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
     auto copath = tree_math::sibling(last, size());
     auto res = resolve(copath);
+    remove_leaves(res, except);
     for (auto nr : res) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
       auto ct = node_pub.encrypt(suite, context, path_secret);

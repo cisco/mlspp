@@ -233,7 +233,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     auto leaf_secret = random_bytes(32);
     auto [new_adder_priv, path] =
-      pub.encap(adder, context, leaf_secret, sig_privs.back(), std::nullopt);
+      pub.encap(adder, context, leaf_secret, sig_privs.back(), {}, std::nullopt);
     privs[i] = new_adder_priv;
     REQUIRE(path.parent_hash_valid(suite));
 
@@ -252,7 +252,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     // Other members update via decap()
     for (uint32_t j = 0; j < i; j++) {
-      privs[j].decap(adder, pub, context, path);
+      privs[j].decap(adder, pub, context, path, {});
       REQUIRE(privs[j].consistent(privs[i]));
       REQUIRE(privs[j].consistent(pub));
     }
