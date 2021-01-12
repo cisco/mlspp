@@ -6,7 +6,7 @@ namespace mls {
 static void
 remove_leaves(std::vector<NodeIndex>& res, const std::vector<LeafIndex>& except)
 {
-  for (const auto leaf : except) {
+  for (const auto& leaf : except) {
     auto it = std::find(res.begin(), res.end(), NodeIndex(leaf));
     if (it == res.end()) {
       continue;
@@ -68,9 +68,9 @@ OptionalNode::set_tree_hash(CipherSuite suite, NodeIndex index)
 
 void
 OptionalNode::set_tree_hash(CipherSuite suite,
-                              NodeIndex index,
-                              const bytes& left,
-                              const bytes& right)
+                            NodeIndex index,
+                            const bytes& left,
+                            const bytes& right)
 {
   auto parent = std::optional<ParentNode>{};
   if (node) {
@@ -645,7 +645,8 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 //     opaque parent_hash<0..255>;
 //     HPKEPublicKey original_child_resolution<0..2^32-1>;
 // } ParentHashInput;
-struct ParentHashInput {
+struct ParentHashInput
+{
   const HPKEPublicKey& public_key;
   const bytes& parent_hash;
   std::vector<HPKEPublicKey> original_child_resolution;
@@ -655,7 +656,8 @@ struct ParentHashInput {
 };
 
 bytes
-TreeKEMPublicKey::parent_hash(const ParentNode& parent, NodeIndex copath_child) const
+TreeKEMPublicKey::parent_hash(const ParentNode& parent,
+                              NodeIndex copath_child) const
 {
   auto res = resolve(copath_child);
   remove_leaves(res, parent.unmerged_leaves);
@@ -710,7 +712,8 @@ TreeKEMPublicKey::parent_hashes(LeafIndex from, const UpdatePath& path) const
 }
 
 bool
-TreeKEMPublicKey::parent_hash_valid(LeafIndex from, const UpdatePath& path) const
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
+                                    const UpdatePath& path) const
 {
   auto ph = parent_hashes(from, path);
   auto phe = path.leaf_key_package.extensions.find<ParentHashExtension>();
