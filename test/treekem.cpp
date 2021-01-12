@@ -61,18 +61,18 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
 
   auto parent = ParentNode{ init_priv.public_key, {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent }, {} };
-  REQUIRE_THROWS_AS(opt_parent.set_leaf_hash(suite, node_index),
+  REQUIRE_THROWS_AS(opt_parent.set_tree_hash(suite, node_index),
                     var::bad_variant_access);
 
-  opt_parent.set_parent_hash(suite, node_index, child_hash, child_hash);
+  opt_parent.set_tree_hash(suite, node_index, child_hash, child_hash);
   REQUIRE_FALSE(opt_parent.hash.empty());
 
   auto opt_leaf = OptionalNode{ Node{ kp }, {} };
   REQUIRE_THROWS_AS(
-    opt_leaf.set_parent_hash(suite, node_index, child_hash, child_hash),
+    opt_leaf.set_tree_hash(suite, node_index, child_hash, child_hash),
     var::bad_variant_access);
 
-  opt_leaf.set_leaf_hash(suite, node_index);
+  opt_leaf.set_tree_hash(suite, node_index);
   REQUIRE_FALSE(opt_leaf.hash.empty());
 }
 
@@ -145,44 +145,41 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   // Construct a full tree using add_leaf and merge
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
-    // Manually construct a key package and a direct path
-    auto [init_priv_add, sig_priv_add, kp_add] = new_key_package();
-    silence_unused(init_priv_add);
-    silence_unused(sig_priv_add);
-
-    auto [init_priv_path, sig_priv_path, kp_path] = new_key_package();
-    silence_unused(init_priv_path);
-    silence_unused(sig_priv_path);
+    // Add a leaf
+    auto [init_priv, sig_priv, kp_before] = new_key_package();
+    silence_unused(init_priv);
 
     auto index = LeafIndex(i);
     auto curr_size = LeafCount(i + 1);
 
-    auto path = UpdatePath{ kp_path, {} };
+    auto add_index = pub.add_leaf(kp_before);
+    REQUIRE(add_index == index);
+
+    auto found = pub.find(kp_before);
+    REQUIRE(found);
+    REQUIRE(found == index);
+
+    auto found_kp = pub.key_package(index);
+    REQUIRE(found_kp);
+    REQUIRE(found_kp == kp_before);
+
+    // Manually construct a direct path to populate nodes above the new leaf
+    auto path = UpdatePath{ kp_before, {} };
     auto dp = tree_math::dirpath(NodeIndex(index), curr_size);
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });
     }
 
-    path.sign(suite, init_priv_path.public_key, sig_priv_path, std::nullopt);
+    auto opts = KeyPackageOpts{};
+    opts.extensions.add(ParentHashExtension{ from_ascii("bogus parent hash") });
+    path.leaf_key_package.sign(sig_priv, opts);
 
-    // Add the key package as a leaf
-    auto add_index = pub.add_leaf(kp_add);
-    REQUIRE(add_index == index);
-
-    auto found = pub.find(kp_add);
-    REQUIRE(found);
-    REQUIRE(found == index);
-
-    auto found_kp = pub.key_package(index);
-    REQUIRE(found_kp);
-    REQUIRE(found_kp == kp_add);
-
-    // Merge the direct path
+    // Merge the direct path (ignoring parent hash validity)
     pub.merge(index, path);
-    REQUIRE(pub.parent_hash_valid());
 
-    found = pub.find(kp_path);
+    auto kp_after = path.leaf_key_package;
+    found = pub.find(kp_after);
     REQUIRE(found);
     REQUIRE(found == index);
     for (const auto& dpn : dp) {
@@ -191,7 +188,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     found_kp = pub.key_package(index);
     REQUIRE(found_kp);
-    REQUIRE(found_kp == kp_path);
+    REQUIRE(found_kp == kp_after);
   }
 
   // Remove a node and verify that the resolution comes out right
@@ -232,10 +229,10 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     REQUIRE(index == joiner);
 
     auto leaf_secret = random_bytes(32);
-    auto [new_adder_priv, path] =
-      pub.encap(adder, context, leaf_secret, sig_privs.back(), {}, std::nullopt);
+    auto [new_adder_priv, path] = pub.encap(
+      adder, context, leaf_secret, sig_privs.back(), {}, std::nullopt);
     privs[i] = new_adder_priv;
-    REQUIRE(path.parent_hash_valid(suite));
+    REQUIRE(pub.parent_hash_valid(adder, path));
 
     pub.merge(adder, path);
     REQUIRE(privs[i].consistent(pub));

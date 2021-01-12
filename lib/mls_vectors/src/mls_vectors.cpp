@@ -486,7 +486,7 @@ TreeKEMTestVector::verify() const
     "tree hash before", tree_before.root_hash(), tree_hash_before.data);
   VERIFY("tree before parent hash valid", tree_before.parent_hash_valid());
 
-  VERIFY("update path parent hash valid", update_path.parent_hash_valid(suite));
+  VERIFY("update path parent hash valid", tree_before.parent_hash_valid(update_sender, update_path));
 
   VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after.data);
   VERIFY("tree after parent hash valid", tree_after.parent_hash_valid());

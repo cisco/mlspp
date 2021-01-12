@@ -252,8 +252,12 @@ State::commit(const bytes& leaf_secret,
       next._transcript_hash.confirmed,
       next._extensions,
     });
-    auto [new_priv, path] = next._tree.encap(
-      next._index, ctx, leaf_secret, _identity_priv, joiner_locations, std::nullopt);
+    auto [new_priv, path] = next._tree.encap(next._index,
+                                             ctx,
+                                             leaf_secret,
+                                             _identity_priv,
+                                             joiner_locations,
+                                             std::nullopt);
     next._tree_priv = new_priv;
     commit.path = path;
     update_secret = new_priv.update_secret;
@@ -375,7 +379,7 @@ State::handle(const MLSPlaintext& pt)
   auto update_secret = _suite.zero();
   if (commit.path) {
     const auto& path = opt::get(commit.path);
-    if (!path.parent_hash_valid(_suite)) {
+    if (!next._tree.parent_hash_valid(sender, path)) {
       throw ProtocolError("Commit path has invalid parent hash");
     }
 

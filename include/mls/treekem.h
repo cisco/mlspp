@@ -36,6 +36,7 @@ struct OptionalNode
   {
     return var::get<KeyPackage>(opt::get(node).node);
   }
+
   const KeyPackage& key_package() const
   {
     return var::get<KeyPackage>(opt::get(node).node);
@@ -45,16 +46,20 @@ struct OptionalNode
   {
     return var::get<ParentNode>(opt::get(node).node);
   }
+
   const ParentNode& parent_node() const
   {
     return var::get<ParentNode>(opt::get(node).node);
   }
 
-  void set_leaf_hash(CipherSuite suite, NodeIndex index);
-  void set_parent_hash(CipherSuite suite,
-                       NodeIndex index,
-                       const bytes& left,
-                       const bytes& right);
+  // For leaf nodes
+  void set_tree_hash(CipherSuite suite, NodeIndex index);
+
+  // For parent nodes
+  void set_tree_hash(CipherSuite suite,
+                     NodeIndex index,
+                     const bytes& left,
+                     const bytes& right);
 
   TLS_SERIALIZABLE(node)
 };
@@ -127,6 +132,8 @@ struct TreeKEMPublicKey
   void set_hash_all();
   bytes root_hash() const;
   LeafCount size() const;
+
+  bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
@@ -158,6 +165,10 @@ private:
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
   bytes get_hash(NodeIndex index);
+
+  bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
+  std::vector<bytes> parent_hashes(LeafIndex from,
+                                   const UpdatePath& path) const;
 
   friend struct TreeKEMPrivateKey;
 };

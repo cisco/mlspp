@@ -54,7 +54,7 @@ Node::parent_hash() const
 ///
 
 void
-OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
+OptionalNode::set_tree_hash(CipherSuite suite, NodeIndex index)
 {
   auto leaf = std::optional<KeyPackage>{};
   if (node) {
@@ -67,7 +67,7 @@ OptionalNode::set_leaf_hash(CipherSuite suite, NodeIndex index)
 }
 
 void
-OptionalNode::set_parent_hash(CipherSuite suite,
+OptionalNode::set_tree_hash(CipherSuite suite,
                               NodeIndex index,
                               const bytes& left,
                               const bytes& right)
@@ -400,7 +400,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
     throw ProtocolError("Malformed direct path");
   }
 
-  auto ph = path.parent_hashes(suite);
+  auto ph = parent_hashes(from, path);
   for (size_t i = 0; i < dp.size(); i++) {
     auto n = dp[i];
 
@@ -450,17 +450,26 @@ TreeKEMPublicKey::parent_hash_valid() const
       continue;
     }
 
-    auto self_hash = nodes[i.val].parent_node().hash(suite);
-
+    const auto& parent = nodes[i.val].parent_node();
     auto l = tree_math::left(i);
-    auto ln = nodes[l.val].node;
-    auto l_match = (ln && opt::get(ln).parent_hash() == self_hash);
-
     auto r = tree_math::right(i, size());
-    auto rn = nodes[r.val].node;
-    auto r_match = (rn && opt::get(rn).parent_hash() == self_hash);
 
-    if (!l_match && !r_match) {
+    auto lh = parent_hash(parent, r);
+    auto rh = parent_hash(parent, l);
+
+    // If left child matches, good to go
+    auto ln = node_at(l).node;
+    if (ln && opt::get(ln).parent_hash() == lh) {
+      continue;
+    }
+
+    // Otherwise, the right child must be present and match
+    while (node_at(r).blank() && tree_math::level(r) > 0) {
+      r = tree_math::left(r);
+    }
+
+    auto rn = node_at(r).node;
+    if (!rn || opt::get(rn).parent_hash() != rh) {
       return false;
     }
   }
@@ -533,7 +542,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const bytes& leaf_secret,
                         const SignaturePrivateKey& sig_priv,
                         const std::vector<LeafIndex>& except,
-                        const std::optional<KeyPackageOpts>& opts)
+                        const std::optional<KeyPackageOpts>& maybe_opts)
 {
   // Grab information about the sender
   auto& maybe_node = node_at(NodeIndex(from)).node;
@@ -568,8 +577,19 @@ TreeKEMPublicKey::encap(LeafIndex from,
   }
 
   // Sign the UpdatePath
-  auto leaf_priv = opt::get(priv.private_key(NodeIndex(from)));
-  path.sign(suite, leaf_priv.public_key, sig_priv, opts);
+  auto opts = KeyPackageOpts{};
+  if (maybe_opts) {
+    opts = opt::get(maybe_opts);
+  }
+
+  auto ph = parent_hashes(from, path);
+  if (!ph.empty()) {
+    opts.extensions.add(ParentHashExtension{ ph[0] });
+  }
+
+  auto leaf_node = opt::get(priv.private_key(NodeIndex(from)));
+  path.leaf_key_package.init_key = leaf_node.public_key;
+  path.leaf_key_package.sign(sig_priv, opts);
 
   // Update the pubic key itself
   merge(from, path);
@@ -610,14 +630,97 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   }
 
   if (tree_math::level(index) == 0) {
-    node_at(index).set_leaf_hash(suite, index);
+    node_at(index).set_tree_hash(suite, index);
     return node_at(index).hash;
   }
 
   auto lh = get_hash(tree_math::left(index));
   auto rh = get_hash(tree_math::right(index, size()));
-  node_at(index).set_parent_hash(suite, index, lh, rh);
+  node_at(index).set_tree_hash(suite, index, lh, rh);
   return node_at(index).hash;
+}
+
+// struct {
+//     HPKEPublicKey public_key;
+//     opaque parent_hash<0..255>;
+//     HPKEPublicKey original_child_resolution<0..2^32-1>;
+// } ParentHashInput;
+struct ParentHashInput {
+  const HPKEPublicKey& public_key;
+  const bytes& parent_hash;
+  std::vector<HPKEPublicKey> original_child_resolution;
+
+  TLS_SERIALIZABLE(public_key, parent_hash, original_child_resolution)
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
+};
+
+bytes
+TreeKEMPublicKey::parent_hash(const ParentNode& parent, NodeIndex copath_child) const
+{
+  auto res = resolve(copath_child);
+  remove_leaves(res, parent.unmerged_leaves);
+
+  auto hash_input = ParentHashInput{
+    parent.public_key,
+    parent.parent_hash,
+    std::vector<HPKEPublicKey>(res.size()),
+  };
+  for (size_t i = 0; i < res.size(); i++) {
+    const auto& node = opt::get(node_at(res[i]).node);
+    hash_input.original_child_resolution[i] = node.public_key();
+  }
+
+  return suite.digest().hash(tls::marshal(hash_input));
+}
+
+std::vector<bytes>
+TreeKEMPublicKey::parent_hashes(LeafIndex from, const UpdatePath& path) const
+{
+  // The list of nodes for whom parent hashes are computed, namely: Direct path
+  // excluding root, including leaf
+  auto from_node = NodeIndex(from);
+  auto dp = tree_math::dirpath(from_node, size());
+  if (!dp.empty()) {
+    // pop_back() on an empty list is undefined behavior
+    dp.pop_back();
+  }
+
+  if (from_node != tree_math::root(size())) {
+    // Handle the special case of a one-leaf tree
+    dp.insert(dp.begin(), from_node);
+  }
+
+  if (dp.size() != path.nodes.size()) {
+    throw ProtocolError("Malformed UpdatePath");
+  }
+
+  // Parent hash for all the parents, starting from the root
+  auto last_hash = bytes{};
+  auto ph = std::vector<bytes>(dp.size());
+  for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
+    auto n = dp[i];
+    auto s = tree_math::sibling(n, size());
+
+    auto parent_node = ParentNode{ path.nodes[i].public_key, {}, last_hash };
+    last_hash = parent_hash(parent_node, s);
+    ph[i] = last_hash;
+  }
+
+  return ph;
+}
+
+bool
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from, const UpdatePath& path) const
+{
+  auto ph = parent_hashes(from, path);
+  auto phe = path.leaf_key_package.extensions.find<ParentHashExtension>();
+
+  // If there are no nodes to hash, then ParentHash MUST be omitted
+  if (ph.empty()) {
+    return !phe;
+  }
+
+  return phe && opt::get(phe).parent_hash == ph[0];
 }
 
 } // namespace mls
