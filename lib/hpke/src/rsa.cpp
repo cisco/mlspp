@@ -31,7 +31,8 @@ RSASignature::generate_key_pair(size_t bits)
   }
 
   // NOLINTNEXTLINE(hicpp-signed-bitwise)
-  if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), bits) <= 0) {
+  if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), static_cast<int>(bits)) <=
+      0) {
     throw openssl_error();
   }
 
@@ -62,7 +63,8 @@ std::unique_ptr<Signature::PublicKey>
 RSASignature::deserialize(const bytes& enc) const
 {
   const auto* data_ptr = enc.data();
-  auto* pkey = d2i_PublicKey(EVP_PKEY_RSA, nullptr, &data_ptr, enc.size());
+  auto* pkey = d2i_PublicKey(
+    EVP_PKEY_RSA, nullptr, &data_ptr, static_cast<int>(enc.size()));
   if (pkey == nullptr) {
     throw openssl_error();
   }
@@ -87,7 +89,8 @@ std::unique_ptr<Signature::PrivateKey>
 RSASignature::deserialize_private(const bytes& skm) const
 {
   const auto* data_ptr = skm.data();
-  auto* pkey = d2i_PrivateKey(EVP_PKEY_RSA, nullptr, &data_ptr, skm.size());
+  auto* pkey = d2i_PrivateKey(
+    EVP_PKEY_RSA, nullptr, &data_ptr, static_cast<int>(skm.size()));
   if (pkey == nullptr) {
     throw openssl_error();
   }

@@ -10,40 +10,54 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
       fail-fast: false
-    
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ctest-target: test
+            - os: macos-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ctest-target: test
+     
+    env:
+      CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+      CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+
     steps:
-    - uses: actions/checkout@v1
-    
+    - uses: actions/checkout@v2
+
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew reinstall openssl@1.1
-        brew install pkgconfig doctest llvm
+        brew install llvm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-  
-    - name: dependencies (ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        brew install pkgconfig
-        brew install --build-from-source doctest
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
-    - name: configure to use clang-tidy
-      run: make tidy
+    - name: configure to use clang-tidy        
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
     - name: build
-      run: make everything
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
-    - name: run tests
-      run: make test-all
-
+    - name: Unit tests
+      run: |
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"

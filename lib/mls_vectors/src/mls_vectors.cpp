@@ -238,8 +238,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 
   auto group_context =
     GroupContext{ tv.group_id.data, 0, tv.initial_tree_hash.data, {}, {} };
-  auto ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, ctx, tv.initial_init_secret.data);
+  auto base_ctx = tls::marshal(group_context);
+  auto epoch = KeyScheduleEpoch(suite, base_ctx, tv.initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
   for (size_t i = 0; i < n_epochs; i++) {
@@ -305,8 +305,8 @@ KeyScheduleTestVector::verify() const
 {
   auto group_context =
     GroupContext{ group_id.data, 0, initial_tree_hash.data, {}, {} };
-  auto ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, ctx, initial_init_secret.data);
+  auto base_ctx = tls::marshal(group_context);
+  auto epoch = KeyScheduleEpoch(suite, base_ctx, initial_init_secret.data);
   auto transcript_hash = TranscriptHash(suite);
 
   for (const auto& tve : epochs) {
@@ -407,8 +407,8 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   if (n_leaves > 4) {
     // Make things more interesting if we have space
     my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
-    tv.add_sender.val = (n_leaves / 2) - 2;
-    tv.update_sender.val = n_leaves - 2;
+    tv.add_sender.val = static_cast<uint32_t>(n_leaves / 2) - 2;
+    tv.update_sender.val = static_cast<uint32_t>(n_leaves) - 2;
   }
 
   // Construct a full ratchet tree with the required number of leaves

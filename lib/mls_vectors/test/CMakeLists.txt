@@ -12,5 +12,4 @@ target_link_libraries(${TEST_APP_NAME} ${CURRENT_LIB_NAME} bytes tls_syntax doct
 
 # Enable CTest
 include(doctest)
-enable_testing()
 doctest_discover_tests(${TEST_APP_NAME})
