@@ -41,6 +41,11 @@ if(CLANG_TIDY)
 endif()
 
 ###
+### Enable testing
+###
+enable_testing()
+
+###
 ### Dependencies
 ###
 
@@ -97,7 +102,6 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-
 add_subdirectory(test)
 
 ###

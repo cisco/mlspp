@@ -10,22 +10,33 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  PKG_CONFIG_PATH: /usr/local/opt/openssl/lib/pkgconfig
   MACOSX_DEPLOYMENT_TARGET: 10.11
 
 jobs:
   build:
     runs-on: macos-latest
     
+    env:
+        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+
     steps:
-    - uses: actions/checkout@v1
-    
+    - uses: actions/checkout@v2
+     
     - name: dependencies
       run: |
-        brew reinstall openssl@1.1
-        brew install pkgconfig doctest llvm
+        brew install llvm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
     - name: build the library
-      run: make
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
