@@ -33,8 +33,8 @@ public:
   std::vector<std::string> dns_names() const;
   bytes hash() const;
 
-  const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;
+  const Signature::ID public_key_algorithm;
   const bytes raw;
 };
 

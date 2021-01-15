@@ -92,6 +92,7 @@ struct Certificate::ParsedCertificate
     return asn1_octet_string_to_bytes(X509_get0_authority_key_id(cert));
   }
 
+  // Parse Subject Alternate Names
   static std::vector<GeneralName> parse_san(X509* cert)
   {
     std::vector<GeneralName> names;
@@ -125,7 +126,6 @@ struct Certificate::ParsedCertificate
 
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
-    , sig_id(signature_algorithm(x509.get()))
     , issuer(X509_issuer_name_hash(x509.get()))
     , subject(X509_subject_name_hash(x509.get()))
     , subject_key_id(parse_skid(x509.get()))
@@ -137,7 +137,6 @@ struct Certificate::ParsedCertificate
 
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
-    , sig_id(signature_algorithm(other.x509.get()))
     , issuer(other.issuer)
     , subject(other.subject)
     , subject_key_id(other.subject_key_id)
@@ -152,34 +151,12 @@ struct Certificate::ParsedCertificate
     x509.reset(other.x509.get());
   }
 
-  static Signature::ID signature_algorithm(X509* cert)
-  {
-    switch (X509_get_signature_nid(cert)) {
-      case EVP_PKEY_ED25519:
-        return Signature::ID::Ed25519;
-      case EVP_PKEY_ED448:
-        return Signature::ID::Ed448;
-      case NID_ecdsa_with_SHA256:
-        return Signature::ID::P256_SHA256;
-      case NID_ecdsa_with_SHA384:
-        return Signature::ID::P384_SHA384;
-      case NID_ecdsa_with_SHA512:
-        return Signature::ID::P521_SHA512;
-      case NID_sha256WithRSAEncryption:
-        return Signature::ID::RSA_SHA256;
-      default:
-        break;
-    }
-    throw std::runtime_error("Unsupported signature algorithm");
-  }
-
-  typed_unique_ptr<EVP_PKEY> public_key() const
+  typed_unique_ptr<EVP_PKEY> public_key()
   {
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
   typed_unique_ptr<X509> x509;
-  const Signature::ID sig_id;
   const uint64_t issuer;
   const uint64_t subject;
   const std::optional<bytes> subject_key_id;
@@ -193,28 +170,55 @@ struct Certificate::ParsedCertificate
 /// Certificate
 ///
 
-static std::unique_ptr<Signature::PublicKey>
-signature_key(EVP_PKEY* pkey, Signature::ID sig_id)
+// Convert signature scheme for public key from EVP format to
+// to hpke variant
+static Signature::ID
+evp_sig_to_hpke_sig(EVP_PKEY* pkey)
 {
+  auto pkey_type = EVP_PKEY_id(pkey);
+  switch (pkey_type) {
+    case EVP_PKEY_ED25519:
+      return Signature::ID::Ed25519;
+    case EVP_PKEY_ED448:
+      return Signature::ID::Ed448;
+    case EVP_PKEY_EC: {
+      auto key_size = EVP_PKEY_bits(pkey);
+      return (key_size == 256) ? Signature::ID::P256_SHA256
+                               : (key_size == 384) ? Signature::ID::P384_SHA384
+                                                   : Signature::ID::P521_SHA512;
+    }
+    case EVP_PKEY_RSA:
+      return Signature::ID::RSA_SHA256;
+    default:
+      throw std::runtime_error("Unsupported signature algorithm");
+  }
+}
+
+static std::unique_ptr<Signature::PublicKey>
+signature_key(EVP_PKEY* pkey)
+{
+  auto sig_id = evp_sig_to_hpke_sig(pkey);
+
   if (sig_id == Signature::ID::RSA_SHA256) {
     return std::make_unique<RSASignature::PublicKey>(pkey);
   }
 
   return std::make_unique<EVPGroup::PublicKey>(pkey);
 }
+
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
-  , public_key_algorithm(parsed_cert->sig_id)
-  , public_key(
-      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
+  , public_key(signature_key(parsed_cert->public_key().release()))
+  , public_key_algorithm(
+      evp_sig_to_hpke_sig(parsed_cert->public_key().release()))
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
-  , public_key_algorithm(parsed_cert->sig_id)
-  , public_key(
-      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
+  , public_key(signature_key(parsed_cert->public_key().release()))
+  , public_key_algorithm(
+      evp_sig_to_hpke_sig(parsed_cert->public_key().release()))
   , raw(other.raw)
 {}
 
