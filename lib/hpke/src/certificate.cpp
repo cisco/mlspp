@@ -151,7 +151,7 @@ struct Certificate::ParsedCertificate
     x509.reset(other.x509.get());
   }
 
-  typed_unique_ptr<EVP_PKEY> public_key()
+  typed_unique_ptr<EVP_PKEY> public_key() const
   {
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
