@@ -12,20 +12,15 @@ namespace mls_vectors {
 
 struct TreeMathTestVector
 {
-  mls::LeafCount n_leaves;
-  std::vector<mls::NodeIndex> root;
-  std::vector<mls::NodeIndex> left;
-  std::vector<mls::NodeIndex> right;
-  std::vector<mls::NodeIndex> parent;
-  std::vector<mls::NodeIndex> sibling;
+  using OptionalNode = std::optional<mls::NodeIndex>;
 
-  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling)
-  TLS_TRAITS(tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>)
+  mls::LeafCount n_leaves;
+  mls::NodeCount n_nodes;
+  std::vector<mls::NodeIndex> root;
+  std::vector<OptionalNode> left;
+  std::vector<OptionalNode> right;
+  std::vector<OptionalNode> parent;
+  std::vector<OptionalNode> sibling;
 
   static TreeMathTestVector create(uint32_t n_leaves);
   std::optional<std::string> verify() const;

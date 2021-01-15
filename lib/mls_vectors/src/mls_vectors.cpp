@@ -18,6 +18,23 @@ operator<<(std::ostream& str, const NodeIndex& obj)
 }
 
 static std::ostream&
+operator<<(std::ostream& str, const NodeCount& obj)
+{
+  return str << obj.val;
+}
+
+template<typename T>
+static std::ostream&
+operator<<(std::ostream& str, const std::optional<T>& obj)
+{
+  if (!obj) {
+    return str << "(nullopt)";
+  }
+
+  return str << opt::get(obj);
+}
+
+static std::ostream&
 operator<<(std::ostream& str, const bytes& obj)
 {
   return str << to_hex(obj);
@@ -79,18 +96,32 @@ verify_round_trip(const std::string& label, const bytes& expected)
 ///
 /// TreeMathTestVector
 ///
+
+// XXX(RLB): This is a hack to get the tests working in the right format.  In
+// reality, the tree math functions should be updated to be fallible.
+static std::optional<mls::NodeIndex>
+null_if_same(NodeIndex input, NodeIndex answer)
+{
+  if (input == answer) {
+    return std::nullopt;
+  }
+
+  return answer;
+}
+
 TreeMathTestVector
 TreeMathTestVector::create(uint32_t n_leaves)
 {
   auto tv = TreeMathTestVector{};
   tv.n_leaves = LeafCount{ n_leaves };
+  tv.n_nodes = NodeCount(tv.n_leaves);
   tv.root.resize(n_leaves);
 
-  auto width = NodeCount(tv.n_leaves).val;
-  tv.left.resize(width);
-  tv.right.resize(width);
-  tv.parent.resize(width);
-  tv.sibling.resize(width);
+  tv.n_nodes = NodeCount(tv.n_leaves);
+  tv.left.resize(tv.n_nodes.val);
+  tv.right.resize(tv.n_nodes.val);
+  tv.parent.resize(tv.n_nodes.val);
+  tv.sibling.resize(tv.n_nodes.val);
 
   // Root is special
   for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
@@ -98,11 +129,11 @@ TreeMathTestVector::create(uint32_t n_leaves)
   }
 
   // Left, right, parent, sibling are relative
-  for (NodeIndex x{ 0 }; x.val < width; x.val++) {
-    tv.left[x.val] = tree_math::left(x);
-    tv.right[x.val] = tree_math::right(x, tv.n_leaves);
-    tv.parent[x.val] = tree_math::parent(x, tv.n_leaves);
-    tv.sibling[x.val] = tree_math::sibling(x, tv.n_leaves);
+  for (NodeIndex x{ 0 }; x.val < tv.n_nodes.val; x.val++) {
+    tv.left[x.val] = null_if_same(x, tree_math::left(x));
+    tv.right[x.val] = null_if_same(x, tree_math::right(x, tv.n_leaves));
+    tv.parent[x.val] = null_if_same(x, tree_math::parent(x, tv.n_leaves));
+    tv.sibling[x.val] = null_if_same(x, tree_math::sibling(x, tv.n_leaves));
   }
 
   return tv;
@@ -111,22 +142,22 @@ TreeMathTestVector::create(uint32_t n_leaves)
 std::optional<std::string>
 TreeMathTestVector::verify() const
 {
+  VERIFY_EQUAL("n_nodes", n_nodes, NodeCount(n_leaves));
+
   auto ss = std::stringstream();
   for (LeafCount n{ 1 }; n.val <= n_leaves.val; n.val++) {
     VERIFY_EQUAL("root", root[n.val - 1], tree_math::root(n));
   }
 
-  auto w = NodeCount(n_leaves);
-  for (NodeIndex x{ 0 }; x.val < w.val; x.val++) {
-    VERIFY_EQUAL("left", left[x.val], tree_math::left(x));
-    VERIFY_EQUAL("right", right[x.val], tree_math::right(x, n_leaves));
-    VERIFY_EQUAL("parent", parent[x.val], tree_math::parent(x, n_leaves));
-    VERIFY_EQUAL("sibling", sibling[x.val], tree_math::sibling(x, n_leaves));
+  for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
+    VERIFY_EQUAL("left", left[x.val], null_if_same(x, tree_math::left(x)));
+    VERIFY_EQUAL("right", right[x.val], null_if_same(x, tree_math::right(x, n_leaves)));
+    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, tree_math::parent(x, n_leaves)));
+    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, tree_math::sibling(x, n_leaves)));
   }
 
   return std::nullopt;
 }
-
 ///
 /// EncryptionTestVector
 ///
