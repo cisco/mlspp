@@ -26,59 +26,50 @@ struct TreeMathTestVector
   std::optional<std::string> verify() const;
 };
 
-struct CryptoValue
-{
-  bytes data;
-  TLS_SERIALIZABLE(data)
-  TLS_TRAITS(tls::vector<1>)
-};
-
 struct EncryptionTestVector
 {
-  struct KeyAndNonce
+  struct SenderDataInfo
   {
-    CryptoValue key;
-    CryptoValue nonce;
-    // TODO(RLB): Include an encrypted message to decrypt
-    TLS_SERIALIZABLE(key, nonce);
+    bytes ciphertext;
+    bytes key;
+    bytes nonce;
   };
 
-  struct HashRatchetSequence
+  struct RatchetStep
   {
-    std::vector<KeyAndNonce> steps;
-    TLS_SERIALIZABLE(steps)
-    TLS_TRAITS(tls::vector<4>)
+    bytes key;
+    bytes nonce;
+    bytes plaintext;
+    bytes ciphertext;
   };
 
-  mls::CipherSuite suite;
-  CryptoValue encryption_secret;
-  CryptoValue sender_data_secret;
+  struct LeafInfo
+  {
+    uint32_t generations;
+    std::vector<RatchetStep> handshake;
+    std::vector<RatchetStep> application;
+  };
 
-  std::vector<HashRatchetSequence> handshake_keys;
-  std::vector<HashRatchetSequence> application_keys;
+  mls::CipherSuite cipher_suite;
+  mls::LeafCount n_leaves;
 
-  mls::MLSCiphertext handshake_message;
-  mls::MLSCiphertext application_message;
+  bytes encryption_secret;
+  bytes sender_data_secret;
+  SenderDataInfo sender_data_info;
 
-  TLS_SERIALIZABLE(suite,
-                   encryption_secret,
-                   sender_data_secret,
-                   handshake_keys,
-                   application_keys,
-                   handshake_message,
-                   application_message)
-  TLS_TRAITS(tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::pass,
-             tls::pass)
+  std::vector<LeafInfo> leaves;
 
   static EncryptionTestVector create(mls::CipherSuite suite,
                                      uint32_t n_leaves,
                                      uint32_t n_generations);
   std::optional<std::string> verify() const;
+};
+
+struct CryptoValue
+{
+  bytes data;
+  TLS_SERIALIZABLE(data)
+  TLS_TRAITS(tls::vector<1>)
 };
 
 struct KeyScheduleTestVector

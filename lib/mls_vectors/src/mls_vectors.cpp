@@ -151,9 +151,13 @@ TreeMathTestVector::verify() const
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
     VERIFY_EQUAL("left", left[x.val], null_if_same(x, tree_math::left(x)));
-    VERIFY_EQUAL("right", right[x.val], null_if_same(x, tree_math::right(x, n_leaves)));
-    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, tree_math::parent(x, n_leaves)));
-    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, tree_math::sibling(x, n_leaves)));
+    VERIFY_EQUAL(
+      "right", right[x.val], null_if_same(x, tree_math::right(x, n_leaves)));
+    VERIFY_EQUAL(
+      "parent", parent[x.val], null_if_same(x, tree_math::parent(x, n_leaves)));
+    VERIFY_EQUAL("sibling",
+                 sibling[x.val],
+                 null_if_same(x, tree_math::sibling(x, n_leaves)));
   }
 
   return std::nullopt;
@@ -168,50 +172,68 @@ EncryptionTestVector::create(CipherSuite suite,
                              uint32_t n_generations)
 {
   auto tv = EncryptionTestVector{};
-  tv.suite = suite;
-  tv.encryption_secret = { random_bytes(suite.secret_size()) };
+  tv.cipher_suite = suite;
+  tv.encryption_secret = random_bytes(suite.secret_size());
+  tv.sender_data_secret = random_bytes(suite.secret_size());
 
-  auto leaf_count = LeafCount{ n_leaves };
-  auto src = GroupKeySource(suite, leaf_count, tv.encryption_secret.data);
+  auto ciphertext = random_bytes(suite.secret_size());
+  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
+    suite, tv.sender_data_secret, ciphertext);
+  tv.sender_data_info = {
+    ciphertext,
+    sender_data_key_nonce.key,
+    sender_data_key_nonce.nonce,
+  };
 
-  auto handshake = GroupKeySource::RatchetType::handshake;
-  auto application = GroupKeySource::RatchetType::application;
-  tv.handshake_keys.resize(n_leaves);
-  tv.application_keys.resize(n_leaves);
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    tv.handshake_keys[i].steps.resize(n_generations);
-    tv.application_keys[i].steps.resize(n_generations);
+  tv.n_leaves = LeafCount{ n_leaves };
+  auto src = GroupKeySource(suite, tv.n_leaves, tv.encryption_secret);
 
-    for (uint32_t j = 0; j < n_generations; ++j) {
-      auto hs_key_nonce = src.get(handshake, LeafIndex{ i }, j);
-      tv.handshake_keys[i].steps[j].key = { std::move(hs_key_nonce.key) };
-      tv.handshake_keys[i].steps[j].nonce = { std::move(hs_key_nonce.nonce) };
-
-      auto app_key_nonce = src.get(application, LeafIndex{ i }, j);
-      tv.application_keys[i].steps[j].key = { std::move(app_key_nonce.key) };
-      tv.application_keys[i].steps[j].nonce = { std::move(
-        app_key_nonce.nonce) };
-    }
-  }
-
-  tv.sender_data_secret = { random_bytes(suite.secret_size()) };
-  auto sender_index = LeafIndex{ n_leaves / 2 };
-  auto sender = Sender{ SenderType::member, sender_index.val };
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
+  auto handshake_type = GroupKeySource::RatchetType::handshake;
+  auto application_type = GroupKeySource::RatchetType::application;
+  auto proposal = Proposal{ Remove{ LeafIndex{ 0 } } };
+  auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
 
-  auto hs_pt = MLSPlaintext{
-    group_id, epoch, sender, Proposal{ Remove{ LeafIndex{ 0 } } }
-  };
-  tv.handshake_message =
-    src.encrypt(sender_index, tv.sender_data_secret.data, hs_pt);
+  tv.leaves.resize(n_leaves);
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    tv.leaves[i].generations = n_generations;
+    tv.leaves[i].handshake.resize(n_generations);
+    tv.leaves[i].application.resize(n_generations);
 
-  auto app_message = std::string("Hello, test vector verifier!");
-  auto app_data =
-    ApplicationData{ bytes(app_message.begin(), app_message.end()) };
-  auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
-  tv.application_message =
-    src.encrypt(sender_index, tv.sender_data_secret.data, app_pt);
+    auto N = LeafIndex{ i };
+    auto sender = Sender{ SenderType::member, i };
+    auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
+    auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
+    auto hs_pt_data = tls::marshal(hs_pt);
+    auto app_pt_data = tls::marshal(app_pt);
+
+    for (uint32_t j = 0; j < n_generations; ++j) {
+      // Handshake
+      auto hs_ct = src.encrypt(N, tv.sender_data_secret, hs_pt);
+      auto hs_key_nonce = src.get(handshake_type, N, j);
+      src.erase(handshake_type, N, j);
+
+      tv.leaves[i].handshake[j] = {
+        std::move(hs_key_nonce.key),
+        std::move(hs_key_nonce.nonce),
+        hs_pt_data,
+        tls::marshal(hs_ct),
+      };
+
+      // Application
+      auto app_ct = src.encrypt(N, tv.sender_data_secret, app_pt);
+      auto app_key_nonce = src.get(application_type, N, j);
+      src.erase(application_type, N, j);
+
+      tv.leaves[i].application[j] = {
+        std::move(app_key_nonce.key),
+        std::move(app_key_nonce.nonce),
+        app_pt_data,
+        tls::marshal(app_ct),
+      };
+    }
+  }
 
   return tv;
 }
@@ -219,6 +241,45 @@ EncryptionTestVector::create(CipherSuite suite,
 std::optional<std::string>
 EncryptionTestVector::verify() const
 {
+  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
+    cipher_suite, sender_data_secret, sender_data_info.ciphertext);
+  VERIFY_EQUAL(
+    "sender data key", sender_data_key_nonce.key, sender_data_info.key);
+  VERIFY_EQUAL(
+    "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
+
+  auto handshake_type = GroupKeySource::RatchetType::handshake;
+  auto application_type = GroupKeySource::RatchetType::application;
+
+  auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+  for (uint32_t i = 0; i < n_leaves.val; i++) {
+    auto N = LeafIndex{ i };
+    for (uint32_t j = 0; j < leaves[i].generations; ++j) {
+      // Handshake
+      const auto& hs_step = leaves[i].handshake[j];
+      auto hs_key_nonce = src.get(handshake_type, N, j);
+      VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
+      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
+
+      auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
+      auto hs_pt = src.decrypt(sender_data_secret, hs_ct);
+      VERIFY_EQUAL("hs pt", tls::marshal(hs_pt), hs_step.plaintext);
+      src.erase(handshake_type, N, j);
+
+      // Application
+      const auto& app_step = leaves[i].application[j];
+      auto app_key_nonce = src.get(application_type, N, j);
+      VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
+      VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
+
+      auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
+      auto app_pt = src.decrypt(sender_data_secret, app_ct);
+      VERIFY_EQUAL("app pt", tls::marshal(app_pt), app_step.plaintext);
+      src.erase(application_type, N, j);
+    }
+  }
+
+#if 0
   if (handshake_keys.size() != application_keys.size()) {
     return "Malformed test vector";
   }
@@ -250,7 +311,7 @@ EncryptionTestVector::verify() const
 
   src.decrypt(sender_data_secret.data, handshake_message);
   src.decrypt(sender_data_secret.data, application_message);
-
+#endif
   return std::nullopt;
 }
 
