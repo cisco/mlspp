@@ -206,11 +206,18 @@ signature_key(EVP_PKEY* pkey)
   return std::make_unique<EVPGroup::PublicKey>(pkey);
 }
 
+static Signature::ID
+signature_algorithm(EVP_PKEY* pkey)
+{
+  typed_unique_ptr<EVP_PKEY> key = make_typed_unique(pkey);
+  return evp_sig_to_hpke_sig(key.get());
+}
+
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
   , public_key(signature_key(parsed_cert->public_key().release()))
   , public_key_algorithm(
-      evp_sig_to_hpke_sig(parsed_cert->public_key().release()))
+      signature_algorithm(parsed_cert->public_key().release()))
   , raw(der)
 {}
 
@@ -218,7 +225,7 @@ Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
   , public_key(signature_key(parsed_cert->public_key().release()))
   , public_key_algorithm(
-      evp_sig_to_hpke_sig(parsed_cert->public_key().release()))
+      signature_algorithm(parsed_cert->public_key().release()))
   , raw(other.raw)
 {}
 
