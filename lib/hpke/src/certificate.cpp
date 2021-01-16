@@ -188,6 +188,9 @@ evp_sig_to_hpke_sig(EVP_PKEY* pkey)
                                                    : Signature::ID::P521_SHA512;
     }
     case EVP_PKEY_RSA:
+      // It is not necessarily the case that RSA keys are used with SHA256, 
+      // but in practically all cases, it is.  Since the SubjectPublicKeyInfo
+      // key doesn't tell us any more information, we assume this is the case.
       return Signature::ID::RSA_SHA256;
     default:
       throw std::runtime_error("Unsupported signature algorithm");
