@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <tls/compat.h>
-namespace var = tls::var;
 namespace opt = tls::opt;
 
 TEST_CASE("Certificate Known-Answer depth 2")
