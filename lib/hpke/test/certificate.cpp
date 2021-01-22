@@ -7,6 +7,9 @@
 #include <iostream>
 #include <vector>
 
+#include <tls/compat.h>
+namespace opt = tls::opt;
+
 TEST_CASE("Certificate Known-Answer depth 2")
 {
   // TODO(suhas) Do this for each supported signature algorithm
@@ -127,13 +130,13 @@ TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
 
   REQUIRE(root.subject_key_id().has_value());
 
-  CHECK_EQ(to_hex(leaf.subject_key_id().value()), leaf_skid);
-  CHECK_EQ(to_hex(leaf.authority_key_id().value()),
-           to_hex(issuing.subject_key_id().value()));
-  CHECK_EQ(to_hex(issuing.subject_key_id().value()), issuing_skid);
-  CHECK_EQ(to_hex(issuing.authority_key_id().value()),
-           to_hex(root.subject_key_id().value()));
-  CHECK_EQ(to_hex(root.subject_key_id().value()), root_skid);
+  CHECK_EQ(to_hex(opt::get(leaf.subject_key_id())), leaf_skid);
+  CHECK_EQ(to_hex(opt::get(leaf.authority_key_id())),
+           to_hex(opt::get(issuing.subject_key_id())));
+  CHECK_EQ(to_hex(opt::get(issuing.subject_key_id())), issuing_skid);
+  CHECK_EQ(to_hex(opt::get(issuing.authority_key_id())),
+           to_hex(opt::get(root.subject_key_id())));
+  CHECK_EQ(to_hex(opt::get(root.subject_key_id())), root_skid);
 }
 
 TEST_CASE("Certificate Known-Answer depth 2 with SAN RFC822Name")
