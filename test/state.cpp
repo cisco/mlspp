@@ -295,8 +295,10 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
       // skip since we removed
       continue;
     }
-    states[i] = states[i].handle(commit_1).value();
-    states[i] = states[i].handle(commit_2).value();
+    auto state = states[i].handle(commit_1);
+    states[i] = opt::get(state);
+    state = states[i].handle(commit_2);
+    states[i] = opt::get(state);
     REQUIRE(expected_creds == get_creds(states[i].roster()));
   }
 }
