@@ -201,7 +201,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone via Empty Commit")
       if (state.index().val == i) {
         state = new_state;
       } else {
-        state = state.handle(commit).value();
+        state = opt::get(state.handle(commit));
       }
     }
 
@@ -295,10 +295,8 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
       // skip since we removed
       continue;
     }
-    auto state = states[i].handle(commit_1);
-    states[i] = opt::get(state);
-    state = states[i].handle(commit_2);
-    states[i] = opt::get(state);
+    states[i] = opt::get(states[i].handle(commit_1));
+    states[i] = opt::get(states[i].handle(commit_2));
     REQUIRE(expected_creds == get_creds(states[i].roster()));
   }
 }
