@@ -27,8 +27,9 @@ find_signature(Signature::ID id)
       return Signature::get<Signature::ID::Ed448>();
     case Signature::ID::RSA_SHA256:
       return Signature::get<Signature::ID::RSA_SHA256>();
+    default:
+      throw InvalidParameterError("Unsupported algorithm");
   }
-  throw InvalidParameterError("Unsupported algorithm");
 }
 
 static std::vector<mls::X509Credential::CertData>

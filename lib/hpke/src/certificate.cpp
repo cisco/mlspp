@@ -125,7 +125,7 @@ struct Certificate::ParsedCertificate
 
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
-    , sig_id(signature_algorithm(x509.get()))
+    , pub_key_id(signature_algorithm(x509.get()))
     , issuer(X509_issuer_name_hash(x509.get()))
     , subject(X509_subject_name_hash(x509.get()))
     , subject_key_id(parse_skid(x509.get()))
@@ -137,7 +137,7 @@ struct Certificate::ParsedCertificate
 
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
-    , sig_id(signature_algorithm(other.x509.get()))
+    , pub_key_id(signature_algorithm(other.x509.get()))
     , issuer(other.issuer)
     , subject(other.subject)
     , subject_key_id(other.subject_key_id)
@@ -152,9 +152,9 @@ struct Certificate::ParsedCertificate
     x509.reset(other.x509.get());
   }
 
-  static Signature::ID signature_algorithm(X509* cert)
+  static Signature::ID signature_algorithm(X509* x509)
   {
-    switch (X509_get_signature_nid(cert)) {
+    switch (EVP_PKEY_base_id(X509_get0_pubkey(x509))) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
@@ -165,8 +165,7 @@ struct Certificate::ParsedCertificate
         return Signature::ID::P384_SHA384;
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
-      case NID_sha256WithRSAEncryption:
-      case NID_sha1WithRSAEncryption:
+      case EVP_PKEY_RSA:
         return Signature::ID::RSA_SHA256;
       default:
         break;
@@ -180,7 +179,7 @@ struct Certificate::ParsedCertificate
   }
 
   typed_unique_ptr<X509> x509;
-  const Signature::ID sig_id;
+  const Signature::ID pub_key_id;
   const uint64_t issuer;
   const uint64_t subject;
   const std::optional<bytes> subject_key_id;
@@ -195,27 +194,37 @@ struct Certificate::ParsedCertificate
 ///
 
 static std::unique_ptr<Signature::PublicKey>
-signature_key(EVP_PKEY* pkey, Signature::ID sig_id)
+signature_key(EVP_PKEY* pkey)
 {
-  if (sig_id == Signature::ID::RSA_SHA256) {
-    return std::make_unique<RSASignature::PublicKey>(pkey);
-  }
+  switch (EVP_PKEY_base_id(pkey)) {
+    case EVP_PKEY_RSA:
+      return std::make_unique<RSASignature::PublicKey>(pkey);
 
-  return std::make_unique<EVPGroup::PublicKey>(pkey);
+    case EVP_PKEY_ED448:
+    case EVP_PKEY_ED25519:
+    case NID_ecdsa_with_SHA256:
+    case NID_ecdsa_with_SHA384:
+    case NID_ecdsa_with_SHA512:
+      return std::make_unique<EVPGroup::PublicKey>(pkey);
+
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
 }
+
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
-  , public_key_algorithm(parsed_cert->sig_id)
+  , public_key_algorithm(parsed_cert->pub_key_id)
   , public_key(
-      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
+      signature_key(parsed_cert->public_key().release()))
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
-  , public_key_algorithm(parsed_cert->sig_id)
+  , public_key_algorithm(parsed_cert->pub_key_id)
   , public_key(
-      signature_key(parsed_cert->public_key().release(), public_key_algorithm))
+      signature_key(parsed_cert->public_key().release()))
   , raw(other.raw)
 {}
 
