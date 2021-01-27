@@ -421,7 +421,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
     auto leaf_secret = random_bytes(suite.secret_size());
     auto added = pub.add_leaf(key_package);
     auto [new_adder_priv, path] =
-      pub.encap(added, {}, leaf_secret, sig_priv, std::nullopt);
+      pub.encap(added, {}, leaf_secret, sig_priv, {}, std::nullopt);
     silence_unused(new_adder_priv);
     pub.merge(added, path);
   }
@@ -434,8 +434,12 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   auto add_secret = random_bytes(suite.secret_size());
   auto [test_sig_priv, test_kp] = new_key_package(suite);
   auto test_index = pub.add_leaf(test_kp);
-  auto [add_priv, add_path] = pub.encap(
-    tv.add_sender, {}, add_secret, sig_privs[tv.add_sender.val], std::nullopt);
+  auto [add_priv, add_path] = pub.encap(tv.add_sender,
+                                        {},
+                                        add_secret,
+                                        sig_privs[tv.add_sender.val],
+                                        {},
+                                        std::nullopt);
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
   silence_unused(add_path);
@@ -455,6 +459,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
                                                {},
                                                update_secret,
                                                sig_privs[tv.update_sender.val],
+                                               {},
                                                std::nullopt);
   pub.merge(tv.update_sender, update_path_);
   pub.set_hash_all();
@@ -485,7 +490,8 @@ TreeKEMTestVector::verify() const
     "tree hash before", tree_before.root_hash(), tree_hash_before.data);
   VERIFY("tree before parent hash valid", tree_before.parent_hash_valid());
 
-  VERIFY("update path parent hash valid", update_path.parent_hash_valid(suite));
+  VERIFY("update path parent hash valid",
+         tree_before.parent_hash_valid(update_sender, update_path));
 
   VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after.data);
   VERIFY("tree after parent hash valid", tree_after.parent_hash_valid());
@@ -509,7 +515,7 @@ TreeKEMTestVector::verify() const
                                         my_path_secret.data);
 
   // Process the UpdatePath
-  priv.decap(update_sender, tree_before, {}, update_path);
+  priv.decap(update_sender, tree_before, {}, update_path, {});
 
   auto my_tree_after = tree_before;
   my_tree_after.merge(update_sender, update_path);

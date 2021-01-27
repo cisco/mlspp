@@ -58,6 +58,10 @@ level(NodeIndex x)
 NodeIndex
 root(LeafCount n)
 {
+  if (n.val == 0) {
+    throw std::runtime_error("Root for zero-size tree is undefined");
+  }
+
   auto w = NodeCount(n);
   return NodeIndex{ (one << log2(w.val)) - 1 };
 }
