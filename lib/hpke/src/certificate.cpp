@@ -215,16 +215,14 @@ signature_key(EVP_PKEY* pkey)
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
   , public_key_algorithm(parsed_cert->pub_key_id)
-  , public_key(
-      signature_key(parsed_cert->public_key().release()))
+  , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
   , public_key_algorithm(parsed_cert->pub_key_id)
-  , public_key(
-      signature_key(parsed_cert->public_key().release()))
+  , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(other.raw)
 {}
 
