@@ -225,3 +225,87 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
     check(initial_epoch);
   }
 }
+
+TEST_CASE("Session with X509 Credential")
+{
+  // leaf_cert with p-256 public key
+  const auto key_raw = from_hex(
+    "f44068a9ca0f7e72135af0db88b342a692ab86dcc136589ecbf6943b5d5ada51");
+  const auto leaf_der =
+    from_hex("308202503082013802022457300d06092a864886f70d01010b05003042310b30"
+             "09060355040613024d5631183016060355040a0c0f42696742726f7468657220"
+             "496e632e3119301706035504030c10696e742e7763612e61636d652e636f6d30"
+             "1e170d3139303630343038313033375a170d3230303630333038313033375a30"
+             "42310b3009060355040613024d5631183016060355040a0c0f42696742726f74"
+             "68657220496e632e3119301706035504030c1043452d453245452d4944454e54"
+             "4954593059301306072a8648ce3d020106082a8648ce3d0301070342000489f0"
+             "d7d8cf224436bd2d081b396c03f4bf1184085a4bf35525af1d42cebc4dcf9e8f"
+             "95db20bcf366630ad16071a38aeb259ceddf16f9fb599ccb04c4de264e05a320"
+             "301e300c0603551d130101ff04023000300e0603551d0f0101ff0404030205e0"
+             "300d06092a864886f70d01010b05000382010100146d4f2b30c58ab43ef5c317"
+             "40683d564fc01b7488df6eafc6090cf74ec542df3fb19f101927e931df3e0318"
+             "7ecaeab2b62fda2c009dc6ebae020f1761c5e2f25b807c8e0fcce22b7bef6504"
+             "a2edd202179b1974f4511585de82bdfd9da79a28b3d1a689fb09465e67d4e30d"
+             "25e7a96032fa48e47a3ce48508083ea52850d4df04ac22583cb27e572526360e"
+             "7ab13e2e313e74c136914f4d3229a6c344b982296a6960006ba37bd5644fa72f"
+             "18872ce27f05655bcc61ffaf90eb623a1a5844f51a3c62ff5e9e232e5e50ec6a"
+             "d89da3882088eac0036d9ed54ac5868bd640d08d764809cdfb490e0efd97ec39"
+             "c64e6e2ddf69522c0533303b1856eea88ce942bf");
+  const auto issuing_der =
+    from_hex("30820259308201ff020223cf300a06082a8648ce3d040302303e310b30090603"
+             "55040613024d5631183016060355040a0c0f42696742726f7468657220496e63"
+             "2e3115301306035504030c0c7763612e61636d652e636f6d301e170d31393036"
+             "30343038313033375a170d3230303630333038313033375a3042310b30090603"
+             "55040613024d5631183016060355040a0c0f42696742726f7468657220496e63"
+             "2e3119301706035504030c10696e742e7763612e61636d652e636f6d30820122"
+             "300d06092a864886f70d01010105000382010f003082010a0282010100f1b334"
+             "4af90b56902acff6df559eef84d3936308ee1adc626394bccb95ae67f17e0fef"
+             "625c2c1fc39fadfd185da17085e0685f5019185d510bcd938460e7342a64daee"
+             "1d4fc85d2ac2c79b445b454fd09a06cd68bd93f24937b68259e97bdf6b28d79a"
+             "7867b89b7b85a9c00156030a1f867055ae628fc70604d780595986b4f3cabd87"
+             "3d63927c9acd105d50f9850c0c55d694b91e202dc702cd0f237a57ddad173dc3"
+             "aab4d2a8d043020e2ed68bf77f0d6707fb18d88951769ac321fa25cc33c78f53"
+             "f2a49a59949fa78fda90713e27c33b774ddf48938bdae0ca90775610aa596a57"
+             "5326258a74cee1cf787217fdf18d7e1b8e9ce5009ba995c38a35bf8923020301"
+             "0001a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101"
+             "ff0404030201a6300a06082a8648ce3d040302034800304502203bf07cda259c"
+             "29b54cb90455bbbce07dae4fe4096e5c493615fe967f29ef1997022100dcbc71"
+             "d9865c93f3952abc7e671e625b8479214c1c9b62a7cc6a51a84a3610f4");
+
+  std::vector<bytes> der_chain{ leaf_der, issuing_der };
+  const mls::CipherSuite suite{
+    mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256
+  };
+
+  std::string alice_name = "alice";
+  auto alice_id = bytes(alice_name.begin(), alice_name.end());
+
+  mls::Credential alice_cred = mls::Credential::x509(der_chain);
+  auto alice_sig_priv = mls::SignaturePrivateKey::parse(suite, key_raw);
+  mls::KeyPackageOpts alice_opts_in;
+  alice_opts_in.extensions.add(mls::KeyIDExtension{ alice_id });
+  mls::Client alice_client(suite, alice_sig_priv, alice_cred, alice_opts_in);
+
+  auto group_id = bytes{ 0, 1, 2, 3 };
+  auto alice_session = alice_client.begin_session(group_id);
+
+  std::string bob_name = "bob";
+  auto bob_id = bytes(bob_name.begin(), bob_name.end());
+  auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
+  auto bob_cred = mls::Credential::basic(bob_id, bob_sig_priv.public_key);
+  mls::KeyPackageOpts bob_opts_in;
+  bob_opts_in.extensions.add(mls::KeyIDExtension{ bob_id });
+
+  mls::Client bob_client(suite, bob_sig_priv, bob_cred, bob_opts_in);
+
+  auto bob_pending_join = bob_client.start_join();
+
+  auto add = alice_session.add(bob_pending_join.key_package());
+  auto [welcome, commit] = alice_session.commit(add);
+  alice_session.handle(commit);
+
+  auto bob_session = bob_pending_join.complete(welcome);
+
+  REQUIRE(alice_session.authentication_secret() ==
+          bob_session.authentication_secret());
+}
