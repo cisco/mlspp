@@ -279,39 +279,6 @@ EncryptionTestVector::verify() const
     }
   }
 
-#if 0
-  if (handshake_keys.size() != application_keys.size()) {
-    return "Malformed test vector";
-  }
-
-  auto handshake = GroupKeySource::RatchetType::handshake;
-  auto application = GroupKeySource::RatchetType::application;
-  auto leaf_count = LeafCount{ static_cast<uint32_t>(handshake_keys.size()) };
-  auto src = GroupKeySource(suite, leaf_count, encryption_secret.data);
-
-  for (uint32_t i = 0; i < application_keys.size(); i++) {
-    for (uint32_t j = 0; j < handshake_keys[i].steps.size(); j++) {
-      const auto key_nonce = src.get(handshake, LeafIndex{ i }, j);
-      const auto& key = handshake_keys[i].steps[j].key.data;
-      const auto& nonce = handshake_keys[i].steps[j].nonce.data;
-      VERIFY_EQUAL("key", key, key_nonce.key);
-      VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
-    }
-  }
-
-  for (uint32_t i = 0; i < application_keys.size(); i++) {
-    for (uint32_t j = 0; j < application_keys[i].steps.size(); j++) {
-      const auto key_nonce = src.get(application, LeafIndex{ i }, j);
-      const auto& key = application_keys[i].steps[j].key.data;
-      const auto& nonce = application_keys[i].steps[j].nonce.data;
-      VERIFY_EQUAL("key", key, key_nonce.key);
-      VERIFY_EQUAL("nonce", nonce, key_nonce.nonce);
-    }
-  }
-
-  src.decrypt(sender_data_secret.data, handshake_message);
-  src.decrypt(sender_data_secret.data, application_message);
-#endif
   return std::nullopt;
 }
 
