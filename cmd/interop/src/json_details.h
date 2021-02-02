@@ -96,6 +96,10 @@ struct tls_serializer
   {};
 
 TLS_SERIALIZER(mls::HPKEPublicKey)
+TLS_SERIALIZER(mls::TreeKEMPublicKey)
+TLS_SERIALIZER(mls::MLSPlaintext)
+TLS_SERIALIZER(mls::UpdatePath)
+TLS_SERIALIZER(mls::KeyPackage)
 
 } // namespace nlohmann
 

@@ -433,7 +433,7 @@ TranscriptTestVector::create(CipherSuite suite)
 
     ks_epoch.membership_key,
     ks_epoch.confirmation_key,
-    tls::marshal(commit),
+    commit,
 
     ctx,
     transcript.confirmed,
@@ -451,10 +451,9 @@ TranscriptTestVector::verify() const
   VERIFY_EQUAL("group context", ctx, group_context);
 
   // Verify the transcript
-  auto commit_obj = tls::get<MLSPlaintext>(commit);
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
-  transcript.update(commit_obj);
+  transcript.update(commit);
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
@@ -467,12 +466,12 @@ TranscriptTestVector::verify() const
   auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
   VERIFY_EQUAL("confirmation",
                confirmation_tag,
-               opt::get(commit_obj.confirmation_tag).mac_value);
+               opt::get(commit.confirmation_tag).mac_value);
 
-  auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit_obj);
+  auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit);
   VERIFY_EQUAL("membership",
                membership_tag,
-               opt::get(commit_obj.membership_tag).mac_value);
+               opt::get(commit.membership_tag).mac_value);
 
   return std::nullopt;
 }
@@ -546,9 +545,9 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   pub.set_hash_all();
 
-  tv.ratchet_tree_before = tls::marshal(pub);
+  tv.ratchet_tree_before = pub;
   tv.tree_hash_before = pub.root_hash();
-  tv.my_key_package = tls::marshal(test_kp);
+  tv.my_key_package = test_kp;
   tv.my_path_secret = path_secret;
   tv.root_secret_after_update = add_priv.update_secret;
 
@@ -563,41 +562,39 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   pub.merge(tv.update_sender, update_path);
   pub.set_hash_all();
 
-  tv.update_path = tls::marshal(update_path);
+  tv.update_path = update_path;
   tv.root_secret_after_update = update_priv.update_secret;
-  tv.ratchet_tree_after = tls::marshal(pub);
+  tv.ratchet_tree_after = pub;
   tv.tree_hash_after = { pub.root_hash() };
 
   return tv;
 }
 
+void
+TreeKEMTestVector::initialize_trees()
+{
+  ratchet_tree_before.suite = cipher_suite;
+  ratchet_tree_before.set_hash_all();
+
+  ratchet_tree_after.suite = cipher_suite;
+  ratchet_tree_after.set_hash_all();
+}
+
 std::optional<std::string>
 TreeKEMTestVector::verify() const
 {
-  // Parse and initialize serialized variables
-  auto tree_before = tls::get<TreeKEMPublicKey>(ratchet_tree_before);
-  tree_before.suite = cipher_suite;
-  tree_before.set_hash_all();
-
-  auto my_key_package_obj = tls::get<KeyPackage>(my_key_package);
-  auto update_path_obj = tls::get<UpdatePath>(update_path);
-
-  auto tree_after = tls::get<TreeKEMPublicKey>(ratchet_tree_after);
-  tree_after.suite = cipher_suite;
-  tree_after.set_hash_all();
-
   // Verify that the trees provided are valid
-  VERIFY_EQUAL("tree hash before", tree_before.root_hash(), tree_hash_before);
-  VERIFY("tree before parent hash valid", tree_before.parent_hash_valid());
+  VERIFY_EQUAL("tree hash before", ratchet_tree_before.root_hash(), tree_hash_before);
+  VERIFY("tree before parent hash valid", ratchet_tree_before.parent_hash_valid());
 
   VERIFY("update path parent hash valid",
-         tree_before.parent_hash_valid(update_sender, update_path_obj));
+         ratchet_tree_before.parent_hash_valid(update_sender, update_path));
 
-  VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after);
-  VERIFY("tree after parent hash valid", tree_after.parent_hash_valid());
+  VERIFY_EQUAL("tree hash after", ratchet_tree_after.root_hash(), tree_hash_after);
+  VERIFY("tree after parent hash valid", ratchet_tree_after.parent_hash_valid());
 
   // Find ourselves in the tree
-  auto maybe_index = tree_before.find(my_key_package_obj);
+  auto maybe_index = ratchet_tree_before.find(my_key_package);
   if (!maybe_index) {
     return "Error: key package not found in ratchet tree";
   }
@@ -608,7 +605,7 @@ TreeKEMTestVector::verify() const
   // Establish a TreeKEMPrivate Key
   auto dummy_leaf_priv = HPKEPrivateKey::generate(cipher_suite);
   auto priv = TreeKEMPrivateKey::joiner(cipher_suite,
-                                        tree_before.size(),
+                                        ratchet_tree_before.size(),
                                         my_index,
                                         dummy_leaf_priv,
                                         ancestor,
@@ -617,15 +614,15 @@ TreeKEMTestVector::verify() const
     "root secret after add", priv.update_secret, root_secret_after_add);
 
   // Process the UpdatePath
-  priv.decap(update_sender, tree_before, {}, update_path_obj, {});
+  priv.decap(update_sender, ratchet_tree_before, {}, update_path, {});
 
-  auto my_tree_after = tree_before;
-  my_tree_after.merge(update_sender, update_path_obj);
+  auto my_tree_after = ratchet_tree_before;
+  my_tree_after.merge(update_sender, update_path);
 
   // Verify that we ended up in the right place
   VERIFY_EQUAL(
     "root secret after update", priv.update_secret, root_secret_after_update);
-  VERIFY_EQUAL("tree after", my_tree_after, tree_after);
+  VERIFY_EQUAL("tree after", my_tree_after, ratchet_tree_after);
 
   return std::nullopt;
 }

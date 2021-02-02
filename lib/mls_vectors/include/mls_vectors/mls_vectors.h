@@ -126,7 +126,7 @@ struct TranscriptTestVector
 
   bytes membership_key;
   bytes confirmation_key;
-  bytes commit;
+  mls::MLSPlaintext commit;
 
   bytes group_context;
   bytes confirmed_transcript_hash_after;
@@ -140,22 +140,23 @@ struct TreeKEMTestVector
 {
   mls::CipherSuite cipher_suite;
 
-  bytes ratchet_tree_before;
+  mls::TreeKEMPublicKey ratchet_tree_before;
 
   mls::LeafIndex add_sender;
-  bytes my_key_package;
+  mls::KeyPackage my_key_package;
   bytes my_path_secret;
 
   mls::LeafIndex update_sender;
-  bytes update_path;
+  mls::UpdatePath update_path;
 
   bytes tree_hash_before;
   bytes root_secret_after_add;
   bytes root_secret_after_update;
-  bytes ratchet_tree_after;
+  mls::TreeKEMPublicKey ratchet_tree_after;
   bytes tree_hash_after;
 
   static TreeKEMTestVector create(mls::CipherSuite suite, size_t n_leaves);
+  void initialize_trees();
   std::optional<std::string> verify() const;
 };
 
