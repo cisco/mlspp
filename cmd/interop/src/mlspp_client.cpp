@@ -107,8 +107,15 @@ class MLSClientImpl final : public MLSClient::Service
         break;
       }
 
+      case TestVectorType::TRANSCRIPT: {
+        error = tv_json.get<mls_vectors::TranscriptTestVector>().verify();
+        break;
+      }
+
       case TestVectorType::TREEKEM: {
-        error = tv_json.get<mls_vectors::TreeKEMTestVector>().verify();
+        auto tv = tv_json.get<mls_vectors::TreeKEMTestVector>();
+        tv.initialize_trees();
+        error = tv.verify();
         break;
       }
 
@@ -149,6 +156,12 @@ class MLSClientImpl final : public MLSClient::Service
         auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
         j = mls_vectors::KeyScheduleTestVector::create(suite,
                                                        request->n_epochs());
+        break;
+      }
+
+      case TestVectorType::TRANSCRIPT: {
+        auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
+        j = mls_vectors::TranscriptTestVector::create(suite);
         break;
       }
 

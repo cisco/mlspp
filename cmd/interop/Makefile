@@ -12,7 +12,7 @@ ${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR} src/*.cpp
 	cmake --build ${BUILD_DIR} --target ${APP_NAME}
 
 run: ${BUILD_DIR}/${APP_NAME}
-	./${BUILD_DIR}/${APP_NAME} -port 50002
+	./${BUILD_DIR}/${APP_NAME} -port 50001
 
 format:
 	clang-format -i -style=Mozilla src/*.cpp src/*.h
