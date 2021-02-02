@@ -397,22 +397,27 @@ TranscriptTestVector::create(CipherSuite suite)
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0);
   auto tree_hash_before = random_bytes(suite.digest().hash_size);
-  auto confirmed_transcript_hash_before = random_bytes(suite.digest().hash_size);
+  auto confirmed_transcript_hash_before =
+    random_bytes(suite.digest().hash_size);
   auto interim_transcript_hash_before = random_bytes(suite.digest().hash_size);
 
   auto transcript = TranscriptHash(suite);
   transcript.interim = interim_transcript_hash_before;
 
-  auto group_context = GroupContext{ group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {} };
+  auto group_context = GroupContext{
+    group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {}
+  };
   auto ctx = tls::marshal(group_context);
 
   auto init_secret = random_bytes(suite.secret_size());
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
 
-  auto commit = MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
+  auto commit =
+    MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
 
   transcript.update_confirmed(commit);
-  commit.confirmation_tag = MAC{ ks_epoch.confirmation_tag(transcript.confirmed) };
+  commit.confirmation_tag =
+    MAC{ ks_epoch.confirmation_tag(transcript.confirmed) };
 
   transcript.update_interim(commit);
   commit.membership_tag = MAC{ ks_epoch.membership_tag(group_context, commit) };
@@ -439,7 +444,9 @@ TranscriptTestVector::create(CipherSuite suite)
 std::optional<std::string>
 TranscriptTestVector::verify() const
 {
-  auto group_context_obj = GroupContext{ group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {} };
+  auto group_context_obj = GroupContext{
+    group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {}
+  };
   auto ctx = tls::marshal(group_context_obj);
   VERIFY_EQUAL("group context", ctx, group_context);
 
@@ -448,7 +455,8 @@ TranscriptTestVector::verify() const
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
   transcript.update(commit_obj);
-  VERIFY_EQUAL("confirmed", transcript.confirmed, confirmed_transcript_hash_after);
+  VERIFY_EQUAL(
+    "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
 
   // Verify the Commit tags
@@ -457,10 +465,14 @@ TranscriptTestVector::verify() const
   ks_epoch.membership_key = membership_key;
 
   auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  VERIFY_EQUAL("confirmation", confirmation_tag, opt::get(commit_obj.confirmation_tag).mac_value);
+  VERIFY_EQUAL("confirmation",
+               confirmation_tag,
+               opt::get(commit_obj.confirmation_tag).mac_value);
 
   auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit_obj);
-  VERIFY_EQUAL("membership", membership_tag, opt::get(commit_obj.membership_tag).mac_value);
+  VERIFY_EQUAL("membership",
+               membership_tag,
+               opt::get(commit_obj.membership_tag).mac_value);
 
   return std::nullopt;
 }
@@ -484,7 +496,7 @@ TreeKEMTestVector
 TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 {
   auto tv = TreeKEMTestVector{};
-  tv.suite = suite;
+  tv.cipher_suite = suite;
 
   // Make a plan
   tv.add_sender = LeafIndex{ 0 };
@@ -534,56 +546,58 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   pub.set_hash_all();
 
-  tv.tree_before = pub;
-  tv.tree_hash_before = { pub.root_hash() };
-  tv.my_key_package = test_kp;
-  tv.my_path_secret = { path_secret };
+  tv.ratchet_tree_before = tls::marshal(pub);
+  tv.tree_hash_before = pub.root_hash();
+  tv.my_key_package = tls::marshal(test_kp);
+  tv.my_path_secret = path_secret;
+  tv.root_secret_after_update = add_priv.update_secret;
 
   // Do a second update that the test participant should be able to process
   auto update_secret = random_bytes(suite.secret_size());
-  auto [update_priv, update_path_] = pub.encap(tv.update_sender,
-                                               {},
-                                               update_secret,
-                                               sig_privs[tv.update_sender.val],
-                                               {},
-                                               std::nullopt);
-  pub.merge(tv.update_sender, update_path_);
+  auto [update_priv, update_path] = pub.encap(tv.update_sender,
+                                              {},
+                                              update_secret,
+                                              sig_privs[tv.update_sender.val],
+                                              {},
+                                              std::nullopt);
+  pub.merge(tv.update_sender, update_path);
   pub.set_hash_all();
 
-  tv.update_path = update_path_;
-  tv.root_secret = { update_priv.update_secret };
-  tv.tree_after = pub;
+  tv.update_path = tls::marshal(update_path);
+  tv.root_secret_after_update = update_priv.update_secret;
+  tv.ratchet_tree_after = tls::marshal(pub);
   tv.tree_hash_after = { pub.root_hash() };
 
   return tv;
 }
 
-void
-TreeKEMTestVector::initialize_trees()
-{
-  tree_before.suite = suite;
-  tree_before.set_hash_all();
-
-  tree_after.suite = suite;
-  tree_after.set_hash_all();
-}
-
 std::optional<std::string>
 TreeKEMTestVector::verify() const
 {
+  // Parse and initialize serialized variables
+  auto tree_before = tls::get<TreeKEMPublicKey>(ratchet_tree_before);
+  tree_before.suite = cipher_suite;
+  tree_before.set_hash_all();
+
+  auto my_key_package_obj = tls::get<KeyPackage>(my_key_package);
+  auto update_path_obj = tls::get<UpdatePath>(update_path);
+
+  auto tree_after = tls::get<TreeKEMPublicKey>(ratchet_tree_after);
+  tree_after.suite = cipher_suite;
+  tree_after.set_hash_all();
+
   // Verify that the trees provided are valid
-  VERIFY_EQUAL(
-    "tree hash before", tree_before.root_hash(), tree_hash_before.data);
+  VERIFY_EQUAL("tree hash before", tree_before.root_hash(), tree_hash_before);
   VERIFY("tree before parent hash valid", tree_before.parent_hash_valid());
 
   VERIFY("update path parent hash valid",
-         tree_before.parent_hash_valid(update_sender, update_path));
+         tree_before.parent_hash_valid(update_sender, update_path_obj));
 
-  VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after.data);
+  VERIFY_EQUAL("tree hash after", tree_after.root_hash(), tree_hash_after);
   VERIFY("tree after parent hash valid", tree_after.parent_hash_valid());
 
   // Find ourselves in the tree
-  auto maybe_index = tree_before.find(my_key_package);
+  auto maybe_index = tree_before.find(my_key_package_obj);
   if (!maybe_index) {
     return "Error: key package not found in ratchet tree";
   }
@@ -592,22 +606,25 @@ TreeKEMTestVector::verify() const
   auto ancestor = tree_math::ancestor(my_index, add_sender);
 
   // Establish a TreeKEMPrivate Key
-  auto dummy_leaf_priv = HPKEPrivateKey::generate(suite);
-  auto priv = TreeKEMPrivateKey::joiner(suite,
+  auto dummy_leaf_priv = HPKEPrivateKey::generate(cipher_suite);
+  auto priv = TreeKEMPrivateKey::joiner(cipher_suite,
                                         tree_before.size(),
                                         my_index,
                                         dummy_leaf_priv,
                                         ancestor,
-                                        my_path_secret.data);
+                                        my_path_secret);
+  VERIFY_EQUAL(
+    "root secret after add", priv.update_secret, root_secret_after_add);
 
   // Process the UpdatePath
-  priv.decap(update_sender, tree_before, {}, update_path, {});
+  priv.decap(update_sender, tree_before, {}, update_path_obj, {});
 
   auto my_tree_after = tree_before;
-  my_tree_after.merge(update_sender, update_path);
+  my_tree_after.merge(update_sender, update_path_obj);
 
   // Verify that we ended up in the right place
-  VERIFY_EQUAL("root secret", priv.update_secret, root_secret.data);
+  VERIFY_EQUAL(
+    "root secret after update", priv.update_secret, root_secret_after_update);
   VERIFY_EQUAL("tree after", my_tree_after, tree_after);
 
   return std::nullopt;
@@ -706,65 +723,62 @@ MessagesTestVector::create()
   };
 
   return MessagesTestVector{
-    { tls::marshal(key_package) },
-    { tls::marshal(capabilities) },
-    { tls::marshal(lifetime) },
-    { tls::marshal(ratchet_tree) },
+    tls::marshal(key_package),
+    tls::marshal(capabilities),
+    tls::marshal(lifetime),
+    tls::marshal(ratchet_tree),
 
-    { tls::marshal(group_info) },
-    { tls::marshal(group_secrets) },
-    { tls::marshal(welcome) },
+    tls::marshal(group_info),
+    tls::marshal(group_secrets),
+    tls::marshal(welcome),
 
-    { tls::marshal(public_group_state) },
+    tls::marshal(public_group_state),
 
-    { tls::marshal(add) },
-    { tls::marshal(update) },
-    { tls::marshal(remove) },
-    { tls::marshal(pre_shared_key) },
-    { tls::marshal(reinit) },
-    { tls::marshal(external_init) },
-    { tls::marshal(app_ack) },
+    tls::marshal(add),
+    tls::marshal(update),
+    tls::marshal(remove),
+    tls::marshal(pre_shared_key),
+    tls::marshal(reinit),
+    tls::marshal(external_init),
+    tls::marshal(app_ack),
 
-    { tls::marshal(commit) },
+    tls::marshal(commit),
 
-    { tls::marshal(pt_application) },
-    { tls::marshal(pt_proposal) },
-    { tls::marshal(pt_commit) },
-    { tls::marshal(ct) },
+    tls::marshal(pt_application),
+    tls::marshal(pt_proposal),
+    tls::marshal(pt_commit),
+    tls::marshal(ct),
   };
 }
 
 std::optional<std::string>
 MessagesTestVector::verify() const
 {
-  VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package.data);
-  VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities.data);
-  VERIFY_TLS_RTT("Lifetime", LifetimeExtension, lifetime.data);
-  VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree.data);
+  VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package);
+  VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities);
+  VERIFY_TLS_RTT("Lifetime", LifetimeExtension, lifetime);
+  VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree);
 
-  VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info.data);
-  VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets.data);
-  VERIFY_TLS_RTT("Welcome", Welcome, welcome.data);
+  VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info);
+  VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets);
+  VERIFY_TLS_RTT("Welcome", Welcome, welcome);
 
-  VERIFY_TLS_RTT("PublicGroupState", PublicGroupState, public_group_state.data);
+  VERIFY_TLS_RTT("PublicGroupState", PublicGroupState, public_group_state);
 
-  VERIFY_TLS_RTT("Add", Add, add_proposal.data);
-  VERIFY_TLS_RTT("Update", Update, update_proposal.data);
-  VERIFY_TLS_RTT("Remove", Remove, remove_proposal.data);
-  VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal.data);
-  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal.data);
-  VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal.data);
-  VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal.data);
+  VERIFY_TLS_RTT("Add", Add, add_proposal);
+  VERIFY_TLS_RTT("Update", Update, update_proposal);
+  VERIFY_TLS_RTT("Remove", Remove, remove_proposal);
+  VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal);
+  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal);
+  VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal);
+  VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal);
 
-  VERIFY_TLS_RTT("Commit", Commit, commit.data);
+  VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  VERIFY_TLS_RTT(
-    "MLSPlaintext/App", MLSPlaintext, mls_plaintext_application.data);
-  VERIFY_TLS_RTT(
-    "MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal.data);
-  VERIFY_TLS_RTT(
-    "MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit.data);
-  VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext.data);
+  VERIFY_TLS_RTT("MLSPlaintext/App", MLSPlaintext, mls_plaintext_application);
+  VERIFY_TLS_RTT("MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal);
+  VERIFY_TLS_RTT("MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit);
+  VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext);
 
   return std::nullopt;
 }
