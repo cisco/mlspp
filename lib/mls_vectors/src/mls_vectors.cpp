@@ -548,7 +548,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   tv.tree_hash_before = pub.root_hash();
   tv.my_key_package = test_kp;
   tv.my_path_secret = path_secret;
-  tv.root_secret_after_update = add_priv.update_secret;
+  tv.root_secret_after_add = add_priv.update_secret;
 
   // Do a second update that the test participant should be able to process
   auto update_secret = random_bytes(suite.secret_size());
