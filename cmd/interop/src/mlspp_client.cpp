@@ -186,7 +186,8 @@ class MLSClientImpl final : public MLSClient::Service
 };
 
 json
-make_sample(uint64_t type) {
+make_sample(uint64_t type)
+{
   auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
   auto n = 5;
   switch (type) {
@@ -214,7 +215,8 @@ make_sample(uint64_t type) {
 }
 
 void
-print_sample(uint64_t type) {
+print_sample(uint64_t type)
+{
   auto j = make_sample(type);
   if (j.is_null()) {
     std::cout << "Invalid test vector type" << std::endl;
