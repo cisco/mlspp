@@ -12,22 +12,56 @@ namespace mls_vectors {
 
 struct TreeMathTestVector
 {
-  mls::LeafCount n_leaves;
-  std::vector<mls::NodeIndex> root;
-  std::vector<mls::NodeIndex> left;
-  std::vector<mls::NodeIndex> right;
-  std::vector<mls::NodeIndex> parent;
-  std::vector<mls::NodeIndex> sibling;
+  using OptionalNode = std::optional<mls::NodeIndex>;
 
-  TLS_SERIALIZABLE(n_leaves, root, left, right, parent, sibling)
-  TLS_TRAITS(tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::vector<4>)
+  mls::LeafCount n_leaves;
+  mls::NodeCount n_nodes;
+  std::vector<mls::NodeIndex> root;
+  std::vector<OptionalNode> left;
+  std::vector<OptionalNode> right;
+  std::vector<OptionalNode> parent;
+  std::vector<OptionalNode> sibling;
 
   static TreeMathTestVector create(uint32_t n_leaves);
+  std::optional<std::string> verify() const;
+};
+
+struct EncryptionTestVector
+{
+  struct SenderDataInfo
+  {
+    bytes ciphertext;
+    bytes key;
+    bytes nonce;
+  };
+
+  struct RatchetStep
+  {
+    bytes key;
+    bytes nonce;
+    bytes plaintext;
+    bytes ciphertext;
+  };
+
+  struct LeafInfo
+  {
+    uint32_t generations;
+    std::vector<RatchetStep> handshake;
+    std::vector<RatchetStep> application;
+  };
+
+  mls::CipherSuite cipher_suite;
+  mls::LeafCount n_leaves;
+
+  bytes encryption_secret;
+  bytes sender_data_secret;
+  SenderDataInfo sender_data_info;
+
+  std::vector<LeafInfo> leaves;
+
+  static EncryptionTestVector create(mls::CipherSuite suite,
+                                     uint32_t n_leaves,
+                                     uint32_t n_generations);
   std::optional<std::string> verify() const;
 };
 
@@ -38,152 +72,88 @@ struct CryptoValue
   TLS_TRAITS(tls::vector<1>)
 };
 
-struct EncryptionTestVector
-{
-  struct KeyAndNonce
-  {
-    CryptoValue key;
-    CryptoValue nonce;
-    // TODO(RLB): Include an encrypted message to decrypt
-    TLS_SERIALIZABLE(key, nonce);
-  };
-
-  struct HashRatchetSequence
-  {
-    std::vector<KeyAndNonce> steps;
-    TLS_SERIALIZABLE(steps)
-    TLS_TRAITS(tls::vector<4>)
-  };
-
-  mls::CipherSuite suite;
-  CryptoValue encryption_secret;
-  CryptoValue sender_data_secret;
-
-  std::vector<HashRatchetSequence> handshake_keys;
-  std::vector<HashRatchetSequence> application_keys;
-
-  mls::MLSCiphertext handshake_message;
-  mls::MLSCiphertext application_message;
-
-  TLS_SERIALIZABLE(suite,
-                   encryption_secret,
-                   sender_data_secret,
-                   handshake_keys,
-                   application_keys,
-                   handshake_message,
-                   application_message)
-  TLS_TRAITS(tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<4>,
-             tls::vector<4>,
-             tls::pass,
-             tls::pass)
-
-  static EncryptionTestVector create(mls::CipherSuite suite,
-                                     uint32_t n_leaves,
-                                     uint32_t n_generations);
-  std::optional<std::string> verify() const;
-};
-
 struct KeyScheduleTestVector
 {
   struct Epoch
   {
-    mls::MLSPlaintext commit;
-    CryptoValue tree_hash;
+    // Chosen by the generator
+    bytes tree_hash;
+    bytes commit_secret;
+    bytes psk_secret;
+    bytes confirmed_transcript_hash;
 
-    CryptoValue commit_secret;
-    CryptoValue psk_secret;
+    // Computed values
+    bytes group_context;
 
-    CryptoValue confirmed_transcript_hash;
-    CryptoValue interim_transcript_hash;
-    CryptoValue group_context;
+    bytes joiner_secret;
+    bytes welcome_secret;
+    bytes epoch_secret;
+    bytes init_secret;
 
-    CryptoValue joiner_secret;
-    CryptoValue welcome_secret;
-    CryptoValue epoch_secret;
-    CryptoValue init_secret;
-
-    CryptoValue sender_data_secret;
-    CryptoValue encryption_secret;
-    CryptoValue exporter_secret;
-    CryptoValue authentication_secret;
-    CryptoValue external_secret;
-    CryptoValue confirmation_key;
-    CryptoValue membership_key;
-    CryptoValue resumption_secret;
+    bytes sender_data_secret;
+    bytes encryption_secret;
+    bytes exporter_secret;
+    bytes authentication_secret;
+    bytes external_secret;
+    bytes confirmation_key;
+    bytes membership_key;
+    bytes resumption_secret;
 
     mls::HPKEPublicKey external_pub;
-
-    TLS_SERIALIZABLE(commit,
-                     tree_hash,
-                     commit_secret,
-                     psk_secret,
-                     confirmed_transcript_hash,
-                     interim_transcript_hash,
-                     group_context,
-                     joiner_secret,
-                     welcome_secret,
-                     epoch_secret,
-                     init_secret,
-                     sender_data_secret,
-                     encryption_secret,
-                     exporter_secret,
-                     authentication_secret,
-                     external_secret,
-                     confirmation_key,
-                     membership_key,
-                     resumption_secret,
-                     external_pub)
   };
 
-  mls::CipherSuite suite;
-  CryptoValue group_id;
-  CryptoValue initial_tree_hash;
-  CryptoValue initial_init_secret;
-  std::vector<Epoch> epochs;
+  mls::CipherSuite cipher_suite;
 
-  TLS_SERIALIZABLE(suite,
-                   group_id,
-                   initial_tree_hash,
-                   initial_init_secret,
-                   epochs)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<4>)
+  bytes group_id;
+  bytes initial_init_secret;
+
+  std::vector<Epoch> epochs;
 
   static KeyScheduleTestVector create(mls::CipherSuite suite,
                                       uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
+struct TranscriptTestVector
+{
+  mls::CipherSuite cipher_suite;
+
+  bytes group_id;
+  mls::epoch_t epoch;
+  bytes tree_hash_before;
+  bytes confirmed_transcript_hash_before;
+  bytes interim_transcript_hash_before;
+
+  bytes membership_key;
+  bytes confirmation_key;
+  mls::MLSPlaintext commit;
+
+  bytes group_context;
+  bytes confirmed_transcript_hash_after;
+  bytes interim_transcript_hash_after;
+
+  static TranscriptTestVector create(mls::CipherSuite suite);
+  std::optional<std::string> verify() const;
+};
+
 struct TreeKEMTestVector
 {
-  mls::CipherSuite suite;
+  mls::CipherSuite cipher_suite;
 
-  mls::TreeKEMPublicKey tree_before;
-  CryptoValue tree_hash_before;
+  mls::TreeKEMPublicKey ratchet_tree_before;
 
   mls::LeafIndex add_sender;
   mls::KeyPackage my_key_package;
-  CryptoValue my_path_secret;
+  bytes my_path_secret;
 
   mls::LeafIndex update_sender;
   mls::UpdatePath update_path;
 
-  CryptoValue root_secret;
-  mls::TreeKEMPublicKey tree_after;
-  CryptoValue tree_hash_after;
-
-  TLS_SERIALIZABLE(suite,
-                   tree_before,
-                   tree_hash_before,
-                   my_key_package,
-                   my_path_secret,
-                   update_sender,
-                   update_path,
-                   root_secret,
-                   tree_after,
-                   tree_hash_after);
+  bytes tree_hash_before;
+  bytes root_secret_after_add;
+  bytes root_secret_after_update;
+  mls::TreeKEMPublicKey ratchet_tree_after;
+  bytes tree_hash_after;
 
   static TreeKEMTestVector create(mls::CipherSuite suite, size_t n_leaves);
   void initialize_trees();
@@ -192,64 +162,31 @@ struct TreeKEMTestVector
 
 struct MessagesTestVector
 {
-  struct Message
-  {
-    bytes data;
-    TLS_SERIALIZABLE(data)
-    TLS_TRAITS(tls::vector<4>)
-  };
+  bytes key_package;
+  bytes capabilities;
+  bytes lifetime;
+  bytes ratchet_tree;
 
-  Message key_package;
-  Message capabilities;
-  Message lifetime;
-  Message ratchet_tree;
+  bytes group_info;
+  bytes group_secrets;
+  bytes welcome;
 
-  Message group_info;
-  Message group_secrets;
-  Message welcome;
+  bytes public_group_state;
 
-  Message public_group_state;
+  bytes add_proposal;
+  bytes update_proposal;
+  bytes remove_proposal;
+  bytes pre_shared_key_proposal;
+  bytes re_init_proposal;
+  bytes external_init_proposal;
+  bytes app_ack_proposal;
 
-  Message add_proposal;
-  Message update_proposal;
-  Message remove_proposal;
-  Message pre_shared_key_proposal;
-  Message re_init_proposal;
-  Message external_init_proposal;
-  Message app_ack_proposal;
+  bytes commit;
 
-  Message commit;
-
-  Message mls_plaintext_application;
-  Message mls_plaintext_proposal;
-  Message mls_plaintext_commit;
-  Message mls_ciphertext;
-
-  TLS_SERIALIZABLE(key_package,
-                   capabilities,
-                   lifetime,
-                   ratchet_tree,
-
-                   group_info,
-                   group_secrets,
-                   welcome,
-
-                   public_group_state,
-
-                   add_proposal,
-                   update_proposal,
-                   remove_proposal,
-                   pre_shared_key_proposal,
-                   re_init_proposal,
-                   external_init_proposal,
-                   app_ack_proposal,
-
-                   commit,
-
-                   mls_plaintext_application,
-                   mls_plaintext_proposal,
-                   mls_plaintext_commit,
-                   mls_ciphertext)
+  bytes mls_plaintext_application;
+  bytes mls_plaintext_proposal;
+  bytes mls_plaintext_commit;
+  bytes mls_ciphertext;
 
   static MessagesTestVector create();
   std::optional<std::string> verify() const;

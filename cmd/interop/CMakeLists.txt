@@ -29,6 +29,8 @@ find_package(gflags REQUIRED)
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
 find_package(MLSPP REQUIRED)
 
+# JSON
+find_package(nlohmann_json 3.2 REQUIRED)
 
 ###
 ### Protobuf generation
