@@ -35,6 +35,14 @@ TEST_CASE("Key Schedule")
   }
 }
 
+TEST_CASE("Transcript")
+{
+  for (auto suite : supported_suites) {
+    const auto tv = TranscriptTestVector::create(suite);
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {

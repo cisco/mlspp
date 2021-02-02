@@ -389,6 +389,83 @@ KeyScheduleTestVector::verify() const
 }
 
 ///
+/// TranscriptTestVector
+///
+TranscriptTestVector
+TranscriptTestVector::create(CipherSuite suite)
+{
+  auto group_id = bytes{ 0, 1, 2, 3 };
+  auto epoch = epoch_t(0);
+  auto tree_hash_before = random_bytes(suite.digest().hash_size);
+  auto confirmed_transcript_hash_before = random_bytes(suite.digest().hash_size);
+  auto interim_transcript_hash_before = random_bytes(suite.digest().hash_size);
+
+  auto transcript = TranscriptHash(suite);
+  transcript.interim = interim_transcript_hash_before;
+
+  auto group_context = GroupContext{ group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {} };
+  auto ctx = tls::marshal(group_context);
+
+  auto init_secret = random_bytes(suite.secret_size());
+  auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
+
+  auto commit = MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
+
+  transcript.update_confirmed(commit);
+  commit.confirmation_tag = MAC{ ks_epoch.confirmation_tag(transcript.confirmed) };
+
+  transcript.update_interim(commit);
+  commit.membership_tag = MAC{ ks_epoch.membership_tag(group_context, commit) };
+
+  return {
+    suite,
+
+    group_id,
+    epoch,
+    tree_hash_before,
+    confirmed_transcript_hash_before,
+    interim_transcript_hash_before,
+
+    ks_epoch.membership_key,
+    ks_epoch.confirmation_key,
+    tls::marshal(commit),
+
+    ctx,
+    transcript.confirmed,
+    transcript.interim,
+  };
+}
+
+std::optional<std::string>
+TranscriptTestVector::verify() const
+{
+  auto group_context_obj = GroupContext{ group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {} };
+  auto ctx = tls::marshal(group_context_obj);
+  VERIFY_EQUAL("group context", ctx, group_context);
+
+  // Verify the transcript
+  auto commit_obj = tls::get<MLSPlaintext>(commit);
+  auto transcript = TranscriptHash(cipher_suite);
+  transcript.interim = interim_transcript_hash_before;
+  transcript.update(commit_obj);
+  VERIFY_EQUAL("confirmed", transcript.confirmed, confirmed_transcript_hash_after);
+  VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
+
+  // Verify the Commit tags
+  auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
+  ks_epoch.confirmation_key = confirmation_key;
+  ks_epoch.membership_key = membership_key;
+
+  auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
+  VERIFY_EQUAL("confirmation", confirmation_tag, opt::get(commit_obj.confirmation_tag).mac_value);
+
+  auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit_obj);
+  VERIFY_EQUAL("membership", membership_tag, opt::get(commit_obj.membership_tag).mac_value);
+
+  return std::nullopt;
+}
+
+///
 /// TreeKEMTestVector
 ///
 

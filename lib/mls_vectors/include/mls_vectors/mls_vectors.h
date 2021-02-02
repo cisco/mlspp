@@ -114,6 +114,27 @@ struct KeyScheduleTestVector
   std::optional<std::string> verify() const;
 };
 
+struct TranscriptTestVector {
+  mls::CipherSuite cipher_suite;
+
+  bytes group_id;
+  mls::epoch_t epoch;
+  bytes tree_hash_before;
+  bytes confirmed_transcript_hash_before;
+  bytes interim_transcript_hash_before;
+
+  bytes membership_key;
+  bytes confirmation_key;
+  bytes commit;
+
+  bytes group_context;
+  bytes confirmed_transcript_hash_after;
+  bytes interim_transcript_hash_after;
+
+  static TranscriptTestVector create(mls::CipherSuite suite);
+  std::optional<std::string> verify() const;
+};
+
 struct TreeKEMTestVector
 {
   mls::CipherSuite suite;
