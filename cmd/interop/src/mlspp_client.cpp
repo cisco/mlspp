@@ -23,6 +23,9 @@ using namespace mls_client;
 
 static constexpr char implementation_name[] = "mlspp";
 
+#if 0
+// XXX(RLB): Normally I wouldn't want `#if 0` code hanging around.  But these
+// will be useful once we start passing MLS messages back and forth.
 static std::string
 bytes_to_string(const std::vector<uint8_t>& data)
 {
@@ -34,6 +37,7 @@ string_to_bytes(const std::string& str)
 {
   return { str.begin(), str.end() };
 }
+#endif // 0
 
 class MLSClientImpl final : public MLSClient::Service
 {
@@ -85,35 +89,31 @@ class MLSClientImpl final : public MLSClient::Service
   // Fallible method implementations, wrapped before being exposed to gRPC
   Status verify_test_vector(const VerifyTestVectorRequest* request)
   {
-    auto tv_data = string_to_bytes(request->test_vector());
     auto error = std::optional<std::string>();
+    auto tv_json = json::parse(request->test_vector());
     switch (request->test_vector_type()) {
       case TestVectorType::TREE_MATH: {
-        auto tv_json = json::parse(request->test_vector());
         error = tv_json.get<mls_vectors::TreeMathTestVector>().verify();
         break;
       }
 
       case TestVectorType::ENCRYPTION: {
-        auto tv_json = json::parse(request->test_vector());
         error = tv_json.get<mls_vectors::EncryptionTestVector>().verify();
         break;
       }
 
       case TestVectorType::KEY_SCHEDULE: {
-        error = tls::get<mls_vectors::KeyScheduleTestVector>(tv_data).verify();
+        error = tv_json.get<mls_vectors::KeyScheduleTestVector>().verify();
         break;
       }
 
       case TestVectorType::TREEKEM: {
-        auto tv = tls::get<mls_vectors::TreeKEMTestVector>(tv_data);
-        tv.initialize_trees();
-        error = tv.verify();
+        error = tv_json.get<mls_vectors::TreeKEMTestVector>().verify();
         break;
       }
 
       case TestVectorType::MESSAGES: {
-        error = tls::get<mls_vectors::MessagesTestVector>(tv_data).verify();
+        error = tv_json.get<mls_vectors::MessagesTestVector>().verify();
         break;
       }
 
@@ -131,49 +131,44 @@ class MLSClientImpl final : public MLSClient::Service
   Status generate_test_vector(const GenerateTestVectorRequest* request,
                               GenerateTestVectorResponse* reply)
   {
+    json j;
     switch (request->test_vector_type()) {
       case TestVectorType::TREE_MATH: {
-        auto tv = mls_vectors::TreeMathTestVector::create(request->n_leaves());
-        reply->set_test_vector(json(tv).dump());
-        return Status::OK;
+        j = mls_vectors::TreeMathTestVector::create(request->n_leaves());
+        break;
       }
 
       case TestVectorType::ENCRYPTION: {
         auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-        auto tv = mls_vectors::EncryptionTestVector::create(
+        j = mls_vectors::EncryptionTestVector::create(
           suite, request->n_leaves(), request->n_generations());
-        reply->set_test_vector(json(tv).dump());
-        return Status::OK;
+        break;
       }
 
       case TestVectorType::KEY_SCHEDULE: {
         auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-        auto tv = mls_vectors::KeyScheduleTestVector::create(
+        j = mls_vectors::KeyScheduleTestVector::create(
           suite, request->n_epochs());
-        auto tv_data = tls::marshal(tv);
-        reply->set_test_vector(bytes_to_string(tv_data));
-        return Status::OK;
+        break;
       }
 
       case TestVectorType::TREEKEM: {
         auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-        auto tv =
-          mls_vectors::TreeKEMTestVector::create(suite, request->n_leaves());
-        auto tv_data = tls::marshal(tv);
-        reply->set_test_vector(bytes_to_string(tv_data));
-        return Status::OK;
+        j = mls_vectors::TreeKEMTestVector::create(suite, request->n_leaves());
+        break;
       }
 
       case TestVectorType::MESSAGES: {
-        auto tv = mls_vectors::MessagesTestVector::create();
-        auto tv_data = tls::marshal(tv);
-        reply->set_test_vector(bytes_to_string(tv_data));
-        return Status::OK;
+        j = mls_vectors::MessagesTestVector::create();
+        break;
       }
 
       default:
         return Status(StatusCode::INVALID_ARGUMENT, "Invalid test vector type");
     }
+
+    reply->set_test_vector(j.dump());
+    return Status::OK;
   }
 };
 
