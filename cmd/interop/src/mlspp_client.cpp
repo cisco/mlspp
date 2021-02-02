@@ -8,6 +8,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include <mls/crypto.h>
+#include <mls/state.h>
 #include <mls_vectors/mls_vectors.h>
 
 #include "json_details.h"
@@ -23,21 +24,22 @@ using namespace mls_client;
 
 static constexpr char implementation_name[] = "mlspp";
 
-#if 0
-// XXX(RLB): Normally I wouldn't want `#if 0` code hanging around.  But these
-// will be useful once we start passing MLS messages back and forth.
-static std::string
+static inline std::string
 bytes_to_string(const std::vector<uint8_t>& data)
 {
   return { data.begin(), data.end() };
 }
 
-static std::vector<uint8_t>
+static inline std::vector<uint8_t>
 string_to_bytes(const std::string& str)
 {
   return { str.begin(), str.end() };
 }
-#endif // 0
+
+static inline mls::CipherSuite mls_suite(uint32_t suite_id)
+{
+  return static_cast<mls::CipherSuite::ID>(suite_id);
+}
 
 class MLSClientImpl final : public MLSClient::Service
 {
@@ -85,6 +87,22 @@ class MLSClientImpl final : public MLSClient::Service
   {
     return catch_wrap([=]() { return verify_test_vector(request); });
   }
+
+  Status CreateGroup(ServerContext* /* context */,
+                     const CreateGroupRequest* request,
+                     CreateGroupResponse* response) override
+  {
+    return catch_wrap([=]() { return create_group(request, response); });
+  }
+
+  Status CreateKeyPackage(ServerContext* /* context */,
+                          const CreateKeyPackageRequest* request,
+                          CreateKeyPackageResponse* response) override
+  {
+    return catch_wrap([=]() { return create_key_package(request, response); });
+  }
+
+  private:
 
   // Fallible method implementations, wrapped before being exposed to gRPC
   Status verify_test_vector(const VerifyTestVectorRequest* request)
@@ -182,6 +200,90 @@ class MLSClientImpl final : public MLSClient::Service
 
     reply->set_test_vector(j.dump());
     return Status::OK;
+  }
+
+  // Ways to join a group
+
+
+  Status create_group(const CreateGroupRequest* request,
+                      CreateGroupResponse* response)
+  {
+    auto group_id = string_to_bytes(request->group_id());
+    auto cipher_suite = mls_suite(request->cipher_suite());
+
+    auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
+    auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
+    auto cred = mls::Credential::basic({}, sig_priv.public_key);
+    auto key_package = mls::KeyPackage(cipher_suite, init_priv.public_key, cred, sig_priv, {});
+
+    auto state = mls::State(group_id, cipher_suite, init_priv, sig_priv, key_package);
+    auto state_id = store_state(std::move(state), request->encrypt_handshake());
+
+    response->set_state_id(state_id);
+    return Status::OK;
+  }
+
+  Status create_key_package(const CreateKeyPackageRequest* request,
+                            CreateKeyPackageResponse* response)
+  {
+    auto cipher_suite = mls_suite(request->cipher_suite());
+
+    auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
+    auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
+    auto cred = mls::Credential::basic({}, sig_priv.public_key);
+    auto kp = mls::KeyPackage(cipher_suite, init_priv.public_key, cred, sig_priv, {});
+
+    auto kp_data = tls::marshal(kp);
+    auto join_id = store_join(std::move(init_priv), std::move(sig_priv), std::move(kp));
+
+    response->set_transaction_id(join_id);
+    response->set_key_package(bytes_to_string(kp_data));
+    return Status::OK;
+  }
+
+  // Cached join transactions
+  struct CachedJoin {
+    mls::HPKEPrivateKey init_priv;
+    mls::SignaturePrivateKey sig_priv;
+    mls::KeyPackage key_package;
+  };
+
+  std::map<uint32_t, CachedJoin> join_cache;
+
+  uint32_t store_join(mls::HPKEPrivateKey&& init_priv, mls::SignaturePrivateKey&& sig_priv, mls::KeyPackage&& kp) {
+    auto join_id = tls::get<uint32_t>(kp.hash());
+    auto entry = CachedJoin{std::move(init_priv), std::move(sig_priv), std::move(kp)};
+    join_cache.emplace(std::make_pair(join_id, std::move(entry)));
+    return join_id;
+  }
+
+  CachedJoin* load_join(uint32_t join_id) {
+    if (join_cache.count(join_id) == 0) {
+      return nullptr;
+    }
+    return &join_cache.at(join_id);
+  }
+
+  // Cached group state
+  struct CachedState {
+    mls::State state;
+    bool encrypt_handshake;
+  };
+
+  std::map<uint32_t, CachedState> state_cache;
+
+  uint32_t store_state(mls::State&& state, bool encrypt_handshake) {
+    auto state_id = tls::get<uint32_t>(state.authentication_secret());
+    auto entry = CachedState{std::move(state), encrypt_handshake};
+    state_cache.emplace(std::make_pair(state_id, std::move(entry)));
+    return state_id;
+  }
+
+  CachedState* load_state(uint32_t state_id) {
+    if (state_cache.count(state_id) == 0) {
+      return nullptr;
+    }
+    return &state_cache.at(state_id);
   }
 };
 
