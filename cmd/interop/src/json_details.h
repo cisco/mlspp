@@ -54,8 +54,10 @@ struct uint_serializer
   static void from_json(const json& j, T& v) { j.get_to(v.val); }
 };
 
-#define UINT_SERIALIZER(T) \
-  template<> struct adl_serializer<T> : uint_serializer<T> {};
+#define UINT_SERIALIZER(T)                                                     \
+  template<>                                                                   \
+  struct adl_serializer<T> : uint_serializer<T>                                \
+  {};
 
 UINT_SERIALIZER(mls::LeafCount)
 UINT_SERIALIZER(mls::NodeCount)
@@ -79,13 +81,19 @@ struct adl_serializer<mls::CipherSuite>
 
 // TLS-serializable things
 template<typename T>
-struct tls_serializer {
+struct tls_serializer
+{
   static void to_json(json& j, const T& v) { j = tls::marshal(v); }
-  static void from_json(const json& j, T& v) { v = tls::get<T>(j.get<bytes>()); }
+  static void from_json(const json& j, T& v)
+  {
+    v = tls::get<T>(j.get<bytes>());
+  }
 };
 
-#define TLS_SERIALIZER(T) \
-  template<> struct adl_serializer<T> : tls_serializer<T> {};
+#define TLS_SERIALIZER(T)                                                      \
+  template<>                                                                   \
+  struct adl_serializer<T> : tls_serializer<T>                                 \
+  {};
 
 TLS_SERIALIZER(mls::HPKEPublicKey)
 
