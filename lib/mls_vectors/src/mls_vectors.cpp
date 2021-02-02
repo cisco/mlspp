@@ -292,11 +292,10 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
   auto tv = KeyScheduleTestVector{};
   tv.cipher_suite = suite;
   tv.group_id = from_hex("00010203");
-  tv.initial_init_secret = random_bytes(suite.secret_size());
 
   auto group_context = GroupContext{ tv.group_id, 0, {}, {}, {} };
-  auto base_ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, base_ctx, tv.initial_init_secret);
+  auto epoch = KeyScheduleEpoch(suite, {}, random_bytes(suite.secret_size()));
+  tv.initial_init_secret = epoch.init_secret;
 
   for (size_t i = 0; i < n_epochs; i++) {
     group_context.epoch += 1;
@@ -345,8 +344,10 @@ std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
   auto group_context = GroupContext{ group_id, 0, {}, {}, {} };
-  auto base_ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(cipher_suite, base_ctx, initial_init_secret);
+  auto epoch = KeyScheduleEpoch(cipher_suite, {}, {});
+
+  // Manually correct the init secret
+  epoch.init_secret = initial_init_secret;
 
   for (const auto& tve : epochs) {
     // Ratchet forward the key schedule
