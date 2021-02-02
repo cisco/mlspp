@@ -469,9 +469,8 @@ TranscriptTestVector::verify() const
                opt::get(commit.confirmation_tag).mac_value);
 
   auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit);
-  VERIFY_EQUAL("membership",
-               membership_tag,
-               opt::get(commit.membership_tag).mac_value);
+  VERIFY_EQUAL(
+    "membership", membership_tag, opt::get(commit.membership_tag).mac_value);
 
   return std::nullopt;
 }
@@ -584,14 +583,18 @@ std::optional<std::string>
 TreeKEMTestVector::verify() const
 {
   // Verify that the trees provided are valid
-  VERIFY_EQUAL("tree hash before", ratchet_tree_before.root_hash(), tree_hash_before);
-  VERIFY("tree before parent hash valid", ratchet_tree_before.parent_hash_valid());
+  VERIFY_EQUAL(
+    "tree hash before", ratchet_tree_before.root_hash(), tree_hash_before);
+  VERIFY("tree before parent hash valid",
+         ratchet_tree_before.parent_hash_valid());
 
   VERIFY("update path parent hash valid",
          ratchet_tree_before.parent_hash_valid(update_sender, update_path));
 
-  VERIFY_EQUAL("tree hash after", ratchet_tree_after.root_hash(), tree_hash_after);
-  VERIFY("tree after parent hash valid", ratchet_tree_after.parent_hash_valid());
+  VERIFY_EQUAL(
+    "tree hash after", ratchet_tree_after.root_hash(), tree_hash_after);
+  VERIFY("tree after parent hash valid",
+         ratchet_tree_after.parent_hash_valid());
 
   // Find ourselves in the tree
   auto maybe_index = ratchet_tree_before.find(my_key_package);
