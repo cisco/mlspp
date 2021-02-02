@@ -290,67 +290,49 @@ KeyScheduleTestVector
 KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 {
   auto tv = KeyScheduleTestVector{};
-  tv.suite = suite;
-  tv.group_id = { from_hex("00010203") };
-  tv.initial_tree_hash = { random_bytes(suite.digest().hash_size) };
-  tv.initial_init_secret = { random_bytes(suite.secret_size()) };
+  tv.cipher_suite = suite;
+  tv.group_id = from_hex("00010203");
+  tv.initial_init_secret = random_bytes(suite.secret_size());
 
-  auto group_context =
-    GroupContext{ tv.group_id.data, 0, tv.initial_tree_hash.data, {}, {} };
+  auto group_context = GroupContext{ tv.group_id, 0, {}, {}, {} };
   auto base_ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, base_ctx, tv.initial_init_secret.data);
-  auto transcript_hash = TranscriptHash(suite);
+  auto epoch = KeyScheduleEpoch(suite, base_ctx, tv.initial_init_secret);
 
   for (size_t i = 0; i < n_epochs; i++) {
-    auto tree_hash = random_bytes(suite.digest().hash_size);
-    auto commit = MLSPlaintext{
-      tv.group_id.data, group_context.epoch, { SenderType::member, 0 }, Commit{}
-    };
+    group_context.epoch += 1;
+    group_context.tree_hash = random_bytes(suite.digest().hash_size);
+    group_context.confirmed_transcript_hash =
+      random_bytes(suite.digest().hash_size);
+    auto ctx = tls::marshal(group_context);
+
     auto commit_secret = random_bytes(suite.secret_size());
     auto psk_secret = random_bytes(suite.secret_size());
-
-    transcript_hash.update_confirmed(commit);
-
-    auto prior_group_context = group_context;
-    group_context.epoch += 1;
-    group_context.tree_hash = tree_hash;
-    group_context.confirmed_transcript_hash = transcript_hash.confirmed;
-    auto ctx = tls::marshal(group_context);
-    auto next_epoch = epoch.next(commit_secret, psk_secret, ctx);
-
-    commit.confirmation_tag = { next_epoch.confirmation_tag(
-      transcript_hash.confirmed) };
-    commit.membership_tag = { epoch.membership_tag(prior_group_context,
-                                                   commit) };
-    transcript_hash.update_interim(commit);
-    epoch = next_epoch;
+    epoch = epoch.next(commit_secret, psk_secret, ctx);
 
     auto welcome_secret =
       KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psk_secret);
 
     tv.epochs.push_back({
-      commit,
-      { tree_hash },
-      { commit_secret },
-      { psk_secret },
+      group_context.tree_hash,
+      commit_secret,
+      psk_secret,
+      group_context.confirmed_transcript_hash,
 
-      { transcript_hash.confirmed },
-      { transcript_hash.interim },
-      { ctx },
+      ctx,
 
-      { epoch.joiner_secret },
-      { welcome_secret },
-      { epoch.epoch_secret },
-      { epoch.init_secret },
+      epoch.joiner_secret,
+      welcome_secret,
+      epoch.epoch_secret,
+      epoch.init_secret,
 
-      { epoch.sender_data_secret },
-      { epoch.encryption_secret },
-      { epoch.exporter_secret },
-      { epoch.authentication_secret },
-      { epoch.external_secret },
-      { epoch.confirmation_key },
-      { epoch.membership_key },
-      { epoch.resumption_secret },
+      epoch.sender_data_secret,
+      epoch.encryption_secret,
+      epoch.exporter_secret,
+      epoch.authentication_secret,
+      epoch.external_secret,
+      epoch.confirmation_key,
+      epoch.membership_key,
+      epoch.resumption_secret,
 
       epoch.external_priv.public_key,
     });
@@ -362,74 +344,42 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
-  auto group_context =
-    GroupContext{ group_id.data, 0, initial_tree_hash.data, {}, {} };
+  auto group_context = GroupContext{ group_id, 0, {}, {}, {} };
   auto base_ctx = tls::marshal(group_context);
-  auto epoch = KeyScheduleEpoch(suite, base_ctx, initial_init_secret.data);
-  auto transcript_hash = TranscriptHash(suite);
+  auto epoch = KeyScheduleEpoch(cipher_suite, base_ctx, initial_init_secret);
 
   for (const auto& tve : epochs) {
-    // Verify the membership tag on the commit
-    auto actual_membership_tag =
-      epoch.membership_tag(group_context, tve.commit);
-    auto expected_membership_tag =
-      opt::get(tve.commit.membership_tag).mac_value;
-    VERIFY_EQUAL(
-      "membership tag", actual_membership_tag, expected_membership_tag);
-
-    // Update the transcript hash with the commit
-    transcript_hash.update(tve.commit);
-    VERIFY_EQUAL("confirmed transcript hash",
-                 transcript_hash.confirmed,
-                 tve.confirmed_transcript_hash.data);
-    VERIFY_EQUAL("interim transcript hash",
-                 transcript_hash.interim,
-                 tve.interim_transcript_hash.data);
-
     // Ratchet forward the key schedule
     group_context.epoch += 1;
-    group_context.tree_hash = tve.tree_hash.data;
-    group_context.confirmed_transcript_hash = transcript_hash.confirmed;
+    group_context.tree_hash = tve.tree_hash;
+    group_context.confirmed_transcript_hash = tve.confirmed_transcript_hash;
     auto ctx = tls::marshal(group_context);
-    VERIFY_EQUAL("context", ctx, tve.group_context.data);
 
-    epoch = epoch.next(tve.commit_secret.data, tve.psk_secret.data, ctx);
-
-    // Verify the confirmation tag on the Commit
-    auto actual_confirmation_tag =
-      epoch.confirmation_tag(transcript_hash.confirmed);
-    auto expected_confirmation_tag =
-      opt::get(tve.commit.confirmation_tag).mac_value;
-    VERIFY_EQUAL(
-      "confirmation tag", actual_confirmation_tag, expected_confirmation_tag);
+    epoch = epoch.next(tve.commit_secret, tve.psk_secret, ctx);
 
     // Verify the rest of the epoch
-    VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret.data);
-    VERIFY_EQUAL("epoch secret", epoch.epoch_secret, tve.epoch_secret.data);
-    VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret.data);
+    VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
+    VERIFY_EQUAL("epoch secret", epoch.epoch_secret, tve.epoch_secret);
+    VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     auto welcome_secret = KeyScheduleEpoch::welcome_secret(
-      suite, tve.joiner_secret.data, tve.psk_secret.data);
-    VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret.data);
+      cipher_suite, tve.joiner_secret, tve.psk_secret);
+    VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
-    VERIFY_EQUAL("sender data secret",
-                 epoch.sender_data_secret,
-                 tve.sender_data_secret.data);
     VERIFY_EQUAL(
-      "encryption secret", epoch.encryption_secret, tve.encryption_secret.data);
+      "sender data secret", epoch.sender_data_secret, tve.sender_data_secret);
     VERIFY_EQUAL(
-      "exporter secret", epoch.exporter_secret, tve.exporter_secret.data);
+      "encryption secret", epoch.encryption_secret, tve.encryption_secret);
+    VERIFY_EQUAL("exporter secret", epoch.exporter_secret, tve.exporter_secret);
     VERIFY_EQUAL("authentication secret",
                  epoch.authentication_secret,
-                 tve.authentication_secret.data);
+                 tve.authentication_secret);
+    VERIFY_EQUAL("external secret", epoch.external_secret, tve.external_secret);
     VERIFY_EQUAL(
-      "external secret", epoch.external_secret, tve.external_secret.data);
+      "confirmation key", epoch.confirmation_key, tve.confirmation_key);
+    VERIFY_EQUAL("membership key", epoch.membership_key, tve.membership_key);
     VERIFY_EQUAL(
-      "confirmation key", epoch.confirmation_key, tve.confirmation_key.data);
-    VERIFY_EQUAL(
-      "membership key", epoch.membership_key, tve.membership_key.data);
-    VERIFY_EQUAL(
-      "resumption secret", epoch.resumption_secret, tve.resumption_secret.data);
+      "resumption secret", epoch.resumption_secret, tve.resumption_secret);
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);

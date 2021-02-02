@@ -76,66 +76,38 @@ struct KeyScheduleTestVector
 {
   struct Epoch
   {
-    mls::MLSPlaintext commit;
-    CryptoValue tree_hash;
+    // Chosen by the generator
+    bytes tree_hash;
+    bytes commit_secret;
+    bytes psk_secret;
+    bytes confirmed_transcript_hash;
 
-    CryptoValue commit_secret;
-    CryptoValue psk_secret;
+    // Computed values
+    bytes group_context;
 
-    CryptoValue confirmed_transcript_hash;
-    CryptoValue interim_transcript_hash;
-    CryptoValue group_context;
+    bytes joiner_secret;
+    bytes welcome_secret;
+    bytes epoch_secret;
+    bytes init_secret;
 
-    CryptoValue joiner_secret;
-    CryptoValue welcome_secret;
-    CryptoValue epoch_secret;
-    CryptoValue init_secret;
-
-    CryptoValue sender_data_secret;
-    CryptoValue encryption_secret;
-    CryptoValue exporter_secret;
-    CryptoValue authentication_secret;
-    CryptoValue external_secret;
-    CryptoValue confirmation_key;
-    CryptoValue membership_key;
-    CryptoValue resumption_secret;
+    bytes sender_data_secret;
+    bytes encryption_secret;
+    bytes exporter_secret;
+    bytes authentication_secret;
+    bytes external_secret;
+    bytes confirmation_key;
+    bytes membership_key;
+    bytes resumption_secret;
 
     mls::HPKEPublicKey external_pub;
-
-    TLS_SERIALIZABLE(commit,
-                     tree_hash,
-                     commit_secret,
-                     psk_secret,
-                     confirmed_transcript_hash,
-                     interim_transcript_hash,
-                     group_context,
-                     joiner_secret,
-                     welcome_secret,
-                     epoch_secret,
-                     init_secret,
-                     sender_data_secret,
-                     encryption_secret,
-                     exporter_secret,
-                     authentication_secret,
-                     external_secret,
-                     confirmation_key,
-                     membership_key,
-                     resumption_secret,
-                     external_pub)
   };
 
-  mls::CipherSuite suite;
-  CryptoValue group_id;
-  CryptoValue initial_tree_hash;
-  CryptoValue initial_init_secret;
-  std::vector<Epoch> epochs;
+  mls::CipherSuite cipher_suite;
 
-  TLS_SERIALIZABLE(suite,
-                   group_id,
-                   initial_tree_hash,
-                   initial_init_secret,
-                   epochs)
-  TLS_TRAITS(tls::pass, tls::pass, tls::pass, tls::pass, tls::vector<4>)
+  bytes group_id;
+  bytes initial_init_secret;
+
+  std::vector<Epoch> epochs;
 
   static KeyScheduleTestVector create(mls::CipherSuite suite,
                                       uint32_t n_epochs);
