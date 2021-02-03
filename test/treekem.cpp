@@ -84,6 +84,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   const auto random = random_bytes(32);
   const auto random2 = random_bytes(32);
   const auto priv = HPKEPrivateKey::derive(suite, random);
+  const auto hash_size = suite.digest().hash_size;
 
   // create() populates the direct path
   auto priv_create = TreeKEMPrivateKey::create(suite, size, index, random);
@@ -95,6 +96,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
           priv_create.path_secrets.end());
   REQUIRE(priv_create.path_secrets.find(NodeIndex(7)) !=
           priv_create.path_secrets.end());
+  REQUIRE(priv_create.update_secret.size() == hash_size);
 
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
@@ -107,10 +109,14 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
           priv_joiner.path_secrets.end());
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(5)) ==
           priv_joiner.path_secrets.end());
+  REQUIRE(priv_joiner.update_secret.size() == hash_size);
+  auto last_update_secret = priv_joiner.update_secret;
 
   // set_leaf_secret() properly sets the leaf secret
   priv_joiner.set_leaf_secret(random2);
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(index))->second == random2);
+  REQUIRE(priv_joiner.update_secret.size() == hash_size);
+  REQUIRE(priv_joiner.update_secret == last_update_secret);
 
   // shared_path_secret() finds the correct ancestor
   auto [overlap, overlap_secret, found] =
