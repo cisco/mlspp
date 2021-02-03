@@ -53,6 +53,21 @@ class MLSClientImpl final : public MLSClient::Service
     }
   }
 
+  template<typename Req, typename F>
+  Status state_wrap(const Req* req, F&& f)
+  {
+    auto maybe_state = load_state(req->state_id());
+    if (!maybe_state) {
+      return Status(StatusCode::NOT_FOUND, "Unknown state");
+    }
+
+    try {
+      return f(*maybe_state);
+    } catch (const std::exception& e) {
+      return Status(StatusCode::INTERNAL, e.what());
+    }
+  }
+
   // gRPC methods
   Status Name(ServerContext* /* context */,
               const NameRequest* /* request */,
@@ -88,6 +103,7 @@ class MLSClientImpl final : public MLSClient::Service
     return catch_wrap([=]() { return verify_test_vector(request); });
   }
 
+  // Ways to become a member of a group
   Status CreateGroup(ServerContext* /* context */,
                      const CreateGroupRequest* request,
                      CreateGroupResponse* response) override
@@ -102,7 +118,80 @@ class MLSClientImpl final : public MLSClient::Service
     return catch_wrap([=]() { return create_key_package(request, response); });
   }
 
+  // Operations using a group state
+  Status AddProposal(ServerContext* /* context */,
+                     const AddProposalRequest* request,
+                     ProposalResponse* response) override
+  {
+    return state_wrap(request, [=](auto& state) {
+      return add_proposal(state, request, response);
+    });
+  }
+
   private:
+
+  // Cached join transactions
+  struct CachedJoin {
+    mls::HPKEPrivateKey init_priv;
+    mls::SignaturePrivateKey sig_priv;
+    mls::KeyPackage key_package;
+  };
+
+  std::map<uint32_t, CachedJoin> join_cache;
+
+  uint32_t store_join(mls::HPKEPrivateKey&& init_priv, mls::SignaturePrivateKey&& sig_priv, mls::KeyPackage&& kp) {
+    auto join_id = tls::get<uint32_t>(kp.hash());
+    auto entry = CachedJoin{std::move(init_priv), std::move(sig_priv), std::move(kp)};
+    join_cache.emplace(std::make_pair(join_id, std::move(entry)));
+    return join_id;
+  }
+
+  CachedJoin* load_join(uint32_t join_id) {
+    if (join_cache.count(join_id) == 0) {
+      return nullptr;
+    }
+    return &join_cache.at(join_id);
+  }
+
+  // Cached group state
+  struct CachedState {
+    mls::State state;
+    bool encrypt_handshake;
+
+    std::string marshal(const mls::MLSPlaintext& pt) {
+      if (encrypt_handshake) {
+        auto ct = state.encrypt(pt);
+        return bytes_to_string(tls::marshal(ct));
+      }
+
+      return bytes_to_string(tls::marshal(pt));
+    }
+
+    mls::MLSPlaintext unmarshal(const std::string& wire) {
+      if (encrypt_handshake) {
+        auto ct = tls::get<mls::MLSCiphertext>(string_to_bytes(wire));
+        return state.decrypt(ct);
+      }
+
+      return tls::get<mls::MLSPlaintext>(string_to_bytes(wire));
+    }
+  };
+
+  std::map<uint32_t, CachedState> state_cache;
+
+  uint32_t store_state(mls::State&& state, bool encrypt_handshake) {
+    auto state_id = tls::get<uint32_t>(state.authentication_secret());
+    auto entry = CachedState{std::move(state), encrypt_handshake};
+    state_cache.emplace(std::make_pair(state_id, std::move(entry)));
+    return state_id;
+  }
+
+  CachedState* load_state(uint32_t state_id) {
+    if (state_cache.count(state_id) == 0) {
+      return nullptr;
+    }
+    return &state_cache.at(state_id);
+  }
 
   // Fallible method implementations, wrapped before being exposed to gRPC
   Status verify_test_vector(const VerifyTestVectorRequest* request)
@@ -203,8 +292,6 @@ class MLSClientImpl final : public MLSClient::Service
   }
 
   // Ways to join a group
-
-
   Status create_group(const CreateGroupRequest* request,
                       CreateGroupResponse* response)
   {
@@ -241,50 +328,63 @@ class MLSClientImpl final : public MLSClient::Service
     return Status::OK;
   }
 
-  // Cached join transactions
-  struct CachedJoin {
-    mls::HPKEPrivateKey init_priv;
-    mls::SignaturePrivateKey sig_priv;
-    mls::KeyPackage key_package;
-  };
+  // Operations on a running group
+  Status add_proposal(CachedState& entry,
+                      const AddProposalRequest* request,
+                      ProposalResponse* response)
+  {
+    auto key_package_data = string_to_bytes(request->key_package());
+    auto key_package = tls::get<mls::KeyPackage>(key_package_data);
 
-  std::map<uint32_t, CachedJoin> join_cache;
+    auto proposal = entry.state.add(key_package);
 
-  uint32_t store_join(mls::HPKEPrivateKey&& init_priv, mls::SignaturePrivateKey&& sig_priv, mls::KeyPackage&& kp) {
-    auto join_id = tls::get<uint32_t>(kp.hash());
-    auto entry = CachedJoin{std::move(init_priv), std::move(sig_priv), std::move(kp)};
-    join_cache.emplace(std::make_pair(join_id, std::move(entry)));
-    return join_id;
+    response->set_proposal(entry.marshal(proposal));
+    return Status::OK;
   }
 
-  CachedJoin* load_join(uint32_t join_id) {
-    if (join_cache.count(join_id) == 0) {
-      return nullptr;
+  Status commit(CachedState& entry,
+                      const CommitRequest* request,
+                      CommitResponse* response)
+  {
+    // Unmarshal and handle external / by_reference proposals
+    const auto by_reference_size = request->by_reference_size();
+    for (int i = 0; i < by_reference_size; i++) {
+      auto pt = entry.unmarshal(request->by_reference(i));
+      entry.state.handle(pt);
     }
-    return &join_cache.at(join_id);
-  }
 
-  // Cached group state
-  struct CachedState {
-    mls::State state;
-    bool encrypt_handshake;
-  };
+    auto inline_proposals = std::vector<mls::Proposal>(request->by_value_size());
+    for (size_t i = 0; i < inline_proposals.size(); i++) {
+      auto pt = entry.unmarshal(request->by_value(i));
+      if (pt.sender.sender != entry.state.index().val) {
+        return Status(grpc::INVALID_ARGUMENT, "Inline proposal not from this member");
+      }
 
-  std::map<uint32_t, CachedState> state_cache;
+      auto proposal = var::get_if<mls::Proposal>(&pt.content);
+      if (!proposal) {
+        return Status(grpc::INVALID_ARGUMENT, "Inline proposal not a proposal");
+      }
 
-  uint32_t store_state(mls::State&& state, bool encrypt_handshake) {
-    auto state_id = tls::get<uint32_t>(state.authentication_secret());
-    auto entry = CachedState{std::move(state), encrypt_handshake};
-    state_cache.emplace(std::make_pair(state_id, std::move(entry)));
-    return state_id;
-  }
-
-  CachedState* load_state(uint32_t state_id) {
-    if (state_cache.count(state_id) == 0) {
-      return nullptr;
+      inline_proposals[i] = std::move(*proposal);
     }
-    return &state_cache.at(state_id);
+
+    auto leaf_secret = mls::random_bytes(entry.state.cipher_suite().secret_size());
+    auto [commit, welcome, next] = entry.state.commit(leaf_secret, inline_proposals);
+
+    auto state_id = store_state(std::move(next), entry.encrypt_handshake);
+    (void)(state_id);
+    // TODO entry.next = state_id
+
+    auto commit_data = entry.marshal(commit);
+    response->set_commit(commit_data);
+
+    auto welcome_data = tls::marshal(welcome);
+    (void)(welcome_data);
+    // TODO response->set_welcome(bytes_to_string(welcome_data));
+    return Status::OK;
   }
+
+
 };
 
 json
