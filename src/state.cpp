@@ -13,13 +13,13 @@ State::State(bytes group_id,
              const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& key_package,
-             const ExtensionList& extensions)
+             ExtensionList extensions)
   : _suite(suite)
   , _group_id(std::move(group_id))
   , _epoch(0)
   , _tree(suite)
   , _transcript_hash(suite)
-  , _extensions(extensions)
+  , _extensions(std::move(extensions))
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
@@ -93,7 +93,7 @@ State::State(const HPKEPrivateKey& init_priv,
   static const auto copy_to_group = std::set<Extension::Type>{
     ExtensionType::sframe_parameters,
   };
-  for (auto ext : group_info.extensions.extensions) {
+  for (const auto& ext : group_info.extensions.extensions) {
     if (copy_to_group.count(ext.type) > 0) {
       _extensions.add(ext.type, ext.data);
     }

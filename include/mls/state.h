@@ -57,7 +57,7 @@ public:
         const HPKEPrivateKey& init_priv,
         SignaturePrivateKey sig_priv,
         const KeyPackage& key_package,
-        const ExtensionList& extensions);
+        ExtensionList extensions);
 
   // Initialize a group from a Welcome
   State(const HPKEPrivateKey& init_priv,
