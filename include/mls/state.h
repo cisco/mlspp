@@ -56,7 +56,8 @@ public:
         CipherSuite suite,
         const HPKEPrivateKey& init_priv,
         SignaturePrivateKey sig_priv,
-        const KeyPackage& key_package);
+        const KeyPackage& key_package,
+        const ExtensionList& extensions);
 
   // Initialize a group from a Welcome
   State(const HPKEPrivateKey& init_priv,
@@ -93,6 +94,8 @@ public:
   epoch_t epoch() const { return _epoch; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
+  const ExtensionList& extensions() const { return _extensions; }
+
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;

@@ -77,8 +77,8 @@ protected:
 TEST_CASE_FIXTURE(StateTest, "Two Person")
 {
   // Initialize the creator's state
-  auto first0 =
-    State{ group_id, suite, init_privs[0], identity_privs[0], key_packages[0] };
+  auto first0 = State{ group_id,          suite,           init_privs[0],
+                       identity_privs[0], key_packages[0], {} };
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
@@ -94,11 +94,65 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   verify_group_functionality(group);
 }
 
+TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
+{
+  // Set the SFrame parameters for the group
+  auto specified_params = SFrameParameters{ 1, 4 };
+  auto group_extensions = ExtensionList{};
+  group_extensions.add(specified_params);
+
+  // Create the initial state of the group
+  auto first0 = State{ group_id,          suite,           init_privs[0],
+                       identity_privs[0], key_packages[0], group_extensions };
+
+  // Get a KeyPackage from the second member, and verify compatiblity
+  auto compatible_capabilities = SFrameCapabilities{ { 1, 2, 3, 4 } };
+  REQUIRE(compatible_capabilities.compatible(specified_params));
+
+  auto incompatible_capabilities = SFrameCapabilities{ { 2, 3, 4 } };
+  REQUIRE_FALSE(incompatible_capabilities.compatible(specified_params));
+
+  auto key_package_extensions = ExtensionList{};
+  key_package_extensions.add(compatible_capabilities);
+  key_packages[1].sign(identity_privs[1],
+                       KeyPackageOpts{ key_package_extensions });
+
+  auto decoded_capabilities =
+    key_packages[1].extensions.find<SFrameCapabilities>();
+  REQUIRE(!!decoded_capabilities);
+  REQUIRE(opt::get(decoded_capabilities) == compatible_capabilities);
+  REQUIRE(opt::get(decoded_capabilities).compatible(specified_params));
+
+  // Add the second member
+  auto add = first0.add_proposal(key_packages[1]);
+  auto [commit, welcome, first1] = first0.commit(fresh_secret(), { add });
+  silence_unused(commit);
+
+  auto second0 =
+    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+  REQUIRE(first1 == second0);
+
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
+
+  // Check that both participants have the  correct SFrame parameters
+  auto first_params = first1.extensions().find<SFrameParameters>();
+  auto second_params = second0.extensions().find<SFrameParameters>();
+  REQUIRE(!!first_params);
+  REQUIRE(!!second_params);
+  REQUIRE(opt::get(first_params) == specified_params);
+  REQUIRE(opt::get(first_params) == opt::get(second_params));
+}
+
 TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 {
   // Initialize the creator's state
-  states.emplace_back(
-    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
+  states.emplace_back(group_id,
+                      suite,
+                      init_privs[0],
+                      identity_privs[0],
+                      key_packages[0],
+                      ExtensionList{});
 
   // Create and process an Add proposal for each new participant
   auto adds = std::vector<Proposal>{};
@@ -123,8 +177,12 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 {
   // Initialize the creator's state
-  states.emplace_back(
-    group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
+  states.emplace_back(group_id,
+                      suite,
+                      init_privs[0],
+                      identity_privs[0],
+                      key_packages[0],
+                      ExtensionList{});
 
   // Each participant invites the next
   for (size_t i = 1; i < group_size; i += 1) {
@@ -160,8 +218,12 @@ protected:
 
   RunningGroupTest()
   {
-    states.emplace_back(
-      group_id, suite, init_privs[0], identity_privs[0], key_packages[0]);
+    states.emplace_back(group_id,
+                        suite,
+                        init_privs[0],
+                        identity_privs[0],
+                        key_packages[0],
+                        ExtensionList{});
 
     auto adds = std::vector<Proposal>{};
     for (size_t i = 1; i < group_size; i += 1) {

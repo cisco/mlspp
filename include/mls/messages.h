@@ -18,6 +18,26 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
+struct SFrameParameters
+{
+  uint16_t cipher_suite;
+  uint8_t epoch_bits;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(cipher_suite, epoch_bits)
+};
+
+struct SFrameCapabilities
+{
+  std::vector<uint16_t> cipher_suites;
+
+  bool compatible(const SFrameParameters& params) const;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(cipher_suites)
+  TLS_TRAITS(tls::vector<1>)
+};
+
 struct MAC
 {
   bytes mac_value;
