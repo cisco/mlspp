@@ -98,17 +98,17 @@ struct Certificate::ParsedCertificate
 
     for (int i = X509_NAME_entry_count(x509_name) - 1; i >= 0; i--) {
       auto* entry = X509_NAME_get_entry(x509_name, i);
-      if (!entry) {
+      if (entry == nullptr) {
         continue;
       }
 
       auto* oid = X509_NAME_ENTRY_get_object(entry);
-      auto* str = X509_NAME_ENTRY_get_data(entry);
-      if (!oid || !str) {
+      auto* asn_str = X509_NAME_ENTRY_get_data(entry);
+      if (oid == nullptr || asn_str == nullptr) {
         continue;
       }
 
-      std::string parsed_name = asn1_string_to_std_string(str);
+      std::string parsed_name = asn1_string_to_std_string(asn_str);
 
       int nid = OBJ_obj2nid(oid);
       switch (nid) {
