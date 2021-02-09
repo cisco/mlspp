@@ -80,6 +80,26 @@ struct Certificate::ParsedCertificate
     return digest;
   }
 
+  // Parse Subject CN into textual representation
+  static std::string parse_subject_name(X509* cert)
+  {
+    auto x509_name = X509_get_subject_name(cert);
+    if (x509_name == nullptr) {
+      throw openssl_error();
+    }
+
+    std::string common_name;
+    auto index = X509_NAME_get_index_by_NID(x509_name, NID_commonName, -1);
+    if (index != -1) {
+      auto* cn = X509_NAME_get_entry(x509_name, index);
+      if (cn != nullptr) {
+        auto* asn_cn = X509_NAME_ENTRY_get_data(cn);
+        common_name = asn1_string_to_std_string(asn_cn);
+      }
+    }
+    return common_name;
+  }
+
   // Parse Subject Key Identifier Extension
   static std::optional<bytes> parse_skid(X509* cert)
   {
@@ -128,6 +148,7 @@ struct Certificate::ParsedCertificate
     , pub_key_id(signature_algorithm(x509.get()))
     , issuer(X509_issuer_name_hash(x509.get()))
     , subject(X509_subject_name_hash(x509.get()))
+    , subject_name(parse_subject_name(x509.get()))
     , subject_key_id(parse_skid(x509.get()))
     , authority_key_id(parse_akid(x509.get()))
     , sub_alt_names(parse_san(x509.get()))
@@ -140,6 +161,7 @@ struct Certificate::ParsedCertificate
     , pub_key_id(signature_algorithm(other.x509.get()))
     , issuer(other.issuer)
     , subject(other.subject)
+    , subject_name(other.subject_name)
     , subject_key_id(other.subject_key_id)
     , authority_key_id(other.authority_key_id)
     , sub_alt_names(other.sub_alt_names)
@@ -183,6 +205,7 @@ struct Certificate::ParsedCertificate
   const Signature::ID pub_key_id;
   const uint64_t issuer;
   const uint64_t subject;
+  const std::string subject_name;
   const std::optional<bytes> subject_key_id;
   const std::optional<bytes> authority_key_id;
   const std::vector<GeneralName> sub_alt_names;
@@ -244,6 +267,12 @@ uint64_t
 Certificate::subject() const
 {
   return parsed_cert->subject;
+}
+
+std::string
+Certificate::subject_name() const
+{
+  return parsed_cert->subject_name;
 }
 
 bool
