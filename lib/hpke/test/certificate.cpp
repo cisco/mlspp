@@ -393,6 +393,6 @@ TEST_CASE("Test Subject Common Name Parsing")
 
   auto leaf = Certificate{ leaf_der };
   CHECK(leaf.raw == leaf_der);
-  CHECK_EQ(leaf.subject_name(),
+  CHECK_EQ(leaf.subject_common_name(),
            "anonymous:1b0b1f55-67e1-11cf-afff-55998d418ddd");
 }
