@@ -91,6 +91,9 @@ struct Certificate::ParsedCertificate
     return digest;
   }
 
+  // Note: This method does not implement total general name parsing.
+  // Duplicate entries are not supported; if they are present, the last one
+  // presented by OpenSSL is chosen.
   static ParsedName parse_names(const X509* cert, bool is_subject)
   {
     X509_NAME* x509_name = nullptr;
