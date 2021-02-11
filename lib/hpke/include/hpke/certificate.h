@@ -10,8 +10,6 @@ using namespace bytes_ns;
 
 namespace hpke {
 
-enum struct NameType;
-
 struct Certificate
 {
 private:
@@ -19,7 +17,13 @@ private:
   std::unique_ptr<ParsedCertificate> parsed_cert;
 
 public:
-  using ParsedName = std::map<NameType, std::string>;
+  struct NameType
+  {
+    static const int organization;
+    static const int common_name;
+  };
+
+  using ParsedName = std::map<int, std::string>;
 
   explicit Certificate(const bytes& der);
   Certificate() = delete;
@@ -29,10 +33,10 @@ public:
   bool valid_from(const Certificate& parent) const;
 
   // Accessors for parsed certificate elements
-  uint64_t issuer() const;
-  uint64_t subject() const;
-  ParsedName parsed_subject() const;
-  ParsedName parsed_issuer() const;
+  uint64_t issuer_hash() const;
+  uint64_t subject_hash() const;
+  ParsedName issuer() const;
+  ParsedName subject() const;
   bool is_ca() const;
   std::optional<bytes> subject_key_id() const;
   std::optional<bytes> authority_key_id() const;

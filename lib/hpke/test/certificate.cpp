@@ -65,9 +65,9 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  REQUIRE(root.subject() == 1072860458);
-  REQUIRE(issuing.issuer() == root.subject());
-  REQUIRE(leaf.issuer() == issuing.subject());
+  REQUIRE(root.subject_hash() == 1072860458);
+  REQUIRE(issuing.issuer_hash() == root.subject_hash());
+  REQUIRE(leaf.issuer_hash() == issuing.subject_hash());
 
   // negative tests
   CHECK_FALSE(issuing.valid_from(leaf));
@@ -263,8 +263,8 @@ TEST_CASE("RSA Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  REQUIRE(issuing.issuer() == root.subject());
-  REQUIRE(leaf.issuer() == issuing.subject());
+  REQUIRE(issuing.issuer_hash() == root.subject_hash());
+  REQUIRE(leaf.issuer_hash() == issuing.subject_hash());
 
   // negative tests
   CHECK_FALSE(issuing.valid_from(leaf));
@@ -386,9 +386,8 @@ TEST_CASE("Test Subject Common Name Parsing")
 
   auto leaf = Certificate{ leaf_der };
   CHECK(leaf.raw == leaf_der);
-  auto parsed_subject = leaf.parsed_subject();
+  auto parsed_subject = leaf.subject();
   CHECK_EQ(parsed_subject.size(), 1);
-  for (const auto& entry : parsed_subject) {
-    CHECK_EQ(entry.second, "anonymous:427d9251-d40d-400d-a72e-72652ee134d5");
-  }
+  auto it = parsed_subject.find(Certificate::NameType::common_name);
+  CHECK_EQ(it->second, "anonymous:427d9251-d40d-400d-a72e-72652ee134d5");
 }
