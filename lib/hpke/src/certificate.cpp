@@ -3,7 +3,6 @@
 #include "rsa.h"
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
-#include <map>
 #include <memory>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -58,16 +57,6 @@ struct DNSName
 
 using GeneralName = tls::var::variant<RFC822Name, DNSName>;
 
-enum struct NameType : int
-{
-  organization = NID_organizationName,
-  organizational_unit = NID_organizationalUnitName,
-  country = NID_countryName,
-  state_or_province_name = NID_stateOrProvinceName,
-  common_name = NID_commonName,
-  serial_number = NID_serialNumber,
-};
-
 struct Certificate::ParsedCertificate
 {
 
@@ -99,7 +88,6 @@ struct Certificate::ParsedCertificate
   // presented by OpenSSL is chosen.
   static ParsedName parse_names(const X509_NAME* x509_name)
   {
-
     if (x509_name == nullptr) {
       throw openssl_error();
     }
