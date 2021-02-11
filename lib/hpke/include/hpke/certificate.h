@@ -4,10 +4,13 @@
 
 #include <bytes/bytes.h>
 #include <hpke/signature.h>
+#include <map>
 
 using namespace bytes_ns;
 
 namespace hpke {
+
+enum struct NameType;
 
 struct Certificate
 {
@@ -16,6 +19,8 @@ private:
   std::unique_ptr<ParsedCertificate> parsed_cert;
 
 public:
+  using ParsedName = std::map<NameType, std::string>;
+
   explicit Certificate(const bytes& der);
   Certificate() = delete;
   Certificate(const Certificate& other);
@@ -26,8 +31,8 @@ public:
   // Accessors for parsed certificate elements
   uint64_t issuer() const;
   uint64_t subject() const;
-  std::string subject_common_name() const;
-  std::string subject_organization_name() const;
+  ParsedName parsed_subject() const;
+  ParsedName parsed_issuer() const;
   bool is_ca() const;
   std::optional<bytes> subject_key_id() const;
   std::optional<bytes> authority_key_id() const;

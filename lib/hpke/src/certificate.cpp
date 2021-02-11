@@ -3,6 +3,7 @@
 #include "rsa.h"
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
+#include <map>
 #include <memory>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -54,10 +55,14 @@ struct DNSName
 
 using GeneralName = tls::var::variant<RFC822Name, DNSName>;
 
-struct ParsedX509Subject
+enum struct NameType : int
 {
-  std::string common_name;
-  std::string organization_name;
+  organization = NID_organizationName,
+  organizational_unit = NID_organizationalUnitName,
+  country = NID_countryName,
+  state_or_province_name = NID_stateOrProvinceName,
+  common_name = NID_commonName,
+  serial_number = NID_serialNumber,
 };
 
 struct Certificate::ParsedCertificate
@@ -86,15 +91,21 @@ struct Certificate::ParsedCertificate
     return digest;
   }
 
-  // Parse Subject fields (CN, O=)
-  static ParsedX509Subject parse_subject(X509* cert)
+  static ParsedName parse_names(const X509* cert, bool is_subject)
   {
-    auto* x509_name = X509_get_subject_name(cert);
+    X509_NAME* x509_name = nullptr;
+
+    if (is_subject) {
+      x509_name = X509_get_subject_name(cert);
+    } else {
+      x509_name = X509_get_issuer_name(cert);
+    }
+
     if (x509_name == nullptr) {
       throw openssl_error();
     }
 
-    ParsedX509Subject parsed_subject;
+    ParsedName parsed_name;
 
     for (int i = X509_NAME_entry_count(x509_name) - 1; i >= 0; i--) {
       auto* entry = X509_NAME_get_entry(x509_name, i);
@@ -108,21 +119,13 @@ struct Certificate::ParsedCertificate
         continue;
       }
 
-      std::string parsed_name = asn1_string_to_std_string(asn_str);
+      std::string parsed_value = asn1_string_to_std_string(asn_str);
 
       int nid = OBJ_obj2nid(oid);
-      switch (nid) {
-        case NID_commonName:
-          parsed_subject.common_name = parsed_name;
-          break;
-        case NID_organizationName:
-          parsed_subject.organization_name = parsed_name;
-        default:
-          break;
-      }
+      parsed_name[NameType(nid)] = parsed_value;
     }
 
-    return parsed_subject;
+    return parsed_name;
   }
 
   // Parse Subject Key Identifier Extension
@@ -173,7 +176,8 @@ struct Certificate::ParsedCertificate
     , pub_key_id(signature_algorithm(x509.get()))
     , issuer(X509_issuer_name_hash(x509.get()))
     , subject(X509_subject_name_hash(x509.get()))
-    , parsed_subject(parse_subject(x509.get()))
+    , parsed_subject_name(parse_names(x509.get(), true))
+    , parsed_issuer_name(parse_names(x509.get(), false))
     , subject_key_id(parse_skid(x509.get()))
     , authority_key_id(parse_akid(x509.get()))
     , sub_alt_names(parse_san(x509.get()))
@@ -186,7 +190,8 @@ struct Certificate::ParsedCertificate
     , pub_key_id(signature_algorithm(other.x509.get()))
     , issuer(other.issuer)
     , subject(other.subject)
-    , parsed_subject(other.parsed_subject)
+    , parsed_subject_name(other.parsed_subject_name)
+    , parsed_issuer_name(other.parsed_issuer_name)
     , subject_key_id(other.subject_key_id)
     , authority_key_id(other.authority_key_id)
     , sub_alt_names(other.sub_alt_names)
@@ -230,7 +235,8 @@ struct Certificate::ParsedCertificate
   const Signature::ID pub_key_id;
   const uint64_t issuer;
   const uint64_t subject;
-  const ParsedX509Subject parsed_subject;
+  const ParsedName parsed_subject_name;
+  const ParsedName parsed_issuer_name;
   const std::optional<bytes> subject_key_id;
   const std::optional<bytes> authority_key_id;
   const std::vector<GeneralName> sub_alt_names;
@@ -294,16 +300,16 @@ Certificate::subject() const
   return parsed_cert->subject;
 }
 
-std::string
-Certificate::subject_common_name() const
+Certificate::ParsedName
+Certificate::parsed_subject() const
 {
-  return parsed_cert->parsed_subject.common_name;
+  return parsed_cert->parsed_subject_name;
 }
 
-std::string
-Certificate::subject_organization_name() const
+Certificate::ParsedName
+Certificate::parsed_issuer() const
 {
-  return parsed_cert->parsed_subject.organization_name;
+  return parsed_cert->parsed_issuer_name;
 }
 
 bool
