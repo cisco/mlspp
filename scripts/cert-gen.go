@@ -138,10 +138,10 @@ func makeCert(template, parent *x509.Certificate, parentPriv interface{}, addSKI
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	chk(err)
 	template.SerialNumber = serialNumber
-
     // set subject
     template.Subject =  pkix.Name {
-                           	CommonName: "anonymous:427d9251-d40d-400d-a72e-72652ee134d5",
+                           	CommonName: "custom:12345",
+                           	SerialNumber: "11-22-33",
                           }
 
 	// Add random SKI if required

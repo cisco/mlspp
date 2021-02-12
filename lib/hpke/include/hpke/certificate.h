@@ -21,6 +21,10 @@ public:
   {
     static const int organization;
     static const int common_name;
+    static const int organizational_unit;
+    static const int country;
+    static const int serial_number;
+    static const int state_or_province_name;
   };
 
   using ParsedName = std::map<int, std::string>;

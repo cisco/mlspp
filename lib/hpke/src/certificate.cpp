@@ -44,6 +44,12 @@ asn1_string_to_std_string(const ASN1_STRING* asn1_string)
 
 const int Certificate::NameType::organization = NID_organizationName;
 const int Certificate::NameType::common_name = NID_commonName;
+const int Certificate::NameType::organizational_unit =
+  NID_organizationalUnitName;
+const int Certificate::NameType::country = NID_countryName;
+const int Certificate::NameType::serial_number = NID_serialNumber;
+const int Certificate::NameType::state_or_province_name =
+  NID_stateOrProvinceName;
 
 struct RFC822Name
 {
