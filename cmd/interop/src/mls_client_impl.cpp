@@ -126,6 +126,15 @@ MLSClientImpl::Commit(ServerContext* /* context */,
     request, [=](auto& state) { return commit(state, request, response); });
 }
 
+Status
+MLSClientImpl::HandleCommit(ServerContext* /* context */,
+                      const HandleCommitRequest* request,
+                      HandleCommitResponse* response)
+{
+  return state_wrap(
+    request, [=](auto& state) { return handle_commit(state, request, response); });
+}
+
 // Cached join transactions
 uint32_t
 MLSClientImpl::store_join(mls::HPKEPrivateKey&& init_priv,
@@ -149,6 +158,13 @@ MLSClientImpl::load_join(uint32_t join_id)
 }
 
 // Cached group state
+void
+MLSClientImpl::CachedState::reset_pending()
+{
+  pending_commit.reset();
+  pending_state_id.reset();
+}
+
 std::string
 MLSClientImpl::CachedState::marshal(const mls::MLSPlaintext& pt)
 {
@@ -175,7 +191,7 @@ uint32_t
 MLSClientImpl::store_state(mls::State&& state, bool encrypt_handshake)
 {
   auto state_id = tls::get<uint32_t>(state.authentication_secret());
-  auto entry = CachedState{ std::move(state), encrypt_handshake };
+  auto entry = CachedState{ std::move(state), encrypt_handshake, {}, {} };
   state_cache.emplace(std::make_pair(state_id, std::move(entry)));
   return state_id;
 }
@@ -187,6 +203,12 @@ MLSClientImpl::load_state(uint32_t state_id)
     return nullptr;
   }
   return &state_cache.at(state_id);
+}
+
+void
+MLSClientImpl::remove_state(uint32_t state_id)
+{
+  state_cache.erase(state_id);
 }
 
 // Fallible method implementations, wrapped before being exposed to gRPC
@@ -356,7 +378,10 @@ MLSClientImpl::commit(CachedState& entry,
   const auto by_reference_size = request->by_reference_size();
   for (int i = 0; i < by_reference_size; i++) {
     auto pt = entry.unmarshal(request->by_reference(i));
-    entry.state.handle(pt);
+    auto should_be_null = entry.state.handle(pt);
+    if (should_be_null) {
+      throw std::runtime_error("Commit included among proposals");
+    }
   }
 
   auto inline_proposals = std::vector<mls::Proposal>(request->by_value_size());
@@ -380,15 +405,54 @@ MLSClientImpl::commit(CachedState& entry,
   auto [commit, welcome, next] =
     entry.state.commit(leaf_secret, inline_proposals);
 
-  auto state_id = store_state(std::move(next), entry.encrypt_handshake);
-  (void)(state_id);
-  // TODO entry.next = state_id
+  auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 
   auto commit_data = entry.marshal(commit);
   response->set_commit(commit_data);
 
+  entry.pending_commit = commit_data;
+  entry.pending_state_id = next_id;
+
   auto welcome_data = tls::marshal(welcome);
-  (void)(welcome_data);
-  // TODO response->set_welcome(bytes_to_string(welcome_data));
+  response->set_welcome(bytes_to_string(welcome_data));
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::handle_commit(CachedState& entry,
+                             const HandleCommitRequest* request,
+                             HandleCommitResponse* response)
+{
+  // Handle our own commits with caching
+  auto commit_data = request->commit();
+  if (entry.pending_commit && commit_data != opt::get(entry.pending_commit)) {
+    response->set_state_id(opt::get(entry.pending_state_id));
+    entry.reset_pending();
+    return Status::OK;
+  } else if (entry.pending_state_id) {
+    remove_state(opt::get(entry.pending_state_id));
+    entry.reset_pending();
+  }
+
+  // Handle the provided proposals, then the commit
+  const auto proposal_size = request->proposal_size();
+  for (int i = 0; i < proposal_size; i++) {
+    auto pt = entry.unmarshal(request->proposal(i));
+    auto should_be_null = entry.state.handle(pt);
+    if (should_be_null) {
+      throw std::runtime_error("Commit included among proposals");
+    }
+  }
+
+  auto commit = entry.unmarshal(request->commit());
+  auto should_be_next = entry.state.handle(commit);
+  if (!should_be_next) {
+    throw std::runtime_error("Commit failed to produce a new state");
+  }
+
+  auto& next = opt::get(should_be_next);
+  auto next_id = store_state(std::move(next), entry.encrypt_handshake);
+  response->set_state_id(next_id);
   return Status::OK;
 }

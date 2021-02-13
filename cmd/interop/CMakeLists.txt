@@ -45,8 +45,9 @@ set_directory_properties( PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/third_party )
 ExternalProject_Add(
     mls-interop-extern
     GIT_REPOSITORY ${MLS_IMPLEMENTATIONS_REPO_URL}
+    GIT_TAG origin/mlspp
     TIMEOUT 10
-    UPDATE_COMMAND ${GIT_EXECUTABLE} pull
+    UPDATE_COMMAND ${GIT_EXECUTABLE} pull origin mlspp
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""

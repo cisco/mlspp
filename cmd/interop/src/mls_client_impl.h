@@ -43,6 +43,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
+  Status HandleCommit(ServerContext* context,
+                const HandleCommitRequest* request,
+                HandleCommitResponse* response) override;
 
 private:
   // Wrapper for methods that rely on state
@@ -70,6 +73,11 @@ private:
     mls::State state;
     bool encrypt_handshake;
 
+    std::optional<std::string> pending_commit;
+    std::optional<uint32_t> pending_state_id;
+    void reset_pending();
+
+    // Marshal/unmarshal with encryption as required
     std::string marshal(const mls::MLSPlaintext& pt);
     mls::MLSPlaintext unmarshal(const std::string& wire);
   };
@@ -78,6 +86,7 @@ private:
 
   uint32_t store_state(mls::State&& state, bool encrypt_handshake);
   CachedState* load_state(uint32_t state_id);
+  void remove_state(uint32_t state_id);
 
   // Fallible method implementations, wrapped before being exposed to gRPC
   Status verify_test_vector(const VerifyTestVectorRequest* request);
@@ -97,4 +106,7 @@ private:
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);
+  Status handle_commit(CachedState& entry,
+                       const HandleCommitRequest* request,
+                       HandleCommitResponse* response);
 };
