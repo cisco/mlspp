@@ -106,6 +106,25 @@ MLSClientImpl::CreateKeyPackage(ServerContext* /* context */,
   return catch_wrap([=]() { return create_key_package(request, response); });
 }
 
+Status
+MLSClientImpl::JoinGroup(ServerContext* /* context */,
+                                const JoinGroupRequest* request,
+                                JoinGroupResponse* response)
+{
+  return catch_wrap([=]() { return join_group(request, response); });
+}
+
+// Access information from a group state
+Status
+MLSClientImpl::StateAuth(ServerContext* /* context */,
+                                const StateAuthRequest* request,
+                                StateAuthResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return state_auth(state, request, response);
+  });
+}
+
 // Operations using a group state
 Status
 MLSClientImpl::AddProposal(ServerContext* /* context */,
@@ -354,6 +373,35 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
   return Status::OK;
 }
 
+Status
+MLSClientImpl::join_group(const JoinGroupRequest* request,
+                          JoinGroupResponse* response)
+{
+  auto join = load_join(request->transaction_id());
+  if (!join) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
+  }
+
+  auto welcome_data = string_to_bytes(request->welcome());
+  auto welcome = tls::get<mls::Welcome>(welcome_data);
+
+  auto state = mls::State(join->init_priv, join->sig_priv, join->key_package, welcome);
+  auto state_id = store_state(std::move(state), request->encrypt_handshake());
+
+  response->set_state_id(state_id);
+  return Status::OK;
+}
+
+// Access information from a group state
+Status MLSClientImpl::state_auth(CachedState& entry,
+                    const StateAuthRequest* /* request */,
+                    StateAuthResponse* response)
+{
+  auto secret = entry.state.authentication_secret();
+  response->set_state_auth_secret(bytes_to_string(secret));
+  return Status::OK;
+}
+
 // Operations on a running group
 Status
 MLSClientImpl::add_proposal(CachedState& entry,
@@ -426,7 +474,7 @@ MLSClientImpl::handle_commit(CachedState& entry,
 {
   // Handle our own commits with caching
   auto commit_data = request->commit();
-  if (entry.pending_commit && commit_data != opt::get(entry.pending_commit)) {
+  if (entry.pending_commit && commit_data == opt::get(entry.pending_commit)) {
     response->set_state_id(opt::get(entry.pending_state_id));
     entry.reset_pending();
     return Status::OK;

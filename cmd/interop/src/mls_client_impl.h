@@ -35,6 +35,14 @@ class MLSClientImpl final : public MLSClient::Service
   Status CreateKeyPackage(ServerContext* context,
                           const CreateKeyPackageRequest* request,
                           CreateKeyPackageResponse* response) override;
+  Status JoinGroup(ServerContext* context,
+                   const JoinGroupRequest* request,
+                   JoinGroupResponse* response) override;
+
+  // Access information from a group state
+  Status StateAuth(ServerContext* context,
+                   const StateAuthRequest* request,
+                   StateAuthResponse* response) override;
 
   // Operations using a group state
   Status AddProposal(ServerContext* context,
@@ -98,6 +106,13 @@ private:
                       CreateGroupResponse* response);
   Status create_key_package(const CreateKeyPackageRequest* request,
                             CreateKeyPackageResponse* response);
+  Status join_group(const JoinGroupRequest* request,
+                    JoinGroupResponse* response);
+
+  // Access information from a group state
+  Status state_auth(CachedState& entry,
+                    const StateAuthRequest* request,
+                    StateAuthResponse* response);
 
   // Operations on a running group
   Status add_proposal(CachedState& entry,
