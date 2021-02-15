@@ -206,10 +206,9 @@ struct Certificate::ParsedCertificate
         return Signature::ID::Ed448;
       case EVP_PKEY_EC: {
         auto key_size = EVP_PKEY_bits(X509_get0_pubkey(x509));
-        return (key_size == 256)
-                 ? Signature::ID::P256_SHA256
-                 : (key_size == 384) ? Signature::ID::P384_SHA384
-                                     : Signature::ID::P521_SHA512;
+        return (key_size == 256)   ? Signature::ID::P256_SHA256
+               : (key_size == 384) ? Signature::ID::P384_SHA384
+                                   : Signature::ID::P521_SHA512;
       }
       case EVP_PKEY_RSA:
         return Signature::ID::RSA_SHA256;

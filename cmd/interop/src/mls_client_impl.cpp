@@ -108,8 +108,8 @@ MLSClientImpl::CreateKeyPackage(ServerContext* /* context */,
 
 Status
 MLSClientImpl::JoinGroup(ServerContext* /* context */,
-                                const JoinGroupRequest* request,
-                                JoinGroupResponse* response)
+                         const JoinGroupRequest* request,
+                         JoinGroupResponse* response)
 {
   return catch_wrap([=]() { return join_group(request, response); });
 }
@@ -117,12 +117,11 @@ MLSClientImpl::JoinGroup(ServerContext* /* context */,
 // Access information from a group state
 Status
 MLSClientImpl::StateAuth(ServerContext* /* context */,
-                                const StateAuthRequest* request,
-                                StateAuthResponse* response)
+                         const StateAuthRequest* request,
+                         StateAuthResponse* response)
 {
-  return state_wrap(request, [=](auto& state) {
-    return state_auth(state, request, response);
-  });
+  return state_wrap(
+    request, [=](auto& state) { return state_auth(state, request, response); });
 }
 
 // Operations using a group state
@@ -147,11 +146,12 @@ MLSClientImpl::Commit(ServerContext* /* context */,
 
 Status
 MLSClientImpl::HandleCommit(ServerContext* /* context */,
-                      const HandleCommitRequest* request,
-                      HandleCommitResponse* response)
+                            const HandleCommitRequest* request,
+                            HandleCommitResponse* response)
 {
-  return state_wrap(
-    request, [=](auto& state) { return handle_commit(state, request, response); });
+  return state_wrap(request, [=](auto& state) {
+    return handle_commit(state, request, response);
+  });
 }
 
 // Cached join transactions
@@ -385,7 +385,8 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
   auto welcome_data = string_to_bytes(request->welcome());
   auto welcome = tls::get<mls::Welcome>(welcome_data);
 
-  auto state = mls::State(join->init_priv, join->sig_priv, join->key_package, welcome);
+  auto state =
+    mls::State(join->init_priv, join->sig_priv, join->key_package, welcome);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
@@ -393,9 +394,10 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
 }
 
 // Access information from a group state
-Status MLSClientImpl::state_auth(CachedState& entry,
-                    const StateAuthRequest* /* request */,
-                    StateAuthResponse* response)
+Status
+MLSClientImpl::state_auth(CachedState& entry,
+                          const StateAuthRequest* /* request */,
+                          StateAuthResponse* response)
 {
   auto secret = entry.state.authentication_secret();
   response->set_state_auth_secret(bytes_to_string(secret));

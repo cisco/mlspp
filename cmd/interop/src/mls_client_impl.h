@@ -52,8 +52,8 @@ class MLSClientImpl final : public MLSClient::Service
                 const CommitRequest* request,
                 CommitResponse* response) override;
   Status HandleCommit(ServerContext* context,
-                const HandleCommitRequest* request,
-                HandleCommitResponse* response) override;
+                      const HandleCommitRequest* request,
+                      HandleCommitResponse* response) override;
 
 private:
   // Wrapper for methods that rely on state
