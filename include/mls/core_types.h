@@ -17,22 +17,28 @@ enum class ProtocolVersion : uint8_t
 
 extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
-struct ExtensionType
-{
-  static constexpr uint16_t capabilities = 1;
-  static constexpr uint16_t lifetime = 2;
-  static constexpr uint16_t key_id = 3;
-  static constexpr uint16_t parent_hash = 4;
-  static constexpr uint16_t ratchet_tree = 5;
-};
-
 struct Extension
 {
-  uint16_t type;
+  using Type = uint16_t;
+
+  Type type;
   bytes data;
 
   TLS_SERIALIZABLE(type, data)
   TLS_TRAITS(tls::pass, tls::vector<2>)
+};
+
+struct ExtensionType
+{
+  static constexpr Extension::Type capabilities = 1;
+  static constexpr Extension::Type lifetime = 2;
+  static constexpr Extension::Type key_id = 3;
+  static constexpr Extension::Type parent_hash = 4;
+  static constexpr Extension::Type ratchet_tree = 5;
+
+  // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
+  // a value from the vendor-specific space
+  static constexpr Extension::Type sframe_parameters = 0xff02;
 };
 
 struct ExtensionList

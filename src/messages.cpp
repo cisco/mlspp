@@ -8,6 +8,16 @@ namespace mls {
 // Extensions
 
 const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+const uint16_t SFrameParameters::type = ExtensionType::sframe_parameters;
+const uint16_t SFrameCapabilities::type = ExtensionType::sframe_parameters;
+
+bool
+SFrameCapabilities::compatible(const SFrameParameters& params) const
+{
+  const auto begin = cipher_suites.begin();
+  const auto end = cipher_suites.end();
+  return std::find(begin, end, params.cipher_suite) != end;
+}
 
 // PublicGroupState
 
