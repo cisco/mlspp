@@ -55,7 +55,7 @@ ExtensionList::for_group() const
 {
   auto group_ext = ExtensionList{};
   for (const auto& ext : extensions) {
-    if (!group_types().count(ext.type)) {
+    if (group_types().count(ext.type) == 0) {
       continue;
     }
 
