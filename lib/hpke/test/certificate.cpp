@@ -65,9 +65,9 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  REQUIRE(root.subject() == 1072860458);
-  REQUIRE(issuing.issuer() == root.subject());
-  REQUIRE(leaf.issuer() == issuing.subject());
+  REQUIRE(root.subject_hash() == 1072860458);
+  REQUIRE(issuing.issuer_hash() == root.subject_hash());
+  REQUIRE(leaf.issuer_hash() == issuing.subject_hash());
 
   // negative tests
   CHECK_FALSE(issuing.valid_from(leaf));
@@ -263,8 +263,8 @@ TEST_CASE("RSA Certificate Known-Answer depth 2")
   CHECK(issuing.is_ca());
   CHECK(root.is_ca());
 
-  REQUIRE(issuing.issuer() == root.subject());
-  REQUIRE(leaf.issuer() == issuing.subject());
+  REQUIRE(issuing.issuer_hash() == root.subject_hash());
+  REQUIRE(leaf.issuer_hash() == issuing.subject_hash());
 
   // negative tests
   CHECK_FALSE(issuing.valid_from(leaf));
@@ -367,4 +367,28 @@ TEST_CASE("Ecdsa p256 Certificate")
   CHECK_FALSE(issuing.valid_from(leaf));
   CHECK_FALSE(root.valid_from(issuing));
   CHECK_FALSE(root.valid_from(leaf));
+}
+
+TEST_CASE("Test Subject Parsing")
+{
+  const auto leaf_der = from_hex(
+    "3082015e30820110a003020102021100d4a0be6c42e855fa6df8269a5521747f300506032b"
+    "6570302a311530130603550403130c637573746f6d3a31323334353111300f060355040513"
+    "0831312d32322d3333301e170d3231303231313233353033325a170d323130323132323335"
+    "3033325a302a311530130603550403130c637573746f6d3a31323334353111300f06035504"
+    "05130831312d32322d3333302a300506032b6570032100b6f359d48609b81ff3eee3546c23"
+    "5a5a31c8dd1b84c29bf0d9ea32fad3945299a34b3049300e0603551d0f0101ff0404030202"
+    "a4300c0603551d130101ff04023000300d0603551d0e040604048dc683c3301a0603551d11"
+    "04133011810f7573657240646f6d61696e2e636f6d300506032b6570034100dcbc8d3431f8"
+    "2f7cc7c97672bad001119b6b4bfbd9ee96a1096238d59ff3211529a90a6b148ed874ca1349"
+    "5e636388ef623f486c85dc53c3e2377809d7fda004");
+
+  auto leaf = Certificate{ leaf_der };
+  CHECK(leaf.raw == leaf_der);
+  auto parsed_subject = leaf.subject();
+  CHECK_EQ(parsed_subject.size(), 2);
+  auto it = parsed_subject.find(Certificate::NameType::common_name);
+  CHECK_EQ(it->second, "custom:12345");
+  it = parsed_subject.find(Certificate::NameType::serial_number);
+  CHECK_EQ(it->second, "11-22-33");
 }

@@ -42,6 +42,15 @@ asn1_string_to_std_string(const ASN1_STRING* asn1_string)
 /// ParsedCertificate
 ///
 
+const int Certificate::NameType::organization = NID_organizationName;
+const int Certificate::NameType::common_name = NID_commonName;
+const int Certificate::NameType::organizational_unit =
+  NID_organizationalUnitName;
+const int Certificate::NameType::country = NID_countryName;
+const int Certificate::NameType::serial_number = NID_serialNumber;
+const int Certificate::NameType::state_or_province_name =
+  NID_stateOrProvinceName;
+
 struct RFC822Name
 {
   std::string value;
@@ -78,6 +87,38 @@ struct Certificate::ParsedCertificate
       throw openssl_error();
     }
     return digest;
+  }
+
+  // Note: This method does not implement total general name parsing.
+  // Duplicate entries are not supported; if they are present, the last one
+  // presented by OpenSSL is chosen.
+  static ParsedName parse_names(const X509_NAME* x509_name)
+  {
+    if (x509_name == nullptr) {
+      throw openssl_error();
+    }
+
+    ParsedName parsed_name;
+
+    for (int i = X509_NAME_entry_count(x509_name) - 1; i >= 0; i--) {
+      auto* entry = X509_NAME_get_entry(x509_name, i);
+      if (entry == nullptr) {
+        continue;
+      }
+
+      auto* oid = X509_NAME_ENTRY_get_object(entry);
+      auto* asn_str = X509_NAME_ENTRY_get_data(entry);
+      if (oid == nullptr || asn_str == nullptr) {
+        continue;
+      }
+
+      std::string parsed_value = asn1_string_to_std_string(asn_str);
+
+      int nid = OBJ_obj2nid(oid);
+      parsed_name[nid] = parsed_value;
+    }
+
+    return parsed_name;
   }
 
   // Parse Subject Key Identifier Extension
@@ -126,8 +167,10 @@ struct Certificate::ParsedCertificate
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
     , pub_key_id(signature_algorithm(x509.get()))
-    , issuer(X509_issuer_name_hash(x509.get()))
-    , subject(X509_subject_name_hash(x509.get()))
+    , issuer_hash(X509_issuer_name_hash(x509.get()))
+    , subject_hash(X509_subject_name_hash(x509.get()))
+    , issuer(parse_names(X509_get_issuer_name(x509.get())))
+    , subject(parse_names(X509_get_subject_name(x509.get())))
     , subject_key_id(parse_skid(x509.get()))
     , authority_key_id(parse_akid(x509.get()))
     , sub_alt_names(parse_san(x509.get()))
@@ -138,6 +181,8 @@ struct Certificate::ParsedCertificate
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
     , pub_key_id(signature_algorithm(other.x509.get()))
+    , issuer_hash(other.issuer_hash)
+    , subject_hash(other.subject_hash)
     , issuer(other.issuer)
     , subject(other.subject)
     , subject_key_id(other.subject_key_id)
@@ -180,8 +225,10 @@ struct Certificate::ParsedCertificate
 
   typed_unique_ptr<X509> x509;
   const Signature::ID pub_key_id;
-  const uint64_t issuer;
-  const uint64_t subject;
+  const uint64_t issuer_hash;
+  const uint64_t subject_hash;
+  const ParsedName issuer;
+  const ParsedName subject;
   const std::optional<bytes> subject_key_id;
   const std::optional<bytes> authority_key_id;
   const std::vector<GeneralName> sub_alt_names;
@@ -234,15 +281,27 @@ Certificate::valid_from(const Certificate& parent) const
 }
 
 uint64_t
-Certificate::issuer() const
+Certificate::issuer_hash() const
 {
-  return parsed_cert->issuer;
+  return parsed_cert->issuer_hash;
 }
 
 uint64_t
+Certificate::subject_hash() const
+{
+  return parsed_cert->subject_hash;
+}
+
+Certificate::ParsedName
 Certificate::subject() const
 {
   return parsed_cert->subject;
+}
+
+Certificate::ParsedName
+Certificate::issuer() const
+{
+  return parsed_cert->issuer;
 }
 
 bool

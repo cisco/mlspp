@@ -150,6 +150,7 @@ TreeKEMPrivateKey::implant(NodeIndex start,
 
   path_secrets[r] = secret;
   private_key_cache.erase(n);
+  update_secret = secret;
 }
 
 std::optional<HPKEPrivateKey>

@@ -60,7 +60,7 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
   , key_size(suite.hpke().aead.key_size)
-  , nonce_size(suite.hpke().aead.key_size)
+  , nonce_size(suite.hpke().aead.nonce_size)
   , secret_size(suite.secret_size())
 {}
 
