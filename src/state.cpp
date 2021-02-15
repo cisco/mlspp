@@ -317,7 +317,8 @@ State::commit(const bytes& leaf_secret,
   // If this is an external commit, see where the new joiner ended up
   auto sender = Sender{ SenderType::member, _index.val };
   if (external_commit) {
-    auto it = std::find(joiners.begin(), joiners.end(), opt::get(joiner_key_package));
+    auto it =
+      std::find(joiners.begin(), joiners.end(), opt::get(joiner_key_package));
     if (it == joiners.end()) {
       throw InvalidParameterError("Joiner not added");
     }
