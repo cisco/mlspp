@@ -2,7 +2,7 @@ MLS++
 =====
 
 Implementation of the proposed [Messaging Layer
-Security](https://github.com/ekr/mls-protocol/blob/master/draft-barnes-mls-protocol.md)
+Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md)
 protocol in C++.  Depends on C++17, STL for data structures, and
 OpenSSL for crypto.
 
