@@ -149,8 +149,8 @@ Session::Inner::begin(const bytes& group_id,
                       const SignaturePrivateKey& sig_priv,
                       const KeyPackage& key_package)
 {
-  auto state =
-    State(group_id, key_package.cipher_suite, init_priv, sig_priv, key_package);
+  auto state = State(
+    group_id, key_package.cipher_suite, init_priv, sig_priv, key_package, {});
   auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }
