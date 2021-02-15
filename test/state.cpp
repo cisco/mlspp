@@ -97,7 +97,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
 {
   // Set the SFrame parameters for the group
-  auto specified_params = SFrameParameters{ 1, 4 };
+  auto specified_params = SFrameParameters{ 1, 8 };
   auto group_extensions = ExtensionList{};
   group_extensions.add(specified_params);
 
@@ -119,7 +119,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
 
   auto decoded_capabilities =
     key_packages[1].extensions.find<SFrameCapabilities>();
-  REQUIRE(!!decoded_capabilities);
+  REQUIRE(decoded_capabilities);
   REQUIRE(opt::get(decoded_capabilities) == compatible_capabilities);
   REQUIRE(opt::get(decoded_capabilities).compatible(specified_params));
 
@@ -138,8 +138,8 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   // Check that both participants have the  correct SFrame parameters
   auto first_params = first1.extensions().find<SFrameParameters>();
   auto second_params = second0.extensions().find<SFrameParameters>();
-  REQUIRE(!!first_params);
-  REQUIRE(!!second_params);
+  REQUIRE(first_params);
+  REQUIRE(second_params);
   REQUIRE(opt::get(first_params) == specified_params);
   REQUIRE(opt::get(first_params) == opt::get(second_params));
 }
