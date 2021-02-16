@@ -167,7 +167,7 @@ protected:
     const bytes& leaf_secret,
     const std::vector<Proposal>& extra_proposals,
     const std::optional<KeyPackage>& joiner_key_package,
-    const std::optional<HPKEPublicKey>& external_init_key) const;
+    const std::optional<HPKEPublicKey>& external_pub) const;
 
   // Ratchet the key schedule forward and sign the commit that caused the
   // transition
