@@ -70,6 +70,7 @@ struct ExtensionList
   }
 
   bool has(uint16_t type) const;
+  ExtensionList for_group() const;
 
   TLS_SERIALIZABLE(extensions)
   TLS_TRAITS(tls::vector<2>)

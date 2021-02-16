@@ -443,6 +443,7 @@ enum struct SenderType : uint8_t
   member = 1,
   preconfigured = 2,
   new_member = 3,
+  external_joiner = 4,
 };
 
 struct Sender

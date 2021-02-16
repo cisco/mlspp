@@ -206,6 +206,19 @@ HPKEPublicKey::encrypt(CipherSuite suite,
   return HPKECiphertext{ enc, ct };
 }
 
+std::tuple<bytes, bytes>
+HPKEPublicKey::do_export(CipherSuite suite,
+                         const std::string& label,
+                         size_t size) const
+{
+  auto label_data = bytes(label.begin(), label.end());
+
+  auto pkR = suite.hpke().kem.deserialize(data);
+  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, {});
+  auto exported = ctx.do_export(label_data, size);
+  return std::make_tuple(enc, exported);
+}
+
 HPKEPrivateKey
 HPKEPrivateKey::generate(CipherSuite suite)
 {
@@ -248,6 +261,19 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
   }
 
   return opt::get(pt);
+}
+
+bytes
+HPKEPrivateKey::do_export(CipherSuite suite,
+                          const bytes& kem_output,
+                          const std::string& label,
+                          size_t size) const
+{
+  auto label_data = bytes(label.begin(), label.end());
+
+  auto skR = suite.hpke().kem.deserialize_private(data);
+  auto ctx = suite.hpke().setup_base_r(kem_output, *skR, {});
+  return ctx.do_export(label_data, size);
 }
 
 HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)

@@ -465,6 +465,10 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , external_priv(HPKEPrivateKey::derive(suite, external_secret))
 {}
 
+KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
+  : suite(suite_in)
+{}
+
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& context)
@@ -485,13 +489,35 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                      context)
 {}
 
+std::tuple<bytes, bytes>
+KeyScheduleEpoch::external_init(CipherSuite suite,
+                                const HPKEPublicKey& external_pub)
+{
+  auto size = suite.secret_size();
+  return external_pub.do_export(suite, "MLS 1.0 external init", size);
+}
+
+bytes
+KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
+{
+  auto size = suite.secret_size();
+  return external_priv.do_export(
+    suite, kem_output, "MLS 1.0 external init", size);
+}
+
 KeyScheduleEpoch
 KeyScheduleEpoch::next(const bytes& commit_secret,
                        const bytes& psk_secret,
+                       const std::optional<bytes>& force_init_secret,
                        const bytes& context) const
 {
+  auto actual_init_secret = init_secret;
+  if (force_init_secret) {
+    actual_init_secret = opt::get(force_init_secret);
+  }
+
   return KeyScheduleEpoch(
-    suite, init_secret, commit_secret, psk_secret, context);
+    suite, actual_init_secret, commit_secret, psk_secret, context);
 }
 
 GroupKeySource
@@ -563,9 +589,10 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
   auto exporter_secret = (lhs.exporter_secret == rhs.exporter_secret);
   auto confirmation_key = (lhs.confirmation_key == rhs.confirmation_key);
   auto init_secret = (lhs.init_secret == rhs.init_secret);
+  auto external_priv = (lhs.external_priv == rhs.external_priv);
 
   return epoch_secret && sender_data_secret && encryption_secret &&
-         exporter_secret && confirmation_key && init_secret;
+         exporter_secret && confirmation_key && init_secret && external_priv;
 }
 
 TranscriptHash::TranscriptHash(CipherSuite suite_in)

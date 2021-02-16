@@ -306,7 +306,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 
     auto commit_secret = random_bytes(suite.secret_size());
     auto psk_secret = random_bytes(suite.secret_size());
-    epoch = epoch.next(commit_secret, psk_secret, ctx);
+    // TODO(RLB) Add Test case for externally-driven epoch change
+    epoch = epoch.next(commit_secret, psk_secret, std::nullopt, ctx);
 
     auto welcome_secret =
       KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psk_secret);
@@ -356,7 +357,7 @@ KeyScheduleTestVector::verify() const
     group_context.confirmed_transcript_hash = tve.confirmed_transcript_hash;
     auto ctx = tls::marshal(group_context);
 
-    epoch = epoch.next(tve.commit_secret, tve.psk_secret, ctx);
+    epoch = epoch.next(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);

@@ -107,6 +107,10 @@ struct HPKEPublicKey
                          const bytes& aad,
                          const bytes& pt) const;
 
+  std::tuple<bytes, bytes> do_export(CipherSuite suite,
+                                     const std::string& label,
+                                     size_t size) const;
+
   TLS_SERIALIZABLE(data)
   TLS_TRAITS(tls::vector<2>)
 };
@@ -125,6 +129,11 @@ struct HPKEPrivateKey
   bytes decrypt(CipherSuite suite,
                 const bytes& aad,
                 const HPKECiphertext& ct) const;
+
+  bytes do_export(CipherSuite suite,
+                  const bytes& kem_output,
+                  const std::string& label,
+                  size_t size) const;
 
   TLS_SERIALIZABLE(data, public_key)
   TLS_TRAITS(tls::vector<2>, tls::pass)

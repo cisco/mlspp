@@ -106,11 +106,14 @@ public:
 
   KeyScheduleEpoch() = default;
 
-  // Full initializer, used by joiner
+  // Full initializer, used by invited joiner
   KeyScheduleEpoch(CipherSuite suite_in,
                    const bytes& joiner_secret,
                    const bytes& psk_secret,
                    const bytes& context);
+
+  // Ciphersuite-only initializer, used by external joiner
+  KeyScheduleEpoch(CipherSuite suite_in);
 
   // Initial epoch
   KeyScheduleEpoch(CipherSuite suite_in,
@@ -124,9 +127,14 @@ public:
                    const bytes& psk_secret,
                    const bytes& context);
 
-  // Advance to the next epoch
+  static std::tuple<bytes, bytes> external_init(
+    CipherSuite suite,
+    const HPKEPublicKey& external_pub);
+  bytes receive_external_init(const bytes& kem_output) const;
+
   KeyScheduleEpoch next(const bytes& commit_secret,
                         const bytes& psk_secret,
+                        const std::optional<bytes>& force_init_secret,
                         const bytes& context) const;
 
   GroupKeySource encryption_keys(LeafCount size) const;
