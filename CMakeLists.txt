@@ -5,6 +5,7 @@ project(mlspp
   LANGUAGES CXX
 )
 
+option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 
@@ -52,7 +53,9 @@ endif()
 ###
 ### Enable testing
 ###
-enable_testing()
+if(TESTING)
+  enable_testing()
+endif()
 
 ###
 ### Dependencies
@@ -90,14 +93,9 @@ target_include_directories(${LIB_NAME}
 ###
 ### Tests
 ###
-add_subdirectory(test)
-
-###
-### Applications
-###
-
-add_subdirectory(cmd)
-
+if(TESTING)
+  add_subdirectory(test)
+endif()
 
 ###
 ### Exports
