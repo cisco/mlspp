@@ -1,8 +1,7 @@
 #pragma once
 
 #include <optional>
-
-#include <mpark/variant.hpp>
+#include <variant.hpp>
 
 namespace tls {
 
