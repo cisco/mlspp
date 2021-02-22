@@ -600,9 +600,19 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
-  while (!nodes.empty() && !nodes.back().node) {
-    nodes.pop_back();
+  auto i = nodes.size() - 1;
+  for (; i >= 0; i -= 2) {
+    // right most non blank leaf
+    if (nodes[i].node) {
+      break;
+    }
   }
+
+  if (i == nodes.size() - 1) {
+    return;
+  }
+
+  nodes.erase(nodes.begin() + i + 1, nodes.end());
 }
 
 void
