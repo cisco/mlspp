@@ -601,12 +601,13 @@ void
 TreeKEMPublicKey::truncate()
 {
   auto i = nodes.size() - 1;
-  for (; i >= 0; i -= 2) {
-    // right most non blank leaf
-    if (nodes[i].node) {
-      break;
+  std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
+    if (node.node && i % 2 == 0) {
+      return true;
     }
-  }
+    i--;
+    return false;
+  });
 
   if (i == nodes.size() - 1) {
     return;
