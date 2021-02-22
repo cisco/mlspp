@@ -600,24 +600,18 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
-  if (nodes.empty()) {
-    return;
-  }
-
-  auto i = nodes.size();
+  auto leaf = false;
+  // Find the first rightmost non blank leaf node index
   auto it = std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
-    if (i > 0) {
-      i -= 1;
-    }
-    return (i % 2 == 0 && node.node);
+    leaf = !leaf;
+    return (leaf && !node.blank());
   });
-  silence_unused(it);
 
-  if (i == nodes.size() - 1) {
+  if (it == nodes.rbegin()) {
     return;
   }
 
-  nodes.erase(nodes.begin() + i + 1, nodes.end());
+  nodes.erase(it.base(), nodes.end());
 }
 
 void
