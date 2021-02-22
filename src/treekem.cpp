@@ -604,16 +604,14 @@ TreeKEMPublicKey::truncate()
     return;
   }
 
-  int i = nodes.size();
+  auto i = nodes.size();
   std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
-    i -= 1;
-    if (i % 2 == 0 && node.node) {
-      return true;
-    }
-    return false;
+    if (i > 0)
+      i -= 1;
+    return (i % 2 == 0 && node.node);
   });
 
-  if (i == int(nodes.size() - 1)) {
+  if (i == nodes.size() - 1) {
     return;
   }
 
