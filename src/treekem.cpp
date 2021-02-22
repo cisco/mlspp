@@ -605,11 +605,13 @@ TreeKEMPublicKey::truncate()
   }
 
   auto i = nodes.size();
-  std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
-    if (i > 0)
+  auto it = std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
+    if (i > 0) {
       i -= 1;
+    }
     return (i % 2 == 0 && node.node);
   });
+  silence_unused(it);
 
   if (i == nodes.size() - 1) {
     return;
