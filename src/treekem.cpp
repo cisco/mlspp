@@ -600,12 +600,17 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
+  if (nodes.empty()) {
+    return;
+  }
+
   auto i = nodes.size() - 1;
   std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
     if (node.node && i % 2 == 0) {
       return true;
     }
-    i--;
+    if (i > 0)
+      i--;
     return false;
   });
 
