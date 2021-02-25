@@ -128,8 +128,9 @@ MLSClientImpl::PublicGroupState(ServerContext* /* context */,
                                 const PublicGroupStateRequest* request,
                                 PublicGroupStateResponse* response)
 {
-  return state_wrap(
-    request, [=](auto& state) { return public_group_state(state, request, response); });
+  return state_wrap(request, [=](auto& state) {
+    return public_group_state(state, request, response);
+  });
 }
 
 Status
@@ -143,8 +144,8 @@ MLSClientImpl::StateAuth(ServerContext* /* context */,
 
 Status
 MLSClientImpl::Export(ServerContext* /* context */,
-                         const ExportRequest* request,
-                         ExportResponse* response)
+                      const ExportRequest* request,
+                      ExportResponse* response)
 {
   return state_wrap(
     request, [=](auto& state) { return do_export(state, request, response); });
@@ -152,8 +153,8 @@ MLSClientImpl::Export(ServerContext* /* context */,
 
 Status
 MLSClientImpl::Protect(ServerContext* /* context */,
-                         const ProtectRequest* request,
-                         ProtectResponse* response)
+                       const ProtectRequest* request,
+                       ProtectResponse* response)
 {
   return state_wrap(
     request, [=](auto& state) { return protect(state, request, response); });
@@ -460,9 +461,9 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   auto kp =
     mls::KeyPackage(pgs.cipher_suite, init_priv.public_key, cred, sig_priv, {});
 
-  auto leaf_secret =
-    mls::random_bytes(pgs.cipher_suite.secret_size());
-  auto [commit, state] = mls::State::external_join(leaf_secret, sig_priv, kp, pgs);
+  auto leaf_secret = mls::random_bytes(pgs.cipher_suite.secret_size());
+  auto [commit, state] =
+    mls::State::external_join(leaf_secret, sig_priv, kp, pgs);
   auto commit_data = tls::marshal(commit);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
@@ -494,8 +495,8 @@ MLSClientImpl::state_auth(CachedState& entry,
 
 Status
 MLSClientImpl::do_export(CachedState& entry,
-                          const ExportRequest* request,
-                          ExportResponse* response)
+                         const ExportRequest* request,
+                         ExportResponse* response)
 {
   auto label = request->label();
   auto context = string_to_bytes(request->context());
@@ -507,8 +508,8 @@ MLSClientImpl::do_export(CachedState& entry,
 
 Status
 MLSClientImpl::protect(CachedState& entry,
-                          const ProtectRequest* request,
-                          ProtectResponse* response)
+                       const ProtectRequest* request,
+                       ProtectResponse* response)
 {
   auto pt = string_to_bytes(request->application_data());
   auto ct = entry.state.protect(pt);
@@ -519,8 +520,8 @@ MLSClientImpl::protect(CachedState& entry,
 
 Status
 MLSClientImpl::unprotect(CachedState& entry,
-                          const UnprotectRequest* request,
-                          UnprotectResponse* response)
+                         const UnprotectRequest* request,
+                         UnprotectResponse* response)
 {
   auto ct_data = string_to_bytes(request->ciphertext());
   auto ct = tls::get<mls::MLSCiphertext>(ct_data);
@@ -633,9 +634,10 @@ MLSClientImpl::handle_commit(CachedState& entry,
 }
 
 Status
-MLSClientImpl::handle_external_commit(CachedState& entry,
-                                      const HandleExternalCommitRequest* request,
-                                      HandleExternalCommitResponse* response)
+MLSClientImpl::handle_external_commit(
+  CachedState& entry,
+  const HandleExternalCommitRequest* request,
+  HandleExternalCommitResponse* response)
 {
   auto commit_data = string_to_bytes(request->commit());
   auto commit = tls::get<mls::MLSPlaintext>(commit_data);

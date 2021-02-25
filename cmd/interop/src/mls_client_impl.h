@@ -50,11 +50,11 @@ class MLSClientImpl final : public MLSClient::Service
                    const StateAuthRequest* request,
                    StateAuthResponse* response) override;
   Status Export(ServerContext* context,
-                   const ExportRequest* request,
-                   ExportResponse* response) override;
+                const ExportRequest* request,
+                ExportResponse* response) override;
   Status Protect(ServerContext* context,
-                   const ProtectRequest* request,
-                   ProtectResponse* response) override;
+                 const ProtectRequest* request,
+                 ProtectResponse* response) override;
   Status Unprotect(ServerContext* context,
                    const UnprotectRequest* request,
                    UnprotectResponse* response) override;
@@ -137,14 +137,14 @@ private:
                     const StateAuthRequest* request,
                     StateAuthResponse* response);
   Status do_export(CachedState& entry,
-                    const ExportRequest* request,
-                    ExportResponse* response);
+                   const ExportRequest* request,
+                   ExportResponse* response);
   Status protect(CachedState& entry,
-                    const ProtectRequest* request,
-                    ProtectResponse* response);
+                 const ProtectRequest* request,
+                 ProtectResponse* response);
   Status unprotect(CachedState& entry,
-                    const UnprotectRequest* request,
-                    UnprotectResponse* response);
+                   const UnprotectRequest* request,
+                   UnprotectResponse* response);
 
   // Operations on a running group
   Status add_proposal(CachedState& entry,
