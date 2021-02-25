@@ -124,6 +124,15 @@ MLSClientImpl::ExternalJoin(ServerContext* /* context */,
 
 // Access information from a group state
 Status
+MLSClientImpl::PublicGroupState(ServerContext* /* context */,
+                                const PublicGroupStateRequest* request,
+                                PublicGroupStateResponse* response)
+{
+  return state_wrap(
+    request, [=](auto& state) { return public_group_state(state, request, response); });
+}
+
+Status
 MLSClientImpl::StateAuth(ServerContext* /* context */,
                          const StateAuthRequest* request,
                          StateAuthResponse* response)
@@ -133,12 +142,30 @@ MLSClientImpl::StateAuth(ServerContext* /* context */,
 }
 
 Status
-MLSClientImpl::PublicGroupState(ServerContext* /* context */,
-                                const PublicGroupStateRequest* request,
-                                PublicGroupStateResponse* response)
+MLSClientImpl::Export(ServerContext* /* context */,
+                         const ExportRequest* request,
+                         ExportResponse* response)
 {
   return state_wrap(
-    request, [=](auto& state) { return public_group_state(state, request, response); });
+    request, [=](auto& state) { return do_export(state, request, response); });
+}
+
+Status
+MLSClientImpl::Protect(ServerContext* /* context */,
+                         const ProtectRequest* request,
+                         ProtectResponse* response)
+{
+  return state_wrap(
+    request, [=](auto& state) { return protect(state, request, response); });
+}
+
+Status
+MLSClientImpl::Unprotect(ServerContext* /* context */,
+                         const UnprotectRequest* request,
+                         UnprotectResponse* response)
+{
+  return state_wrap(
+    request, [=](auto& state) { return unprotect(state, request, response); });
 }
 
 // Operations using a group state
@@ -446,6 +473,16 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 
 // Access information from a group state
 Status
+MLSClientImpl::public_group_state(CachedState& entry,
+                                  const PublicGroupStateRequest* /* request */,
+                                  PublicGroupStateResponse* response)
+{
+  auto pgs = tls::marshal(entry.state.public_group_state());
+  response->set_public_group_state(bytes_to_string(pgs));
+  return Status::OK;
+}
+
+Status
 MLSClientImpl::state_auth(CachedState& entry,
                           const StateAuthRequest* /* request */,
                           StateAuthResponse* response)
@@ -456,12 +493,39 @@ MLSClientImpl::state_auth(CachedState& entry,
 }
 
 Status
-MLSClientImpl::public_group_state(CachedState& entry,
-                                  const PublicGroupStateRequest* /* request */,
-                                  PublicGroupStateResponse* response)
+MLSClientImpl::do_export(CachedState& entry,
+                          const ExportRequest* request,
+                          ExportResponse* response)
 {
-  auto pgs = tls::marshal(entry.state.public_group_state());
-  response->set_public_group_state(bytes_to_string(pgs));
+  auto label = request->label();
+  auto context = string_to_bytes(request->context());
+  auto size = request->key_length();
+  auto secret = entry.state.do_export(label, context, size);
+  response->set_exported_secret(bytes_to_string(secret));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::protect(CachedState& entry,
+                          const ProtectRequest* request,
+                          ProtectResponse* response)
+{
+  auto pt = string_to_bytes(request->application_data());
+  auto ct = entry.state.protect(pt);
+  auto ct_data = tls::marshal(ct);
+  response->set_ciphertext(bytes_to_string(ct_data));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::unprotect(CachedState& entry,
+                          const UnprotectRequest* request,
+                          UnprotectResponse* response)
+{
+  auto ct_data = string_to_bytes(request->ciphertext());
+  auto ct = tls::get<mls::MLSCiphertext>(ct_data);
+  auto pt = entry.state.unprotect(ct);
+  response->set_application_data(bytes_to_string(pt));
   return Status::OK;
 }
 
