@@ -87,7 +87,6 @@ struct KeyScheduleTestVector
 
     bytes joiner_secret;
     bytes welcome_secret;
-    bytes epoch_secret;
     bytes init_secret;
 
     bytes sender_data_secret;
