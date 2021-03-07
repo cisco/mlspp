@@ -322,7 +322,6 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 
       epoch.joiner_secret,
       welcome_secret,
-      epoch.epoch_secret,
       epoch.init_secret,
 
       epoch.sender_data_secret,
@@ -361,8 +360,6 @@ KeyScheduleTestVector::verify() const
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
-    VERIFY_EQUAL("epoch secret", epoch.epoch_secret, tve.epoch_secret);
-    VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     auto welcome_secret = KeyScheduleEpoch::welcome_secret(
       cipher_suite, tve.joiner_secret, tve.psk_secret);
@@ -382,6 +379,7 @@ KeyScheduleTestVector::verify() const
     VERIFY_EQUAL("membership key", epoch.membership_key, tve.membership_key);
     VERIFY_EQUAL(
       "resumption secret", epoch.resumption_secret, tve.resumption_secret);
+    VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
