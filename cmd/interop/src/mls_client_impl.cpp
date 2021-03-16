@@ -143,6 +143,16 @@ MLSClientImpl::StateAuth(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::PublicGroupState(ServerContext* /* context */,
+                                const PublicGroupStateRequest* request,
+                                PublicGroupStateResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return public_group_state(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::Export(ServerContext* /* context */,
                       const ExportRequest* request,
                       ExportResponse* response)
@@ -527,6 +537,16 @@ MLSClientImpl::unprotect(CachedState& entry,
   auto ct = tls::get<mls::MLSCiphertext>(ct_data);
   auto pt = entry.state.unprotect(ct);
   response->set_application_data(bytes_to_string(pt));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::public_group_state(CachedState& entry,
+                                  const PublicGroupStateRequest* /* request */,
+                                  PublicGroupStateResponse* response)
+{
+  auto pgs = tls::marshal(entry.state.public_group_state());
+  response->set_public_group_state(bytes_to_string(pgs));
   return Status::OK;
 }
 

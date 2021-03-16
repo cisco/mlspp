@@ -70,11 +70,11 @@ CipherSuite::get() const
 
   static const auto ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519 =
     CipherSuite::Ciphers{
-      HPKE(KEM::ID::DHKEM_X448_SHA512,
-           KDF::ID::HKDF_SHA512,
-           AEAD::ID::AES_256_GCM),
-      Digest::get<Digest::ID::SHA512>(),
-      Signature::get<Signature::ID::Ed448>(),
+      HPKE(KEM::ID::DHKEM_X25519_SHA256,
+           KDF::ID::HKDF_SHA256,
+           AEAD::ID::CHACHA20_POLY1305),
+      Digest::get<Digest::ID::SHA256>(),
+      Signature::get<Signature::ID::Ed25519>(),
     };
 
   static const auto ciphers_X448_AES256GCM_SHA512_Ed448 = CipherSuite::Ciphers{
