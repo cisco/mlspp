@@ -38,11 +38,17 @@ class MLSClientImpl final : public MLSClient::Service
   Status JoinGroup(ServerContext* context,
                    const JoinGroupRequest* request,
                    JoinGroupResponse* response) override;
+  Status ExternalJoin(ServerContext* context,
+                      const ExternalJoinRequest* request,
+                      ExternalJoinResponse* response) override;
 
   // Access information from a group state
   Status StateAuth(ServerContext* context,
                    const StateAuthRequest* request,
                    StateAuthResponse* response) override;
+  Status PublicGroupState(ServerContext* context,
+                          const PublicGroupStateRequest* request,
+                          PublicGroupStateResponse* response) override;
 
   // Operations using a group state
   Status AddProposal(ServerContext* context,
@@ -54,6 +60,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status HandleCommit(ServerContext* context,
                       const HandleCommitRequest* request,
                       HandleCommitResponse* response) override;
+  Status HandleExternalCommit(ServerContext* context,
+                              const HandleExternalCommitRequest* request,
+                              HandleExternalCommitResponse* response) override;
 
 private:
   // Wrapper for methods that rely on state
@@ -108,11 +117,16 @@ private:
                             CreateKeyPackageResponse* response);
   Status join_group(const JoinGroupRequest* request,
                     JoinGroupResponse* response);
+  Status external_join(const ExternalJoinRequest* request,
+                       ExternalJoinResponse* response);
 
   // Access information from a group state
   Status state_auth(CachedState& entry,
                     const StateAuthRequest* request,
                     StateAuthResponse* response);
+  Status public_group_state(CachedState& entry,
+                            const PublicGroupStateRequest* request,
+                            PublicGroupStateResponse* response);
 
   // Operations on a running group
   Status add_proposal(CachedState& entry,
@@ -124,4 +138,7 @@ private:
   Status handle_commit(CachedState& entry,
                        const HandleCommitRequest* request,
                        HandleCommitResponse* response);
+  Status handle_external_commit(CachedState& entry,
+                                const HandleExternalCommitRequest* request,
+                                HandleExternalCommitResponse* response);
 };
