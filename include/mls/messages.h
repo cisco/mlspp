@@ -528,8 +528,9 @@ private:
 
 // struct {
 //     opaque group_id<0..255>;
-//     uint32 epoch;
+//     uint64 epoch;
 //     ContentType content_type;
+//     opaque authenticated_data<0..2^32-1>;
 //     opaque encrypted_sender_data<0..255>;
 //     opaque ciphertext<0..2^32-1>;
 // } MLSCiphertext;
@@ -538,21 +539,21 @@ struct MLSCiphertext
   bytes group_id;
   epoch_t epoch;
   ContentType content_type;
-  bytes encrypted_sender_data;
   bytes authenticated_data;
+  bytes encrypted_sender_data;
   bytes ciphertext;
 
   TLS_SERIALIZABLE(group_id,
                    epoch,
                    content_type,
-                   encrypted_sender_data,
                    authenticated_data,
+                   encrypted_sender_data,
                    ciphertext)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector<1>,
              tls::vector<4>,
+             tls::vector<1>,
              tls::vector<4>)
 };
 
