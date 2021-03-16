@@ -163,7 +163,7 @@ SecretTree::get(LeafIndex sender)
     auto left = tree_math::left(curr_node);
     auto right = tree_math::right(curr_node, group_size);
 
-    auto& secret = secrets[node.val];
+    auto& secret = secrets[curr_node.val];
     secrets[left.val] =
       derive_tree_secret(suite, secret, "tree", left, 0, secret_size);
     secrets[right.val] =
