@@ -58,9 +58,6 @@ class MLSClientImpl final : public MLSClient::Service
   Status Unprotect(ServerContext* context,
                    const UnprotectRequest* request,
                    UnprotectResponse* response) override;
-  Status PublicGroupState(ServerContext* context,
-                          const PublicGroupStateRequest* request,
-                          PublicGroupStateResponse* response) override;
 
   // Operations using a group state
   Status AddProposal(ServerContext* context,
@@ -148,9 +145,6 @@ private:
   Status unprotect(CachedState& entry,
                    const UnprotectRequest* request,
                    UnprotectResponse* response);
-  Status public_group_state(CachedState& entry,
-                            const PublicGroupStateRequest* request,
-                            PublicGroupStateResponse* response);
 
   // Operations on a running group
   Status add_proposal(CachedState& entry,
