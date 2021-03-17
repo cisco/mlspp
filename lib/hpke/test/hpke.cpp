@@ -24,7 +24,10 @@ test_base_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -39,8 +42,9 @@ test_psk_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
   auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
 
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
@@ -56,12 +60,18 @@ test_auth_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem.derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.ikmS);
+  auto skSm = kem.serialize_private(*skS);
+  REQUIRE(skSm == tv.skSm);
+
   auto pkS = skS->public_key();
   auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -76,12 +86,18 @@ test_auth_psk_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem.derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.ikmS);
+  auto skSm = kem.serialize_private(*skS);
+  REQUIRE(skSm == tv.skSm);
+
   auto pkS = skS->public_key();
   auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -131,14 +147,14 @@ TEST_CASE("HPKE Round-Trip")
   const auto info = from_hex("00010203");
   const auto plaintext = from_hex("04050607");
   const auto aad = from_hex("08090a0b");
-  const auto seedS = from_hex("A0A0A0A0");
-  const auto seedR = from_hex("B0B0B0B0");
+  const auto ikmS = from_hex("A0A0A0A0");
+  const auto ikmR = from_hex("B0B0B0B0");
   const auto iterations = int(256);
 
   for (const auto& kem_id : kems) {
     const auto& kem = select_kem(kem_id);
-    auto skS = kem.derive_key_pair(seedS);
-    auto skR = kem.derive_key_pair(seedR);
+    auto skS = kem.derive_key_pair(ikmS);
+    auto skR = kem.derive_key_pair(ikmR);
 
     auto pkS = skS->public_key();
     auto pkR = skR->public_key();

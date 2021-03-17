@@ -32,24 +32,19 @@ var (
 )
 
 func labeledExtract(hash crypto.Hash, suiteID, salt, label, ikm []byte) []byte {
-	labeledIKM := append([]byte("HPKE-05 "), suiteID...)
+	labeledIKM := append([]byte("HPKE-v1"), suiteID...)
 	labeledIKM = append(labeledIKM, label...)
 	labeledIKM = append(labeledIKM, ikm...)
-	fmt.Printf("xxx lt ikm=%x\n", labeledIKM)
-	fmt.Printf("xxx lt salt=%x\n", salt)
 	return hkdf.Extract(hash.New, labeledIKM, salt)
 }
 
 func labeledExpand(hash crypto.Hash, suiteID, prk, label, info []byte, size int) []byte {
 	labeledInfo := make([]byte, 2)
 	binary.BigEndian.PutUint16(labeledInfo, uint16(size))
-	labeledInfo = append(labeledInfo, []byte("HPKE-05 ")...)
+	labeledInfo = append(labeledInfo, []byte("HPKE-v1")...)
 	labeledInfo = append(labeledInfo, suiteID...)
 	labeledInfo = append(labeledInfo, label...)
 	labeledInfo = append(labeledInfo, info...)
-
-	fmt.Printf("xxx lx prk=%x\n", prk)
-	fmt.Printf("xxx lx info=%x\n", labeledInfo)
 
 	out := make([]byte, size)
 	h := hkdf.Expand(hash.New, prk, labeledInfo)

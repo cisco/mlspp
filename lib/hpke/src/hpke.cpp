@@ -33,9 +33,9 @@ label_hpke()
 }
 
 static const bytes&
-label_hpke_05()
+label_hpke_version()
 {
-  static const bytes val = from_ascii("HPKE-05 ");
+  static const bytes val = from_ascii("HPKE-v1");
   return val;
 }
 
@@ -198,7 +198,7 @@ KDF::labeled_extract(const bytes& suite_id,
                      const bytes& label,
                      const bytes& ikm) const
 {
-  auto labeled_ikm = label_hpke_05() + suite_id + label + ikm;
+  auto labeled_ikm = label_hpke_version() + suite_id + label + ikm;
   return extract(salt, labeled_ikm);
 }
 
@@ -210,7 +210,7 @@ KDF::labeled_expand(const bytes& suite_id,
                     size_t size) const
 {
   auto labeled_info =
-    i2osp(size, 2) + label_hpke_05() + suite_id + label + info;
+    i2osp(size, 2) + label_hpke_version() + suite_id + label + info;
   return expand(prk, labeled_info, size);
 }
 
