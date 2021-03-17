@@ -355,6 +355,7 @@ KeyScheduleTestVector::verify() const
     group_context.tree_hash = tve.tree_hash;
     group_context.confirmed_transcript_hash = tve.confirmed_transcript_hash;
     auto ctx = tls::marshal(group_context);
+    VERIFY_EQUAL("group context", ctx, tve.group_context);
 
     epoch = epoch.next(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
 
