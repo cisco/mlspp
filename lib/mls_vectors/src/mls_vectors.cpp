@@ -298,7 +298,6 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
   tv.initial_init_secret = epoch.init_secret;
 
   for (size_t i = 0; i < n_epochs; i++) {
-    group_context.epoch += 1;
     group_context.tree_hash = random_bytes(suite.digest().hash_size);
     group_context.confirmed_transcript_hash =
       random_bytes(suite.digest().hash_size);
@@ -335,6 +334,8 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
 
       epoch.external_priv.public_key,
     });
+
+    group_context.epoch += 1;
   }
 
   return tv;
@@ -351,10 +352,10 @@ KeyScheduleTestVector::verify() const
 
   for (const auto& tve : epochs) {
     // Ratchet forward the key schedule
-    group_context.epoch += 1;
     group_context.tree_hash = tve.tree_hash;
     group_context.confirmed_transcript_hash = tve.confirmed_transcript_hash;
     auto ctx = tls::marshal(group_context);
+    VERIFY_EQUAL("group context", ctx, tve.group_context);
 
     epoch = epoch.next(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
 
@@ -383,6 +384,8 @@ KeyScheduleTestVector::verify() const
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
+
+    group_context.epoch += 1;
   }
 
   return std::nullopt;

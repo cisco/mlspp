@@ -73,7 +73,7 @@ struct ExtensionList
   ExtensionList for_group() const;
 
   TLS_SERIALIZABLE(extensions)
-  TLS_TRAITS(tls::vector<2>)
+  TLS_TRAITS(tls::vector<4>)
 };
 
 struct CapabilitiesExtension
