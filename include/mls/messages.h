@@ -561,8 +561,6 @@ struct MLSCiphertext
 
 namespace tls {
 
-using namespace mls;
-
 TLS_VARIANT_MAP(PSKType, ExternalPSK, external)
 TLS_VARIANT_MAP(PSKType, ReInitPSK, reinit)
 TLS_VARIANT_MAP(PSKType, BranchPSK, branch)
