@@ -4,9 +4,28 @@
 #include "common.h"
 #include "test_vectors.h"
 
+namespace hpke {
+
+struct HPKETest {
+  static bytes key(const Context& ctx) { return ctx.key; }
+  static bytes nonce(const Context& ctx) { return ctx.nonce; }
+  static bytes exporter_secret(const Context& ctx) { return ctx.exporter_secret; }
+};
+
+} // namespace HPKE
+
 static void
 test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 {
+  auto key = hpke::HPKETest::key(ctxR);
+  REQUIRE(key == tv.key);
+
+  auto nonce = hpke::HPKETest::nonce(ctxR);
+  REQUIRE(nonce == tv.nonce);
+
+  auto exporter_secret = hpke::HPKETest::exporter_secret(ctxR);
+  REQUIRE(exporter_secret == tv.exporter_secret);
+
   for (const auto& enc : tv.encryptions) {
     auto plaintext = ctxR.open(enc.aad, enc.ciphertext);
     REQUIRE(plaintext == enc.plaintext);

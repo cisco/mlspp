@@ -114,6 +114,7 @@ struct AEAD
     AES_128_GCM = 0x0001,
     AES_256_GCM = 0x0002,
     CHACHA20_POLY1305 = 0x0003,
+    export_only = 0xffff,
   };
 
   template<AEAD::ID id>
@@ -164,6 +165,7 @@ private:
           const AEAD& aead_in);
 
   friend struct HPKE;
+  friend struct HPKETest;
   friend bool operator==(const Context& lhs, const Context& rhs);
 };
 
