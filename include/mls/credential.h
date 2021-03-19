@@ -109,9 +109,7 @@ private:
 
 namespace tls {
 
-using namespace mls;
-
-TLS_VARIANT_MAP(CredentialType, BasicCredential, basic)
-TLS_VARIANT_MAP(CredentialType, X509Credential, x509)
+TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
+TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
 
 } // namespace TLS
