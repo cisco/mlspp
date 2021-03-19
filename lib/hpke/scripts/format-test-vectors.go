@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	header = `#include "test_vectors.h"
+	encryptionThreshold = 10
+	header              = `#include "test_vectors.h"
 
 std::vector<HPKETestVector> test_vectors{`
 	footer = `};`
@@ -127,8 +128,12 @@ func writeTestVector(tv HPKETestVector, indent int) {
 	writeHexLine(tv.ExporterSecret, indent+2)
 
 	fmt.Printf("%s  {\n", pad)
-	for _, enc := range tv.Encryptions {
+	for i, enc := range tv.Encryptions {
 		writeEncryption(enc, indent+4)
+
+		if i > encryptionThreshold {
+			break
+		}
 	}
 	fmt.Printf("%s  },\n", pad)
 
