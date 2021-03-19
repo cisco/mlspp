@@ -114,6 +114,8 @@ struct AEAD
     AES_128_GCM = 0x0001,
     AES_256_GCM = 0x0002,
     CHACHA20_POLY1305 = 0x0003,
+
+    // Reserved identifier for pseudo-AEAD on contexts that only allow export
     export_only = 0xffff,
   };
 
