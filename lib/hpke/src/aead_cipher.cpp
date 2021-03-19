@@ -9,7 +9,8 @@ namespace hpke {
 /// ExportOnlyCipher
 ///
 const ExportOnlyCipher&
-ExportOnlyCipher::get() {
+ExportOnlyCipher::get()
+{
   static const auto singleton = ExportOnlyCipher();
   return singleton;
 }

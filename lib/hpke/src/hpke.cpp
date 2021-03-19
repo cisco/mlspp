@@ -235,7 +235,6 @@ AEAD::get<AEAD::ID::export_only>()
   return ExportOnlyCipher::get();
 }
 
-
 AEAD::AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in)
   : id(id_in)
   , key_size(key_size_in)

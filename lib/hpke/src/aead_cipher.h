@@ -18,7 +18,7 @@ struct ExportOnlyCipher : public AEAD
                             const bytes& aad,
                             const bytes& ct) const override;
 
-  private:
+private:
   ExportOnlyCipher();
 };
 

@@ -6,10 +6,14 @@
 
 namespace hpke {
 
-struct HPKETest {
+struct HPKETest
+{
   static bytes key(const Context& ctx) { return ctx.key; }
   static bytes nonce(const Context& ctx) { return ctx.nonce; }
-  static bytes exporter_secret(const Context& ctx) { return ctx.exporter_secret; }
+  static bytes exporter_secret(const Context& ctx)
+  {
+    return ctx.exporter_secret;
+  }
 };
 
 } // namespace HPKE
