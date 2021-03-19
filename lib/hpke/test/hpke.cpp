@@ -16,7 +16,7 @@ struct HPKETest
   }
 };
 
-} // namespace HPKE
+} // namespace hpke
 
 static void
 test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
