@@ -20,6 +20,8 @@ struct ExportOnlyCipher : public AEAD
 
 private:
   ExportOnlyCipher();
+
+  static const ExportOnlyCipher instance;
 };
 
 struct AEADCipher : public AEAD

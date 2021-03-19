@@ -11,8 +11,7 @@ namespace hpke {
 const ExportOnlyCipher&
 ExportOnlyCipher::get()
 {
-  static const auto singleton = ExportOnlyCipher();
-  return singleton;
+  return instance;
 }
 
 bytes
@@ -36,6 +35,8 @@ ExportOnlyCipher::open(const bytes& /* key */,
 ExportOnlyCipher::ExportOnlyCipher()
   : AEAD(AEAD::ID::export_only, 0, 0)
 {}
+
+const ExportOnlyCipher ExportOnlyCipher::instance = ExportOnlyCipher{};
 
 ///
 /// AEADCipher
