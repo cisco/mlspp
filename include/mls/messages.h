@@ -561,23 +561,23 @@ struct MLSCiphertext
 
 namespace tls {
 
-TLS_VARIANT_MAP(PSKType, ExternalPSK, external)
-TLS_VARIANT_MAP(PSKType, ReInitPSK, reinit)
-TLS_VARIANT_MAP(PSKType, BranchPSK, branch)
+TLS_VARIANT_MAP(mls::PSKType, mls::ExternalPSK, external)
+TLS_VARIANT_MAP(mls::PSKType, mls::ReInitPSK, reinit)
+TLS_VARIANT_MAP(mls::PSKType, mls::BranchPSK, branch)
 
-TLS_VARIANT_MAP(ProposalOrRefType, Proposal, value)
-TLS_VARIANT_MAP(ProposalOrRefType, ProposalRef, reference)
+TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::Proposal, value)
+TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::ProposalRef, reference)
 
-TLS_VARIANT_MAP(ProposalType, Add, add)
-TLS_VARIANT_MAP(ProposalType, Update, update)
-TLS_VARIANT_MAP(ProposalType, Remove, remove)
-TLS_VARIANT_MAP(ProposalType, PreSharedKey, psk)
-TLS_VARIANT_MAP(ProposalType, ReInit, reinit)
-TLS_VARIANT_MAP(ProposalType, ExternalInit, external_init)
-TLS_VARIANT_MAP(ProposalType, AppAck, app_ack)
+TLS_VARIANT_MAP(mls::ProposalType, mls::Add, add)
+TLS_VARIANT_MAP(mls::ProposalType, mls::Update, update)
+TLS_VARIANT_MAP(mls::ProposalType, mls::Remove, remove)
+TLS_VARIANT_MAP(mls::ProposalType, mls::PreSharedKey, psk)
+TLS_VARIANT_MAP(mls::ProposalType, mls::ReInit, reinit)
+TLS_VARIANT_MAP(mls::ProposalType, mls::ExternalInit, external_init)
+TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
 
-TLS_VARIANT_MAP(ContentType, ApplicationData, application)
-TLS_VARIANT_MAP(ContentType, Proposal, proposal)
-TLS_VARIANT_MAP(ContentType, Commit, commit)
+TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
+TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
+TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
 
 } // namespace tls
