@@ -163,7 +163,7 @@ Session::Inner::join(const HPKEPrivateKey& init_priv,
 {
   auto welcome = tls::get<Welcome>(welcome_data);
 
-  auto state = State(init_priv, sig_priv, key_package, welcome);
+  auto state = State(init_priv, sig_priv, key_package, welcome, std::nullopt);
   auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }

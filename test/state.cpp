@@ -87,7 +87,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 
   // Initialize the second participant from the Welcome
   auto second0 =
-    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+    State{ init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -147,7 +147,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   silence_unused(commit);
 
   auto second0 =
-    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+    State{ init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -186,7 +186,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome, std::nullopt);
   }
 
   verify_group_functionality(states);
@@ -218,7 +218,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
     }
 
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome, std::nullopt);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -254,7 +254,7 @@ protected:
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.emplace_back(
-        init_privs[i], identity_privs[i], key_packages[i], welcome);
+        init_privs[i], identity_privs[i], key_packages[i], welcome, std::nullopt);
     }
 
     check_consistency();

@@ -69,7 +69,8 @@ State::State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs)
 State::State(const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& kp,
-             const Welcome& welcome)
+             const Welcome& welcome,
+             const std::optional<TreeKEMPublicKey>& tree)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
@@ -95,28 +96,31 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, {});
+
+  // Import the tree from the argument or from the extension
   auto maybe_tree_extn = group_info.extensions.find<RatchetTreeExtension>();
-  if (!maybe_tree_extn) {
-    throw InvalidParameterError("Ratchet tree not provided in GroupInfo");
+  if (tree) {
+    _tree = opt::get(tree);
+  } else if (maybe_tree_extn) {
+    _tree = opt::get(maybe_tree_extn).tree;
+    _tree.suite = _suite;
+  } else {
+    throw InvalidParameterError("No tree available");
   }
 
-  auto& group_info_tree = opt::get(maybe_tree_extn).tree;
-  group_info_tree.suite = _suite;
-  group_info_tree.set_hash_all();
+  _tree.set_hash_all();
+  if (!_tree.parent_hash_valid()) {
+    throw InvalidParameterError("Invalid tree");
+  }
 
   // Verify the signature on the GroupInfo
-  if (!group_info.verify(group_info_tree)) {
+  if (!group_info.verify(_tree)) {
     throw InvalidParameterError("Invalid GroupInfo");
   }
 
   // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
-
-  _tree = group_info_tree;
-  if (!_tree.parent_hash_valid()) {
-    throw InvalidParameterError("Invalid tree");
-  }
 
   _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
   _transcript_hash.update_interim(group_info.confirmation_tag);

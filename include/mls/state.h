@@ -62,7 +62,8 @@ public:
   State(const HPKEPrivateKey& init_priv,
         SignaturePrivateKey sig_priv,
         const KeyPackage& kp,
-        const Welcome& welcome);
+        const Welcome& welcome,
+        const std::optional<TreeKEMPublicKey>& tree);
 
   // Join a group from outside
   // XXX(RLB) For full generality, this should be capable of covering other
@@ -104,6 +105,7 @@ public:
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
+  const TreeKEMPublicKey& tree() const { return _tree; }
 
   bytes do_export(const std::string& label,
                   const bytes& context,
