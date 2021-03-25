@@ -57,6 +57,9 @@ enable_testing()
 # Internal libraries
 add_subdirectory(lib)
 
+# Third-Party libraries in tree
+add_subdirectory(third_party)
+
 # External libraries
 find_package(OpenSSL 1.1 REQUIRED)
 

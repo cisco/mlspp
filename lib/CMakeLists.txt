@@ -1,4 +1,3 @@
-add_subdirectory(third_party)
 add_subdirectory(bytes)
 add_subdirectory(hpke)
 add_subdirectory(tls_syntax)
