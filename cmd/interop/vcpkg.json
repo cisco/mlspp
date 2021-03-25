@@ -5,6 +5,7 @@
   "dependencies": [
     "openssl",
     "protobuf",
-    "grpc"
+    "grpc",
+    "gflags"
   ]
 }
