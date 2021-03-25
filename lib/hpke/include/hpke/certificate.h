@@ -30,9 +30,12 @@ public:
   using ParsedName = std::map<int, std::string>;
 
   explicit Certificate(const bytes& der);
+  explicit Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in);
   Certificate() = delete;
   Certificate(const Certificate& other);
   ~Certificate();
+
+  static std::vector<Certificate> parse_pem(const bytes& pem);
 
   bool valid_from(const Certificate& parent) const;
 
@@ -52,5 +55,8 @@ public:
   const std::unique_ptr<Signature::PublicKey> public_key;
   const bytes raw;
 };
+
+bool
+operator==(const Certificate& lhs, const Certificate& rhs);
 
 } // namespace hpke
