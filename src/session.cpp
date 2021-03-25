@@ -285,7 +285,7 @@ Session::commit(const std::vector<bytes>& proposals)
 std::tuple<bytes, bytes>
 Session::commit()
 {
-  auto opts = State::CommitOpts{{}, true};
+  auto opts = State::CommitOpts{ {}, true };
   auto commit_secret = inner->fresh_secret();
   auto [commit, welcome, new_state] =
     inner->history.front().commit(commit_secret, opts);

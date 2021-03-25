@@ -89,7 +89,8 @@ public:
   MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
-  struct CommitOpts {
+  struct CommitOpts
+  {
     std::vector<Proposal> extra_proposals;
     bool inline_tree;
   };

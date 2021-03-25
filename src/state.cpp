@@ -165,7 +165,7 @@ State::external_join(const bytes& leaf_secret,
 {
   auto initial_state = State(std::move(sig_priv), pgs);
   auto add = initial_state.add_proposal(kp);
-  auto opts = CommitOpts{ {add}, true };
+  auto opts = CommitOpts{ { add }, true };
   auto [commit_pt, welcome, state] =
     initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
   silence_unused(welcome);
