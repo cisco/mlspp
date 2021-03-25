@@ -65,5 +65,5 @@ jobs:
     - name: Build interop harness
       run: |
          cd cmd/interop
-         cmake -B build .
+         cmake -B build . -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
          cmake --build build
