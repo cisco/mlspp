@@ -1,17 +1,20 @@
-name: Check Formatting
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
+name: Formatting Check
+on: [push]
 jobs:
-  build:
+  formatting-check:
+    name: Formatting Check
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - 'include'
+          - 'src'
+          - 'test'
+          - 'cmd'
+          - 'lib'
     steps:
-    - uses: actions/checkout@v1
-    - name: check clang-format
-      uses: jidicula/clang-format-action@v2.0.0
+    - uses: actions/checkout@v2
+    - name: Run clang-format style check for C/C++ programs.
+      uses: jidicula/clang-format-action@v3.2.0
+      with:
+        check-path: ${{ matrix.path }}
