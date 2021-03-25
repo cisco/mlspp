@@ -1,5 +1,5 @@
 {
-  "name": "mlspp_client",
+  "name": "mlspp-interop",
   "version-string": "0.1",
   "description": "Interop harness for Cisco MLS C++ library",
   "dependencies": [
