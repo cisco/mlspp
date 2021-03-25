@@ -30,7 +30,7 @@ public:
   using ParsedName = std::map<int, std::string>;
 
   explicit Certificate(const bytes& der);
-  Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in);
+  explicit Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in);
   Certificate() = delete;
   Certificate(const Certificate& other);
   ~Certificate();
