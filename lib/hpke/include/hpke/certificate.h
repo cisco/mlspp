@@ -56,6 +56,7 @@ public:
   const bytes raw;
 };
 
-bool operator==(const Certificate& lhs, const Certificate& rhs);
+bool
+operator==(const Certificate& lhs, const Certificate& rhs);
 
 } // namespace hpke

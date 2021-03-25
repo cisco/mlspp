@@ -71,7 +71,8 @@ void typed_delete(STACK_OF(GENERAL_NAME) * ptr)
 }
 
 template<>
-void typed_delete(BIO* ptr)
+void
+typed_delete(BIO* ptr)
 {
   BIO_vfree(ptr);
 }

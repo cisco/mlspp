@@ -310,7 +310,8 @@ Certificate::parse_pem(const bytes& pem)
 
   auto certs = std::vector<Certificate>();
   while (true) {
-    auto x509 = make_typed_unique<X509>(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    auto x509 = make_typed_unique<X509>(
+      PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
     if (!x509) {
       // NOLINTNEXTLINE(hicpp-signed-bitwise)
       auto err = ERR_GET_REASON(ERR_peek_last_error());
@@ -328,7 +329,6 @@ Certificate::parse_pem(const bytes& pem)
 
   return certs;
 }
-
 
 bool
 Certificate::valid_from(const Certificate& parent) const
