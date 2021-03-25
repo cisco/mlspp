@@ -41,7 +41,7 @@ if(CLANG_TIDY)
   endif()
 endif()
 
-if($ENV{MACOSX_DEPLOYMENT_TARGET} STREQUAL "10.11")
+if("$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "10.11")
   add_compile_options(-DVARIANT_COMPAT)
 endif()
 
