@@ -165,8 +165,9 @@ State::external_join(const bytes& leaf_secret,
 {
   auto initial_state = State(std::move(sig_priv), pgs);
   auto add = initial_state.add_proposal(kp);
+  auto opts = CommitOpts{ {add}, true };
   auto [commit_pt, welcome, state] =
-    initial_state.commit(leaf_secret, { add }, kp, pgs.external_pub);
+    initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
   silence_unused(welcome);
   return { commit_pt, state };
 }
@@ -262,14 +263,14 @@ State::remove(LeafIndex removed) const
 
 std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret,
-              const std::vector<Proposal>& extra_proposals) const
+              const std::optional<CommitOpts>& opts) const
 {
-  return commit(leaf_secret, extra_proposals, std::nullopt, std::nullopt);
+  return commit(leaf_secret, opts, std::nullopt, std::nullopt);
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret,
-              const std::vector<Proposal>& extra_proposals,
+              const std::optional<CommitOpts>& opts,
               const std::optional<KeyPackage>& joiner_key_package,
               const std::optional<HPKEPublicKey>& external_pub) const
 {
@@ -290,13 +291,16 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Add the extra proposals to those we had cached
-  for (const auto& proposal : extra_proposals) {
-    if (var::holds_alternative<Add>(proposal.content)) {
-      const auto& add = var::get<Add>(proposal.content);
-      joiners.push_back(add.key_package);
-    }
+  if (opts) {
+    const auto& extra_proposals = opt::get(opts).extra_proposals;
+    for (const auto& proposal : extra_proposals) {
+      if (var::holds_alternative<Add>(proposal.content)) {
+        const auto& add = var::get<Add>(proposal.content);
+        joiners.push_back(add.key_package);
+      }
 
-    commit.proposals.push_back({ proposal });
+      commit.proposals.push_back({ proposal });
+    }
   }
 
   // If this is an external commit, insert an ExternalInit proposal
@@ -377,7 +381,9 @@ State::commit(const bytes& leaf_secret,
     next._tree.root_hash(), next._transcript_hash.confirmed,
     next._extensions,       opt::get(pt.confirmation_tag),
   };
-  group_info.extensions.add(RatchetTreeExtension{ next._tree });
+  if (opts && opt::get(opts).inline_tree) {
+    group_info.extensions.add(RatchetTreeExtension{ next._tree });
+  }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome =

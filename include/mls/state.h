@@ -89,9 +89,13 @@ public:
   MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
+  struct CommitOpts {
+    std::vector<Proposal> extra_proposals;
+    bool inline_tree;
+  };
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
-    const std::vector<Proposal>& extra_proposals) const;
+    const std::optional<CommitOpts>& opts) const;
 
   ///
   /// Generic handshake message handler
@@ -167,7 +171,7 @@ protected:
   // Form a commit that can be either internal or external
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
-    const std::vector<Proposal>& extra_proposals,
+    const std::optional<CommitOpts>& opts,
     const std::optional<KeyPackage>& joiner_key_package,
     const std::optional<HPKEPublicKey>& external_pub) const;
 
