@@ -109,6 +109,10 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   _tree.set_hash_all();
+  if (_tree.root_hash() != group_info.tree_hash) {
+    throw InvalidParameterError("Tree does not match GroupInfo");
+  }
+
   if (!_tree.parent_hash_valid()) {
     throw InvalidParameterError("Invalid tree");
   }

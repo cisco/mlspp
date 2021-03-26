@@ -117,6 +117,13 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
       init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt),
     InvalidParameterError);
 
+  auto incorrect_tree = TreeKEMPublicKey(suite);
+  incorrect_tree.add_leaf(key_packages[1]);
+  CHECK_THROWS_AS(
+      State(
+      init_privs[1], identity_privs[1], key_packages[1], welcome, incorrect_tree),
+      InvalidParameterError);
+
   auto second0 = State{
     init_privs[1], identity_privs[1], key_packages[1], welcome, first1.tree()
   };
