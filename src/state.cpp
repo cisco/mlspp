@@ -43,10 +43,11 @@ State::import_tree(const bytes& tree_hash,
     tree = opt::get(external);
   } else if (maybe_tree_extn) {
     tree = opt::get(maybe_tree_extn).tree;
-    tree.suite = _suite;
   } else {
     throw InvalidParameterError("No tree available");
   }
+
+  tree.suite = _suite;
 
   tree.set_hash_all();
   if (tree.root_hash() != tree_hash) {
