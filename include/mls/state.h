@@ -43,6 +43,12 @@ struct RosterIndex : public UInt32
   using UInt32::UInt32;
 };
 
+struct CommitOpts
+{
+  std::vector<Proposal> extra_proposals;
+  bool inline_tree;
+};
+
 class State
 {
 public:
@@ -89,11 +95,6 @@ public:
   MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
 
-  struct CommitOpts
-  {
-    std::vector<Proposal> extra_proposals;
-    bool inline_tree;
-  };
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
     const std::optional<CommitOpts>& opts) const;

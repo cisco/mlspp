@@ -285,10 +285,9 @@ Session::commit(const std::vector<bytes>& proposals)
 std::tuple<bytes, bytes>
 Session::commit()
 {
-  auto opts = State::CommitOpts{ {}, true };
   auto commit_secret = inner->fresh_secret();
   auto [commit, welcome, new_state] =
-    inner->history.front().commit(commit_secret, opts);
+    inner->history.front().commit(commit_secret, CommitOpts{ {}, true });
 
   auto commit_msg = inner->export_message(commit);
   auto welcome_msg = tls::marshal(welcome);
