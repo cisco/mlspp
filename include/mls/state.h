@@ -43,6 +43,12 @@ struct RosterIndex : public UInt32
   using UInt32::UInt32;
 };
 
+struct CommitOpts
+{
+  std::vector<Proposal> extra_proposals;
+  bool inline_tree;
+};
+
 class State
 {
 public:
@@ -62,7 +68,8 @@ public:
   State(const HPKEPrivateKey& init_priv,
         SignaturePrivateKey sig_priv,
         const KeyPackage& kp,
-        const Welcome& welcome);
+        const Welcome& welcome,
+        const std::optional<TreeKEMPublicKey>& tree);
 
   // Join a group from outside
   // XXX(RLB) For full generality, this should be capable of covering other
@@ -90,7 +97,7 @@ public:
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
-    const std::vector<Proposal>& extra_proposals) const;
+    const std::optional<CommitOpts>& opts) const;
 
   ///
   /// Generic handshake message handler
@@ -104,6 +111,7 @@ public:
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
+  const TreeKEMPublicKey& tree() const { return _tree; }
 
   bytes do_export(const std::string& label,
                   const bytes& context,
@@ -165,7 +173,7 @@ protected:
   // Form a commit that can be either internal or external
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
-    const std::vector<Proposal>& extra_proposals,
+    const std::optional<CommitOpts>& opts,
     const std::optional<KeyPackage>& joiner_key_package,
     const std::optional<HPKEPublicKey>& external_pub) const;
 

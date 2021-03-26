@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <hpke/random.h>
+#include <mls/common.h>
 #include <mls/state.h>
 
 using namespace mls;
@@ -82,12 +83,43 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit, welcome, first1] = first0.commit(fresh_secret(), { add });
+  auto [commit, welcome, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome
-  auto second0 =
-    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+  auto second0 = State{
+    init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt
+  };
+  REQUIRE(first1 == second0);
+
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
+}
+
+TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,          suite,           init_privs[0],
+                       identity_privs[0], key_packages[0], {} };
+
+  // Handle the Add proposal and create a Commit
+  auto add = first0.add_proposal(key_packages[1]);
+  // Don't generate RatchetTree extension
+  auto [commit, welcome, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add }, false });
+  silence_unused(commit);
+
+  // Initialize the second participant from the Welcome, pass in the
+  // tree externally
+  CHECK_THROWS_AS(
+    State(
+      init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt),
+    InvalidParameterError);
+
+  auto second0 = State{
+    init_privs[1], identity_privs[1], key_packages[1], welcome, first1.tree()
+  };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -143,11 +175,13 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
 
   // Add the second member
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit, welcome, first1] = first0.commit(fresh_secret(), { add });
+  auto [commit, welcome, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
   silence_unused(commit);
 
-  auto second0 =
-    State{ init_privs[1], identity_privs[1], key_packages[1], welcome };
+  auto second0 = State{
+    init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt
+  };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -179,14 +213,15 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
   }
 
   // Create a Commit that adds everybody
-  auto [commit, welcome, new_state] = states[0].commit(fresh_secret(), adds);
+  auto [commit, welcome, new_state] =
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true });
   silence_unused(commit);
   states[0] = new_state;
 
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome, std::nullopt);
   }
 
   verify_group_functionality(states);
@@ -208,7 +243,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 
     auto add = states[sender].add_proposal(key_packages[i]);
     auto [commit, welcome, new_state] =
-      states[sender].commit(fresh_secret(), { add });
+      states[sender].commit(fresh_secret(), CommitOpts{ { add }, true });
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
         states[j] = new_state;
@@ -218,7 +253,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
     }
 
     states.emplace_back(
-      init_privs[i], identity_privs[i], key_packages[i], welcome);
+      init_privs[i], identity_privs[i], key_packages[i], welcome, std::nullopt);
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -249,12 +284,15 @@ protected:
     }
 
     auto [commit, welcome, new_state] =
-      states[0].commit(fresh_secret(), { adds });
+      states[0].commit(fresh_secret(), CommitOpts{ adds, true });
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
-      states.emplace_back(
-        init_privs[i], identity_privs[i], key_packages[i], welcome);
+      states.emplace_back(init_privs[i],
+                          identity_privs[i],
+                          key_packages[i],
+                          welcome,
+                          std::nullopt);
     }
 
     check_consistency();
@@ -294,7 +332,8 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = fresh_secret();
     auto update = states[i].update_proposal(new_leaf);
-    auto [commit, welcome, new_state] = states[i].commit(new_leaf, { update });
+    auto [commit, welcome, new_state] =
+      states[i].commit(new_leaf, CommitOpts{ { update }, true });
     silence_unused(welcome);
 
     for (auto& state : states) {
@@ -314,7 +353,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(LeafIndex{ uint32_t(i + 1) });
     auto [commit, welcome, new_state] =
-      states[i].commit(fresh_secret(), { remove });
+      states[i].commit(fresh_secret(), CommitOpts{ { remove }, true });
     silence_unused(welcome);
 
     states.pop_back();
@@ -343,7 +382,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
   auto [commit_1, welcome_1, new_state_1] =
-    states[0].commit(fresh_secret(), { remove_1 });
+    states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true });
   silence_unused(welcome_1);
   silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
@@ -358,7 +397,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
   auto [commit_2, welcome_2, new_state_2] =
-    new_state_1.commit(fresh_secret(), { remove_2 });
+    new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true });
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
   expected_creds = std::vector<Credential>{
