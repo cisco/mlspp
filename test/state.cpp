@@ -119,10 +119,12 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   auto incorrect_tree = TreeKEMPublicKey(suite);
   incorrect_tree.add_leaf(key_packages[1]);
-  CHECK_THROWS_AS(
-      State(
-      init_privs[1], identity_privs[1], key_packages[1], welcome, incorrect_tree),
-      InvalidParameterError);
+  CHECK_THROWS_AS(State(init_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        incorrect_tree),
+                  InvalidParameterError);
 
   auto second0 = State{
     init_privs[1], identity_privs[1], key_packages[1], welcome, first1.tree()
@@ -141,8 +143,11 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
   auto public_group_state = first0.public_group_state();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(
-    fresh_secret(), identity_privs[1], key_packages[1], public_group_state, std::nullopt);
+  auto [commit, second0] = State::external_join(fresh_secret(),
+                                                identity_privs[1],
+                                                key_packages[1],
+                                                public_group_state,
+                                                std::nullopt);
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
@@ -160,8 +165,11 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
   auto tree = first0.tree();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(
-    fresh_secret(), identity_privs[1], key_packages[1], public_group_state, tree);
+  auto [commit, second0] = State::external_join(fresh_secret(),
+                                                identity_privs[1],
+                                                key_packages[1],
+                                                public_group_state,
+                                                tree);
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));

@@ -169,7 +169,9 @@ protected:
   GroupContext group_context() const;
 
   // Assemble a preliminary, unjoined group state
-  State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs, const std::optional<TreeKEMPublicKey>& tree);
+  State(SignaturePrivateKey sig_priv,
+        const PublicGroupState& pgs,
+        const std::optional<TreeKEMPublicKey>& tree);
 
   // Import a tree from an externally-provided tree or an extension
   TreeKEMPublicKey import_tree(const bytes& tree_hash,

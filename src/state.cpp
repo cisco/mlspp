@@ -61,7 +61,9 @@ State::import_tree(const bytes& tree_hash,
   return tree;
 }
 
-State::State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs, const std::optional<TreeKEMPublicKey>& tree)
+State::State(SignaturePrivateKey sig_priv,
+             const PublicGroupState& pgs,
+             const std::optional<TreeKEMPublicKey>& tree)
   : _suite(pgs.cipher_suite)
   , _group_id(pgs.group_id)
   , _epoch(pgs.epoch)
