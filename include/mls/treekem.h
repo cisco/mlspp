@@ -177,9 +177,7 @@ private:
 
 namespace tls {
 
-using namespace mls;
-
-TLS_VARIANT_MAP(NodeType, KeyPackage, leaf)
-TLS_VARIANT_MAP(NodeType, ParentNode, parent)
+TLS_VARIANT_MAP(mls::NodeType, mls::KeyPackage, leaf)
+TLS_VARIANT_MAP(mls::NodeType, mls::ParentNode, parent)
 
 } // namespace tls

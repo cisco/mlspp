@@ -70,6 +70,13 @@ void typed_delete(STACK_OF(GENERAL_NAME) * ptr)
   sk_GENERAL_NAME_pop_free(ptr, GENERAL_NAME_free);
 }
 
+template<>
+void
+typed_delete(BIO* ptr)
+{
+  BIO_vfree(ptr);
+}
+
 ///
 /// Map OpenSSL errors to C++ exceptions
 ///

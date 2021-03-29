@@ -19,6 +19,7 @@ endif()
 ###
 ### Dependencies
 ###
+find_package(OpenSSL 1.1 REQUIRED)
 
 # gRPC dependencies
 find_package(Protobuf REQUIRED)

@@ -163,7 +163,7 @@ Session::Inner::join(const HPKEPrivateKey& init_priv,
 {
   auto welcome = tls::get<Welcome>(welcome_data);
 
-  auto state = State(init_priv, sig_priv, key_package, welcome);
+  auto state = State(init_priv, sig_priv, key_package, welcome, std::nullopt);
   auto inner = std::make_unique<Inner>(state);
   return Session(inner.release());
 }
@@ -287,7 +287,7 @@ Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
   auto [commit, welcome, new_state] =
-    inner->history.front().commit(commit_secret, {});
+    inner->history.front().commit(commit_secret, CommitOpts{ {}, true });
 
   auto commit_msg = inner->export_message(commit);
   auto welcome_msg = tls::marshal(welcome);
