@@ -4,9 +4,13 @@
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
 #include <memory>
+#include <openssl/err.h>
+#include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
+
+#include <iostream>
 
 namespace hpke {
 ///
@@ -230,6 +234,14 @@ struct Certificate::ParsedCertificate
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
+  bytes raw() const
+  {
+    auto out = bytes(i2d_X509(x509.get(), nullptr));
+    auto* ptr = out.data();
+    i2d_X509(x509.get(), &ptr);
+    return out;
+  }
+
   typed_unique_ptr<X509> x509;
   const Signature::ID pub_key_id;
   const uint64_t issuer_hash;
@@ -264,6 +276,13 @@ signature_key(EVP_PKEY* pkey)
   }
 }
 
+Certificate::Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in)
+  : parsed_cert(std::move(parsed_cert_in))
+  , public_key_algorithm(parsed_cert->pub_key_id)
+  , public_key(signature_key(parsed_cert->public_key().release()))
+  , raw(parsed_cert->raw())
+{}
+
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
   , public_key_algorithm(parsed_cert->pub_key_id)
@@ -279,6 +298,37 @@ Certificate::Certificate(const Certificate& other)
 {}
 
 Certificate::~Certificate() = default;
+
+std::vector<Certificate>
+Certificate::parse_pem(const bytes& pem)
+{
+  auto size_int = static_cast<int>(pem.size());
+  auto bio = make_typed_unique<BIO>(BIO_new_mem_buf(pem.data(), size_int));
+  if (!bio) {
+    throw openssl_error();
+  }
+
+  auto certs = std::vector<Certificate>();
+  while (true) {
+    auto x509 = make_typed_unique<X509>(
+      PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    if (!x509) {
+      // NOLINTNEXTLINE(hicpp-signed-bitwise)
+      auto err = ERR_GET_REASON(ERR_peek_last_error());
+      if (err == PEM_R_NO_START_LINE) {
+        // No more objects to read
+        break;
+      }
+
+      throw openssl_error();
+    }
+
+    auto parsed = std::make_unique<ParsedCertificate>(x509.release());
+    certs.emplace_back(std::move(parsed));
+  }
+
+  return certs;
+}
 
 bool
 Certificate::valid_from(const Certificate& parent) const
@@ -359,4 +409,11 @@ Certificate::hash() const
 {
   return parsed_cert->hash;
 }
+
+bool
+operator==(const Certificate& lhs, const Certificate& rhs)
+{
+  return lhs.raw == rhs.raw;
+}
+
 } // namespace hpke

@@ -32,11 +32,42 @@ State::State(bytes group_id,
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
-State::State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs)
+TreeKEMPublicKey
+State::import_tree(const bytes& tree_hash,
+                   const std::optional<TreeKEMPublicKey>& external,
+                   const ExtensionList& extensions)
+{
+  auto tree = TreeKEMPublicKey(_suite);
+  auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
+  if (external) {
+    tree = opt::get(external);
+  } else if (maybe_tree_extn) {
+    tree = opt::get(maybe_tree_extn).tree;
+  } else {
+    throw InvalidParameterError("No tree available");
+  }
+
+  tree.suite = _suite;
+
+  tree.set_hash_all();
+  if (tree.root_hash() != tree_hash) {
+    throw InvalidParameterError("Tree does not match GroupInfo");
+  }
+
+  if (!tree.parent_hash_valid()) {
+    throw InvalidParameterError("Invalid tree");
+  }
+
+  return tree;
+}
+
+State::State(SignaturePrivateKey sig_priv,
+             const PublicGroupState& pgs,
+             const std::optional<TreeKEMPublicKey>& tree)
   : _suite(pgs.cipher_suite)
   , _group_id(pgs.group_id)
   , _epoch(pgs.epoch)
-  , _tree(pgs.cipher_suite)
+  , _tree(import_tree(pgs.tree_hash, tree, pgs.extensions))
   , _transcript_hash(pgs.cipher_suite)
   , _extensions(pgs.extensions.for_group())
   , _key_schedule(pgs.cipher_suite)
@@ -45,16 +76,6 @@ State::State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs)
 {
   // Import the interim transcript hash
   _transcript_hash.interim = pgs.interim_transcript_hash;
-
-  // Import the tree
-  auto maybe_tree_extn = pgs.extensions.find<RatchetTreeExtension>();
-  if (!maybe_tree_extn) {
-    throw InvalidParameterError("Ratchet tree not provided in GroupInfo");
-  }
-
-  _tree = opt::get(maybe_tree_extn).tree;
-  _tree.suite = _suite;
-  _tree.set_hash_all();
 
   // The following are not set:
   //    _transcript_hash.confirmed
@@ -69,7 +90,8 @@ State::State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs)
 State::State(const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& kp,
-             const Welcome& welcome)
+             const Welcome& welcome,
+             const std::optional<TreeKEMPublicKey>& tree)
   : _suite(welcome.cipher_suite)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
@@ -95,28 +117,18 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, {});
-  auto maybe_tree_extn = group_info.extensions.find<RatchetTreeExtension>();
-  if (!maybe_tree_extn) {
-    throw InvalidParameterError("Ratchet tree not provided in GroupInfo");
-  }
 
-  auto& group_info_tree = opt::get(maybe_tree_extn).tree;
-  group_info_tree.suite = _suite;
-  group_info_tree.set_hash_all();
+  // Import the tree from the argument or from the extension
+  _tree = import_tree(group_info.tree_hash, tree, group_info.extensions);
 
   // Verify the signature on the GroupInfo
-  if (!group_info.verify(group_info_tree)) {
+  if (!group_info.verify(_tree)) {
     throw InvalidParameterError("Invalid GroupInfo");
   }
 
   // Ingest the GroupSecrets and GroupInfo
   _epoch = group_info.epoch;
   _group_id = group_info.group_id;
-
-  _tree = group_info_tree;
-  if (!_tree.parent_hash_valid()) {
-    throw InvalidParameterError("Invalid tree");
-  }
 
   _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
   _transcript_hash.update_interim(group_info.confirmation_tag);
@@ -157,12 +169,14 @@ std::tuple<MLSPlaintext, State>
 State::external_join(const bytes& leaf_secret,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& kp,
-                     const PublicGroupState& pgs)
+                     const PublicGroupState& pgs,
+                     const std::optional<TreeKEMPublicKey>& tree)
 {
-  auto initial_state = State(std::move(sig_priv), pgs);
+  auto initial_state = State(std::move(sig_priv), pgs, tree);
   auto add = initial_state.add_proposal(kp);
+  auto opts = CommitOpts{ { add }, false };
   auto [commit_pt, welcome, state] =
-    initial_state.commit(leaf_secret, { add }, kp, pgs.external_pub);
+    initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
   silence_unused(welcome);
   return { commit_pt, state };
 }
@@ -258,14 +272,14 @@ State::remove(LeafIndex removed) const
 
 std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret,
-              const std::vector<Proposal>& extra_proposals) const
+              const std::optional<CommitOpts>& opts) const
 {
-  return commit(leaf_secret, extra_proposals, std::nullopt, std::nullopt);
+  return commit(leaf_secret, opts, std::nullopt, std::nullopt);
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
 State::commit(const bytes& leaf_secret,
-              const std::vector<Proposal>& extra_proposals,
+              const std::optional<CommitOpts>& opts,
               const std::optional<KeyPackage>& joiner_key_package,
               const std::optional<HPKEPublicKey>& external_pub) const
 {
@@ -286,13 +300,16 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Add the extra proposals to those we had cached
-  for (const auto& proposal : extra_proposals) {
-    if (var::holds_alternative<Add>(proposal.content)) {
-      const auto& add = var::get<Add>(proposal.content);
-      joiners.push_back(add.key_package);
-    }
+  if (opts) {
+    const auto& extra_proposals = opt::get(opts).extra_proposals;
+    for (const auto& proposal : extra_proposals) {
+      if (var::holds_alternative<Add>(proposal.content)) {
+        const auto& add = var::get<Add>(proposal.content);
+        joiners.push_back(add.key_package);
+      }
 
-    commit.proposals.push_back({ proposal });
+      commit.proposals.push_back({ proposal });
+    }
   }
 
   // If this is an external commit, insert an ExternalInit proposal
@@ -373,7 +390,9 @@ State::commit(const bytes& leaf_secret,
     next._tree.root_hash(), next._transcript_hash.confirmed,
     next._extensions,       opt::get(pt.confirmation_tag),
   };
-  group_info.extensions.add(RatchetTreeExtension{ next._tree });
+  if (opts && opt::get(opts).inline_tree) {
+    group_info.extensions.add(RatchetTreeExtension{ next._tree });
+  }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome =

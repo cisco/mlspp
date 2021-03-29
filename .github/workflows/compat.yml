@@ -38,5 +38,5 @@ jobs:
 
     - name: build the library
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
