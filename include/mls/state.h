@@ -79,7 +79,8 @@ public:
     const bytes& leaf_secret,
     SignaturePrivateKey sig_priv,
     const KeyPackage& kp,
-    const PublicGroupState& pgs);
+    const PublicGroupState& pgs,
+    const std::optional<TreeKEMPublicKey>& tree);
 
   ///
   /// Message factories
@@ -168,7 +169,14 @@ protected:
   GroupContext group_context() const;
 
   // Assemble a preliminary, unjoined group state
-  State(SignaturePrivateKey sig_priv, const PublicGroupState& pgs);
+  State(SignaturePrivateKey sig_priv,
+        const PublicGroupState& pgs,
+        const std::optional<TreeKEMPublicKey>& tree);
+
+  // Import a tree from an externally-provided tree or an extension
+  TreeKEMPublicKey import_tree(const bytes& tree_hash,
+                               const std::optional<TreeKEMPublicKey>& external,
+                               const ExtensionList& extensions);
 
   // Form a commit that can be either internal or external
   std::tuple<MLSPlaintext, Welcome, State> commit(
