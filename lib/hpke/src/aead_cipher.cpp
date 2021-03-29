@@ -8,12 +8,6 @@ namespace hpke {
 ///
 /// ExportOnlyCipher
 ///
-const ExportOnlyCipher&
-ExportOnlyCipher::get()
-{
-  return instance;
-}
-
 bytes
 ExportOnlyCipher::seal(const bytes& /* key */,
                        const bytes& /* nonce */,
@@ -35,8 +29,6 @@ ExportOnlyCipher::open(const bytes& /* key */,
 ExportOnlyCipher::ExportOnlyCipher()
   : AEAD(AEAD::ID::export_only, 0, 0)
 {}
-
-const ExportOnlyCipher ExportOnlyCipher::instance = ExportOnlyCipher{};
 
 ///
 /// AEADCipher

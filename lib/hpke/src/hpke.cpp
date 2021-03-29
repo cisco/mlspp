@@ -232,7 +232,8 @@ template<>
 const AEAD&
 AEAD::get<AEAD::ID::export_only>()
 {
-  return ExportOnlyCipher::get();
+  static const auto export_only = ExportOnlyCipher{};
+  return export_only;
 }
 
 AEAD::AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in)

@@ -6,7 +6,7 @@ namespace hpke {
 
 struct ExportOnlyCipher : public AEAD
 {
-  static const ExportOnlyCipher& get();
+  ExportOnlyCipher();
   ~ExportOnlyCipher() override = default;
 
   bytes seal(const bytes& key,
@@ -17,11 +17,6 @@ struct ExportOnlyCipher : public AEAD
                             const bytes& nonce,
                             const bytes& aad,
                             const bytes& ct) const override;
-
-private:
-  ExportOnlyCipher();
-
-  static const ExportOnlyCipher instance;
 };
 
 struct AEADCipher : public AEAD
