@@ -33,9 +33,9 @@ label_hpke()
 }
 
 static const bytes&
-label_hpke_05()
+label_hpke_version()
 {
-  static const bytes val = from_ascii("HPKE-05 ");
+  static const bytes val = from_ascii("HPKE-v1");
   return val;
 }
 
@@ -54,16 +54,9 @@ label_key()
 }
 
 static const bytes&
-label_nonce()
+label_base_nonce()
 {
-  static const bytes val = from_ascii("nonce");
-  return val;
-}
-
-static const bytes&
-label_psk_hash()
-{
-  static const bytes val = from_ascii("psk_hash");
+  static const bytes val = from_ascii("base_nonce");
   return val;
 }
 
@@ -198,7 +191,7 @@ KDF::labeled_extract(const bytes& suite_id,
                      const bytes& label,
                      const bytes& ikm) const
 {
-  auto labeled_ikm = label_hpke_05() + suite_id + label + ikm;
+  auto labeled_ikm = label_hpke_version() + suite_id + label + ikm;
   return extract(salt, labeled_ikm);
 }
 
@@ -210,7 +203,7 @@ KDF::labeled_expand(const bytes& suite_id,
                     size_t size) const
 {
   auto labeled_info =
-    i2osp(size, 2) + label_hpke_05() + suite_id + label + info;
+    i2osp(size, 2) + label_hpke_version() + suite_id + label + info;
   return expand(prk, labeled_info, size);
 }
 
@@ -233,6 +226,14 @@ const AEAD&
 AEAD::get<AEAD::ID::CHACHA20_POLY1305>()
 {
   return AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>();
+}
+
+template<>
+const AEAD&
+AEAD::get<AEAD::ID::export_only>()
+{
+  static const auto export_only = ExportOnlyCipher{};
+  return export_only;
 }
 
 AEAD::AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in)
@@ -379,6 +380,8 @@ select_aead(AEAD::ID id)
       return AEAD::get<AEAD::ID::AES_256_GCM>();
     case AEAD::ID::CHACHA20_POLY1305:
       return AEAD::get<AEAD::ID::CHACHA20_POLY1305>();
+    case AEAD::ID::export_only:
+      return AEAD::get<AEAD::ID::export_only>();
     default:
       throw std::runtime_error("Unsupported algorithm");
   }
@@ -512,14 +515,12 @@ HPKE::key_schedule(Mode mode,
   auto mode_bytes = bytes{ uint8_t(mode) };
   auto key_schedule_context = mode_bytes + psk_id_hash + info_hash;
 
-  auto psk_hash = kdf.labeled_extract(suite, {}, label_psk_hash(), psk);
-  auto secret =
-    kdf.labeled_extract(suite, psk_hash, label_secret(), shared_secret);
+  auto secret = kdf.labeled_extract(suite, shared_secret, label_secret(), psk);
 
   auto key = kdf.labeled_expand(
     suite, secret, label_key(), key_schedule_context, aead.key_size);
   auto nonce = kdf.labeled_expand(
-    suite, secret, label_nonce(), key_schedule_context, aead.nonce_size);
+    suite, secret, label_base_nonce(), key_schedule_context, aead.nonce_size);
   auto exporter_secret = kdf.labeled_expand(
     suite, secret, label_exp(), key_schedule_context, kdf.hash_size);
 

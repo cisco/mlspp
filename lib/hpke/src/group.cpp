@@ -11,6 +11,11 @@
 
 namespace hpke {
 
+using namespace bytes_ns::operators;
+
+static inline size_t
+group_dh_size(Group::ID group_id);
+
 ///
 /// General implementation with OpenSSL EVP_PKEY
 ///
@@ -231,12 +236,14 @@ struct ECKeyGroup : public EVPGroup
     auto* eckey = EVP_PKEY_get0_EC_KEY(rsk.pkey.get());
     const auto* d = EC_KEY_get0_private_key(eckey);
 
-    bytes out(BN_num_bytes(d));
+    auto out = bytes(BN_num_bytes(d));
     if (BN_bn2bin(d, out.data()) != int(out.size())) {
       throw openssl_error();
     }
 
-    return out;
+    const auto zeros_needed = group_dh_size(id) - out.size();
+    auto leading_zeros = bytes(zeros_needed, 0);
+    return leading_zeros + out;
   }
 
   std::unique_ptr<Group::PrivateKey> deserialize_private(
