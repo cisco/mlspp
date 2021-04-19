@@ -10,9 +10,14 @@ namespace mls {
 /// Extensions
 ///
 
+// enum {
+//   reserved(0),
+//   mls10(1),
+//   (255)
+// } ProtocolVersion;
 enum class ProtocolVersion : uint8_t
 {
-  mls10 = 0xFF,
+  mls10 = 0x01,
 };
 
 extern const std::array<ProtocolVersion, 1> all_supported_versions;
