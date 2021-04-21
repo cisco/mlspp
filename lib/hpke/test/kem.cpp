@@ -7,6 +7,8 @@
 
 TEST_CASE("KEM round-trip")
 {
+  ensure_fips_if_required();
+
   const std::vector<KEM::ID> ids{ KEM::ID::DHKEM_P256_SHA256,
                                   KEM::ID::DHKEM_P384_SHA384,
                                   KEM::ID::DHKEM_P384_SHA384,
