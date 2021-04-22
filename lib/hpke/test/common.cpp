@@ -8,7 +8,7 @@ void
 ensure_fips_if_required()
 {
   const auto* require = std::getenv("REQUIRE_FIPS");
-  if (require && FIPS_mode() == 0) {
+  if (require != nullptr && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
 }
