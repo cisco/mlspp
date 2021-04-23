@@ -5,6 +5,8 @@
 
 TEST_CASE("KDF Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     KDF::ID id;

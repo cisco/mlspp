@@ -3,6 +3,7 @@
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
@@ -27,6 +28,13 @@ void
 typed_delete(EVP_MD_CTX* ptr)
 {
   EVP_MD_CTX_free(ptr);
+}
+
+template<>
+void
+typed_delete(HMAC_CTX* ptr)
+{
+  HMAC_CTX_free(ptr);
 }
 
 template<>

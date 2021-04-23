@@ -28,6 +28,9 @@ struct Digest
 
 private:
   explicit Digest(ID id);
+
+  bytes hmac_for_hkdf_extract(const bytes& key, const bytes& data) const;
+  friend struct HKDF;
 };
 
 } // namespace hpke

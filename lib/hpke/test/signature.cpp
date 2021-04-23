@@ -6,6 +6,8 @@
 #include <vector>
 TEST_CASE("Signature Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     Signature::ID id;
@@ -81,6 +83,8 @@ TEST_CASE("Signature Known-Answer")
 
 TEST_CASE("Signature Round-Trip")
 {
+  ensure_fips_if_required();
+
   const std::vector<Signature::ID> ids{
     Signature::ID::P256_SHA256, Signature::ID::P384_SHA384,
     Signature::ID::P521_SHA512, Signature::ID::Ed25519,

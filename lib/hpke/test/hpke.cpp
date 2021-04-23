@@ -132,6 +132,8 @@ test_auth_psk_vector(const HPKETestVector& tv)
 
 TEST_CASE("HPKE Test Vectors")
 {
+  ensure_fips_if_required();
+
   for (const auto& tv : test_vectors) {
     switch (tv.mode) {
       case HPKE::Mode::base:
@@ -155,6 +157,8 @@ TEST_CASE("HPKE Test Vectors")
 
 TEST_CASE("HPKE Round-Trip")
 {
+  ensure_fips_if_required();
+
   const std::vector<KEM::ID> kems{ KEM::ID::DHKEM_P256_SHA256,
                                    KEM::ID::DHKEM_P384_SHA384,
                                    KEM::ID::DHKEM_P384_SHA384,
