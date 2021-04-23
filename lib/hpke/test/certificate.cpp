@@ -73,6 +73,8 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK_FALSE(issuing.valid_from(leaf));
   CHECK_FALSE(root.valid_from(issuing));
   CHECK_FALSE(root.valid_from(leaf));
+  auto status = root.status();
+  REQUIRE(status == Certificate::Status::expired);
 }
 
 TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
@@ -469,4 +471,6 @@ TEST_CASE("Test Subject Parsing")
   CHECK_EQ(it->second, "custom:12345");
   it = parsed_subject.find(Certificate::NameType::serial_number);
   CHECK_EQ(it->second, "11-22-33");
+  auto status = leaf.status();
+  (void)status;
 }

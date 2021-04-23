@@ -234,6 +234,34 @@ struct Certificate::ParsedCertificate
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
+  Certificate::Status status() const
+  {
+    auto* notBefore = X509_get_notBefore(x509.get());
+    auto ret = X509_cmp_current_time(notBefore);
+    if (ret == 0) {
+      throw std::runtime_error("Certificate notBefore invalid");
+    }
+
+    // current time  < notBefore
+    if (ret == 1) {
+      return Certificate::Status::inactive;
+    }
+
+    // certificate is active, check for expirt
+    auto* notAfter = X509_get_notAfter(x509.get());
+    ret = X509_cmp_current_time(notAfter);
+    if (ret == 0) {
+      throw std::runtime_error("Certificate notAfter invalid");
+    }
+
+    // current time > notAfter
+    if (ret == -1) {
+      return Certificate::Status::expired;
+    }
+
+    return Certificate::Status::active;
+  }
+
   bytes raw() const
   {
     auto out = bytes(i2d_X509(x509.get(), nullptr));
@@ -365,6 +393,12 @@ bool
 Certificate::is_ca() const
 {
   return parsed_cert->is_ca;
+}
+
+Certificate::Status
+Certificate::status() const
+{
+  return parsed_cert->status();
 }
 
 std::optional<bytes>
