@@ -13,6 +13,27 @@ ensure_fips_if_required()
   }
 }
 
+static inline bool
+fips() {
+  return FIPS_mode() == 0;
+}
+
+static bool
+fips_disable(AEAD::ID id) {
+  static const auto approved = std::set<AEAD::ID>{
+    AEAD::ID::CHACHA20_POLY1305,
+  };
+  return approved.count(id) > 0;
+}
+
+static bool
+fips_disable(Signature::ID id) {
+  static const auto approved = std::set<Signature::ID>{
+    Signature::ID::Ed448,
+  };
+  return approved.count(id) > 0;
+}
+
 const Signature&
 select_signature(Signature::ID id)
 {

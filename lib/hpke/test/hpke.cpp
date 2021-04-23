@@ -6,6 +6,28 @@
 
 namespace hpke {
 
+static inline bool
+fips() {
+  return FIPS_mode() == 0;
+}
+
+static bool
+fips_disable(AEAD::ID id) {
+  static const auto approved = std::set<AEAD::ID>{
+    AEAD::ID::CHACHA20_POLY1305,
+  };
+  return approved.count(id) > 0;
+}
+
+static bool
+fips_disable(Signature::ID id) {
+  static const auto approved = std::set<Signature::ID>{
+    Signature::ID::Ed448,
+  };
+  return approved.count(id) > 0;
+}
+
+
 struct HPKETest
 {
   static bytes key(const Context& ctx) { return ctx.key; }
@@ -135,6 +157,10 @@ TEST_CASE("HPKE Test Vectors")
   ensure_fips_if_required();
 
   for (const auto& tv : test_vectors) {
+    if (fips() && fips_disable(tv.aead_id)) {
+      continue;
+    }
+
     switch (tv.mode) {
       case HPKE::Mode::base:
         test_base_vector(tv);
@@ -188,6 +214,10 @@ TEST_CASE("HPKE Round-Trip")
 
     for (const auto& kdf_id : kdfs) {
       for (const auto& aead_id : aeads) {
+        if (fips() && fips_disable(tv.aead_id)) {
+          continue;
+        }
+
         auto hpke = HPKE(kem_id, kdf_id, aead_id);
 
         auto [enc, ctxS] = hpke.setup_base_s(*pkR, info);
