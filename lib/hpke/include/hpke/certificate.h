@@ -29,6 +29,14 @@ public:
 
   using ParsedName = std::map<int, std::string>;
 
+  // Certificate Status
+  enum struct Status
+  {
+    expired,
+    inactive,
+    active
+  };
+
   explicit Certificate(const bytes& der);
   explicit Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in);
   Certificate() = delete;
@@ -45,6 +53,8 @@ public:
   ParsedName issuer() const;
   ParsedName subject() const;
   bool is_ca() const;
+  Status status() const;
+
   std::optional<bytes> subject_key_id() const;
   std::optional<bytes> authority_key_id() const;
   std::vector<std::string> email_addresses() const;
