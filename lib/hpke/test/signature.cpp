@@ -98,7 +98,7 @@ TEST_CASE("Signature Round-Trip")
   const auto data = from_hex("00010203");
 
   for (const auto& id : ids) {
-    if (fips() && fips_disable(tc.id)) {
+    if (fips() && fips_disable(id)) {
       continue;
     }
 

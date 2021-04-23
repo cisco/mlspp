@@ -6,28 +6,6 @@
 
 namespace hpke {
 
-static inline bool
-fips() {
-  return FIPS_mode() == 0;
-}
-
-static bool
-fips_disable(AEAD::ID id) {
-  static const auto approved = std::set<AEAD::ID>{
-    AEAD::ID::CHACHA20_POLY1305,
-  };
-  return approved.count(id) > 0;
-}
-
-static bool
-fips_disable(Signature::ID id) {
-  static const auto approved = std::set<Signature::ID>{
-    Signature::ID::Ed448,
-  };
-  return approved.count(id) > 0;
-}
-
-
 struct HPKETest
 {
   static bytes key(const Context& ctx) { return ctx.key; }
@@ -214,7 +192,7 @@ TEST_CASE("HPKE Round-Trip")
 
     for (const auto& kdf_id : kdfs) {
       for (const auto& aead_id : aeads) {
-        if (fips() && fips_disable(tv.aead_id)) {
+        if (fips() && fips_disable(aead_id)) {
           continue;
         }
 
