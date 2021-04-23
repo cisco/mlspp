@@ -17,25 +17,25 @@ ensure_fips_if_required()
 bool
 fips()
 {
-  return FIPS_mode() == 0;
+  return FIPS_mode() != 0;
 }
 
 bool
 fips_disable(AEAD::ID id)
 {
-  static const auto approved = std::set<AEAD::ID>{
+  static const auto disabled = std::set<AEAD::ID>{
     AEAD::ID::CHACHA20_POLY1305,
   };
-  return approved.count(id) > 0;
+  return disabled.count(id) > 0;
 }
 
 bool
 fips_disable(Signature::ID id)
 {
-  static const auto approved = std::set<Signature::ID>{
+  static const auto disabled = std::set<Signature::ID>{
     Signature::ID::Ed448,
   };
-  return approved.count(id) > 0;
+  return disabled.count(id) > 0;
 }
 
 const Signature&
