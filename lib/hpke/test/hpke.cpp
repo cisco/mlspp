@@ -4,9 +4,32 @@
 #include "common.h"
 #include "test_vectors.h"
 
+namespace hpke {
+
+struct HPKETest
+{
+  static bytes key(const Context& ctx) { return ctx.key; }
+  static bytes nonce(const Context& ctx) { return ctx.nonce; }
+  static bytes exporter_secret(const Context& ctx)
+  {
+    return ctx.exporter_secret;
+  }
+};
+
+} // namespace hpke
+
 static void
 test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 {
+  auto key = hpke::HPKETest::key(ctxR);
+  REQUIRE(key == tv.key);
+
+  auto nonce = hpke::HPKETest::nonce(ctxR);
+  REQUIRE(nonce == tv.nonce);
+
+  auto exporter_secret = hpke::HPKETest::exporter_secret(ctxR);
+  REQUIRE(exporter_secret == tv.exporter_secret);
+
   for (const auto& enc : tv.encryptions) {
     auto plaintext = ctxR.open(enc.aad, enc.ciphertext);
     REQUIRE(plaintext == enc.plaintext);
@@ -24,7 +47,10 @@ test_base_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -39,8 +65,9 @@ test_psk_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
   auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
 
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
@@ -56,12 +83,18 @@ test_auth_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem.derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.ikmS);
+  auto skSm = kem.serialize_private(*skS);
+  REQUIRE(skSm == tv.skSm);
+
   auto pkS = skS->public_key();
   auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -76,12 +109,18 @@ test_auth_psk_vector(const HPKETestVector& tv)
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
-  auto skS = kem.derive_key_pair(tv.seedS);
+  auto skS = kem.derive_key_pair(tv.ikmS);
+  auto skSm = kem.serialize_private(*skS);
+  REQUIRE(skSm == tv.skSm);
+
   auto pkS = skS->public_key();
   auto pkSm = kem.serialize(*pkS);
   REQUIRE(pkSm == tv.pkSm);
 
-  auto skR = kem.derive_key_pair(tv.seedR);
+  auto skR = kem.derive_key_pair(tv.ikmR);
+  auto skRm = kem.serialize_private(*skR);
+  REQUIRE(skRm == tv.skRm);
+
   auto pkR = skR->public_key();
   auto pkRm = kem.serialize(*pkR);
   REQUIRE(pkRm == tv.pkRm);
@@ -93,6 +132,8 @@ test_auth_psk_vector(const HPKETestVector& tv)
 
 TEST_CASE("HPKE Test Vectors")
 {
+  ensure_fips_if_required();
+
   for (const auto& tv : test_vectors) {
     switch (tv.mode) {
       case HPKE::Mode::base:
@@ -116,6 +157,8 @@ TEST_CASE("HPKE Test Vectors")
 
 TEST_CASE("HPKE Round-Trip")
 {
+  ensure_fips_if_required();
+
   const std::vector<KEM::ID> kems{ KEM::ID::DHKEM_P256_SHA256,
                                    KEM::ID::DHKEM_P384_SHA384,
                                    KEM::ID::DHKEM_P384_SHA384,
@@ -131,14 +174,14 @@ TEST_CASE("HPKE Round-Trip")
   const auto info = from_hex("00010203");
   const auto plaintext = from_hex("04050607");
   const auto aad = from_hex("08090a0b");
-  const auto seedS = from_hex("A0A0A0A0");
-  const auto seedR = from_hex("B0B0B0B0");
+  const auto ikmS = from_hex("A0A0A0A0");
+  const auto ikmR = from_hex("B0B0B0B0");
   const auto iterations = int(256);
 
   for (const auto& kem_id : kems) {
     const auto& kem = select_kem(kem_id);
-    auto skS = kem.derive_key_pair(seedS);
-    auto skR = kem.derive_key_pair(seedR);
+    auto skS = kem.derive_key_pair(ikmS);
+    auto skR = kem.derive_key_pair(ikmR);
 
     auto pkS = skS->public_key();
     auto pkR = skR->public_key();

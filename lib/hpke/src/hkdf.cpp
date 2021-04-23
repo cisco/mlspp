@@ -3,7 +3,6 @@
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
-#include <openssl/hmac.h>
 #include <stdexcept>
 
 namespace hpke {
@@ -57,7 +56,7 @@ HKDF::HKDF(const Digest& digest_in)
 bytes
 HKDF::extract(const bytes& salt, const bytes& ikm) const
 {
-  return digest.hmac(salt, ikm);
+  return digest.hmac_for_hkdf_extract(salt, ikm);
 }
 
 bytes

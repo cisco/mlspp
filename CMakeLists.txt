@@ -21,6 +21,10 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
 elseif(MSVC)
   add_compile_options(/W4 /WX)
+
+  # MSVC helpfully recommends safer equivalents for things like
+  # getenv, but they are not portable.
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)  
 endif()
 
 if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"))

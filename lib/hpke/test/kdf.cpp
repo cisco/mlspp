@@ -5,6 +5,8 @@
 
 TEST_CASE("KDF Known-Answer")
 {
+  ensure_fips_if_required();
+
   struct KnownAnswerTest
   {
     KDF::ID id;
@@ -33,9 +35,9 @@ TEST_CASE("KDF Known-Answer")
       from_hex("3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5b"
                "f34007208d5b887185865"),
       from_hex(
-        "b3ff2930e482ac10e3b256863288c2b0ebe3c5b999462b281e7119e1e05d8a55"),
-      from_hex("c38019a12154353cb7659d003c55853856a29953234508729909a4144c1f21f"
-               "000319302ab20b381e321"),
+        "0d49c73b424a1a811a561969011c17a8f8274da9d972296c19fd699e0479b539"),
+      from_hex("9c302814651c8bb4369af9ae64a7a27be968ceab9e8a9bb4d2cb20d77014ce7"
+               "8422a60cfb6258664cf76"),
     },
     {
       KDF::ID::HKDF_SHA384,
@@ -44,10 +46,10 @@ TEST_CASE("KDF Known-Answer")
                "ec70ee9a7e1f3e293ef68eceb072a5ade"),
       from_hex("9b5097a86038b805309076a44b3a9f38063e25b516dcbf369f394cfab43685f"
                "748b6457763e4f0204fc5"),
-      from_hex("aa52397877bbae9d7fa36dd7e4dfc387145954dfdffbfd5d81570a067095fa1"
-               "7bb1f90cf1805f4f132f2e2759a6d1bef"),
-      from_hex("61f6f019651351cb09135fe66b0b078f6c421fb1a138d4f050e70d1e013e4aa"
-               "c77d83cee050bc5597d54"),
+      from_hex("1e49e7289df25b71632d01652e326c37dc7a9b73b09bd0b7b94981d880bf957"
+               "0b92d7fbc74c6645f8975952e61e1f344"),
+      from_hex("1ff240b2aac3dd7017994f5da9419955c5493d1e6fce3eec73f915873cd2350"
+               "59173029998f3acf6785a"),
     },
     {
       KDF::ID::HKDF_SHA512,
@@ -58,10 +60,10 @@ TEST_CASE("KDF Known-Answer")
       from_hex("832390086cda71fb47625bb5ceb168e4c8e26a1a16ed34d9fc7fe92c1481579"
                "338da362cb8d9f925d7cb"),
       from_hex(
-        "06feddff04160100e3587a5b652af12d06f128b4cb9cb39a44526acf5c9bc9e8bf3b0c"
-        "ef579c969a2beb54b070797bb920d6b85561036397f6e163c9cd12b210"),
-      from_hex("0ec647b801d616313ccb45cda27d1f7e50eb2c9d03dffc4c3bb0a73a15030d9"
-               "8a7ba09de1973304c1742"),
+        "5019ddbb5155a0b5085393236760d2535d0761b668284f96062d779a80aefe391aee1a"
+        "f484ff60698706297abad419c1223bb0271d07f887868b6ffbc54afb27"),
+      from_hex("6ce7b9415c53ab65daab5bc463d83cea29a342fd3145fe40708e0144834a90a"
+               "01f24bc9b76a8fda3375e"),
     },
   };
 

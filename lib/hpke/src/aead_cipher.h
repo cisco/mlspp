@@ -4,6 +4,21 @@
 
 namespace hpke {
 
+struct ExportOnlyCipher : public AEAD
+{
+  ExportOnlyCipher();
+  ~ExportOnlyCipher() override = default;
+
+  bytes seal(const bytes& key,
+             const bytes& nonce,
+             const bytes& aad,
+             const bytes& pt) const override;
+  std::optional<bytes> open(const bytes& key,
+                            const bytes& nonce,
+                            const bytes& aad,
+                            const bytes& ct) const override;
+};
+
 struct AEADCipher : public AEAD
 {
   template<AEAD::ID id>

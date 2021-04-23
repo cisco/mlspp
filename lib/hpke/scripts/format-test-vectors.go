@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	header = `#include "test_vectors.h"
+	encryptionThreshold = 10
+	header              = `#include "test_vectors.h"
 
 std::vector<HPKETestVector> test_vectors{`
 	footer = `};`
@@ -23,9 +24,9 @@ type EncryptionTestVector struct {
 }
 
 type ExporterTestVector struct {
-	Context string `json:"exportContext"`
-	Length  int    `json:"exportLength"`
-	Value   string `json:"exportValue"`
+	Context string `json:"exporter_context"`
+	Length  int    `json:"L"`
+	Value   string `json:"exported_value"`
 }
 
 type HPKETestVector struct {
@@ -37,9 +38,12 @@ type HPKETestVector struct {
 	Info   string `json:"info"`
 
 	// Private keys
-	SeedR string `json:"seedR"`
-	SeedS string `json:"seedS"`
-	SeedE string `json:"seedE"`
+	IKMR  string `json:"ikmR"`
+	IKMS  string `json:"ikmS"`
+	IKME  string `json:"ikmE"`
+	SKR   string `json:"skRm"`
+	SKS   string `json:"skSm"`
+	SKE   string `json:"skEm"`
 	PSK   string `json:"psk"`
 	PSKID string `json:"psk_id"`
 
@@ -54,7 +58,7 @@ type HPKETestVector struct {
 	KeyScheduleContext string `json:"key_schedule_context"`
 	Secret             string `json:"secret"`
 	Key                string `json:"key"`
-	Nonce              string `json:"nonce"`
+	Nonce              string `json:"base_nonce"`
 	ExporterSecret     string `json:"exporter_secret"`
 
 	Encryptions []EncryptionTestVector `json:"encryptions"`
@@ -100,16 +104,20 @@ func writeTestVector(tv HPKETestVector, indent int) {
 	fmt.Printf("%s  AEAD::ID(%d),\n", pad, tv.AEADID)
 	writeHexLine(tv.Info, indent+2)
 
-	writeHexLine(tv.SeedR, indent+2)
-	writeHexLine(tv.SeedS, indent+2)
-	writeHexLine(tv.SeedE, indent+2)
+	writeHexLine(tv.IKMR, indent+2)
+	writeHexLine(tv.IKMS, indent+2)
+	writeHexLine(tv.IKME, indent+2)
+
+	writeHexLine(tv.SKR, indent+2)
+	writeHexLine(tv.SKS, indent+2)
+	writeHexLine(tv.SKE, indent+2)
+
+	writeHexLine(tv.PSK, indent+2)
+	writeHexLine(tv.PSKID, indent+2)
 
 	writeHexLine(tv.PKR, indent+2)
 	writeHexLine(tv.PKS, indent+2)
 	writeHexLine(tv.PKE, indent+2)
-
-	writeHexLine(tv.PSK, indent+2)
-	writeHexLine(tv.PSKID, indent+2)
 
 	writeHexLine(tv.Enc, indent+2)
 	writeHexLine(tv.SharedSecret, indent+2)
@@ -120,8 +128,12 @@ func writeTestVector(tv HPKETestVector, indent int) {
 	writeHexLine(tv.ExporterSecret, indent+2)
 
 	fmt.Printf("%s  {\n", pad)
-	for _, enc := range tv.Encryptions {
+	for i, enc := range tv.Encryptions {
 		writeEncryption(enc, indent+4)
+
+		if i > encryptionThreshold {
+			break
+		}
 	}
 	fmt.Printf("%s  },\n", pad)
 
