@@ -236,26 +236,14 @@ struct Certificate::ParsedCertificate
 
   Certificate::Status status() const
   {
-    auto* notBefore = X509_get_notBefore(x509.get());
-    auto ret = X509_cmp_current_time(notBefore);
-    if (ret == 0) {
-      throw std::runtime_error("Certificate notBefore invalid");
-    }
+    auto* not_before = X509_get_notBefore(x509.get());
+    auto* not_after = X509_get_notAfter(x509.get());
 
-    // current time  < notBefore
-    if (ret == 1) {
+    if (X509_cmp_current_time(not_before) > 0) {
       return Certificate::Status::inactive;
     }
 
-    // certificate is active, check for expirt
-    auto* notAfter = X509_get_notAfter(x509.get());
-    ret = X509_cmp_current_time(notAfter);
-    if (ret == 0) {
-      throw std::runtime_error("Certificate notAfter invalid");
-    }
-
-    // current time > notAfter
-    if (ret == -1) {
+    if (X509_cmp_current_time(not_after) < 0) {
       return Certificate::Status::expired;
     }
 
