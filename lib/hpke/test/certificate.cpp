@@ -473,7 +473,7 @@ TEST_CASE("Test Subject Parsing")
 
 TEST_CASE("Test Certificate notBefore status")
 {
-  // notBefore - 99 years from 04/22/2022
+  // notBefore - 99 years from 04/22/2021
   const auto root_der = from_hex(
     "3082016230820114a00302010202101dcfbd024e5f62ccfb04a1f32e7ce755300506032b65"
     "70302a311530130603550403130c637573746f6d3a31323334353111300f06035504051308"
@@ -492,7 +492,7 @@ TEST_CASE("Test Certificate notBefore status")
 
 TEST_CASE("Test Certificate notAfter status")
 {
-  // notAfter - 2 days older than 04/22/2022
+  // notAfter - 2 days older than 04/22/2021
   const auto root_der = from_hex(
     "3082016030820112a00302010202104746a8dc01b0c2a729cb307bd52cd94f300506032b65"
     "70302a311530130603550403130c637573746f6d3a31323334353111300f06035504051308"
@@ -511,8 +511,8 @@ TEST_CASE("Test Certificate notAfter status")
 
 TEST_CASE("Test Certificate active status")
 {
-  // notBefore - 2 days older than 04/22/2022
-  // notAfter - 99 years from 04/22/2022
+  // notBefore - 2 days older than 04/22/2021
+  // notAfter - 99 years from 04/22/2021
   const auto root_der = from_hex(
     "3082016230820114a0030201020210021dca182b9f52f6081841be66a84938300506032b65"
     "70302a311530130603550403130c637573746f6d3a31323334353111300f06035504051308"
