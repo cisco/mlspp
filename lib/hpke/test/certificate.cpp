@@ -73,8 +73,6 @@ TEST_CASE("Certificate Known-Answer depth 2")
   CHECK_FALSE(issuing.valid_from(leaf));
   CHECK_FALSE(root.valid_from(issuing));
   CHECK_FALSE(root.valid_from(leaf));
-  auto status = root.status();
-  REQUIRE(status == Certificate::Status::expired);
 }
 
 TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
@@ -489,8 +487,7 @@ TEST_CASE("Test Certificate notBefore status")
     "4d134de11eca367f9d967d6eae14192454770a2fc278963602");
 
   auto root = Certificate{ root_der };
-  auto status = root.status();
-  REQUIRE(status == Certificate::Status::inactive);
+  REQUIRE(root.expiration_status() == Certificate::ExpirationStatus::inactive);
 }
 
 TEST_CASE("Test Certificate notAfter status")
@@ -509,8 +506,7 @@ TEST_CASE("Test Certificate notAfter status")
     "e4e7d2b0606050b2e0edcfc8d6390b373e21f08116910b");
 
   auto root = Certificate{ root_der };
-  auto status = root.status();
-  REQUIRE(status == Certificate::Status::expired);
+  REQUIRE(root.expiration_status() == Certificate::ExpirationStatus::expired);
 }
 
 TEST_CASE("Test Certificate active status")
@@ -530,6 +526,5 @@ TEST_CASE("Test Certificate active status")
     "16a821444907e84cd4fb88167f1c3a4d4911f8260dafb21b05");
 
   auto root = Certificate{ root_der };
-  auto status = root.status();
-  REQUIRE(status == Certificate::Status::active);
+  REQUIRE(root.expiration_status() == Certificate::ExpirationStatus::active);
 }

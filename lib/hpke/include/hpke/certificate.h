@@ -29,12 +29,12 @@ public:
 
   using ParsedName = std::map<int, std::string>;
 
-  // Certificate Status
-  enum struct Status
+  // Certificate Expiration Status
+  enum struct ExpirationStatus
   {
-    expired,
-    inactive,
-    active
+    inactive, // now < notBefore
+    active,   // notBefore < now < notAfter
+    expired,  // notAfter < now
   };
 
   explicit Certificate(const bytes& der);
@@ -53,7 +53,7 @@ public:
   ParsedName issuer() const;
   ParsedName subject() const;
   bool is_ca() const;
-  Status status() const;
+  ExpirationStatus expiration_status() const;
 
   std::optional<bytes> subject_key_id() const;
   std::optional<bytes> authority_key_id() const;
