@@ -49,6 +49,25 @@ CipherSuite::CipherSuite(ID id_in)
   : id(id_in)
 {}
 
+SignatureScheme
+CipherSuite::signature_scheme() const
+{
+  switch (id) {
+    case ID::X25519_AES128GCM_SHA256_Ed25519:
+    case ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
+      return SignatureScheme::ed25519;
+    case ID::P256_AES128GCM_SHA256_P256:
+      return SignatureScheme::ecdsa_secp256r1_sha256;
+    case ID::X448_AES256GCM_SHA512_Ed448:
+    case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
+      return SignatureScheme::ed448;
+    case ID::P521_AES256GCM_SHA512_P521:
+      return SignatureScheme::ecdsa_secp521r1_sha512;
+    default:
+      throw InvalidParameterError("Unsupported algorithm");
+  }
+}
+
 const CipherSuite::Ciphers&
 CipherSuite::get() const
 {

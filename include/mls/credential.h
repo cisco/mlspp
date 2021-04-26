@@ -13,16 +13,18 @@ struct BasicCredential
 {
   BasicCredential() {}
 
-  BasicCredential(bytes identity_in, SignaturePublicKey public_key_in)
+  BasicCredential(bytes identity_in, CipherSuite suite_in, SignaturePublicKey public_key_in)
     : identity(std::move(identity_in))
+    , scheme(suite_in.signature_scheme())
     , public_key(std::move(public_key_in))
   {}
 
   bytes identity;
+  SignatureScheme scheme;
   SignaturePublicKey public_key;
 
-  TLS_SERIALIZABLE(identity, public_key)
-  TLS_TRAITS(tls::vector<2>, tls::pass)
+  TLS_SERIALIZABLE(identity, scheme, public_key)
+  TLS_TRAITS(tls::vector<2>, tls::pass, tls::pass)
 };
 
 struct X509Credential
@@ -59,15 +61,11 @@ operator>>(tls::istream& str, X509Credential& obj);
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
 
-// enum {
-//     basic(0),
-//     x509(1),
-//     (255)
-// } CredentialType;
-enum struct CredentialType : uint8_t
+enum struct CredentialType : uint16_t
 {
-  basic = 0,
-  x509 = 1,
+  reserved = 0,
+  basic = 1,
+  x509 = 2,
 };
 
 // struct {
@@ -94,6 +92,7 @@ public:
   }
 
   static Credential basic(const bytes& identity,
+                          CipherSuite suite,
                           const SignaturePublicKey& public_key);
 
   static Credential x509(const std::vector<bytes>& der_chain);

@@ -49,7 +49,7 @@ protected:
   {
     auto id_priv = new_identity_key();
     auto init_priv = new_init_key();
-    auto cred = Credential::basic(user_id, id_priv.public_key);
+    auto cred = Credential::basic(user_id, suite, id_priv.public_key);
     auto client = Client(suite, id_priv, cred, std::nullopt);
 
     // Initial add is different
@@ -292,7 +292,7 @@ TEST_CASE("Session with X509 Credential")
   std::string bob_name = "bob";
   auto bob_id = bytes(bob_name.begin(), bob_name.end());
   auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
-  auto bob_cred = mls::Credential::basic(bob_id, bob_sig_priv.public_key);
+  auto bob_cred = mls::Credential::basic(bob_id, suite, bob_sig_priv.public_key);
   mls::KeyPackageOpts bob_opts_in;
   bob_opts_in.extensions.add(mls::KeyIDExtension{ bob_id });
 

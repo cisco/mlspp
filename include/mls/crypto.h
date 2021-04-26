@@ -50,6 +50,7 @@ struct CipherSuite
   CipherSuite(ID id_in);
 
   ID cipher_suite() const { return id; }
+  SignatureScheme signature_scheme() const;
 
   size_t secret_size() const { return get().digest.hash_size; }
   size_t key_size() const { return get().hpke.aead.key_size; }

@@ -13,7 +13,7 @@ public:
     for (size_t i = 0; i < group_size; i += 1) {
       auto init_secret = random_bytes(32);
       auto identity_priv = SignaturePrivateKey::generate(suite);
-      auto credential = Credential::basic(user_id, identity_priv.public_key);
+      auto credential = Credential::basic(user_id, suite, identity_priv.public_key);
       auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
       auto key_package = KeyPackage{
         suite, init_priv.public_key, credential, identity_priv, std::nullopt

@@ -485,10 +485,11 @@ TranscriptTestVector::verify() const
 static std::tuple<bytes, SignaturePrivateKey, KeyPackage>
 new_key_package(CipherSuite suite)
 {
+  auto scheme = suite;
   auto init_secret = random_bytes(suite.secret_size());
   auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
+  auto cred = Credential::basic({ 0, 1, 2, 3 }, scheme, sig_priv.public_key);
   auto kp =
     KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
   return { init_secret, sig_priv, kp };
@@ -660,7 +661,7 @@ MessagesTestVector::create()
   auto sig_priv = SignaturePrivateKey::generate(suite);
 
   // KeyPackage and extensions
-  auto cred = Credential::basic(user_id, sig_priv.public_key);
+  auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
   auto key_package =
     KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
 

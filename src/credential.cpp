@@ -136,10 +136,10 @@ Credential::valid_for(const SignaturePrivateKey& priv) const
 }
 
 Credential
-Credential::basic(const bytes& identity, const SignaturePublicKey& public_key)
+Credential::basic(const bytes& identity, CipherSuite suite, const SignaturePublicKey& public_key)
 {
   Credential cred;
-  cred._cred = BasicCredential{ identity, public_key };
+  cred._cred = BasicCredential{ identity, suite, public_key };
   return cred;
 }
 
