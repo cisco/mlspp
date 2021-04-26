@@ -17,7 +17,6 @@ import (
 )
 
 var (
-
     notBefore = time.Now().Add(-2 * 24 * time.Hour)
     notAfter  = time.Now().Add(99 * 365 * 24 * time.Hour)
 

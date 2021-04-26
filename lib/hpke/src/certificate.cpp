@@ -234,20 +234,20 @@ struct Certificate::ParsedCertificate
     return make_typed_unique<EVP_PKEY>(X509_get_pubkey(x509.get()));
   }
 
-  Certificate::Status status() const
+  Certificate::ExpirationStatus expiration_status() const
   {
     auto* not_before = X509_get_notBefore(x509.get());
     auto* not_after = X509_get_notAfter(x509.get());
 
     if (X509_cmp_current_time(not_before) > 0) {
-      return Certificate::Status::inactive;
+      return Certificate::ExpirationStatus::inactive;
     }
 
     if (X509_cmp_current_time(not_after) < 0) {
-      return Certificate::Status::expired;
+      return Certificate::ExpirationStatus::expired;
     }
 
-    return Certificate::Status::active;
+    return Certificate::ExpirationStatus::active;
   }
 
   bytes raw() const
@@ -383,10 +383,10 @@ Certificate::is_ca() const
   return parsed_cert->is_ca;
 }
 
-Certificate::Status
-Certificate::status() const
+Certificate::ExpirationStatus
+Certificate::expiration_status() const
 {
-  return parsed_cert->status();
+  return parsed_cert->expiration_status();
 }
 
 std::optional<bytes>
