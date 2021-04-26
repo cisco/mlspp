@@ -482,15 +482,16 @@ TranscriptTestVector::verify() const
 /// TreeKEMTestVector
 ///
 
-static std::tuple<SignaturePrivateKey, KeyPackage>
+static std::tuple<bytes, SignaturePrivateKey, KeyPackage>
 new_key_package(CipherSuite suite)
 {
-  auto init_priv = HPKEPrivateKey::generate(suite);
+  auto init_secret = random_bytes(suite.secret_size());
+  auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
   auto kp =
     KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
-  return { sig_priv, kp };
+  return { init_secret, sig_priv, kp };
 }
 
 TreeKEMTestVector
@@ -514,7 +515,8 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   auto sig_privs = std::vector<SignaturePrivateKey>{};
   auto pub = TreeKEMPublicKey{ suite };
   for (size_t i = 0; i < n_leaves; i++) {
-    auto [sig_priv, key_package] = new_key_package(suite);
+    auto [init_secret, sig_priv, key_package] = new_key_package(suite);
+    silence_unused(init_secret);
     sig_privs.push_back(sig_priv);
 
     auto leaf_secret = random_bytes(suite.secret_size());
@@ -531,7 +533,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   // Add the test participant
   auto add_secret = random_bytes(suite.secret_size());
-  auto [test_sig_priv, test_kp] = new_key_package(suite);
+  auto [test_init_secret, test_sig_priv, test_kp] = new_key_package(suite);
   auto test_index = pub.add_leaf(test_kp);
   auto [add_priv, add_path] = pub.encap(tv.add_sender,
                                         {},
@@ -549,6 +551,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   tv.ratchet_tree_before = pub;
   tv.tree_hash_before = pub.root_hash();
+  tv.my_leaf_secret = test_init_secret;
   tv.my_key_package = test_kp;
   tv.my_path_secret = path_secret;
   tv.root_secret_after_add = add_priv.update_secret;
@@ -609,11 +612,11 @@ TreeKEMTestVector::verify() const
   auto ancestor = tree_math::ancestor(my_index, add_sender);
 
   // Establish a TreeKEMPrivate Key
-  auto dummy_leaf_priv = HPKEPrivateKey::generate(cipher_suite);
+  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, my_leaf_secret);
   auto priv = TreeKEMPrivateKey::joiner(cipher_suite,
                                         ratchet_tree_before.size(),
                                         my_index,
-                                        dummy_leaf_priv,
+                                        leaf_priv,
                                         ancestor,
                                         my_path_secret);
   VERIFY_EQUAL(
