@@ -10,8 +10,6 @@
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
 
-#include <iostream>
-
 namespace hpke {
 ///
 /// Utility functions
@@ -40,6 +38,26 @@ asn1_string_to_std_string(const ASN1_STRING* asn1_string)
     throw std::runtime_error("Malformed ASN.1 string");
   }
   return str;
+}
+
+static std::chrono::system_clock::time_point
+asn1_time_to_chrono(const ASN1_TIME* asn1_time)
+{
+  auto epoch_chrono = std::chrono::system_clock::time_point();
+  auto epoch_time_t = std::chrono::system_clock::to_time_t(epoch_chrono);
+  auto epoch_asn1 = make_typed_unique(ASN1_TIME_set(nullptr, epoch_time_t));
+  if (!epoch_asn1) {
+    throw openssl_error();
+  }
+
+  auto secs = int(0);
+  auto days = int(0);
+  if (ASN1_TIME_diff(&days, &secs, epoch_asn1.get(), asn1_time) != 1) {
+    throw openssl_error();
+  }
+
+  auto delta = std::chrono::seconds(secs) + std::chrono::hours(24 * days);
+  return std::chrono::system_clock::time_point(delta);
 }
 
 ///
@@ -180,6 +198,8 @@ struct Certificate::ParsedCertificate
     , sub_alt_names(parse_san(x509.get()))
     , is_ca(X509_check_ca(x509.get()) != 0)
     , hash(compute_digest(x509.get()))
+    , not_before(asn1_time_to_chrono(X509_get_notBefore(x509.get())))
+    , not_after(asn1_time_to_chrono(X509_get_notAfter(x509.get())))
   {}
 
   ParsedCertificate(const ParsedCertificate& other)
@@ -194,6 +214,8 @@ struct Certificate::ParsedCertificate
     , sub_alt_names(other.sub_alt_names)
     , is_ca(other.is_ca)
     , hash(other.hash)
+    , not_before(other.not_before)
+    , not_after(other.not_after)
   {
     if (1 != X509_up_ref(other.x509.get())) {
       throw openssl_error();
@@ -269,6 +291,8 @@ struct Certificate::ParsedCertificate
   const std::vector<GeneralName> sub_alt_names;
   const bool is_ca;
   const bytes hash;
+  const std::chrono::system_clock::time_point not_before;
+  const std::chrono::system_clock::time_point not_after;
 };
 
 ///
@@ -430,6 +454,18 @@ bytes
 Certificate::hash() const
 {
   return parsed_cert->hash;
+}
+
+std::chrono::system_clock::time_point
+Certificate::not_before() const
+{
+  return parsed_cert->not_before;
+}
+
+std::chrono::system_clock::time_point
+Certificate::not_after() const
+{
+  return parsed_cert->not_after;
 }
 
 bool

@@ -527,4 +527,6 @@ TEST_CASE("Test Certificate active status")
 
   auto root = Certificate{ root_der };
   REQUIRE(root.expiration_status() == Certificate::ExpirationStatus::active);
+  CHECK_NOTHROW(root.not_before());
+  CHECK_NOTHROW(root.not_after());
 }
