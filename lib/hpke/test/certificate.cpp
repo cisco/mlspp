@@ -529,4 +529,6 @@ TEST_CASE("Test Certificate active status")
   REQUIRE(root.expiration_status() == Certificate::ExpirationStatus::active);
   CHECK_NOTHROW(root.not_before());
   CHECK_NOTHROW(root.not_after());
+  REQUIRE(root.signature_algo() == "ed25519");
+  REQUIRE(root.public_key_algo() == "ed25519");
 }

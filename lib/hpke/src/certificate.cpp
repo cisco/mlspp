@@ -188,7 +188,8 @@ struct Certificate::ParsedCertificate
 
   explicit ParsedCertificate(X509* x509_in)
     : x509(x509_in, typed_delete<X509>)
-    , pub_key_id(signature_algorithm(x509.get()))
+    , pub_key_id(public_key_algorithm(x509.get()))
+    , sig_algo(signature_algorithm(x509.get()))
     , issuer_hash(X509_issuer_name_hash(x509.get()))
     , subject_hash(X509_subject_name_hash(x509.get()))
     , issuer(parse_names(X509_get_issuer_name(x509.get())))
@@ -204,7 +205,8 @@ struct Certificate::ParsedCertificate
 
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
-    , pub_key_id(signature_algorithm(other.x509.get()))
+    , pub_key_id(public_key_algorithm(other.x509.get()))
+    , sig_algo(signature_algorithm(other.x509.get()))
     , issuer_hash(other.issuer_hash)
     , subject_hash(other.subject_hash)
     , issuer(other.issuer)
@@ -223,7 +225,7 @@ struct Certificate::ParsedCertificate
     x509.reset(other.x509.get());
   }
 
-  static Signature::ID signature_algorithm(X509* x509)
+  static Signature::ID public_key_algorithm(X509* x509)
   {
     switch (EVP_PKEY_base_id(X509_get0_pubkey(x509))) {
       case EVP_PKEY_ED25519:
@@ -248,6 +250,28 @@ struct Certificate::ParsedCertificate
       default:
         break;
     }
+    throw std::runtime_error("Unsupported public key algorithm");
+  }
+
+  static Signature::ID signature_algorithm(X509* cert)
+  {
+    switch (X509_get_signature_nid(cert)) {
+      case EVP_PKEY_ED25519:
+        return Signature::ID::Ed25519;
+      case EVP_PKEY_ED448:
+        return Signature::ID::Ed448;
+      case NID_ecdsa_with_SHA256:
+        return Signature::ID::P256_SHA256;
+      case NID_ecdsa_with_SHA384:
+        return Signature::ID::P384_SHA384;
+      case NID_ecdsa_with_SHA512:
+        return Signature::ID::P521_SHA512;
+      case NID_sha256WithRSAEncryption:
+        return Signature::ID::RSA_SHA256;
+      default:
+        break;
+    }
+
     throw std::runtime_error("Unsupported signature algorithm");
   }
 
@@ -282,6 +306,7 @@ struct Certificate::ParsedCertificate
 
   typed_unique_ptr<X509> x509;
   const Signature::ID pub_key_id;
+  const Signature::ID sig_algo;
   const uint64_t issuer_hash;
   const uint64_t subject_hash;
   const ParsedName issuer;
@@ -466,6 +491,28 @@ std::chrono::system_clock::time_point
 Certificate::not_after() const
 {
   return parsed_cert->not_after;
+}
+
+static std::map<Signature::ID, std::string> algo_str = {
+
+  { Signature::ID::Ed25519, "ed25519" },
+  { Signature::ID::Ed448, "ed448" },
+  { Signature::ID::RSA_SHA256, "rsa_sh256" },
+  { Signature::ID::P256_SHA256, SN_ecdsa_with_SHA256 },
+  { Signature::ID::P384_SHA384, SN_ecdsa_with_SHA384 },
+  { Signature::ID::P521_SHA512, SN_ecdsa_with_SHA512 },
+};
+
+std::string
+Certificate::public_key_algo() const
+{
+  return algo_str.at(public_key_algorithm);
+}
+
+std::string
+Certificate::signature_algo() const
+{
+  return algo_str.at(parsed_cert->sig_algo);
 }
 
 bool
