@@ -255,7 +255,8 @@ struct Certificate::ParsedCertificate
 
   static Signature::ID signature_algorithm(X509* cert)
   {
-    switch (X509_get_signature_nid(cert)) {
+    auto nid = X509_get_signature_nid(cert);
+    switch (nid) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
       case EVP_PKEY_ED448:
@@ -267,6 +268,7 @@ struct Certificate::ParsedCertificate
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
       case NID_sha256WithRSAEncryption:
+      case NID_sha1WithRSAEncryption:
         return Signature::ID::RSA_SHA256;
       default:
         break;
