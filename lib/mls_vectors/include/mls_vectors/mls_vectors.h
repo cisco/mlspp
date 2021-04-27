@@ -148,6 +148,7 @@ struct TreeKEMTestVector
 
   mls::LeafIndex update_sender;
   mls::UpdatePath update_path;
+  bytes update_group_context;
 
   bytes tree_hash_before;
   bytes root_secret_after_add;

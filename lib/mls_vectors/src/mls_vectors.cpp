@@ -87,7 +87,14 @@ template<typename T>
 static std::optional<std::string>
 verify_round_trip(const std::string& label, const bytes& expected)
 {
-  auto obj = tls::get<T>(expected);
+  auto obj = T{};
+  try {
+    obj = tls::get<T>(expected);
+  } catch (const std::exception& e) {
+    auto ss = std::stringstream();
+    ss << "Decode error: " << label << " " << e.what();
+    return ss.str();
+  }
   auto actual = tls::marshal(obj);
   VERIFY_EQUAL(label, actual, expected);
   return std::nullopt;
@@ -559,8 +566,9 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   // Do a second update that the test participant should be able to process
   auto update_secret = random_bytes(suite.secret_size());
+  auto update_context = random_bytes(suite.secret_size());
   auto [update_priv, update_path] = pub.encap(tv.update_sender,
-                                              {},
+                                              update_context,
                                               update_secret,
                                               sig_privs[tv.update_sender.val],
                                               {},
@@ -569,6 +577,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   pub.set_hash_all();
 
   tv.update_path = update_path;
+  tv.update_group_context = update_context;
   tv.root_secret_after_update = update_priv.update_secret;
   tv.ratchet_tree_after = pub;
   tv.tree_hash_after = { pub.root_hash() };
@@ -624,7 +633,7 @@ TreeKEMTestVector::verify() const
     "root secret after add", priv.update_secret, root_secret_after_add);
 
   // Process the UpdatePath
-  priv.decap(update_sender, ratchet_tree_before, {}, update_path, {});
+  priv.decap(update_sender, ratchet_tree_before, update_group_context, update_path, {});
 
   auto my_tree_after = ratchet_tree_before;
   my_tree_after.merge(update_sender, update_path);
