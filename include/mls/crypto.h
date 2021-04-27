@@ -96,7 +96,7 @@ struct HPKECiphertext
   bytes ciphertext;
 
   TLS_SERIALIZABLE(kem_output, ciphertext)
-  TLS_TRAITS(tls::vector<2>, tls::vector<4>)
+  TLS_TRAITS(tls::vector<2>, tls::vector<2>)
 };
 
 struct HPKEPublicKey
