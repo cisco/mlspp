@@ -210,7 +210,7 @@ struct RatchetNode
   std::vector<HPKECiphertext> node_secrets;
 
   TLS_SERIALIZABLE(public_key, node_secrets)
-  TLS_TRAITS(tls::pass, tls::vector<2>)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 // struct {
@@ -222,7 +222,7 @@ struct UpdatePath
   std::vector<RatchetNode> nodes;
 
   TLS_SERIALIZABLE(leaf_key_package, nodes)
-  TLS_TRAITS(tls::pass, tls::vector<2>)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 } // namespace mls
