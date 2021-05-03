@@ -284,14 +284,14 @@ struct Certificate::ParsedCertificate
 
   Certificate::ExpirationStatus expiration_status() const
   {
-    auto* not_before = X509_get_notBefore(x509.get());
-    auto* not_after = X509_get_notAfter(x509.get());
+    auto* nb = X509_get_notBefore(x509.get());
+    auto* na = X509_get_notAfter(x509.get());
 
-    if (X509_cmp_current_time(not_before) > 0) {
+    if (X509_cmp_current_time(nb) > 0) {
       return Certificate::ExpirationStatus::inactive;
     }
 
-    if (X509_cmp_current_time(not_after) < 0) {
+    if (X509_cmp_current_time(na) < 0) {
       return Certificate::ExpirationStatus::expired;
     }
 
