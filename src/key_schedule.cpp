@@ -569,7 +569,8 @@ KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
   if (ciphertext.size() < sample_size) {
     sample = ciphertext;
   } else {
-    // NOLINTNEXTLINE (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE
+    // (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
     sample = bytes(ciphertext.begin(), ciphertext.begin() + sample_size);
   }
 
