@@ -214,7 +214,8 @@ AEADCipher::open(const bytes& key,
   }
 
   auto inner_ct_size = ct.size() - tag_size;
-  auto tag = bytes(ct.begin() + static_cast<size_t>(inner_ct_size), ct.end());
+  // NOLINTNEXTLINE (cppcoreguidelines-narrowing-conversion)
+  auto tag = bytes(ct.begin() + inner_ct_size, ct.end());
   if (1 != EVP_CIPHER_CTX_ctrl(ctx.get(),
                                EVP_CTRL_GCM_SET_TAG,
                                static_cast<int>(tag_size),
