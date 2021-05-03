@@ -83,9 +83,8 @@ operator<<(std::ostream& out, const bytes& data)
     return out << to_hex(data);
   }
 
-  bytes abbrev(data.begin(),
-               data.begin() +
-                 threshold); // NOLINT(cppcoreguidelines-narrowing-conversion)
+  // NOLINTNEXTLINE (cppcoreguidelines-narrowing-conversion)
+  bytes abbrev(data.begin(), data.begin() + threshold);
   return out << to_hex(abbrev) << "...";
 }
 
