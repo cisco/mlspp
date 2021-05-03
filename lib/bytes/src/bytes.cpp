@@ -83,7 +83,7 @@ operator<<(std::ostream& out, const bytes& data)
     return out << to_hex(data);
   }
 
-  bytes abbrev(data.begin(), data.begin() + static_cast<long>(threshold));
+  bytes abbrev(data.begin(), data.begin() + static_cast<size_t>(threshold));
   return out << to_hex(abbrev) << "...";
 }
 

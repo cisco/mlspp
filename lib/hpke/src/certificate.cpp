@@ -284,14 +284,13 @@ struct Certificate::ParsedCertificate
 
   Certificate::ExpirationStatus expiration_status() const
   {
-    auto* nb = X509_get_notBefore(x509.get());
-    auto* na = X509_get_notAfter(x509.get());
+    auto now = std::chrono::system_clock::now();
 
-    if (X509_cmp_current_time(nb) > 0) {
+    if (now < not_before) {
       return Certificate::ExpirationStatus::inactive;
     }
 
-    if (X509_cmp_current_time(na) < 0) {
+    if (now > not_after) {
       return Certificate::ExpirationStatus::expired;
     }
 
@@ -505,16 +504,16 @@ static std::map<Signature::ID, std::string> algo_str = {
   { Signature::ID::P521_SHA512, SN_ecdsa_with_SHA512 },
 };
 
-std::string
+Signature::ID
 Certificate::public_key_algo() const
 {
-  return algo_str.at(public_key_algorithm);
+  return public_key_algorithm;
 }
 
-std::string
+Signature::ID
 Certificate::signature_algo() const
 {
-  return algo_str.at(parsed_cert->sig_algo);
+  return parsed_cert->sig_algo;
 }
 
 bool
