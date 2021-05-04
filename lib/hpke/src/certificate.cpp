@@ -268,6 +268,7 @@ struct Certificate::ParsedCertificate
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
       case NID_sha256WithRSAEncryption:
+      case NID_sha1WithRSAEncryption:
         return Signature::ID::RSA_SHA256;
       default:
         break;
