@@ -268,7 +268,6 @@ struct Certificate::ParsedCertificate
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
       case NID_sha256WithRSAEncryption:
-      case NID_sha1WithRSAEncryption:
         return Signature::ID::RSA_SHA256;
       default:
         break;
@@ -344,21 +343,18 @@ signature_key(EVP_PKEY* pkey)
 
 Certificate::Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in)
   : parsed_cert(std::move(parsed_cert_in))
-  , public_key_algorithm(parsed_cert->pub_key_id)
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(parsed_cert->raw())
 {}
 
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
-  , public_key_algorithm(parsed_cert->pub_key_id)
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(der)
 {}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
-  , public_key_algorithm(parsed_cert->pub_key_id)
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(other.raw)
 {}
@@ -494,24 +490,14 @@ Certificate::not_after() const
   return parsed_cert->not_after;
 }
 
-static std::map<Signature::ID, std::string> algo_str = {
-
-  { Signature::ID::Ed25519, "ed25519" },
-  { Signature::ID::Ed448, "ed448" },
-  { Signature::ID::RSA_SHA256, "rsa_sh256" },
-  { Signature::ID::P256_SHA256, SN_ecdsa_with_SHA256 },
-  { Signature::ID::P384_SHA384, SN_ecdsa_with_SHA384 },
-  { Signature::ID::P521_SHA512, SN_ecdsa_with_SHA512 },
-};
-
 Signature::ID
-Certificate::public_key_algo() const
+Certificate::public_key_algorithm() const
 {
-  return public_key_algorithm;
+  return parsed_cert->pub_key_id;
 }
 
 Signature::ID
-Certificate::signature_algo() const
+Certificate::signature_algorithm() const
 {
   return parsed_cert->sig_algo;
 }

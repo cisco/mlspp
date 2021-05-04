@@ -62,10 +62,9 @@ public:
   bytes hash() const;
   std::chrono::system_clock::time_point not_before() const;
   std::chrono::system_clock::time_point not_after() const;
-  Signature::ID public_key_algo() const;
-  Signature::ID signature_algo() const;
+  Signature::ID public_key_algorithm() const;
+  Signature::ID signature_algorithm() const;
 
-  const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;
   const bytes raw;
 };
