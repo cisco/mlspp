@@ -17,6 +17,8 @@ Checks:            '*,
                     -modernize-use-nodiscard,
                     -modernize-use-trailing-return-type,
                     -readability-magic-numbers,
+                    -altera-struct-pack-align,
+                    -readability-function-cognitive-complexity,
                     '
 WarningsAsErrors:  '*'
 HeaderFilterRegex: '*'

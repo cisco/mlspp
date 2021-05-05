@@ -3,6 +3,7 @@
 #include <optional>
 
 #include <bytes/bytes.h>
+#include <chrono>
 #include <hpke/signature.h>
 #include <map>
 
@@ -54,14 +55,16 @@ public:
   ParsedName subject() const;
   bool is_ca() const;
   ExpirationStatus expiration_status() const;
-
   std::optional<bytes> subject_key_id() const;
   std::optional<bytes> authority_key_id() const;
   std::vector<std::string> email_addresses() const;
   std::vector<std::string> dns_names() const;
   bytes hash() const;
+  std::chrono::system_clock::time_point not_before() const;
+  std::chrono::system_clock::time_point not_after() const;
+  Signature::ID public_key_algorithm() const;
+  Signature::ID signature_algorithm() const;
 
-  const Signature::ID public_key_algorithm;
   const std::unique_ptr<Signature::PublicKey> public_key;
   const bytes raw;
 };
