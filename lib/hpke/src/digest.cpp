@@ -101,7 +101,7 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   // https://doi.org/10.6028/NIST.SP.800-131Ar2
   static const auto fips_min_hmac_key_len = 14;
   auto key_size = static_cast<int>(key.size());
-  if (key_size < fips_min_hmac_key_len) {
+  if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
     HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
   }
 

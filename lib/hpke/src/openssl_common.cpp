@@ -85,6 +85,13 @@ typed_delete(BIO* ptr)
   BIO_vfree(ptr);
 }
 
+template<>
+void
+typed_delete(ASN1_TIME* ptr)
+{
+  ASN1_TIME_free(ptr);
+}
+
 ///
 /// Map OpenSSL errors to C++ exceptions
 ///

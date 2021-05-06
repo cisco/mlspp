@@ -1,4 +1,5 @@
 #include "common.h"
+#include <set>
 #include <stdexcept>
 
 #include <doctest/doctest.h>
@@ -7,10 +8,35 @@
 void
 ensure_fips_if_required()
 {
+  // NOLINTNEXTLINE (concurrency-mt-unsafe)
   const auto* require = std::getenv("REQUIRE_FIPS");
   if (require != nullptr && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
+}
+
+bool
+fips()
+{
+  return FIPS_mode() != 0;
+}
+
+bool
+fips_disable(AEAD::ID id)
+{
+  static const auto disabled = std::set<AEAD::ID>{
+    AEAD::ID::CHACHA20_POLY1305,
+  };
+  return disabled.count(id) > 0;
+}
+
+bool
+fips_disable(Signature::ID id)
+{
+  static const auto disabled = std::set<Signature::ID>{
+    Signature::ID::Ed448,
+  };
+  return disabled.count(id) > 0;
 }
 
 const Signature&

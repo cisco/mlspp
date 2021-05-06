@@ -135,6 +135,10 @@ TEST_CASE("HPKE Test Vectors")
   ensure_fips_if_required();
 
   for (const auto& tv : test_vectors) {
+    if (fips() && fips_disable(tv.aead_id)) {
+      continue;
+    }
+
     switch (tv.mode) {
       case HPKE::Mode::base:
         test_base_vector(tv);
@@ -188,6 +192,10 @@ TEST_CASE("HPKE Round-Trip")
 
     for (const auto& kdf_id : kdfs) {
       for (const auto& aead_id : aeads) {
+        if (fips() && fips_disable(aead_id)) {
+          continue;
+        }
+
         auto hpke = HPKE(kem_id, kdf_id, aead_id);
 
         auto [enc, ctxS] = hpke.setup_base_s(*pkR, info);

@@ -17,16 +17,23 @@ import (
 )
 
 var (
+    notBefore = time.Now().Add(-2 * 24 * time.Hour)
+    notAfter  = time.Now().Add(99 * 365 * 24 * time.Hour)
+
 	caTemplate = &x509.Certificate{
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		NotBefore: notBefore,
+        NotAfter: notAfter,
 	}
 
 	leafTemplate = &x509.Certificate{
 		BasicConstraintsValid: true,
 		IsCA:                  false,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		NotBefore: notBefore,
+		NotAfter: notAfter,
 	}
 
     sigAlgo = flag.String("sig-alg", "", "rsa, ecdsa-p256, ed25519")
@@ -125,13 +132,7 @@ func privateKeyToBytes(algo string, priv interface{}) []byte {
 }
 
 func makeCert(template, parent *x509.Certificate, parentPriv interface{}, addSKI bool, depth int) (interface{}, *x509.Certificate, []byte) {
-	backdate := time.Hour
-	lifetime := 24 * time.Hour
 	skiSize := 4 // bytes
-
-	// Set expiry
-	template.NotBefore = time.Now().Add(-backdate)
-	template.NotAfter = template.NotBefore.Add(lifetime)
 
 	// Set serial number
 	serialNumberLimit := big.NewInt(0).Lsh(big.NewInt(1), 128)

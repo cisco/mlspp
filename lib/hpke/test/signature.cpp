@@ -65,6 +65,10 @@ TEST_CASE("Signature Known-Answer")
   };
 
   for (const auto& tc : cases) {
+    if (fips() && fips_disable(tc.id)) {
+      continue;
+    }
+
     const auto& sig = select_signature(tc.id);
 
     auto priv = sig.deserialize_private(tc.priv_serialized);
@@ -94,6 +98,10 @@ TEST_CASE("Signature Round-Trip")
   const auto data = from_hex("00010203");
 
   for (const auto& id : ids) {
+    if (fips() && fips_disable(id)) {
+      continue;
+    }
+
     const auto& sig = select_signature(id);
 
     auto priv = std::unique_ptr<Signature::PrivateKey>(nullptr);
