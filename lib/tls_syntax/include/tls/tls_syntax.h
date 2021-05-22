@@ -7,10 +7,15 @@
 #include <optional>
 #include <stdexcept>
 #include <vector>
+#include <string_view>
 
 #include <tls/compat.h>
 
 namespace tls {
+
+// Abbreviations for owned and unowned buffers
+using owned_bytes = std::vector<uint8_t>;
+using input_bytes = std::basic_string_view<const uint8_t>;
 
 // For indicating no min or max in vector definitions
 const size_t none = std::numeric_limits<size_t>::max();
@@ -38,14 +43,14 @@ class ostream
 public:
   static const size_t none = std::numeric_limits<size_t>::max();
 
-  void write_raw(const std::vector<uint8_t>& bytes);
+  void write_raw(const owned_bytes& content);
 
-  std::vector<uint8_t> bytes() const { return _buffer; }
+  owned_bytes bytes() const { return _buffer; }
   size_t size() const { return _buffer.size(); }
   bool empty() const { return _buffer.empty(); }
 
 private:
-  std::vector<uint8_t> _buffer;
+  owned_bytes _buffer;
   ostream& write_uint(uint64_t value, int length);
 
   friend ostream& operator<<(ostream& out, bool data);
@@ -102,19 +107,16 @@ operator<<(tls::ostream& str, const T& val)
 class istream
 {
 public:
-  istream(const std::vector<uint8_t>& data)
-    : _buffer(data)
-  {
-    // So that we can use the constant-time pop_back
-    std::reverse(_buffer.begin(), _buffer.end());
-  }
+  istream(const owned_bytes& data)
+    : _buffer(data.data(), data.size())
+  {}
 
   size_t size() const { return _buffer.size(); }
   bool empty() const { return _buffer.empty(); }
 
 private:
   istream() {}
-  std::vector<uint8_t> _buffer;
+  input_bytes _buffer;
   uint8_t next();
 
   template<typename T>
@@ -192,7 +194,7 @@ operator>>(tls::istream& str, T& val)
 
 // Abbreviations
 template<typename T>
-std::vector<uint8_t>
+owned_bytes
 marshal(const T& value)
 {
   ostream w;
@@ -202,7 +204,7 @@ marshal(const T& value)
 
 template<typename T>
 void
-unmarshal(const std::vector<uint8_t>& data, T& value)
+unmarshal(const owned_bytes& data, T& value)
 {
   istream r(data);
   r >> value;
@@ -210,7 +212,7 @@ unmarshal(const std::vector<uint8_t>& data, T& value)
 
 template<typename T, typename... Tp>
 T
-get(const std::vector<uint8_t>& data, Tp... args)
+get(const owned_bytes& data, Tp... args)
 {
   T value(args...);
   tls::unmarshal(data, value);
@@ -375,18 +377,16 @@ struct vector
 
     // Truncate the buffer to the declared length and wrap it in a
     // new reader, then read items from it
-    // NB: Remember that we store the vector in reverse order
     // NB: This requires that T be default-constructible
-    std::vector<uint8_t> trunc(str._buffer.end() - size, str._buffer.end());
     istream r;
-    r._buffer = trunc;
+    r._buffer = input_bytes(str._buffer.data(), size);
     while (r._buffer.size() > 0) {
       data.emplace_back();
       r >> data.back();
     }
 
     // Truncate the primary buffer
-    str._buffer.erase(str._buffer.end() - size, str._buffer.end());
+    str._buffer.remove_prefix(size);
 
     return str;
   }
@@ -557,26 +557,6 @@ inline
 {
   read_tuple_traits<typename T::_tls_traits>(str, obj._tls_fields_r());
   return str;
-}
-
-///
-/// Abbreviation for opaque<N>
-///
-
-template<size_t N>
-struct opaque
-{
-  std::vector<uint8_t> data;
-
-  TLS_SERIALIZABLE(data)
-  TLS_TRAITS(vector<N>)
-};
-
-template<size_t N>
-bool
-operator==(const opaque<N>& lhs, const opaque<N>& rhs)
-{
-  return lhs.data == rhs.data;
 }
 
 } // namespace tls

@@ -12,4 +12,4 @@ target_link_libraries(${TEST_APP_NAME} ${CURRENT_LIB_NAME} bytes doctest::doctes
 
 # Enable CTest
 include(doctest)
-doctest_discover_tests(${TEST_APP_NAME})
+doctest_discover_tests(${TEST_APP_NAME} ADD_LABELS 0)
