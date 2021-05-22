@@ -92,6 +92,7 @@ ostream_test(T val, const std::vector<uint8_t>& enc)
   w << val;
   REQUIRE(w.bytes() == enc);
   REQUIRE(w.size() == enc.size());
+  REQUIRE(w.size() == tls::size_of(val));
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
