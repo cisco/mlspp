@@ -319,14 +319,13 @@ struct vector
         throw WriteError("Invalid header size");
     }
 
-    // Pre-encode contents
-    ostream temp;
-    for (const auto& item : data) {
-      temp << item;
-    }
+    // Write a zero header, followed by the data
+    auto base_size = str._buffer.size();
+    str.write_uint(0, head);
+    write_all(str, data);
 
     // Check that the encoded length is OK
-    uint64_t size = temp._buffer.size();
+    uint64_t size = str._buffer.size() - base_size - head;
     if (size > head_max) {
       throw WriteError("Data too large for header size");
     } else if constexpr ((max != none) && (size > max)) {
@@ -336,10 +335,26 @@ struct vector
     }
 
     // Write the encoded length, then the pre-encoded data
-    str.write_uint(size, head);
-    str.write_raw(temp.bytes());
+    for (size_t i = 0; i < head; i += 1) {
+      auto shift = 8 * (head - i - 1);
+      str._buffer[base_size + i] = static_cast<uint8_t>(size >> shift);
+    }
 
     return str;
+  }
+
+  template<typename T>
+  static void write_all(ostream& str, const std::vector<T>& data)
+  {
+    for (const auto& item : data) {
+      str << item;
+    }
+  }
+
+  template<>
+  static void write_all(ostream& str, const std::vector<uint8_t>& data)
+  {
+    str._buffer.insert(str._buffer.end(), data.begin(), data.end());
   }
 
   template<typename T>
