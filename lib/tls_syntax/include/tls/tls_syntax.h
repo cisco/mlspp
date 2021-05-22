@@ -380,16 +380,30 @@ struct vector
     // NB: This requires that T be default-constructible
     istream r;
     r._buffer = input_bytes(str._buffer.data(), size);
-    while (r._buffer.size() > 0) {
-      data.emplace_back();
-      r >> data.back();
-    }
+    read_all(r, data);
 
     // Truncate the primary buffer
     str._buffer.remove_prefix(size);
 
     return str;
   }
+
+  private:
+  template<typename T>
+  static void read_all(istream& str, std::vector<T>& data)
+  {
+    while (!str._buffer.empty()) {
+      data.emplace_back();
+      str >> data.back();
+    }
+  }
+
+  template<>
+  static void read_all(istream& str, std::vector<uint8_t>& data)
+  {
+    data.insert(data.end(), str._buffer.begin(), str._buffer.end());
+  }
+
 };
 
 // Variant encoding
