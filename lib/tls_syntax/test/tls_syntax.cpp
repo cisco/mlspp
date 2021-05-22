@@ -86,21 +86,19 @@ protected:
 
 template<typename T>
 void
-ostream_test(T val, const std::vector<uint8_t>& enc)
+ostream_test(const T& val, const std::vector<uint8_t>& enc)
 {
-  tls::ostream w;
-  w << val;
-  REQUIRE(w.bytes() == enc);
-  REQUIRE(w.size() == enc.size());
-  REQUIRE(w.size() == tls::size_of(val));
+  auto sample = tls::marshal(val);
+  REQUIRE(sample == enc);
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
 {
   bytes answer{ 1, 2, 3, 4 };
-  tls::ostream w;
+  bytes sample(answer.size());
+  tls::ostream w(sample);
   w.write_raw(answer);
-  REQUIRE(w.bytes() == answer);
+  REQUIRE(sample == answer);
 
   ostream_test(val_bool, enc_bool);
   ostream_test(val_uint8, enc_uint8);
@@ -116,63 +114,24 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
 
 template<typename T>
 void
-istream_test(T val, T& data, const std::vector<uint8_t>& enc)
+istream_test(const T& val, const std::vector<uint8_t>& enc)
 {
-  tls::istream r(enc);
-  r >> data;
+  auto data = tls::get<T>(enc);
   REQUIRE(data == val);
-  REQUIRE(r.empty());
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 {
-  bool data_bool = false;
-  istream_test(val_bool, data_bool, enc_bool);
-
-  uint8_t data_uint8 = 0;
-  istream_test(val_uint8, data_uint8, enc_uint8);
-
-  uint16_t data_uint16 = 0;
-  istream_test(val_uint16, data_uint16, enc_uint16);
-
-  uint32_t data_uint32 = 0;
-  istream_test(val_uint32, data_uint32, enc_uint32);
-
-  uint64_t data_uint64 = 0;
-  istream_test(val_uint64, data_uint64, enc_uint64);
-
-  std::array<uint16_t, 4> data_array = { 0, 0, 0, 0 };
-  istream_test(val_array, data_array, enc_array);
-
-  ExampleStruct data_struct;
-  istream_test(val_struct, data_struct, enc_struct);
-
-  std::optional<ExampleStruct> data_optional;
-  istream_test(val_optional, data_optional, enc_optional);
-
-  std::optional<ExampleStruct> data_optional_null;
-  istream_test(val_optional_null, data_optional_null, enc_optional_null);
-
-  IntType data_enum;
-  istream_test(val_enum, data_enum, enc_enum);
-}
-
-TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
-{
-  ExampleStruct val_in = val_struct;
-
-  tls::ostream w;
-  w << val_struct;
-  auto streamed = w.bytes();
-  auto marshaled = tls::marshal(val_struct);
-  REQUIRE(streamed == marshaled);
-
-  ExampleStruct val_out1;
-  tls::unmarshal(marshaled, val_out1);
-  REQUIRE(val_in == val_out1);
-
-  auto val_out2 = tls::get<ExampleStruct>(marshaled);
-  REQUIRE(val_in == val_out2);
+  istream_test(val_bool, enc_bool);
+  istream_test(val_uint8, enc_uint8);
+  istream_test(val_uint16, enc_uint16);
+  istream_test(val_uint32, enc_uint32);
+  istream_test(val_uint64, enc_uint64);
+  istream_test(val_array, enc_array);
+  istream_test(val_struct, enc_struct);
+  istream_test(val_optional, enc_optional);
+  istream_test(val_optional_null, enc_optional_null);
+  istream_test(val_enum, enc_enum);
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

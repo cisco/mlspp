@@ -15,6 +15,7 @@ namespace tls {
 
 // Abbreviations for owned and unowned buffers
 using owned_bytes = std::vector<uint8_t>;
+using output_bytes = std::basic_string_view<uint8_t>;
 using input_bytes = std::basic_string_view<const uint8_t>;
 
 // For indicating no min or max in vector definitions
@@ -189,17 +190,24 @@ constexpr size_t size_of(const T& val)
 class ostream
 {
 public:
+  ostream(owned_bytes& buf)
+    : _written(0)
+    , _buffer(buf.data(), buf.size())
+  {}
+
   static const size_t none = std::numeric_limits<size_t>::max();
 
   void write_raw(const owned_bytes& content);
 
-  owned_bytes bytes() const { return _buffer; }
-  size_t size() const { return _buffer.size(); }
-  bool empty() const { return _buffer.empty(); }
+  size_t written() const { return _written; }
 
 private:
-  owned_bytes _buffer;
-  ostream& write_uint(uint64_t value, int length);
+  size_t _written = 0;
+  output_bytes _buffer;
+
+  void check_remaining(size_t length);
+  void write_uint(uint64_t value, size_t length);
+  static void write_uint(uint64_t value, output_bytes span);
 
   friend ostream& operator<<(ostream& out, bool data);
   friend ostream& operator<<(ostream& out, uint8_t data);
@@ -345,9 +353,11 @@ template<typename T>
 owned_bytes
 marshal(const T& value)
 {
-  ostream w;
+  auto size = size_of(value);
+  auto buf = owned_bytes(size);
+  auto w = ostream(buf);
   w << value;
-  return w.bytes();
+  return buf;
 }
 
 template<typename T>
@@ -447,12 +457,13 @@ struct vector
     }
 
     // Write a zero header, followed by the data
-    auto base_size = str._buffer.size();
+    auto header = str._buffer.substr(0, head);
+    auto base_size = str._written;
     str.write_uint(0, head);
     write_all(str, data);
 
     // Check that the encoded length is OK
-    uint64_t size = str._buffer.size() - base_size - head;
+    uint64_t size = str._written - base_size - head;
     if (size > head_max) {
       throw WriteError("Data too large for header size");
     } else if constexpr ((max != none) && (size > max)) {
@@ -461,11 +472,8 @@ struct vector
       throw WriteError("Data too small for declared min");
     }
 
-    // Write the encoded length, then the pre-encoded data
-    for (size_t i = 0; i < head; i += 1) {
-      auto shift = 8 * (head - i - 1);
-      str._buffer[base_size + i] = static_cast<uint8_t>(size >> shift);
-    }
+    // Write the encoded length back to the header
+    str.write_uint(size, header);
 
     return str;
   }
@@ -528,7 +536,7 @@ struct vector
   template<>
   static void write_all(ostream& str, const std::vector<uint8_t>& data)
   {
-    str._buffer.insert(str._buffer.end(), data.begin(), data.end());
+    str.write_raw(data);
   }
 
   template<typename T>

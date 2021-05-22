@@ -4,25 +4,45 @@
 namespace tls {
 
 void
+ostream::check_remaining(size_t length)
+{
+  if (length > _buffer.size()) {
+    throw WriteError("Write size exceeds available size");
+  }
+}
+
+void
 ostream::write_raw(const std::vector<uint8_t>& bytes)
 {
-  // Not sure what the default argument is here
-  // NOLINTNEXTLINE(fuchsia-default-arguments)
-  _buffer.insert(_buffer.end(), bytes.begin(), bytes.end());
+  check_remaining(bytes.size());
+
+  // XXX(RLB) This is a hack around the const-ness of string_view
+  auto* data = const_cast<uint8_t*>(_buffer.data());
+  std::copy(bytes.begin(), bytes.end(), data);
+
+  _buffer.remove_prefix(bytes.size());
+  _written += bytes.size();
 }
 
 // Primitive type writers
-ostream&
-ostream::write_uint(uint64_t value, int length)
+void
+ostream::write_uint(uint64_t value, size_t length)
 {
-  auto prev_size = _buffer.size();
-  _buffer.resize(prev_size + length);
+  check_remaining(length);
+  write_uint(value, _buffer.substr(0, length));
+  _buffer.remove_prefix(length);
+  _written += length;
+}
 
-  for (int i = 0; i < length; i++) {
-    auto shift = 8 * (length - i  - 1);
-    _buffer[prev_size + i] = static_cast<uint8_t>(value >> shift);
+void
+ostream::write_uint(uint64_t value, output_bytes span)
+{
+  // XXX(RLB) This is a hack around the const-ness of string_view
+  auto* data = const_cast<uint8_t*>(span.data());
+  for (size_t i = 0; i < span.size(); i++) {
+    auto shift = 8 * (span.size() - i  - 1);
+    *(data + i) = static_cast<uint8_t>(value >> shift);
   }
-  return *this;
 }
 
 ostream&
@@ -38,25 +58,29 @@ operator<<(ostream& out, bool data)
 ostream&
 operator<<(ostream& out, uint8_t data) // NOLINT(llvmlibc-callee-namespace)
 {
-  return out.write_uint(data, 1);
+  out.write_uint(data, 1);
+  return out;
 }
 
 ostream&
 operator<<(ostream& out, uint16_t data)
 {
-  return out.write_uint(data, 2);
+  out.write_uint(data, 2);
+  return out;
 }
 
 ostream&
 operator<<(ostream& out, uint32_t data)
 {
-  return out.write_uint(data, 4);
+  out.write_uint(data, 4);
+  return out;
 }
 
 ostream&
 operator<<(ostream& out, uint64_t data)
 {
-  return out.write_uint(data, 8);
+  out.write_uint(data, 8);
+  return out;
 }
 
 // Because pop_back() on an empty vector is undefined
