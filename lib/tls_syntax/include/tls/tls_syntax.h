@@ -87,6 +87,18 @@ inline typename std::enable_if<!is_serializable<T>::value && !std::is_enum<T>::v
                           size_t>::type
 size_of(const T& val);
 
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj);
+
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj);
+
 // Primitive sizes
 template<>
 constexpr size_t size_of(const bool&) { return 1; }
@@ -102,6 +114,35 @@ constexpr size_t size_of(const uint32_t&) { return 4; }
 
 template<>
 constexpr size_t size_of(const uint64_t&) { return 8; }
+
+// Array size
+template<typename T, size_t N>
+constexpr size_t size_of(const std::array<T, N>& data)
+{
+  auto out = size_t(0);
+  for (const auto& item : data) {
+    out += size_of(item);
+  }
+  return out;
+}
+
+// Optional size
+template<typename T>
+constexpr size_t size_of(const std::optional<T>& opt)
+{
+  if (!opt) {
+    return 1;
+  }
+
+  return 1 + size_of(opt::get(opt));
+}
+
+// Enum size
+template<typename T, std::enable_if_t<std::is_enum<T>::value, bool> = true>
+constexpr size_t size_of(const T& val)
+{
+  return size_of(static_cast<std::underlying_type_t<T>>(val));
+}
 
 // Struct sizer without traits (enabled by macro)
 template<size_t I = 0, typename... Tp>
@@ -154,34 +195,6 @@ constexpr
   return tuple_traits_size_of<typename T::_tls_traits>(obj._tls_fields_w());
 }
 
-// Array size
-template<typename T, size_t N>
-constexpr size_t size_of(const std::array<T, N>& data)
-{
-  auto out = size_t(0);
-  for (const auto& item : data) {
-    out += size_of(item);
-  }
-  return out;
-}
-
-// Optional size
-template<typename T>
-constexpr size_t size_of(const std::optional<T>& opt)
-{
-  if (!opt) {
-    return 1;
-  }
-
-  return 1 + size_of(opt::get(opt));
-}
-
-// Enum size
-template<typename T, std::enable_if_t<std::is_enum<T>::value, bool> = true>
-constexpr size_t size_of(const T& val)
-{
-  return size_of(static_cast<std::underlying_type_t<T>>(val));
-}
 
 ///
 /// ostream
@@ -349,14 +362,23 @@ operator>>(tls::istream& str, T& val)
 }
 
 // Abbreviations
-template<typename T>
+template <class T, typename... Ts>
+size_t total_size(const T& first, const Ts&... rest) {
+  auto out = size_of(first);
+  if constexpr (sizeof...(rest) > 0) {
+      out += total_size(rest...);
+  }
+  return out;
+}
+
+template<typename... Ts>
 owned_bytes
-marshal(const T& value)
+marshal(const Ts&... vals)
 {
-  auto size = size_of(value);
+  auto size = total_size(vals...);
   auto buf = owned_bytes(size);
   auto w = ostream(buf);
-  w << value;
+  (w << ... << vals);
   return buf;
 }
 

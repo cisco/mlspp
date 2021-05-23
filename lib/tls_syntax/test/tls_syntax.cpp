@@ -20,6 +20,20 @@ TLS_VARIANT_MAP(IntType, uint16_t, uint16)
 } // namespace tls
 
 // A struct to test struct encoding and traits
+struct InnerStruct
+{
+  uint8_t a;
+
+  TLS_SERIALIZABLE(a)
+  TLS_TRAITS(tls::pass)
+};
+
+static bool
+operator==(const InnerStruct& lhs, const InnerStruct& rhs)
+{
+  return (lhs.a == rhs.a);
+}
+
 struct ExampleStruct
 {
   uint16_t a{ 0 };
@@ -27,19 +41,21 @@ struct ExampleStruct
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   tls::var::variant<uint8_t, uint16_t> e;
+  InnerStruct f;
 
-  TLS_SERIALIZABLE(a, b, c, d, e)
+  TLS_SERIALIZABLE(a, b, c, d, e, f)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant<IntType>)
+             tls::variant<IntType>,
+             tls::pass)
 };
 
 static bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 {
-  return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
+  return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c) && (lhs.d == rhs.d) && (lhs.e == rhs.e) && (lhs.f == rhs.f);
 }
 
 // Known-answer tests
@@ -70,9 +86,10 @@ protected:
     { uint8_t(0x66) },
     { 0x77, 0x88 },
     { uint16_t(0x9999) },
+    { 0xaa },
   };
   const bytes enc_struct =
-    from_hex("111122222222333333334444444455555555016600027788BBBB9999");
+    from_hex("111122222222333333334444444455555555016600027788BBBB9999aa");
 
   const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;

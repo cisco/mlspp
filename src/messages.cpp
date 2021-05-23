@@ -37,17 +37,46 @@ PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
   , external_pub(std::move(external_pub_in))
 {}
 
+struct PublicGroupStateTBS {
+  const CipherSuite& cipher_suite;
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const bytes& tree_hash;
+  const bytes& interim_transcript_hash;
+  const ExtensionList& extensions;
+  const HPKEPublicKey& external_pub;
+  const LeafIndex& signer_index;
+
+  TLS_SERIALIZABLE(cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   interim_transcript_hash,
+                   extensions,
+                   external_pub,
+                   signer_index)
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::pass)
+
+};
+
 bytes
 PublicGroupState::to_be_signed() const
 {
-  tls::ostream w;
-  w << cipher_suite;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch;
-  tls::vector<1>::encode(w, tree_hash);
-  tls::vector<1>::encode(w, interim_transcript_hash);
-  w << extensions << external_pub << signer_index;
-  return w.bytes();
+  return tls::marshal(PublicGroupStateTBS{cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   interim_transcript_hash,
+                   extensions,
+                   external_pub,
+                   signer_index});
 }
 
 void
@@ -101,16 +130,22 @@ GroupInfo::GroupInfo(bytes group_id_in,
   , confirmation_tag(std::move(confirmation_tag_in))
 {}
 
+struct GroupInfoTBS {
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const bytes& tree_hash;
+  const bytes& confirmed_transcript_hash;
+  const MAC& confirmation_tag;
+  const LeafIndex& signer_index;
+
+  TLS_SERIALIZABLE(group_id, epoch, tree_hash, confirmed_transcript_hash, confirmation_tag, signer_index)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::vector<1>, tls::vector<1>, tls::pass, tls::pass)
+};
+
 bytes
 GroupInfo::to_be_signed() const
 {
-  tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch;
-  tls::vector<1>::encode(w, tree_hash);
-  tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << confirmation_tag << signer_index;
-  return w.bytes();
+  return tls::marshal(GroupInfoTBS{group_id, epoch, tree_hash, confirmed_transcript_hash, confirmation_tag, signer_index});
 }
 
 void
@@ -317,28 +352,43 @@ MLSPlaintext::content_type() const
   return var::visit(get_content_type, content);
 }
 
+struct MLSPlaintextContentExtra {
+  const bytes& signature;
+  const std::optional<MAC>& confirmation_tag;
+  const bytes& padding;
+
+  TLS_SERIALIZABLE(signature, confirmation_tag, padding)
+  TLS_TRAITS(tls::vector<2>, tls::pass, tls::vector<2>)
+};
+
 bytes
 MLSPlaintext::marshal_content(size_t padding_size) const
 {
-  tls::ostream w;
-  var::visit([&](auto&& inner_content) { w << inner_content; }, content);
+  static const auto marshal_content = [](const auto& val) {
+    return tls::marshal(val);
+  };
 
   bytes padding(padding_size, 0);
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
-  tls::vector<2>::encode(w, padding);
-  return w.bytes();
+  auto content_data = var::visit(marshal_content, content);
+  auto extra_data = tls::marshal(MLSPlaintextContentExtra{signature, confirmation_tag, padding});
+  return content_data + extra_data;
 }
+
+struct MLSPlaintextCommitContent {
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  // TODO(RLB) Include authenticated_data;
+  const var::variant<ApplicationData, Proposal, Commit>& content;
+
+  TLS_SERIALIZABLE(group_id, epoch, sender, content)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::variant<ContentType>)
+};
 
 bytes
 MLSPlaintext::commit_content() const
 {
-  tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::variant<ContentType>::encode(w, content);
-  tls::vector<2>::encode(w, signature);
-  return w.bytes();
+  return tls::marshal(MLSPlaintextCommitContent{group_id, epoch, sender, content});
 }
 
 bytes
@@ -351,16 +401,22 @@ MLSPlaintext::commit_auth_data() const
   return tls::marshal(opt::get(confirmation_tag));
 }
 
+struct MLSPlaintextTBS {
+  const GroupContext& context;
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  const bytes& authenticated_data;
+  const var::variant<ApplicationData, Proposal, Commit>& content;
+
+  TLS_SERIALIZABLE(group_id, epoch, sender, authenticated_data, content)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>, tls::variant<ContentType>)
+};
+
 bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
-  tls::ostream w;
-  w << context;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::vector<4>::encode(w, authenticated_data);
-  tls::variant<ContentType>::encode(w, content);
-  return w.bytes();
+  return tls::marshal(MLSPlaintextTBS{context, group_id, epoch, sender, authenticated_data, content});
 }
 
 void
@@ -381,13 +437,19 @@ MLSPlaintext::verify(const CipherSuite& suite,
   return pub.verify(suite, tbs, signature);
 }
 
+struct AuthData {
+  const bytes& signature;
+  const std::optional<MAC>& confirmation_tag;
+
+  TLS_SERIALIZABLE(signature, confirmation_tag)
+  TLS_TRAITS(tls::vector<2>, tls::pass)
+};
+
 bytes
 MLSPlaintext::membership_tag_input(const GroupContext& context) const
 {
-  tls::ostream w;
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
-  return to_be_signed(context) + w.bytes();
+  auto auth_data = tls::marshal(AuthData{signature, confirmation_tag});
+  return to_be_signed(context) + auth_data;
 }
 
 bool
