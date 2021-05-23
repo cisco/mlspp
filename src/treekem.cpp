@@ -61,10 +61,19 @@ OptionalNode::set_tree_hash(CipherSuite suite, NodeIndex index)
     leaf = var::get<KeyPackage>(opt::get(node).node);
   }
 
-  tls::ostream w;
-  w << index << leaf;
-  hash = suite.digest().hash(w.bytes());
+  auto tbh = tls::marshal(index, leaf);
+  hash = suite.digest().hash(tbh);
 }
+
+struct ParentNodeHashInput {
+  const NodeIndex& index;
+  const std::optional<ParentNode>& parent;
+  const bytes& left;
+  const bytes& right;
+
+  TLS_SERIALIZABLE(index, parent, left, right)
+  TLS_TRAITS(tls::pass, tls::pass, tls::vector<1>, tls::vector<1>)
+};
 
 void
 OptionalNode::set_tree_hash(CipherSuite suite,
@@ -77,11 +86,8 @@ OptionalNode::set_tree_hash(CipherSuite suite,
     parent = var::get<ParentNode>(opt::get(node).node);
   }
 
-  tls::ostream w;
-  w << index << parent;
-  tls::vector<1>::encode(w, left);
-  tls::vector<1>::encode(w, right);
-  hash = suite.digest().hash(w.bytes());
+  auto tbh = tls::marshal(ParentNodeHashInput{index, parent, left,right});
+  hash = suite.digest().hash(tbh);
 }
 
 ///

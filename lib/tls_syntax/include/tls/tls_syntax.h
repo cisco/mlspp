@@ -7,10 +7,16 @@
 #include <optional>
 #include <stdexcept>
 #include <vector>
+#include <string_view>
 
 #include <tls/compat.h>
 
 namespace tls {
+
+// Abbreviations for owned and unowned buffers
+using owned_bytes = std::vector<uint8_t>;
+using output_bytes = std::basic_string_view<uint8_t>;
+using input_bytes = std::basic_string_view<const uint8_t>;
 
 // For indicating no min or max in vector definitions
 const size_t none = std::numeric_limits<size_t>::max();
@@ -30,23 +36,191 @@ public:
 };
 
 ///
+/// Struct-building tools
+///
+
+// Use this macro to define struct serialization with minimal boilerplate
+#define TLS_SERIALIZABLE(...)                                                  \
+  static const bool _tls_serializable = true;                                  \
+  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); }          \
+  auto _tls_fields_w() const { return std::forward_as_tuple(__VA_ARGS__); }
+
+// If your struct contains nontrivial members (e.g., vectors), use this to
+// define traits for them.
+#define TLS_TRAITS(...)                                                        \
+  static const bool _tls_has_traits = true;                                    \
+  using _tls_traits = std::tuple<__VA_ARGS__>;
+
+template<typename T>
+struct is_serializable
+{
+  template<typename U>
+  static std::true_type test(decltype(U::_tls_serializable));
+
+  template<typename U>
+  static std::false_type test(...);
+
+  static const bool value = decltype(test<T>(true))::value;
+};
+
+template<typename T>
+struct has_traits
+{
+  template<typename U>
+  static std::true_type test(decltype(U::_tls_has_traits));
+
+  template<typename U>
+  static std::false_type test(...);
+
+  static const bool value = decltype(test<T>(true))::value;
+};
+
+///
+/// size_of
+///
+
+template<typename T>
+struct is_serializable;
+
+template<typename T>
+inline typename std::enable_if<!is_serializable<T>::value && !std::is_enum<T>::value,
+                          size_t>::type
+size_of(const T& val);
+
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj);
+
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj);
+
+// Primitive sizes
+template<>
+constexpr size_t size_of(const bool&) { return 1; }
+
+template<>
+constexpr size_t size_of(const uint8_t&) { return 1; }
+
+template<>
+constexpr size_t size_of(const uint16_t&) { return 2; }
+
+template<>
+constexpr size_t size_of(const uint32_t&) { return 4; }
+
+template<>
+constexpr size_t size_of(const uint64_t&) { return 8; }
+
+// Array size
+template<typename T, size_t N>
+constexpr size_t size_of(const std::array<T, N>& data)
+{
+  auto out = size_t(0);
+  for (const auto& item : data) {
+    out += size_of(item);
+  }
+  return out;
+}
+
+// Optional size
+template<typename T>
+constexpr size_t size_of(const std::optional<T>& opt)
+{
+  if (!opt) {
+    return 1;
+  }
+
+  return 1 + size_of(opt::get(opt));
+}
+
+// Enum size
+template<typename T, std::enable_if_t<std::is_enum<T>::value, bool> = true>
+constexpr size_t size_of(const T& val)
+{
+  return size_of(static_cast<std::underlying_type_t<T>>(val));
+}
+
+// Struct sizer without traits (enabled by macro)
+template<size_t I = 0, typename... Tp>
+constexpr typename std::enable_if<I == sizeof...(Tp), size_t>::type
+tuple_size_of(const std::tuple<Tp...>&)
+{
+  return 0;
+}
+
+template<size_t I = 0, typename... Tp>
+  constexpr typename std::enable_if <
+  I<sizeof...(Tp), size_t>::type
+  tuple_size_of(const std::tuple<Tp...>& t)
+{
+  return size_of(std::get<I>(t)) + tuple_size_of<I+1, Tp...>(t);
+}
+
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && !has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj)
+{
+  return tuple_size_of(obj._tls_fields_w());
+}
+
+// Struct sizer with traits (enabled by macro)
+template<typename Tr, size_t I = 0, typename... Tp>
+constexpr  typename std::enable_if<I == sizeof...(Tp), size_t>::type
+tuple_traits_size_of(const std::tuple<Tp...>&)
+{
+  return 0;
+}
+
+template<typename Tr, size_t I = 0, typename... Tp>
+  constexpr  typename std::enable_if <
+  I<sizeof...(Tp), size_t>::type
+  tuple_traits_size_of(const std::tuple<Tp...>& t)
+{
+  auto elem_size = std::tuple_element_t<I, Tr>::size_of(std::get<I>(t));
+  return elem_size + tuple_traits_size_of<Tr, I+1, Tp...>(t);
+}
+
+template<typename T>
+constexpr
+  typename std::enable_if<is_serializable<T>::value && has_traits<T>::value,
+                          size_t>::type
+  size_of(const T& obj)
+{
+  return tuple_traits_size_of<typename T::_tls_traits>(obj._tls_fields_w());
+}
+
+
+///
 /// ostream
 ///
 
 class ostream
 {
 public:
+  ostream(owned_bytes& buf)
+    : _written(0)
+    , _buffer(buf.data(), buf.size())
+  {}
+
   static const size_t none = std::numeric_limits<size_t>::max();
 
-  void write_raw(const std::vector<uint8_t>& bytes);
+  void write_raw(const owned_bytes& content);
 
-  std::vector<uint8_t> bytes() const { return _buffer; }
-  size_t size() const { return _buffer.size(); }
-  bool empty() const { return _buffer.empty(); }
+  size_t written() const { return _written; }
 
 private:
-  std::vector<uint8_t> _buffer;
-  ostream& write_uint(uint64_t value, int length);
+  size_t _written = 0;
+  output_bytes _buffer;
+
+  void check_remaining(size_t length);
+  void write_uint(uint64_t value, size_t length);
+  static void write_uint(uint64_t value, output_bytes span);
 
   friend ostream& operator<<(ostream& out, bool data);
   friend ostream& operator<<(ostream& out, uint8_t data);
@@ -102,19 +276,16 @@ operator<<(tls::ostream& str, const T& val)
 class istream
 {
 public:
-  istream(const std::vector<uint8_t>& data)
-    : _buffer(data)
-  {
-    // So that we can use the constant-time pop_back
-    std::reverse(_buffer.begin(), _buffer.end());
-  }
+  istream(const owned_bytes& data)
+    : _buffer(data.data(), data.size())
+  {}
 
   size_t size() const { return _buffer.size(); }
   bool empty() const { return _buffer.empty(); }
 
 private:
   istream() {}
-  std::vector<uint8_t> _buffer;
+  input_bytes _buffer;
   uint8_t next();
 
   template<typename T>
@@ -191,18 +362,29 @@ operator>>(tls::istream& str, T& val)
 }
 
 // Abbreviations
-template<typename T>
-std::vector<uint8_t>
-marshal(const T& value)
+template <class T, typename... Ts>
+size_t total_size(const T& first, const Ts&... rest) {
+  auto out = size_of(first);
+  if constexpr (sizeof...(rest) > 0) {
+      out += total_size(rest...);
+  }
+  return out;
+}
+
+template<typename... Ts>
+owned_bytes
+marshal(const Ts&... vals)
 {
-  ostream w;
-  w << value;
-  return w.bytes();
+  auto size = total_size(vals...);
+  auto buf = owned_bytes(size);
+  auto w = ostream(buf);
+  (w << ... << vals);
+  return buf;
 }
 
 template<typename T>
 void
-unmarshal(const std::vector<uint8_t>& data, T& value)
+unmarshal(const owned_bytes& data, T& value)
 {
   istream r(data);
   r >> value;
@@ -210,48 +392,12 @@ unmarshal(const std::vector<uint8_t>& data, T& value)
 
 template<typename T, typename... Tp>
 T
-get(const std::vector<uint8_t>& data, Tp... args)
+get(const owned_bytes& data, Tp... args)
 {
   T value(args...);
   tls::unmarshal(data, value);
   return value;
 }
-
-// Use this macro to define struct serialization with minimal boilerplate
-#define TLS_SERIALIZABLE(...)                                                  \
-  static const bool _tls_serializable = true;                                  \
-  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); }          \
-  auto _tls_fields_w() const { return std::forward_as_tuple(__VA_ARGS__); }
-
-// If your struct contains nontrivial members (e.g., vectors), use this to
-// define traits for them.
-#define TLS_TRAITS(...)                                                        \
-  static const bool _tls_has_traits = true;                                    \
-  using _tls_traits = std::tuple<__VA_ARGS__>;
-
-template<typename T>
-struct is_serializable
-{
-  template<typename U>
-  static std::true_type test(decltype(U::_tls_serializable));
-
-  template<typename U>
-  static std::false_type test(...);
-
-  static const bool value = decltype(test<T>(true))::value;
-};
-
-template<typename T>
-struct has_traits
-{
-  template<typename U>
-  static std::true_type test(decltype(U::_tls_has_traits));
-
-  template<typename U>
-  static std::false_type test(...);
-
-  static const bool value = decltype(test<T>(true))::value;
-};
 
 // Traits must have static encode and decode methods, of the following form:
 //
@@ -272,6 +418,11 @@ struct has_traits
 struct pass
 {
   template<typename T>
+  static size_t size_of(const T& val) {
+    return ::tls::size_of(val);
+  }
+
+  template<typename T>
   static ostream& encode(ostream& str, const T& val)
   {
     return str << val;
@@ -288,6 +439,16 @@ struct pass
 template<size_t head, size_t min = none, size_t max = none>
 struct vector
 {
+  template<typename T>
+  static size_t size_of(const std::vector<T>& data)
+  {
+    auto out = head;
+    for (const auto& item : data) {
+      out += ::tls::size_of(item);
+    }
+    return out;
+  }
+
   template<typename T>
   static ostream& encode(ostream& str, const std::vector<T>& data)
   {
@@ -317,14 +478,14 @@ struct vector
         throw WriteError("Invalid header size");
     }
 
-    // Pre-encode contents
-    ostream temp;
-    for (const auto& item : data) {
-      temp << item;
-    }
+    // Write a zero header, followed by the data
+    auto header = str._buffer.substr(0, head);
+    auto base_size = str._written;
+    str.write_uint(0, head);
+    write_all(str, data);
 
     // Check that the encoded length is OK
-    uint64_t size = temp._buffer.size();
+    uint64_t size = str._written - base_size - head;
     if (size > head_max) {
       throw WriteError("Data too large for header size");
     } else if constexpr ((max != none) && (size > max)) {
@@ -333,9 +494,8 @@ struct vector
       throw WriteError("Data too small for declared min");
     }
 
-    // Write the encoded length, then the pre-encoded data
-    str.write_uint(size, head);
-    str.write_raw(temp.bytes());
+    // Write the encoded length back to the header
+    str.write_uint(size, header);
 
     return str;
   }
@@ -375,21 +535,47 @@ struct vector
 
     // Truncate the buffer to the declared length and wrap it in a
     // new reader, then read items from it
-    // NB: Remember that we store the vector in reverse order
     // NB: This requires that T be default-constructible
-    std::vector<uint8_t> trunc(str._buffer.end() - size, str._buffer.end());
     istream r;
-    r._buffer = trunc;
-    while (r._buffer.size() > 0) {
-      data.emplace_back();
-      r >> data.back();
-    }
+    r._buffer = input_bytes(str._buffer.data(), size);
+    read_all(r, data);
 
     // Truncate the primary buffer
-    str._buffer.erase(str._buffer.end() - size, str._buffer.end());
+    str._buffer.remove_prefix(size);
 
     return str;
   }
+
+  private:
+  template<typename T>
+  static void write_all(ostream& str, const std::vector<T>& data)
+  {
+    for (const auto& item : data) {
+      str << item;
+    }
+  }
+
+  template<>
+  static void write_all(ostream& str, const std::vector<uint8_t>& data)
+  {
+    str.write_raw(data);
+  }
+
+  template<typename T>
+  static void read_all(istream& str, std::vector<T>& data)
+  {
+    while (!str._buffer.empty()) {
+      data.emplace_back();
+      str >> data.back();
+    }
+  }
+
+  template<>
+  static void read_all(istream& str, std::vector<uint8_t>& data)
+  {
+    data.insert(data.end(), str._buffer.begin(), str._buffer.end());
+  }
+
 };
 
 // Variant encoding
@@ -407,6 +593,19 @@ variant_map();
 template<typename Ts>
 struct variant
 {
+  template<typename... Tp>
+  static size_t size_of(const var::variant<Tp...>& data)
+  {
+    static const auto get_size = [](const auto& v) {
+      return ::tls::size_of(v);
+    };
+
+    auto type_size = ::tls::size_of(type(data));
+    auto item_size = var::visit(get_size, data);
+    return type_size + item_size;
+  }
+
+
   template<typename... Tp>
   static inline Ts type(const var::variant<Tp...>& data)
   {
@@ -557,26 +756,6 @@ inline
 {
   read_tuple_traits<typename T::_tls_traits>(str, obj._tls_fields_r());
   return str;
-}
-
-///
-/// Abbreviation for opaque<N>
-///
-
-template<size_t N>
-struct opaque
-{
-  std::vector<uint8_t> data;
-
-  TLS_SERIALIZABLE(data)
-  TLS_TRAITS(vector<N>)
-};
-
-template<size_t N>
-bool
-operator==(const opaque<N>& lhs, const opaque<N>& rhs)
-{
-  return lhs.data == rhs.data;
 }
 
 } // namespace tls

@@ -112,4 +112,7 @@ namespace tls {
 TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
 TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
 
+template<>
+size_t size_of(const mls::X509Credential& obj);
+
 } // namespace TLS

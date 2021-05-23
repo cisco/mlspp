@@ -152,3 +152,14 @@ Credential::x509(const std::vector<bytes>& der_chain)
 }
 
 } // namespace mls
+
+namespace tls {
+
+template<>
+size_t
+size_of(const mls::X509Credential& obj)
+{
+  return vector<4>::size_of(obj.der_chain);
+}
+
+} // namespace tls

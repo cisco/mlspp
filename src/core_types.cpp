@@ -71,7 +71,7 @@ ExtensionList::for_group() const
 bytes
 ParentNode::hash(CipherSuite suite) const
 {
-  return suite.digest().hash(tls::marshal(this));
+  return suite.digest().hash(tls::marshal(*this));
 }
 
 KeyPackage::KeyPackage()
@@ -165,9 +165,7 @@ KeyPackage::verify() const
 bytes
 KeyPackage::to_be_signed() const
 {
-  tls::ostream out;
-  out << version << cipher_suite << init_key << credential;
-  return out.bytes();
+  return tls::marshal(version, cipher_suite, init_key, credential);
 }
 
 bool
