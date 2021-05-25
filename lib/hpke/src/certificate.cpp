@@ -269,6 +269,8 @@ struct Certificate::ParsedCertificate
         return Signature::ID::P521_SHA512;
       case NID_sha256WithRSAEncryption:
       case NID_sha1WithRSAEncryption:
+      case NID_sha384WithRSAEncryption:
+      case NID_sha512WithRSAEncryption:
         return Signature::ID::RSA_SHA256;
       default:
         break;
