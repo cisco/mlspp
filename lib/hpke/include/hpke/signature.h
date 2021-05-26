@@ -17,6 +17,8 @@ struct Signature
     Ed25519,
     Ed448,
     RSA_SHA256,
+    RSA_SHA384,
+    RSA_SHA512,
   };
 
   template<Signature::ID id>

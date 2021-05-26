@@ -153,6 +153,10 @@ RSASignature::digest_to_md(Digest::ID digest)
   switch (digest) {
     case Digest::ID::SHA256:
       return EVP_sha256();
+    case Digest::ID::SHA384:
+      return EVP_sha384();
+    case Digest::ID::SHA512:
+      return EVP_sha512();
     default:
       throw std::runtime_error("Unsupported digest");
   }
@@ -165,6 +169,10 @@ RSASignature::digest_to_sig(Digest::ID digest)
   switch (digest) {
     case Digest::ID::SHA256:
       return Signature::ID::RSA_SHA256;
+    case Digest::ID::SHA384:
+      return Signature::ID::RSA_SHA384;
+    case Digest::ID::SHA512:
+      return Signature::ID::RSA_SHA512;
     default:
       throw std::runtime_error("Unsupported digest");
   }
