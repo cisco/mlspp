@@ -153,6 +153,22 @@ Signature::get<Signature::ID::RSA_SHA256>()
   return instance;
 }
 
+template<>
+const Signature&
+Signature::get<Signature::ID::RSA_SHA384>()
+{
+  static const auto instance = RSASignature(Digest::ID::SHA384);
+  return instance;
+}
+
+template<>
+const Signature&
+Signature::get<Signature::ID::RSA_SHA512>()
+{
+  static const auto instance = RSASignature(Digest::ID::SHA512);
+  return instance;
+}
+
 Signature::Signature(Signature::ID id_in)
   : id(id_in)
 {}

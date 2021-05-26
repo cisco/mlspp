@@ -246,6 +246,7 @@ struct Certificate::ParsedCertificate
         }
       }
       case EVP_PKEY_RSA:
+        // RSA public keys are not specific to an algorithm
         return Signature::ID::RSA_SHA256;
       default:
         break;
@@ -267,9 +268,14 @@ struct Certificate::ParsedCertificate
         return Signature::ID::P384_SHA384;
       case NID_ecdsa_with_SHA512:
         return Signature::ID::P521_SHA512;
-      case NID_sha256WithRSAEncryption:
       case NID_sha1WithRSAEncryption:
+        // We fall through to SHA256 for SHA1 because we do not implement SHA-1.
+      case NID_sha256WithRSAEncryption:
         return Signature::ID::RSA_SHA256;
+      case NID_sha384WithRSAEncryption:
+        return Signature::ID::RSA_SHA384;
+      case NID_sha512WithRSAEncryption:
+        return Signature::ID::RSA_SHA512;
       default:
         break;
     }
