@@ -440,8 +440,8 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
   auto welcome_data = string_to_bytes(request->welcome());
   auto welcome = tls::get<mls::Welcome>(welcome_data);
 
-  auto state =
-    mls::State(join->init_priv, join->sig_priv, join->key_package, welcome, std::nullopt);
+  auto state = mls::State(
+    join->init_priv, join->sig_priv, join->key_package, welcome, std::nullopt);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
@@ -579,7 +579,7 @@ MLSClientImpl::commit(CachedState& entry,
   auto leaf_secret =
     mls::random_bytes(entry.state.cipher_suite().secret_size());
   auto [commit, welcome, next] =
-    entry.state.commit(leaf_secret, mls::CommitOpts{inline_proposals, true});
+    entry.state.commit(leaf_secret, mls::CommitOpts{ inline_proposals, true });
 
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 
