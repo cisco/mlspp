@@ -6,6 +6,7 @@
     "openssl",
     "protobuf",
     "grpc",
-    "gflags"
+    "gflags",
+    "nlohmann-json"
   ]
 }
