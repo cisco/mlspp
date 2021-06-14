@@ -9,7 +9,7 @@ TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
 CLANG_TIDY=OFF
 
-.PHONY: all dev test ctest dtest dbtest libs test-libs test-all everything clean cclean format
+.PHONY: all dev test ctest dtest dbtest libs test-libs test-all everything ci clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
@@ -50,6 +50,9 @@ test-all: test-libs ctest
 
 everything: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
+
+ci:
+	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${VCPKG_TOOLCHAIN_FILE}" .
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean
