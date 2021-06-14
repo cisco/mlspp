@@ -50,6 +50,7 @@ struct CipherSuite
   CipherSuite(ID id_in);
 
   ID cipher_suite() const { return id; }
+  SignatureScheme signature_scheme() const;
 
   size_t secret_size() const { return get().digest.hash_size; }
   size_t key_size() const { return get().hpke.aead.key_size; }
@@ -96,7 +97,7 @@ struct HPKECiphertext
   bytes ciphertext;
 
   TLS_SERIALIZABLE(kem_output, ciphertext)
-  TLS_TRAITS(tls::vector<2>, tls::vector<4>)
+  TLS_TRAITS(tls::vector<2>, tls::vector<2>)
 };
 
 struct HPKEPublicKey

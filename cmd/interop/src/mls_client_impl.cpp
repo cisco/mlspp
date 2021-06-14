@@ -395,7 +395,7 @@ MLSClientImpl::create_group(const CreateGroupRequest* request,
 
   auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({}, sig_priv.public_key);
+  auto cred = mls::Credential::basic({}, cipher_suite, sig_priv.public_key);
   auto key_package =
     mls::KeyPackage(cipher_suite, init_priv.public_key, cred, sig_priv, {});
 
@@ -415,7 +415,7 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
 
   auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({}, sig_priv.public_key);
+  auto cred = mls::Credential::basic({}, cipher_suite, sig_priv.public_key);
   auto kp =
     mls::KeyPackage(cipher_suite, init_priv.public_key, cred, sig_priv, {});
 
@@ -457,7 +457,7 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 
   auto init_priv = mls::HPKEPrivateKey::generate(pgs.cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(pgs.cipher_suite);
-  auto cred = mls::Credential::basic({}, sig_priv.public_key);
+  auto cred = mls::Credential::basic({}, pgs.cipher_suite, sig_priv.public_key);
   auto kp =
     mls::KeyPackage(pgs.cipher_suite, init_priv.public_key, cred, sig_priv, {});
 

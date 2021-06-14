@@ -620,7 +620,8 @@ TranscriptHash::update_confirmed(const MLSPlaintext& pt)
 void
 TranscriptHash::update_interim(const MAC& confirmation_tag)
 {
-  const auto transcript = confirmed + tls::marshal(confirmation_tag);
+  const auto opt_tag = std::optional<MAC>(confirmation_tag);
+  const auto transcript = confirmed + tls::marshal(opt_tag);
   interim = suite.digest().hash(transcript);
 }
 

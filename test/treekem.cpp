@@ -16,7 +16,7 @@ protected:
   {
     auto init_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic({ 0, 1, 2, 3 }, sig_priv.public_key);
+    auto cred = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
     auto kp =
       KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
     return std::make_tuple(init_priv, sig_priv, kp);

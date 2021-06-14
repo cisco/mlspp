@@ -142,11 +142,13 @@ struct TreeKEMTestVector
   mls::TreeKEMPublicKey ratchet_tree_before;
 
   mls::LeafIndex add_sender;
+  bytes my_leaf_secret;
   mls::KeyPackage my_key_package;
   bytes my_path_secret;
 
   mls::LeafIndex update_sender;
   mls::UpdatePath update_path;
+  bytes update_group_context;
 
   bytes tree_hash_before;
   bytes root_secret_after_add;

@@ -227,8 +227,8 @@ struct GroupSecrets
   std::optional<PathSecret> path_secret;
   std::optional<PreSharedKeys> psks;
 
-  TLS_SERIALIZABLE(joiner_secret, path_secret)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
+  TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
 };
 
 // struct {
