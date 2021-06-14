@@ -14,7 +14,7 @@ create_client(CipherSuite suite, const std::string& name)
 {
   auto id = bytes(name.begin(), name.end());
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto cred = Credential::basic(id, sig_priv.public_key);
+  auto cred = Credential::basic(id, suite, sig_priv.public_key);
 
   auto ext_list = ExtensionList{};
   ext_list.add(KeyIDExtension{ bytes(name.begin(), name.end()) });

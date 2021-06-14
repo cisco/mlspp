@@ -336,6 +336,7 @@ MLSPlaintext::commit_content() const
   tls::ostream w;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
+  tls::vector<4>::encode(w, authenticated_data);
   tls::variant<ContentType>::encode(w, content);
   tls::vector<2>::encode(w, signature);
   return w.bytes();
@@ -348,7 +349,9 @@ MLSPlaintext::commit_auth_data() const
   // the wire transcript by one byte -- the optional indicator on the
   // confirmation tag is missing.  It's always 0x01, so it shouldn't matter, but
   // it might be clearer to fix this.
-  return tls::marshal(opt::get(confirmation_tag));
+  //
+  // XXX(RLB): This matches PR#466, not the current spec.
+  return tls::marshal(confirmation_tag);
 }
 
 bytes

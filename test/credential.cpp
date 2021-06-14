@@ -11,7 +11,7 @@ TEST_CASE("Basic Credential")
   auto priv = SignaturePrivateKey::generate(suite);
   auto pub = priv.public_key;
 
-  auto cred = Credential::basic(user_id, pub);
+  auto cred = Credential::basic(user_id, suite, pub);
   REQUIRE(cred.public_key() == pub);
 
   const auto& basic = cred.get<BasicCredential>();
