@@ -13,7 +13,9 @@ struct BasicCredential
 {
   BasicCredential() {}
 
-  BasicCredential(bytes identity_in, CipherSuite suite_in, SignaturePublicKey public_key_in)
+  BasicCredential(bytes identity_in,
+                  CipherSuite suite_in,
+                  SignaturePublicKey public_key_in)
     : identity(std::move(identity_in))
     , scheme(suite_in.signature_scheme())
     , public_key(std::move(public_key_in))

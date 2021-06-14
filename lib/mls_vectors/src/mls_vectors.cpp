@@ -633,7 +633,8 @@ TreeKEMTestVector::verify() const
     "root secret after add", priv.update_secret, root_secret_after_add);
 
   // Process the UpdatePath
-  priv.decap(update_sender, ratchet_tree_before, update_group_context, update_path, {});
+  priv.decap(
+    update_sender, ratchet_tree_before, update_group_context, update_path, {});
 
   auto my_tree_after = ratchet_tree_before;
   my_tree_after.merge(update_sender, update_path);

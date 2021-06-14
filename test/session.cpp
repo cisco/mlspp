@@ -292,7 +292,8 @@ TEST_CASE("Session with X509 Credential")
   std::string bob_name = "bob";
   auto bob_id = bytes(bob_name.begin(), bob_name.end());
   auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
-  auto bob_cred = mls::Credential::basic(bob_id, suite, bob_sig_priv.public_key);
+  auto bob_cred =
+    mls::Credential::basic(bob_id, suite, bob_sig_priv.public_key);
   mls::KeyPackageOpts bob_opts_in;
   bob_opts_in.extensions.add(mls::KeyIDExtension{ bob_id });
 
