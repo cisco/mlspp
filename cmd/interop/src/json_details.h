@@ -120,23 +120,23 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
                                    ciphertext,
                                    key,
-                                   nonce);
+                                   nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
                                    key,
                                    nonce,
                                    plaintext,
-                                   ciphertext);
+                                   ciphertext)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    generations,
                                    handshake,
-                                   application);
+                                   application)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    cipher_suite,
                                    n_leaves,
                                    encryption_secret,
                                    sender_data_secret,
                                    sender_data_info,
-                                   leaves);
+                                   leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    tree_hash,

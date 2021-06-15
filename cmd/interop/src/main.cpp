@@ -16,7 +16,7 @@ using grpc::ServerBuilder;
 using nlohmann::json;
 using namespace mls_client;
 
-json
+static json
 make_sample(uint64_t type)
 {
   auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
@@ -45,7 +45,7 @@ make_sample(uint64_t type)
   }
 }
 
-void
+static void
 print_sample(uint64_t type)
 {
   auto j = make_sample(type);
@@ -72,7 +72,9 @@ main(int argc, char* argv[])
   }
 
   auto service = MLSClientImpl{};
-  auto server_address = (std::stringstream{} << "0.0.0.0:" << FLAGS_port).str();
+  auto addr_stream = std::stringstream{};
+  addr_stream << "0.0.0.0:" << FLAGS_port;
+  auto server_address = addr_stream.str();
 
   grpc::EnableDefaultHealthCheckService(true);
   ServerBuilder builder;

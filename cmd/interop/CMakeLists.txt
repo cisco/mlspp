@@ -15,7 +15,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
 elseif(MSVC)
-  add_compile_options(/W4 /WX)
+  # XXX(RLB) Protobuf and gRPC cannot build with these additional errors enabled
+  # add_compile_options(/W4 /WX)
 endif()
 
 if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"))
