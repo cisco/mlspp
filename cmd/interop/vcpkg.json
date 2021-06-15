@@ -1,0 +1,12 @@
+{
+  "name": "mlspp-interop",
+  "version-string": "0.1",
+  "description": "Interop harness for Cisco MLS C++ library",
+  "dependencies": [
+    "openssl",
+    "protobuf",
+    "grpc",
+    "gflags",
+    "nlohmann-json"
+  ]
+}

@@ -1,24 +1,23 @@
+#pragma once
+
 #include <mls_vectors/mls_vectors.h>
 #include <nlohmann/json.hpp>
 
-#include <iostream>
+using nlohmann::json;
 
 ///
 /// Serializers for foreign types
 ///
-namespace nlohmann {
 
 // bytes
-template<>
-struct adl_serializer<bytes>
-{
-  static void to_json(json& j, const bytes& v) { j = to_hex(v); }
+namespace bytes_ns {
+void
+to_json(json& j, const bytes& v);
+void
+from_json(const json& j, bytes& v);
+}
 
-  static void from_json(const json& j, bytes& v)
-  {
-    v = from_hex(j.get<std::string>());
-  }
-};
+namespace nlohmann {
 
 // std::optional<T>
 template<typename T>
@@ -120,23 +119,23 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
                                    ciphertext,
                                    key,
-                                   nonce);
+                                   nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
                                    key,
                                    nonce,
                                    plaintext,
-                                   ciphertext);
+                                   ciphertext)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    generations,
                                    handshake,
-                                   application);
+                                   application)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    cipher_suite,
                                    n_leaves,
                                    encryption_secret,
                                    sender_data_secret,
                                    sender_data_info,
-                                   leaves);
+                                   leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    tree_hash,

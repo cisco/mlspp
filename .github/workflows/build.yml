@@ -50,14 +50,20 @@ jobs:
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
-    - name: configure to use clang-tidy and sanitizers      
+    - name: Configure to use clang-tidy and sanitizers      
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
-    - name: build
+    - name: Build
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
     - name: Unit tests
       run: |
          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build interop harness
+      run: |
+         cd cmd/interop
+         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+         cmake --build build

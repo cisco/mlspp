@@ -23,4 +23,6 @@ target_include_directories(${CURRENT_LIB_NAME}
 ### Tests
 ###
 
-add_subdirectory(test)
+if (TESTING)
+  add_subdirectory(test)
+endif()

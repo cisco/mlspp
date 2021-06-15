@@ -7,17 +7,20 @@
 BUILD_DIR=build
 TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
+CLANG_TIDY=OFF
 
-.PHONY: all tidy test libs test-libs test-all example everything clean cclean format
+.PHONY: all dev test ctest dtest dbtest libs test-libs test-all everything ci clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
 
-${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt cmd/CMakeLists.txt
-	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
+${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
+	cmake -B${BUILD_DIR} .
 
-tidy:
-	cmake -B${BUILD_DIR} -DCLANG_TIDY=ON -DCMAKE_BUILD_TYPE=Debug .
+dev:
+	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
+	# too slow, and we can run them in CI
+	cmake -B${BUILD_DIR} -DTESTING=ON .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
@@ -29,7 +32,7 @@ dbtest: test
 	lldb ${TEST_DIR}/mlspp_test
 
 ctest: test
-	cd ${TEST_DIR} && ctest
+	cmake --build ${BUILD_DIR} --target test
 
 libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target bytes
@@ -38,23 +41,18 @@ libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mls_vectors 
 
 test-libs: ${BUILD_DIR}
-	cmake --build ${BUILD_DIR} --target bytes_test
-	cd build/lib/bytes/test/ && ctest
-	cmake --build ${BUILD_DIR} --target hpke_test
-	cd build/lib/hpke/test/ && ctest
-	cmake --build ${BUILD_DIR} --target tls_syntax_test
-	cd build/lib/tls_syntax/test/ && ctest
-	cmake --build ${BUILD_DIR} --target mls_vectors_test
-	cd build/lib/mls_vectors/test/ && ctest
+	cmake --build ${BUILD_DIR} --target lib/bytes/test
+	cmake --build ${BUILD_DIR} --target lib/hpke/test
+	cmake --build ${BUILD_DIR} --target lib/tls_syntax/test
+	cmake --build ${BUILD_DIR} --target lib/mls_vectors/test
 
 test-all: test-libs ctest
 
-example: ${BUILD_DIR}
-	cmake --build ${BUILD_DIR} --target api_example
-	./build/cmd/api_example/api_example
-
 everything: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
+
+ci:
+	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${VCPKG_TOOLCHAIN_FILE}" .
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean
@@ -66,5 +64,4 @@ format:
 	find include -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find lib -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
+	find lib -iname "*.h" -or -iname "*.cpp" |  xargs ${CLANG_FORMAT}

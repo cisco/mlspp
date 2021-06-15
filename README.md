@@ -10,11 +10,14 @@ OpenSSL for crypto.
 Quickstart
 ----------
 
-Using the convenient Makefile that wraps CMake:
+A convenience Makefile is included to avoid the need to remember a bunch of
+CMake parameters.
 
 ```
-> make
-> make test
+> make        # Configures and builds the library 
+> make dev    # Configure a "developer" build with tests and checks
+> make test   # Builds and runs tests
+> make format # Runs clang-format over the source
 ```
 
 Conventions
@@ -27,8 +30,3 @@ Conventions
   * Snake case for variables, functions, members (`derive_epoch_keys`)
   * Private member variables start with underscore (`_`)
   * In general, prefer descriptive names
-* For cryptographic keys in particular:
-  * `X_key` is the public key of an asymmetric key pair
-  * `X_priv` is the private key of an asymmetric key pair
-  * `X_secret` is a symmetric secret
-
