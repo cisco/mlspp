@@ -11,8 +11,10 @@ using nlohmann::json;
 
 // bytes
 namespace bytes_ns {
-  void to_json(json& j, const bytes& v);
-  void from_json(const json& j, bytes& v);
+void
+to_json(json& j, const bytes& v);
+void
+from_json(const json& j, bytes& v);
 }
 
 namespace nlohmann {
