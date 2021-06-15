@@ -1,24 +1,21 @@
+#pragma once
+
 #include <mls_vectors/mls_vectors.h>
 #include <nlohmann/json.hpp>
 
-#include <iostream>
+using nlohmann::json;
 
 ///
 /// Serializers for foreign types
 ///
-namespace nlohmann {
 
 // bytes
-template<>
-struct adl_serializer<bytes>
-{
-  static void to_json(json& j, const bytes& v) { j = to_hex(v); }
+namespace bytes_ns {
+  void to_json(json& j, const bytes& v);
+  void from_json(const json& j, bytes& v);
+}
 
-  static void from_json(const json& j, bytes& v)
-  {
-    v = from_hex(j.get<std::string>());
-  }
-};
+namespace nlohmann {
 
 // std::optional<T>
 template<typename T>
