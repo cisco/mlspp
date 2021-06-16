@@ -83,8 +83,9 @@ struct BranchPSK
 struct PreSharedKeyID
 {
   var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
-  TLS_SERIALIZABLE(content)
-  TLS_TRAITS(tls::variant<PSKType>)
+  bytes psk_nonce;
+  TLS_SERIALIZABLE(content, psk_nonce)
+  TLS_TRAITS(tls::variant<PSKType>, tls::vector<1>)
 };
 
 struct PreSharedKeys
