@@ -109,7 +109,6 @@ struct TreeKEMPrivateKey
 
 private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
-  bytes path_step(const bytes& path_secret) const;
 };
 
 struct TreeKEMPublicKey
