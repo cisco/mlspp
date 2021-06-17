@@ -125,12 +125,6 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
   return priv;
 }
 
-bytes
-TreeKEMPrivateKey::path_step(const bytes& path_secret) const
-{
-  return suite.expand_with_label(path_secret, "path", {}, suite.secret_size());
-}
-
 void
 TreeKEMPrivateKey::implant(NodeIndex start,
                            LeafCount size,
@@ -145,7 +139,7 @@ TreeKEMPrivateKey::implant(NodeIndex start,
     private_key_cache.erase(n);
 
     n = tree_math::parent(n, size);
-    secret = path_step(secret);
+    secret = suite.derive_secret(secret, "path");
   }
 
   path_secrets[r] = secret;
@@ -166,7 +160,8 @@ TreeKEMPrivateKey::private_key(NodeIndex n) const
     return std::nullopt;
   }
 
-  return HPKEPrivateKey::derive(suite, i->second);
+  auto node_secret = suite.derive_secret(i->second, "node");
+  return HPKEPrivateKey::derive(suite, node_secret);
 }
 
 bool

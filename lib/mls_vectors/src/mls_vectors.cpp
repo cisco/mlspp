@@ -670,6 +670,8 @@ MessagesTestVector::create()
   auto hpke_ct = HPKECiphertext{ opaque, opaque };
   auto sig_priv = SignaturePrivateKey::generate(suite);
 
+  auto psk_nonce = random_bytes(suite.secret_size());
+
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
   auto key_package =
@@ -689,8 +691,8 @@ MessagesTestVector::create()
   auto group_secrets = GroupSecrets{ opaque,
                                      { { opaque } },
                                      PreSharedKeys{ {
-                                       { psk_id },
-                                       { psk_id },
+                                       { psk_id, psk_nonce },
+                                       { psk_id, psk_nonce },
                                      } } };
   auto welcome = Welcome{ suite, opaque, opaque, group_info };
   welcome.encrypt(key_package, opaque);
@@ -704,7 +706,7 @@ MessagesTestVector::create()
   auto add = Add{ key_package };
   auto update = Update{ key_package };
   auto remove = Remove{ index };
-  auto pre_shared_key = PreSharedKey{ psk_id };
+  auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };
   auto app_ack = AppAck{ { { index.val, 0, 5 }, { index.val, 7, 10 } } };
