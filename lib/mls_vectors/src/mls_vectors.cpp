@@ -52,6 +52,12 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
   return str << "[TreeKEMPublicKey]";
 }
 
+bool
+operator==(const bytes& b, const HexBytes& hb)
+{
+  return b == hb.data;
+}
+
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY(label, test)                                                    \
   if (!(test)) {                                                               \
@@ -70,9 +76,9 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
     return err;                                                                \
   }
 
-template<typename T>
+template<typename T, typename U>
 static std::optional<std::string>
-verify_equal(const std::string& label, const T& actual, const T& expected)
+verify_equal(const std::string& label, const T& actual, const U& expected)
 {
   if (actual == expected) {
     return std::nullopt;
