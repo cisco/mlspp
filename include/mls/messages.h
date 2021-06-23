@@ -461,6 +461,8 @@ struct MLSPlaintext
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
+
+  ContentType content_type;
   var::variant<ApplicationData, Proposal, Commit> content;
 
   bytes signature;
@@ -486,7 +488,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
-  ContentType content_type() const;
+  ContentType infer_content_type() const;
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -508,6 +510,7 @@ struct MLSPlaintext
                    epoch,
                    sender,
                    authenticated_data,
+                   content_type,
                    content,
                    signature,
                    confirmation_tag,
@@ -516,6 +519,7 @@ struct MLSPlaintext
              tls::pass,
              tls::pass,
              tls::vector<4>,
+             tls::pass,
              tls::variant<ContentType>,
              tls::vector<2>,
              tls::pass,

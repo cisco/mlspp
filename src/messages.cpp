@@ -240,6 +240,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
+  , content_type(content_type_in)
   , content(ApplicationData())
   , decrypted(true)
 {
@@ -280,6 +281,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
+  , content_type(ContentType::application)
   , content(std::move(application_data_in))
   , decrypted(false)
 {}
@@ -291,6 +293,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
+  , content_type(ContentType::proposal)
   , content(std::move(proposal))
   , decrypted(false)
 {}
@@ -302,12 +305,13 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
+  , content_type(ContentType::commit)
   , content(std::move(commit))
   , decrypted(false)
 {}
 
 ContentType
-MLSPlaintext::content_type() const
+MLSPlaintext::infer_content_type() const
 {
   static const auto get_content_type = overloaded{
     [](const ApplicationData& /*unused*/) { return ContentType::application; },

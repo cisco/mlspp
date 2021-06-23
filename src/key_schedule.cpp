@@ -326,9 +326,8 @@ GroupKeySource::encrypt(LeafIndex index,
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
   auto content = pt.marshal_content(0);
-  auto content_type_val = pt.content_type();
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    pt.group_id, pt.epoch, content_type_val, pt.authenticated_data });
+    pt.group_id, pt.epoch, pt.content_type, pt.authenticated_data });
 
   auto reuse_guard = new_reuse_guard();
   apply_reuse_guard(reuse_guard, content_keys.nonce);
@@ -343,7 +342,7 @@ GroupKeySource::encrypt(LeafIndex index,
   auto sender_data_keys =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, content_ct);
   auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, content_type_val });
+    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, pt.content_type });
 
   auto encrypted_sender_data = suite.hpke().aead.seal(
     sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
@@ -352,7 +351,7 @@ GroupKeySource::encrypt(LeafIndex index,
   MLSCiphertext ct;
   ct.group_id = pt.group_id;
   ct.epoch = pt.epoch;
-  ct.content_type = content_type_val;
+  ct.content_type = pt.content_type;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.authenticated_data = pt.authenticated_data;
   ct.ciphertext = content_ct;
