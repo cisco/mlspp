@@ -428,7 +428,32 @@ struct ApplicationData
   TLS_TRAITS(tls::vector<4>)
 };
 
-struct GroupContext;
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     opaque tree_hash<0..255>;
+//     opaque confirmed_transcript_hash<0..255>;
+//     Extension extensions<0..2^16-1>;
+// } GroupContext;
+struct GroupContext
+{
+  bytes group_id;
+  epoch_t epoch;
+  bytes tree_hash;
+  bytes confirmed_transcript_hash;
+  ExtensionList extensions;
+
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   extensions)
+  TLS_TRAITS(tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass)
+};
 
 enum struct ContentType : uint8_t
 {
@@ -453,6 +478,34 @@ struct Sender
   uint32_t sender{ 0 };
 
   TLS_SERIALIZABLE(sender_type, sender)
+};
+
+struct MLSPlaintextTBS
+{
+  const var::variant<GroupContext>& context;
+
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  const bytes& authenticated_data;
+
+  const ContentType& content_type;
+  const var::variant<ApplicationData, Proposal, Commit>& content;
+
+  TLS_SERIALIZABLE(context,
+                   group_id,
+                   epoch,
+                   sender,
+                   authenticated_data,
+                   content_type,
+                   content)
+  TLS_TRAITS(tls::variant<SenderType>,
+             tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::vector<4>,
+             tls::pass,
+             tls::variant<ContentType>)
 };
 
 struct MLSPlaintext
@@ -584,5 +637,7 @@ TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
+
+TLS_VARIANT_MAP(mls::SenderType, mls::GroupContext, member)
 
 } // namespace tls

@@ -361,13 +361,13 @@ MLSPlaintext::commit_auth_data() const
 bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
-  tls::ostream w;
-  w << context;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::vector<4>::encode(w, authenticated_data);
-  tls::variant<ContentType>::encode(w, content);
-  return w.bytes();
+  return tls::marshal(MLSPlaintextTBS{ context,
+                                       group_id,
+                                       epoch,
+                                       sender,
+                                       authenticated_data,
+                                       content_type,
+                                       content });
 }
 
 void
