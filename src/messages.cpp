@@ -391,10 +391,15 @@ MLSPlaintext::verify(const CipherSuite& suite,
 bytes
 MLSPlaintext::membership_tag_input(const GroupContext& context) const
 {
-  tls::ostream w;
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
-  return to_be_signed(context) + w.bytes();
+  return tls::marshal(MLSPlaintextTBM{ MLSPlaintextTBS{ context,
+                                                        group_id,
+                                                        epoch,
+                                                        sender,
+                                                        authenticated_data,
+                                                        content_type,
+                                                        content },
+                                       signature,
+                                       confirmation_tag });
 }
 
 bool

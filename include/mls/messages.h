@@ -508,6 +508,16 @@ struct MLSPlaintextTBS
              tls::variant<ContentType>)
 };
 
+struct MLSPlaintextTBM
+{
+  const MLSPlaintextTBS& tbs;
+  const bytes& signature;
+  const std::optional<MAC>& confirmation_tag;
+
+  TLS_SERIALIZABLE(tbs, signature, confirmation_tag)
+  TLS_TRAITS(tls::pass, tls::vector<2>, tls::pass)
+};
+
 struct MLSPlaintext
 {
   bytes group_id;
