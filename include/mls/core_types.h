@@ -22,6 +22,10 @@ enum class ProtocolVersion : uint8_t
 
 extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
+// struct {
+//     ExtensionType extension_type;
+//     opaque extension_data<0..2^32-1>;
+// } Extension;
 struct Extension
 {
   using Type = uint16_t;
@@ -30,7 +34,7 @@ struct Extension
   bytes data;
 
   TLS_SERIALIZABLE(type, data)
-  TLS_TRAITS(tls::pass, tls::vector<2>)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 struct ExtensionType
@@ -138,9 +142,9 @@ struct ParentNode
 // struct {
 //     ProtocolVersion version;
 //     CipherSuite cipher_suite;
-//     HPKEPublicKey init_key;
+//     HPKEPublicKey hpke_init_key;
 //     Credential credential;
-//     Extension extensions<0..2^16-1>;
+//     Extension extensions<8..2^32-1>;
 //     opaque signature<0..2^16-1>;
 // } KeyPackage;
 struct KeyPackageOpts

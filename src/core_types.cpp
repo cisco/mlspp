@@ -166,7 +166,7 @@ bytes
 KeyPackage::to_be_signed() const
 {
   tls::ostream out;
-  out << version << cipher_suite << init_key << credential;
+  out << version << cipher_suite << init_key << credential << extensions;
   return out.bytes();
 }
 
