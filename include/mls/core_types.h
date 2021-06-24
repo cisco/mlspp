@@ -30,7 +30,7 @@ struct Extension
   bytes data;
 
   TLS_SERIALIZABLE(type, data)
-  TLS_TRAITS(tls::pass, tls::vector<2>)
+  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 struct ExtensionType
