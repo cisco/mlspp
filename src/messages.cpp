@@ -219,6 +219,7 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // MLSPlaintext
+
 ProposalType
 Proposal::proposal_type() const
 {
@@ -233,8 +234,8 @@ MLSPlaintext::MLSPlaintext()
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
-                           ContentType content_type_in,
                            bytes authenticated_data_in,
+                           ContentType content_type_in,
                            const bytes& content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
@@ -322,19 +323,6 @@ MLSPlaintext::infer_content_type() const
 }
 
 bytes
-MLSPlaintext::marshal_content(size_t padding_size) const
-{
-  tls::ostream w;
-  var::visit([&](auto&& inner_content) { w << inner_content; }, content);
-
-  bytes padding(padding_size, 0);
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
-  tls::vector<2>::encode(w, padding);
-  return w.bytes();
-}
-
-bytes
 MLSPlaintext::commit_content() const
 {
   tls::ostream w;
@@ -414,6 +402,19 @@ MLSPlaintext::verify_membership_tag(const bytes& tag) const
   }
 
   return constant_time_eq(tag, opt::get(membership_tag).mac_value);
+}
+
+// MLSCiphertext
+
+tls::ostream&
+operator<<(tls::ostream& str, const MLSCiphertextContent& ct)
+{
+  var::visit([&](auto&& content) { str << content; }, ct.content);
+  tls::vector<2>::encode(str, ct.signature);
+  str << ct.confirmation_tag;
+  tls::vector<2>::encode(str, ct.padding);
+
+  return str;
 }
 
 } // namespace mls

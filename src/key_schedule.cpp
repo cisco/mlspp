@@ -1,5 +1,6 @@
 #include <mls/key_schedule.h>
 #include <mls/log.h>
+#include <mls/messages.h>
 
 using mls::log::Log;
 static const auto log_mod = "key_schedule"s;
@@ -237,23 +238,6 @@ GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
   return chain(type, sender).erase(generation);
 }
 
-// struct {
-//     opaque group_id<0..255>;
-//     uint64 epoch;
-//     ContentType content_type;
-//     opaque authenticated_data<0..2^32-1>;
-// } MLSCiphertextContentAAD;
-struct MLSCiphertextContentAAD
-{
-  const bytes& group_id;
-  const epoch_t epoch;
-  const ContentType content_type;
-  const bytes& authenticated_data;
-
-  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
-};
-
 using ReuseGuard = std::array<uint8_t, 4>;
 
 static ReuseGuard
@@ -325,7 +309,9 @@ GroupKeySource::encrypt(LeafIndex index,
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
-  auto content = pt.marshal_content(0);
+  bytes padding(0, 0);
+  auto content = tls::marshal(MLSCiphertextContent{
+    pt.content, pt.signature, pt.confirmation_tag, padding });
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
     pt.group_id, pt.epoch, pt.content_type, pt.authenticated_data });
 
@@ -415,8 +401,8 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
   return MLSPlaintext{ ct.group_id,
                        ct.epoch,
                        { SenderType::member, sender_data.sender },
-                       ct.content_type,
                        ct.authenticated_data,
+                       ct.content_type,
                        opt::get(content) };
 }
 
