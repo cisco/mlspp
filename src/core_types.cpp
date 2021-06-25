@@ -170,13 +170,43 @@ KeyPackage::to_be_signed() const
   return out.bytes();
 }
 
+tls::ostream&
+operator<<(tls::ostream& str, const KeyPackage& kp)
+{
+  str << kp.version << kp.cipher_suite << kp.init_key << kp.credential
+      << kp.extensions;
+  tls::vector<2>::encode(str, kp.signature);
+  return str;
+}
+
+tls::istream&
+operator>>(tls::istream& str, KeyPackage& kp)
+{
+  str >> kp.version;
+  str >> kp.cipher_suite;
+  str >> kp.init_key;
+  str >> kp.credential;
+  str >> kp.extensions;
+  tls::vector<2>::decode(str, kp.signature);
+
+  if (!kp.verify()) {
+    throw InvalidParameterError("Invalid signature on key package");
+  }
+  return str;
+}
+
 bool
 operator==(const KeyPackage& lhs, const KeyPackage& rhs)
 {
-  auto tbs = lhs.to_be_signed() == rhs.to_be_signed();
-  auto ver = lhs.verify() && rhs.verify();
-  auto same = lhs.signature == rhs.signature;
-  return tbs && (ver || same);
+  auto version = (lhs.version == rhs.version);
+  auto cipher_suite = (lhs.cipher_suite == rhs.cipher_suite);
+  auto init_key = (lhs.init_key == rhs.init_key);
+  auto credential = (lhs.credential == rhs.credential);
+  auto extensions = (lhs.extensions == rhs.extensions);
+  auto signature = (lhs.signature == rhs.signature);
+
+  return version && cipher_suite && init_key && credential && extensions &&
+         signature;
 }
 
 } // namespace mls
