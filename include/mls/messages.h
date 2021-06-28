@@ -594,6 +594,42 @@ private:
   bool decrypted;
 };
 
+struct MLSPlaintextCommitContent
+{
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  const bytes& authenticated_data;
+
+  const ContentType content_type{ ContentType::commit };
+  const Commit& commit;
+
+  const bytes& signature;
+
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   sender,
+                   authenticated_data,
+                   content_type,
+                   commit,
+                   signature)
+  TLS_TRAITS(tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::vector<4>,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>)
+};
+
+struct MLSPlaintextCommitAuthData
+{
+  const std::optional<MAC>& confirmation_tag;
+
+  TLS_SERIALIZABLE(confirmation_tag)
+  TLS_TRAITS(tls::pass)
+};
+
 // struct {
 //     select (MLSCiphertext.content_type) {
 //         case application:

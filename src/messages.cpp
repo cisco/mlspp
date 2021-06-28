@@ -325,25 +325,19 @@ MLSPlaintext::infer_content_type() const
 bytes
 MLSPlaintext::commit_content() const
 {
-  tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::vector<4>::encode(w, authenticated_data);
-  tls::variant<ContentType>::encode(w, content);
-  tls::vector<2>::encode(w, signature);
-  return w.bytes();
+  return tls::marshal(MLSPlaintextCommitContent{ group_id,
+                                                 epoch,
+                                                 sender,
+                                                 authenticated_data,
+                                                 ContentType::commit,
+                                                 var::get<Commit>(content),
+                                                 signature });
 }
 
 bytes
 MLSPlaintext::commit_auth_data() const
 {
-  // XXX(RLB): This construction means that the hashed transcript differs from
-  // the wire transcript by one byte -- the optional indicator on the
-  // confirmation tag is missing.  It's always 0x01, so it shouldn't matter, but
-  // it might be clearer to fix this.
-  //
-  // XXX(RLB): This matches PR#466, not the current spec.
-  return tls::marshal(confirmation_tag);
+  return tls::marshal(MLSPlaintextCommitAuthData{ confirmation_tag });
 }
 
 bytes
