@@ -178,24 +178,17 @@ struct KeyPackage
   bool verify_extension_support(const ExtensionList& ext_list) const;
   bool verify() const;
 
-  TLS_SERIALIZABLE(version,
-                   cipher_suite,
-                   init_key,
-                   credential,
-                   extensions,
-                   signature)
-  TLS_TRAITS(tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<2>)
-
 private:
   bytes to_be_signed() const;
 
   friend bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 };
+
+tls::ostream&
+operator<<(tls::ostream& str, const KeyPackage& kp);
+
+tls::istream&
+operator>>(tls::istream& str, KeyPackage& kp);
 
 bool
 operator==(const KeyPackage& lhs, const KeyPackage& rhs);
