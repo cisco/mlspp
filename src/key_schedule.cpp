@@ -1,5 +1,6 @@
 #include <mls/key_schedule.h>
 #include <mls/log.h>
+#include <mls/messages.h>
 
 using mls::log::Log;
 static const auto log_mod = "key_schedule"s;
@@ -237,23 +238,6 @@ GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
   return chain(type, sender).erase(generation);
 }
 
-// struct {
-//     opaque group_id<0..255>;
-//     uint64 epoch;
-//     ContentType content_type;
-//     opaque authenticated_data<0..2^32-1>;
-// } MLSCiphertextContentAAD;
-struct MLSCiphertextContentAAD
-{
-  const bytes& group_id;
-  const epoch_t epoch;
-  const ContentType content_type;
-  const bytes& authenticated_data;
-
-  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
-};
-
 using ReuseGuard = std::array<uint8_t, 4>;
 
 static ReuseGuard
@@ -325,10 +309,11 @@ GroupKeySource::encrypt(LeafIndex index,
 
   // Encrypt the content
   // XXX(rlb@ipv.sx): Apply padding?
-  auto content = pt.marshal_content(0);
-  auto content_type_val = pt.content_type();
+  bytes padding(0, 0);
+  auto content = tls::marshal(MLSCiphertextContent{
+    pt.content, pt.signature, pt.confirmation_tag, padding });
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    pt.group_id, pt.epoch, content_type_val, pt.authenticated_data });
+    pt.group_id, pt.epoch, pt.content_type, pt.authenticated_data });
 
   auto reuse_guard = new_reuse_guard();
   apply_reuse_guard(reuse_guard, content_keys.nonce);
@@ -343,7 +328,7 @@ GroupKeySource::encrypt(LeafIndex index,
   auto sender_data_keys =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, content_ct);
   auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, content_type_val });
+    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, pt.content_type });
 
   auto encrypted_sender_data = suite.hpke().aead.seal(
     sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
@@ -352,7 +337,7 @@ GroupKeySource::encrypt(LeafIndex index,
   MLSCiphertext ct;
   ct.group_id = pt.group_id;
   ct.epoch = pt.epoch;
-  ct.content_type = content_type_val;
+  ct.content_type = pt.content_type;
   ct.encrypted_sender_data = encrypted_sender_data;
   ct.authenticated_data = pt.authenticated_data;
   ct.ciphertext = content_ct;
@@ -416,8 +401,8 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
   return MLSPlaintext{ ct.group_id,
                        ct.epoch,
                        { SenderType::member, sender_data.sender },
-                       ct.content_type,
                        ct.authenticated_data,
+                       ct.content_type,
                        opt::get(content) };
 }
 

@@ -428,7 +428,32 @@ struct ApplicationData
   TLS_TRAITS(tls::vector<4>)
 };
 
-struct GroupContext;
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     opaque tree_hash<0..255>;
+//     opaque confirmed_transcript_hash<0..255>;
+//     Extension extensions<0..2^16-1>;
+// } GroupContext;
+struct GroupContext
+{
+  bytes group_id;
+  epoch_t epoch;
+  bytes tree_hash;
+  bytes confirmed_transcript_hash;
+  ExtensionList extensions;
+
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   extensions)
+  TLS_TRAITS(tls::vector<1>,
+             tls::pass,
+             tls::vector<1>,
+             tls::vector<1>,
+             tls::pass)
+};
 
 enum struct ContentType : uint8_t
 {
@@ -455,12 +480,52 @@ struct Sender
   TLS_SERIALIZABLE(sender_type, sender)
 };
 
+struct MLSPlaintextTBS
+{
+  const var::variant<GroupContext>& context;
+
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  const bytes& authenticated_data;
+
+  const ContentType& content_type;
+  const var::variant<ApplicationData, Proposal, Commit>& content;
+
+  TLS_SERIALIZABLE(context,
+                   group_id,
+                   epoch,
+                   sender,
+                   authenticated_data,
+                   content_type,
+                   content)
+  TLS_TRAITS(tls::variant<SenderType>,
+             tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::vector<4>,
+             tls::pass,
+             tls::variant<ContentType>)
+};
+
+struct MLSPlaintextTBM
+{
+  const MLSPlaintextTBS& tbs;
+  const bytes& signature;
+  const std::optional<MAC>& confirmation_tag;
+
+  TLS_SERIALIZABLE(tbs, signature, confirmation_tag)
+  TLS_TRAITS(tls::pass, tls::vector<2>, tls::pass)
+};
+
 struct MLSPlaintext
 {
   bytes group_id;
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
+
+  ContentType content_type;
   var::variant<ApplicationData, Proposal, Commit> content;
 
   bytes signature;
@@ -474,8 +539,8 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id,
                epoch_t epoch,
                Sender sender,
-               ContentType content_type,
                bytes authenticated_data,
+               ContentType content_type,
                const bytes& content);
 
   // Constructors for encrypting
@@ -486,7 +551,7 @@ struct MLSPlaintext
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Proposal proposal);
   MLSPlaintext(bytes group_id, epoch_t epoch, Sender sender, Commit commit);
 
-  ContentType content_type() const;
+  ContentType infer_content_type() const;
 
   bytes to_be_signed(const GroupContext& context) const;
   void sign(const CipherSuite& suite,
@@ -508,6 +573,7 @@ struct MLSPlaintext
                    epoch,
                    sender,
                    authenticated_data,
+                   content_type,
                    content,
                    signature,
                    confirmation_tag,
@@ -516,6 +582,7 @@ struct MLSPlaintext
              tls::pass,
              tls::pass,
              tls::vector<4>,
+             tls::pass,
              tls::variant<ContentType>,
              tls::vector<2>,
              tls::pass,
@@ -525,6 +592,83 @@ private:
   // Not part of the struct, an indicator of whether this MLSPlaintext was
   // constructed from an MLSCiphertext
   bool decrypted;
+};
+
+struct MLSPlaintextCommitContent
+{
+  const bytes& group_id;
+  const epoch_t& epoch;
+  const Sender& sender;
+  const bytes& authenticated_data;
+
+  const ContentType content_type{ ContentType::commit };
+  const Commit& commit;
+
+  const bytes& signature;
+
+  TLS_SERIALIZABLE(group_id,
+                   epoch,
+                   sender,
+                   authenticated_data,
+                   content_type,
+                   commit,
+                   signature)
+  TLS_TRAITS(tls::vector<1>,
+             tls::pass,
+             tls::pass,
+             tls::vector<4>,
+             tls::pass,
+             tls::pass,
+             tls::vector<2>)
+};
+
+struct MLSPlaintextCommitAuthData
+{
+  const std::optional<MAC>& confirmation_tag;
+
+  TLS_SERIALIZABLE(confirmation_tag)
+  TLS_TRAITS(tls::pass)
+};
+
+// struct {
+//     select (MLSCiphertext.content_type) {
+//         case application:
+//           opaque application_data<0..2^32-1>;
+//         case proposal:
+//           Proposal proposal;
+//         case commit:
+//           Commit commit;
+//     }
+//     opaque signature<0..2^16-1>;
+//     optional<MAC> confirmation_tag;
+//     opaque padding<0..2^16-1>;
+// } MLSCiphertextContent;
+struct MLSCiphertextContent
+{
+  const var::variant<ApplicationData, Proposal, Commit>& content;
+  const bytes& signature;
+  const std::optional<MAC>& confirmation_tag;
+  const bytes& padding;
+};
+
+tls::ostream&
+operator<<(tls::ostream& str, const MLSCiphertextContent& ct);
+
+// struct {
+//     opaque group_id<0..255>;
+//     uint64 epoch;
+//     ContentType content_type;
+//     opaque authenticated_data<0..2^32-1>;
+// } MLSCiphertextContentAAD;
+struct MLSCiphertextContentAAD
+{
+  const bytes& group_id;
+  const epoch_t epoch;
+  const ContentType content_type;
+  const bytes& authenticated_data;
+
+  TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
+  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
 };
 
 // struct {
@@ -580,5 +724,7 @@ TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
+
+TLS_VARIANT_MAP(mls::SenderType, mls::GroupContext, member)
 
 } // namespace tls
