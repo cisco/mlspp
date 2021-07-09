@@ -228,6 +228,7 @@ Proposal::proposal_type() const
 
 MLSPlaintext::MLSPlaintext()
   : epoch(0)
+  , content_type(ContentType::invalid)
   , decrypted(false)
 {}
 
