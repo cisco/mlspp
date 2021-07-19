@@ -428,8 +428,11 @@ TranscriptTestVector::create(CipherSuite suite)
   auto init_secret = random_bytes(suite.secret_size());
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
 
+  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto credential = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto commit =
     MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
+  commit.sign(suite, group_context, sig_priv);
 
   transcript.update_confirmed(commit);
   commit.confirmation_tag =
@@ -449,6 +452,7 @@ TranscriptTestVector::create(CipherSuite suite)
 
     ks_epoch.membership_key,
     ks_epoch.confirmation_key,
+    credential,
     commit,
 
     ctx,
@@ -473,6 +477,10 @@ TranscriptTestVector::verify() const
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
+
+  // Verify that the commit signature is valid
+  auto commit_valid = commit.verify(cipher_suite, group_context_obj, credential.public_key());
+  VERIFY("commit signature valid", commit_valid);
 
   // Verify the Commit tags
   auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
