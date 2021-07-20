@@ -691,7 +691,7 @@ MessagesTestVector::create()
   auto key_package =
     KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
 
-  auto lifetime = LifetimeExtension{ 0xA0A1A2A3A4A5A6A7, 0xB0B1B2B3B4B5B6B7 };
+  auto lifetime = LifetimeExtension{ 0x0000000000000000, 0xffffffffffffffff };
   auto capabilities = CapabilitiesExtension{ { version },
                                              { suite.cipher_suite() },
                                              { ExtensionType::ratchet_tree } };
