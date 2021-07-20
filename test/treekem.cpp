@@ -29,9 +29,9 @@ TEST_CASE_FIXTURE(TreeKEMTest, "ParentNode Equality")
   auto initB = HPKEPrivateKey::generate(suite);
 
   auto nodeA =
-    ParentNode{ initA.public_key, { LeafIndex(1), LeafIndex(2) }, { 3, 4 } };
+    ParentNode{ initA.public_key, { 3, 4 }, { LeafIndex(1), LeafIndex(2) } };
   auto nodeB =
-    ParentNode{ initB.public_key, { LeafIndex(5), LeafIndex(6) }, { 7, 8 } };
+    ParentNode{ initB.public_key, { 7, 8 }, { LeafIndex(5), LeafIndex(6) } };
 
   REQUIRE(nodeA == nodeA);
   REQUIRE(nodeB == nodeB);

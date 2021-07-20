@@ -20,7 +20,7 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 dev:
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
-	cmake -B${BUILD_DIR} -DTESTING=ON .
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test

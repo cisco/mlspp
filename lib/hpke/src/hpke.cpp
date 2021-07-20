@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <iostream>
+
 namespace hpke {
 
 using namespace bytes_ns::operators;
@@ -316,6 +318,8 @@ ReceiverContext::ReceiverContext(Context&& c)
 std::optional<bytes>
 ReceiverContext::open(const bytes& aad, const bytes& ct)
 {
+  std::cout << "--- open aad=[" << to_hex(aad) << "] ct=[" << to_hex(ct) << "]" << std::endl;
+
   auto maybe_pt = aead.open(key, current_nonce(), aad, ct);
   increment_seq();
   return maybe_pt;
@@ -408,6 +412,9 @@ HPKE::setup_base_r(const bytes& enc,
                    const KEM::PrivateKey& skR,
                    const bytes& info) const
 {
+  auto pkRm = kem.serialize(*skR.public_key());
+  std::cout << "--- setup_base_r pkr=[" << to_hex(pkRm) << "] info=[" << to_hex(info) << "]" << std::endl;
+
   auto shared_secret = kem.decap(enc, skR);
   auto ctx =
     key_schedule(Mode::base, shared_secret, info, default_psk, default_psk_id);

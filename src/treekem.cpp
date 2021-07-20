@@ -1,5 +1,7 @@
 #include <mls/treekem.h>
 
+#include <iostream> // XXX
+
 namespace mls {
 
 // Utility method used for removing leaves from a resolution
@@ -207,6 +209,8 @@ TreeKEMPrivateKey::decap(LeafIndex from,
                          const UpdatePath& path,
                          const std::vector<LeafIndex>& except)
 {
+  std::cout << "decap with context: [" << to_hex(context) << "]" << std::endl;
+
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
   auto size = pub.size();
@@ -406,7 +410,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
     }
 
     node_at(n).node = { ParentNode{
-      path.nodes[i].public_key, {}, parent_hash } };
+      path.nodes[i].public_key, parent_hash, {} } };
   }
 
   clear_hash_path(from);
@@ -540,6 +544,8 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const std::vector<LeafIndex>& except,
                         const std::optional<KeyPackageOpts>& maybe_opts)
 {
+  std::cout << "encap with context: [" << to_hex(context) << "]" << std::endl;
+
   // Grab information about the sender
   auto& maybe_node = node_at(NodeIndex(from)).node;
   if (!maybe_node) {
@@ -708,7 +714,7 @@ TreeKEMPublicKey::parent_hashes(LeafIndex from, const UpdatePath& path) const
     auto n = dp[i];
     auto s = tree_math::sibling(n, size());
 
-    auto parent_node = ParentNode{ path.nodes[i].public_key, {}, last_hash };
+    auto parent_node = ParentNode{ path.nodes[i].public_key, last_hash, {} };
     last_hash = parent_hash(parent_node, s);
     ph[i] = last_hash;
   }
