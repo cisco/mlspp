@@ -115,8 +115,12 @@ State::State(const HPKEPrivateKey& init_priv,
     throw NotImplementedError(/* PSKs are not supported */);
   }
 
+  // Look up any required PSKs
+  // TODO(RLB): Allow for PSKs
+  auto psk_secret = _suite.zero();
+
   // Decrypt the GroupInfo
-  auto group_info = welcome.decrypt(secrets.joiner_secret, {});
+  auto group_info = welcome.decrypt(secrets.joiner_secret, psk_secret);
 
   // Import the tree from the argument or from the extension
   _tree = import_tree(group_info.tree_hash, tree, group_info.extensions);
@@ -155,7 +159,7 @@ State::State(const HPKEPrivateKey& init_priv,
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
   _key_schedule =
-    KeyScheduleEpoch(_suite, secrets.joiner_secret, _suite.zero(), group_ctx);
+    KeyScheduleEpoch(_suite, secrets.joiner_secret, psk_secret, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
@@ -349,7 +353,7 @@ State::commit(const bytes& leaf_secret,
   auto no_proposals = commit.proposals.empty();
   auto path_required =
     has_updates || has_removes || no_proposals || external_commit;
-  auto update_secret = _suite.zero();
+  auto commit_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
@@ -368,7 +372,7 @@ State::commit(const bytes& leaf_secret,
                                              std::nullopt);
     next._tree_priv = new_priv;
     commit.path = path;
-    update_secret = new_priv.update_secret;
+    commit_secret = new_priv.update_secret;
 
     for (size_t i = 0; i < joiner_locations.size(); i++) {
       auto [overlap, shared_path_secret, ok] =
@@ -380,9 +384,13 @@ State::commit(const bytes& leaf_secret,
     }
   }
 
+  // Add any required PSKs to the key schedule
+  // TODO(RLB) Allow for PSKs
+  const auto psk_secret = _suite.zero();
+
   // Create the Commit message and advance the transcripts / key schedule
   auto pt = next.ratchet_and_sign(
-    sender, commit, update_secret, force_init_secret, group_context());
+    sender, commit, commit_secret, psk_secret, force_init_secret, group_context());
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
@@ -396,7 +404,7 @@ State::commit(const bytes& leaf_secret,
   group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome =
-    Welcome{ _suite, next._key_schedule.joiner_secret, {}, group_info };
+    Welcome{ _suite, next._key_schedule.joiner_secret, psk_secret, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -420,7 +428,8 @@ State::group_context() const
 MLSPlaintext
 State::ratchet_and_sign(const Sender& sender,
                         const Commit& op,
-                        const bytes& update_secret,
+                        const bytes& commit_secret,
+                        const bytes& psk_secret,
                         const std::optional<bytes>& force_init_secret,
                         const GroupContext& prev_ctx)
 {
@@ -431,7 +440,7 @@ State::ratchet_and_sign(const Sender& sender,
 
   _transcript_hash.update_confirmed(pt);
   _epoch += 1;
-  update_epoch_secrets(update_secret, force_init_secret);
+  update_epoch_secrets(commit_secret, psk_secret, force_init_secret);
 
   pt.confirmation_tag = { _key_schedule.confirmation_tag(
     _transcript_hash.confirmed) };
@@ -508,7 +517,7 @@ State::handle(const MLSPlaintext& pt)
 
   // Decapsulate and apply the UpdatePath, if provided
   // TODO(RLB) Verify that path is provided if required
-  auto update_secret = _suite.zero();
+  auto commit_secret = _suite.zero();
   if (commit.path) {
     const auto& path = opt::get(commit.path);
     if (!next._tree.parent_hash_valid(sender, path)) {
@@ -524,13 +533,17 @@ State::handle(const MLSPlaintext& pt)
     });
     next._tree_priv.decap(sender, next._tree, ctx, path, joiner_locations);
     next._tree.merge(sender, path);
-    update_secret = next._tree_priv.update_secret;
+    commit_secret = next._tree_priv.update_secret;
   }
+
+  // Add any required PSKs
+  // TODO(RLB) Allow for PSKs
+  const auto psk_secret = _suite.zero();
 
   // Update the transcripts and advance the key schedule
   next._transcript_hash.update(pt);
   next._epoch += 1;
-  next.update_epoch_secrets(update_secret, force_init_secret);
+  next.update_epoch_secrets(commit_secret, psk_secret, force_init_secret);
 
   // Verify the confirmation MAC
   if (!pt.confirmation_tag) {
@@ -733,6 +746,7 @@ operator!=(const State& lhs, const State& rhs)
 
 void
 State::update_epoch_secrets(const bytes& commit_secret,
+                            const bytes& psk_secret,
                             const std::optional<bytes>& force_init_secret)
 {
   auto ctx = tls::marshal(GroupContext{
@@ -743,7 +757,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
     _extensions,
   });
   _key_schedule =
-    _key_schedule.next(commit_secret, _suite.zero(), force_init_secret, ctx);
+    _key_schedule.next(commit_secret, psk_secret, force_init_secret, ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
