@@ -1,7 +1,5 @@
 #include <mls/treekem.h>
 
-#include <iostream> // XXX
-
 namespace mls {
 
 // Utility method used for removing leaves from a resolution
@@ -202,6 +200,57 @@ TreeKEMPrivateKey::shared_path_secret(LeafIndex to) const
   return std::make_tuple(n, i->second, true);
 }
 
+#if 0
+// XXX(RLB) This should ultimately be deleted, but it is handy for interop
+// debugging, so I'm keeping it around for now.  If re-enabled, you'll also need
+// to add the appropriate declarations to treekem.h
+
+void
+TreeKEMPrivateKey::dump() const
+{
+  for (const auto& [node, _] : path_secrets) {
+    private_key(node);
+  }
+
+  std::cout << "Tree (priv):" << std::endl;
+  std::cout << "  Index: " << NodeIndex(index).val << std::endl;
+  std::cout << "  Nodes: " << std::endl;
+  for (auto& [n, sk]: private_key_cache) {
+    auto pkm = to_hex(sk.public_key.data).substr(0, 8);
+    std::cout << "    " << n.val << " => " << pkm << std::endl;
+  }
+}
+
+void
+TreeKEMPublicKey::dump() const
+{
+  std::cout << "Tree:" << std::endl;
+  for (uint32_t i = 0; i < nodes.size(); ++i) {
+    printf("  %03d : ", i);
+
+    if (!nodes.at(i).blank()) {
+      auto pkRm = to_hex(opt::get(nodes.at(i).node).public_key().data);
+      std::cout << pkRm.substr(0, 8);
+    } else {
+      std::cout << "        ";
+    }
+
+    std::cout << "  | ";
+    for (uint32_t j = 0; j < tree_math::level(NodeIndex{i}); j++) {
+      std::cout << "  ";
+    }
+
+    if (!nodes.at(i).blank()) {
+      std::cout << "X";
+    } else {
+      std::cout << "_";
+    }
+
+    std::cout << std::endl;
+  }
+}
+#endif
+
 void
 TreeKEMPrivateKey::decap(LeafIndex from,
                          const TreeKEMPublicKey& pub,
@@ -209,7 +258,9 @@ TreeKEMPrivateKey::decap(LeafIndex from,
                          const UpdatePath& path,
                          const std::vector<LeafIndex>& except)
 {
-  std::cout << "decap with context: [" << to_hex(context) << "]" << std::endl;
+  if (!consistent(pub)) {
+    throw ProtocolError("TreeKEMPublicKey inconsistent with TreeKEMPrivateKey");
+  }
 
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
@@ -310,19 +361,23 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     return false;
   }
 
-  const auto public_match = [&](const auto& entry) {
-    auto n = entry.first;
-    auto priv = opt::get(private_key(n));
+  for (const auto& [node, _] : path_secrets) {
+    private_key(node);
+  }
 
-    const auto& opt_node = other.node_at(n).node;
+  for (const auto& [node, priv] : private_key_cache) {
+    const auto& opt_node = other.node_at(node).node;
     if (!opt_node) {
       return false;
     }
 
     const auto& pub = opt::get(opt_node).public_key();
-    return priv.public_key == pub;
-  };
-  return std::all_of(path_secrets.begin(), path_secrets.end(), public_match);
+    if (priv.public_key != pub) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 ///
@@ -544,8 +599,6 @@ TreeKEMPublicKey::encap(LeafIndex from,
                         const std::vector<LeafIndex>& except,
                         const std::optional<KeyPackageOpts>& maybe_opts)
 {
-  std::cout << "encap with context: [" << to_hex(context) << "]" << std::endl;
-
   // Grab information about the sender
   auto& maybe_node = node_at(NodeIndex(from)).node;
   if (!maybe_node) {

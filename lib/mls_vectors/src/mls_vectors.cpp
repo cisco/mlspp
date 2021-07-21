@@ -508,7 +508,8 @@ new_key_package(CipherSuite suite)
 {
   auto scheme = suite;
   auto init_secret = random_bytes(suite.secret_size());
-  auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+  auto leaf_node_secret = suite.derive_secret(init_secret, "node");
+  auto init_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto cred = Credential::basic({ 0, 1, 2, 3 }, scheme, sig_priv.public_key);
   auto kp =
@@ -636,13 +637,15 @@ TreeKEMTestVector::verify() const
   auto ancestor = tree_math::ancestor(my_index, add_sender);
 
   // Establish a TreeKEMPrivate Key
-  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, my_leaf_secret);
+  auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");
+  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
   auto priv = TreeKEMPrivateKey::joiner(cipher_suite,
                                         ratchet_tree_before.size(),
                                         my_index,
                                         leaf_priv,
                                         ancestor,
                                         my_path_secret);
+  VERIFY("private key consistent with tree before", priv.consistent(ratchet_tree_before));
   VERIFY_EQUAL(
     "root secret after add", priv.update_secret, root_secret_after_add);
 
