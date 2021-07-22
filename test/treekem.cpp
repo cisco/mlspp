@@ -207,15 +207,17 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 {
   const auto size = LeafCount{ 10 };
 
-  auto pub = TreeKEMPublicKey{ suite };
   auto privs = std::vector<TreeKEMPrivateKey>{};
+  auto pubs = std::vector<TreeKEMPublicKey>{};
   auto sig_privs = std::vector<SignaturePrivateKey>{};
 
   // Add the first member
   auto [init_priv_0, sig_priv_0, kp0] = new_key_package();
   sig_privs.push_back(sig_priv_0);
 
+  auto pub = TreeKEMPublicKey{ suite };
   auto index_0 = pub.add_leaf(kp0);
+  pubs.push_back(pub);
   REQUIRE(index_0 == LeafIndex{ 0 });
 
   auto priv = TreeKEMPrivateKey::solo(suite, index_0, init_priv_0);
@@ -231,33 +233,37 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     sig_privs.push_back(sig_priv);
 
     // Add the new joiner
-    auto index = pub.add_leaf(kp);
+    auto index = pubs[i].add_leaf(kp);
     REQUIRE(index == joiner);
 
     auto leaf_secret = random_bytes(32);
-    auto [new_adder_priv, path] = pub.encap(
+    auto [new_adder_priv, path] = pubs[i].encap(
       adder, context, leaf_secret, sig_privs.back(), {}, std::nullopt);
     privs[i] = new_adder_priv;
-    REQUIRE(pub.parent_hash_valid(adder, path));
-
-    pub.merge(adder, path);
-    REQUIRE(privs[i].consistent(pub));
+    REQUIRE(pubs[i].parent_hash_valid(adder, path));
 
     auto [overlap, path_secret, ok] = privs[i].shared_path_secret(joiner);
     REQUIRE(ok);
 
+    pubs[i].merge(adder, path);
+    REQUIRE(privs[i].consistent(pubs[i]));
+
     // New joiner initializes their private key
     auto joiner_priv = TreeKEMPrivateKey::joiner(
-      suite, pub.size(), joiner, init_priv, overlap, path_secret);
+      suite, pubs[i].size(), joiner, init_priv, overlap, path_secret);
     privs.push_back(joiner_priv);
+    pubs.push_back(pubs[i]);
     REQUIRE(privs[i + 1].consistent(privs[i]));
-    REQUIRE(privs[i + 1].consistent(pub));
+    REQUIRE(privs[i + 1].consistent(pubs[i + 1]));
 
     // Other members update via decap()
     for (uint32_t j = 0; j < i; j++) {
-      privs[j].decap(adder, pub, context, path, {});
+      pubs[j].add_leaf(kp);
+      privs[j].decap(adder, pubs[j], context, path, {});
+      pubs[j].merge(adder, path);
+
       REQUIRE(privs[j].consistent(privs[i]));
-      REQUIRE(privs[j].consistent(pub));
+      REQUIRE(privs[j].consistent(pubs[j]));
     }
   }
 }

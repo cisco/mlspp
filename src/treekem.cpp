@@ -365,19 +365,20 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     private_key(node);
   }
 
-  for (const auto& [node, priv] : private_key_cache) {
+  return std::all_of(private_key_cache.begin(), private_key_cache.end(), [other](const auto& entry) {
+    const auto& [node, priv] = entry;
     const auto& opt_node = other.node_at(node).node;
     if (!opt_node) {
-      return false;
+      // It's OK for a TreeKEMPrivateKey to have private keys for nodes that are
+      // blank in the TreeKEMPublicKey.  This will happen traniently during
+      // Commit processing, since proposals will be applied in the public tree
+      // and not in the private tree.
+      return true;
     }
 
     const auto& pub = opt::get(opt_node).public_key();
-    if (priv.public_key != pub) {
-      return false;
-    }
-  }
-
-  return true;
+    return priv.public_key == pub;
+  });
 }
 
 ///
