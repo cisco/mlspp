@@ -218,8 +218,10 @@ Welcome::group_info_key_nonce(CipherSuite suite,
   // XXX(RLB): These used to be done with ExpandWithLabel.  Should we do that
   // instead, for better domain separation? (In particular, including "mls10")
   // That is what we do for the sender data key/nonce.
-  auto key = suite.hpke().kdf.expand(welcome_secret, key_label, suite.key_size());
-  auto nonce = suite.hpke().kdf.expand(welcome_secret, nonce_label, suite.nonce_size());
+  auto key =
+    suite.hpke().kdf.expand(welcome_secret, key_label, suite.key_size());
+  auto nonce =
+    suite.hpke().kdf.expand(welcome_secret, nonce_label, suite.nonce_size());
   return { std::move(key), std::move(nonce) };
 }
 

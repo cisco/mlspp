@@ -389,8 +389,12 @@ State::commit(const bytes& leaf_secret,
   const auto psk_secret = _suite.zero();
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt = next.ratchet_and_sign(
-    sender, commit, commit_secret, psk_secret, force_init_secret, group_context());
+  auto pt = next.ratchet_and_sign(sender,
+                                  commit,
+                                  commit_secret,
+                                  psk_secret,
+                                  force_init_secret,
+                                  group_context());
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{

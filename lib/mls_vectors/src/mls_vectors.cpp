@@ -429,7 +429,8 @@ TranscriptTestVector::create(CipherSuite suite)
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
 
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto credential = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
+  auto credential =
+    Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto commit =
     MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
   commit.sign(suite, group_context, sig_priv);
@@ -479,7 +480,8 @@ TranscriptTestVector::verify() const
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
 
   // Verify that the commit signature is valid
-  auto commit_valid = commit.verify(cipher_suite, group_context_obj, credential.public_key());
+  auto commit_valid =
+    commit.verify(cipher_suite, group_context_obj, credential.public_key());
   VERIFY("commit signature valid", commit_valid);
 
   // Verify the Commit tags
@@ -645,7 +647,8 @@ TreeKEMTestVector::verify() const
                                         leaf_priv,
                                         ancestor,
                                         my_path_secret);
-  VERIFY("private key consistent with tree before", priv.consistent(ratchet_tree_before));
+  VERIFY("private key consistent with tree before",
+         priv.consistent(ratchet_tree_before));
   VERIFY_EQUAL(
     "root secret after add", priv.update_secret, root_secret_after_add);
 
