@@ -1,8 +1,10 @@
 #include "mls_client_impl.h"
 #include "json_details.h"
+#include <bytes/bytes.h>
 
 using grpc::StatusCode;
 using nlohmann::json;
+using namespace bytes_ns;
 
 static inline std::string
 bytes_to_string(const std::vector<uint8_t>& data)
@@ -265,6 +267,8 @@ uint32_t
 MLSClientImpl::store_state(mls::State&& state, bool encrypt_handshake)
 {
   auto state_id = tls::get<uint32_t>(state.authentication_secret());
+  state_id += state.index().val;
+
   auto entry = CachedState{ std::move(state), encrypt_handshake, {}, {} };
   state_cache.emplace(std::make_pair(state_id, std::move(entry)));
   return state_id;
