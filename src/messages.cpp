@@ -186,7 +186,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
   }
 
   auto gs_data = tls::marshal(gs);
-  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
+  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, {}, gs_data);
   secrets.push_back({ kp.hash(), enc_gs });
 }
 

@@ -109,7 +109,7 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupSecrets
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
-  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
+  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
   if (!secrets.psks.psks.empty()) {
     throw NotImplementedError(/* PSKs are not supported */);

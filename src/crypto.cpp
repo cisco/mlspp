@@ -216,24 +216,26 @@ constant_time_eq(const bytes& lhs, const bytes& rhs)
 ///
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
+                       const bytes& info,
                        const bytes& aad,
                        const bytes& pt) const
 {
   auto pkR = suite.hpke().kem.deserialize(data);
-  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, {});
+  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
   auto ct = ctx.seal(aad, pt);
   return HPKECiphertext{ enc, ct };
 }
 
 std::tuple<bytes, bytes>
 HPKEPublicKey::do_export(CipherSuite suite,
+                         const bytes& info,
                          const std::string& label,
                          size_t size) const
 {
   auto label_data = bytes(label.begin(), label.end());
 
   auto pkR = suite.hpke().kem.deserialize(data);
-  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, {});
+  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
   auto exported = ctx.do_export(label_data, size);
   return std::make_tuple(enc, exported);
 }
@@ -269,11 +271,12 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 HPKEPrivateKey::decrypt(CipherSuite suite,
+                        const bytes& info,
                         const bytes& aad,
                         const HPKECiphertext& ct) const
 {
   auto skR = suite.hpke().kem.deserialize_private(data);
-  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, {});
+  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, info);
   auto pt = ctx.open(aad, ct.ciphertext);
   if (!pt) {
     throw InvalidParameterError("HPKE decryption failure");
@@ -284,6 +287,7 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
 
 bytes
 HPKEPrivateKey::do_export(CipherSuite suite,
+                          const bytes& info,
                           const bytes& kem_output,
                           const std::string& label,
                           size_t size) const
@@ -291,7 +295,7 @@ HPKEPrivateKey::do_export(CipherSuite suite,
   auto label_data = bytes(label.begin(), label.end());
 
   auto skR = suite.hpke().kem.deserialize_private(data);
-  auto ctx = suite.hpke().setup_base_r(kem_output, *skR, {});
+  auto ctx = suite.hpke().setup_base_r(kem_output, *skR, info);
   return ctx.do_export(label_data, size);
 }
 
