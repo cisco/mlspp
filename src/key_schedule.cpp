@@ -494,7 +494,7 @@ KeyScheduleEpoch::external_init(CipherSuite suite,
                                 const HPKEPublicKey& external_pub)
 {
   auto size = suite.secret_size();
-  return external_pub.do_export(suite, {}, "MLS 1.0 external init", size);
+  return external_pub.do_export(suite, {}, "MLS 1.0 external init secret", size);
 }
 
 bytes
@@ -502,7 +502,7 @@ KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
 {
   auto size = suite.secret_size();
   return external_priv.do_export(
-    suite, {}, kem_output, "MLS 1.0 external init", size);
+    suite, {}, kem_output, "MLS 1.0 external init secret", size);
 }
 
 KeyScheduleEpoch
