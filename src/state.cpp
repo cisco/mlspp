@@ -1,5 +1,7 @@
 #include <mls/state.h>
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -874,6 +876,11 @@ State::encrypt(const MLSPlaintext& pt)
 MLSPlaintext
 State::decrypt(const MLSCiphertext& ct)
 {
+  if (ct.wire_format != WireFormat::mls_ciphertext) {
+    std::cout << "!!! " << int(ct.wire_format) << std::endl;
+    throw InvalidParameterError("Invalid wire format for MLSCiphertext");
+  }
+
   // Verify the epoch
   if (ct.group_id != _group_id) {
     throw InvalidParameterError("Ciphertext not from this group");

@@ -307,6 +307,10 @@ GroupKeySource::encrypt(LeafIndex index,
                         const bytes& sender_data_secret,
                         const MLSPlaintext& pt)
 {
+  if (pt.wire_format != WireFormat::mls_ciphertext) {
+    throw InvalidParameterError("Encrypt on MLSPlaintext without wire_format signal");
+  }
+
   // Pull from the key schedule
   static const auto get_key_type = overloaded{
     [](const ApplicationData& /*unused*/) {

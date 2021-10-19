@@ -744,7 +744,7 @@ MessagesTestVector::create()
   pt_commit.membership_tag = mac;
 
   auto ct = MLSCiphertext{
-    group_id, epoch, ContentType::application, opaque, opaque, opaque,
+    WireFormat::mls_ciphertext, group_id, epoch, ContentType::application, opaque, opaque, opaque,
   };
 
   return MessagesTestVector{
