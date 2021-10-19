@@ -614,7 +614,7 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
 
 std::vector<LeafIndex>
 State::apply(const std::vector<CachedProposal>& proposals,
-             ProposalType required_type)
+             Proposal::Type required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& cached : proposals) {

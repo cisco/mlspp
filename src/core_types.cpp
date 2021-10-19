@@ -96,6 +96,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
     { all_supported_versions.begin(), all_supported_versions.end() },
     { all_supported_suites.begin(), all_supported_suites.end() },
     {},
+    {},
   });
 
   // TODO(RLB) Set non-eternal lifetimes

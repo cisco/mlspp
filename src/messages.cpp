@@ -219,10 +219,10 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // MLSPlaintext
-ProposalType
+Proposal::Type
 Proposal::proposal_type() const
 {
-  return tls::variant<ProposalType>::type(content);
+  return tls::variant<ProposalType>::type(content).val;
 }
 
 MLSPlaintext::MLSPlaintext()

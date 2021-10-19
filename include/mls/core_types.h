@@ -90,10 +90,11 @@ struct CapabilitiesExtension
   std::vector<ProtocolVersion> versions;
   std::vector<CipherSuite::ID> cipher_suites;
   std::vector<uint16_t> extensions;
+  std::vector<uint16_t> proposals;
 
   static const uint16_t type;
-  TLS_SERIALIZABLE(versions, cipher_suites, extensions)
-  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>)
+  TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
+  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>, tls::vector<1>)
 };
 
 struct LifetimeExtension
