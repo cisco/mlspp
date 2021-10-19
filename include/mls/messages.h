@@ -212,7 +212,7 @@ public:
 // struct {
 //   opaque joiner_secret<1..255>;
 //   optional<PathSecret> path_secret;
-//   optional<PreSharedKeys> psks;
+//   PreSharedKeys psks;
 // } GroupSecrets;
 struct GroupSecrets
 {
@@ -226,7 +226,7 @@ struct GroupSecrets
 
   bytes joiner_secret;
   std::optional<PathSecret> path_secret;
-  std::optional<PreSharedKeys> psks;
+  PreSharedKeys psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
   TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)

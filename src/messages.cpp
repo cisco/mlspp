@@ -180,7 +180,7 @@ Welcome::find(const KeyPackage& kp) const
 void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, std::nullopt };
+  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, {} };
   if (path_secret) {
     gs.path_secret = { opt::get(path_secret) };
   }
