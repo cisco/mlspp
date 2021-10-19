@@ -1,7 +1,5 @@
 #include <mls/state.h>
 
-#include <iostream>
-
 namespace mls {
 
 ///
@@ -176,7 +174,7 @@ State::external_join(const bytes& leaf_secret,
 {
   auto initial_state = State(std::move(sig_priv), pgs, tree);
   auto add = initial_state.add_proposal(kp);
-  auto opts = CommitOpts{ { add }, false };
+  auto opts = CommitOpts{ { add }, false, false };
   auto [commit_pt, welcome, state] =
     initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
   silence_unused(welcome);
@@ -383,8 +381,13 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto pt = next.ratchet_and_sign(
-    sender, commit, update_secret, force_init_secret, group_context());
+  auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
+  auto pt = next.ratchet_and_sign(sender,
+                                  commit,
+                                  update_secret,
+                                  force_init_secret,
+                                  encrypt_handshake,
+                                  group_context());
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
@@ -424,11 +427,15 @@ State::ratchet_and_sign(const Sender& sender,
                         const Commit& op,
                         const bytes& update_secret,
                         const std::optional<bytes>& force_init_secret,
+                        bool encrypt_handshake,
                         const GroupContext& prev_ctx)
 {
   auto prev_key_schedule = _key_schedule;
 
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
+  if (encrypt_handshake) {
+    pt.wire_format = WireFormat::mls_ciphertext;
+  }
   pt.sign(_suite, prev_ctx, _identity_priv);
 
   _transcript_hash.update_confirmed(pt);
@@ -688,6 +695,7 @@ State::protect(const bytes& pt)
 {
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
+  mpt.wire_format = WireFormat::mls_ciphertext;
   mpt.sign(_suite, group_context(), _identity_priv);
   mpt.membership_tag = { _key_schedule.membership_tag(group_context(), mpt) };
   return encrypt(mpt);
@@ -870,14 +878,32 @@ State::authentication_secret() const
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
-  return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt);
+  if ((pt.sender.sender_type != SenderType::member) ||
+      (pt.sender.sender != _index.val)) {
+    throw InvalidParameterError("Cannot encrypt a plaintext from someone else");
+  }
+
+  if (pt.wire_format == WireFormat::mls_ciphertext) {
+    return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt);
+  }
+
+  // If a plaintext has been created without the prior intent to encrypt it,
+  // then it needs to be re-signed.
+  //
+  // XXX(RLB): This is currently true for all MLSPlaintexts generated with the
+  // X_proposal() methods.  There is a trade-off here between API decoupling
+  // (when do you need to know you're going to encrypt?) and the work of
+  // re-signing.
+  auto pt_copy = pt;
+  pt_copy.wire_format = WireFormat::mls_ciphertext;
+  pt_copy.sign(_suite, group_context(), _identity_priv);
+  return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt_copy);
 }
 
 MLSPlaintext
 State::decrypt(const MLSCiphertext& ct)
 {
   if (ct.wire_format != WireFormat::mls_ciphertext) {
-    std::cout << "!!! " << int(ct.wire_format) << std::endl;
     throw InvalidParameterError("Invalid wire format for MLSCiphertext");
   }
 

@@ -85,7 +85,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome
@@ -108,7 +108,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   auto add = first0.add_proposal(key_packages[1]);
   // Don't generate RatchetTree extension
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, false });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, false, false });
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome, pass in the
@@ -211,7 +211,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   // Add the second member
   auto add = first0.add_proposal(key_packages[1]);
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
   silence_unused(commit);
 
   auto second0 = State{
@@ -249,7 +249,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 
   // Create a Commit that adds everybody
   auto [commit, welcome, new_state] =
-    states[0].commit(fresh_secret(), CommitOpts{ adds, true });
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false });
   silence_unused(commit);
   states[0] = new_state;
 
@@ -278,7 +278,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 
     auto add = states[sender].add_proposal(key_packages[i]);
     auto [commit, welcome, new_state] =
-      states[sender].commit(fresh_secret(), CommitOpts{ { add }, true });
+      states[sender].commit(fresh_secret(), CommitOpts{ { add }, true, false });
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
         states[j] = new_state;
@@ -319,7 +319,7 @@ protected:
     }
 
     auto [commit, welcome, new_state] =
-      states[0].commit(fresh_secret(), CommitOpts{ adds, true });
+      states[0].commit(fresh_secret(), CommitOpts{ adds, true, false });
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
@@ -368,7 +368,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
     auto new_leaf = fresh_secret();
     auto update = states[i].update_proposal(new_leaf);
     auto [commit, welcome, new_state] =
-      states[i].commit(new_leaf, CommitOpts{ { update }, true });
+      states[i].commit(new_leaf, CommitOpts{ { update }, true, false });
     silence_unused(welcome);
 
     for (auto& state : states) {
@@ -388,7 +388,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(LeafIndex{ uint32_t(i + 1) });
     auto [commit, welcome, new_state] =
-      states[i].commit(fresh_secret(), CommitOpts{ { remove }, true });
+      states[i].commit(fresh_secret(), CommitOpts{ { remove }, true, false });
     silence_unused(welcome);
 
     states.pop_back();
@@ -417,7 +417,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
   auto [commit_1, welcome_1, new_state_1] =
-    states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true });
+    states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true, false });
   silence_unused(welcome_1);
   silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
@@ -432,7 +432,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
   auto [commit_2, welcome_2, new_state_2] =
-    new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true });
+    new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true, false });
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
   expected_creds = std::vector<Credential>{

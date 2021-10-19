@@ -228,7 +228,6 @@ Proposal::proposal_type() const
 MLSPlaintext::MLSPlaintext()
   : wire_format(WireFormat::mls_plaintext)
   , epoch(0)
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -243,7 +242,6 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
-  , decrypted(true)
 {
   tls::istream r(content_in);
   switch (content_type_in) {
@@ -279,36 +277,33 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            ApplicationData application_data_in)
-  : wire_format(WireFormat::mls_ciphertext)
+  : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(application_data_in))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Proposal proposal)
-  : wire_format(WireFormat::mls_ciphertext)
+  : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(proposal))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Commit commit)
-  : wire_format(WireFormat::mls_ciphertext)
+  : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(commit))
-  , decrypted(false)
 {}
 
 ContentType
@@ -397,7 +392,7 @@ MLSPlaintext::membership_tag_input(const GroupContext& context) const
 bool
 MLSPlaintext::verify_membership_tag(const bytes& tag) const
 {
-  if (decrypted) {
+  if (wire_format == WireFormat::mls_ciphertext) {
     return true;
   }
 

@@ -3,6 +3,8 @@
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 
+#include <iostream>
+
 using namespace mls;
 using namespace mls_vectors;
 
@@ -46,5 +48,10 @@ TEST_CASE("Extensions")
 TEST_CASE("Messages Interop")
 {
   auto tv = MessagesTestVector::create();
-  REQUIRE(tv.verify() == std::nullopt);
+
+  auto result = tv.verify();
+  if (result) {
+    std::cout << opt::get(result) << std::endl;
+  }
+  REQUIRE(result == std::nullopt);
 }

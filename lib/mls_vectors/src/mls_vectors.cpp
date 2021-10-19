@@ -76,6 +76,12 @@ operator==(const bytes& b, const HexBytes& hb)
     return err;                                                                \
   }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define VERIFY_TLS_RTT_VAL(label, Type, expected, val)                         \
+  if (auto err = verify_round_trip<Type>(label, expected, val)) {              \
+    return err;                                                                \
+  }
+
 template<typename T, typename U>
 static std::optional<std::string>
 verify_equal(const std::string& label, const T& actual, const U& expected)
@@ -93,6 +99,14 @@ template<typename T>
 static std::optional<std::string>
 verify_round_trip(const std::string& label, const bytes& expected)
 {
+  auto noop = [](const auto&) { return true; };
+  return verify_round_trip<T>(label, expected, noop);
+}
+
+template<typename T, typename F>
+static std::optional<std::string>
+verify_round_trip(const std::string& label, const bytes& expected, const F& val)
+{
   auto obj = T{};
   try {
     obj = tls::get<T>(expected);
@@ -101,6 +115,13 @@ verify_round_trip(const std::string& label, const bytes& expected)
     ss << "Decode error: " << label << " " << e.what();
     return ss.str();
   }
+
+  if (!val(obj)) {
+    auto ss = std::stringstream();
+    ss << "Validation error: " << label;
+    return ss.str();
+  }
+
   auto actual = tls::marshal(obj);
   VERIFY_EQUAL(label, actual, expected);
   return std::nullopt;
@@ -217,7 +238,11 @@ EncryptionTestVector::create(CipherSuite suite,
     auto N = LeafIndex{ i };
     auto sender = Sender{ SenderType::member, i };
     auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
+    hs_pt.wire_format = WireFormat::mls_ciphertext;
+
     auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
+    app_pt.wire_format = WireFormat::mls_ciphertext;
+
     auto hs_pt_data = tls::marshal(hs_pt);
     auto app_pt_data = tls::marshal(app_pt);
 
@@ -744,7 +769,13 @@ MessagesTestVector::create()
   pt_commit.membership_tag = mac;
 
   auto ct = MLSCiphertext{
-    WireFormat::mls_ciphertext, group_id, epoch, ContentType::application, opaque, opaque, opaque,
+    WireFormat::mls_ciphertext,
+    group_id,
+    epoch,
+    ContentType::application,
+    opaque,
+    opaque,
+    opaque,
   };
 
   return MessagesTestVector{
@@ -800,10 +831,21 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  VERIFY_TLS_RTT("MLSPlaintext/App", MLSPlaintext, mls_plaintext_application);
-  VERIFY_TLS_RTT("MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal);
-  VERIFY_TLS_RTT("MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit);
-  VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext);
+  auto require_pt = [](const auto& pt) {
+    return pt.wire_format == WireFormat::mls_plaintext;
+  };
+  auto require_ct = [](const auto& pt) {
+    return pt.wire_format == WireFormat::mls_ciphertext;
+  };
+
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/App", MLSPlaintext, mls_plaintext_application, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSCiphertext", MLSCiphertext, mls_ciphertext, require_ct);
 
   return std::nullopt;
 }

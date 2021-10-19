@@ -530,11 +530,6 @@ struct MLSPlaintext
              tls::vector<2>,
              tls::pass,
              tls::pass)
-
-private:
-  // Not part of the struct, an indicator of whether this MLSPlaintext was
-  // constructed from an MLSCiphertext
-  bool decrypted;
 };
 
 // struct {
