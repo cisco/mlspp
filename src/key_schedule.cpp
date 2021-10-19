@@ -427,11 +427,12 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
 
 static bytes
 make_joiner_secret(CipherSuite suite,
+                   const bytes& context,
                    const bytes& init_secret,
                    const bytes& commit_secret)
 {
   auto pre_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
-  return suite.derive_secret(pre_joiner_secret, "joiner");
+  return suite.expand_with_label(pre_joiner_secret, "joiner", context, suite.secret_size());
 }
 
 static bytes
@@ -473,7 +474,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& context)
   : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, init_secret, suite_in.zero()),
+                     make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
                      suite_in.zero(),
                      context)
 {}
@@ -484,7 +485,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& psk_secret,
                                    const bytes& context)
   : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, init_secret, commit_secret),
+                     make_joiner_secret(suite_in, context, init_secret, commit_secret),
                      psk_secret,
                      context)
 {}
