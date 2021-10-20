@@ -432,7 +432,8 @@ make_joiner_secret(CipherSuite suite,
                    const bytes& commit_secret)
 {
   auto pre_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
-  return suite.expand_with_label(pre_joiner_secret, "joiner", context, suite.secret_size());
+  return suite.expand_with_label(
+    pre_joiner_secret, "joiner", context, suite.secret_size());
 }
 
 static bytes
@@ -473,10 +474,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& context)
-  : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
-                     suite_in.zero(),
-                     context)
+  : KeyScheduleEpoch(
+      suite_in,
+      make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
+      suite_in.zero(),
+      context)
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
@@ -484,10 +486,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& commit_secret,
                                    const bytes& psk_secret,
                                    const bytes& context)
-  : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, context, init_secret, commit_secret),
-                     psk_secret,
-                     context)
+  : KeyScheduleEpoch(
+      suite_in,
+      make_joiner_secret(suite_in, context, init_secret, commit_secret),
+      psk_secret,
+      context)
 {}
 
 std::tuple<bytes, bytes>
@@ -495,7 +498,8 @@ KeyScheduleEpoch::external_init(CipherSuite suite,
                                 const HPKEPublicKey& external_pub)
 {
   auto size = suite.secret_size();
-  return external_pub.do_export(suite, {}, "MLS 1.0 external init secret", size);
+  return external_pub.do_export(
+    suite, {}, "MLS 1.0 external init secret", size);
 }
 
 bytes

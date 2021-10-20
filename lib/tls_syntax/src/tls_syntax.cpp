@@ -13,7 +13,8 @@ ostream::write_raw(const std::vector<uint8_t>& bytes)
 
 // Primitive type writers
 ostream&
-ostream::write_uint(uint64_t value, int length) // NOLINT(bugprone-easily-swappable-parameters)
+ostream::write_uint(uint64_t value,
+                    int length) // NOLINT(bugprone-easily-swappable-parameters)
 {
   // NOLINTNEXTLINE(altera-unroll-loops, altera-id-dependent-backward-branch)
   for (int i = length - 1; i >= 0; --i) {
