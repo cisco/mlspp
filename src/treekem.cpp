@@ -255,7 +255,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   // Decrypt and implant
   auto priv = opt::get(private_key(res[resi]));
   auto path_secret =
-    priv.decrypt(suite, context, path.nodes[dpi].node_secrets[resi]);
+    priv.decrypt(suite, context, {}, path.nodes[dpi].node_secrets[resi]);
   implant(overlap_node, LeafCount(size), path_secret);
 }
 
@@ -564,7 +564,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
     remove_leaves(res, except);
     for (auto nr : res) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
-      auto ct = node_pub.encrypt(suite, context, path_secret);
+      auto ct = node_pub.encrypt(suite, context, {}, path_secret);
       node.node_secrets.push_back(ct);
     }
 

@@ -105,10 +105,12 @@ struct HPKEPublicKey
   bytes data;
 
   HPKECiphertext encrypt(CipherSuite suite,
+                         const bytes& info,
                          const bytes& aad,
                          const bytes& pt) const;
 
   std::tuple<bytes, bytes> do_export(CipherSuite suite,
+                                     const bytes& info,
                                      const std::string& label,
                                      size_t size) const;
 
@@ -128,10 +130,12 @@ struct HPKEPrivateKey
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
+                const bytes& info,
                 const bytes& aad,
                 const HPKECiphertext& ct) const;
 
   bytes do_export(CipherSuite suite,
+                  const bytes& info,
                   const bytes& kem_output,
                   const std::string& label,
                   size_t size) const;

@@ -427,11 +427,13 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
 
 static bytes
 make_joiner_secret(CipherSuite suite,
+                   const bytes& context,
                    const bytes& init_secret,
                    const bytes& commit_secret)
 {
   auto pre_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
-  return suite.derive_secret(pre_joiner_secret, "joiner");
+  return suite.expand_with_label(
+    pre_joiner_secret, "joiner", context, suite.secret_size());
 }
 
 static bytes
@@ -472,10 +474,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& context)
-  : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, init_secret, suite_in.zero()),
-                     suite_in.zero(),
-                     context)
+  : KeyScheduleEpoch(
+      suite_in,
+      make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
+      suite_in.zero(),
+      context)
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
@@ -483,10 +486,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& commit_secret,
                                    const bytes& psk_secret,
                                    const bytes& context)
-  : KeyScheduleEpoch(suite_in,
-                     make_joiner_secret(suite_in, init_secret, commit_secret),
-                     psk_secret,
-                     context)
+  : KeyScheduleEpoch(
+      suite_in,
+      make_joiner_secret(suite_in, context, init_secret, commit_secret),
+      psk_secret,
+      context)
 {}
 
 std::tuple<bytes, bytes>
@@ -494,7 +498,8 @@ KeyScheduleEpoch::external_init(CipherSuite suite,
                                 const HPKEPublicKey& external_pub)
 {
   auto size = suite.secret_size();
-  return external_pub.do_export(suite, "MLS 1.0 external init", size);
+  return external_pub.do_export(
+    suite, {}, "MLS 1.0 external init secret", size);
 }
 
 bytes
@@ -502,7 +507,7 @@ KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
 {
   auto size = suite.secret_size();
   return external_priv.do_export(
-    suite, kem_output, "MLS 1.0 external init", size);
+    suite, {}, kem_output, "MLS 1.0 external init secret", size);
 }
 
 KeyScheduleEpoch
@@ -516,14 +521,13 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
     actual_init_secret = opt::get(force_init_secret);
   }
 
-  return KeyScheduleEpoch(
-    suite, actual_init_secret, commit_secret, psk_secret, context);
+  return { suite, actual_init_secret, commit_secret, psk_secret, context };
 }
 
 GroupKeySource
 KeyScheduleEpoch::encryption_keys(LeafCount size) const
 {
-  return GroupKeySource(suite, size, encryption_secret);
+  return { suite, size, encryption_secret };
 }
 
 bytes

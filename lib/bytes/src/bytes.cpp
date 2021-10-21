@@ -10,7 +10,7 @@ namespace bytes_ns {
 bytes
 from_ascii(const std::string& ascii)
 {
-  return bytes(ascii.begin(), ascii.end());
+  return { ascii.begin(), ascii.end() };
 }
 
 std::string
@@ -31,9 +31,9 @@ from_hex(const std::string& hex)
     throw std::invalid_argument("Odd-length hex string");
   }
 
-  int len = static_cast<int>(hex.length()) / 2;
-  bytes out(len);
-  for (int i = 0; i < len; i += 1) {
+  auto len = hex.length() / 2;
+  auto out = bytes(len);
+  for (size_t i = 0; i < len; i += 1) {
     std::string byte = hex.substr(2 * i, 2);
     out[i] = static_cast<bytes::value_type>(strtol(byte.c_str(), nullptr, 16));
   }

@@ -7,7 +7,6 @@ void
 ostream::write_raw(const std::vector<uint8_t>& bytes)
 {
   // Not sure what the default argument is here
-  // NOLINTNEXTLINE(fuchsia-default-arguments)
   _buffer.insert(_buffer.end(), bytes.begin(), bytes.end());
 }
 

@@ -19,7 +19,7 @@ DHKEM::PrivateKey::public_key() const
 DHKEM
 make_dhkem(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
 {
-  return DHKEM(kem_id_in, group_in, kdf_in);
+  return { kem_id_in, group_in, kdf_in };
 }
 
 template<>
