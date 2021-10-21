@@ -10,7 +10,7 @@ namespace bytes_ns {
 bytes
 from_ascii(const std::string& ascii)
 {
-  return bytes(ascii.begin(), ascii.end());
+  return { ascii.begin(), ascii.end() };
 }
 
 std::string
