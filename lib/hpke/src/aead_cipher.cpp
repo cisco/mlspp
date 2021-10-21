@@ -36,7 +36,7 @@ ExportOnlyCipher::ExportOnlyCipher()
 AEADCipher
 make_aead(AEAD::ID cipher_in)
 {
-  return AEADCipher(cipher_in);
+  return { cipher_in };
 }
 
 template<>

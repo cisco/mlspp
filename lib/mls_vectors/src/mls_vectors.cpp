@@ -711,7 +711,8 @@ MessagesTestVector::create()
   auto lifetime = LifetimeExtension{ 0xA0A1A2A3A4A5A6A7, 0xB0B1B2B3B4B5B6B7 };
   auto capabilities = CapabilitiesExtension{ { version },
                                              { suite.cipher_suite() },
-                                             { ExtensionType::ratchet_tree } };
+                                             { ExtensionType::ratchet_tree },
+                                             { ProposalType::add } };
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(key_package);
   tree.add_leaf(key_package);

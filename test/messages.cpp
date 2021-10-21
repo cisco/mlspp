@@ -14,6 +14,7 @@ TEST_CASE("Extensions")
     { ProtocolVersion::mls10 },
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
     {},
+    {},
   };
   auto lt0 = LifetimeExtension{ 0xA0A0A0A0A0A0A0A0, 0xB0B0B0B0B0B0B0B0 };
   auto kid0 = KeyIDExtension{ { 0, 1, 2, 3 } };

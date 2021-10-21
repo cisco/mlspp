@@ -7,6 +7,7 @@ using namespace mls;
 
 TEST_CASE("Basic HPKE")
 {
+  auto info = random_bytes(100);
   auto aad = random_bytes(100);
   auto original = random_bytes(100);
 
@@ -27,8 +28,8 @@ TEST_CASE("Basic HPKE")
     REQUIRE(gY == gY);
     REQUIRE(gX != gY);
 
-    auto encrypted = gX.encrypt(suite, aad, original);
-    auto decrypted = x.decrypt(suite, aad, encrypted);
+    auto encrypted = gX.encrypt(suite, info, aad, original);
+    auto decrypted = x.decrypt(suite, info, aad, encrypted);
 
     REQUIRE(original == decrypted);
   }

@@ -212,7 +212,7 @@ public:
 // struct {
 //   opaque joiner_secret<1..255>;
 //   optional<PathSecret> path_secret;
-//   optional<PreSharedKeys> psks;
+//   PreSharedKeys psks;
 // } GroupSecrets;
 struct GroupSecrets
 {
@@ -226,7 +226,7 @@ struct GroupSecrets
 
   bytes joiner_secret;
   std::optional<PathSecret> path_secret;
-  std::optional<PreSharedKeys> psks;
+  PreSharedKeys psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
   TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
@@ -346,27 +346,42 @@ struct AppAck
   TLS_TRAITS(tls::vector<4>)
 };
 
-enum struct ProposalType : uint8_t
-{
-  invalid = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
-  psk = 4,
-  reinit = 5,
-  external_init = 6,
-  app_ack = 7,
-};
+struct ProposalType;
 
 struct Proposal
 {
+  using Type = uint16_t;
+
   var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
     content;
 
-  ProposalType proposal_type() const;
+  Type proposal_type() const;
 
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
+};
+
+struct ProposalType
+{
+  static constexpr Proposal::Type invalid = 0;
+  static constexpr Proposal::Type add = 1;
+  static constexpr Proposal::Type update = 2;
+  static constexpr Proposal::Type remove = 3;
+  static constexpr Proposal::Type psk = 4;
+  static constexpr Proposal::Type reinit = 5;
+  static constexpr Proposal::Type external_init = 6;
+  static constexpr Proposal::Type app_ack = 7;
+
+  constexpr ProposalType()
+    : val(invalid)
+  {}
+
+  constexpr ProposalType(Proposal::Type pt)
+    : val(pt)
+  {}
+
+  Proposal::Type val;
+  TLS_SERIALIZABLE(val);
 };
 
 struct ProposalRef

@@ -153,7 +153,7 @@ copath(NodeIndex x, LeafCount n)
 {
   auto d = dirpath(x, n);
   if (d.empty()) {
-    return std::vector<NodeIndex>();
+    return {};
   }
 
   std::vector<NodeIndex> path;
@@ -198,6 +198,7 @@ ancestor(LeafIndex l, LeafIndex r)
 
   uint32_t prefix = ln.val << k;
   uint32_t stop = (1U << uint8_t(k - 1));
+  // NOLINTNEXTLINE(modernize-return-braced-init-list)
   return NodeIndex(prefix + (stop - 1));
 }
 

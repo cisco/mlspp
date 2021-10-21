@@ -109,9 +109,9 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupSecrets
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
-  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
+  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
-  if (secrets.psks) {
+  if (!secrets.psks.psks.empty()) {
     throw NotImplementedError(/* PSKs are not supported */);
   }
 
@@ -623,7 +623,7 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
 
 std::vector<LeafIndex>
 State::apply(const std::vector<CachedProposal>& proposals,
-             ProposalType required_type)
+             Proposal::Type required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& cached : proposals) {
