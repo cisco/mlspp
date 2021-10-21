@@ -521,14 +521,13 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
     actual_init_secret = opt::get(force_init_secret);
   }
 
-  return KeyScheduleEpoch(
-    suite, actual_init_secret, commit_secret, psk_secret, context);
+  return { suite, actual_init_secret, commit_secret, psk_secret, context };
 }
 
 GroupKeySource
 KeyScheduleEpoch::encryption_keys(LeafCount size) const
 {
-  return GroupKeySource(suite, size, encryption_secret);
+  return { suite, size, encryption_secret };
 }
 
 bytes

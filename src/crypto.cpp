@@ -247,7 +247,7 @@ HPKEPrivateKey::generate(CipherSuite suite)
   auto priv_data = suite.hpke().kem.serialize_private(*priv);
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return HPKEPrivateKey(priv_data, pub_data);
+  return { priv_data, pub_data };
 }
 
 HPKEPrivateKey
@@ -256,7 +256,7 @@ HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
   auto priv = suite.hpke().kem.deserialize_private(data);
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return HPKEPrivateKey(data, pub_data);
+  return { data, pub_data };
 }
 
 HPKEPrivateKey
@@ -266,7 +266,7 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
   auto priv_data = suite.hpke().kem.serialize_private(*priv);
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return HPKEPrivateKey(priv_data, pub_data);
+  return { priv_data, pub_data };
 }
 
 bytes
@@ -323,7 +323,7 @@ SignaturePrivateKey::generate(CipherSuite suite)
   auto priv_data = suite.sig().serialize_private(*priv);
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return SignaturePrivateKey(priv_data, pub_data);
+  return { priv_data, pub_data };
 }
 
 SignaturePrivateKey
@@ -332,7 +332,7 @@ SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
   auto priv = suite.sig().deserialize_private(data);
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return SignaturePrivateKey(data, pub_data);
+  return { data, pub_data };
 }
 
 SignaturePrivateKey
@@ -342,7 +342,7 @@ SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
   auto priv_data = suite.sig().serialize_private(*priv);
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return SignaturePrivateKey(priv_data, pub_data);
+  return { priv_data, pub_data };
 }
 
 bytes
