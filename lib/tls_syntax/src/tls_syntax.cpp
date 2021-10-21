@@ -7,16 +7,14 @@ void
 ostream::write_raw(const std::vector<uint8_t>& bytes)
 {
   // Not sure what the default argument is here
-  // NOLINTNEXTLINE(fuchsia-default-arguments)
   _buffer.insert(_buffer.end(), bytes.begin(), bytes.end());
 }
 
 // Primitive type writers
 ostream&
 ostream::write_uint(uint64_t value,
-                    int length) // NOLINT(bugprone-easily-swappable-parameters)
+                    int length)
 {
-  // NOLINTNEXTLINE(altera-unroll-loops, altera-id-dependent-backward-branch)
   for (int i = length - 1; i >= 0; --i) {
     _buffer.push_back(static_cast<uint8_t>(value >> unsigned(8 * i)));
   }
