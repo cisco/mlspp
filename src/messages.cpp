@@ -153,13 +153,13 @@ Welcome::Welcome()
 
 Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
-                 const bytes& psk_secret,
+                 const std::vector<PSKWithSecret>& psks,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
   , _joiner_secret(joiner_secret)
 {
-  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psk_secret);
+  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
     cipher_suite.hpke().aead.seal(key, nonce, {}, group_info_data);
@@ -191,10 +191,10 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
+Welcome::decrypt(const bytes& joiner_secret, const std::vector<PSKWithSecret>& psks) const
 {
   auto [key, nonce] =
-    group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
+    group_info_key_nonce(cipher_suite, joiner_secret, psks);
   auto group_info_data =
     cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data) {
@@ -207,10 +207,10 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
 KeyAndNonce
 Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
-                              const bytes& psk_secret)
+                              const std::vector<PSKWithSecret>& psks)
 {
   auto welcome_secret =
-    KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psk_secret);
+    KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psks);
   auto key =
     suite.expand_with_label(welcome_secret, "key", {}, suite.key_size());
   auto nonce =

@@ -109,7 +109,7 @@ public:
   // Full initializer, used by invited joiner
   KeyScheduleEpoch(CipherSuite suite_in,
                    const bytes& joiner_secret,
-                   const bytes& psk_secret,
+                   const std::vector<PSKWithSecret>& psks,
                    const bytes& context);
 
   // Ciphersuite-only initializer, used by external joiner
@@ -124,7 +124,7 @@ public:
   KeyScheduleEpoch(CipherSuite suite_in,
                    const bytes& init_secret,
                    const bytes& commit_secret,
-                   const bytes& psk_secret,
+                   const std::vector<PSKWithSecret>& psks,
                    const bytes& context);
 
   static std::tuple<bytes, bytes> external_init(
@@ -133,7 +133,7 @@ public:
   bytes receive_external_init(const bytes& kem_output) const;
 
   KeyScheduleEpoch next(const bytes& commit_secret,
-                        const bytes& psk_secret,
+                        const std::vector<PSKWithSecret>& psks,
                         const std::optional<bytes>& force_init_secret,
                         const bytes& context) const;
 
@@ -145,9 +145,11 @@ public:
                   const bytes& context,
                   size_t size) const;
 
+  static bytes psk_secret(CipherSuite suite,
+                          const std::vector<PSKWithSecret> psks);
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& joiner_secret,
-                              const bytes& psk_secret);
+                              const std::vector<PSKWithSecret>& psks);
   static KeyAndNonce sender_data_keys(CipherSuite suite,
                                       const bytes& sender_data_secret,
                                       const bytes& ciphertext);

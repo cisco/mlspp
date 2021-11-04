@@ -95,6 +95,11 @@ struct PreSharedKeys
   TLS_TRAITS(tls::vector<2>)
 };
 
+struct PSKWithSecret {
+  PreSharedKeyID id;
+  bytes secret;
+};
+
 // struct {
 //     CipherSuite cipher_suite;
 //     opaque group_id<0..255>;
@@ -261,12 +266,12 @@ struct Welcome
   Welcome();
   Welcome(CipherSuite suite,
           const bytes& joiner_secret,
-          const bytes& psk_secret,
+          const std::vector<PSKWithSecret>& psks,
           const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& joiner_secret, const bytes& psk_secret) const;
+  GroupInfo decrypt(const bytes& joiner_secret, const std::vector<PSKWithSecret>& psks) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
@@ -275,7 +280,7 @@ private:
   bytes _joiner_secret;
   static KeyAndNonce group_info_key_nonce(CipherSuite suite,
                                           const bytes& joiner_secret,
-                                          const bytes& psk_secret);
+                                          const std::vector<PSKWithSecret>& psks);
 };
 
 ///
