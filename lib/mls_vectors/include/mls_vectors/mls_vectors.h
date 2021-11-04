@@ -87,17 +87,24 @@ struct EncryptionTestVector
 
 struct KeyScheduleTestVector
 {
+  struct ExternalPSKInfo {
+    HexBytes id;
+    HexBytes nonce;
+    HexBytes secret;
+  };
+
   struct Epoch
   {
     // Chosen by the generator
     HexBytes tree_hash;
     HexBytes commit_secret;
-    HexBytes psk_secret;
     HexBytes confirmed_transcript_hash;
+    std::vector<ExternalPSKInfo> external_psks;
 
     // Computed values
     HexBytes group_context;
 
+    HexBytes psk_secret;
     HexBytes joiner_secret;
     HexBytes welcome_secret;
     HexBytes init_secret;
@@ -122,7 +129,8 @@ struct KeyScheduleTestVector
   std::vector<Epoch> epochs;
 
   static KeyScheduleTestVector create(mls::CipherSuite suite,
-                                      uint32_t n_epochs);
+                                      uint32_t n_epochs,
+                                      uint32_t n_psks);
   std::optional<std::string> verify() const;
 };
 

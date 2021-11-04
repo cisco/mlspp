@@ -90,6 +90,7 @@ private:
 
 public:
   bytes joiner_secret;
+  bytes psk_secret;
   bytes epoch_secret;
 
   bytes sender_data_secret;
@@ -145,8 +146,6 @@ public:
                   const bytes& context,
                   size_t size) const;
 
-  static bytes psk_secret(CipherSuite suite,
-                          const std::vector<PSKWithSecret> psks);
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& joiner_secret,
                               const std::vector<PSKWithSecret>& psks);

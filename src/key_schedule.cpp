@@ -462,10 +462,9 @@ make_joiner_secret(CipherSuite suite,
 static bytes
 make_epoch_secret(CipherSuite suite,
                   const bytes& joiner_secret,
-                  const std::vector<PSKWithSecret> psks,
+                  const bytes& psk_secret,
                   const bytes& context)
 {
-  auto psk_secret = make_psk_secret(suite, psks);
   auto member_secret = suite.hpke().kdf.extract(joiner_secret, psk_secret);
   return suite.expand_with_label(
     member_secret, "epoch", context, suite.secret_size());
@@ -477,8 +476,9 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& context)
   : suite(suite_in)
   , joiner_secret(joiner_secret)
+  , psk_secret(make_psk_secret(suite_in, psks))
   , epoch_secret(
-      make_epoch_secret(suite_in, joiner_secret, psks, context))
+      make_epoch_secret(suite_in, joiner_secret, joiner_secret, context))
   , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
   , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
   , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))

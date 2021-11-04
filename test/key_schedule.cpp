@@ -16,7 +16,7 @@ TEST_CASE("Encryption Keys Interop")
 TEST_CASE("Key Schedule Interop")
 {
   for (auto suite : all_supported_suites) {
-    auto tv = KeyScheduleTestVector::create(suite, 15);
+    auto tv = KeyScheduleTestVector::create(suite, 15, 3);
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
