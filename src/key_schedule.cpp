@@ -425,7 +425,8 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
 /// KeyScheduleEpoch
 ///
 
-struct PSKLabel {
+struct PSKLabel
+{
   const PreSharedKeyID& id;
   uint16_t index;
   uint16_t count;
@@ -434,14 +435,16 @@ struct PSKLabel {
 };
 
 bytes
-make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret> psks) {
+make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret> psks)
+{
   auto psk_secret = suite.zero();
   auto count = uint16_t(psks.size());
   auto index = uint16_t(0);
   for (const auto& psk : psks) {
     auto psk_extracted = suite.hpke().kdf.extract(suite.zero(), psk.secret);
     auto psk_label = tls::marshal(PSKLabel{ psk.id, index, count });
-    auto psk_input = suite.expand_with_label(psk_extracted, "derived psk", psk_label, suite.secret_size());
+    auto psk_input = suite.expand_with_label(
+      psk_extracted, "derived psk", psk_label, suite.secret_size());
     psk_secret = suite.hpke().kdf.extract(psk_input, psk_secret);
     index += 1;
   }

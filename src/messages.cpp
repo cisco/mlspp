@@ -191,10 +191,10 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& joiner_secret, const std::vector<PSKWithSecret>& psks) const
+Welcome::decrypt(const bytes& joiner_secret,
+                 const std::vector<PSKWithSecret>& psks) const
 {
-  auto [key, nonce] =
-    group_info_key_nonce(cipher_suite, joiner_secret, psks);
+  auto [key, nonce] = group_info_key_nonce(cipher_suite, joiner_secret, psks);
   auto group_info_data =
     cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data) {

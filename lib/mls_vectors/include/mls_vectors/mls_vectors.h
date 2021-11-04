@@ -87,7 +87,8 @@ struct EncryptionTestVector
 
 struct KeyScheduleTestVector
 {
-  struct ExternalPSKInfo {
+  struct ExternalPSKInfo
+  {
     HexBytes id;
     HexBytes nonce;
     HexBytes secret;

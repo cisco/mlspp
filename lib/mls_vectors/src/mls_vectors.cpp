@@ -300,7 +300,9 @@ EncryptionTestVector::verify() const
 ///
 
 KeyScheduleTestVector
-KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs, uint32_t n_psks)
+KeyScheduleTestVector::create(CipherSuite suite,
+                              uint32_t n_epochs,
+                              uint32_t n_psks)
 {
   auto tv = KeyScheduleTestVector{};
   tv.cipher_suite = suite;
@@ -324,12 +326,12 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs, uint32_t n_p
       auto secret = random_bytes(suite.secret_size());
 
       psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
-      external_psks.push_back({id, nonce, secret});
+      external_psks.push_back({ id, nonce, secret });
     }
 
     auto branch_psk_nonce = bytes{};
     if (i > 0) {
-      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i-1));
+      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i - 1));
       branch_psk_nonce = psk.id.psk_nonce;
       psks.push_back(psk);
     }
@@ -392,7 +394,8 @@ KeyScheduleTestVector::verify() const
 
     auto psks = std::vector<PSKWithSecret>{};
     for (const auto& psk : tve.external_psks) {
-      psks.push_back({ PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
+      psks.push_back(
+        { PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
     }
 
     if (epoch_n > 0) {
@@ -407,8 +410,8 @@ KeyScheduleTestVector::verify() const
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
-    auto welcome_secret = KeyScheduleEpoch::welcome_secret(
-      cipher_suite, tve.joiner_secret, psks);
+    auto welcome_secret =
+      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, psks);
     VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
     VERIFY_EQUAL(
