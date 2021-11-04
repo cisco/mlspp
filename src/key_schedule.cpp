@@ -434,7 +434,7 @@ struct PSKLabel
   TLS_SERIALIZABLE(id, index, count);
 };
 
-bytes
+static bytes
 make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
 {
   auto psk_secret = suite.zero();
