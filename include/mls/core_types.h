@@ -94,9 +94,8 @@ struct CapabilitiesExtension
   std::vector<uint16_t> proposals;
 
   static CapabilitiesExtension create_default();
-  bool extensions_supported(
-    const std::vector<Extension::Type>& extensions) const;
-  bool proposals_supported(const std::vector<uint16_t>& proposals) const;
+  bool extensions_supported(const std::vector<Extension::Type>& required) const;
+  bool proposals_supported(const std::vector<uint16_t>& required) const;
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
