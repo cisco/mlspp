@@ -326,7 +326,13 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs, uint32_t n_p
       psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
       external_psks.push_back({id, nonce, secret});
     }
-    // TODO(RLB) Add resumption PSK from previous epoch
+
+    auto branch_psk_nonce = bytes{};
+    if (i > 0) {
+      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i-1));
+      branch_psk_nonce = psk.id.psk_nonce;
+      psks.push_back(psk);
+    }
 
     auto commit_secret = random_bytes(suite.secret_size());
     // TODO(RLB) Add Test case for externally-driven epoch change
@@ -340,6 +346,7 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs, uint32_t n_p
       commit_secret,
       group_context.confirmed_transcript_hash,
       external_psks,
+      branch_psk_nonce,
 
       ctx,
 
@@ -375,6 +382,7 @@ KeyScheduleTestVector::verify() const
   // Manually correct the init secret
   epoch.init_secret = initial_init_secret;
 
+  auto epoch_n = epoch_t(0);
   for (const auto& tve : epochs) {
     // Ratchet forward the key schedule
     group_context.tree_hash = tve.tree_hash;
@@ -386,8 +394,14 @@ KeyScheduleTestVector::verify() const
     for (const auto& psk : tve.external_psks) {
       psks.push_back({ PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
     }
-    // TODO(RLB) Add resumption PSK from previous epoch
 
+    if (epoch_n > 0) {
+      auto psk = epoch.branch_psk(group_id, epoch_n - 1);
+      psk.id.psk_nonce = tve.branch_psk_nonce;
+      psks.push_back(psk);
+    }
+
+    epoch_n += 1;
     epoch = epoch.next(tve.commit_secret, psks, std::nullopt, ctx);
 
     // Verify the rest of the epoch

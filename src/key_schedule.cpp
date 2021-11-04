@@ -578,6 +578,20 @@ KeyScheduleEpoch::do_export(const std::string& label,
   return suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
+PSKWithSecret
+KeyScheduleEpoch::branch_psk(const bytes& group_id, epoch_t epoch)
+{
+  auto nonce = random_bytes(suite.secret_size());
+  return { { BranchPSK{ group_id, epoch }, nonce }, resumption_secret };
+}
+
+PSKWithSecret
+KeyScheduleEpoch::reinit_psk(const bytes& group_id, epoch_t epoch)
+{
+  auto nonce = random_bytes(suite.secret_size());
+  return { { ReInitPSK{ group_id, epoch }, nonce }, resumption_secret };
+}
+
 bytes
 KeyScheduleEpoch::welcome_secret(CipherSuite suite,
                                  const bytes& joiner_secret,

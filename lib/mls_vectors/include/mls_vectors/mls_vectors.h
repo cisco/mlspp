@@ -100,6 +100,7 @@ struct KeyScheduleTestVector
     HexBytes commit_secret;
     HexBytes confirmed_transcript_hash;
     std::vector<ExternalPSKInfo> external_psks;
+    HexBytes branch_psk_nonce;
 
     // Computed values
     HexBytes group_context;
