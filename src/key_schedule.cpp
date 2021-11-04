@@ -435,7 +435,7 @@ struct PSKLabel
 };
 
 bytes
-make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret> psks)
+make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
 {
   auto psk_secret = suite.zero();
   auto count = uint16_t(psks.size());
