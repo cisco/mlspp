@@ -236,7 +236,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
-  : wire_format(WireFormat::mls_ciphertext)
+  : wire_format(WireFormat::mls_ciphertext) // since this is used for decryption
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
