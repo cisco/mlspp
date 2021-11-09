@@ -136,6 +136,9 @@ public:
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
+  // Assemble a group context for this state
+  GroupContext group_context() const;
+
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
@@ -164,9 +167,6 @@ protected:
   };
   std::list<CachedProposal> _pending_proposals;
   std::map<bytes, bytes> _update_secrets;
-
-  // Assemble a group context for this state
-  GroupContext group_context() const;
 
   // Assemble a preliminary, unjoined group state
   State(SignaturePrivateKey sig_priv,

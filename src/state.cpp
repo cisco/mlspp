@@ -21,6 +21,11 @@ State::State(bytes group_id,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
+  // Verify that the client supports the proposed group extensions
+  if (!key_package.verify_extension_support(_extensions)) {
+    throw InvalidParameterError("Client doesn't support required extensions");
+  }
+
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
