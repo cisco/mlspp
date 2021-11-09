@@ -425,6 +425,32 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
 /// KeyScheduleEpoch
 ///
 
+struct PSKLabel
+{
+  const PreSharedKeyID& id;
+  uint16_t index;
+  uint16_t count;
+
+  TLS_SERIALIZABLE(id, index, count);
+};
+
+static bytes
+make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
+{
+  auto psk_secret = suite.zero();
+  auto count = uint16_t(psks.size());
+  auto index = uint16_t(0);
+  for (const auto& psk : psks) {
+    auto psk_extracted = suite.hpke().kdf.extract(suite.zero(), psk.secret);
+    auto psk_label = tls::marshal(PSKLabel{ psk.id, index, count });
+    auto psk_input = suite.expand_with_label(
+      psk_extracted, "derived psk", psk_label, suite.secret_size());
+    psk_secret = suite.hpke().kdf.extract(psk_input, psk_secret);
+    index += 1;
+  }
+  return psk_secret;
+}
+
 static bytes
 make_joiner_secret(CipherSuite suite,
                    const bytes& context,
@@ -449,12 +475,13 @@ make_epoch_secret(CipherSuite suite,
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& joiner_secret,
-                                   const bytes& psk_secret,
+                                   const std::vector<PSKWithSecret>& psks,
                                    const bytes& context)
   : suite(suite_in)
   , joiner_secret(joiner_secret)
+  , psk_secret(make_psk_secret(suite_in, psks))
   , epoch_secret(
-      make_epoch_secret(suite_in, joiner_secret, psk_secret, context))
+      make_epoch_secret(suite_in, joiner_secret, joiner_secret, context))
   , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
   , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
   , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))
@@ -477,19 +504,19 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   : KeyScheduleEpoch(
       suite_in,
       make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
-      suite_in.zero(),
+      { /* no PSKs */ },
       context)
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& commit_secret,
-                                   const bytes& psk_secret,
+                                   const std::vector<PSKWithSecret>& psks,
                                    const bytes& context)
   : KeyScheduleEpoch(
       suite_in,
       make_joiner_secret(suite_in, context, init_secret, commit_secret),
-      psk_secret,
+      psks,
       context)
 {}
 
@@ -512,7 +539,7 @@ KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
 
 KeyScheduleEpoch
 KeyScheduleEpoch::next(const bytes& commit_secret,
-                       const bytes& psk_secret,
+                       const std::vector<PSKWithSecret>& psks,
                        const std::optional<bytes>& force_init_secret,
                        const bytes& context) const
 {
@@ -521,7 +548,7 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
     actual_init_secret = opt::get(force_init_secret);
   }
 
-  return { suite, actual_init_secret, commit_secret, psk_secret, context };
+  return { suite, actual_init_secret, commit_secret, psks, context };
 }
 
 GroupKeySource
@@ -554,11 +581,26 @@ KeyScheduleEpoch::do_export(const std::string& label,
   return suite.expand_with_label(secret, "exporter", context_hash, size);
 }
 
+PSKWithSecret
+KeyScheduleEpoch::branch_psk(const bytes& group_id, epoch_t epoch)
+{
+  auto nonce = random_bytes(suite.secret_size());
+  return { { BranchPSK{ group_id, epoch }, nonce }, resumption_secret };
+}
+
+PSKWithSecret
+KeyScheduleEpoch::reinit_psk(const bytes& group_id, epoch_t epoch)
+{
+  auto nonce = random_bytes(suite.secret_size());
+  return { { ReInitPSK{ group_id, epoch }, nonce }, resumption_secret };
+}
+
 bytes
 KeyScheduleEpoch::welcome_secret(CipherSuite suite,
                                  const bytes& joiner_secret,
-                                 const bytes& psk_secret)
+                                 const std::vector<PSKWithSecret>& psks)
 {
+  auto psk_secret = make_psk_secret(suite, psks);
   auto extract = suite.hpke().kdf.extract(joiner_secret, psk_secret);
   return suite.derive_secret(extract, "welcome");
 }

@@ -300,7 +300,9 @@ EncryptionTestVector::verify() const
 ///
 
 KeyScheduleTestVector
-KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
+KeyScheduleTestVector::create(CipherSuite suite,
+                              uint32_t n_epochs,
+                              uint32_t n_psks)
 {
   auto tv = KeyScheduleTestVector{};
   tv.cipher_suite = suite;
@@ -316,22 +318,41 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
       random_bytes(suite.digest().hash_size);
     auto ctx = tls::marshal(group_context);
 
+    auto psks = std::vector<PSKWithSecret>{};
+    auto external_psks = std::vector<ExternalPSKInfo>{};
+    for (size_t j = 0; j < n_psks; j++) {
+      auto id = random_bytes(suite.secret_size());
+      auto nonce = random_bytes(suite.secret_size());
+      auto secret = random_bytes(suite.secret_size());
+
+      psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
+      external_psks.push_back({ id, nonce, secret });
+    }
+
+    auto branch_psk_nonce = bytes{};
+    if (i > 0) {
+      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i - 1));
+      branch_psk_nonce = psk.id.psk_nonce;
+      psks.push_back(psk);
+    }
+
     auto commit_secret = random_bytes(suite.secret_size());
-    auto psk_secret = random_bytes(suite.secret_size());
     // TODO(RLB) Add Test case for externally-driven epoch change
-    epoch = epoch.next(commit_secret, psk_secret, std::nullopt, ctx);
+    epoch = epoch.next(commit_secret, psks, std::nullopt, ctx);
 
     auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psk_secret);
+      KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psks);
 
     tv.epochs.push_back({
       group_context.tree_hash,
       commit_secret,
-      psk_secret,
       group_context.confirmed_transcript_hash,
+      external_psks,
+      branch_psk_nonce,
 
       ctx,
 
+      epoch.psk_secret,
       epoch.joiner_secret,
       welcome_secret,
       epoch.init_secret,
@@ -363,6 +384,7 @@ KeyScheduleTestVector::verify() const
   // Manually correct the init secret
   epoch.init_secret = initial_init_secret;
 
+  auto epoch_n = epoch_t(0);
   for (const auto& tve : epochs) {
     // Ratchet forward the key schedule
     group_context.tree_hash = tve.tree_hash;
@@ -370,13 +392,26 @@ KeyScheduleTestVector::verify() const
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("group context", ctx, tve.group_context);
 
-    epoch = epoch.next(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
+    auto psks = std::vector<PSKWithSecret>{};
+    for (const auto& psk : tve.external_psks) {
+      psks.push_back(
+        { PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
+    }
+
+    if (epoch_n > 0) {
+      auto psk = epoch.branch_psk(group_id, epoch_n - 1);
+      psk.id.psk_nonce = tve.branch_psk_nonce;
+      psks.push_back(psk);
+    }
+
+    epoch_n += 1;
+    epoch = epoch.next(tve.commit_secret, psks, std::nullopt, ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
-    auto welcome_secret = KeyScheduleEpoch::welcome_secret(
-      cipher_suite, tve.joiner_secret, tve.psk_secret);
+    auto welcome_secret =
+      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, psks);
     VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
     VERIFY_EQUAL(
@@ -701,7 +736,7 @@ MessagesTestVector::create()
                                        { psk_id, psk_nonce },
                                        { psk_id, psk_nonce },
                                      } } };
-  auto welcome = Welcome{ suite, opaque, opaque, group_info };
+  auto welcome = Welcome{ suite, opaque, {}, group_info };
   welcome.encrypt(key_package, opaque);
 
   // PublicGroupState

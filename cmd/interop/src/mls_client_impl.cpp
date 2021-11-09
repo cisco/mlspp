@@ -339,6 +339,9 @@ Status
 MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
                                     GenerateTestVectorResponse* reply)
 {
+  // XXX(RLB): Should this value be set by the test runner?
+  static const uint32_t n_psks = 3;
+
   json j;
   switch (request->test_vector_type()) {
     case TestVectorType::TREE_MATH: {
@@ -355,8 +358,8 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::KEY_SCHEDULE: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j =
-        mls_vectors::KeyScheduleTestVector::create(suite, request->n_epochs());
+      j = mls_vectors::KeyScheduleTestVector::create(
+        suite, request->n_epochs(), n_psks);
       break;
     }
 

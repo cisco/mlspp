@@ -140,11 +140,17 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    sender_data_info,
                                    leaves)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,
+                                   id,
+                                   nonce,
+                                   secret)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    tree_hash,
                                    commit_secret,
-                                   psk_secret,
                                    confirmed_transcript_hash,
+                                   external_psks,
+                                   branch_psk_nonce,
+                                   psk_secret,
                                    group_context,
                                    joiner_secret,
                                    welcome_secret,
