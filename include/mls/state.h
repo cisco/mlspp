@@ -47,6 +47,7 @@ struct CommitOpts
 {
   std::vector<Proposal> extra_proposals;
   bool inline_tree;
+  bool encrypt_handshake;
 };
 
 class State
@@ -191,6 +192,7 @@ protected:
                                 const Commit& op,
                                 const bytes& update_secret,
                                 const std::optional<bytes>& force_init_secret,
+                                bool encrypt_handshake,
                                 const GroupContext& prev_ctx);
 
   // Create an MLSPlaintext with a signature over some content

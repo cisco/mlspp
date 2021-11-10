@@ -453,6 +453,13 @@ struct ApplicationData
 
 struct GroupContext;
 
+enum struct WireFormat : uint8_t
+{
+  reserved = 0,
+  mls_plaintext = 1,
+  mls_ciphertext = 2,
+};
+
 enum struct ContentType : uint8_t
 {
   invalid = 0,
@@ -480,6 +487,7 @@ struct Sender
 
 struct MLSPlaintext
 {
+  WireFormat wire_format;
   bytes group_id;
   epoch_t epoch;
   Sender sender;
@@ -527,7 +535,8 @@ struct MLSPlaintext
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id,
+  TLS_SERIALIZABLE(wire_format,
+                   group_id,
                    epoch,
                    sender,
                    authenticated_data,
@@ -535,7 +544,8 @@ struct MLSPlaintext
                    signature,
                    confirmation_tag,
                    membership_tag)
-  TLS_TRAITS(tls::vector<1>,
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,
@@ -543,11 +553,6 @@ struct MLSPlaintext
              tls::vector<2>,
              tls::pass,
              tls::pass)
-
-private:
-  // Not part of the struct, an indicator of whether this MLSPlaintext was
-  // constructed from an MLSCiphertext
-  bool decrypted;
 };
 
 // struct {
@@ -560,6 +565,7 @@ private:
 // } MLSCiphertext;
 struct MLSCiphertext
 {
+  WireFormat wire_format;
   bytes group_id;
   epoch_t epoch;
   ContentType content_type;
@@ -567,13 +573,15 @@ struct MLSCiphertext
   bytes encrypted_sender_data;
   bytes ciphertext;
 
-  TLS_SERIALIZABLE(group_id,
+  TLS_SERIALIZABLE(wire_format,
+                   group_id,
                    epoch,
                    content_type,
                    authenticated_data,
                    encrypted_sender_data,
                    ciphertext)
-  TLS_TRAITS(tls::vector<1>,
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,

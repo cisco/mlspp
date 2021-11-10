@@ -581,8 +581,9 @@ MLSClientImpl::commit(CachedState& entry,
 
   auto leaf_secret =
     mls::random_bytes(entry.state.cipher_suite().secret_size());
-  auto [commit, welcome, next] =
-    entry.state.commit(leaf_secret, mls::CommitOpts{ inline_proposals, true });
+  auto [commit, welcome, next] = entry.state.commit(
+    leaf_secret,
+    mls::CommitOpts{ inline_proposals, true, entry.encrypt_handshake });
 
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 

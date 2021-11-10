@@ -307,6 +307,11 @@ GroupKeySource::encrypt(LeafIndex index,
                         const bytes& sender_data_secret,
                         const MLSPlaintext& pt)
 {
+  if (pt.wire_format != WireFormat::mls_ciphertext) {
+    throw InvalidParameterError(
+      "Encrypt on MLSPlaintext without wire_format signal");
+  }
+
   // Pull from the key schedule
   static const auto get_key_type = overloaded{
     [](const ApplicationData& /*unused*/) {
@@ -349,14 +354,15 @@ GroupKeySource::encrypt(LeafIndex index,
     sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
 
   // Assemble the MLSCiphertext
-  MLSCiphertext ct;
-  ct.group_id = pt.group_id;
-  ct.epoch = pt.epoch;
-  ct.content_type = content_type_val;
-  ct.encrypted_sender_data = encrypted_sender_data;
-  ct.authenticated_data = pt.authenticated_data;
-  ct.ciphertext = content_ct;
-  return ct;
+  return MLSCiphertext{
+    WireFormat::mls_ciphertext,
+    pt.group_id,
+    pt.epoch,
+    content_type_val,
+    pt.authenticated_data,
+    encrypted_sender_data,
+    content_ct,
+  };
 }
 
 MLSPlaintext

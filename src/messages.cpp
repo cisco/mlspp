@@ -226,8 +226,8 @@ Proposal::proposal_type() const
 }
 
 MLSPlaintext::MLSPlaintext()
-  : epoch(0)
-  , decrypted(false)
+  : wire_format(WireFormat::mls_plaintext)
+  , epoch(0)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -236,12 +236,12 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_ciphertext) // since this is used for decryption
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
-  , decrypted(true)
 {
   tls::istream r(content_in);
   switch (content_type_in) {
@@ -277,33 +277,33 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            ApplicationData application_data_in)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(application_data_in))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Proposal proposal)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(proposal))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Commit commit)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(commit))
-  , decrypted(false)
 {}
 
 ContentType
@@ -334,6 +334,7 @@ bytes
 MLSPlaintext::commit_content() const
 {
   tls::ostream w;
+  w << wire_format;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
   tls::vector<4>::encode(w, authenticated_data);
@@ -345,12 +346,6 @@ MLSPlaintext::commit_content() const
 bytes
 MLSPlaintext::commit_auth_data() const
 {
-  // XXX(RLB): This construction means that the hashed transcript differs from
-  // the wire transcript by one byte -- the optional indicator on the
-  // confirmation tag is missing.  It's always 0x01, so it shouldn't matter, but
-  // it might be clearer to fix this.
-  //
-  // XXX(RLB): This matches PR#466, not the current spec.
   return tls::marshal(confirmation_tag);
 }
 
@@ -359,6 +354,7 @@ MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
   w << context;
+  w << wire_format;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
   tls::vector<4>::encode(w, authenticated_data);
@@ -396,7 +392,7 @@ MLSPlaintext::membership_tag_input(const GroupContext& context) const
 bool
 MLSPlaintext::verify_membership_tag(const bytes& tag) const
 {
-  if (decrypted) {
+  if (wire_format == WireFormat::mls_ciphertext) {
     return true;
   }
 
