@@ -107,7 +107,7 @@ PendingJoin::Inner::create(CipherSuite suite,
 {
   auto inner = std::make_unique<Inner>(
     suite, std::move(sig_priv), std::move(cred), opts_in);
-  return PendingJoin(inner.release());
+  return { inner.release() };
 }
 
 PendingJoin::PendingJoin(PendingJoin&& other) noexcept = default;
@@ -152,7 +152,7 @@ Session::Inner::begin(const bytes& group_id,
   auto state = State(
     group_id, key_package.cipher_suite, init_priv, sig_priv, key_package, {});
   auto inner = std::make_unique<Inner>(state);
-  return Session(inner.release());
+  return { inner.release() };
 }
 
 Session
@@ -165,7 +165,7 @@ Session::Inner::join(const HPKEPrivateKey& init_priv,
 
   auto state = State(init_priv, sig_priv, key_package, welcome, std::nullopt);
   auto inner = std::make_unique<Inner>(state);
-  return Session(inner.release());
+  return { inner.release() };
 }
 
 bytes
@@ -189,12 +189,30 @@ Session::Inner::export_message(const MLSPlaintext& plaintext)
 MLSPlaintext
 Session::Inner::import_message(const bytes& encoded)
 {
-  if (!encrypt_handshake) {
-    return tls::get<MLSPlaintext>(encoded);
-  }
+  auto wire_format = WireFormat::reserved;
+  auto r = tls::istream(encoded);
+  r >> wire_format;
 
-  auto ciphertext = tls::get<MLSCiphertext>(encoded);
-  return history.front().decrypt(ciphertext);
+  switch (wire_format) {
+    case WireFormat::mls_plaintext:
+      if (encrypt_handshake) {
+        throw ProtocolError("Handshake not encrypted as required");
+      }
+
+      return tls::get<MLSPlaintext>(encoded);
+
+    case WireFormat::mls_ciphertext: {
+      if (!encrypt_handshake) {
+        throw ProtocolError("Unexpected handshake encryption");
+      }
+
+      auto ciphertext = tls::get<MLSCiphertext>(encoded);
+      return history.front().decrypt(ciphertext);
+    }
+
+    default:
+      throw InvalidParameterError("Illegal wire format");
+  }
 }
 
 void
@@ -286,8 +304,9 @@ std::tuple<bytes, bytes>
 Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
-  auto [commit, welcome, new_state] =
-    inner->history.front().commit(commit_secret, CommitOpts{ {}, true });
+  auto encrypt = inner->encrypt_handshake;
+  auto [commit, welcome, new_state] = inner->history.front().commit(
+    commit_secret, CommitOpts{ {}, true, encrypt });
 
   auto commit_msg = inner->export_message(commit);
   auto welcome_msg = tls::marshal(welcome);

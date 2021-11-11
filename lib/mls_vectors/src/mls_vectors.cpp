@@ -76,6 +76,12 @@ operator==(const bytes& b, const HexBytes& hb)
     return err;                                                                \
   }
 
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define VERIFY_TLS_RTT_VAL(label, Type, expected, val)                         \
+  if (auto err = verify_round_trip<Type>(label, expected, val)) {              \
+    return err;                                                                \
+  }
+
 template<typename T, typename U>
 static std::optional<std::string>
 verify_equal(const std::string& label, const T& actual, const U& expected)
@@ -93,6 +99,14 @@ template<typename T>
 static std::optional<std::string>
 verify_round_trip(const std::string& label, const bytes& expected)
 {
+  auto noop = [](const auto&) { return true; };
+  return verify_round_trip<T>(label, expected, noop);
+}
+
+template<typename T, typename F>
+static std::optional<std::string>
+verify_round_trip(const std::string& label, const bytes& expected, const F& val)
+{
   auto obj = T{};
   try {
     obj = tls::get<T>(expected);
@@ -101,6 +115,13 @@ verify_round_trip(const std::string& label, const bytes& expected)
     ss << "Decode error: " << label << " " << e.what();
     return ss.str();
   }
+
+  if (!val(obj)) {
+    auto ss = std::stringstream();
+    ss << "Validation error: " << label;
+    return ss.str();
+  }
+
   auto actual = tls::marshal(obj);
   VERIFY_EQUAL(label, actual, expected);
   return std::nullopt;
@@ -217,7 +238,11 @@ EncryptionTestVector::create(CipherSuite suite,
     auto N = LeafIndex{ i };
     auto sender = Sender{ SenderType::member, i };
     auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
+    hs_pt.wire_format = WireFormat::mls_ciphertext;
+
     auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
+    app_pt.wire_format = WireFormat::mls_ciphertext;
+
     auto hs_pt_data = tls::marshal(hs_pt);
     auto app_pt_data = tls::marshal(app_pt);
 
@@ -300,7 +325,9 @@ EncryptionTestVector::verify() const
 ///
 
 KeyScheduleTestVector
-KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
+KeyScheduleTestVector::create(CipherSuite suite,
+                              uint32_t n_epochs,
+                              uint32_t n_psks)
 {
   auto tv = KeyScheduleTestVector{};
   tv.cipher_suite = suite;
@@ -316,22 +343,41 @@ KeyScheduleTestVector::create(CipherSuite suite, uint32_t n_epochs)
       random_bytes(suite.digest().hash_size);
     auto ctx = tls::marshal(group_context);
 
+    auto psks = std::vector<PSKWithSecret>{};
+    auto external_psks = std::vector<ExternalPSKInfo>{};
+    for (size_t j = 0; j < n_psks; j++) {
+      auto id = random_bytes(suite.secret_size());
+      auto nonce = random_bytes(suite.secret_size());
+      auto secret = random_bytes(suite.secret_size());
+
+      psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
+      external_psks.push_back({ id, nonce, secret });
+    }
+
+    auto branch_psk_nonce = bytes{};
+    if (i > 0) {
+      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i - 1));
+      branch_psk_nonce = psk.id.psk_nonce;
+      psks.push_back(psk);
+    }
+
     auto commit_secret = random_bytes(suite.secret_size());
-    auto psk_secret = random_bytes(suite.secret_size());
     // TODO(RLB) Add Test case for externally-driven epoch change
-    epoch = epoch.next(commit_secret, psk_secret, std::nullopt, ctx);
+    epoch = epoch.next(commit_secret, psks, std::nullopt, ctx);
 
     auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psk_secret);
+      KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psks);
 
     tv.epochs.push_back({
       group_context.tree_hash,
       commit_secret,
-      psk_secret,
       group_context.confirmed_transcript_hash,
+      external_psks,
+      branch_psk_nonce,
 
       ctx,
 
+      epoch.psk_secret,
       epoch.joiner_secret,
       welcome_secret,
       epoch.init_secret,
@@ -363,6 +409,7 @@ KeyScheduleTestVector::verify() const
   // Manually correct the init secret
   epoch.init_secret = initial_init_secret;
 
+  auto epoch_n = epoch_t(0);
   for (const auto& tve : epochs) {
     // Ratchet forward the key schedule
     group_context.tree_hash = tve.tree_hash;
@@ -370,13 +417,26 @@ KeyScheduleTestVector::verify() const
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("group context", ctx, tve.group_context);
 
-    epoch = epoch.next(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
+    auto psks = std::vector<PSKWithSecret>{};
+    for (const auto& psk : tve.external_psks) {
+      psks.push_back(
+        { PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
+    }
+
+    if (epoch_n > 0) {
+      auto psk = epoch.branch_psk(group_id, epoch_n - 1);
+      psk.id.psk_nonce = tve.branch_psk_nonce;
+      psks.push_back(psk);
+    }
+
+    epoch_n += 1;
+    epoch = epoch.next(tve.commit_secret, psks, std::nullopt, ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
-    auto welcome_secret = KeyScheduleEpoch::welcome_secret(
-      cipher_suite, tve.joiner_secret, tve.psk_secret);
+    auto welcome_secret =
+      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, psks);
     VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
     VERIFY_EQUAL(
@@ -700,7 +760,8 @@ MessagesTestVector::create()
   auto lifetime = LifetimeExtension{ 0x0000000000000000, 0xffffffffffffffff };
   auto capabilities = CapabilitiesExtension{ { version },
                                              { suite.cipher_suite() },
-                                             { ExtensionType::ratchet_tree } };
+                                             { ExtensionType::ratchet_tree },
+                                             { ProposalType::add } };
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(key_package);
   tree.add_leaf(key_package);
@@ -714,7 +775,7 @@ MessagesTestVector::create()
                                        { psk_id, psk_nonce },
                                        { psk_id, psk_nonce },
                                      } } };
-  auto welcome = Welcome{ suite, opaque, opaque, group_info };
+  auto welcome = Welcome{ suite, opaque, {}, group_info };
   welcome.encrypt(key_package, opaque);
 
   // PublicGroupState
@@ -758,7 +819,13 @@ MessagesTestVector::create()
   pt_commit.membership_tag = mac;
 
   auto ct = MLSCiphertext{
-    group_id, epoch, ContentType::application, opaque, opaque, opaque,
+    WireFormat::mls_ciphertext,
+    group_id,
+    epoch,
+    ContentType::application,
+    opaque,
+    opaque,
+    opaque,
   };
 
   return MessagesTestVector{
@@ -814,10 +881,21 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  VERIFY_TLS_RTT("MLSPlaintext/App", MLSPlaintext, mls_plaintext_application);
-  VERIFY_TLS_RTT("MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal);
-  VERIFY_TLS_RTT("MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit);
-  VERIFY_TLS_RTT("MLSCiphertext", MLSCiphertext, mls_ciphertext);
+  auto require_pt = [](const auto& pt) {
+    return pt.wire_format == WireFormat::mls_plaintext;
+  };
+  auto require_ct = [](const auto& pt) {
+    return pt.wire_format == WireFormat::mls_ciphertext;
+  };
+
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/App", MLSPlaintext, mls_plaintext_application, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit, require_pt);
+  VERIFY_TLS_RTT_VAL(
+    "MLSCiphertext", MLSCiphertext, mls_ciphertext, require_ct);
 
   return std::nullopt;
 }

@@ -44,6 +44,7 @@ struct ExtensionType
   static constexpr Extension::Type key_id = 3;
   static constexpr Extension::Type parent_hash = 4;
   static constexpr Extension::Type ratchet_tree = 5;
+  static constexpr Extension::Type required_capabilities = 5;
 
   // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
   // a value from the vendor-specific space
@@ -61,10 +62,10 @@ struct ExtensionList
   inline void add(const T& obj)
   {
     auto data = tls::marshal(obj);
-    add(static_cast<uint16_t>(T::type), std::move(data));
+    add(T::type, std::move(data));
   }
 
-  void add(uint16_t type, bytes data);
+  void add(Extension::Type type, bytes data);
 
   template<typename T>
   std::optional<T> find() const
@@ -89,11 +90,26 @@ struct CapabilitiesExtension
 {
   std::vector<ProtocolVersion> versions;
   std::vector<CipherSuite::ID> cipher_suites;
-  std::vector<uint16_t> extensions;
+  std::vector<Extension::Type> extensions;
+  std::vector<uint16_t> proposals;
 
-  static const uint16_t type;
-  TLS_SERIALIZABLE(versions, cipher_suites, extensions)
-  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>)
+  static CapabilitiesExtension create_default();
+  bool extensions_supported(const std::vector<Extension::Type>& required) const;
+  bool proposals_supported(const std::vector<uint16_t>& required) const;
+
+  static const Extension::Type type;
+  TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
+  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>, tls::vector<1>)
+};
+
+struct RequiredCapabilitiesExtension
+{
+  std::vector<Extension::Type> extensions;
+  std::vector<uint16_t> proposals;
+
+  static const Extension::Type type;
+  TLS_SERIALIZABLE(extensions, proposals)
+  TLS_TRAITS(tls::vector<1>, tls::vector<1>)
 };
 
 struct LifetimeExtension
@@ -101,7 +117,7 @@ struct LifetimeExtension
   uint64_t not_before;
   uint64_t not_after;
 
-  static const uint16_t type;
+  static const Extension::Type type;
   TLS_SERIALIZABLE(not_before, not_after)
 };
 
@@ -109,7 +125,7 @@ struct KeyIDExtension
 {
   bytes key_id;
 
-  static const uint16_t type;
+  static const Extension::Type type;
   TLS_SERIALIZABLE(key_id)
   TLS_TRAITS(tls::vector<2>)
 };
@@ -118,7 +134,7 @@ struct ParentHashExtension
 {
   bytes parent_hash;
 
-  static const uint16_t type;
+  static const Extension::Type type;
   TLS_SERIALIZABLE(parent_hash)
   TLS_TRAITS(tls::vector<1>)
 };

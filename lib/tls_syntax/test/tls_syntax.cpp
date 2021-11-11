@@ -156,7 +156,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
   std::optional<ExampleStruct> data_optional_null;
   istream_test(val_optional_null, data_optional_null, enc_optional_null);
 
-  IntType data_enum;
+  IntType data_enum = IntType::uint16;
   istream_test(val_enum, data_enum, enc_enum);
 
   tls::opaque<2> data_opaque;

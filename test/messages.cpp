@@ -3,6 +3,8 @@
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 
+#include <iostream>
+
 using namespace mls;
 using namespace mls_vectors;
 
@@ -11,6 +13,7 @@ TEST_CASE("Extensions")
   auto cap0 = CapabilitiesExtension{
     { ProtocolVersion::mls10 },
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+    {},
     {},
   };
   auto lt0 = LifetimeExtension{ 0xA0A0A0A0A0A0A0A0, 0xB0B0B0B0B0B0B0B0 };
@@ -46,5 +49,10 @@ TEST_CASE("Extensions")
 TEST_CASE("Messages Interop")
 {
   auto tv = MessagesTestVector::create();
-  REQUIRE(tv.verify() == std::nullopt);
+
+  auto result = tv.verify();
+  if (result) {
+    std::cout << opt::get(result) << std::endl;
+  }
+  REQUIRE(result == std::nullopt);
 }

@@ -95,6 +95,12 @@ struct PreSharedKeys
   TLS_TRAITS(tls::vector<2>)
 };
 
+struct PSKWithSecret
+{
+  PreSharedKeyID id;
+  bytes secret;
+};
+
 // struct {
 //     CipherSuite cipher_suite;
 //     opaque group_id<0..255>;
@@ -212,7 +218,7 @@ public:
 // struct {
 //   opaque joiner_secret<1..255>;
 //   optional<PathSecret> path_secret;
-//   optional<PreSharedKeys> psks;
+//   PreSharedKeys psks;
 // } GroupSecrets;
 struct GroupSecrets
 {
@@ -226,7 +232,7 @@ struct GroupSecrets
 
   bytes joiner_secret;
   std::optional<PathSecret> path_secret;
-  std::optional<PreSharedKeys> psks;
+  PreSharedKeys psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
   TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
@@ -261,21 +267,23 @@ struct Welcome
   Welcome();
   Welcome(CipherSuite suite,
           const bytes& joiner_secret,
-          const bytes& psk_secret,
+          const std::vector<PSKWithSecret>& psks,
           const GroupInfo& group_info);
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& joiner_secret, const bytes& psk_secret) const;
+  GroupInfo decrypt(const bytes& joiner_secret,
+                    const std::vector<PSKWithSecret>& psks) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
   TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
 private:
   bytes _joiner_secret;
-  static KeyAndNonce group_info_key_nonce(CipherSuite suite,
-                                          const bytes& joiner_secret,
-                                          const bytes& psk_secret);
+  static KeyAndNonce group_info_key_nonce(
+    CipherSuite suite,
+    const bytes& joiner_secret,
+    const std::vector<PSKWithSecret>& psks);
 };
 
 ///
@@ -346,27 +354,42 @@ struct AppAck
   TLS_TRAITS(tls::vector<4>)
 };
 
-enum struct ProposalType : uint8_t
-{
-  invalid = 0,
-  add = 1,
-  update = 2,
-  remove = 3,
-  psk = 4,
-  reinit = 5,
-  external_init = 6,
-  app_ack = 7,
-};
+struct ProposalType;
 
 struct Proposal
 {
+  using Type = uint16_t;
+
   var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
     content;
 
-  ProposalType proposal_type() const;
+  Type proposal_type() const;
 
   TLS_SERIALIZABLE(content)
   TLS_TRAITS(tls::variant<ProposalType>)
+};
+
+struct ProposalType
+{
+  static constexpr Proposal::Type invalid = 0;
+  static constexpr Proposal::Type add = 1;
+  static constexpr Proposal::Type update = 2;
+  static constexpr Proposal::Type remove = 3;
+  static constexpr Proposal::Type psk = 4;
+  static constexpr Proposal::Type reinit = 5;
+  static constexpr Proposal::Type external_init = 6;
+  static constexpr Proposal::Type app_ack = 7;
+
+  constexpr ProposalType()
+    : val(invalid)
+  {}
+
+  constexpr ProposalType(Proposal::Type pt)
+    : val(pt)
+  {}
+
+  Proposal::Type val;
+  TLS_SERIALIZABLE(val);
 };
 
 struct ProposalRef
@@ -430,6 +453,13 @@ struct ApplicationData
 
 struct GroupContext;
 
+enum struct WireFormat : uint8_t
+{
+  reserved = 0,
+  mls_plaintext = 1,
+  mls_ciphertext = 2,
+};
+
 enum struct ContentType : uint8_t
 {
   invalid = 0,
@@ -457,6 +487,7 @@ struct Sender
 
 struct MLSPlaintext
 {
+  WireFormat wire_format;
   bytes group_id;
   epoch_t epoch;
   Sender sender;
@@ -504,7 +535,8 @@ struct MLSPlaintext
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  TLS_SERIALIZABLE(group_id,
+  TLS_SERIALIZABLE(wire_format,
+                   group_id,
                    epoch,
                    sender,
                    authenticated_data,
@@ -512,7 +544,8 @@ struct MLSPlaintext
                    signature,
                    confirmation_tag,
                    membership_tag)
-  TLS_TRAITS(tls::vector<1>,
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,
@@ -520,11 +553,6 @@ struct MLSPlaintext
              tls::vector<2>,
              tls::pass,
              tls::pass)
-
-private:
-  // Not part of the struct, an indicator of whether this MLSPlaintext was
-  // constructed from an MLSCiphertext
-  bool decrypted;
 };
 
 // struct {
@@ -537,6 +565,7 @@ private:
 // } MLSCiphertext;
 struct MLSCiphertext
 {
+  WireFormat wire_format;
   bytes group_id;
   epoch_t epoch;
   ContentType content_type;
@@ -544,13 +573,15 @@ struct MLSCiphertext
   bytes encrypted_sender_data;
   bytes ciphertext;
 
-  TLS_SERIALIZABLE(group_id,
+  TLS_SERIALIZABLE(wire_format,
+                   group_id,
                    epoch,
                    content_type,
                    authenticated_data,
                    encrypted_sender_data,
                    ciphertext)
-  TLS_TRAITS(tls::vector<1>,
+  TLS_TRAITS(tls::pass,
+             tls::vector<1>,
              tls::pass,
              tls::pass,
              tls::vector<4>,

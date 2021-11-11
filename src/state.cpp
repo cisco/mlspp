@@ -21,6 +21,11 @@ State::State(bytes group_id,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
+  // Verify that the client supports the proposed group extensions
+  if (!key_package.verify_extension_support(_extensions)) {
+    throw InvalidParameterError("Client doesn't support required extensions");
+  }
+
   auto index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
@@ -109,15 +114,11 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupSecrets
   auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
-  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, secrets_ct);
+  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, {}, secrets_ct);
   auto secrets = tls::get<GroupSecrets>(secrets_data);
-  if (secrets.psks) {
+  if (!secrets.psks.psks.empty()) {
     throw NotImplementedError(/* PSKs are not supported */);
   }
-
-  // Look up any required PSKs
-  // TODO(RLB): Allow for PSKs
-  auto psk_secret = _suite.zero();
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, psk_secret);
@@ -158,8 +159,8 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _key_schedule =
-    KeyScheduleEpoch(_suite, secrets.joiner_secret, psk_secret, group_ctx);
+  _key_schedule = KeyScheduleEpoch(
+    _suite, secrets.joiner_secret, { /* no PSKs */ }, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
@@ -178,7 +179,7 @@ State::external_join(const bytes& leaf_secret,
 {
   auto initial_state = State(std::move(sig_priv), pgs, tree);
   auto add = initial_state.add_proposal(kp);
-  auto opts = CommitOpts{ { add }, false };
+  auto opts = CommitOpts{ { add }, false, false };
   auto [commit_pt, welcome, state] =
     initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
   silence_unused(welcome);
@@ -384,16 +385,13 @@ State::commit(const bytes& leaf_secret,
     }
   }
 
-  // Add any required PSKs to the key schedule
-  // TODO(RLB) Allow for PSKs
-  const auto psk_secret = _suite.zero();
-
   // Create the Commit message and advance the transcripts / key schedule
+  auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
   auto pt = next.ratchet_and_sign(sender,
                                   commit,
-                                  commit_secret,
-                                  psk_secret,
+                                  update_secret,
                                   force_init_secret,
+                                  encrypt_handshake,
                                   group_context());
 
   // Complete the GroupInfo and form the Welcome
@@ -435,11 +433,15 @@ State::ratchet_and_sign(const Sender& sender,
                         const bytes& commit_secret,
                         const bytes& psk_secret,
                         const std::optional<bytes>& force_init_secret,
+                        bool encrypt_handshake,
                         const GroupContext& prev_ctx)
 {
   auto prev_key_schedule = _key_schedule;
 
   auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
+  if (encrypt_handshake) {
+    pt.wire_format = WireFormat::mls_ciphertext;
+  }
   pt.sign(_suite, prev_ctx, _identity_priv);
 
   _transcript_hash.update_confirmed(pt);
@@ -631,7 +633,7 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
 
 std::vector<LeafIndex>
 State::apply(const std::vector<CachedProposal>& proposals,
-             ProposalType required_type)
+             Proposal::Type required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& cached : proposals) {
@@ -703,6 +705,7 @@ State::protect(const bytes& pt)
 {
   auto sender = Sender{ SenderType::member, _index.val };
   MLSPlaintext mpt{ _group_id, _epoch, sender, ApplicationData{ pt } };
+  mpt.wire_format = WireFormat::mls_ciphertext;
   mpt.sign(_suite, group_context(), _identity_priv);
   mpt.membership_tag = { _key_schedule.membership_tag(group_context(), mpt) };
   return encrypt(mpt);
@@ -760,8 +763,8 @@ State::update_epoch_secrets(const bytes& commit_secret,
     _transcript_hash.confirmed,
     _extensions,
   });
-  _key_schedule =
-    _key_schedule.next(commit_secret, psk_secret, force_init_secret, ctx);
+  _key_schedule = _key_schedule.next(
+    commit_secret, { /* no PSKs */ }, force_init_secret, ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
@@ -886,12 +889,35 @@ State::authentication_secret() const
 MLSCiphertext
 State::encrypt(const MLSPlaintext& pt)
 {
-  return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt);
+  if ((pt.sender.sender_type != SenderType::member) ||
+      (pt.sender.sender != _index.val)) {
+    throw InvalidParameterError("Cannot encrypt a plaintext from someone else");
+  }
+
+  if (pt.wire_format == WireFormat::mls_ciphertext) {
+    return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt);
+  }
+
+  // If a plaintext has been created without the prior intent to encrypt it,
+  // then it needs to be re-signed.
+  //
+  // XXX(RLB): This is currently true for all MLSPlaintexts generated with the
+  // X_proposal() methods.  There is a trade-off here between API decoupling
+  // (when do you need to know you're going to encrypt?) and the work of
+  // re-signing.
+  auto pt_copy = pt;
+  pt_copy.wire_format = WireFormat::mls_ciphertext;
+  pt_copy.sign(_suite, group_context(), _identity_priv);
+  return _keys.encrypt(_index, _key_schedule.sender_data_secret, pt_copy);
 }
 
 MLSPlaintext
 State::decrypt(const MLSCiphertext& ct)
 {
+  if (ct.wire_format != WireFormat::mls_ciphertext) {
+    throw InvalidParameterError("Invalid wire format for MLSCiphertext");
+  }
+
   // Verify the epoch
   if (ct.group_id != _group_id) {
     throw InvalidParameterError("Ciphertext not from this group");

@@ -30,7 +30,7 @@ TEST_CASE("Encryption Keys")
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    const auto tv = KeyScheduleTestVector::create(suite, 15);
+    const auto tv = KeyScheduleTestVector::create(suite, 15, 3);
     REQUIRE(tv.verify() == std::nullopt);
   }
 }

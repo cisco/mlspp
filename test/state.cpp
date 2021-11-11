@@ -11,15 +11,7 @@ public:
   StateTest()
   {
     for (size_t i = 0; i < group_size; i += 1) {
-      auto init_secret = random_bytes(32);
-      auto identity_priv = SignaturePrivateKey::generate(suite);
-      auto credential =
-        Credential::basic(user_id, suite, identity_priv.public_key);
-      auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
-      auto key_package = KeyPackage{
-        suite, init_priv.public_key, credential, identity_priv, std::nullopt
-      };
-
+      auto [init_priv, identity_priv, key_package] = make_client();
       init_privs.push_back(init_priv);
       identity_privs.push_back(identity_priv);
       key_packages.push_back(key_package);
@@ -43,6 +35,20 @@ protected:
   std::vector<State> states;
 
   bytes fresh_secret() const { return random_bytes(suite.secret_size()); }
+
+  std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage> make_client()
+  {
+    auto init_secret = random_bytes(32);
+    auto identity_priv = SignaturePrivateKey::generate(suite);
+    auto credential =
+      Credential::basic(user_id, suite, identity_priv.public_key);
+    auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+    auto key_package = KeyPackage{
+      suite, init_priv.public_key, credential, identity_priv, std::nullopt
+    };
+
+    return std::make_tuple(init_priv, identity_priv, key_package);
+  }
 
   void verify_group_functionality(std::vector<State>& group_states)
   {
@@ -85,7 +91,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome
@@ -108,7 +114,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   auto add = first0.add_proposal(key_packages[1]);
   // Don't generate RatchetTree extension
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, false });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, false, false });
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome, pass in the
@@ -186,37 +192,28 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   auto group_extensions = ExtensionList{};
   group_extensions.add(specified_params);
 
+  auto capabilities = CapabilitiesExtension::create_default();
+  capabilities.extensions.push_back(SFrameParameters::type);
+  auto kp_extensions = ExtensionList{};
+  kp_extensions.add(capabilities);
+
+  // Create two clients that support the SFrame extension
+  auto [init0, id0, kp0] = make_client();
+  kp0.sign(id0, KeyPackageOpts{ kp_extensions });
+
+  auto [init1, id1, kp1] = make_client();
+  kp1.sign(id1, KeyPackageOpts{ kp_extensions });
+
   // Create the initial state of the group
-  auto first0 = State{ group_id,          suite,           init_privs[0],
-                       identity_privs[0], key_packages[0], group_extensions };
-
-  // Get a KeyPackage from the second member, and verify compatiblity
-  auto compatible_capabilities = SFrameCapabilities{ { 1, 2, 3, 4 } };
-  REQUIRE(compatible_capabilities.compatible(specified_params));
-
-  auto incompatible_capabilities = SFrameCapabilities{ { 2, 3, 4 } };
-  REQUIRE_FALSE(incompatible_capabilities.compatible(specified_params));
-
-  auto key_package_extensions = ExtensionList{};
-  key_package_extensions.add(compatible_capabilities);
-  key_packages[1].sign(identity_privs[1],
-                       KeyPackageOpts{ key_package_extensions });
-
-  auto decoded_capabilities =
-    key_packages[1].extensions.find<SFrameCapabilities>();
-  REQUIRE(decoded_capabilities);
-  REQUIRE(opt::get(decoded_capabilities) == compatible_capabilities);
-  REQUIRE(opt::get(decoded_capabilities).compatible(specified_params));
+  auto first0 = State{ group_id, suite, init0, id1, kp1, group_extensions };
 
   // Add the second member
-  auto add = first0.add_proposal(key_packages[1]);
+  auto add = first0.add_proposal(kp1);
   auto [commit, welcome, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
   silence_unused(commit);
 
-  auto second0 = State{
-    init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt
-  };
+  auto second0 = State{ init1, id1, kp1, welcome, std::nullopt };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -229,6 +226,54 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   REQUIRE(second_params);
   REQUIRE(opt::get(first_params) == specified_params);
   REQUIRE(opt::get(first_params) == opt::get(second_params));
+}
+
+TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
+{
+  // Require some capabilities that don't exist
+  auto required_capabilities =
+    RequiredCapabilitiesExtension{ { 0xffff }, { 0xffff } };
+  auto group_extensions = ExtensionList{};
+  group_extensions.add(required_capabilities);
+
+  auto capabilities = CapabilitiesExtension{
+    { ProtocolVersion::mls10 },
+    { suite.cipher_suite() },
+    { ExtensionType::required_capabilities, 0xffff },
+    { 0xffff },
+  };
+  auto kp_extensions = ExtensionList{};
+  kp_extensions.add(capabilities);
+
+  // One client that supports the required capabilities, and two that do
+  auto [init_no, id_no, kp_no] = make_client();
+
+  auto [init_yes, id_yes, kp_yes] = make_client();
+  kp_yes.sign(id_yes, KeyPackageOpts{ kp_extensions });
+
+  auto [init_yes_2, id_yes_2, kp_yes_2] = make_client();
+  kp_yes_2.sign(id_yes_2, KeyPackageOpts{ kp_extensions });
+
+  // Creating a group with a first member that doesn't support the required
+  // capabilities should fail.
+  REQUIRE_THROWS(
+    State{ group_id, suite, init_no, id_no, kp_no, group_extensions });
+
+  // State should refuse to create an Add for a new member that doesn't support
+  // the required capabilities for the group.
+  auto state =
+    State{ group_id, suite, init_yes, id_yes, kp_yes, group_extensions };
+  REQUIRE_THROWS(state.add_proposal(kp_no));
+
+  // When State receives an add proposal for a new member that doesn't
+  // support the required capabilities for the group, it should reject it.
+  //
+  // TODO(RLB) We do not test this check right now, since it requires either (a)
+  // configuring State to generate an invalid Add, or (b) synthesizing one.
+
+  // When a client is added who does support the required extensions, it should
+  // work.
+  state.handle(state.add(kp_yes_2));
 }
 
 TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
@@ -249,7 +294,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 
   // Create a Commit that adds everybody
   auto [commit, welcome, new_state] =
-    states[0].commit(fresh_secret(), CommitOpts{ adds, true });
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false });
   silence_unused(commit);
   states[0] = new_state;
 
@@ -278,7 +323,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 
     auto add = states[sender].add_proposal(key_packages[i]);
     auto [commit, welcome, new_state] =
-      states[sender].commit(fresh_secret(), CommitOpts{ { add }, true });
+      states[sender].commit(fresh_secret(), CommitOpts{ { add }, true, false });
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
         states[j] = new_state;
@@ -319,7 +364,7 @@ protected:
     }
 
     auto [commit, welcome, new_state] =
-      states[0].commit(fresh_secret(), CommitOpts{ adds, true });
+      states[0].commit(fresh_secret(), CommitOpts{ adds, true, false });
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
@@ -368,7 +413,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
     auto new_leaf = fresh_secret();
     auto update = states[i].update_proposal(new_leaf);
     auto [commit, welcome, new_state] =
-      states[i].commit(new_leaf, CommitOpts{ { update }, true });
+      states[i].commit(new_leaf, CommitOpts{ { update }, true, false });
     silence_unused(welcome);
 
     for (auto& state : states) {
@@ -388,7 +433,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(LeafIndex{ uint32_t(i + 1) });
     auto [commit, welcome, new_state] =
-      states[i].commit(fresh_secret(), CommitOpts{ { remove }, true });
+      states[i].commit(fresh_secret(), CommitOpts{ { remove }, true, false });
     silence_unused(welcome);
 
     states.pop_back();
@@ -417,7 +462,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
   auto [commit_1, welcome_1, new_state_1] =
-    states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true });
+    states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true, false });
   silence_unused(welcome_1);
   silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
@@ -432,7 +477,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
   auto [commit_2, welcome_2, new_state_2] =
-    new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true });
+    new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true, false });
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
   expected_creds = std::vector<Credential>{

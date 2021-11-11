@@ -8,14 +8,56 @@ namespace mls {
 /// Extensions
 ///
 
-const uint16_t CapabilitiesExtension::type = ExtensionType::capabilities;
-const uint16_t LifetimeExtension::type = ExtensionType::lifetime;
-const uint16_t KeyIDExtension::type = ExtensionType::key_id;
-const uint16_t ParentHashExtension::type = ExtensionType::parent_hash;
+const Extension::Type CapabilitiesExtension::type = ExtensionType::capabilities;
+const Extension::Type RequiredCapabilitiesExtension::type =
+  ExtensionType::required_capabilities;
+const Extension::Type LifetimeExtension::type = ExtensionType::lifetime;
+const Extension::Type KeyIDExtension::type = ExtensionType::key_id;
+const Extension::Type ParentHashExtension::type = ExtensionType::parent_hash;
 
 const std::array<ProtocolVersion, 1> all_supported_versions = {
   ProtocolVersion::mls10
 };
+
+const std::array<CipherSuite::ID, 6> all_supported_ciphersuites = {
+  CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+  CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+  CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
+  CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
+  CipherSuite::ID::P521_AES256GCM_SHA512_P521,
+  CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
+};
+
+CapabilitiesExtension
+CapabilitiesExtension::create_default()
+{
+  return {
+    { all_supported_versions.begin(), all_supported_versions.end() },
+    { all_supported_ciphersuites.begin(), all_supported_ciphersuites.end() },
+    { RequiredCapabilitiesExtension::type },
+    { /* No non-default proposals */ },
+  };
+}
+
+bool
+CapabilitiesExtension::extensions_supported(
+  const std::vector<Extension::Type>& required) const
+{
+  return std::all_of(required.begin(), required.end(), [&](const auto& type) {
+    return std::find(extensions.begin(), extensions.end(), type) !=
+           extensions.end();
+  });
+}
+
+bool
+CapabilitiesExtension::proposals_supported(
+  const std::vector<uint16_t>& required) const
+{
+  return std::all_of(required.begin(), required.end(), [&](const auto& type) {
+    return std::find(proposals.begin(), proposals.end(), type) !=
+           proposals.end();
+  });
+}
 
 void
 ExtensionList::add(uint16_t type, bytes data)
@@ -92,15 +134,8 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , init_key(std::move(init_key_in))
   , credential(std::move(credential_in))
 {
-  extensions.add(CapabilitiesExtension{
-    { all_supported_versions.begin(), all_supported_versions.end() },
-    { all_supported_suites.begin(), all_supported_suites.end() },
-    {},
-  });
-
-  // TODO(RLB) Set non-eternal lifetimes
+  extensions.add(CapabilitiesExtension::create_default());
   extensions.add(LifetimeExtension{ default_not_before, default_not_after });
-
   sign(sig_priv_in, opts_in);
 }
 
@@ -140,10 +175,33 @@ KeyPackage::verify_expiry(uint64_t now) const
 bool
 KeyPackage::verify_extension_support(const ExtensionList& ext_list) const
 {
-  return std::all_of(
-    ext_list.extensions.begin(),
-    ext_list.extensions.end(),
-    [&](const Extension& ext) -> bool { return extensions.has(ext.type); });
+  const auto maybe_capas = extensions.find<CapabilitiesExtension>();
+  if (!maybe_capas) {
+    return false;
+  }
+
+  const auto& capas = opt::get(maybe_capas);
+
+  // Verify that extensions in the list are supported
+  auto ext_types = std::vector<Extension::Type>(ext_list.extensions.size());
+  std::transform(ext_list.extensions.begin(),
+                 ext_list.extensions.end(),
+                 ext_types.begin(),
+                 [](const auto& ext) { return ext.type; });
+
+  if (!capas.extensions_supported(ext_types)) {
+    return false;
+  }
+
+  // If there's a RequiredCapabilities extension, verify support
+  const auto maybe_req_capas = ext_list.find<RequiredCapabilitiesExtension>();
+  if (!maybe_req_capas) {
+    return true;
+  }
+
+  const auto& req_capas = opt::get(maybe_req_capas);
+  return capas.extensions_supported(req_capas.extensions) &&
+         capas.proposals_supported(req_capas.proposals);
 }
 
 bool

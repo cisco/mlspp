@@ -153,13 +153,13 @@ Welcome::Welcome()
 
 Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
-                 const bytes& psk_secret,
+                 const std::vector<PSKWithSecret>& psks,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
   , _joiner_secret(joiner_secret)
 {
-  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psk_secret);
+  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
     cipher_suite.hpke().aead.seal(key, nonce, {}, group_info_data);
@@ -180,21 +180,21 @@ Welcome::find(const KeyPackage& kp) const
 void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, std::nullopt };
+  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, {} };
   if (path_secret) {
     gs.path_secret = { opt::get(path_secret) };
   }
 
   auto gs_data = tls::marshal(gs);
-  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, gs_data);
+  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, {}, gs_data);
   secrets.push_back({ kp.hash(), enc_gs });
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
+Welcome::decrypt(const bytes& joiner_secret,
+                 const std::vector<PSKWithSecret>& psks) const
 {
-  auto [key, nonce] =
-    group_info_key_nonce(cipher_suite, joiner_secret, psk_secret);
+  auto [key, nonce] = group_info_key_nonce(cipher_suite, joiner_secret, psks);
   auto group_info_data =
     cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
   if (!group_info_data) {
@@ -207,13 +207,13 @@ Welcome::decrypt(const bytes& joiner_secret, const bytes& psk_secret) const
 KeyAndNonce
 Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
-                              const bytes& psk_secret)
+                              const std::vector<PSKWithSecret>& psks)
 {
   static const auto key_label = from_ascii("key");
   static const auto nonce_label = from_ascii("nonce");
 
   auto welcome_secret =
-    KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psk_secret);
+    KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psks);
 
   // XXX(RLB): These used to be done with ExpandWithLabel.  Should we do that
   // instead, for better domain separation? (In particular, including "mls10")
@@ -226,15 +226,15 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // MLSPlaintext
-ProposalType
+Proposal::Type
 Proposal::proposal_type() const
 {
-  return tls::variant<ProposalType>::type(content);
+  return tls::variant<ProposalType>::type(content).val;
 }
 
 MLSPlaintext::MLSPlaintext()
-  : epoch(0)
-  , decrypted(false)
+  : wire_format(WireFormat::mls_plaintext)
+  , epoch(0)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -243,12 +243,12 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            ContentType content_type_in,
                            bytes authenticated_data_in,
                            const bytes& content_in)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_ciphertext) // since this is used for decryption
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
-  , decrypted(true)
 {
   tls::istream r(content_in);
   switch (content_type_in) {
@@ -284,33 +284,33 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            ApplicationData application_data_in)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(application_data_in))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Proposal proposal)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(proposal))
-  , decrypted(false)
 {}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
                            Sender sender_in,
                            Commit commit)
-  : group_id(std::move(group_id_in))
+  : wire_format(WireFormat::mls_plaintext)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(sender_in)
   , content(std::move(commit))
-  , decrypted(false)
 {}
 
 ContentType
@@ -341,6 +341,7 @@ bytes
 MLSPlaintext::commit_content() const
 {
   tls::ostream w;
+  w << wire_format;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
   tls::vector<4>::encode(w, authenticated_data);
@@ -352,12 +353,6 @@ MLSPlaintext::commit_content() const
 bytes
 MLSPlaintext::commit_auth_data() const
 {
-  // XXX(RLB): This construction means that the hashed transcript differs from
-  // the wire transcript by one byte -- the optional indicator on the
-  // confirmation tag is missing.  It's always 0x01, so it shouldn't matter, but
-  // it might be clearer to fix this.
-  //
-  // XXX(RLB): This matches PR#466, not the current spec.
   return tls::marshal(confirmation_tag);
 }
 
@@ -366,6 +361,7 @@ MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
   w << context;
+  w << wire_format;
   tls::vector<1>::encode(w, group_id);
   w << epoch << sender;
   tls::vector<4>::encode(w, authenticated_data);
@@ -403,7 +399,7 @@ MLSPlaintext::membership_tag_input(const GroupContext& context) const
 bool
 MLSPlaintext::verify_membership_tag(const bytes& tag) const
 {
-  if (decrypted) {
+  if (wire_format == WireFormat::mls_ciphertext) {
     return true;
   }
 

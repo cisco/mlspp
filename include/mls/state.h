@@ -47,6 +47,7 @@ struct CommitOpts
 {
   std::vector<Proposal> extra_proposals;
   bool inline_tree;
+  bool encrypt_handshake;
 };
 
 class State
@@ -136,6 +137,9 @@ public:
   MLSCiphertext protect(const bytes& pt);
   bytes unprotect(const MLSCiphertext& ct);
 
+  // Assemble a group context for this state
+  GroupContext group_context() const;
+
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
@@ -165,9 +169,6 @@ protected:
   std::list<CachedProposal> _pending_proposals;
   std::map<bytes, bytes> _update_secrets;
 
-  // Assemble a group context for this state
-  GroupContext group_context() const;
-
   // Assemble a preliminary, unjoined group state
   State(SignaturePrivateKey sig_priv,
         const PublicGroupState& pgs,
@@ -192,6 +193,7 @@ protected:
                                 const bytes& commit_secret,
                                 const bytes& psk_secret,
                                 const std::optional<bytes>& force_init_secret,
+                                bool encrypt_handshake,
                                 const GroupContext& prev_ctx);
 
   // Create an MLSPlaintext with a signature over some content
@@ -203,7 +205,7 @@ protected:
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
-                               ProposalType required_type);
+                               Proposal::Type required_type);
   std::tuple<bool, bool, std::vector<LeafIndex>> apply(
     const std::vector<CachedProposal>& proposals);
 

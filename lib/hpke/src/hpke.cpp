@@ -420,7 +420,7 @@ HPKE::setup_base_r(const bytes& enc,
   auto shared_secret = kem.decap(enc, skR);
   auto ctx =
     key_schedule(Mode::base, shared_secret, info, default_psk, default_psk_id);
-  return ReceiverContext(std::move(ctx));
+  return { std::move(ctx) };
 }
 
 HPKE::SenderInfo
@@ -443,7 +443,7 @@ HPKE::setup_psk_r(const bytes& enc,
 {
   auto shared_secret = kem.decap(enc, skR);
   auto ctx = key_schedule(Mode::psk, shared_secret, info, psk, psk_id);
-  return ReceiverContext(std::move(ctx));
+  return { std::move(ctx) };
 }
 
 HPKE::SenderInfo
@@ -466,7 +466,7 @@ HPKE::setup_auth_r(const bytes& enc,
   auto shared_secret = kem.auth_decap(enc, pkS, skR);
   auto ctx =
     key_schedule(Mode::auth, shared_secret, info, default_psk, default_psk_id);
-  return ReceiverContext(std::move(ctx));
+  return { std::move(ctx) };
 }
 
 HPKE::SenderInfo
@@ -491,7 +491,7 @@ HPKE::setup_auth_psk_r(const bytes& enc,
 {
   auto shared_secret = kem.auth_decap(enc, pkS, skR);
   auto ctx = key_schedule(Mode::auth_psk, shared_secret, info, psk, psk_id);
-  return ReceiverContext(std::move(ctx));
+  return { std::move(ctx) };
 }
 
 bool
@@ -533,7 +533,7 @@ HPKE::key_schedule(Mode mode,
   auto exporter_secret = kdf.labeled_expand(
     suite, secret, label_exp(), key_schedule_context, kdf.hash_size);
 
-  return Context(suite, key, nonce, exporter_secret, kdf, aead);
+  return { suite, key, nonce, exporter_secret, kdf, aead };
 }
 
 } // namespace hpke
