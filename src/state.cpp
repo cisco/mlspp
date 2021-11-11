@@ -98,6 +98,7 @@ State::State(const HPKEPrivateKey& init_priv,
              const Welcome& welcome,
              const std::optional<TreeKEMPublicKey>& tree)
   : _suite(welcome.cipher_suite)
+  , _epoch(0)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
@@ -121,7 +122,7 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   // Decrypt the GroupInfo
-  auto group_info = welcome.decrypt(secrets.joiner_secret, psk_secret);
+  auto group_info = welcome.decrypt(secrets.joiner_secret, { /* no PSKs */ });
 
   // Import the tree from the argument or from the extension
   _tree = import_tree(group_info.tree_hash, tree, group_info.extensions);
@@ -389,7 +390,8 @@ State::commit(const bytes& leaf_secret,
   auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
   auto pt = next.ratchet_and_sign(sender,
                                   commit,
-                                  update_secret,
+                                  commit_secret,
+                                  { /* no PSKs */ },
                                   force_init_secret,
                                   encrypt_handshake,
                                   group_context());
@@ -405,8 +407,9 @@ State::commit(const bytes& leaf_secret,
   }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
-  auto welcome =
-    Welcome{ _suite, next._key_schedule.joiner_secret, psk_secret, group_info };
+  auto welcome = Welcome{
+    _suite, next._key_schedule.joiner_secret, { /* no PSKs */ }, group_info
+  };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -431,7 +434,7 @@ MLSPlaintext
 State::ratchet_and_sign(const Sender& sender,
                         const Commit& op,
                         const bytes& commit_secret,
-                        const bytes& psk_secret,
+                        const std::vector<PSKWithSecret>& psks,
                         const std::optional<bytes>& force_init_secret,
                         bool encrypt_handshake,
                         const GroupContext& prev_ctx)
@@ -446,7 +449,7 @@ State::ratchet_and_sign(const Sender& sender,
 
   _transcript_hash.update_confirmed(pt);
   _epoch += 1;
-  update_epoch_secrets(commit_secret, psk_secret, force_init_secret);
+  update_epoch_secrets(commit_secret, psks, force_init_secret);
 
   pt.confirmation_tag = { _key_schedule.confirmation_tag(
     _transcript_hash.confirmed) };
@@ -542,14 +545,11 @@ State::handle(const MLSPlaintext& pt)
     commit_secret = next._tree_priv.update_secret;
   }
 
-  // Add any required PSKs
-  // TODO(RLB) Allow for PSKs
-  const auto psk_secret = _suite.zero();
-
   // Update the transcripts and advance the key schedule
   next._transcript_hash.update(pt);
   next._epoch += 1;
-  next.update_epoch_secrets(commit_secret, psk_secret, force_init_secret);
+  next.update_epoch_secrets(
+    commit_secret, { /* no PSKs */ }, force_init_secret);
 
   // Verify the confirmation MAC
   if (!pt.confirmation_tag) {
@@ -753,7 +753,7 @@ operator!=(const State& lhs, const State& rhs)
 
 void
 State::update_epoch_secrets(const bytes& commit_secret,
-                            const bytes& psk_secret,
+                            const std::vector<PSKWithSecret>& psks,
                             const std::optional<bytes>& force_init_secret)
 {
   auto ctx = tls::marshal(GroupContext{
@@ -763,8 +763,8 @@ State::update_epoch_secrets(const bytes& commit_secret,
     _transcript_hash.confirmed,
     _extensions,
   });
-  _key_schedule = _key_schedule.next(
-    commit_secret, { /* no PSKs */ }, force_init_secret, ctx);
+  _key_schedule =
+    _key_schedule.next(commit_secret, psks, force_init_secret, ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
 }
 
