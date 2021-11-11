@@ -5,10 +5,19 @@
 
 using namespace mls;
 
-struct CustomExtension {
+struct CustomExtension
+{
   uint8_t value;
 
   static constexpr Extension::Type type = 0xfffe;
+  TLS_SERIALIZABLE(value);
+};
+
+struct CustomExtension2
+{
+  uint8_t value;
+
+  static constexpr Extension::Type type = 0xfffd;
   TLS_SERIALIZABLE(value);
 };
 
@@ -48,6 +57,7 @@ protected:
     auto ext_list = ExtensionList{};
     auto capas = CapabilitiesExtension::create_default();
     capas.extensions.push_back(CustomExtension::type);
+    capas.extensions.push_back(CustomExtension2::type);
     ext_list.add(capas);
 
     auto init_secret = random_bytes(32);
@@ -56,7 +66,7 @@ protected:
       Credential::basic(user_id, suite, identity_priv.public_key);
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
     auto key_package = KeyPackage{
-      suite, init_priv.public_key, credential, identity_priv, {{ ext_list }}
+      suite, init_priv.public_key, credential, identity_priv, { { ext_list } }
     };
 
     return std::make_tuple(init_priv, identity_priv, key_package);
@@ -96,12 +106,9 @@ protected:
 
 TEST_CASE_FIXTURE(StateTest, "Two Person")
 {
-  auto exts = ExtensionList{};
-  exts.add(CustomExtension{0xa0});
-
   // Initialize the creator's state
   auto first0 = State{ group_id,          suite,           init_privs[0],
-                       identity_privs[0], key_packages[0], exts };
+                       identity_privs[0], key_packages[0], {} };
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
@@ -117,6 +124,44 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 
   auto group = std::vector<State>{ first1, second0 };
   verify_group_functionality(group);
+}
+
+TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
+{
+  // Initialize the creator's state
+  auto first_exts = ExtensionList{};
+  first_exts.add(CustomExtension{ 0xa0 });
+
+  auto first0 = State{ group_id,          suite,           init_privs[0],
+                       identity_privs[0], key_packages[0], first_exts };
+
+  // Handle the Add proposal and create a Commit
+  auto add = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
+  silence_unused(commit1);
+
+  // Initialize the second participant from the Welcome
+  auto second1 = State{
+    init_privs[1], identity_privs[1], key_packages[1], welcome1, std::nullopt
+  };
+  REQUIRE(first1 == second1);
+  REQUIRE(first1.extensions() == first_exts);
+
+  auto group = std::vector<State>{ first1, second1 };
+  verify_group_functionality(group);
+
+  // Change the group's extensions
+  auto second_exts = ExtensionList{};
+  second_exts.add(CustomExtension2{ 0xb0 });
+
+  auto gce = first1.group_context_extensions_proposal(second_exts);
+  auto [commit2, welcome2, first2] =
+    first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false });
+  auto second2 = second1.handle(commit2);
+  silence_unused(welcome2);
+  REQUIRE(first2 == second2);
+  REQUIRE(first2.extensions() == second_exts);
 }
 
 TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")

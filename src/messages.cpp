@@ -48,7 +48,8 @@ PublicGroupState::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, interim_transcript_hash);
-  w << group_context_extensions << other_extensions << external_pub << signer_index;
+  w << group_context_extensions << other_extensions << external_pub
+    << signer_index;
   return w.bytes();
 }
 
@@ -113,7 +114,8 @@ GroupInfo::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << group_context_extensions << other_extensions << confirmation_tag << signer_index;
+  w << group_context_extensions << other_extensions << confirmation_tag
+    << signer_index;
   return w.bytes();
 }
 

@@ -363,13 +363,27 @@ struct AppAck
   TLS_TRAITS(tls::vector<4>)
 };
 
+// GroupContextExtensions
+struct GroupContextExtensions
+{
+  ExtensionList group_context_extensions;
+  TLS_SERIALIZABLE(group_context_extensions);
+};
+
 struct ProposalType;
 
 struct Proposal
 {
   using Type = uint16_t;
 
-  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
+  var::variant<Add,
+               Update,
+               Remove,
+               PreSharedKey,
+               ReInit,
+               ExternalInit,
+               AppAck,
+               GroupContextExtensions>
     content;
 
   Type proposal_type() const;
@@ -388,6 +402,7 @@ struct ProposalType
   static constexpr Proposal::Type reinit = 5;
   static constexpr Proposal::Type external_init = 6;
   static constexpr Proposal::Type app_ack = 7;
+  static constexpr Proposal::Type group_context_extensions = 8;
 
   constexpr ProposalType()
     : val(invalid)
@@ -616,6 +631,9 @@ TLS_VARIANT_MAP(mls::ProposalType, mls::PreSharedKey, psk)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ReInit, reinit)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ExternalInit, external_init)
 TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
+TLS_VARIANT_MAP(mls::ProposalType,
+                mls::GroupContextExtensions,
+                group_context_extensions)
 
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)

@@ -251,6 +251,16 @@ State::remove_proposal(LeafIndex removed) const
   return { Remove{ removed } };
 }
 
+Proposal
+State::group_context_extensions_proposal(ExtensionList exts) const
+{
+  if (!extensions_supported(exts)) {
+    throw InvalidParameterError("Unsupported extensions");
+  }
+
+  return { GroupContextExtensions{ std::move(exts) } };
+}
+
 MLSPlaintext
 State::add(const KeyPackage& key_package) const
 {
@@ -273,6 +283,12 @@ MLSPlaintext
 State::remove(LeafIndex removed) const
 {
   return sign(remove_proposal(removed));
+}
+
+MLSPlaintext
+State::group_context_extensions(ExtensionList exts) const
+{
+  return sign(group_context_extensions_proposal(std::move(exts)));
 }
 
 std::tuple<MLSPlaintext, Welcome, State>
@@ -396,9 +412,12 @@ State::commit(const bytes& leaf_secret,
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
-    next._group_id,         next._epoch,
-    next._tree.root_hash(), next._transcript_hash.confirmed,
-    next._extensions,       {/* No other extensions */},
+    next._group_id,
+    next._epoch,
+    next._tree.root_hash(),
+    next._transcript_hash.confirmed,
+    next._extensions,
+    { /* No other extensions */ },
     opt::get(pt.confirmation_tag),
   };
   if (opts && opt::get(opts).inline_tree) {
@@ -585,6 +604,36 @@ State::apply(const Remove& remove)
 }
 
 void
+State::apply(const GroupContextExtensions& gce)
+{
+  // TODO(RLB): Update spec to clarify that you MUST verify that the new
+  // extensions are compatible with all members.
+  if (!extensions_supported(gce.group_context_extensions)) {
+    throw ProtocolError("Unsupported extensions in GroupContextExtensions");
+  }
+
+  _extensions = gce.group_context_extensions;
+}
+
+bool
+State::extensions_supported(const ExtensionList& exts) const
+{
+  for (LeafIndex i{ 0 }; i < _tree.size(); i.val++) {
+    const auto maybe_kp = _tree.key_package(i);
+    if (!maybe_kp) {
+      continue;
+    }
+
+    const auto& kp = opt::get(maybe_kp);
+    if (!kp.verify_extension_support(exts)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void
 State::cache_proposal(const MLSPlaintext& pt)
 {
   _pending_proposals.push_back({
@@ -668,8 +717,15 @@ State::apply(const std::vector<CachedProposal>& proposals,
         break;
       }
 
+      case ProposalType::group_context_extensions: {
+        const auto& gce =
+          var::get<GroupContextExtensions>(cached.proposal.content);
+        apply(gce);
+        break;
+      }
+
       default:
-        throw ProtocolError("Unknown proposal type");
+        throw ProtocolError("Unsupported proposal type");
     }
   }
 
@@ -682,6 +738,9 @@ State::apply(const std::vector<CachedProposal>& proposals)
   auto update_locations = apply(proposals, ProposalType::update);
   auto remove_locations = apply(proposals, ProposalType::remove);
   auto joiner_locations = apply(proposals, ProposalType::add);
+  apply(proposals, ProposalType::group_context_extensions);
+
+  // TODO(RLB) Check for unknown / unhandled proposal types.
 
   auto has_updates = !update_locations.empty();
   auto has_removes = !remove_locations.empty();
@@ -739,7 +798,8 @@ operator==(const State& lhs, const State& rhs)
   auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
   auto extensions = (lhs._extensions == rhs._extensions);
 
-  return suite && group_id && epoch && tree && transcript_hash && key_schedule && extensions;
+  return suite && group_id && epoch && tree && transcript_hash &&
+         key_schedule && extensions;
 }
 
 bool
@@ -850,7 +910,7 @@ State::public_group_state() const
     _tree.root_hash(),
     _transcript_hash.interim,
     _extensions,
-    {/* No other extensions */},
+    { /* No other extensions */ },
     _key_schedule.external_priv.public_key,
   };
   pgs.other_extensions.add(RatchetTreeExtension{ _tree });

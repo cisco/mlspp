@@ -91,11 +91,13 @@ public:
   Proposal update_proposal(const bytes& leaf_secret);
   Proposal remove_proposal(RosterIndex index) const;
   Proposal remove_proposal(LeafIndex removed) const;
+  Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
   MLSPlaintext remove(RosterIndex index) const;
   MLSPlaintext remove(LeafIndex removed) const;
+  MLSPlaintext group_context_extensions(ExtensionList exts) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
     const bytes& leaf_secret,
@@ -203,10 +205,15 @@ protected:
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
   void apply(const Remove& remove);
+  void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                Proposal::Type required_type);
   std::tuple<bool, bool, std::vector<LeafIndex>> apply(
     const std::vector<CachedProposal>& proposals);
+
+  // Verify that a specific key package or all members support a given set of
+  // extensions
+  bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract a proposal from the cache
   void cache_proposal(const MLSPlaintext& pt);

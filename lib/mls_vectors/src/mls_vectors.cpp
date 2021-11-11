@@ -758,7 +758,8 @@ MessagesTestVector::create()
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{ group_id, epoch, opaque, opaque, ext_list, ext_list, mac };
+  auto group_info =
+    GroupInfo{ group_id, epoch, opaque, opaque, ext_list, ext_list, mac };
   auto group_secrets = GroupSecrets{ opaque,
                                      { { opaque } },
                                      PreSharedKeys{ {
@@ -770,7 +771,8 @@ MessagesTestVector::create()
 
   // PublicGroupState
   auto public_group_state =
-    PublicGroupState{ suite, group_id, epoch, opaque, opaque, ext_list, ext_list, hpke_pub };
+    PublicGroupState{ suite,  group_id, epoch,    opaque,
+                      opaque, ext_list, ext_list, hpke_pub };
   public_group_state.sign(tree, LeafIndex{ 1 }, sig_priv);
 
   // Proposals
