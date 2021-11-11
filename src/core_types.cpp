@@ -83,29 +83,6 @@ ExtensionList::has(uint16_t type) const
     });
 }
 
-static const std::set<Extension::Type>&
-group_types()
-{
-  static const auto group_types = std::set<Extension::Type>{
-    ExtensionType::sframe_parameters,
-  };
-  return group_types;
-}
-
-ExtensionList
-ExtensionList::for_group() const
-{
-  auto group_ext = ExtensionList{};
-  for (const auto& ext : extensions) {
-    if (group_types().count(ext.type) == 0) {
-      continue;
-    }
-
-    group_ext.extensions.push_back(ext);
-  }
-  return group_ext;
-}
-
 ///
 /// NodeType, ParentNode, and KeyPackage
 ///

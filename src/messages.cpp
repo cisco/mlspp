@@ -26,14 +26,16 @@ PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
                                    epoch_t epoch_in,
                                    bytes tree_hash_in,
                                    bytes interim_transcript_hash_in,
-                                   ExtensionList extensions_in,
+                                   ExtensionList group_context_extensions_in,
+                                   ExtensionList other_extensions_in,
                                    HPKEPublicKey external_pub_in)
   : cipher_suite(cipher_suite_in)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , interim_transcript_hash(std::move(interim_transcript_hash_in))
-  , extensions(std::move(extensions_in))
+  , group_context_extensions(std::move(group_context_extensions_in))
+  , other_extensions(std::move(other_extensions_in))
   , external_pub(std::move(external_pub_in))
 {}
 
@@ -46,7 +48,7 @@ PublicGroupState::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, interim_transcript_hash);
-  w << extensions << external_pub << signer_index;
+  w << group_context_extensions << other_extensions << external_pub << signer_index;
   return w.bytes();
 }
 
@@ -91,13 +93,15 @@ GroupInfo::GroupInfo(bytes group_id_in,
                      epoch_t epoch_in,
                      bytes tree_hash_in,
                      bytes confirmed_transcript_hash_in,
-                     ExtensionList extensions_in,
+                     ExtensionList group_context_extensions_in,
+                     ExtensionList other_extensions_in,
                      MAC confirmation_tag_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
-  , extensions(std::move(extensions_in))
+  , group_context_extensions(std::move(group_context_extensions_in))
+  , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
 {}
 
@@ -109,7 +113,7 @@ GroupInfo::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << confirmation_tag << signer_index;
+  w << group_context_extensions << other_extensions << confirmation_tag << signer_index;
   return w.bytes();
 }
 

@@ -5,6 +5,13 @@
 
 using namespace mls;
 
+struct CustomExtension {
+  uint8_t value;
+
+  static constexpr Extension::Type type = 0xfffe;
+  TLS_SERIALIZABLE(value);
+};
+
 class StateTest
 {
 public:
@@ -38,13 +45,18 @@ protected:
 
   std::tuple<HPKEPrivateKey, SignaturePrivateKey, KeyPackage> make_client()
   {
+    auto ext_list = ExtensionList{};
+    auto capas = CapabilitiesExtension::create_default();
+    capas.extensions.push_back(CustomExtension::type);
+    ext_list.add(capas);
+
     auto init_secret = random_bytes(32);
     auto identity_priv = SignaturePrivateKey::generate(suite);
     auto credential =
       Credential::basic(user_id, suite, identity_priv.public_key);
     auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
     auto key_package = KeyPackage{
-      suite, init_priv.public_key, credential, identity_priv, std::nullopt
+      suite, init_priv.public_key, credential, identity_priv, {{ ext_list }}
     };
 
     return std::make_tuple(init_priv, identity_priv, key_package);
@@ -84,9 +96,12 @@ protected:
 
 TEST_CASE_FIXTURE(StateTest, "Two Person")
 {
+  auto exts = ExtensionList{};
+  exts.add(CustomExtension{0xa0});
+
   // Initialize the creator's state
   auto first0 = State{ group_id,          suite,           init_privs[0],
-                       identity_privs[0], key_packages[0], {} };
+                       identity_privs[0], key_packages[0], exts };
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);

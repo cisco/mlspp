@@ -738,23 +738,27 @@ MessagesTestVector::create()
 
   auto psk_nonce = random_bytes(suite.secret_size());
 
-  // KeyPackage and extensions
-  auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
-  auto key_package =
-    KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
-
   auto lifetime = LifetimeExtension{ 0xA0A1A2A3A4A5A6A7, 0xB0B1B2B3B4B5B6B7 };
   auto capabilities = CapabilitiesExtension{ { version },
                                              { suite.cipher_suite() },
                                              { ExtensionType::ratchet_tree },
                                              { ProposalType::add } };
+  auto ext_list = ExtensionList{};
+  ext_list.add(lifetime);
+  ext_list.add(capabilities);
+
+  // KeyPackage and extensions
+  auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
+  auto key_package =
+    KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
+
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(key_package);
   tree.add_leaf(key_package);
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{ group_id, epoch, opaque, opaque, {}, mac };
+  auto group_info = GroupInfo{ group_id, epoch, opaque, opaque, ext_list, ext_list, mac };
   auto group_secrets = GroupSecrets{ opaque,
                                      { { opaque } },
                                      PreSharedKeys{ {
@@ -766,7 +770,7 @@ MessagesTestVector::create()
 
   // PublicGroupState
   auto public_group_state =
-    PublicGroupState{ suite, group_id, epoch, opaque, opaque, {}, hpke_pub };
+    PublicGroupState{ suite, group_id, epoch, opaque, opaque, ext_list, ext_list, hpke_pub };
   public_group_state.sign(tree, LeafIndex{ 1 }, sig_priv);
 
   // Proposals
