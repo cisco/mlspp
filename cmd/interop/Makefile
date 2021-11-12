@@ -6,7 +6,7 @@ APP_NAME=mlspp_client
 all: ${BUILD_DIR}/${APP_NAME}
 
 ${BUILD_DIR}:
-	cmake -B${BUILD_DIR} .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
 
 ${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR} src/*.cpp
 	cmake --build ${BUILD_DIR} --target ${APP_NAME}
@@ -19,5 +19,6 @@ format:
 
 clean: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target clean
+
 cclean:
 	rm -rf ${BUILD_DIR}

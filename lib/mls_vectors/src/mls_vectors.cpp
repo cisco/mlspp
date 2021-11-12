@@ -488,8 +488,12 @@ TranscriptTestVector::create(CipherSuite suite)
   auto init_secret = random_bytes(suite.secret_size());
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
 
+  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto credential =
+    Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto commit =
     MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
+  commit.sign(suite, group_context, sig_priv);
 
   transcript.update_confirmed(commit);
   commit.confirmation_tag =
@@ -509,6 +513,7 @@ TranscriptTestVector::create(CipherSuite suite)
 
     ks_epoch.membership_key,
     ks_epoch.confirmation_key,
+    credential,
     commit,
 
     ctx,
@@ -533,6 +538,11 @@ TranscriptTestVector::verify() const
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
+
+  // Verify that the commit signature is valid
+  auto commit_valid =
+    commit.verify(cipher_suite, group_context_obj, credential.public_key());
+  VERIFY("commit signature valid", commit_valid);
 
   // Verify the Commit tags
   auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
@@ -560,7 +570,8 @@ new_key_package(CipherSuite suite)
 {
   auto scheme = suite;
   auto init_secret = random_bytes(suite.secret_size());
-  auto init_priv = HPKEPrivateKey::derive(suite, init_secret);
+  auto leaf_node_secret = suite.derive_secret(init_secret, "node");
+  auto init_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto cred = Credential::basic({ 0, 1, 2, 3 }, scheme, sig_priv.public_key);
   auto kp =
@@ -688,13 +699,16 @@ TreeKEMTestVector::verify() const
   auto ancestor = tree_math::ancestor(my_index, add_sender);
 
   // Establish a TreeKEMPrivate Key
-  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, my_leaf_secret);
+  auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");
+  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
   auto priv = TreeKEMPrivateKey::joiner(cipher_suite,
                                         ratchet_tree_before.size(),
                                         my_index,
                                         leaf_priv,
                                         ancestor,
                                         my_path_secret);
+  VERIFY("private key consistent with tree before",
+         priv.consistent(ratchet_tree_before));
   VERIFY_EQUAL(
     "root secret after add", priv.update_secret, root_secret_after_add);
 
@@ -743,7 +757,7 @@ MessagesTestVector::create()
   auto key_package =
     KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
 
-  auto lifetime = LifetimeExtension{ 0xA0A1A2A3A4A5A6A7, 0xB0B1B2B3B4B5B6B7 };
+  auto lifetime = LifetimeExtension{ 0x0000000000000000, 0xffffffffffffffff };
   auto capabilities = CapabilitiesExtension{ { version },
                                              { suite.cipher_suite() },
                                              { ExtensionType::ratchet_tree },

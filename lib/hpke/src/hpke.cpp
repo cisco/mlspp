@@ -408,6 +408,7 @@ HPKE::setup_base_r(const bytes& enc,
                    const KEM::PrivateKey& skR,
                    const bytes& info) const
 {
+  auto pkRm = kem.serialize(*skR.public_key());
   auto shared_secret = kem.decap(enc, skR);
   auto ctx =
     key_schedule(Mode::base, shared_secret, info, default_psk, default_psk_id);

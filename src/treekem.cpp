@@ -200,6 +200,57 @@ TreeKEMPrivateKey::shared_path_secret(LeafIndex to) const
   return std::make_tuple(n, i->second, true);
 }
 
+#if 0
+// XXX(RLB) This should ultimately be deleted, but it is handy for interop
+// debugging, so I'm keeping it around for now.  If re-enabled, you'll also need
+// to add the appropriate declarations to treekem.h
+
+void
+TreeKEMPrivateKey::dump() const
+{
+  for (const auto& [node, _] : path_secrets) {
+    private_key(node);
+  }
+
+  std::cout << "Tree (priv):" << std::endl;
+  std::cout << "  Index: " << NodeIndex(index).val << std::endl;
+  std::cout << "  Nodes: " << std::endl;
+  for (auto& [n, sk]: private_key_cache) {
+    auto pkm = to_hex(sk.public_key.data).substr(0, 8);
+    std::cout << "    " << n.val << " => " << pkm << std::endl;
+  }
+}
+
+void
+TreeKEMPublicKey::dump() const
+{
+  std::cout << "Tree:" << std::endl;
+  for (uint32_t i = 0; i < nodes.size(); ++i) {
+    printf("  %03d : ", i);
+
+    if (!nodes.at(i).blank()) {
+      auto pkRm = to_hex(opt::get(nodes.at(i).node).public_key().data);
+      std::cout << pkRm.substr(0, 8);
+    } else {
+      std::cout << "        ";
+    }
+
+    std::cout << "  | ";
+    for (uint32_t j = 0; j < tree_math::level(NodeIndex{i}); j++) {
+      std::cout << "  ";
+    }
+
+    if (!nodes.at(i).blank()) {
+      std::cout << "X";
+    } else {
+      std::cout << "_";
+    }
+
+    std::cout << std::endl;
+  }
+}
+#endif
+
 void
 TreeKEMPrivateKey::decap(LeafIndex from,
                          const TreeKEMPublicKey& pub,
@@ -207,6 +258,10 @@ TreeKEMPrivateKey::decap(LeafIndex from,
                          const UpdatePath& path,
                          const std::vector<LeafIndex>& except)
 {
+  if (!consistent(pub)) {
+    throw ProtocolError("TreeKEMPublicKey inconsistent with TreeKEMPrivateKey");
+  }
+
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
   auto size = pub.size();
@@ -306,19 +361,27 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     return false;
   }
 
-  const auto public_match = [&](const auto& entry) {
-    auto n = entry.first;
-    auto priv = opt::get(private_key(n));
+  for (const auto& [node, _] : path_secrets) {
+    private_key(node);
+  }
 
-    const auto& opt_node = other.node_at(n).node;
-    if (!opt_node) {
-      return false;
-    }
+  return std::all_of(private_key_cache.begin(),
+                     private_key_cache.end(),
+                     [other](const auto& entry) {
+                       const auto& [node, priv] = entry;
+                       const auto& opt_node = other.node_at(node).node;
+                       if (!opt_node) {
+                         // It's OK for a TreeKEMPrivateKey to have private keys
+                         // for nodes that are blank in the TreeKEMPublicKey.
+                         // This will happen traniently during Commit
+                         // processing, since proposals will be applied in the
+                         // public tree and not in the private tree.
+                         return true;
+                       }
 
-    const auto& pub = opt::get(opt_node).public_key();
-    return priv.public_key == pub;
-  };
-  return std::all_of(path_secrets.begin(), path_secrets.end(), public_match);
+                       const auto& pub = opt::get(opt_node).public_key();
+                       return priv.public_key == pub;
+                     });
 }
 
 ///
@@ -406,7 +469,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
     }
 
     node_at(n).node = { ParentNode{
-      path.nodes[i].public_key, {}, parent_hash } };
+      path.nodes[i].public_key, parent_hash, {} } };
   }
 
   clear_hash_path(from);
@@ -708,7 +771,7 @@ TreeKEMPublicKey::parent_hashes(LeafIndex from, const UpdatePath& path) const
     auto n = dp[i];
     auto s = tree_math::sibling(n, size());
 
-    auto parent_node = ParentNode{ path.nodes[i].public_key, {}, last_hash };
+    auto parent_node = ParentNode{ path.nodes[i].public_key, last_hash, {} };
     last_hash = parent_hash(parent_node, s);
     ph[i] = last_hash;
   }

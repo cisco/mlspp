@@ -148,6 +148,7 @@ struct TranscriptTestVector
 
   HexBytes membership_key;
   HexBytes confirmation_key;
+  mls::Credential credential;
   mls::MLSPlaintext commit;
 
   HexBytes group_context;

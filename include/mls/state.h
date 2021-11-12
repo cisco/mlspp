@@ -190,7 +190,8 @@ protected:
   // transition
   MLSPlaintext ratchet_and_sign(const Sender& sender,
                                 const Commit& op,
-                                const bytes& update_secret,
+                                const bytes& commit_secret,
+                                const std::vector<PSKWithSecret>& psks,
                                 const std::optional<bytes>& force_init_secret,
                                 bool encrypt_handshake,
                                 const GroupContext& prev_ctx);
@@ -222,6 +223,7 @@ protected:
 
   // Derive and set the secrets for an epoch, given some new entropy
   void update_epoch_secrets(const bytes& commit_secret,
+                            const std::vector<PSKWithSecret>& psks,
                             const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
