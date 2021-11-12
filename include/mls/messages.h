@@ -107,9 +107,10 @@ struct PSKWithSecret
 //     uint64 epoch;
 //     opaque tree_hash<0..255>;
 //     opaque interim_transcript_hash<0..255>;
-//     Extension extensions<0..2^32-1>;
+//     Extension group_context_extensions<0..2^32-1>;
+//     Extension other_extensions<0..2^32-1>;
 //     HPKEPublicKey external_pub;
-//     uint32 signer_index;
+//     KeyPackageID signer;
 //     opaque signature<0..2^16-1>;
 // } PublicGroupState;
 struct PublicGroupState
@@ -119,7 +120,8 @@ struct PublicGroupState
   epoch_t epoch;
   bytes tree_hash;
   bytes interim_transcript_hash;
-  ExtensionList extensions;
+  ExtensionList group_context_extensions;
+  ExtensionList other_extensions;
   HPKEPublicKey external_pub;
   LeafIndex signer_index;
   bytes signature;
@@ -130,7 +132,8 @@ struct PublicGroupState
                    epoch_t epoch_in,
                    bytes tree_hash_in,
                    bytes interim_transcript_hash_in,
-                   ExtensionList extensions_in,
+                   ExtensionList group_context_extensions_in,
+                   ExtensionList other_extensions_in,
                    HPKEPublicKey external_pub_in);
 
   bytes to_be_signed() const;
@@ -144,7 +147,8 @@ struct PublicGroupState
                    epoch,
                    tree_hash,
                    interim_transcript_hash,
-                   extensions,
+                   group_context_extensions,
+                   other_extensions,
                    external_pub,
                    signer_index,
                    signature)
@@ -156,6 +160,7 @@ struct PublicGroupState
              tls::pass,
              tls::pass,
              tls::pass,
+             tls::pass,
              tls::vector<2>)
 };
 
@@ -164,9 +169,10 @@ struct PublicGroupState
 //   uint64 epoch;
 //   opaque tree_hash<0..255>;
 //   opaque confirmed_transcript_hash<0..255>;
-//   Extension extensions<0..2^32-1>;
+//   Extension group_context_extensions<0..2^32-1>;
+//   Extension other_extensions<0..2^32-1>;
 //   MAC confirmation_tag;
-//   uint32 signer_index;
+//   KeyPackageID signer;
 //   opaque signature<0..2^16-1>;
 // } GroupInfo;
 struct GroupInfo
@@ -175,9 +181,9 @@ public:
   bytes group_id;
   epoch_t epoch;
   bytes tree_hash;
-
   bytes confirmed_transcript_hash;
-  ExtensionList extensions;
+  ExtensionList group_context_extensions;
+  ExtensionList other_extensions;
 
   MAC confirmation_tag;
   LeafIndex signer_index;
@@ -188,7 +194,8 @@ public:
             epoch_t epoch_in,
             bytes tree_hash_in,
             bytes confirmed_transcript_hash_in,
-            ExtensionList extensions_in,
+            ExtensionList group_context_extensions_in,
+            ExtensionList other_extensions_in,
             MAC confirmation_tag_in);
 
   bytes to_be_signed() const;
@@ -201,7 +208,8 @@ public:
                    epoch,
                    tree_hash,
                    confirmed_transcript_hash,
-                   extensions,
+                   group_context_extensions,
+                   other_extensions,
                    confirmation_tag,
                    signer_index,
                    signature)
@@ -209,6 +217,7 @@ public:
              tls::pass,
              tls::vector<1>,
              tls::vector<1>,
+             tls::pass,
              tls::pass,
              tls::pass,
              tls::pass,
@@ -354,13 +363,27 @@ struct AppAck
   TLS_TRAITS(tls::vector<4>)
 };
 
+// GroupContextExtensions
+struct GroupContextExtensions
+{
+  ExtensionList group_context_extensions;
+  TLS_SERIALIZABLE(group_context_extensions);
+};
+
 struct ProposalType;
 
 struct Proposal
 {
   using Type = uint16_t;
 
-  var::variant<Add, Update, Remove, PreSharedKey, ReInit, ExternalInit, AppAck>
+  var::variant<Add,
+               Update,
+               Remove,
+               PreSharedKey,
+               ReInit,
+               ExternalInit,
+               AppAck,
+               GroupContextExtensions>
     content;
 
   Type proposal_type() const;
@@ -379,6 +402,7 @@ struct ProposalType
   static constexpr Proposal::Type reinit = 5;
   static constexpr Proposal::Type external_init = 6;
   static constexpr Proposal::Type app_ack = 7;
+  static constexpr Proposal::Type group_context_extensions = 8;
 
   constexpr ProposalType()
     : val(invalid)
@@ -607,6 +631,9 @@ TLS_VARIANT_MAP(mls::ProposalType, mls::PreSharedKey, psk)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ReInit, reinit)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ExternalInit, external_init)
 TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
+TLS_VARIANT_MAP(mls::ProposalType,
+                mls::GroupContextExtensions,
+                group_context_extensions)
 
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
