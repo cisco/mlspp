@@ -505,7 +505,8 @@ State::handle(const MLSPlaintext& pt)
   silence_unused(_has_updates);
   silence_unused(_has_removes);
 
-  // If this is an external Commit, then its direct proposals must meet certain constraints
+  // If this is an external Commit, then its direct proposals must meet certain
+  // constraints
   auto force_init_secret = std::optional<bytes>{};
   if (pt.sender.sender_type == SenderType::external_joiner) {
     auto kem_output = commit.valid_external();
@@ -513,7 +514,8 @@ State::handle(const MLSPlaintext& pt)
       throw ProtocolError("Invalid external commit");
     }
 
-    force_init_secret = _key_schedule.receive_external_init(opt::get(kem_output));
+    force_init_secret =
+      _key_schedule.receive_external_init(opt::get(kem_output));
   }
 
   // Decapsulate and apply the UpdatePath, if provided

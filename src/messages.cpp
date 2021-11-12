@@ -261,7 +261,7 @@ Commit::valid_external() const
   auto removes = filter_inline<Remove>(proposals);
   if (removes.size() > 1) {
     return std::nullopt;
-  } if (removes.size() == 1) {
+  } else if (removes.size() == 1) {
     // TODO(RLB) Implement identity match once endpoint_id is implemented
   }
 
