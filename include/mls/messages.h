@@ -123,7 +123,7 @@ struct PublicGroupState
   ExtensionList group_context_extensions;
   ExtensionList other_extensions;
   HPKEPublicKey external_pub;
-  LeafIndex signer_index;
+  KeyPackageID signer;
   bytes signature;
 
   PublicGroupState() = default;
@@ -138,7 +138,7 @@ struct PublicGroupState
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafIndex index,
+            KeyPackageID signer_id,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -150,7 +150,7 @@ struct PublicGroupState
                    group_context_extensions,
                    other_extensions,
                    external_pub,
-                   signer_index,
+                   signer,
                    signature)
   TLS_TRAITS(tls::pass,
              tls::vector<1>,
@@ -186,7 +186,7 @@ public:
   ExtensionList other_extensions;
 
   MAC confirmation_tag;
-  LeafIndex signer_index;
+  KeyPackageID signer;
   bytes signature;
 
   GroupInfo() = default;
@@ -200,7 +200,7 @@ public:
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafIndex index,
+            KeyPackageID signer_id,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -211,7 +211,7 @@ public:
                    group_context_extensions,
                    other_extensions,
                    confirmation_tag,
-                   signer_index,
+                   signer,
                    signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
@@ -253,11 +253,10 @@ struct GroupSecrets
 // } EncryptedGroupSecrets;
 struct EncryptedGroupSecrets
 {
-  bytes key_package_hash;
+  KeyPackageID new_member;
   HPKECiphertext encrypted_group_secrets;
 
-  TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
+  TLS_SERIALIZABLE(new_member, encrypted_group_secrets)
 };
 
 // struct {

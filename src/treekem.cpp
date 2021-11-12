@@ -569,14 +569,15 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
 std::optional<LeafIndex>
 TreeKEMPublicKey::find(const KeyPackage& kp) const
 {
-  for (LeafIndex i{ 0 }; i < size(); i.val++) {
-    const auto& node = node_at(NodeIndex(i)).node;
-    if (!node) {
-      continue;
-    }
+  return find(kp.id());
+}
 
-    const auto& node_kp = var::get<KeyPackage>(opt::get(node).node);
-    if (kp == node_kp) {
+std::optional<LeafIndex>
+TreeKEMPublicKey::find(const KeyPackageID& id) const
+{
+  for (LeafIndex i{ 0 }; i < size(); i.val++) {
+    const auto& node = node_at(NodeIndex(i));
+    if (!node.blank() && node.key_package().id() == id) {
       return i;
     }
   }
@@ -593,6 +594,23 @@ TreeKEMPublicKey::key_package(LeafIndex index) const
   }
 
   return var::get<KeyPackage>(opt::get(node).node);
+}
+
+std::optional<KeyPackage>
+TreeKEMPublicKey::key_package(const KeyPackageID& id) const
+{
+  for (const auto& node : nodes) {
+    if (node.blank() || !node.leaf()) {
+      continue;
+    }
+
+    auto kp = node.key_package();
+    if (kp.id() == id) {
+      return kp;
+    }
+  }
+
+  return std::nullopt;
 }
 
 std::tuple<TreeKEMPrivateKey, UpdatePath>

@@ -26,9 +26,10 @@ State::State(bytes group_id,
     throw InvalidParameterError("Client doesn't support required extensions");
   }
 
-  auto index = _tree.add_leaf(key_package);
+  _id = key_package.id();
+  _index = _tree.add_leaf(key_package);
   _tree.set_hash_all();
-  _tree_priv = TreeKEMPrivateKey::solo(suite, index, init_priv);
+  _tree_priv = TreeKEMPrivateKey::solo(suite, _index, init_priv);
 
   // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
   auto ctx = tls::marshal(group_context());
@@ -148,8 +149,10 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   _index = opt::get(maybe_index);
+  _id = kp.id();
 
-  auto ancestor = tree_math::ancestor(_index, group_info.signer_index);
+  auto signer_index = opt::get(_tree.find(group_info.signer));
+  auto ancestor = tree_math::ancestor(_index, signer_index);
   auto path_secret = std::optional<bytes>{};
   if (secrets.path_secret) {
     path_secret = opt::get(secrets.path_secret).secret;
@@ -232,7 +235,7 @@ State::update_proposal(const bytes& leaf_secret)
   kp.init_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   kp.sign(_identity_priv, std::nullopt);
 
-  _update_secrets[kp.hash()] = leaf_secret;
+  _update_secrets[kp.id().id] = leaf_secret;
   return { Update{ kp } };
 }
 
@@ -356,14 +359,15 @@ State::commit(const bytes& leaf_secret,
   // If this is an external commit, see where the new joiner ended up
   auto sender = Sender{ SenderType::member, _index.val };
   if (external_commit) {
-    auto it =
-      std::find(joiners.begin(), joiners.end(), opt::get(joiner_key_package));
+    const auto& kp = opt::get(joiner_key_package);
+    const auto it = std::find(joiners.begin(), joiners.end(), kp);
     if (it == joiners.end()) {
       throw InvalidParameterError("Joiner not added");
     }
 
-    auto pos = it - joiners.begin();
+    const auto pos = it - joiners.begin();
     next._index = joiner_locations[pos];
+    next._id = kp.id();
     sender = Sender{ SenderType::external_joiner, next._index.val };
   }
 
@@ -389,6 +393,7 @@ State::commit(const bytes& leaf_secret,
                                              joiner_locations,
                                              std::nullopt);
     next._tree_priv = new_priv;
+    next._id = path.leaf_key_package.id();
     commit.path = path;
     commit_secret = new_priv.update_secret;
 
@@ -425,7 +430,7 @@ State::commit(const bytes& leaf_secret,
   if (opts && opt::get(opts).inline_tree) {
     group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
   }
-  group_info.sign(next._tree, next._index, next._identity_priv);
+  group_info.sign(next._tree, next._id, next._identity_priv);
 
   auto welcome = Welcome{
     _suite, next._key_schedule.joiner_secret, { /* no PSKs */ }, group_info
@@ -703,8 +708,8 @@ State::apply(const std::vector<CachedProposal>& proposals,
           break;
         }
 
-        auto kp_hash = update.key_package.hash();
-        if (_update_secrets.count(kp_hash) == 0) {
+        const auto kp_id = update.key_package.id();
+        if (_update_secrets.count(kp_id.id) == 0) {
           throw ProtocolError("Self-update with no cached secret");
         }
 
@@ -918,7 +923,7 @@ State::public_group_state() const
     _key_schedule.external_priv.public_key,
   };
   pgs.other_extensions.add(RatchetTreeExtension{ _tree });
-  pgs.sign(_tree, _index, _identity_priv);
+  pgs.sign(_tree, _id, _identity_priv);
   return pgs;
 }
 

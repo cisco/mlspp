@@ -168,6 +168,13 @@ struct KeyPackageOpts
   ExtensionList extensions;
 };
 
+struct KeyPackageID
+{
+  bytes id;
+  TLS_SERIALIZABLE(id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
 struct KeyPackage
 {
   ProtocolVersion version;
@@ -184,7 +191,7 @@ struct KeyPackage
              const SignaturePrivateKey& sig_priv_in,
              const std::optional<KeyPackageOpts>& opts_in);
 
-  bytes hash() const;
+  KeyPackageID id() const;
 
   void sign(const SignaturePrivateKey& sig_priv,
             const std::optional<KeyPackageOpts>& opts);

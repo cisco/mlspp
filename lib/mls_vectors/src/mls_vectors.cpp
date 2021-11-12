@@ -787,7 +787,7 @@ MessagesTestVector::create()
   auto public_group_state =
     PublicGroupState{ suite,  group_id, epoch,    opaque,
                       opaque, ext_list, ext_list, hpke_pub };
-  public_group_state.sign(tree, LeafIndex{ 1 }, sig_priv);
+  public_group_state.sign(tree, key_package.id(), sig_priv);
 
   // Proposals
   auto add = Add{ key_package };

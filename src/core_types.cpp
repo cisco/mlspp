@@ -116,10 +116,10 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   sign(sig_priv_in, opts_in);
 }
 
-bytes
-KeyPackage::hash() const
+KeyPackageID
+KeyPackage::id() const
 {
-  return cipher_suite.digest().hash(tls::marshal(*this));
+  return { cipher_suite.digest().hash(tls::marshal(*this)) };
 }
 
 void

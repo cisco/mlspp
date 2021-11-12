@@ -32,6 +32,7 @@ struct OptionalNode
   bytes hash;
 
   bool blank() const { return !node.has_value(); }
+  bool leaf() const { return !blank() && var::holds_alternative<KeyPackage>(opt::get(node).node); }
 
   KeyPackage& key_package()
   {
@@ -137,7 +138,9 @@ struct TreeKEMPublicKey
   bool parent_hash_valid() const;
 
   std::optional<LeafIndex> find(const KeyPackage& kp) const;
+  std::optional<LeafIndex> find(const KeyPackageID& id) const;
   std::optional<KeyPackage> key_package(LeafIndex index) const;
+  std::optional<KeyPackage> key_package(const KeyPackageID& id) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::tuple<TreeKEMPrivateKey, UpdatePath> encap(

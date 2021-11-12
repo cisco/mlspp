@@ -48,17 +48,16 @@ PublicGroupState::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, interim_transcript_hash);
-  w << group_context_extensions << other_extensions << external_pub
-    << signer_index;
+  w << group_context_extensions << other_extensions << external_pub << signer;
   return w.bytes();
 }
 
 void
 PublicGroupState::sign(const TreeKEMPublicKey& tree,
-                       LeafIndex index,
+                       KeyPackageID signer_id,
                        const SignaturePrivateKey& priv)
 {
-  auto maybe_kp = tree.key_package(index);
+  auto maybe_kp = tree.key_package(signer_id);
   if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -68,7 +67,7 @@ PublicGroupState::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer_index = index;
+  signer = signer_id;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
@@ -79,7 +78,7 @@ PublicGroupState::verify(const TreeKEMPublicKey& tree) const
     throw InvalidParameterError("Cipher suite mismatch");
   }
 
-  auto maybe_kp = tree.key_package(signer_index);
+  auto maybe_kp = tree.key_package(signer);
   if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -114,17 +113,16 @@ GroupInfo::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << group_context_extensions << other_extensions << confirmation_tag
-    << signer_index;
+  w << group_context_extensions << other_extensions << confirmation_tag << signer;
   return w.bytes();
 }
 
 void
 GroupInfo::sign(const TreeKEMPublicKey& tree,
-                LeafIndex index,
+                KeyPackageID signer_id,
                 const SignaturePrivateKey& priv)
 {
-  auto maybe_kp = tree.key_package(index);
+  auto maybe_kp = tree.key_package(signer_id);
   if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -134,14 +132,14 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer_index = index;
+  signer = signer_id;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
 bool
 GroupInfo::verify(const TreeKEMPublicKey& tree) const
 {
-  auto maybe_kp = tree.key_package(signer_index);
+  auto maybe_kp = tree.key_package(signer);
   if (!maybe_kp) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -174,9 +172,9 @@ Welcome::Welcome(CipherSuite suite,
 std::optional<int>
 Welcome::find(const KeyPackage& kp) const
 {
-  auto hash = kp.hash();
+  auto id = kp.id();
   for (size_t i = 0; i < secrets.size(); i++) {
-    if (hash == secrets[i].key_package_hash) {
+    if (id == secrets[i].new_member) {
       return static_cast<int>(i);
     }
   }
@@ -193,7 +191,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 
   auto gs_data = tls::marshal(gs);
   auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, {}, gs_data);
-  secrets.push_back({ kp.hash(), enc_gs });
+  secrets.push_back({ kp.id(), enc_gs });
 }
 
 GroupInfo

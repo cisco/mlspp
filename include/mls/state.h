@@ -159,6 +159,7 @@ protected:
 
   // Per-participant state
   LeafIndex _index;
+  KeyPackageID _id;
   SignaturePrivateKey _identity_priv;
 
   // Cache of Proposals and update secrets
