@@ -116,6 +116,7 @@ GroupInfo::to_be_signed() const
   tls::vector<1>::encode(w, confirmed_transcript_hash);
   w << group_context_extensions << other_extensions << confirmation_tag
     << signer_index;
+  w << extensions << confirmation_tag << signer_index;
   return w.bytes();
 }
 
@@ -215,12 +216,19 @@ Welcome::group_info_key_nonce(CipherSuite suite,
                               const bytes& joiner_secret,
                               const std::vector<PSKWithSecret>& psks)
 {
+  static const auto key_label = from_ascii("key");
+  static const auto nonce_label = from_ascii("nonce");
+
   auto welcome_secret =
     KeyScheduleEpoch::welcome_secret(suite, joiner_secret, psks);
+
+  // XXX(RLB): These used to be done with ExpandWithLabel.  Should we do that
+  // instead, for better domain separation? (In particular, including "mls10")
+  // That is what we do for the sender data key/nonce.
   auto key =
-    suite.expand_with_label(welcome_secret, "key", {}, suite.key_size());
+    suite.hpke().kdf.expand(welcome_secret, key_label, suite.key_size());
   auto nonce =
-    suite.expand_with_label(welcome_secret, "nonce", {}, suite.nonce_size());
+    suite.hpke().kdf.expand(welcome_secret, nonce_label, suite.nonce_size());
   return { std::move(key), std::move(nonce) };
 }
 

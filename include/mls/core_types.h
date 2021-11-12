@@ -145,13 +145,13 @@ struct ParentHashExtension
 struct ParentNode
 {
   HPKEPublicKey public_key;
-  std::vector<LeafIndex> unmerged_leaves;
   bytes parent_hash;
+  std::vector<LeafIndex> unmerged_leaves;
 
   bytes hash(CipherSuite suite) const;
 
-  TLS_SERIALIZABLE(public_key, unmerged_leaves, parent_hash)
-  TLS_TRAITS(tls::pass, tls::vector<4>, tls::vector<1>)
+  TLS_SERIALIZABLE(public_key, parent_hash, unmerged_leaves)
+  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 // struct {
