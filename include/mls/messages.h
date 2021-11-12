@@ -501,15 +501,28 @@ enum struct SenderType : uint8_t
   member = 1,
   preconfigured = 2,
   new_member = 3,
-  external_joiner = 4,
+};
+
+struct PreconfiguredKeyID
+{
+  bytes id;
+  TLS_SERIALIZABLE(id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+struct NewMemberID
+{
+  TLS_SERIALIZABLE()
 };
 
 struct Sender
 {
-  SenderType sender_type{ SenderType::invalid };
-  uint32_t sender{ 0 };
+  var::variant<KeyPackageID, PreconfiguredKeyID, NewMemberID> sender;
 
-  TLS_SERIALIZABLE(sender_type, sender)
+  SenderType sender_type() const;
+
+  TLS_SERIALIZABLE(sender)
+  TLS_TRAITS(tls::variant<SenderType>)
 };
 
 struct MLSPlaintext
@@ -641,5 +654,9 @@ TLS_VARIANT_MAP(mls::ProposalType,
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
+
+TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageID, member)
+TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
+TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberID, new_member)
 
 } // namespace tls

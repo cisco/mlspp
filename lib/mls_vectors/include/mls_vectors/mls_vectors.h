@@ -71,8 +71,8 @@ struct EncryptionTestVector
   };
 
   mls::CipherSuite cipher_suite;
-  mls::LeafCount n_leaves;
 
+  HexBytes tree;
   HexBytes encryption_secret;
   HexBytes sender_data_secret;
   SenderDataInfo sender_data_info;

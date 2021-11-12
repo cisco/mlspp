@@ -294,6 +294,12 @@ Proposal::proposal_type() const
   return tls::variant<ProposalType>::type(content).val;
 }
 
+SenderType
+Sender::sender_type() const
+{
+  return tls::variant<SenderType>::type(sender);
+}
+
 MLSPlaintext::MLSPlaintext()
   : wire_format(WireFormat::mls_plaintext)
   , epoch(0)

@@ -320,13 +320,13 @@ Session::handle(const bytes& handshake_data)
 {
   auto pt = inner->import_message(handshake_data);
 
-  if (pt.sender.sender_type != SenderType::member) {
+  if (pt.sender.sender_type() != SenderType::member) {
     throw ProtocolError("External senders not supported");
   }
 
   const auto is_commit = var::holds_alternative<Commit>(pt.content);
   if (is_commit &&
-      LeafIndex(pt.sender.sender) == inner->history.front().index()) {
+      pt.sender.sender == inner->history.front().id()) {
     if (!inner->outbound_cache) {
       throw ProtocolError("Received from self without sending");
     }

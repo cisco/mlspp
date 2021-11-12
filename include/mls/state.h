@@ -112,6 +112,7 @@ public:
   /// Accessors
   ///
   epoch_t epoch() const { return _epoch; }
+  KeyPackageID id() const { return _id; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
@@ -167,7 +168,7 @@ protected:
   {
     bytes ref;
     Proposal proposal;
-    LeafIndex sender;
+    std::optional<LeafIndex> sender;
   };
   std::list<CachedProposal> _pending_proposals;
   std::map<bytes, bytes> _update_secrets;
@@ -220,10 +221,10 @@ protected:
   // Extract a proposal from the cache
   void cache_proposal(const MLSPlaintext& pt);
   std::optional<CachedProposal> resolve(const ProposalOrRef& id,
-                                        LeafIndex sender_index) const;
+                                        std::optional<LeafIndex> sender_index) const;
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
-    LeafIndex sender_index) const;
+    std::optional<LeafIndex> sender_index) const;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
@@ -236,7 +237,7 @@ protected:
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSPlaintext& pt) const;
-  bool verify_external_commit(const MLSPlaintext& pt) const;
+  bool verify_new_member(const MLSPlaintext& pt) const;
   bool verify(const MLSPlaintext& pt) const;
 
   // Verification of the confirmation MAC
