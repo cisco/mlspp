@@ -226,12 +226,12 @@ filter_inline(const std::vector<ProposalOrRef>& prop_or_refs)
 {
   auto selected = std::vector<std::reference_wrapper<const P>>{};
   for (const auto& prop_or_ref : prop_or_refs) {
-    auto by_value = var::get_if<Proposal>(&prop_or_ref.content);
+    const auto* by_value = var::get_if<Proposal>(&prop_or_ref.content);
     if (!by_value) {
       continue;
     }
 
-    auto correct_type = var::get_if<P>(&by_value->content);
+    const auto* correct_type = var::get_if<P>(&by_value->content);
     if (!correct_type) {
       continue;
     }
@@ -261,7 +261,9 @@ Commit::valid_external() const
   auto removes = filter_inline<Remove>(proposals);
   if (removes.size() > 1) {
     return std::nullopt;
-  } else if (removes.size() == 1) {
+  }
+
+  if (removes.size() == 1) {
     // TODO(RLB) Implement identity match once endpoint_id is implemented
   }
 
