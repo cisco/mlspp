@@ -116,7 +116,6 @@ GroupInfo::to_be_signed() const
   tls::vector<1>::encode(w, confirmed_transcript_hash);
   w << group_context_extensions << other_extensions << confirmation_tag
     << signer_index;
-  w << extensions << confirmation_tag << signer_index;
   return w.bytes();
 }
 

@@ -766,11 +766,6 @@ MessagesTestVector::create()
   ext_list.add(lifetime);
   ext_list.add(capabilities);
 
-  // KeyPackage and extensions
-  auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
-  auto key_package =
-    KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
-
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(key_package);
   tree.add_leaf(key_package);
