@@ -218,6 +218,62 @@ Welcome::group_info_key_nonce(CipherSuite suite,
   return { std::move(key), std::move(nonce) };
 }
 
+// Commit
+
+template<typename P>
+std::vector<std::reference_wrapper<const P>>
+filter_inline(const std::vector<ProposalOrRef>& prop_or_refs)
+{
+  auto selected = std::vector<std::reference_wrapper<const P>>{};
+  for (const auto& prop_or_ref : prop_or_refs) {
+    auto by_value = var::get_if<Proposal>(&prop_or_ref.content);
+    if (!by_value) {
+      continue;
+    }
+
+    auto correct_type = var::get_if<P>(&by_value->content);
+    if (!correct_type) {
+      continue;
+    }
+
+    selected.push_back(*correct_type);
+  }
+
+  return selected;
+}
+
+std::optional<bytes>
+Commit::valid_external() const
+{
+  // There MUST be a single Add proposal
+  if (filter_inline<Add>(proposals).size() != 1) {
+    return std::nullopt;
+  }
+
+  // There MUST NOT be any Update proposals
+  if (!filter_inline<Update>(proposals).empty()) {
+    return std::nullopt;
+  }
+
+  // If a Remove proposal is present, then the `credential` and `endpoint_id` of
+  // the removed leaf MUST be the same as the corresponding values in the Add
+  // KeyPackage.
+  auto removes = filter_inline<Remove>(proposals);
+  if (removes.size() > 1) {
+    return std::nullopt;
+  } if (removes.size() == 1) {
+    // TODO(RLB) Implement identity match once endpoint_id is implemented
+  }
+
+  // There MUST be a single ExternalInit proposal
+  auto ext_inits = filter_inline<ExternalInit>(proposals);
+  if (ext_inits.size() != 1) {
+    return std::nullopt;
+  }
+
+  return ext_inits[0].get().kem_output;
+}
+
 // MLSPlaintext
 Proposal::Type
 Proposal::proposal_type() const

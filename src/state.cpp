@@ -508,25 +508,12 @@ State::handle(const MLSPlaintext& pt)
   // If this is an external Commit, then its direct proposals must meet certain constraints
   auto force_init_secret = std::optional<bytes>{};
   if (pt.sender.sender_type == SenderType::external_joiner) {
-    // There MUST be a single Add proposal
-    // There MUST be a single ExternalInit proposal
-    // There MUST NOT be any Update proposals
-    // If a Remove proposal is present, then the `credential` and `endpoint_id` of
-    // the removed leaf MUST be the same as the corresponding values in the Add
-    // KeyPackage.
-
-    /*
-    auto pos =
-      std::find_if(proposals.begin(), proposals.end(), [&](auto&& cached) {
-        return var::holds_alternative<ExternalInit>(cached.proposal.content);
-      });
-    if (pos == proposals.end()) {
-      throw ProtocolError("External commit without ExternalInit");
+    auto kem_output = commit.valid_external();
+    if (!kem_output) {
+      throw ProtocolError("Invalid external commit");
     }
 
-    const auto& enc = var::get<ExternalInit>(pos->proposal.content).kem_output;
-    force_init_secret = _key_schedule.receive_external_init(enc);
-    */
+    force_init_secret = _key_schedule.receive_external_init(opt::get(kem_output));
   }
 
   // Decapsulate and apply the UpdatePath, if provided
