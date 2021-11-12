@@ -246,9 +246,9 @@ State::remove_proposal(RosterIndex index) const
 }
 
 Proposal
-State::remove_proposal(LeafIndex removed) const
+State::remove_proposal(KeyPackageID removed) const
 {
-  if (!_tree.key_package(removed)) {
+  if (!_tree.find(removed)) {
     throw InvalidParameterError("Remove on blank leaf");
   }
 
@@ -284,7 +284,7 @@ State::remove(RosterIndex index) const
 }
 
 MLSPlaintext
-State::remove(LeafIndex removed) const
+State::remove(KeyPackageID removed) const
 {
   return sign(remove_proposal(removed));
 }
@@ -605,10 +605,17 @@ State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
   _tree_priv.set_leaf_secret(leaf_secret);
 }
 
-void
+LeafIndex
 State::apply(const Remove& remove)
 {
-  _tree.blank_path(remove.removed);
+  auto maybe_removed = _tree.find(remove.removed);
+  if (!maybe_removed) {
+    throw ProtocolError("Attempt to remove non-member");
+  }
+
+  auto removed = opt::get(maybe_removed);
+  _tree.blank_path(removed);
+  return removed;
 }
 
 void
@@ -720,8 +727,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
 
       case ProposalType::remove: {
         const auto& remove = var::get<Remove>(cached.proposal.content);
-        apply(remove);
-        locations.push_back(remove.removed);
+        locations.push_back(apply(remove));
         break;
       }
 
@@ -996,7 +1002,7 @@ State::decrypt(const MLSCiphertext& ct)
   return _keys.decrypt(_key_schedule.sender_data_secret, ct);
 }
 
-LeafIndex
+KeyPackageID
 State::leaf_for_roster_entry(RosterIndex index) const
 {
   auto non_blank_leaves = uint32_t(0);
@@ -1007,7 +1013,7 @@ State::leaf_for_roster_entry(RosterIndex index) const
       continue;
     }
     if (non_blank_leaves == index.val) {
-      return i;
+      return opt::get(kp).id();
     }
     non_blank_leaves += 1;
   }

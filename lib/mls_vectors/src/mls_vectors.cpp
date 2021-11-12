@@ -226,7 +226,7 @@ EncryptionTestVector::create(CipherSuite suite,
   auto epoch = epoch_t(0x0001020304050607);
   auto handshake_type = GroupKeySource::RatchetType::handshake;
   auto application_type = GroupKeySource::RatchetType::application;
-  auto proposal = Proposal{ Remove{ LeafIndex{ 0 } } };
+  auto proposal = Proposal{ GroupContextExtensions{} };
   auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
 
   tv.leaves.resize(n_leaves);
@@ -792,7 +792,7 @@ MessagesTestVector::create()
   // Proposals
   auto add = Add{ key_package };
   auto update = Update{ key_package };
-  auto remove = Remove{ index };
+  auto remove = Remove{ key_package.id() };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };

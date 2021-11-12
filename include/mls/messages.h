@@ -315,7 +315,7 @@ struct Update
 // Remove
 struct Remove
 {
-  LeafIndex removed;
+  KeyPackageID removed;
   TLS_SERIALIZABLE(removed)
 };
 

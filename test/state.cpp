@@ -490,8 +490,10 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 
 TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
-  for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
-    auto remove = states[i].remove_proposal(LeafIndex{ uint32_t(i + 1) });
+  for (uint32_t i = group_size - 2; i > 0; i -= 1) {
+    auto kp = states[i].tree().key_package(LeafIndex{i+1});
+    auto kp_id = opt::get(kp).id();
+    auto remove = states[i].remove_proposal(kp_id);
     auto [commit, welcome, new_state] =
       states[i].commit(fresh_secret(), CommitOpts{ { remove }, true, false });
     silence_unused(welcome);
