@@ -447,6 +447,10 @@ struct Commit
   std::vector<ProposalOrRef> proposals;
   std::optional<UpdatePath> path;
 
+  // Validate that the commit is accepable as an external commit, and if so,
+  // produce the public key from the ExternalInit proposal
+  std::optional<bytes> valid_external() const;
+
   TLS_SERIALIZABLE(proposals, path)
   TLS_TRAITS(tls::vector<4>, tls::pass)
 };
