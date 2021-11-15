@@ -204,6 +204,10 @@ protected:
   MLSPlaintext sign(const Proposal& proposal) const;
 
   // Apply the changes requested by various messages
+  void check_add_key_package(const KeyPackage& key_package,
+                             std::optional<LeafIndex> except) const;
+  void check_update_key_package(LeafIndex target,
+                                const KeyPackage& key_package) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
@@ -220,8 +224,9 @@ protected:
 
   // Extract a proposal from the cache
   void cache_proposal(const MLSPlaintext& pt);
-  std::optional<CachedProposal> resolve(const ProposalOrRef& id,
-                                        std::optional<LeafIndex> sender_index) const;
+  std::optional<CachedProposal> resolve(
+    const ProposalOrRef& id,
+    std::optional<LeafIndex> sender_index) const;
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
     std::optional<LeafIndex> sender_index) const;

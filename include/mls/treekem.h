@@ -32,7 +32,10 @@ struct OptionalNode
   bytes hash;
 
   bool blank() const { return !node.has_value(); }
-  bool leaf() const { return !blank() && var::holds_alternative<KeyPackage>(opt::get(node).node); }
+  bool leaf() const
+  {
+    return !blank() && var::holds_alternative<KeyPackage>(opt::get(node).node);
+  }
 
   KeyPackage& key_package()
   {

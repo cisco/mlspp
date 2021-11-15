@@ -224,7 +224,8 @@ EncryptionTestVector::create(CipherSuite suite,
     auto init_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({}, suite, sig_priv.public_key);
-    auto key_package = KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
+    auto key_package =
+      KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
     auto key_package_id = key_package.id();
     tree.add_leaf(key_package);
   }
@@ -246,7 +247,7 @@ EncryptionTestVector::create(CipherSuite suite,
     tv.leaves[i].application.resize(n_generations);
 
     auto N = LeafIndex{ i };
-    auto sender = Sender{ opt::get(tree.key_package(LeafIndex{i})).id() };
+    auto sender = Sender{ opt::get(tree.key_package(LeafIndex{ i })).id() };
     auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
     hs_pt.wire_format = WireFormat::mls_ciphertext;
 

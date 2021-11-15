@@ -113,7 +113,8 @@ GroupInfo::to_be_signed() const
   w << epoch;
   tls::vector<1>::encode(w, tree_hash);
   tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << group_context_extensions << other_extensions << confirmation_tag << signer;
+  w << group_context_extensions << other_extensions << confirmation_tag
+    << signer;
   return w.bytes();
 }
 

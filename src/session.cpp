@@ -325,8 +325,7 @@ Session::handle(const bytes& handshake_data)
   }
 
   const auto is_commit = var::holds_alternative<Commit>(pt.content);
-  if (is_commit &&
-      pt.sender.sender == inner->history.front().id()) {
+  if (is_commit && pt.sender.sender == inner->history.front().id()) {
     if (!inner->outbound_cache) {
       throw ProtocolError("Received from self without sending");
     }

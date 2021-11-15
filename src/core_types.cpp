@@ -109,6 +109,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
   , init_key(std::move(init_key_in))
+  , endpoint_id(random_bytes(cipher_suite.secret_size()))
   , credential(std::move(credential_in))
 {
   extensions.add(CapabilitiesExtension::create_default());
@@ -242,8 +243,8 @@ operator==(const KeyPackage& lhs, const KeyPackage& rhs)
   const auto extensions = (lhs.extensions == rhs.extensions);
   const auto signature = (lhs.signature == rhs.signature);
 
-  return version && cipher_suite && init_key && endpoint_id && credential && extensions &&
-         signature;
+  return version && cipher_suite && init_key && endpoint_id && credential &&
+         extensions && signature;
 }
 
 } // namespace mls

@@ -543,7 +543,7 @@ State::handle(const MLSPlaintext& pt)
   // If this is an external Commit, then its direct proposals must meet certain
   // constraints, and we need to identify the sender's location in the new tree.
   auto force_init_secret = std::optional<bytes>{};
-  auto sender_location = LeafIndex{0};
+  auto sender_location = LeafIndex{ 0 };
   if (sender) {
     sender_location = opt::get(sender);
   }
@@ -554,9 +554,9 @@ State::handle(const MLSPlaintext& pt)
     if (!kem_output) {
       throw ProtocolError("Invalid external commit");
     }
-      
+
     force_init_secret =
-    _key_schedule.receive_external_init(opt::get(kem_output));
+      _key_schedule.receive_external_init(opt::get(kem_output));
 
     // Figure out where the new joiner was added by identifying the Add by value
     // in the proposals vector
@@ -589,6 +589,8 @@ State::handle(const MLSPlaintext& pt)
       throw ProtocolError("Commit path has invalid parent hash");
     }
 
+    next.check_update_key_package(sender_location, path.leaf_key_package);
+
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
       next._epoch + 1,
@@ -596,7 +598,8 @@ State::handle(const MLSPlaintext& pt)
       next._transcript_hash.confirmed,
       next._extensions,
     });
-    next._tree_priv.decap(sender_location, next._tree, ctx, path, joiner_locations);
+    next._tree_priv.decap(
+      sender_location, next._tree, ctx, path, joiner_locations);
     next._tree.merge(sender_location, path);
     commit_secret = next._tree_priv.update_secret;
   }
@@ -619,15 +622,68 @@ State::handle(const MLSPlaintext& pt)
   return next;
 }
 
+// A KeyPackage in an Add must not have the same endpoint_id, init_key, or
+// signature_key as any KeyPackage for a current member.
+void
+State::check_add_key_package(const KeyPackage& key_package,
+                             std::optional<LeafIndex> except) const
+{
+  for (LeafIndex i{ 0 }; i < _tree.size(); i.val++) {
+    if (i == except) {
+      continue;
+    }
+
+    const auto maybe_tkp = _tree.key_package(i);
+    if (!maybe_tkp) {
+      continue;
+    }
+
+    const auto& tkp = opt::get(maybe_tkp);
+    const auto init_key_eq = tkp.init_key == key_package.init_key;
+    const auto sig_key_eq =
+      tkp.credential.public_key() == key_package.credential.public_key();
+    const auto endpoint_id_eq = tkp.endpoint_id == key_package.endpoint_id;
+    if (init_key_eq || sig_key_eq || endpoint_id_eq) {
+      throw ProtocolError("Duplicate parameters in new KeyPackage");
+    }
+  }
+}
+
+// A KeyPackage in an Update must meet the same uniqueness criteria as for an
+// Add, except with regard to the KeyPackage it replaces.  There, it also MUST
+// change the init_key and MUST NOT change the endpoint_id.
+void
+State::check_update_key_package(LeafIndex target,
+                                const KeyPackage& key_package) const
+{
+  check_add_key_package(key_package, target);
+
+  const auto maybe_tkp = _tree.key_package(target);
+  if (!maybe_tkp) {
+    return;
+  }
+
+  const auto& tkp = opt::get(maybe_tkp);
+  if (tkp.init_key == key_package.init_key) {
+    throw ProtocolError("Update without a fresh init key");
+  }
+
+  if (tkp.endpoint_id != key_package.endpoint_id) {
+    throw ProtocolError("Update attempting to change endpoint ID");
+  }
+}
+
 LeafIndex
 State::apply(const Add& add)
 {
+  check_add_key_package(add.key_package, std::nullopt);
   return _tree.add_leaf(add.key_package);
 }
 
 void
 State::apply(LeafIndex target, const Update& update)
 {
+  check_update_key_package(target, update.key_package);
   _tree.update_leaf(target, update.key_package);
 }
 
@@ -697,7 +753,8 @@ State::cache_proposal(const MLSPlaintext& pt)
 }
 
 std::optional<State::CachedProposal>
-State::resolve(const ProposalOrRef& id, std::optional<LeafIndex> sender_index) const
+State::resolve(const ProposalOrRef& id,
+               std::optional<LeafIndex> sender_index) const
 {
   if (var::holds_alternative<Proposal>(id.content)) {
     return CachedProposal{
@@ -912,28 +969,28 @@ State::verify_internal(const MLSPlaintext& pt) const
 bool
 State::verify_new_member(const MLSPlaintext& pt) const
 {
-  const auto& pub = var::visit(overloaded{
-    [](const Commit& commit) -> SignaturePublicKey {
-      if (!commit.path) {
-        throw ProtocolError("External Commit does not have a path");
-      }
+  const auto& pub = var::visit(
+    overloaded{ [](const Commit& commit) -> SignaturePublicKey {
+                 if (!commit.path) {
+                   throw ProtocolError("External Commit does not have a path");
+                 }
 
-      // Verify with public key from update path leaf key package
-      const auto& kp = opt::get(commit.path).leaf_key_package;
-      return kp.credential.public_key();
-    },
-    [](const Proposal& proposal) -> SignaturePublicKey  {
-      if (proposal.proposal_type() != ProposalType::add) {
-        throw ProtocolError("New member proposal is not an Add");
-      }
+                 // Verify with public key from update path leaf key package
+                 const auto& kp = opt::get(commit.path).leaf_key_package;
+                 return kp.credential.public_key();
+               },
+                [](const Proposal& proposal) -> SignaturePublicKey {
+                  if (proposal.proposal_type() != ProposalType::add) {
+                    throw ProtocolError("New member proposal is not an Add");
+                  }
 
-      const auto& add = var::get<Add>(proposal.content);
-      return add.key_package.credential.public_key();
-    },
-    [](const auto& /* other */) -> SignaturePublicKey  {
-      throw ProtocolError("New member message of unknown type");
-    }
-  }, pt.content);
+                  const auto& add = var::get<Add>(proposal.content);
+                  return add.key_package.credential.public_key();
+                },
+                [](const auto& /* other */) -> SignaturePublicKey {
+                  throw ProtocolError("New member message of unknown type");
+                } },
+    pt.content);
 
   return pt.verify(_suite, group_context(), pub);
 }
@@ -1033,7 +1090,8 @@ State::encrypt(const MLSPlaintext& pt)
   auto pt_copy = pt;
   pt_copy.wire_format = WireFormat::mls_ciphertext;
   pt_copy.sign(_suite, group_context(), _identity_priv);
-  return _keys.encrypt(_tree, _index, _key_schedule.sender_data_secret, pt_copy);
+  return _keys.encrypt(
+    _tree, _index, _key_schedule.sender_data_secret, pt_copy);
 }
 
 MLSPlaintext
