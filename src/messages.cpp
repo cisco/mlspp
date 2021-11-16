@@ -67,7 +67,7 @@ PublicGroupState::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = signer_id;
+  signer = std::move(signer_id);
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
@@ -133,7 +133,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = signer_id;
+  signer = std::move(signer_id);
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
@@ -315,7 +315,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : wire_format(WireFormat::mls_ciphertext) // since this is used for decryption
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , authenticated_data(std::move(authenticated_data_in))
   , content(ApplicationData())
 {
@@ -356,7 +356,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , content(std::move(application_data_in))
 {}
 
@@ -367,7 +367,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , content(std::move(proposal))
 {}
 
@@ -378,7 +378,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   : wire_format(WireFormat::mls_plaintext)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(sender_in)
+  , sender(std::move(sender_in))
   , content(std::move(commit))
 {}
 

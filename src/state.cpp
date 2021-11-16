@@ -251,7 +251,7 @@ State::remove_proposal(KeyPackageID removed) const
     throw InvalidParameterError("Remove on blank leaf");
   }
 
-  return { Remove{ removed } };
+  return { Remove{ std::move(removed) } };
 }
 
 Proposal
@@ -285,7 +285,7 @@ State::remove(RosterIndex index) const
 MLSPlaintext
 State::remove(KeyPackageID removed) const
 {
-  return sign(remove_proposal(removed));
+  return sign(remove_proposal(std::move(removed)));
 }
 
 MLSPlaintext

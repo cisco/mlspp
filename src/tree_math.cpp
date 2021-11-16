@@ -32,7 +32,7 @@ LeafIndex::LeafIndex(NodeIndex x)
     throw InvalidParameterError("Only even node indices describe leaves");
   }
 
-  val = x.val >> 1;
+  val = x.val >> 1; // NOLINT(hicpp-signed-bitwise)
 }
 
 NodeIndex::NodeIndex(LeafIndex x)
