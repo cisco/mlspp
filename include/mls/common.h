@@ -34,7 +34,7 @@ template<typename T, typename... Ts>
 bool
 operator==(const var::variant<Ts...>& v, const T& t)
 {
-  return std::visit(
+  return var::visit(
     [&](const auto& arg) {
       using U = std::decay_t<decltype(arg)>;
       if constexpr (std::is_same_v<U, T>) {

@@ -490,7 +490,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 
 TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
-  for (uint32_t i = group_size - 2; i > 0; i -= 1) {
+  for (uint32_t i = uint32_t(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(states[i + 1].id());
     auto [commit, welcome, new_state] =
       states[i].commit(fresh_secret(), CommitOpts{ { remove }, true, false });

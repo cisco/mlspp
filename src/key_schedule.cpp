@@ -281,8 +281,8 @@ apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
 struct MLSSenderData
 {
   KeyPackageID sender;
-  uint32_t generation{0};
-  ReuseGuard reuse_guard{0, 0, 0, 0};
+  uint32_t generation{ 0 };
+  ReuseGuard reuse_guard{ 0, 0, 0, 0 };
 
   TLS_SERIALIZABLE(sender, generation, reuse_guard)
 };

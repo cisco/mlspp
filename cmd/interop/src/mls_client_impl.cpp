@@ -217,7 +217,7 @@ MLSClientImpl::store_join(mls::HPKEPrivateKey&& init_priv,
                           mls::SignaturePrivateKey&& sig_priv,
                           mls::KeyPackage&& kp)
 {
-  auto join_id = tls::get<uint32_t>(kp.hash());
+  auto join_id = tls::get<uint32_t>(kp.id().id);
   auto entry =
     CachedJoin{ std::move(init_priv), std::move(sig_priv), std::move(kp) };
   join_cache.emplace(std::make_pair(join_id, std::move(entry)));

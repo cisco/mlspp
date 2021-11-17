@@ -135,7 +135,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    application)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    cipher_suite,
-                                   n_leaves,
+                                   tree,
                                    encryption_secret,
                                    sender_data_secret,
                                    sender_data_info,
