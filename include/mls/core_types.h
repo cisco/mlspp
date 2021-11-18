@@ -44,7 +44,7 @@ struct ExtensionType
   static constexpr Extension::Type key_id = 3;
   static constexpr Extension::Type parent_hash = 4;
   static constexpr Extension::Type ratchet_tree = 5;
-  static constexpr Extension::Type required_capabilities = 5;
+  static constexpr Extension::Type required_capabilities = 6;
 
   // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
   // a value from the vendor-specific space
