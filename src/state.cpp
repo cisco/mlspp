@@ -988,7 +988,7 @@ State::verify_new_member(const MLSPlaintext& pt) const
         const auto& add = var::get<Add>(proposal.content);
         return add.key_package.credential.public_key();
       },
-      [](const auto& /* other */) -> SignaturePublicKey {
+      [](const ApplicationData& /* unused */) -> SignaturePublicKey {
         throw ProtocolError("New member message of unknown type");
       },
     },
