@@ -970,26 +970,28 @@ bool
 State::verify_new_member(const MLSPlaintext& pt) const
 {
   const auto& pub = var::visit(
-    overloaded{ [](const Commit& commit) -> SignaturePublicKey {
-                 if (!commit.path) {
-                   throw ProtocolError("External Commit does not have a path");
-                 }
+    overloaded{
+      [](const Commit& commit) -> SignaturePublicKey {
+        if (!commit.path) {
+          throw ProtocolError("External Commit does not have a path");
+        }
 
-                 // Verify with public key from update path leaf key package
-                 const auto& kp = opt::get(commit.path).leaf_key_package;
-                 return kp.credential.public_key();
-               },
-                [](const Proposal& proposal) -> SignaturePublicKey {
-                  if (proposal.proposal_type() != ProposalType::add) {
-                    throw ProtocolError("New member proposal is not an Add");
-                  }
+        // Verify with public key from update path leaf key package
+        const auto& kp = opt::get(commit.path).leaf_key_package;
+        return kp.credential.public_key();
+      },
+      [](const Proposal& proposal) -> SignaturePublicKey {
+        if (proposal.proposal_type() != ProposalType::add) {
+          throw ProtocolError("New member proposal is not an Add");
+        }
 
-                  const auto& add = var::get<Add>(proposal.content);
-                  return add.key_package.credential.public_key();
-                },
-                [](const auto& /* other */) -> SignaturePublicKey {
-                  throw ProtocolError("New member message of unknown type");
-                } },
+        const auto& add = var::get<Add>(proposal.content);
+        return add.key_package.credential.public_key();
+      },
+      [](const auto& /* other */) -> SignaturePublicKey {
+        throw ProtocolError("New member message of unknown type");
+      },
+    },
     pt.content);
 
   return pt.verify(_suite, group_context(), pub);
