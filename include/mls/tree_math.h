@@ -61,20 +61,26 @@ struct NodeCount : public UInt32
   explicit NodeCount(const LeafCount n);
 };
 
+struct NodeIndex;
+
 struct LeafIndex : public UInt32
 {
   using UInt32::UInt32;
+  explicit LeafIndex(const NodeIndex x);
   bool operator<(const LeafIndex other) const { return val < other.val; }
   bool operator<(const LeafCount other) const { return val < other.val; }
 };
 
+// Leaf indices serialize as node indices, and are validated on deserialize
+tls::ostream&
+operator<<(tls::ostream& str, const LeafIndex& obj);
+tls::istream&
+operator>>(tls::istream& str, LeafIndex& obj);
+
 struct NodeIndex : public UInt32
 {
   using UInt32::UInt32;
-  explicit NodeIndex(const LeafIndex x)
-    : UInt32(2 * x.val)
-  {}
-
+  explicit NodeIndex(const LeafIndex x);
   bool operator<(const NodeIndex other) const { return val < other.val; }
 };
 

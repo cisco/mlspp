@@ -90,13 +90,13 @@ public:
   Proposal add_proposal(const KeyPackage& key_package) const;
   Proposal update_proposal(const bytes& leaf_secret);
   Proposal remove_proposal(RosterIndex index) const;
-  Proposal remove_proposal(LeafIndex removed) const;
+  Proposal remove_proposal(KeyPackageID removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSPlaintext add(const KeyPackage& key_package) const;
   MLSPlaintext update(const bytes& leaf_secret);
   MLSPlaintext remove(RosterIndex index) const;
-  MLSPlaintext remove(LeafIndex removed) const;
+  MLSPlaintext remove(KeyPackageID removed) const;
   MLSPlaintext group_context_extensions(ExtensionList exts) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
@@ -112,6 +112,7 @@ public:
   /// Accessors
   ///
   epoch_t epoch() const { return _epoch; }
+  KeyPackageID id() const { return _id; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
@@ -159,6 +160,7 @@ protected:
 
   // Per-participant state
   LeafIndex _index;
+  KeyPackageID _id;
   SignaturePrivateKey _identity_priv;
 
   // Cache of Proposals and update secrets
@@ -166,7 +168,7 @@ protected:
   {
     bytes ref;
     Proposal proposal;
-    LeafIndex sender;
+    std::optional<LeafIndex> sender;
   };
   std::list<CachedProposal> _pending_proposals;
   std::map<bytes, bytes> _update_secrets;
@@ -202,10 +204,14 @@ protected:
   MLSPlaintext sign(const Proposal& proposal) const;
 
   // Apply the changes requested by various messages
+  void check_add_key_package(const KeyPackage& key_package,
+                             std::optional<LeafIndex> except) const;
+  void check_update_key_package(LeafIndex target,
+                                const KeyPackage& key_package) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
-  void apply(const Remove& remove);
+  LeafIndex apply(const Remove& remove);
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                Proposal::Type required_type);
@@ -218,11 +224,12 @@ protected:
 
   // Extract a proposal from the cache
   void cache_proposal(const MLSPlaintext& pt);
-  std::optional<CachedProposal> resolve(const ProposalOrRef& id,
-                                        LeafIndex sender_index) const;
+  std::optional<CachedProposal> resolve(
+    const ProposalOrRef& id,
+    std::optional<LeafIndex> sender_index) const;
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
-    LeafIndex sender_index) const;
+    std::optional<LeafIndex> sender_index) const;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
@@ -235,14 +242,14 @@ protected:
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSPlaintext& pt) const;
-  bool verify_external_commit(const MLSPlaintext& pt) const;
+  bool verify_new_member(const MLSPlaintext& pt) const;
   bool verify(const MLSPlaintext& pt) const;
 
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
 
   // Convert a Roster entry into LeafIndex
-  LeafIndex leaf_for_roster_entry(RosterIndex index) const;
+  KeyPackageID leaf_for_roster_entry(RosterIndex index) const;
 
   // Create a draft successor state
   State successor() const;

@@ -280,9 +280,9 @@ apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
 // } MLSSenderData;
 struct MLSSenderData
 {
-  uint32_t sender;
-  uint32_t generation;
-  ReuseGuard reuse_guard;
+  KeyPackageID sender;
+  uint32_t generation{ 0 };
+  ReuseGuard reuse_guard{ 0, 0, 0, 0 };
 
   TLS_SERIALIZABLE(sender, generation, reuse_guard)
 };
@@ -303,7 +303,8 @@ struct MLSSenderDataAAD
 };
 
 MLSCiphertext
-GroupKeySource::encrypt(LeafIndex index,
+GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
+                        LeafIndex index,
                         const bytes& sender_data_secret,
                         const MLSPlaintext& pt)
 {
@@ -342,7 +343,12 @@ GroupKeySource::encrypt(LeafIndex index,
     content_keys.key, content_keys.nonce, content_aad, content);
 
   // Encrypt the sender data
-  auto sender_data_obj = MLSSenderData{ index.val, generation, reuse_guard };
+  auto maybe_sender_kp = tree.key_package(index);
+  if (!maybe_sender_kp) {
+    throw InvalidParameterError("Attempt to send from blank leaf");
+  }
+  auto sender_id = opt::get(maybe_sender_kp).id();
+  auto sender_data_obj = MLSSenderData{ sender_id, generation, reuse_guard };
   auto sender_data = tls::marshal(sender_data_obj);
 
   auto sender_data_keys =
@@ -366,7 +372,8 @@ GroupKeySource::encrypt(LeafIndex index,
 }
 
 MLSPlaintext
-GroupKeySource::decrypt(const bytes& sender_data_secret,
+GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
+                        const bytes& sender_data_secret,
                         const MLSCiphertext& ct)
 {
   // Decrypt and parse the sender data
@@ -383,7 +390,12 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
   }
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  auto sender = LeafIndex(sender_data.sender);
+  auto maybe_sender = tree.find(sender_data.sender);
+  if (!maybe_sender) {
+    throw ProtocolError("Send from unknown group member");
+  }
+
+  auto sender = opt::get(maybe_sender);
 
   // Pull from the key schedule
   auto key_type = GroupKeySource::RatchetType::handshake;
@@ -421,7 +433,7 @@ GroupKeySource::decrypt(const bytes& sender_data_secret,
   // Set up a new plaintext based on the content
   return MLSPlaintext{ ct.group_id,
                        ct.epoch,
-                       { SenderType::member, sender_data.sender },
+                       { sender_data.sender },
                        ct.content_type,
                        ct.authenticated_data,
                        opt::get(content) };

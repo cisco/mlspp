@@ -158,6 +158,7 @@ struct ParentNode
 //     ProtocolVersion version;
 //     CipherSuite cipher_suite;
 //     HPKEPublicKey hpke_init_key;
+//     opaque endpoint_id<0..255>;
 //     Credential credential;
 //     Extension extensions<8..2^32-1>;
 //     opaque signature<0..2^16-1>;
@@ -168,11 +169,19 @@ struct KeyPackageOpts
   ExtensionList extensions;
 };
 
+struct KeyPackageID
+{
+  bytes id;
+  TLS_SERIALIZABLE(id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
 struct KeyPackage
 {
   ProtocolVersion version;
   CipherSuite cipher_suite;
   HPKEPublicKey init_key;
+  bytes endpoint_id;
   Credential credential;
   ExtensionList extensions;
   bytes signature;
@@ -184,7 +193,7 @@ struct KeyPackage
              const SignaturePrivateKey& sig_priv_in,
              const std::optional<KeyPackageOpts>& opts_in);
 
-  bytes hash() const;
+  KeyPackageID id() const;
 
   void sign(const SignaturePrivateKey& sig_priv,
             const std::optional<KeyPackageOpts>& opts);

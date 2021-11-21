@@ -219,14 +219,25 @@ EncryptionTestVector::create(CipherSuite suite,
     sender_data_key_nonce.nonce,
   };
 
-  tv.n_leaves = LeafCount{ n_leaves };
-  auto src = GroupKeySource(suite, tv.n_leaves, tv.encryption_secret);
+  auto tree = TreeKEMPublicKey(suite);
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    auto init_priv = HPKEPrivateKey::generate(suite);
+    auto sig_priv = SignaturePrivateKey::generate(suite);
+    auto cred = Credential::basic({}, suite, sig_priv.public_key);
+    auto key_package =
+      KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
+    auto key_package_id = key_package.id();
+    tree.add_leaf(key_package);
+  }
+  tv.tree = tls::marshal(tree);
+
+  auto src = GroupKeySource(suite, tree.size(), tv.encryption_secret);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
   auto handshake_type = GroupKeySource::RatchetType::handshake;
   auto application_type = GroupKeySource::RatchetType::application;
-  auto proposal = Proposal{ Remove{ LeafIndex{ 0 } } };
+  auto proposal = Proposal{ GroupContextExtensions{} };
   auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
 
   tv.leaves.resize(n_leaves);
@@ -236,7 +247,7 @@ EncryptionTestVector::create(CipherSuite suite,
     tv.leaves[i].application.resize(n_generations);
 
     auto N = LeafIndex{ i };
-    auto sender = Sender{ SenderType::member, i };
+    auto sender = Sender{ opt::get(tree.key_package(LeafIndex{ i })).id() };
     auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
     hs_pt.wire_format = WireFormat::mls_ciphertext;
 
@@ -248,7 +259,7 @@ EncryptionTestVector::create(CipherSuite suite,
 
     for (uint32_t j = 0; j < n_generations; ++j) {
       // Handshake
-      auto hs_ct = src.encrypt(N, tv.sender_data_secret, hs_pt);
+      auto hs_ct = src.encrypt(tree, N, tv.sender_data_secret, hs_pt);
       auto hs_key_nonce = src.get(handshake_type, N, j);
       src.erase(handshake_type, N, j);
 
@@ -260,7 +271,7 @@ EncryptionTestVector::create(CipherSuite suite,
       };
 
       // Application
-      auto app_ct = src.encrypt(N, tv.sender_data_secret, app_pt);
+      auto app_ct = src.encrypt(tree, N, tv.sender_data_secret, app_pt);
       auto app_key_nonce = src.get(application_type, N, j);
       src.erase(application_type, N, j);
 
@@ -286,6 +297,11 @@ EncryptionTestVector::verify() const
   VERIFY_EQUAL(
     "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
 
+  auto ratchet_tree = tls::get<TreeKEMPublicKey>(tree);
+  ratchet_tree.suite = cipher_suite;
+  ratchet_tree.set_hash_all();
+  auto n_leaves = ratchet_tree.size();
+
   auto handshake_type = GroupKeySource::RatchetType::handshake;
   auto application_type = GroupKeySource::RatchetType::application;
 
@@ -300,7 +316,7 @@ EncryptionTestVector::verify() const
       VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
 
       auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto hs_pt = src.decrypt(sender_data_secret, hs_ct);
+      auto hs_pt = src.decrypt(ratchet_tree, sender_data_secret, hs_ct);
       VERIFY_EQUAL("hs pt", tls::marshal(hs_pt), hs_step.plaintext);
       src.erase(handshake_type, N, j);
 
@@ -311,7 +327,7 @@ EncryptionTestVector::verify() const
       VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
 
       auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
-      auto app_pt = src.decrypt(sender_data_secret, app_ct);
+      auto app_pt = src.decrypt(ratchet_tree, sender_data_secret, app_ct);
       VERIFY_EQUAL("app pt", tls::marshal(app_pt), app_step.plaintext);
       src.erase(application_type, N, j);
     }
@@ -492,7 +508,7 @@ TranscriptTestVector::create(CipherSuite suite)
   auto credential =
     Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto commit =
-    MLSPlaintext{ group_id, epoch, { SenderType::member, 0 }, Commit{} };
+    MLSPlaintext{ group_id, epoch, Sender{ KeyPackageID{ {} } }, Commit{} };
   commit.sign(suite, group_context, sig_priv);
 
   transcript.update_confirmed(commit);
@@ -736,7 +752,6 @@ MessagesTestVector::create()
 {
   auto epoch = epoch_t(0xA0A1A2A3A4A5A6A7);
   auto index = LeafIndex{ 0xB0B1B2B3 };
-  auto sender = Sender{ SenderType::member, index.val };
   auto user_id = bytes(16, 0xD1);
   auto group_id = bytes(16, 0xD2);
   auto opaque = bytes(32, 0xD3);
@@ -756,6 +771,7 @@ MessagesTestVector::create()
   auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
   auto key_package =
     KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
+  auto sender = Sender{ key_package.id() };
 
   auto lifetime = LifetimeExtension{ 0x0000000000000000, 0xffffffffffffffff };
   auto capabilities = CapabilitiesExtension{ { version },
@@ -787,12 +803,12 @@ MessagesTestVector::create()
   auto public_group_state =
     PublicGroupState{ suite,  group_id, epoch,    opaque,
                       opaque, ext_list, ext_list, hpke_pub };
-  public_group_state.sign(tree, LeafIndex{ 1 }, sig_priv);
+  public_group_state.sign(tree, key_package.id(), sig_priv);
 
   // Proposals
   auto add = Add{ key_package };
   auto update = Update{ key_package };
-  auto remove = Remove{ index };
+  auto remove = Remove{ key_package.id() };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };

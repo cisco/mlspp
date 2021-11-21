@@ -123,7 +123,7 @@ struct PublicGroupState
   ExtensionList group_context_extensions;
   ExtensionList other_extensions;
   HPKEPublicKey external_pub;
-  LeafIndex signer_index;
+  KeyPackageID signer;
   bytes signature;
 
   PublicGroupState() = default;
@@ -138,7 +138,7 @@ struct PublicGroupState
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafIndex index,
+            KeyPackageID signer_id,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -150,7 +150,7 @@ struct PublicGroupState
                    group_context_extensions,
                    other_extensions,
                    external_pub,
-                   signer_index,
+                   signer,
                    signature)
   TLS_TRAITS(tls::pass,
              tls::vector<1>,
@@ -186,7 +186,7 @@ public:
   ExtensionList other_extensions;
 
   MAC confirmation_tag;
-  LeafIndex signer_index;
+  KeyPackageID signer;
   bytes signature;
 
   GroupInfo() = default;
@@ -200,7 +200,7 @@ public:
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafIndex index,
+            KeyPackageID signer_id,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -211,7 +211,7 @@ public:
                    group_context_extensions,
                    other_extensions,
                    confirmation_tag,
-                   signer_index,
+                   signer,
                    signature)
   TLS_TRAITS(tls::vector<1>,
              tls::pass,
@@ -253,11 +253,10 @@ struct GroupSecrets
 // } EncryptedGroupSecrets;
 struct EncryptedGroupSecrets
 {
-  bytes key_package_hash;
+  KeyPackageID new_member;
   HPKECiphertext encrypted_group_secrets;
 
-  TLS_SERIALIZABLE(key_package_hash, encrypted_group_secrets)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
+  TLS_SERIALIZABLE(new_member, encrypted_group_secrets)
 };
 
 // struct {
@@ -316,7 +315,7 @@ struct Update
 // Remove
 struct Remove
 {
-  LeafIndex removed;
+  KeyPackageID removed;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -502,15 +501,28 @@ enum struct SenderType : uint8_t
   member = 1,
   preconfigured = 2,
   new_member = 3,
-  external_joiner = 4,
+};
+
+struct PreconfiguredKeyID
+{
+  bytes id;
+  TLS_SERIALIZABLE(id)
+  TLS_TRAITS(tls::vector<1>)
+};
+
+struct NewMemberID
+{
+  TLS_SERIALIZABLE()
 };
 
 struct Sender
 {
-  SenderType sender_type{ SenderType::invalid };
-  uint32_t sender{ 0 };
+  var::variant<KeyPackageID, PreconfiguredKeyID, NewMemberID> sender;
 
-  TLS_SERIALIZABLE(sender_type, sender)
+  SenderType sender_type() const;
+
+  TLS_SERIALIZABLE(sender)
+  TLS_TRAITS(tls::variant<SenderType>)
 };
 
 struct MLSPlaintext
@@ -642,5 +654,9 @@ TLS_VARIANT_MAP(mls::ProposalType,
 TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
+
+TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageID, member)
+TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
+TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberID, new_member)
 
 } // namespace tls

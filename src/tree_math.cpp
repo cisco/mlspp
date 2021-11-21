@@ -25,6 +25,35 @@ NodeCount::NodeCount(const LeafCount n)
   : UInt32(2 * (n.val - 1) + 1)
 {}
 
+LeafIndex::LeafIndex(NodeIndex x)
+  : UInt32(0)
+{
+  if (x.val % 2 == 1) {
+    throw InvalidParameterError("Only even node indices describe leaves");
+  }
+
+  val = x.val >> 1; // NOLINT(hicpp-signed-bitwise)
+}
+
+NodeIndex::NodeIndex(LeafIndex x)
+  : UInt32(2 * x.val)
+{}
+
+tls::ostream&
+operator<<(tls::ostream& str, const LeafIndex& obj)
+{
+  return str << NodeIndex(obj);
+}
+
+tls::istream&
+operator>>(tls::istream& str, LeafIndex& obj)
+{
+  auto index = NodeIndex(0);
+  str >> index;
+  obj = LeafIndex(index);
+  return str;
+}
+
 namespace tree_math {
 
 static uint32_t

@@ -65,10 +65,12 @@ struct GroupKeySource
   KeyAndNonce get(RatchetType type, LeafIndex sender, uint32_t generation);
   void erase(RatchetType type, LeafIndex sender, uint32_t generation);
 
-  MLSCiphertext encrypt(LeafIndex index,
+  MLSCiphertext encrypt(const TreeKEMPublicKey& tree,
+                        LeafIndex index,
                         const bytes& sender_data_secret,
                         const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const bytes& sender_data_secret,
+  MLSPlaintext decrypt(const TreeKEMPublicKey& tree,
+                       const bytes& sender_data_secret,
                        const MLSCiphertext& ct);
 
 private:

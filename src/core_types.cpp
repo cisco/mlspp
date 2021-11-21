@@ -109,6 +109,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite_in)
   , init_key(std::move(init_key_in))
+  , endpoint_id(random_bytes(cipher_suite.secret_size()))
   , credential(std::move(credential_in))
 {
   extensions.add(CapabilitiesExtension::create_default());
@@ -116,10 +117,10 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   sign(sig_priv_in, opts_in);
 }
 
-bytes
-KeyPackage::hash() const
+KeyPackageID
+KeyPackage::id() const
 {
-  return cipher_suite.digest().hash(tls::marshal(*this));
+  return { cipher_suite.digest().hash(tls::marshal(*this)) };
 }
 
 void
@@ -201,15 +202,18 @@ bytes
 KeyPackage::to_be_signed() const
 {
   tls::ostream out;
-  out << version << cipher_suite << init_key << credential << extensions;
+  out << version << cipher_suite << init_key;
+  tls::vector<1>::encode(out, endpoint_id);
+  out << credential << extensions;
   return out.bytes();
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const KeyPackage& kp)
 {
-  str << kp.version << kp.cipher_suite << kp.init_key << kp.credential
-      << kp.extensions;
+  str << kp.version << kp.cipher_suite << kp.init_key;
+  tls::vector<1>::encode(str, kp.endpoint_id);
+  str << kp.credential << kp.extensions;
   tls::vector<2>::encode(str, kp.signature);
   return str;
 }
@@ -217,11 +221,9 @@ operator<<(tls::ostream& str, const KeyPackage& kp)
 tls::istream&
 operator>>(tls::istream& str, KeyPackage& kp)
 {
-  str >> kp.version;
-  str >> kp.cipher_suite;
-  str >> kp.init_key;
-  str >> kp.credential;
-  str >> kp.extensions;
+  str >> kp.version >> kp.cipher_suite >> kp.init_key;
+  tls::vector<1>::decode(str, kp.endpoint_id);
+  str >> kp.credential >> kp.extensions;
   tls::vector<2>::decode(str, kp.signature);
 
   if (!kp.verify()) {
@@ -233,15 +235,16 @@ operator>>(tls::istream& str, KeyPackage& kp)
 bool
 operator==(const KeyPackage& lhs, const KeyPackage& rhs)
 {
-  auto version = (lhs.version == rhs.version);
-  auto cipher_suite = (lhs.cipher_suite == rhs.cipher_suite);
-  auto init_key = (lhs.init_key == rhs.init_key);
-  auto credential = (lhs.credential == rhs.credential);
-  auto extensions = (lhs.extensions == rhs.extensions);
-  auto signature = (lhs.signature == rhs.signature);
+  const auto version = (lhs.version == rhs.version);
+  const auto cipher_suite = (lhs.cipher_suite == rhs.cipher_suite);
+  const auto init_key = (lhs.init_key == rhs.init_key);
+  const auto endpoint_id = (lhs.endpoint_id == rhs.endpoint_id);
+  const auto credential = (lhs.credential == rhs.credential);
+  const auto extensions = (lhs.extensions == rhs.extensions);
+  const auto signature = (lhs.signature == rhs.signature);
 
-  return version && cipher_suite && init_key && credential && extensions &&
-         signature;
+  return version && cipher_suite && init_key && endpoint_id && credential &&
+         extensions && signature;
 }
 
 } // namespace mls

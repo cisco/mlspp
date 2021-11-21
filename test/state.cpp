@@ -265,7 +265,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   kp1.sign(id1, KeyPackageOpts{ kp_extensions });
 
   // Create the initial state of the group
-  auto first0 = State{ group_id, suite, init0, id1, kp1, group_extensions };
+  auto first0 = State{ group_id, suite, init0, id0, kp0, group_extensions };
 
   // Add the second member
   auto add = first0.add_proposal(kp1);
@@ -490,8 +490,8 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 
 TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
-  for (int i = static_cast<int>(group_size) - 2; i > 0; i -= 1) {
-    auto remove = states[i].remove_proposal(LeafIndex{ uint32_t(i + 1) });
+  for (uint32_t i = uint32_t(group_size) - 2; i > 0; i -= 1) {
+    auto remove = states[i].remove_proposal(states[i + 1].id());
     auto [commit, welcome, new_state] =
       states[i].commit(fresh_secret(), CommitOpts{ { remove }, true, false });
     silence_unused(welcome);

@@ -23,6 +23,50 @@ namespace mls {
 // Expose bytes operators for code within this namespace
 using namespace bytes_ns::operators;
 
+// Make variant equality work in the same way as optional equality, with
+// automatic unwrapping.  In other words
+//
+//     v == T(x) <=> hold_alternative<T>(v) && get<T>(v) == x
+//
+// For consistency, we also define symmetric and negated version.  In this
+// house, we obey the symmetric law of equivalence relations!
+template<typename T, typename... Ts>
+bool
+operator==(const var::variant<Ts...>& v, const T& t)
+{
+  return var::visit(
+    [&](const auto& arg) {
+      using U = std::decay_t<decltype(arg)>;
+      if constexpr (std::is_same_v<U, T>) {
+        return arg == t;
+      } else {
+        return false;
+      }
+    },
+    v);
+}
+
+template<typename T, typename... Ts>
+bool
+operator==(const T& t, const var::variant<Ts...>& v)
+{
+  return v == t;
+}
+
+template<typename T, typename... Ts>
+bool
+operator!=(const var::variant<Ts...>& v, const T& t)
+{
+  return !(v == t);
+}
+
+template<typename T, typename... Ts>
+bool
+operator!=(const T& t, const var::variant<Ts...>& v)
+{
+  return !(v == t);
+}
+
 using epoch_t = uint64_t;
 
 ///
