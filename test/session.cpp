@@ -31,7 +31,7 @@ protected:
   void broadcast(const bytes& message, const uint32_t except)
   {
     for (auto& session : sessions) {
-      if (except != no_except && session.index() == except) {
+      if (except != no_except && session.index().val == except) {
         continue;
       }
 
@@ -59,7 +59,7 @@ protected:
       return;
     }
 
-    auto initial_epoch = sessions[0].current_epoch();
+    auto initial_epoch = sessions[0].epoch();
 
     auto join = client.start_join();
 
@@ -100,7 +100,7 @@ protected:
     // Verify that everyone ended up in consistent states, and that
     // they can send and be received.
     for (auto& session : sessions) {
-      if (except != no_except && session.index() == except) {
+      if (except != no_except && session.index().val == except) {
         continue;
       }
 
@@ -109,7 +109,7 @@ protected:
       auto plaintext = bytes{ 0, 1, 2, 3 };
       auto encrypted = session.protect(plaintext);
       for (auto& other : sessions) {
-        if (except != no_except && other.index() == except) {
+        if (except != no_except && other.index().val == except) {
           continue;
         }
 
@@ -121,7 +121,7 @@ protected:
     }
 
     // Verify that the epoch got updated
-    REQUIRE(sessions[ref].current_epoch() != initial_epoch);
+    REQUIRE(sessions[ref].epoch() != initial_epoch);
   }
 };
 
@@ -151,7 +151,7 @@ protected:
 TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
-    auto initial_epoch = sessions[0].current_epoch();
+    auto initial_epoch = sessions[0].epoch();
 
     auto update = sessions[i].update();
     broadcast(update);
@@ -166,7 +166,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
 {
   for (int i = group_size - 1; i > 0; i -= 1) {
-    auto initial_epoch = sessions[0].current_epoch();
+    auto initial_epoch = sessions[0].epoch();
     auto evict_secret = fresh_secret();
     sessions.pop_back();
 
@@ -186,7 +186,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
     auto target = (i + 1) % group_size;
 
     // Remove target
-    auto initial_epoch = sessions[i].current_epoch();
+    auto initial_epoch = sessions[i].epoch();
     auto remove = sessions[i].remove(target);
     broadcast(remove, target);
     auto welcome_commit = sessions[i].commit();
@@ -194,7 +194,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
     check(initial_epoch, target);
 
     // Re-add at target
-    initial_epoch = sessions[i].current_epoch();
+    initial_epoch = sessions[i].epoch();
     broadcast_add(i, target);
     check(initial_epoch, target);
   }
@@ -206,7 +206,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 
   // 2. Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
-    auto initial_epoch = sessions[0].current_epoch();
+    auto initial_epoch = sessions[0].epoch();
     auto update = sessions[i].update();
     broadcast(update);
     auto welcome_commit = sessions[i].commit();
@@ -216,7 +216,7 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 
   // 3. Remove everyone but the creator
   for (int i = group_size - 1; i > 0; i -= 1) {
-    auto initial_epoch = sessions[0].current_epoch();
+    auto initial_epoch = sessions[0].epoch();
     sessions.pop_back();
     auto remove = sessions[i - 1].remove(i);
     broadcast(remove);
