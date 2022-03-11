@@ -27,13 +27,19 @@ struct ExampleStruct
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   tls::var::variant<uint8_t, uint16_t> e;
+  uint8_t f;
+  uint16_t g;
+  uint32_t h;
 
-  TLS_SERIALIZABLE(a, b, c, d, e)
+  TLS_SERIALIZABLE(a, b, c, d, e, f, g, h)
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
              tls::vector<2>,
-             tls::variant<IntType>)
+             tls::variant<IntType>,
+             tls::varint,
+             tls::varint,
+             tls::varint)
 };
 
 static bool
@@ -70,9 +76,12 @@ protected:
     { uint8_t(0x66) },
     { 0x77, 0x88 },
     { uint16_t(0x9999) },
+    0x11,
+    0x2222,
+    0x33333333,
   };
   const bytes enc_struct =
-    from_hex("111122222222333333334444444455555555016600027788BBBB9999");
+    from_hex("1111222222223333333344444444555555550166027788BBBB9999116222b3333333");
 
   const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
@@ -84,16 +93,7 @@ protected:
   const bytes enc_enum = from_hex("aaaa");
 
   const tls::opaque<2> val_opaque{ from_hex("bbbb") };
-  const bytes enc_opaque = from_hex("0002bbbb");
-
-  const uint8_t val_varint8{ 0x11 };
-  const bytes enc_varint8 = from_hex("11");
-
-  const uint16_t val_varint16{ 0x2222 };
-  const bytes enc_varint16 = from_hex("6222");
-
-  const uint32_t val_varint32{ 0x33333333 };
-  const bytes enc_varint32 = from_hex("b3333333");
+  const bytes enc_opaque = from_hex("02bbbb");
 };
 
 template<typename T>
@@ -124,9 +124,6 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
   ostream_test(val_opaque, enc_opaque);
-  ostream_test(val_varint8, enc_varint8);
-  ostream_test(val_varint16, enc_varint16);
-  ostream_test(val_varint32, enc_varint32);
 }
 
 template<typename T>
@@ -170,15 +167,6 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 
   IntType data_enum = IntType::uint16;
   istream_test(val_enum, data_enum, enc_enum);
-
-  varint8_t data_varint8 = 0;
-  istream_test(val_varint8, data_varint8, enc_varint8);
-
-  varint16_t data_varint16 = 0;
-  istream_test(val_varint16, data_varint16, enc_varint16);
-
-  varint32_t data_varint32 = 0;
-  istream_test(val_varint32, data_varint32, enc_varint32);
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
@@ -197,6 +185,30 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
 
   auto val_out2 = tls::get<ExampleStruct>(marshaled);
   REQUIRE(val_in == val_out2);
+}
+
+TEST_CASE("TLS varint failure cases") {
+  // Encoding a value that is to large
+  tls::ostream w;
+  REQUIRE_THROWS(tls::varint::encode(w, uint64_t(0xffffffff)));
+
+  // Too large and non-minimal values
+  auto decode_failure_cases = std::vector<bytes>{
+    from_hex("c0"),
+    from_hex("403f"),
+    from_hex("80003fff"),
+  };
+  for (const auto& enc : decode_failure_cases) {
+    auto val = uint64_t(0);
+    auto r = tls::istream(enc);
+    REQUIRE_THROWS(tls::varint::decode(r, val));
+  }
+
+  // Don't overflow storage
+  auto val = uint8_t(0);
+  auto enc = from_hex("7fff");
+  auto r = tls::istream(enc);
+  REQUIRE_THROWS(tls::varint::decode(r, val));
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

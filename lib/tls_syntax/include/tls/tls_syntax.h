@@ -54,8 +54,8 @@ private:
   friend ostream& operator<<(ostream& out, uint32_t data);
   friend ostream& operator<<(ostream& out, uint64_t data);
 
-  template<typename T, size_t N>
-  friend ostream& operator<<(ostream& out, const std::array<T, N>& data);
+  template<typename T>
+  friend ostream& operator<<(ostream& out, const std::vector<T>& data);
 
   template<size_t head, size_t min, size_t max>
   friend struct vector;
@@ -96,8 +96,8 @@ private:
   friend istream& operator>>(istream& in, uint32_t& data);
   friend istream& operator>>(istream& in, uint64_t& data);
 
-  template<typename T, size_t N>
-  friend istream& operator>>(istream& in, std::array<T, N>& data);
+  template<typename T>
+  friend istream& operator>>(istream& in, std::vector<T>& data);
 
   template<size_t head, size_t min, size_t max>
   friend struct vector;
@@ -213,6 +213,24 @@ operator<<(tls::ostream& str, const T& val)
   return str << u;
 }
 
+// Vector writer
+template<typename T>
+ostream&
+operator<<(ostream& str, const std::vector<T>& vec)
+{
+  // Pre-encode contents
+  ostream temp;
+  for (const auto& item : vec) {
+    temp << item;
+  }
+
+  // Write the encoded length, then the pre-encoded data
+  varint::encode(str, temp._buffer.size());
+  str.write_raw(temp.bytes());
+
+  return str;
+}
+
 ///
 /// Reader implementations
 ///
@@ -263,6 +281,33 @@ operator>>(tls::istream& str, T& val)
   std::underlying_type_t<T> u;
   str >> u;
   val = static_cast<T>(u);
+  return str;
+}
+
+// Vector reader
+template<typename T>
+istream&
+operator>>(istream& str, std::vector<T>& vec)
+{
+  // Read the encoded data size
+  auto size = size_t(0);
+  varint::decode(str, size);
+
+  // Read the elements of the vector
+  // NB: Remember that we store the vector in reverse order
+  // NB: This requires that T be default-constructible
+  istream r;
+  r._buffer = std::vector<uint8_t>{str._buffer.end() - size, str._buffer.end()};
+
+  vec.clear();
+  while (r._buffer.size() > 0) {
+    vec.emplace_back();
+    r >> vec.back();
+  }
+
+  // Truncate the primary buffer
+  str._buffer.erase(str._buffer.end() - size, str._buffer.end());
+
   return str;
 }
 
@@ -354,53 +399,7 @@ template<typename T>
 ostream&
 vector<head, min, max>::encode(ostream& str, const std::vector<T>& data)
 {
-  // Vectors with no header are written directly
-  if constexpr (head == 0) {
-    for (const auto& item : data) {
-      str << item;
-    }
-    return str;
-  }
-
-  uint64_t head_max = 0;
-  switch (head) {
-    case 1:
-      head_max = 0xff;
-      break;
-    case 2:
-      head_max = 0xffff;
-      break;
-    case 3:
-      head_max = 0xffffff;
-      break;
-    case 4:
-      head_max = 0xffffffff;
-      break;
-    default:
-      throw WriteError("Invalid header size");
-  }
-
-  // Pre-encode contents
-  ostream temp;
-  for (const auto& item : data) {
-    temp << item;
-  }
-
-  // Check that the encoded length is OK
-  uint64_t size = temp._buffer.size();
-  if (size > head_max) {
-    throw WriteError("Data too large for header size");
-  } else if constexpr ((max != none) && (size > max)) {
-    throw WriteError("Data too large for declared max");
-  } else if constexpr ((min != none) && (size < min)) {
-    throw WriteError("Data too small for declared min");
-  }
-
-  // Write the encoded length, then the pre-encoded data
-  str.write_uint(size, head);
-  str.write_raw(temp.bytes());
-
-  return str;
+  return str << data;
 }
 
 template<size_t head, size_t min, size_t max>
@@ -408,52 +407,7 @@ template<typename T>
 istream&
 vector<head, min, max>::decode(istream& str, std::vector<T>& data)
 {
-  switch (head) {
-    case 0: // fallthrough
-    case 1: // fallthrough
-    case 2: // fallthrough
-    case 3: // fallthrough
-    case 4:
-      break;
-    default:
-      throw ReadError("Invalid header size");
-  }
-
-  // Read the size of the vector, if provided; otherwise consume all remaining
-  // data in the buffer
-  uint64_t size = str._buffer.size();
-  if constexpr (head > 0) {
-    str.read_uint(size, head);
-  }
-
-  // Check the size against the declared constraints
-  if (size > str._buffer.size()) {
-    throw ReadError("Declared size exceeds available data size");
-  } else if constexpr ((max != none) && (size > max)) {
-    throw ReadError("Data too large for declared max");
-  } else if constexpr ((min != none) && (size < min)) {
-    throw ReadError("Data too small for declared min");
-  }
-
-  // Truncate the data buffer
-  data.clear();
-
-  // Truncate the buffer to the declared length and wrap it in a
-  // new reader, then read items from it
-  // NB: Remember that we store the vector in reverse order
-  // NB: This requires that T be default-constructible
-  std::vector<uint8_t> trunc(str._buffer.end() - size, str._buffer.end());
-  istream r;
-  r._buffer = trunc;
-  while (r._buffer.size() > 0) {
-    data.emplace_back();
-    r >> data.back();
-  }
-
-  // Truncate the primary buffer
-  str._buffer.erase(str._buffer.end() - size, str._buffer.end());
-
-  return str;
+  return str >> data;
 }
 
 // Variant encoding
@@ -557,6 +511,9 @@ ostream& varint::encode(ostream& str, const T& val) {
 template<typename T, typename>
 istream& varint::decode(istream& str, T& val) {
   auto log_size = str._buffer.back() >> VARINT_1_OFFSET;
+  if (sizeof(T) < (1 << log_size)) {
+    throw ReadError("Varint value too large for storage");
+  }
 
   switch (log_size) {
     case 0: {
