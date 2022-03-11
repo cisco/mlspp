@@ -21,6 +21,9 @@ SFrameCapabilities::compatible(const SFrameParameters& params) const
 
 // PublicGroupState
 
+static const auto zero_ref =
+  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
                                    bytes group_id_in,
                                    epoch_t epoch_in,
@@ -37,6 +40,7 @@ PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
   , group_context_extensions(std::move(group_context_extensions_in))
   , other_extensions(std::move(other_extensions_in))
   , external_pub(std::move(external_pub_in))
+  , signer(zero_ref)
 {}
 
 bytes
@@ -50,20 +54,20 @@ PublicGroupState::to_be_signed() const
 
 void
 PublicGroupState::sign(const TreeKEMPublicKey& tree,
-                       KeyPackageID signer_id,
+                       LeafNodeRef signer_ref,
                        const SignaturePrivateKey& priv)
 {
-  auto maybe_kp = tree.key_package(signer_id);
-  if (!maybe_kp) {
+  auto maybe_leaf = tree.leaf_node(signer_ref);
+  if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = opt::get(maybe_kp).credential;
+  auto cred = opt::get(maybe_leaf).credential;
   if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = std::move(signer_id);
+  signer = signer_ref;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
@@ -74,12 +78,12 @@ PublicGroupState::verify(const TreeKEMPublicKey& tree) const
     throw InvalidParameterError("Cipher suite mismatch");
   }
 
-  auto maybe_kp = tree.key_package(signer);
-  if (!maybe_kp) {
+  auto maybe_leaf = tree.leaf_node(signer);
+  if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = opt::get(maybe_kp).credential;
+  auto cred = opt::get(maybe_leaf).credential;
   return cred.public_key().verify(cipher_suite, to_be_signed(), signature);
 }
 
@@ -99,6 +103,7 @@ GroupInfo::GroupInfo(bytes group_id_in,
   , group_context_extensions(std::move(group_context_extensions_in))
   , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
+  , signer(zero_ref)
 {}
 
 bytes
@@ -113,32 +118,32 @@ GroupInfo::to_be_signed() const
 
 void
 GroupInfo::sign(const TreeKEMPublicKey& tree,
-                KeyPackageID signer_id,
+                LeafNodeRef signer_ref,
                 const SignaturePrivateKey& priv)
 {
-  auto maybe_kp = tree.key_package(signer_id);
-  if (!maybe_kp) {
+  auto maybe_leaf = tree.leaf_node(signer_ref);
+  if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = opt::get(maybe_kp).credential;
+  auto cred = opt::get(maybe_leaf).credential;
   if (cred.public_key() != priv.public_key) {
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = std::move(signer_id);
+  signer = signer_ref;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
 bool
 GroupInfo::verify(const TreeKEMPublicKey& tree) const
 {
-  auto maybe_kp = tree.key_package(signer);
-  if (!maybe_kp) {
+  auto maybe_leaf = tree.leaf_node(signer);
+  if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = opt::get(maybe_kp).credential;
+  auto cred = opt::get(maybe_leaf).credential;
   return cred.public_key().verify(tree.suite, to_be_signed(), signature);
 }
 

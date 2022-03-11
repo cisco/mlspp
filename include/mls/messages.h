@@ -117,7 +117,7 @@ struct PublicGroupState
   ExtensionList group_context_extensions;
   ExtensionList other_extensions;
   HPKEPublicKey external_pub;
-  KeyPackageID signer;
+  LeafNodeRef signer;
   bytes signature;
 
   PublicGroupState() = default;
@@ -132,7 +132,7 @@ struct PublicGroupState
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            KeyPackageID signer_id,
+            LeafNodeRef signer_ref,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -156,7 +156,7 @@ struct PublicGroupState
 //   Extension group_context_extensions<0..2^32-1>;
 //   Extension other_extensions<0..2^32-1>;
 //   MAC confirmation_tag;
-//   KeyPackageID signer;
+//   LeafNodeRef signer;
 //   opaque signature<0..2^16-1>;
 // } GroupInfo;
 struct GroupInfo
@@ -170,7 +170,7 @@ public:
   ExtensionList other_extensions;
 
   MAC confirmation_tag;
-  KeyPackageID signer;
+  LeafNodeRef signer;
   bytes signature;
 
   GroupInfo() = default;
@@ -184,7 +184,7 @@ public:
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            KeyPackageID signer_id,
+            LeafNodeRef signer_ref,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -280,14 +280,14 @@ struct Add
 // Update
 struct Update
 {
-  KeyPackage key_package;
-  TLS_SERIALIZABLE(key_package)
+  LeafNode leaf_node;
+  TLS_SERIALIZABLE(leaf_node)
 };
 
 // Remove
 struct Remove
 {
-  KeyPackageID removed;
+  LeafNodeRef removed;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -384,12 +384,6 @@ struct ProposalType
   TLS_SERIALIZABLE(val);
 };
 
-struct ProposalRef
-{
-  bytes id;
-  TLS_SERIALIZABLE(id)
-};
-
 enum struct ProposalOrRefType : uint8_t
 {
   reserved = 0,
@@ -482,7 +476,7 @@ struct NewMemberID
 
 struct Sender
 {
-  var::variant<KeyPackageID, PreconfiguredKeyID, NewMemberID> sender;
+  var::variant<LeafNodeRef, PreconfiguredKeyID, NewMemberID> sender;
 
   SenderType sender_type() const;
 
@@ -613,7 +607,7 @@ TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
 
-TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageID, member)
+TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageRef, member)
 TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
 TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberID, new_member)
 

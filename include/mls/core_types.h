@@ -6,10 +6,6 @@
 
 namespace mls {
 
-///
-/// Extensions
-///
-
 // enum {
 //   reserved(0),
 //   mls10(1),
@@ -24,7 +20,7 @@ extern const std::array<ProtocolVersion, 1> all_supported_versions;
 
 // struct {
 //     ExtensionType extension_type;
-//     opaque extension_data<0..2^32-1>;
+//     opaque extension_data<V>;
 // } Extension;
 struct Extension
 {
@@ -38,8 +34,6 @@ struct Extension
 
 struct ExtensionType
 {
-  static constexpr Extension::Type capabilities = 1;
-  static constexpr Extension::Type lifetime = 2;
   static constexpr Extension::Type key_id = 3;
   static constexpr Extension::Type parent_hash = 4;
   static constexpr Extension::Type ratchet_tree = 5;
@@ -83,21 +77,164 @@ struct ExtensionList
   TLS_SERIALIZABLE(extensions)
 };
 
-struct CapabilitiesExtension
+// enum {
+//     reserved(0),
+//     key_package(1),
+//     update(2),
+//     commit(3),
+//     (255)
+// } LeafNodeSource;
+enum struct LeafNodeSource : uint8_t
+{
+  key_package = 1,
+  update = 2,
+  commit = 3,
+};
+
+// struct {
+//     ProtocolVersion versions<V>;
+//     CipherSuite ciphersuites<V>;
+//     ExtensionType extensions<V>;
+//     ProposalType proposals<V>;
+// } Capabilities;
+struct Capabilities
 {
   std::vector<ProtocolVersion> versions;
   std::vector<CipherSuite::ID> cipher_suites;
   std::vector<Extension::Type> extensions;
   std::vector<uint16_t> proposals;
 
-  static CapabilitiesExtension create_default();
+  static Capabilities create_default();
   bool extensions_supported(const std::vector<Extension::Type>& required) const;
   bool proposals_supported(const std::vector<uint16_t>& required) const;
 
-  static const Extension::Type type;
   TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
 };
 
+// struct {
+//     uint64 not_before;
+//     uint64 not_after;
+// } Lifetime;
+struct Lifetime
+{
+  uint64_t not_before;
+  uint64_t not_after;
+
+  static Lifetime create_default();
+
+  TLS_SERIALIZABLE(not_before, not_after)
+};
+
+// struct {
+//     HPKEPublicKey public_key;
+//     Credential credential;
+//     Capabilities capabilities;
+//
+//     LeafNodeSource leaf_node_source;
+//     select (leaf_node_source) {
+//         case add:
+//             Lifetime lifetime;
+//
+//         case update:
+//             struct {}
+//
+//         case commit:
+//             opaque parent_hash<V>;
+//     }
+//
+//     Extension extensions<V>;
+//     // SignWithLabel(., "LeafNodeTBS", LeafNodeTBS)
+//     opaque signature<V>;
+// } LeafNode;
+struct Empty
+{
+  TLS_SERIALIZABLE()
+};
+
+struct ParentHash
+{
+  bytes parent_hash;
+  TLS_SERIALIZABLE(parent_hash);
+};
+
+struct LeafNodeOptions
+{
+  std::optional<Credential> credential;
+  std::optional<Capabilities> capabilities;
+  std::optional<ExtensionList> extensions;
+};
+
+// TODO Move this to treekem.h
+struct LeafNode
+{
+  HPKEPublicKey public_key;
+  Credential credential;
+  Capabilities capabilities;
+
+  var::variant<Lifetime, Empty, ParentHash> content;
+
+  ExtensionList extensions;
+  bytes signature;
+
+  LeafNode() = default;
+  LeafNode(const LeafNode&) = default;
+  LeafNode(LeafNode&&) = default;
+  LeafNode& operator=(const LeafNode&) = default;
+  LeafNode& operator=(LeafNode&&) = default;
+
+  LeafNode(CipherSuite cipher_suite,
+           HPKEPublicKey public_key_in,
+           Credential credential_in,
+           Capabilities capabilities_in,
+           Lifetime lifetime_in,
+           ExtensionList extensions_in,
+           const SignaturePrivateKey& sig_priv);
+
+  LeafNode for_update(CipherSuite cipher_suite,
+                      const bytes& group_id,
+                      HPKEPublicKey public_key,
+                      const LeafNodeOptions& opts,
+                      const SignaturePrivateKey& sig_priv_in) const;
+
+  LeafNode for_commit(CipherSuite cipher_suite,
+                      const bytes& group_id,
+                      HPKEPublicKey public_key,
+                      const bytes& parent_hash,
+                      const LeafNodeOptions& opts,
+                      const SignaturePrivateKey& sig_priv_in) const;
+
+  LeafNodeSource source() const;
+
+  LeafNodeRef ref(CipherSuite suite) const;
+  void sign(CipherSuite cipher_suite,
+            const SignaturePrivateKey& sig_priv,
+            const std::optional<bytes>& group_id);
+  bool verify(CipherSuite cipher_suite,
+              const std::optional<bytes>& group_id) const;
+
+  bool verify_expiry(uint64_t now) const;
+  bool verify_extension_support(const ExtensionList& ext_list) const;
+
+  TLS_SERIALIZABLE(public_key,
+                   credential,
+                   capabilities,
+                   content,
+                   extensions,
+                   signature)
+  TLS_TRAITS(tls::pass,
+             tls::pass,
+             tls::pass,
+             tls::variant<LeafNodeSource>,
+             tls::pass,
+             tls::pass)
+
+private:
+  LeafNode clone_with_options(HPKEPublicKey public_key,
+                              const LeafNodeOptions& opts) const;
+  bytes to_be_signed(const std::optional<bytes>& group_id) const;
+};
+
+// Concrete extension types
 struct RequiredCapabilitiesExtension
 {
   std::vector<Extension::Type> extensions;
@@ -105,15 +242,6 @@ struct RequiredCapabilitiesExtension
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(extensions, proposals)
-};
-
-struct LifetimeExtension
-{
-  uint64_t not_before;
-  uint64_t not_after;
-
-  static const Extension::Type type;
-  TLS_SERIALIZABLE(not_before, not_after)
 };
 
 struct KeyIDExtension
@@ -124,18 +252,11 @@ struct KeyIDExtension
   TLS_SERIALIZABLE(key_id)
 };
 
-struct ParentHashExtension
-{
-  bytes parent_hash;
-
-  static const Extension::Type type;
-  TLS_SERIALIZABLE(parent_hash)
-};
-
 ///
 /// NodeType, ParentNode, and KeyPackage
 ///
 
+// TODO move this to treekem.h
 struct ParentNode
 {
   HPKEPublicKey public_key;
@@ -147,21 +268,16 @@ struct ParentNode
   TLS_SERIALIZABLE(public_key, parent_hash, unmerged_leaves)
 };
 
+// TODO Move this to messages.h
 // struct {
 //     ProtocolVersion version;
 //     CipherSuite cipher_suite;
-//     HPKEPublicKey hpke_init_key;
-//     opaque endpoint_id<0..255>;
-//     Credential credential;
-//     Extension extensions<8..2^32-1>;
-//     opaque signature<0..2^16-1>;
+//     HPKEPublicKey init_key;
+//     LeafNode leaf_node;
+//     Extension extensions<V>;
+//     // SignWithLabel(., "KeyPackageTBS", KeyPackageTBS)
+//     opaque signature<V>;
 // } KeyPackage;
-struct KeyPackageOpts
-{
-  // TODO: Things to change in a KeyPackage
-  ExtensionList extensions;
-};
-
 struct KeyPackageID
 {
   bytes id;
@@ -173,67 +289,67 @@ struct KeyPackage
   ProtocolVersion version;
   CipherSuite cipher_suite;
   HPKEPublicKey init_key;
-  bytes endpoint_id;
-  Credential credential;
+  LeafNode leaf_node;
   ExtensionList extensions;
   bytes signature;
 
   KeyPackage();
   KeyPackage(CipherSuite suite_in,
              HPKEPublicKey init_key_in,
-             Credential credential_in,
-             const SignaturePrivateKey& sig_priv_in,
-             const std::optional<KeyPackageOpts>& opts_in);
+             LeafNode leaf_node_in,
+             ExtensionList extensions_in,
+             const SignaturePrivateKey& sig_priv_in);
 
   KeyPackageID id() const;
 
-  void sign(const SignaturePrivateKey& sig_priv,
-            const std::optional<KeyPackageOpts>& opts);
-
-  bool verify_expiry(uint64_t now) const;
-  bool verify_extension_support(const ExtensionList& ext_list) const;
+  void sign(const SignaturePrivateKey& sig_priv);
   bool verify() const;
+
+  TLS_SERIALIZABLE(version,
+                   cipher_suite,
+                   init_key,
+                   leaf_node,
+                   extensions,
+                   signature)
 
 private:
   bytes to_be_signed() const;
-
-  friend bool operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 };
-
-tls::ostream&
-operator<<(tls::ostream& str, const KeyPackage& kp);
-
-tls::istream&
-operator>>(tls::istream& str, KeyPackage& kp);
-
-bool
-operator==(const KeyPackage& lhs, const KeyPackage& rhs);
 
 ///
 /// UpdatePath
 ///
 
 // struct {
-//    HPKEPublicKey public_key;
-//    HPKECiphertext node_secrets<0..2^16-1>;
-// } RatchetNode
-struct RatchetNode
+//     HPKEPublicKey public_key;
+//     HPKECiphertext encrypted_path_secret<V>;
+// } UpdatePathNode;
+struct UpdatePathNode
 {
   HPKEPublicKey public_key;
-  std::vector<HPKECiphertext> node_secrets;
+  std::vector<HPKECiphertext> encrypted_path_secret;
 
-  TLS_SERIALIZABLE(public_key, node_secrets)
+  TLS_SERIALIZABLE(public_key, encrypted_path_secret)
 };
 
 // struct {
-//    RatchetNode nodes<0..2^16-1>;
+//     LeafNode leaf_node;
+//     UpdatePathNode nodes<V>;
 // } UpdatePath;
 struct UpdatePath
 {
-  KeyPackage leaf_key_package;
-  std::vector<RatchetNode> nodes;
+  LeafNode leaf_node;
+  std::vector<UpdatePathNode> nodes;
 
-  TLS_SERIALIZABLE(leaf_key_package, nodes)
+  TLS_SERIALIZABLE(leaf_node, nodes)
 };
 
 } // namespace mls
+
+namespace tls {
+
+TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Lifetime, key_package)
+TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Empty, update)
+TLS_VARIANT_MAP(mls::LeafNodeSource, mls::ParentHash, commit)
+
+} // namespace tls
