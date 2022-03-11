@@ -30,11 +30,6 @@ struct GroupContext
                    tree_hash,
                    confirmed_transcript_hash,
                    extensions)
-  TLS_TRAITS(tls::vector<1>,
-             tls::pass,
-             tls::vector<1>,
-             tls::vector<1>,
-             tls::pass)
 };
 
 // Index into the session roster
