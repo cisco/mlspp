@@ -659,24 +659,4 @@ inline
   return str;
 }
 
-///
-/// Abbreviation for opaque<N>
-///
-
-template<size_t N>
-struct opaque
-{
-  std::vector<uint8_t> data;
-
-  TLS_SERIALIZABLE(data)
-  TLS_TRAITS(vector<N>)
-};
-
-template<size_t N>
-bool
-operator==(const opaque<N>& lhs, const opaque<N>& rhs)
-{
-  return lhs.data == rhs.data;
-}
-
 } // namespace tls

@@ -35,7 +35,7 @@ struct ExampleStruct
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
-             tls::vector<2>,
+             tls::pass,
              tls::variant<IntType>,
              tls::varint,
              tls::varint,
@@ -70,6 +70,9 @@ protected:
   const std::array<uint16_t, 4> val_array{ 1, 2, 3, 4 };
   const bytes enc_array = from_hex("0001000200030004");
 
+  const std::vector<uint32_t> val_vector{ 5, 6, 7, 8 };
+  const bytes enc_vector = from_hex("1000000005000000060000000700000008");
+
   const ExampleStruct val_struct{
     0x1111,
     { 0x22222222, 0x33333333, 0x44444444, 0x55555555 },
@@ -91,9 +94,6 @@ protected:
 
   const IntType val_enum = IntType::uint8;
   const bytes enc_enum = from_hex("aaaa");
-
-  const tls::opaque<2> val_opaque{ from_hex("bbbb") };
-  const bytes enc_opaque = from_hex("02bbbb");
 };
 
 template<typename T>
@@ -119,11 +119,11 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
   ostream_test(val_uint32, enc_uint32);
   ostream_test(val_uint64, enc_uint64);
   ostream_test(val_array, enc_array);
+  ostream_test(val_vector, enc_vector);
   ostream_test(val_struct, enc_struct);
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
-  ostream_test(val_opaque, enc_opaque);
 }
 
 template<typename T>
@@ -155,6 +155,9 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 
   std::array<uint16_t, 4> data_array = { 0, 0, 0, 0 };
   istream_test(val_array, data_array, enc_array);
+
+  std::vector<uint32_t> data_vector = {};
+  istream_test(val_vector, data_vector, enc_vector);
 
   ExampleStruct data_struct;
   istream_test(val_struct, data_struct, enc_struct);
