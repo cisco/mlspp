@@ -85,6 +85,15 @@ protected:
 
   const tls::opaque<2> val_opaque{ from_hex("bbbb") };
   const bytes enc_opaque = from_hex("0002bbbb");
+
+  const uint8_t val_varint8{ 0x11 };
+  const bytes enc_varint8 = from_hex("11");
+
+  const uint16_t val_varint16{ 0x2222 };
+  const bytes enc_varint16 = from_hex("6222");
+
+  const uint32_t val_varint32{ 0x33333333 };
+  const bytes enc_varint32 = from_hex("b3333333");
 };
 
 template<typename T>
@@ -115,6 +124,9 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
   ostream_test(val_opaque, enc_opaque);
+  ostream_test(val_varint8, enc_varint8);
+  ostream_test(val_varint16, enc_varint16);
+  ostream_test(val_varint32, enc_varint32);
 }
 
 template<typename T>
@@ -159,8 +171,14 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
   IntType data_enum = IntType::uint16;
   istream_test(val_enum, data_enum, enc_enum);
 
-  tls::opaque<2> data_opaque;
-  istream_test(val_opaque, data_opaque, enc_opaque);
+  varint8_t data_varint8 = 0;
+  istream_test(val_varint8, data_varint8, enc_varint8);
+
+  varint16_t data_varint16 = 0;
+  istream_test(val_varint16, data_varint16, enc_varint16);
+
+  varint32_t data_varint32 = 0;
+  istream_test(val_varint32, data_varint32, enc_varint32);
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
