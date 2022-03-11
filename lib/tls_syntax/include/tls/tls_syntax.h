@@ -56,9 +56,6 @@ private:
 
   template<typename T>
   friend ostream& operator<<(ostream& out, const std::vector<T>& data);
-
-  template<size_t head, size_t min, size_t max>
-  friend struct vector;
 };
 
 class istream
@@ -99,9 +96,6 @@ private:
   template<typename T>
   friend istream& operator>>(istream& in, std::vector<T>& data);
 
-  template<size_t head, size_t min, size_t max>
-  friend struct vector;
-
   friend struct varint;
 };
 
@@ -127,16 +121,6 @@ struct pass
 
   template<typename T>
   static istream& decode(istream& str, T& val);
-};
-
-template<size_t head, size_t min = none, size_t max = none>
-struct vector
-{
-  template<typename T>
-  static ostream& encode(ostream& str, const std::vector<T>& data);
-
-  template<typename T>
-  static istream& decode(istream& str, std::vector<T>& data);
 };
 
 template<typename Ts>
@@ -392,23 +376,6 @@ istream&
 pass::decode(istream& str, T& val)
 {
   return str >> val;
-}
-
-// Vector encoding
-template<size_t head, size_t min, size_t max>
-template<typename T>
-ostream&
-vector<head, min, max>::encode(ostream& str, const std::vector<T>& data)
-{
-  return str << data;
-}
-
-template<size_t head, size_t min, size_t max>
-template<typename T>
-istream&
-vector<head, min, max>::decode(istream& str, std::vector<T>& data)
-{
-  return str >> data;
 }
 
 // Variant encoding
