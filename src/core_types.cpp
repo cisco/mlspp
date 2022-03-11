@@ -202,29 +202,24 @@ bytes
 KeyPackage::to_be_signed() const
 {
   tls::ostream out;
-  out << version << cipher_suite << init_key;
-  tls::vector<1>::encode(out, endpoint_id);
-  out << credential << extensions;
+  out << version << cipher_suite << init_key << endpoint_id << credential
+      << extensions;
   return out.bytes();
 }
 
 tls::ostream&
 operator<<(tls::ostream& str, const KeyPackage& kp)
 {
-  str << kp.version << kp.cipher_suite << kp.init_key;
-  tls::vector<1>::encode(str, kp.endpoint_id);
-  str << kp.credential << kp.extensions;
-  tls::vector<2>::encode(str, kp.signature);
+  str << kp.version << kp.cipher_suite << kp.init_key << kp.endpoint_id
+      << kp.credential << kp.extensions << kp.signature;
   return str;
 }
 
 tls::istream&
 operator>>(tls::istream& str, KeyPackage& kp)
 {
-  str >> kp.version >> kp.cipher_suite >> kp.init_key;
-  tls::vector<1>::decode(str, kp.endpoint_id);
-  str >> kp.credential >> kp.extensions;
-  tls::vector<2>::decode(str, kp.signature);
+  str >> kp.version >> kp.cipher_suite >> kp.init_key >> kp.endpoint_id >>
+    kp.credential >> kp.extensions >> kp.signature;
 
   if (!kp.verify()) {
     throw InvalidParameterError("Invalid signature on key package");

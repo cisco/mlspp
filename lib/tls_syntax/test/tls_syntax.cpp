@@ -80,8 +80,8 @@ protected:
     0x2222,
     0x33333333,
   };
-  const bytes enc_struct =
-    from_hex("1111222222223333333344444444555555550166027788BBBB9999116222b3333333");
+  const bytes enc_struct = from_hex(
+    "1111222222223333333344444444555555550166027788BBBB9999116222b3333333");
 
   const std::optional<ExampleStruct> val_optional{ val_struct };
   const bytes enc_optional = from_hex("01") + enc_struct;
@@ -187,7 +187,8 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
   REQUIRE(val_in == val_out2);
 }
 
-TEST_CASE("TLS varint failure cases") {
+TEST_CASE("TLS varint failure cases")
+{
   // Encoding a value that is to large
   tls::ostream w;
   REQUIRE_THROWS(tls::varint::encode(w, uint64_t(0xffffffff)));

@@ -297,7 +297,8 @@ operator>>(istream& str, std::vector<T>& vec)
   // NB: Remember that we store the vector in reverse order
   // NB: This requires that T be default-constructible
   istream r;
-  r._buffer = std::vector<uint8_t>{str._buffer.end() - size, str._buffer.end()};
+  r._buffer =
+    std::vector<uint8_t>{ str._buffer.end() - size, str._buffer.end() };
 
   vec.clear();
   while (r._buffer.size() > 0) {
@@ -494,7 +495,9 @@ static constexpr uint64_t VARINT_2_MAX = (1 << VARINT_2_OFFSET) - 1;
 static constexpr uint64_t VARINT_4_MAX = (1 << VARINT_4_OFFSET) - 1;
 
 template<typename T, typename>
-ostream& varint::encode(ostream& str, const T& val) {
+ostream&
+varint::encode(ostream& str, const T& val)
+{
   if (val <= VARINT_1_MAX) {
     return str << uint8_t(VARINT_1_HEADER | static_cast<uint8_t>(val));
   } else if (val <= VARINT_2_MAX) {
@@ -509,7 +512,9 @@ ostream& varint::encode(ostream& str, const T& val) {
 }
 
 template<typename T, typename>
-istream& varint::decode(istream& str, T& val) {
+istream&
+varint::decode(istream& str, T& val)
+{
   auto log_size = str._buffer.back() >> VARINT_1_OFFSET;
   if (sizeof(T) < (1 << log_size)) {
     throw ReadError("Varint value too large for storage");
@@ -611,9 +616,9 @@ read_tuple(istream&, const std::tuple<Tp...>&)
 {}
 
 template<size_t I = 0, typename... Tp>
-  inline typename std::enable_if <
-  I<sizeof...(Tp), void>::type
-  read_tuple(istream& str, const std::tuple<Tp...>& t)
+  inline
+  typename std::enable_if < I<sizeof...(Tp), void>::type
+                            read_tuple(istream& str, const std::tuple<Tp...>& t)
 {
   str >> std::get<I>(t);
   read_tuple<I + 1, Tp...>(str, t);

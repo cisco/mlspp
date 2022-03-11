@@ -78,9 +78,7 @@ OptionalNode::set_tree_hash(CipherSuite suite,
   }
 
   tls::ostream w;
-  w << index << parent;
-  tls::vector<1>::encode(w, left);
-  tls::vector<1>::encode(w, right);
+  w << index << parent << left << right;
   hash = suite.digest().hash(w.bytes());
 }
 
@@ -738,7 +736,6 @@ struct ParentHashInput
   std::vector<HPKEPublicKey> original_child_resolution;
 
   TLS_SERIALIZABLE(public_key, parent_hash, original_child_resolution)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 bytes

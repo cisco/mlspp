@@ -82,15 +82,15 @@ X509Credential::public_key() const
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
-  tls::vector<4>::encode(str, obj.der_chain);
-  return str;
+  return str << obj.der_chain;
 }
 
 tls::istream&
 operator>>(tls::istream& str, X509Credential& obj)
 {
   auto der_chain = std::vector<X509Credential::CertData>{};
-  tls::vector<4>::decode(str, der_chain);
+  str >> der_chain;
+
   std::vector<bytes> der_in;
   der_in.resize(der_chain.size());
 
