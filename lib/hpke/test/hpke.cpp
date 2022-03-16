@@ -198,9 +198,9 @@ TEST_CASE("HPKE Round-Trip")
 
         auto hpke = HPKE(kem_id, kdf_id, aead_id);
 
-        auto [enc, ctxS] = hpke.setup_base_s(*pkR, info);
+        auto enc_and_ctxS = hpke.setup_base_s(*pkR, info);
         auto ctxR = hpke.setup_base_r(enc, *skR, info);
-        REQUIRE(ctxS == ctxR);
+        REQUIRE(std::get<1>(enc_and_ctxS) == ctxR);
 
         auto last_encrypted = bytes{};
         for (int i = 0; i < iterations; i += 1) {

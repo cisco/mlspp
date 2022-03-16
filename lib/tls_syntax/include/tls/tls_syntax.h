@@ -454,12 +454,12 @@ variant<Ts>::decode(istream& str, var::variant<Tp...>& data)
 static constexpr size_t VARINT_1_OFFSET = 6;
 static constexpr size_t VARINT_2_OFFSET = 14;
 static constexpr size_t VARINT_4_OFFSET = 30;
-static constexpr auto VARINT_1_HEADER = uint8_t(0 << VARINT_1_OFFSET);
-static constexpr auto VARINT_2_HEADER = uint16_t(1 << VARINT_2_OFFSET);
-static constexpr auto VARINT_4_HEADER = uint32_t(2 << VARINT_4_OFFSET);
-static constexpr auto VARINT_1_MAX = uint64_t((1 << VARINT_1_OFFSET) - 1);
-static constexpr auto VARINT_2_MAX = uint64_t((1 << VARINT_2_OFFSET) - 1);
-static constexpr auto VARINT_4_MAX = uint64_t((1 << VARINT_4_OFFSET) - 1);
+static constexpr uint64_t VARINT_1_HEADER = 0x00;       // 0 << V1_OFFSET
+static constexpr uint64_t VARINT_2_HEADER = 0x4000;     // 1 << V2_OFFSET
+static constexpr uint64_t VARINT_4_HEADER = 0x80000000; // 2 << V4_OFFSET
+static constexpr uint64_t VARINT_1_MAX = 0x3f;          // (1 << V1_OFFSET) - 1
+static constexpr uint64_t VARINT_2_MAX = 0x3fff;        // (1 << V2_OFFSET) - 1
+static constexpr uint64_t VARINT_4_MAX = 0x3fffffff;    // (1 << V4_OFFSET) - 1
 
 template<typename T, typename>
 ostream&
