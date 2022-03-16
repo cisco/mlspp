@@ -201,7 +201,6 @@ TEST_CASE("HPKE Round-Trip")
         auto [enc, ctxS] = hpke.setup_base_s(*pkR, info);
         auto ctxR = hpke.setup_base_r(enc, *skR, info);
         REQUIRE(ctxS == ctxR);
-        // TODO(RLB): Define operator==, CHECK(ctxS == ctxR)
 
         auto last_encrypted = bytes{};
         for (int i = 0; i < iterations; i += 1) {

@@ -454,12 +454,12 @@ variant<Ts>::decode(istream& str, var::variant<Tp...>& data)
 static constexpr size_t VARINT_1_OFFSET = 6;
 static constexpr size_t VARINT_2_OFFSET = 14;
 static constexpr size_t VARINT_4_OFFSET = 30;
-static constexpr uint8_t VARINT_1_HEADER = 0 << VARINT_1_OFFSET;
-static constexpr uint16_t VARINT_2_HEADER = 1 << VARINT_2_OFFSET;
-static constexpr uint32_t VARINT_4_HEADER = 2 << VARINT_4_OFFSET;
-static constexpr uint64_t VARINT_1_MAX = (1 << VARINT_1_OFFSET) - 1;
-static constexpr uint64_t VARINT_2_MAX = (1 << VARINT_2_OFFSET) - 1;
-static constexpr uint64_t VARINT_4_MAX = (1 << VARINT_4_OFFSET) - 1;
+static constexpr auto VARINT_1_HEADER = uint8_t(0 << VARINT_1_OFFSET);
+static constexpr auto VARINT_2_HEADER = uint16_t(1 << VARINT_2_OFFSET);
+static constexpr auto VARINT_4_HEADER = uint32_t(2 << VARINT_4_OFFSET);
+static constexpr auto VARINT_1_MAX = uint64_t((1 << VARINT_1_OFFSET) - 1);
+static constexpr auto VARINT_2_MAX = uint64_t((1 << VARINT_2_OFFSET) - 1);
+static constexpr auto VARINT_4_MAX = uint64_t((1 << VARINT_4_OFFSET) - 1);
 
 template<typename T, typename>
 ostream&
@@ -483,7 +483,7 @@ istream&
 varint::decode(istream& str, T& val)
 {
   auto log_size = str._buffer.back() >> VARINT_1_OFFSET;
-  if (sizeof(T) < (1 << log_size)) {
+  if (sizeof(T) < size_t(1 << log_size)) {
     throw ReadError("Varint value too large for storage");
   }
 
