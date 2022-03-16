@@ -4,6 +4,7 @@
 #include <mls/core_types.h>
 #include <mls/credential.h>
 #include <mls/crypto.h>
+#include <mls/state.h>
 
 namespace mls {
 
@@ -60,6 +61,7 @@ public:
   bytes add(const bytes& key_package_data);
   bytes update();
   bytes remove(uint32_t index);
+  bytes remove(const bytes& key_id_data);
   std::tuple<bytes, bytes> commit(const bytes& proposal);
   std::tuple<bytes, bytes> commit(const std::vector<bytes>& proposals);
   std::tuple<bytes, bytes> commit();
@@ -68,11 +70,16 @@ public:
   bool handle(const bytes& handshake_data);
 
   // Information about the current state
-  epoch_t current_epoch() const;
-  uint32_t index() const;
+  epoch_t epoch() const;
+  KeyPackageID id() const;
+  LeafIndex index() const;
+  CipherSuite cipher_suite() const;
+  const ExtensionList& extensions() const;
+  const TreeKEMPublicKey& tree() const;
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  PublicGroupState public_group_state() const;
   std::vector<KeyPackage> roster() const;
   bytes authentication_secret() const;
 

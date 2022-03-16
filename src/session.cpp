@@ -1,7 +1,6 @@
 #include <mls/session.h>
 
 #include <mls/messages.h>
-#include <mls/state.h>
 
 #include <deque>
 
@@ -279,6 +278,14 @@ Session::remove(uint32_t index)
   return inner->export_message(proposal);
 }
 
+bytes
+Session::remove(const bytes& key_id_data)
+{
+  auto key_id = tls::get<KeyPackageID>(key_id_data);
+  auto proposal = inner->history.front().remove(key_id);
+  return inner->export_message(proposal);
+}
+
 std::tuple<bytes, bytes>
 Session::commit(const bytes& proposal)
 {
@@ -350,15 +357,39 @@ Session::handle(const bytes& handshake_data)
 }
 
 epoch_t
-Session::current_epoch() const
+Session::epoch() const
 {
   return inner->history.front().epoch();
 }
 
-uint32_t
+KeyPackageID
+Session::id() const
+{
+  return inner->history.front().id();
+}
+
+LeafIndex
 Session::index() const
 {
-  return inner->history.front().index().val;
+  return inner->history.front().index();
+}
+
+CipherSuite
+Session::cipher_suite() const
+{
+  return inner->history.front().cipher_suite();
+}
+
+const ExtensionList&
+Session::extensions() const
+{
+  return inner->history.front().extensions();
+}
+
+const TreeKEMPublicKey&
+Session::tree() const
+{
+  return inner->history.front().tree();
 }
 
 bytes
@@ -367,6 +398,12 @@ Session::do_export(const std::string& label,
                    size_t size) const
 {
   return inner->history.front().do_export(label, context, size);
+}
+
+PublicGroupState
+Session::public_group_state() const
+{
+  return inner->history.front().public_group_state();
 }
 
 std::vector<KeyPackage>
