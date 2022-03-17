@@ -33,7 +33,10 @@ TEST_CASE("KEM round-trip")
 
     SUBCASE("Encap/Decap")
     {
-      auto [secretS, enc] = kem.encap(*pkR);
+      auto [secretS_, enc_] = kem.encap(*pkR);
+      auto secretS = secretS_;
+      auto enc = enc_;
+
       REQUIRE(enc.size() == kem.enc_size);
       REQUIRE(secretS.size() == kem.secret_size);
 
@@ -43,7 +46,10 @@ TEST_CASE("KEM round-trip")
 
     SUBCASE("AuthEncap/AuthDecap")
     {
-      auto [secretS, enc] = kem.auth_encap(*pkR, *skS);
+      auto [secretS_, enc_] = kem.auth_encap(*pkR, *skS);
+      auto secretS = secretS_;
+      auto enc = enc_;
+
       REQUIRE(enc.size() == kem.enc_size);
       REQUIRE(secretS.size() == kem.secret_size);
 

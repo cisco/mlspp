@@ -44,7 +44,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
   auto parent = Node{ ParentNode{ parent_priv.public_key, {}, {} } };
   REQUIRE(parent.public_key() == parent_priv.public_key);
 
-  auto [leaf_priv, sig_priv, kp] = new_key_package();
+  auto [leaf_priv_, sig_priv, kp] = new_key_package();
+  auto leaf_priv = leaf_priv_;
   silence_unused(sig_priv);
 
   auto leaf = Node{ kp };
@@ -119,8 +120,11 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   REQUIRE(priv_joiner.update_secret == last_update_secret);
 
   // shared_path_secret() finds the correct ancestor
-  auto [overlap, overlap_secret, found] =
+  auto [overlap_, overlap_secret_, found_] =
     priv_joiner.shared_path_secret(LeafIndex(0));
+  auto overlap = overlap_;
+  auto overlap_secret = overlap_secret_;
+  auto found = found_;
   REQUIRE(found);
   REQUIRE(overlap == NodeIndex(3));
   REQUIRE(overlap_secret == priv_joiner.path_secrets[overlap]);
@@ -152,7 +156,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
     // Add a leaf
-    auto [init_priv, sig_priv, kp_before] = new_key_package();
+    auto [init_priv, sig_priv, kp_before_] = new_key_package();
+    auto kp_before = kp_before_;
     silence_unused(init_priv);
 
     auto index = LeafIndex(i);
@@ -237,12 +242,14 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     REQUIRE(index == joiner);
 
     auto leaf_secret = random_bytes(32);
-    auto [new_adder_priv, path] = pubs[i].encap(
+    auto [new_adder_priv, path_] = pubs[i].encap(
       adder, context, leaf_secret, sig_privs.back(), {}, std::nullopt);
+    auto path = path_;
     privs[i] = new_adder_priv;
     REQUIRE(pubs[i].parent_hash_valid(adder, path));
 
-    auto [overlap, path_secret, ok] = privs[i].shared_path_secret(joiner);
+    auto [overlap, path_secret, ok_] = privs[i].shared_path_secret(joiner);
+    auto ok = ok_;
     REQUIRE(ok);
 
     pubs[i].merge(adder, path);
