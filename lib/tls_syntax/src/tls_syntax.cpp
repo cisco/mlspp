@@ -109,4 +109,65 @@ operator>>(istream& in, uint64_t& data)
   return in.read_uint(data, 8);
 }
 
+// Varint encoding
+static constexpr size_t VARINT_HEADER_OFFSET = 6;
+static constexpr uint64_t VARINT_1_HEADER = 0x00;       // 0 << V1_OFFSET
+static constexpr uint64_t VARINT_2_HEADER = 0x4000;     // 1 << V2_OFFSET
+static constexpr uint64_t VARINT_4_HEADER = 0x80000000; // 2 << V4_OFFSET
+static constexpr uint64_t VARINT_1_MAX = 0x3f;
+static constexpr uint64_t VARINT_2_MAX = 0x3fff;
+static constexpr uint64_t VARINT_4_MAX = 0x3fffffff;
+
+ostream&
+varint::encode(ostream& str, const uint64_t& val)
+{
+  if (val <= VARINT_1_MAX) {
+    return str.write_uint(VARINT_1_HEADER | val, 1);
+  } else if (val <= VARINT_2_MAX) {
+    return str.write_uint(VARINT_2_HEADER | val, 2);
+  } else if (val <= VARINT_4_MAX) {
+    return str.write_uint(VARINT_4_HEADER | val, 4);
+  } else {
+    throw WriteError("Varint value exceeds maximum size");
+  }
+}
+
+istream&
+varint::decode(istream& str, uint64_t& val)
+{
+  auto log_size = str._buffer.back() >> VARINT_HEADER_OFFSET;
+  if (log_size > 2) {
+    throw ReadError("Malformed varint header");
+  }
+
+  auto read = uint64_t(0);
+  auto read_bytes = int(1 << log_size);
+  str.read_uint(read, read_bytes);
+
+  switch (log_size) {
+    case 0:
+      val = (read ^ VARINT_1_HEADER);
+      break;
+
+    case 1:
+      read ^= VARINT_2_HEADER;
+      if (read <= VARINT_1_MAX) {
+        throw ReadError("Non-minimal varint");
+      }
+      break;
+
+    case 2:
+      read ^= VARINT_4_HEADER;
+      if (read <= VARINT_2_MAX) {
+        throw ReadError("Non-minimal varint");
+      }
+      break;
+
+    default:
+      throw ReadError("Malformed varint header");
+  }
+
+  return str;
+}
+
 } // namespace tls

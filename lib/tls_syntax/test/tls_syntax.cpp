@@ -27,9 +27,9 @@ struct ExampleStruct
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   tls::var::variant<uint8_t, uint16_t> e;
-  uint8_t f;
-  uint16_t g;
-  uint32_t h;
+  uint64_t f;
+  uint64_t g;
+  uint64_t h;
 
   TLS_SERIALIZABLE(a, b, c, d, e, f, g, h)
   TLS_TRAITS(tls::pass,
@@ -207,12 +207,6 @@ TEST_CASE("TLS varint failure cases")
     auto r = tls::istream(enc);
     REQUIRE_THROWS(tls::varint::decode(r, val));
   }
-
-  // Don't overflow storage
-  auto val = uint8_t(0);
-  auto enc = from_hex("7fff");
-  auto r = tls::istream(enc);
-  REQUIRE_THROWS(tls::varint::decode(r, val));
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

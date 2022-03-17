@@ -56,6 +56,8 @@ private:
 
   template<typename T>
   friend ostream& operator<<(ostream& out, const std::vector<T>& data);
+
+  friend struct varint;
 };
 
 class istream
@@ -148,15 +150,8 @@ struct variant
 
 struct varint
 {
-  template<
-    typename T,
-    typename = typename std::enable_if<std::is_unsigned<T>::value, T>::type>
-  static ostream& encode(ostream& str, const T& val);
-
-  template<
-    typename T,
-    typename = typename std::enable_if<std::is_unsigned<T>::value, T>::type>
-  static istream& decode(istream& str, T& val);
+  static ostream& encode(ostream& str, const uint64_t& val);
+  static istream& decode(istream& str, uint64_t& val);
 };
 
 ///
@@ -274,7 +269,7 @@ istream&
 operator>>(istream& str, std::vector<T>& vec)
 {
   // Read the encoded data size
-  auto size = size_t(0);
+  auto size = uint64_t(0);
   varint::decode(str, size);
 
   // Read the elements of the vector
@@ -447,82 +442,6 @@ variant<Ts>::decode(istream& str, var::variant<Tp...>& data)
   Ts target_type;
   str >> target_type;
   read_variant(str, target_type, data);
-  return str;
-}
-
-// Varint encoding
-static constexpr size_t VARINT_1_OFFSET = 6;
-static constexpr size_t VARINT_2_OFFSET = 14;
-static constexpr size_t VARINT_4_OFFSET = 30;
-static constexpr uint64_t VARINT_1_HEADER = 0x00;       // 0 << V1_OFFSET
-static constexpr uint64_t VARINT_2_HEADER = 0x4000;     // 1 << V2_OFFSET
-static constexpr uint64_t VARINT_4_HEADER = 0x80000000; // 2 << V4_OFFSET
-static constexpr uint64_t VARINT_1_MAX = 0x3f;          // (1 << V1_OFFSET) - 1
-static constexpr uint64_t VARINT_2_MAX = 0x3fff;        // (1 << V2_OFFSET) - 1
-static constexpr uint64_t VARINT_4_MAX = 0x3fffffff;    // (1 << V4_OFFSET) - 1
-
-template<typename T, typename>
-ostream&
-varint::encode(ostream& str, const T& val)
-{
-  if (val <= VARINT_1_MAX) {
-    return str << uint8_t(VARINT_1_HEADER | static_cast<uint8_t>(val));
-  } else if (val <= VARINT_2_MAX) {
-    return str << uint16_t(VARINT_2_HEADER | static_cast<uint16_t>(val));
-  } else if (val <= VARINT_4_MAX) {
-    return str << uint32_t(VARINT_4_HEADER | static_cast<uint32_t>(val));
-  } else {
-    throw WriteError("Varint value exceeds maximum size");
-  }
-
-  return str;
-}
-
-template<typename T, typename>
-istream&
-varint::decode(istream& str, T& val)
-{
-  auto log_size = str._buffer.back() >> VARINT_1_OFFSET;
-  if (sizeof(T) < size_t(1 << log_size)) {
-    throw ReadError("Varint value too large for storage");
-  }
-
-  switch (log_size) {
-    case 0: {
-      auto read = uint8_t(0);
-      str >> read;
-      val = (read ^ VARINT_1_HEADER);
-      break;
-    }
-
-    case 1: {
-      auto read = uint16_t(0);
-      str >> read;
-      read ^= VARINT_2_HEADER;
-      if (read <= VARINT_1_MAX) {
-        throw ReadError("Non-minimal varint");
-      }
-
-      val = read;
-      break;
-    }
-
-    case 2: {
-      auto read = uint32_t(0);
-      str >> read;
-      read ^= VARINT_4_HEADER;
-      if (read <= VARINT_2_MAX) {
-        throw ReadError("Non-minimal varint");
-      }
-
-      val = read;
-      break;
-    }
-
-    default:
-      throw ReadError("Malformed varint header");
-  }
-
   return str;
 }
 
