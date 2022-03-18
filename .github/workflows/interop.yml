@@ -10,7 +10,6 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  MACOSX_DEPLOYMENT_TARGET: 10.11
 
 jobs:
   build:
