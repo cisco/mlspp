@@ -62,6 +62,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
 
   auto parent = ParentNode{ init_priv.public_key, {}, {} };
   auto opt_parent = OptionalNode{ Node{ parent }, {} };
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS_AS(opt_parent.set_tree_hash(suite, node_index),
                     var::bad_variant_access);
 
@@ -69,6 +70,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
   REQUIRE_FALSE(opt_parent.hash.empty());
 
   auto opt_leaf = OptionalNode{ Node{ kp }, {} };
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS_AS(
     opt_leaf.set_tree_hash(suite, node_index, child_hash, child_hash),
     var::bad_variant_access);
