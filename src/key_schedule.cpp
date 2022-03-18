@@ -497,7 +497,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , joiner_secret(joiner_secret)
   , psk_secret(make_psk_secret(suite_in, psks))
   , epoch_secret(
-      make_epoch_secret(suite_in, joiner_secret, joiner_secret, context))
+      make_epoch_secret(suite_in, joiner_secret, psk_secret, context))
   , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
   , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
   , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))

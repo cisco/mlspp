@@ -23,6 +23,9 @@ struct HashRatchet
   // These defaults are necessary for use with containers
   HashRatchet() = default;
   HashRatchet(const HashRatchet& other) = default;
+  HashRatchet(HashRatchet&& other) = default;
+  HashRatchet& operator=(const HashRatchet& other) = default;
+  HashRatchet& operator=(HashRatchet&& other) = default;
 
   HashRatchet(CipherSuite suite_in, NodeIndex node_in, bytes base_secret_in);
 

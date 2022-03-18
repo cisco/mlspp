@@ -198,11 +198,9 @@ TEST_CASE("HPKE Round-Trip")
 
         auto hpke = HPKE(kem_id, kdf_id, aead_id);
 
-        // XXX(RLB) Manual destructuring here because the Ubuntu compiler gets
-        // unhappy if we use a destructuring assignment.
-        auto enc_and_ctxS = hpke.setup_base_s(*pkR, info);
-        auto enc = std::get<0>(enc_and_ctxS);
-        auto ctxS = std::get<1>(enc_and_ctxS);
+        auto [enc_, ctxS_] = hpke.setup_base_s(*pkR, info);
+        auto enc = enc_;
+        auto ctxS = ctxS_;
 
         auto ctxR = hpke.setup_base_r(enc, *skR, info);
         REQUIRE(ctxS == ctxR);
