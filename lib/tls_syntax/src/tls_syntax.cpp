@@ -139,13 +139,13 @@ varint::encode(ostream& str, const uint64_t& val)
 istream&
 varint::decode(istream& str, uint64_t& val)
 {
-  auto log_size = str._buffer.back() >> VARINT_HEADER_OFFSET;
+  auto log_size = size_t(str._buffer.back() >> VARINT_HEADER_OFFSET);
   if (log_size > 2) {
     throw ReadError("Malformed varint header");
   }
 
   auto read = uint64_t(0);
-  auto read_bytes = size_t(1) << log_size;
+  auto read_bytes = size_t(size_t(1) << log_size);
   str.read_uint(read, read_bytes);
 
   switch (log_size) {

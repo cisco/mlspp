@@ -27,9 +27,9 @@ struct ExampleStruct
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
   tls::var::variant<uint8_t, uint16_t> e;
-  uint64_t f;
-  uint64_t g;
-  uint64_t h;
+  uint64_t f{ 0 };
+  uint64_t g{ 0 };
+  uint64_t h{ 0 };
 
   TLS_SERIALIZABLE(a, b, c, d, e, f, g, h)
   TLS_TRAITS(tls::pass,
@@ -194,6 +194,7 @@ TEST_CASE("TLS varint failure cases")
 {
   // Encoding a value that is to large
   tls::ostream w;
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS(tls::varint::encode(w, uint64_t(0xffffffff)));
 
   // Too large and non-minimal values
@@ -205,6 +206,7 @@ TEST_CASE("TLS varint failure cases")
   for (const auto& enc : decode_failure_cases) {
     auto val = uint64_t(0);
     auto r = tls::istream(enc);
+    // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
     REQUIRE_THROWS(tls::varint::decode(r, val));
   }
 }
