@@ -112,9 +112,10 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit, welcome, first1] =
+  auto [commit, welcome, first1_] =
     first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
   silence_unused(commit);
+  auto first1 = first1_;
 
   // Initialize the second participant from the Welcome
   auto second0 = State{
@@ -137,8 +138,9 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit1, welcome1, first1] =
+  auto [commit1, welcome1, first1_] =
     first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
+  auto first1 = first1_;
   silence_unused(commit1);
 
   // Initialize the second participant from the Welcome
@@ -156,10 +158,11 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
   second_exts.add(CustomExtension2{ 0xb0 });
 
   auto gce = first1.group_context_extensions_proposal(second_exts);
-  auto [commit2, welcome2, first2] =
+  auto [commit2, welcome2, first2_] =
     first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false });
   auto second2 = second1.handle(commit2);
   silence_unused(welcome2);
+  auto first2 = first2_;
   REQUIRE(first2 == second2);
   REQUIRE(first2.extensions() == second_exts);
 }
@@ -173,12 +176,15 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   // Don't generate RatchetTree extension
-  auto [commit, welcome, first1] =
+  auto [commit, welcome_, first1_] =
     first0.commit(fresh_secret(), CommitOpts{ { add }, false, false });
+  auto welcome = welcome_;
+  auto first1 = first1_;
   silence_unused(commit);
 
   // Initialize the second participant from the Welcome, pass in the
   // tree externally
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   CHECK_THROWS_AS(
     State(
       init_privs[1], identity_privs[1], key_packages[1], welcome, std::nullopt),
@@ -186,6 +192,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   auto incorrect_tree = TreeKEMPublicKey(suite);
   incorrect_tree.add_leaf(key_packages[1]);
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   CHECK_THROWS_AS(State(init_privs[1],
                         identity_privs[1],
                         key_packages[1],
@@ -269,8 +276,9 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
 
   // Add the second member
   auto add = first0.add_proposal(kp1);
-  auto [commit, welcome, first1] =
+  auto [commit, welcome, first1_] =
     first0.commit(fresh_secret(), CommitOpts{ { add }, true, false });
+  auto first1 = first1_;
   silence_unused(commit);
 
   auto second0 = State{ init1, id1, kp1, welcome, std::nullopt };
@@ -306,7 +314,10 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   kp_extensions.add(capabilities);
 
   // One client that supports the required capabilities, and two that do
-  auto [init_no, id_no, kp_no] = make_client();
+  auto [init_no_, id_no_, kp_no_] = make_client();
+  auto init_no = init_no_;
+  auto id_no = id_no_;
+  auto kp_no = kp_no_;
 
   auto [init_yes, id_yes, kp_yes] = make_client();
   kp_yes.sign(id_yes, KeyPackageOpts{ kp_extensions });
@@ -316,6 +327,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
 
   // Creating a group with a first member that doesn't support the required
   // capabilities should fail.
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS(
     State{ group_id, suite, init_no, id_no, kp_no, group_extensions });
 
@@ -323,6 +335,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   // the required capabilities for the group.
   auto state =
     State{ group_id, suite, init_yes, id_yes, kp_yes, group_extensions };
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS(state.add_proposal(kp_no));
 
   // When State receives an add proposal for a new member that doesn't
@@ -521,8 +534,9 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
 
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
-  auto [commit_1, welcome_1, new_state_1] =
+  auto [commit_1, welcome_1, new_state_1_] =
     states[0].commit(fresh_secret(), CommitOpts{ { remove_1 }, true, false });
+  auto new_state_1 = new_state_1_;
   silence_unused(welcome_1);
   silence_unused(commit_1);
   // roster should be 0, 2, 3, 4
@@ -536,8 +550,9 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
 
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
-  auto [commit_2, welcome_2, new_state_2] =
+  auto [commit_2, welcome_2, new_state_2_] =
     new_state_1.commit(fresh_secret(), CommitOpts{ { remove_2 }, true, false });
+  auto new_state_2 = new_state_2_;
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
   expected_creds = std::vector<Credential>{
