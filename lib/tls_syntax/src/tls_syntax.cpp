@@ -123,13 +123,17 @@ varint::encode(ostream& str, const uint64_t& val)
 {
   if (val <= VARINT_1_MAX) {
     return str.write_uint(VARINT_1_HEADER | val, 1);
-  } else if (val <= VARINT_2_MAX) {
-    return str.write_uint(VARINT_2_HEADER | val, 2);
-  } else if (val <= VARINT_4_MAX) {
-    return str.write_uint(VARINT_4_HEADER | val, 4);
-  } else {
-    throw WriteError("Varint value exceeds maximum size");
   }
+
+  if (val <= VARINT_2_MAX) {
+    return str.write_uint(VARINT_2_HEADER | val, 2);
+  }
+
+  if (val <= VARINT_4_MAX) {
+    return str.write_uint(VARINT_4_HEADER | val, 4);
+  }
+
+  throw WriteError("Varint value exceeds maximum size");
 }
 
 istream&
@@ -146,7 +150,7 @@ varint::decode(istream& str, uint64_t& val)
 
   switch (log_size) {
     case 0:
-      val = (read ^ VARINT_1_HEADER);
+      read ^= VARINT_1_HEADER;
       break;
 
     case 1:
@@ -167,6 +171,7 @@ varint::decode(istream& str, uint64_t& val)
       throw ReadError("Malformed varint header");
   }
 
+  val = read;
   return str;
 }
 
