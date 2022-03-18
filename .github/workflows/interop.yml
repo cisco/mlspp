@@ -30,8 +30,13 @@ jobs:
             ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
         key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
 
+    - name: Build the library      
+      run: |
+        cmake -B build
+        cmake --build build          
+
     - name: Build interop harness
       run: |
          cd cmd/interop
-         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
-         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+         cmake --build build
