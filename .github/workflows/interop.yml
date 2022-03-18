@@ -1,0 +1,37 @@
+name: Build the interop harness
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  MACOSX_DEPLOYMENT_TARGET: 10.11
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: Build interop harness
+      run: |
+         cd cmd/interop
+         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+         cmake --build build

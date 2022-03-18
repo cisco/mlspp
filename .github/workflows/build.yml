@@ -61,9 +61,3 @@ jobs:
     - name: Unit tests
       run: |
          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-
-    - name: Build interop harness
-      run: |
-         cd cmd/interop
-         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
-         cmake --build build
