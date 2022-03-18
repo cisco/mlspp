@@ -145,7 +145,7 @@ varint::decode(istream& str, uint64_t& val)
   }
 
   auto read = uint64_t(0);
-  auto read_bytes = int(1 << log_size);
+  auto read_bytes = size_t(1) << log_size;
   str.read_uint(read, read_bytes);
 
   switch (log_size) {
