@@ -33,5 +33,5 @@ jobs:
     - name: Build interop harness
       run: |
          cd cmd/interop
-         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
-         cmake --build build
+         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
