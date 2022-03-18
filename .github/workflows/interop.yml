@@ -32,7 +32,7 @@ jobs:
 
     - name: Build the library      
       run: |
-        cmake -B build
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
         cmake --build build          
 
     - name: Build interop harness
