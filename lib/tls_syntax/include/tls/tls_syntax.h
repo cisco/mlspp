@@ -79,10 +79,10 @@ private:
   uint8_t next();
 
   template<typename T>
-  istream& read_uint(T& data, int length)
+  istream& read_uint(T& data, size_t length)
   {
     uint64_t value = 0;
-    for (int i = 0; i < length; i += 1) {
+    for (size_t i = 0; i < length; i += 1) {
       value = (value << unsigned(8)) + next();
     }
     data = static_cast<T>(value);
