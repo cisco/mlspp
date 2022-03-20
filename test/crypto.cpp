@@ -45,7 +45,8 @@ TEST_CASE("HPKE Key Serialization")
     HPKEPublicKey parsed{ gX.data };
     REQUIRE(parsed == gX);
 
-    auto gX2 = tls::get<HPKEPublicKey>(tls::marshal(gX));
+    auto marshaled = tls::marshal(gX);
+    auto gX2 = tls::get<HPKEPublicKey>(marshaled);
     REQUIRE(gX2 == gX);
   }
 }

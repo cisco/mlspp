@@ -165,7 +165,6 @@ struct TreeKEMPublicKey
   }
 
   TLS_SERIALIZABLE(nodes)
-  TLS_TRAITS(tls::vector<4>)
 
 private:
   void clear_hash_all();

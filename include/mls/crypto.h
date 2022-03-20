@@ -97,7 +97,6 @@ struct HPKECiphertext
   bytes ciphertext;
 
   TLS_SERIALIZABLE(kem_output, ciphertext)
-  TLS_TRAITS(tls::vector<2>, tls::vector<2>)
 };
 
 struct HPKEPublicKey
@@ -115,7 +114,6 @@ struct HPKEPublicKey
                                      size_t size) const;
 
   TLS_SERIALIZABLE(data)
-  TLS_TRAITS(tls::vector<2>)
 };
 
 struct HPKEPrivateKey
@@ -141,7 +139,6 @@ struct HPKEPrivateKey
                   size_t size) const;
 
   TLS_SERIALIZABLE(data, public_key)
-  TLS_TRAITS(tls::vector<2>, tls::pass)
 
 private:
   HPKEPrivateKey(bytes priv_data, bytes pub_data);
@@ -157,7 +154,6 @@ struct SignaturePublicKey
               const bytes& signature) const;
 
   TLS_SERIALIZABLE(data)
-  TLS_TRAITS(tls::vector<2>)
 };
 
 struct SignaturePrivateKey
@@ -172,7 +168,6 @@ struct SignaturePrivateKey
   bytes sign(const CipherSuite& suite, const bytes& message) const;
 
   TLS_SERIALIZABLE(data, public_key)
-  TLS_TRAITS(tls::vector<2>, tls::pass)
 
 private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);

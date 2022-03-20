@@ -43,12 +43,8 @@ bytes
 PublicGroupState::to_be_signed() const
 {
   tls::ostream w;
-  w << cipher_suite;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch;
-  tls::vector<1>::encode(w, tree_hash);
-  tls::vector<1>::encode(w, interim_transcript_hash);
-  w << group_context_extensions << other_extensions << external_pub << signer;
+  w << cipher_suite << group_id << epoch << tree_hash << interim_transcript_hash
+    << group_context_extensions << other_extensions << external_pub << signer;
   return w.bytes();
 }
 
@@ -109,11 +105,8 @@ bytes
 GroupInfo::to_be_signed() const
 {
   tls::ostream w;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch;
-  tls::vector<1>::encode(w, tree_hash);
-  tls::vector<1>::encode(w, confirmed_transcript_hash);
-  w << group_context_extensions << other_extensions << confirmation_tag
+  w << group_id << epoch << tree_hash << confirmed_transcript_hash
+    << group_context_extensions << other_extensions << confirmation_tag
     << signer;
   return w.bytes();
 }
@@ -344,9 +337,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   }
 
   bytes padding;
-  tls::vector<2>::decode(r, signature);
-  r >> confirmation_tag;
-  tls::vector<2>::decode(r, padding);
+  r >> signature >> confirmation_tag >> padding;
 }
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
@@ -399,10 +390,7 @@ MLSPlaintext::marshal_content(size_t padding_size) const
   tls::ostream w;
   var::visit([&](auto&& inner_content) { w << inner_content; }, content);
 
-  bytes padding(padding_size, 0);
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
-  tls::vector<2>::encode(w, padding);
+  w << signature << confirmation_tag << bytes(padding_size, 0);
   return w.bytes();
 }
 
@@ -410,12 +398,9 @@ bytes
 MLSPlaintext::commit_content() const
 {
   tls::ostream w;
-  w << wire_format;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::vector<4>::encode(w, authenticated_data);
+  w << wire_format << group_id << epoch << sender << authenticated_data;
   tls::variant<ContentType>::encode(w, content);
-  tls::vector<2>::encode(w, signature);
+  w << signature;
   return w.bytes();
 }
 
@@ -429,11 +414,8 @@ bytes
 MLSPlaintext::to_be_signed(const GroupContext& context) const
 {
   tls::ostream w;
-  w << context;
-  w << wire_format;
-  tls::vector<1>::encode(w, group_id);
-  w << epoch << sender;
-  tls::vector<4>::encode(w, authenticated_data);
+  w << context << wire_format << group_id << epoch << sender
+    << authenticated_data;
   tls::variant<ContentType>::encode(w, content);
   return w.bytes();
 }
@@ -460,8 +442,7 @@ bytes
 MLSPlaintext::membership_tag_input(const GroupContext& context) const
 {
   tls::ostream w;
-  tls::vector<2>::encode(w, signature);
-  w << confirmation_tag;
+  w << signature << confirmation_tag;
   return to_be_signed(context) + w.bytes();
 }
 

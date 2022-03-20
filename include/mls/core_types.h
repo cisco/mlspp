@@ -34,7 +34,6 @@ struct Extension
   bytes data;
 
   TLS_SERIALIZABLE(type, data)
-  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 struct ExtensionType
@@ -82,7 +81,6 @@ struct ExtensionList
   bool has(uint16_t type) const;
 
   TLS_SERIALIZABLE(extensions)
-  TLS_TRAITS(tls::vector<4>)
 };
 
 struct CapabilitiesExtension
@@ -98,7 +96,6 @@ struct CapabilitiesExtension
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
-  TLS_TRAITS(tls::vector<1>, tls::vector<1>, tls::vector<1>, tls::vector<1>)
 };
 
 struct RequiredCapabilitiesExtension
@@ -108,7 +105,6 @@ struct RequiredCapabilitiesExtension
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(extensions, proposals)
-  TLS_TRAITS(tls::vector<1>, tls::vector<1>)
 };
 
 struct LifetimeExtension
@@ -126,7 +122,6 @@ struct KeyIDExtension
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(key_id)
-  TLS_TRAITS(tls::vector<2>)
 };
 
 struct ParentHashExtension
@@ -135,7 +130,6 @@ struct ParentHashExtension
 
   static const Extension::Type type;
   TLS_SERIALIZABLE(parent_hash)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 ///
@@ -151,7 +145,6 @@ struct ParentNode
   bytes hash(CipherSuite suite) const;
 
   TLS_SERIALIZABLE(public_key, parent_hash, unmerged_leaves)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 // struct {
@@ -173,7 +166,6 @@ struct KeyPackageID
 {
   bytes id;
   TLS_SERIALIZABLE(id)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 struct KeyPackage
@@ -231,7 +223,6 @@ struct RatchetNode
   std::vector<HPKECiphertext> node_secrets;
 
   TLS_SERIALIZABLE(public_key, node_secrets)
-  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 // struct {
@@ -243,7 +234,6 @@ struct UpdatePath
   std::vector<RatchetNode> nodes;
 
   TLS_SERIALIZABLE(leaf_key_package, nodes)
-  TLS_TRAITS(tls::pass, tls::vector<4>)
 };
 
 } // namespace mls

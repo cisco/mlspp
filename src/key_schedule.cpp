@@ -251,7 +251,6 @@ struct MLSCiphertextContentAAD
   const bytes& authenticated_data;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::vector<4>)
 };
 
 using ReuseGuard = std::array<uint8_t, 4>;
@@ -299,7 +298,6 @@ struct MLSSenderDataAAD
   const ContentType content_type;
 
   TLS_SERIALIZABLE(group_id, epoch, content_type)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
 };
 
 MLSCiphertext

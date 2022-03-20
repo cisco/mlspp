@@ -26,7 +26,6 @@ struct BasicCredential
   SignaturePublicKey public_key;
 
   TLS_SERIALIZABLE(identity, scheme, public_key)
-  TLS_TRAITS(tls::vector<2>, tls::pass, tls::pass)
 };
 
 struct X509Credential
@@ -36,7 +35,6 @@ struct X509Credential
     bytes data;
 
     TLS_SERIALIZABLE(data)
-    TLS_TRAITS(tls::vector<2>)
   };
 
   X509Credential() = default;

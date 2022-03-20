@@ -153,7 +153,6 @@ struct HKDFLabel
   bytes context;
 
   TLS_SERIALIZABLE(length, label, context)
-  TLS_TRAITS(tls::pass, tls::vector<1>, tls::vector<4>)
 };
 
 bytes

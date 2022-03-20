@@ -35,7 +35,6 @@ struct SFrameCapabilities
 
   static const uint16_t type;
   TLS_SERIALIZABLE(cipher_suites)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 struct MAC
@@ -43,7 +42,6 @@ struct MAC
   bytes mac_value;
 
   TLS_SERIALIZABLE(mac_value)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 ///
@@ -61,7 +59,6 @@ struct ExternalPSK
 {
   bytes psk_id;
   TLS_SERIALIZABLE(psk_id)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 struct ReInitPSK
@@ -69,7 +66,6 @@ struct ReInitPSK
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
 struct BranchPSK
@@ -77,7 +73,6 @@ struct BranchPSK
   bytes group_id;
   epoch_t psk_epoch;
   TLS_SERIALIZABLE(group_id, psk_epoch)
-  TLS_TRAITS(tls::vector<1>, tls::pass)
 };
 
 struct PreSharedKeyID
@@ -85,14 +80,13 @@ struct PreSharedKeyID
   var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
   bytes psk_nonce;
   TLS_SERIALIZABLE(content, psk_nonce)
-  TLS_TRAITS(tls::variant<PSKType>, tls::vector<1>)
+  TLS_TRAITS(tls::variant<PSKType>, tls::pass)
 };
 
 struct PreSharedKeys
 {
   std::vector<PreSharedKeyID> psks;
   TLS_SERIALIZABLE(psks)
-  TLS_TRAITS(tls::vector<2>)
 };
 
 struct PSKWithSecret
@@ -152,16 +146,6 @@ struct PublicGroupState
                    external_pub,
                    signer,
                    signature)
-  TLS_TRAITS(tls::pass,
-             tls::vector<1>,
-             tls::pass,
-             tls::vector<1>,
-             tls::vector<1>,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<2>)
 };
 
 // struct {
@@ -213,15 +197,6 @@ public:
                    confirmation_tag,
                    signer,
                    signature)
-  TLS_TRAITS(tls::vector<1>,
-             tls::pass,
-             tls::vector<1>,
-             tls::vector<1>,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::vector<2>)
 };
 
 // struct {
@@ -236,7 +211,6 @@ struct GroupSecrets
     bytes secret;
 
     TLS_SERIALIZABLE(secret)
-    TLS_TRAITS(tls::vector<1>)
   };
 
   bytes joiner_secret;
@@ -244,7 +218,6 @@ struct GroupSecrets
   PreSharedKeys psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass)
 };
 
 // struct {
@@ -284,7 +257,6 @@ struct Welcome
                     const std::vector<PSKWithSecret>& psks) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
-  TLS_TRAITS(tls::pass, tls::pass, tls::vector<4>, tls::vector<4>)
 
 private:
   bytes _joiner_secret;
@@ -335,7 +307,6 @@ struct ReInit
   ExtensionList extensions;
 
   TLS_SERIALIZABLE(group_id, version, cipher_suite, extensions)
-  TLS_TRAITS(tls::vector<1>, tls::pass, tls::pass, tls::pass)
 };
 
 // ExternalInit
@@ -343,7 +314,6 @@ struct ExternalInit
 {
   bytes kem_output;
   TLS_SERIALIZABLE(kem_output)
-  TLS_TRAITS(tls::vector<2>)
 };
 
 // AppAck
@@ -359,7 +329,6 @@ struct AppAck
 {
   std::vector<MessageRange> received_ranges;
   TLS_SERIALIZABLE(received_ranges)
-  TLS_TRAITS(tls::vector<4>)
 };
 
 // GroupContextExtensions
@@ -419,7 +388,6 @@ struct ProposalRef
 {
   bytes id;
   TLS_SERIALIZABLE(id)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 enum struct ProposalOrRefType : uint8_t
@@ -451,7 +419,6 @@ struct Commit
   std::optional<bytes> valid_external() const;
 
   TLS_SERIALIZABLE(proposals, path)
-  TLS_TRAITS(tls::vector<4>, tls::pass)
 };
 
 // struct {
@@ -475,7 +442,6 @@ struct ApplicationData
 {
   bytes data;
   TLS_SERIALIZABLE(data)
-  TLS_TRAITS(tls::vector<4>)
 };
 
 struct GroupContext;
@@ -507,7 +473,6 @@ struct PreconfiguredKeyID
 {
   bytes id;
   TLS_SERIALIZABLE(id)
-  TLS_TRAITS(tls::vector<1>)
 };
 
 struct NewMemberID
@@ -585,12 +550,12 @@ struct MLSPlaintext
                    confirmation_tag,
                    membership_tag)
   TLS_TRAITS(tls::pass,
-             tls::vector<1>,
              tls::pass,
              tls::pass,
-             tls::vector<4>,
+             tls::pass,
+             tls::pass,
              tls::variant<ContentType>,
-             tls::vector<2>,
+             tls::pass,
              tls::pass,
              tls::pass)
 };
@@ -620,13 +585,6 @@ struct MLSCiphertext
                    authenticated_data,
                    encrypted_sender_data,
                    ciphertext)
-  TLS_TRAITS(tls::pass,
-             tls::vector<1>,
-             tls::pass,
-             tls::pass,
-             tls::vector<4>,
-             tls::vector<1>,
-             tls::vector<4>)
 };
 
 } // namespace mls
