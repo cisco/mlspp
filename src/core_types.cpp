@@ -200,7 +200,7 @@ LeafNode::verify(CipherSuite cipher_suite,
 
   if (CredentialType::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
-    if (cred._signature_scheme != tls_signature_scheme(cipher_suite.sig().id)) {
+    if (cred.signature_scheme() != tls_signature_scheme(cipher_suite.sig().id)) {
       throw std::runtime_error("Signature algorithm invalid");
     }
   }
@@ -396,7 +396,7 @@ KeyPackage::verify() const
 
   if (CredentialType::x509 == leaf_node.credential.type()) {
     const auto& cred = leaf_node.credential.get<X509Credential>();
-    if (cred._signature_scheme != tls_signature_scheme(cipher_suite.sig().id)) {
+    if (cred.signature_scheme() != tls_signature_scheme(cipher_suite.sig().id)) {
       throw std::runtime_error("Signature algorithm invalid");
     }
   }
