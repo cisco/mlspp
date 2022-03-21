@@ -364,10 +364,10 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   sign(sig_priv_in);
 }
 
-KeyPackageID
-KeyPackage::id() const
+KeyPackageRef
+KeyPackage::ref() const
 {
-  return { cipher_suite.digest().hash(tls::marshal(*this)) };
+  return cipher_suite.ref(*this);
 }
 
 void
