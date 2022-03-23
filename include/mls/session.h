@@ -16,8 +16,7 @@ class Client
 public:
   Client(CipherSuite suite_in,
          SignaturePrivateKey sig_priv_in,
-         Credential cred_in,
-         std::optional<KeyPackageOpts> opts_in);
+         Credential cred_in);
 
   Session begin_session(const bytes& group_id) const;
 
@@ -27,7 +26,6 @@ private:
   const CipherSuite suite;
   const SignaturePrivateKey sig_priv;
   const Credential cred;
-  const std::optional<KeyPackageOpts> opts;
 };
 
 class PendingJoin
@@ -61,7 +59,7 @@ public:
   bytes add(const bytes& key_package_data);
   bytes update();
   bytes remove(uint32_t index);
-  bytes remove(const bytes& key_id_data);
+  bytes remove(const LeafNodeRef& ref);
   std::tuple<bytes, bytes> commit(const bytes& proposal);
   std::tuple<bytes, bytes> commit(const std::vector<bytes>& proposals);
   std::tuple<bytes, bytes> commit();
@@ -71,7 +69,7 @@ public:
 
   // Information about the current state
   epoch_t epoch() const;
-  KeyPackageID id() const;
+  LeafNodeRef ref() const;
   LeafIndex index() const;
   CipherSuite cipher_suite() const;
   const ExtensionList& extensions() const;
@@ -80,7 +78,7 @@ public:
                   const bytes& context,
                   size_t size) const;
   PublicGroupState public_group_state() const;
-  std::vector<KeyPackage> roster() const;
+  std::vector<LeafNode> roster() const;
   bytes authentication_secret() const;
 
   // Application message protection

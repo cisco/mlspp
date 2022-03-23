@@ -162,12 +162,13 @@ struct TranscriptTestVector
 struct TreeKEMTestVector
 {
   mls::CipherSuite cipher_suite;
+  HexBytes group_id;
 
   mls::TreeKEMPublicKey ratchet_tree_before;
 
   mls::LeafIndex add_sender;
   HexBytes my_leaf_secret;
-  mls::KeyPackage my_key_package;
+  mls::LeafNode my_leaf_node;
   HexBytes my_path_secret;
 
   mls::LeafIndex update_sender;
@@ -188,8 +189,6 @@ struct TreeKEMTestVector
 struct MessagesTestVector
 {
   HexBytes key_package;
-  HexBytes capabilities;
-  HexBytes lifetime;
   HexBytes ratchet_tree;
 
   HexBytes group_info;

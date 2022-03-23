@@ -50,7 +50,7 @@ protected:
     auto id_priv = new_identity_key();
     auto init_priv = new_init_key();
     auto cred = Credential::basic(user_id, suite, id_priv.public_key);
-    auto client = Client(suite, id_priv, cred, std::nullopt);
+    auto client = Client(suite, id_priv, cred);
 
     // Initial add is different
     if (sessions.empty()) {
@@ -282,9 +282,7 @@ TEST_CASE("Session with X509 Credential")
 
   mls::Credential alice_cred = mls::Credential::x509(der_chain);
   auto alice_sig_priv = mls::SignaturePrivateKey::parse(suite, key_raw);
-  mls::KeyPackageOpts alice_opts_in;
-  alice_opts_in.extensions.add(mls::KeyIDExtension{ alice_id });
-  mls::Client alice_client(suite, alice_sig_priv, alice_cred, alice_opts_in);
+  mls::Client alice_client(suite, alice_sig_priv, alice_cred);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto alice_session = alice_client.begin_session(group_id);
@@ -294,10 +292,8 @@ TEST_CASE("Session with X509 Credential")
   auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
   auto bob_cred =
     mls::Credential::basic(bob_id, suite, bob_sig_priv.public_key);
-  mls::KeyPackageOpts bob_opts_in;
-  bob_opts_in.extensions.add(mls::KeyIDExtension{ bob_id });
 
-  mls::Client bob_client(suite, bob_sig_priv, bob_cred, bob_opts_in);
+  mls::Client bob_client(suite, bob_sig_priv, bob_cred);
 
   auto bob_pending_join = bob_client.start_join();
 

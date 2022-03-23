@@ -49,6 +49,7 @@ private:
   SignaturePublicKey _public_key;
   SignatureScheme _signature_scheme;
 
+  friend struct LeafNode;
   friend struct KeyPackage;
 };
 

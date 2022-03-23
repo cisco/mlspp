@@ -1,5 +1,7 @@
+#include <mls/core_types.h>
 #include <mls/crypto.h>
 #include <mls/log.h>
+#include <mls/messages.h>
 
 #include <iostream>
 #include <string>
@@ -189,6 +191,42 @@ const std::array<CipherSuite::ID, 6> all_supported_suites = {
   CipherSuite::ID::P521_AES256GCM_SHA512_P521,
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
 };
+
+// MakeKeyPackageRef(value) = KDF.expand(
+//   KDF.extract("", value), "MLS 1.0 KeyPackage Reference", 16)
+template<>
+const bytes&
+CipherSuite::reference_label<KeyPackage>()
+{
+  static const auto label = from_ascii("MLS 1.0 KeyPackage Reference");
+  return label;
+}
+
+// MakeLeafNodeRef(value) = KDF.expand(
+//   KDF.extract("", value), "MLS 1.0 Leaf Node Reference", 16)
+template<>
+const bytes&
+CipherSuite::reference_label<LeafNode>()
+{
+  static const auto label = from_ascii("MLS 1.0 Leaf Node Reference");
+  return label;
+}
+
+// MakeProposalRef(value) = KDF.expand(
+//   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
+//
+// Even though the label says "Proposal", we actually hash the entire enclosing
+// MLSPlaintext object.
+//
+// XXX(RLB): Is this still the case with the MLSMessage transition?  Does the
+// spec reflect this accurately?
+template<>
+const bytes&
+CipherSuite::reference_label<MLSPlaintext>()
+{
+  static const auto label = from_ascii("MLS 1.0 Proposal Reference");
+  return label;
+}
 
 ///
 /// Utilities

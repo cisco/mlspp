@@ -101,6 +101,7 @@ TLS_SERIALIZER(mls::HPKEPublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
 TLS_SERIALIZER(mls::Credential)
 TLS_SERIALIZER(mls::MLSPlaintext)
+TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
 
@@ -188,10 +189,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    cipher_suite,
+                                   group_id,
                                    ratchet_tree_before,
                                    add_sender,
                                    my_leaf_secret,
-                                   my_key_package,
+                                   my_leaf_node,
                                    my_path_secret,
                                    update_sender,
                                    update_path,
@@ -204,8 +206,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
                                    key_package,
-                                   capabilities,
-                                   lifetime,
                                    ratchet_tree,
                                    group_info,
                                    group_secrets,

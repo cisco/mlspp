@@ -43,6 +43,7 @@ struct CommitOpts
   std::vector<Proposal> extra_proposals;
   bool inline_tree;
   bool encrypt_handshake;
+  LeafNodeOptions leaf_node_opts;
 };
 
 class State
@@ -57,11 +58,12 @@ public:
         CipherSuite suite,
         const HPKEPrivateKey& init_priv,
         SignaturePrivateKey sig_priv,
-        const KeyPackage& key_package,
+        const LeafNode& leaf_node,
         ExtensionList extensions);
 
   // Initialize a group from a Welcome
   State(const HPKEPrivateKey& init_priv,
+        HPKEPrivateKey leaf_priv,
         SignaturePrivateKey sig_priv,
         const KeyPackage& kp,
         const Welcome& welcome,
@@ -83,15 +85,16 @@ public:
   ///
 
   Proposal add_proposal(const KeyPackage& key_package) const;
-  Proposal update_proposal(const bytes& leaf_secret);
+  Proposal update_proposal(const bytes& leaf_secret,
+                           const LeafNodeOptions& opts);
   Proposal remove_proposal(RosterIndex index) const;
-  Proposal remove_proposal(KeyPackageID removed) const;
+  Proposal remove_proposal(LeafNodeRef removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSPlaintext add(const KeyPackage& key_package) const;
-  MLSPlaintext update(const bytes& leaf_secret);
+  MLSPlaintext update(const bytes& leaf_secret, const LeafNodeOptions& opts);
   MLSPlaintext remove(RosterIndex index) const;
-  MLSPlaintext remove(KeyPackageID removed) const;
+  MLSPlaintext remove(LeafNodeRef removed) const;
   MLSPlaintext group_context_extensions(ExtensionList exts) const;
 
   std::tuple<MLSPlaintext, Welcome, State> commit(
@@ -107,7 +110,7 @@ public:
   /// Accessors
   ///
   epoch_t epoch() const { return _epoch; }
-  KeyPackageID id() const { return _id; }
+  LeafNodeRef ref() const { return _ref; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
@@ -119,7 +122,7 @@ public:
   PublicGroupState public_group_state() const;
 
   // Ordered list of credentials from non-blank leaves
-  std::vector<KeyPackage> roster() const;
+  std::vector<LeafNode> roster() const;
 
   bytes authentication_secret() const;
 
@@ -155,18 +158,18 @@ protected:
 
   // Per-participant state
   LeafIndex _index;
-  KeyPackageID _id;
+  LeafNodeRef _ref;
   SignaturePrivateKey _identity_priv;
 
   // Cache of Proposals and update secrets
   struct CachedProposal
   {
-    bytes ref;
+    ProposalRef ref;
     Proposal proposal;
     std::optional<LeafIndex> sender;
   };
   std::list<CachedProposal> _pending_proposals;
-  std::map<bytes, bytes> _update_secrets;
+  std::map<LeafNodeRef, bytes> _update_secrets;
 
   // Assemble a preliminary, unjoined group state
   State(SignaturePrivateKey sig_priv,
@@ -199,10 +202,11 @@ protected:
   MLSPlaintext sign(const Proposal& proposal) const;
 
   // Apply the changes requested by various messages
-  void check_add_key_package(const KeyPackage& key_package,
-                             std::optional<LeafIndex> except) const;
-  void check_update_key_package(LeafIndex target,
-                                const KeyPackage& key_package) const;
+  void check_add_leaf_node(const LeafNode& leaf,
+                           std::optional<LeafIndex> except) const;
+  void check_update_leaf_node(LeafIndex target,
+                              const LeafNode& leaf,
+                              LeafNodeSource required_source) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
@@ -243,8 +247,8 @@ protected:
   // Verification of the confirmation MAC
   bool verify_confirmation(const bytes& confirmation) const;
 
-  // Convert a Roster entry into LeafIndex
-  KeyPackageID leaf_for_roster_entry(RosterIndex index) const;
+  // Convert a Roster entry into LeafNodeRef
+  LeafNodeRef leaf_for_roster_entry(RosterIndex index) const;
 
   // Create a draft successor state
   State successor() const;

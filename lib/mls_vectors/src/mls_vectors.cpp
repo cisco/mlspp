@@ -221,13 +221,17 @@ EncryptionTestVector::create(CipherSuite suite,
 
   auto tree = TreeKEMPublicKey(suite);
   for (uint32_t i = 0; i < n_leaves; i++) {
-    auto init_priv = HPKEPrivateKey::generate(suite);
+    auto leaf_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
     auto cred = Credential::basic({}, suite, sig_priv.public_key);
-    auto key_package =
-      KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
-    auto key_package_id = key_package.id();
-    tree.add_leaf(key_package);
+    auto leaf = LeafNode(suite,
+                         leaf_priv.public_key,
+                         cred,
+                         Capabilities::create_default(),
+                         Lifetime::create_default(),
+                         {},
+                         sig_priv);
+    tree.add_leaf(leaf);
   }
   tv.tree = tls::marshal(tree);
 
@@ -247,7 +251,8 @@ EncryptionTestVector::create(CipherSuite suite,
     tv.leaves[i].application.resize(n_generations);
 
     auto N = LeafIndex{ i };
-    auto sender = Sender{ opt::get(tree.key_package(LeafIndex{ i })).id() };
+    auto sender_ref = opt::get(tree.leaf_node(LeafIndex{ i })).ref(suite);
+    auto sender = Sender{ sender_ref };
     auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
     hs_pt.wire_format = WireFormat::mls_ciphertext;
 
@@ -507,8 +512,10 @@ TranscriptTestVector::create(CipherSuite suite)
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto credential =
     Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
+  auto leaf_node_ref = LeafNodeRef{};
+  leaf_node_ref.fill(0xa0);
   auto commit =
-    MLSPlaintext{ group_id, epoch, Sender{ KeyPackageID{ {} } }, Commit{} };
+    MLSPlaintext{ group_id, epoch, Sender{ leaf_node_ref }, Commit{} };
   commit.sign(suite, group_context, sig_priv);
 
   transcript.update_confirmed(commit);
@@ -581,18 +588,22 @@ TranscriptTestVector::verify() const
 /// TreeKEMTestVector
 ///
 
-static std::tuple<bytes, SignaturePrivateKey, KeyPackage>
-new_key_package(CipherSuite suite)
+static std::tuple<bytes, SignaturePrivateKey, LeafNode>
+new_leaf_node(CipherSuite suite)
 {
-  auto scheme = suite;
   auto init_secret = random_bytes(suite.secret_size());
   auto leaf_node_secret = suite.derive_secret(init_secret, "node");
-  auto init_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
+  auto leaf_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto cred = Credential::basic({ 0, 1, 2, 3 }, scheme, sig_priv.public_key);
-  auto kp =
-    KeyPackage{ suite, init_priv.public_key, cred, sig_priv, std::nullopt };
-  return { init_secret, sig_priv, kp };
+  auto cred = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
+  auto leaf = LeafNode(suite,
+                       leaf_priv.public_key,
+                       cred,
+                       Capabilities::create_default(),
+                       Lifetime::create_default(),
+                       {},
+                       sig_priv);
+  return std::make_tuple(init_secret, sig_priv, leaf);
 }
 
 TreeKEMTestVector
@@ -600,6 +611,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 {
   auto tv = TreeKEMTestVector{};
   tv.cipher_suite = suite;
+  tv.group_id = bytes{ 0, 1, 2, 3 };
 
   // Make a plan
   tv.add_sender = LeafIndex{ 0 };
@@ -616,14 +628,14 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   auto sig_privs = std::vector<SignaturePrivateKey>{};
   auto pub = TreeKEMPublicKey{ suite };
   for (size_t i = 0; i < n_leaves; i++) {
-    auto [init_secret, sig_priv, key_package] = new_key_package(suite);
+    auto [init_secret, sig_priv, leaf] = new_leaf_node(suite);
     silence_unused(init_secret);
     sig_privs.push_back(sig_priv);
 
     auto leaf_secret = random_bytes(suite.secret_size());
-    auto added = pub.add_leaf(key_package);
+    auto added = pub.add_leaf(leaf);
     auto [new_adder_priv, path] =
-      pub.encap(added, {}, leaf_secret, sig_priv, {}, std::nullopt);
+      pub.encap(added, tv.group_id, {}, leaf_secret, sig_priv, {}, {});
     silence_unused(new_adder_priv);
     pub.merge(added, path);
   }
@@ -634,14 +646,15 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   // Add the test participant
   auto add_secret = random_bytes(suite.secret_size());
-  auto [test_init_secret, test_sig_priv, test_kp] = new_key_package(suite);
-  auto test_index = pub.add_leaf(test_kp);
+  auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node(suite);
+  auto test_index = pub.add_leaf(test_leaf);
   auto [add_priv, add_path] = pub.encap(tv.add_sender,
+                                        tv.group_id,
                                         {},
                                         add_secret,
                                         sig_privs[tv.add_sender.val],
                                         {},
-                                        std::nullopt);
+                                        {});
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
   silence_unused(add_path);
@@ -653,7 +666,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   tv.ratchet_tree_before = pub;
   tv.tree_hash_before = pub.root_hash();
   tv.my_leaf_secret = test_init_secret;
-  tv.my_key_package = test_kp;
+  tv.my_leaf_node = test_leaf;
   tv.my_path_secret = path_secret;
   tv.root_secret_after_add = add_priv.update_secret;
 
@@ -661,11 +674,12 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   auto update_secret = random_bytes(suite.secret_size());
   auto update_context = random_bytes(suite.secret_size());
   auto [update_priv, update_path] = pub.encap(tv.update_sender,
+                                              tv.group_id,
                                               update_context,
                                               update_secret,
                                               sig_privs[tv.update_sender.val],
                                               {},
-                                              std::nullopt);
+                                              {});
   pub.merge(tv.update_sender, update_path);
   pub.set_hash_all();
 
@@ -706,7 +720,7 @@ TreeKEMTestVector::verify() const
          ratchet_tree_after.parent_hash_valid());
 
   // Find ourselves in the tree
-  auto maybe_index = ratchet_tree_before.find(my_key_package);
+  auto maybe_index = ratchet_tree_before.find(my_leaf_node);
   if (!maybe_index) {
     return "Error: key package not found in ratchet tree";
   }
@@ -769,22 +783,30 @@ MessagesTestVector::create()
 
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
-  auto key_package =
-    KeyPackage{ suite, hpke_pub, cred, sig_priv, std::nullopt };
-  auto sender = Sender{ key_package.id() };
+  auto leaf_node = LeafNode{ suite,
+                             hpke_pub,
+                             cred,
+                             Capabilities::create_default(),
+                             Lifetime::create_default(),
+                             {},
+                             sig_priv };
+  auto key_package = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
+  auto leaf_node_update =
+    leaf_node.for_update(suite, opaque, hpke_pub, {}, sig_priv);
+  auto leaf_node_commit =
+    leaf_node.for_commit(suite, opaque, hpke_pub, opaque, {}, sig_priv);
 
-  auto lifetime = LifetimeExtension{ 0x0000000000000000, 0xffffffffffffffff };
-  auto capabilities = CapabilitiesExtension{ { version },
-                                             { suite.cipher_suite() },
-                                             { ExtensionType::ratchet_tree },
-                                             { ProposalType::add } };
+  auto leaf_node_ref = leaf_node.ref(suite);
+  auto sender = Sender{ leaf_node_ref };
+
+  auto key_id_ext = KeyIDExtension{ opaque };
+
   auto ext_list = ExtensionList{};
-  ext_list.add(lifetime);
-  ext_list.add(capabilities);
+  ext_list.add(key_id_ext);
 
   auto tree = TreeKEMPublicKey{ suite };
-  tree.add_leaf(key_package);
-  tree.add_leaf(key_package);
+  tree.add_leaf(leaf_node);
+  tree.add_leaf(leaf_node);
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
@@ -803,24 +825,27 @@ MessagesTestVector::create()
   auto public_group_state =
     PublicGroupState{ suite,  group_id, epoch,    opaque,
                       opaque, ext_list, ext_list, hpke_pub };
-  public_group_state.sign(tree, key_package.id(), sig_priv);
+  public_group_state.sign(tree, leaf_node_ref, sig_priv);
 
   // Proposals
   auto add = Add{ key_package };
-  auto update = Update{ key_package };
-  auto remove = Remove{ key_package.id() };
+  auto update = Update{ leaf_node_update };
+  auto remove = Remove{ leaf_node_ref };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };
   auto app_ack = AppAck{ { { index.val, 0, 5 }, { index.val, 7, 10 } } };
 
   // Commit
+  auto proposal_ref = ProposalRef{};
+  proposal_ref.fill(0xa0);
+
   auto commit = Commit{ {
-                          { ProposalRef{ opaque } },
+                          { proposal_ref },
                           { Proposal{ add } },
                         },
                         UpdatePath{
-                          key_package,
+                          leaf_node_commit,
                           {
                             { hpke_pub, { hpke_ct, hpke_ct } },
                             { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
@@ -852,8 +877,6 @@ MessagesTestVector::create()
 
   return MessagesTestVector{
     tls::marshal(key_package),
-    tls::marshal(capabilities),
-    tls::marshal(lifetime),
     tls::marshal(ratchet_tree),
 
     tls::marshal(group_info),
@@ -883,8 +906,6 @@ std::optional<std::string>
 MessagesTestVector::verify() const
 {
   VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package);
-  VERIFY_TLS_RTT("Capabilities", CapabilitiesExtension, capabilities);
-  VERIFY_TLS_RTT("Lifetime", LifetimeExtension, lifetime);
   VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree);
 
   VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info);

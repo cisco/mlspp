@@ -82,6 +82,7 @@ private:
   struct CachedJoin
   {
     mls::HPKEPrivateKey init_priv;
+    mls::HPKEPrivateKey leaf_priv;
     mls::SignaturePrivateKey sig_priv;
     mls::KeyPackage key_package;
   };
@@ -89,6 +90,7 @@ private:
   std::map<uint32_t, CachedJoin> join_cache;
 
   uint32_t store_join(mls::HPKEPrivateKey&& init_priv,
+                      mls::HPKEPrivateKey&& leaf_priv,
                       mls::SignaturePrivateKey&& sig_priv,
                       mls::KeyPackage&& kp);
   CachedJoin* load_join(uint32_t join_id);

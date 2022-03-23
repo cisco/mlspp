@@ -279,7 +279,7 @@ apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
 // } MLSSenderData;
 struct MLSSenderData
 {
-  KeyPackageID sender;
+  LeafNodeRef sender{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   uint32_t generation{ 0 };
   ReuseGuard reuse_guard{ 0, 0, 0, 0 };
 
@@ -341,11 +341,11 @@ GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
     content_keys.key, content_keys.nonce, content_aad, content);
 
   // Encrypt the sender data
-  auto maybe_sender_kp = tree.key_package(index);
-  if (!maybe_sender_kp) {
+  auto maybe_sender_leaf = tree.leaf_node(index);
+  if (!maybe_sender_leaf) {
     throw InvalidParameterError("Attempt to send from blank leaf");
   }
-  auto sender_id = opt::get(maybe_sender_kp).id();
+  auto sender_id = opt::get(maybe_sender_leaf).ref(suite);
   auto sender_data_obj = MLSSenderData{ sender_id, generation, reuse_guard };
   auto sender_data = tls::marshal(sender_data_obj);
 

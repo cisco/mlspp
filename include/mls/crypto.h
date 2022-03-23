@@ -33,6 +33,15 @@ struct KeyAndNonce
   bytes nonce;
 };
 
+// opaque HashReference[16];
+// HashReference KeyPackageRef;
+// HashReference LeafNodeRef;
+// HashReference ProposalRef;
+using HashReference = std::array<uint8_t, 16>;
+using KeyPackageRef = HashReference;
+using LeafNodeRef = HashReference;
+using ProposalRef = HashReference;
+
 struct CipherSuite
 {
   enum struct ID : uint16_t
@@ -67,6 +76,18 @@ struct CipherSuite
                           size_t length) const;
   bytes derive_secret(const bytes& secret, const std::string& label) const;
 
+  template<typename T>
+  HashReference ref(const T& val) const
+  {
+    auto ref = HashReference{};
+    auto marshaled = tls::marshal(val);
+    auto extracted = hpke().kdf.extract({}, marshaled);
+    auto expanded =
+      hpke().kdf.expand(extracted, reference_label<T>(), ref.size());
+    std::copy(expanded.begin(), expanded.end(), ref.begin());
+    return ref;
+  }
+
   TLS_SERIALIZABLE(id)
 
 private:
@@ -80,6 +101,9 @@ private:
   };
 
   const Ciphers& get() const;
+
+  template<typename T>
+  static const bytes& reference_label();
 };
 
 extern const std::array<CipherSuite::ID, 6> all_supported_suites;
