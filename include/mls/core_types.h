@@ -278,12 +278,6 @@ struct ParentNode
 //     // SignWithLabel(., "KeyPackageTBS", KeyPackageTBS)
 //     opaque signature<V>;
 // } KeyPackage;
-struct KeyPackageID
-{
-  bytes id;
-  TLS_SERIALIZABLE(id)
-};
-
 struct KeyPackage
 {
   ProtocolVersion version;
@@ -300,7 +294,7 @@ struct KeyPackage
              ExtensionList extensions_in,
              const SignaturePrivateKey& sig_priv_in);
 
-  KeyPackageID id() const;
+  KeyPackageRef ref() const;
 
   void sign(const SignaturePrivateKey& sig_priv);
   bool verify() const;

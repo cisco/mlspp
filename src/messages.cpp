@@ -171,9 +171,9 @@ Welcome::Welcome(CipherSuite suite,
 std::optional<int>
 Welcome::find(const KeyPackage& kp) const
 {
-  auto id = kp.id();
+  auto ref = kp.ref();
   for (size_t i = 0; i < secrets.size(); i++) {
-    if (id == secrets[i].new_member) {
+    if (ref == secrets[i].new_member) {
       return static_cast<int>(i);
     }
   }
@@ -190,7 +190,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 
   auto gs_data = tls::marshal(gs);
   auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, {}, gs_data);
-  secrets.push_back({ kp.id(), enc_gs });
+  secrets.push_back({ kp.ref(), enc_gs });
 }
 
 GroupInfo

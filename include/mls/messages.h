@@ -104,7 +104,7 @@ struct PSKWithSecret
 //     Extension group_context_extensions<0..2^32-1>;
 //     Extension other_extensions<0..2^32-1>;
 //     HPKEPublicKey external_pub;
-//     KeyPackageID signer;
+//     LeafNodeRef signer;
 //     opaque signature<0..2^16-1>;
 // } PublicGroupState;
 struct PublicGroupState
@@ -226,7 +226,7 @@ struct GroupSecrets
 // } EncryptedGroupSecrets;
 struct EncryptedGroupSecrets
 {
-  KeyPackageID new_member;
+  KeyPackageRef new_member;
   HPKECiphertext encrypted_group_secrets;
 
   TLS_SERIALIZABLE(new_member, encrypted_group_secrets)

@@ -73,6 +73,12 @@ X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
   }
 }
 
+SignatureScheme
+X509Credential::signature_scheme() const
+{
+  return _signature_scheme;
+}
+
 SignaturePublicKey
 X509Credential::public_key() const
 {
