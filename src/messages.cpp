@@ -162,7 +162,7 @@ Welcome::Welcome(CipherSuite suite,
   , cipher_suite(suite)
   , _joiner_secret(std::move(joiner_secret))
 {
-  auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
+  auto [key, nonce] = group_info_key_nonce(suite, _joiner_secret, psks);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info = cipher_suite.hpke().aead.seal(
     key.data(), nonce.data(), {}, group_info_data);

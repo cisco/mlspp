@@ -62,7 +62,7 @@ Secret::data()
 
 Secret::~Secret()
 {
-  std::fill(_data.begin(), _data.end(), 0);
+  std::fill(_data.begin(), _data.end(), uint8_t(0));
 }
 
 Secret
