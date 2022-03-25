@@ -36,9 +36,16 @@ tls_signature_scheme(hpke::Signature::ID id);
 struct Secret
 {
   Secret() = default;
+  Secret(const Secret&) = default;
+  Secret& operator=(const Secret&) = default;
+  Secret(Secret&&) = default;
+  Secret& operator=(Secret&&) = default;
+
   Secret(bytes&& data_in);
   Secret& operator=(bytes&& new_data);
   ~Secret();
+
+  static Secret clone(const bytes& data_in);
 
   bytes& data();
   const bytes& data() const;

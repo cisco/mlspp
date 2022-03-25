@@ -236,7 +236,7 @@ EncryptionTestVector::create(CipherSuite suite,
   tv.tree = tls::marshal(tree);
 
   auto src =
-    GroupKeySource(suite, tree.size(), Secret{ bytes(tv.encryption_secret) });
+    GroupKeySource(suite, tree.size(), Secret::clone(tv.encryption_secret));
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
@@ -374,7 +374,7 @@ KeyScheduleTestVector::create(CipherSuite suite,
       auto secret = Secret{ random_bytes(suite.secret_size()) };
 
       psks.push_back(
-        { PreSharedKeyID{ ExternalPSK{ id }, nonce }, std::move(secret) });
+        { PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
       external_psks.push_back({ id, nonce, secret });
     }
 
@@ -385,9 +385,9 @@ KeyScheduleTestVector::create(CipherSuite suite,
       psks.push_back(psk);
     }
 
-    auto commit_secret = random_bytes(suite.secret_size());
+    auto commit_secret = Secret{ random_bytes(suite.secret_size()) };
     // TODO(RLB) Add Test case for externally-driven epoch change
-    epoch = epoch.next(std::move(commit_secret), psks, std::nullopt, ctx);
+    epoch = epoch.next(commit_secret, psks, std::nullopt, ctx);
 
     auto welcome_secret =
       KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psks);

@@ -251,7 +251,7 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
   auto new_leaf =
     leaf.for_update(_suite, _group_id, public_key, opts, _identity_priv);
 
-  _update_secrets[new_leaf.ref(_suite)] = Secret{ bytes(leaf_secret) };
+  _update_secrets[new_leaf.ref(_suite)] = Secret::clone(leaf_secret);
   return { Update{ new_leaf } };
 }
 
@@ -411,7 +411,7 @@ State::commit(const bytes& leaf_secret,
     auto [new_priv, path] = next._tree.encap(next._index,
                                              next._group_id,
                                              ctx,
-                                             Secret{ bytes(leaf_secret) },
+                                             Secret::clone(leaf_secret),
                                              _identity_priv,
                                              joiner_locations,
                                              leaf_node_opts);
@@ -434,7 +434,7 @@ State::commit(const bytes& leaf_secret,
   auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
   auto pt = next.ratchet_and_sign(sender,
                                   commit,
-                                  std::move(commit_secret),
+                                  commit_secret,
                                   { /* no PSKs */ },
                                   force_init_secret,
                                   encrypt_handshake,

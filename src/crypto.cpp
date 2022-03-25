@@ -65,6 +65,11 @@ Secret::~Secret()
   std::fill(_data.begin(), _data.end(), 0);
 }
 
+Secret
+Secret::clone(const bytes& data_in) {
+  return Secret{ bytes(data_in) };
+}
+
 const bytes&
 Secret::data() const
 {
@@ -346,7 +351,7 @@ HPKEPrivateKey::generate(CipherSuite suite)
 HPKEPrivateKey
 HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  auto priv_data = Secret{ bytes(data) };
+  auto priv_data = Secret::clone(data);
   auto priv = suite.hpke().kem.deserialize_private(priv_data.data());
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
@@ -423,7 +428,7 @@ SignaturePrivateKey::generate(CipherSuite suite)
 SignaturePrivateKey
 SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  auto priv_data = Secret{ bytes(data) };
+  auto priv_data = Secret::clone(data);
   auto priv = suite.sig().deserialize_private(priv_data.data());
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
