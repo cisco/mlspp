@@ -66,7 +66,8 @@ Secret::~Secret()
 }
 
 Secret
-Secret::clone(const bytes& data_in) {
+Secret::clone(const bytes& data_in)
+{
   return Secret{ bytes(data_in) };
 }
 

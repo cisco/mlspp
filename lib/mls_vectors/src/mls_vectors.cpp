@@ -373,8 +373,7 @@ KeyScheduleTestVector::create(CipherSuite suite,
       auto nonce = random_bytes(suite.secret_size());
       auto secret = Secret{ random_bytes(suite.secret_size()) };
 
-      psks.push_back(
-        { PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
+      psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
       external_psks.push_back({ id, nonce, secret });
     }
 
