@@ -155,17 +155,17 @@ Welcome::Welcome()
 {}
 
 Welcome::Welcome(CipherSuite suite,
-                 const bytes& joiner_secret,
+                 Secret joiner_secret,
                  const std::vector<PSKWithSecret>& psks,
                  const GroupInfo& group_info)
   : version(ProtocolVersion::mls10)
   , cipher_suite(suite)
-  , _joiner_secret(joiner_secret)
+  , _joiner_secret(std::move(joiner_secret))
 {
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
   auto group_info_data = tls::marshal(group_info);
-  encrypted_group_info =
-    cipher_suite.hpke().aead.seal(key, nonce, {}, group_info_data);
+  encrypted_group_info = cipher_suite.hpke().aead.seal(
+    key.data(), nonce.data(), {}, group_info_data);
 }
 
 std::optional<int>
@@ -181,7 +181,7 @@ Welcome::find(const KeyPackage& kp) const
 }
 
 void
-Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
+Welcome::encrypt(const KeyPackage& kp, const std::optional<Secret>& path_secret)
 {
   auto gs = GroupSecrets{ _joiner_secret, std::nullopt, {} };
   if (path_secret) {
@@ -194,12 +194,12 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 }
 
 GroupInfo
-Welcome::decrypt(const bytes& joiner_secret,
+Welcome::decrypt(const Secret& joiner_secret,
                  const std::vector<PSKWithSecret>& psks) const
 {
   auto [key, nonce] = group_info_key_nonce(cipher_suite, joiner_secret, psks);
-  auto group_info_data =
-    cipher_suite.hpke().aead.open(key, nonce, {}, encrypted_group_info);
+  auto group_info_data = cipher_suite.hpke().aead.open(
+    key.data(), nonce.data(), {}, encrypted_group_info);
   if (!group_info_data) {
     throw ProtocolError("Welcome decryption failed");
   }
@@ -209,7 +209,7 @@ Welcome::decrypt(const bytes& joiner_secret,
 
 KeyAndNonce
 Welcome::group_info_key_nonce(CipherSuite suite,
-                              const bytes& joiner_secret,
+                              const Secret& joiner_secret,
                               const std::vector<PSKWithSecret>& psks)
 {
   static const auto key_label = from_ascii("key");
@@ -222,9 +222,9 @@ Welcome::group_info_key_nonce(CipherSuite suite,
   // instead, for better domain separation? (In particular, including "mls10")
   // That is what we do for the sender data key/nonce.
   auto key =
-    suite.hpke().kdf.expand(welcome_secret, key_label, suite.key_size());
-  auto nonce =
-    suite.hpke().kdf.expand(welcome_secret, nonce_label, suite.nonce_size());
+    suite.hpke().kdf.expand(welcome_secret.data(), key_label, suite.key_size());
+  auto nonce = suite.hpke().kdf.expand(
+    welcome_secret.data(), nonce_label, suite.nonce_size());
   return { std::move(key), std::move(nonce) };
 }
 

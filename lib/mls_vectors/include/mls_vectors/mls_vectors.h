@@ -23,8 +23,13 @@ struct HexBytes
   HexBytes(bytes data_in)
     : data(std::move(data_in))
   {}
+  HexBytes(mls::Secret secret_in)
+    : data(secret_in.data())
+  {}
+
   operator const bytes&() const { return data; }
   operator bytes&() { return data; }
+  operator mls::Secret() const { return bytes(data); }
 };
 
 bool

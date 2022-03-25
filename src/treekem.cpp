@@ -104,10 +104,10 @@ TreeKEMPrivateKey
 TreeKEMPrivateKey::create(CipherSuite suite,
                           LeafCount size,
                           LeafIndex index,
-                          const bytes& leaf_secret)
+                          Secret leaf_secret)
 {
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
-  priv.implant(NodeIndex(index), size, leaf_secret);
+  priv.implant(NodeIndex(index), size, std::move(leaf_secret));
   return priv;
 }
 
@@ -117,12 +117,12 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
                           LeafIndex index,
                           HPKEPrivateKey leaf_priv,
                           NodeIndex intersect,
-                          const std::optional<bytes>& path_secret)
+                          std::optional<Secret>&& path_secret)
 {
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
   priv.private_key_cache.insert({ NodeIndex(index), std::move(leaf_priv) });
   if (path_secret) {
-    priv.implant(intersect, size, opt::get(path_secret));
+    priv.implant(intersect, size, std::move(opt::get(path_secret)));
   }
   return priv;
 }
@@ -130,7 +130,7 @@ TreeKEMPrivateKey::joiner(CipherSuite suite,
 void
 TreeKEMPrivateKey::implant(NodeIndex start,
                            LeafCount size,
-                           const bytes& path_secret)
+                           Secret&& path_secret)
 {
   auto n = start;
   auto r = tree_math::root(size);
@@ -141,7 +141,7 @@ TreeKEMPrivateKey::implant(NodeIndex start,
     private_key_cache.erase(n);
 
     n = tree_math::parent(n, size);
-    secret = suite.derive_secret(secret, "path");
+    secret = suite.derive_secret(secret.data(), "path");
   }
 
   path_secrets[r] = secret;
@@ -162,7 +162,7 @@ TreeKEMPrivateKey::private_key(NodeIndex n) const
     return std::nullopt;
   }
 
-  auto node_secret = suite.derive_secret(i->second, "node");
+  auto node_secret = suite.derive_secret(i->second.data(), "node");
   return HPKEPrivateKey::derive(suite, node_secret);
 }
 
@@ -185,12 +185,12 @@ TreeKEMPrivateKey::private_key(NodeIndex n)
 }
 
 void
-TreeKEMPrivateKey::set_leaf_secret(const bytes& secret)
+TreeKEMPrivateKey::set_leaf_secret(Secret secret)
 {
-  path_secrets[NodeIndex(index)] = secret;
+  path_secrets[NodeIndex(index)] = std::move(secret);
 }
 
-std::tuple<NodeIndex, bytes, bool>
+std::tuple<NodeIndex, Secret, bool>
 TreeKEMPrivateKey::shared_path_secret(LeafIndex to) const
 {
   auto n = tree_math::ancestor(index, to);
@@ -312,7 +312,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   auto priv = opt::get(private_key(res[resi]));
   auto path_secret = priv.decrypt(
     suite, context, {}, path.nodes[dpi].encrypted_path_secret[resi]);
-  implant(overlap_node, LeafCount(size), path_secret);
+  implant(overlap_node, LeafCount(size), std::move(path_secret));
 }
 
 void
@@ -612,7 +612,7 @@ std::tuple<TreeKEMPrivateKey, UpdatePath>
 TreeKEMPublicKey::encap(LeafIndex from,
                         const bytes& group_id,
                         const bytes& context,
-                        const bytes& leaf_secret,
+                        Secret leaf_secret,
                         const SignaturePrivateKey& sig_priv,
                         const std::vector<LeafIndex>& except,
                         const LeafNodeOptions& opts)
@@ -624,7 +624,8 @@ TreeKEMPublicKey::encap(LeafIndex from,
   }
 
   // Generate path secrets
-  auto priv = TreeKEMPrivateKey::create(suite, size(), from, leaf_secret);
+  auto priv =
+    TreeKEMPrivateKey::create(suite, size(), from, std::move(leaf_secret));
 
   // Encrypt path secrets to the copath
   auto last = NodeIndex(from);
@@ -639,7 +640,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
     remove_leaves(res, except);
     for (auto nr : res) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
-      auto ct = node_pub.encrypt(suite, context, {}, path_secret);
+      auto ct = node_pub.encrypt(suite, context, {}, path_secret.data());
       node.encrypted_path_secret.push_back(ct);
     }
 

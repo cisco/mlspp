@@ -1,5 +1,7 @@
 #include <mls/state.h>
 
+#include <iostream>
+
 namespace mls {
 
 ///
@@ -163,13 +165,17 @@ State::State(const HPKEPrivateKey& init_priv,
 
   auto signer_index = opt::get(_tree.find(group_info.signer));
   auto ancestor = tree_math::ancestor(_index, signer_index);
-  auto path_secret = std::optional<bytes>{};
+  auto path_secret = std::optional<Secret>{};
   if (secrets.path_secret) {
-    path_secret = opt::get(secrets.path_secret).secret;
+    path_secret = opt::get(secrets.path_secret);
   }
 
-  _tree_priv = TreeKEMPrivateKey::joiner(
-    _suite, _tree.size(), _index, std::move(leaf_priv), ancestor, path_secret);
+  _tree_priv = TreeKEMPrivateKey::joiner(_suite,
+                                         _tree.size(),
+                                         _index,
+                                         std::move(leaf_priv),
+                                         ancestor,
+                                         std::move(path_secret));
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
@@ -245,7 +251,7 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
   auto new_leaf =
     leaf.for_update(_suite, _group_id, public_key, opts, _identity_priv);
 
-  _update_secrets[new_leaf.ref(_suite)] = leaf_secret;
+  _update_secrets[new_leaf.ref(_suite)] = Secret{ bytes(leaf_secret) };
   return { Update{ new_leaf } };
 }
 
@@ -353,11 +359,11 @@ State::commit(const bytes& leaf_secret,
     throw InvalidParameterError("Malformed external commit parameters");
   }
 
-  auto force_init_secret = std::optional<bytes>{};
+  auto force_init_secret = std::optional<Secret>{};
   if (external_commit) {
     auto [enc, exported] =
       KeyScheduleEpoch::external_init(_suite, opt::get(external_pub));
-    force_init_secret = exported;
+    force_init_secret = std::move(exported);
     commit.proposals.push_back({ Proposal{ ExternalInit{ enc } } });
   }
 
@@ -385,9 +391,9 @@ State::commit(const bytes& leaf_secret,
   auto no_proposals = commit.proposals.empty();
   auto path_required =
     has_updates || has_removes || no_proposals || external_commit;
-  auto commit_secret = _suite.zero();
+  auto commit_secret = Secret{ _suite.zero() };
   auto path_secrets =
-    std::vector<std::optional<bytes>>(joiner_locations.size());
+    std::vector<std::optional<Secret>>(joiner_locations.size());
   if (path_required) {
     auto ctx = tls::marshal(GroupContext{
       next._group_id,
@@ -405,7 +411,7 @@ State::commit(const bytes& leaf_secret,
     auto [new_priv, path] = next._tree.encap(next._index,
                                              next._group_id,
                                              ctx,
-                                             leaf_secret,
+                                             Secret{ bytes(leaf_secret) },
                                              _identity_priv,
                                              joiner_locations,
                                              leaf_node_opts);
@@ -428,7 +434,7 @@ State::commit(const bytes& leaf_secret,
   auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
   auto pt = next.ratchet_and_sign(sender,
                                   commit,
-                                  commit_secret,
+                                  std::move(commit_secret),
                                   { /* no PSKs */ },
                                   force_init_secret,
                                   encrypt_handshake,
@@ -475,9 +481,9 @@ State::group_context() const
 MLSPlaintext
 State::ratchet_and_sign(const Sender& sender,
                         const Commit& op,
-                        const bytes& commit_secret,
+                        const Secret& commit_secret,
                         const std::vector<PSKWithSecret>& psks,
-                        const std::optional<bytes>& force_init_secret,
+                        const std::optional<Secret>& force_init_secret,
                         bool encrypt_handshake,
                         const GroupContext& prev_ctx)
 {
@@ -560,7 +566,7 @@ State::handle(const MLSPlaintext& pt)
 
   // If this is an external Commit, then its direct proposals must meet certain
   // constraints, and we need to identify the sender's location in the new tree.
-  auto force_init_secret = std::optional<bytes>{};
+  auto force_init_secret = std::optional<Secret>{};
   auto sender_location = LeafIndex{ 0 };
   if (sender) {
     sender_location = opt::get(sender);
@@ -600,7 +606,7 @@ State::handle(const MLSPlaintext& pt)
 
   // Decapsulate and apply the UpdatePath, if provided
   // TODO(RLB) Verify that path is provided if required
-  auto commit_secret = _suite.zero();
+  auto commit_secret = Secret{ _suite.zero() };
   if (commit.path) {
     const auto& path = opt::get(commit.path);
 
@@ -625,7 +631,7 @@ State::handle(const MLSPlaintext& pt)
     next._tree_priv.decap(
       sender_location, next._tree, ctx, path, joiner_locations);
     next._tree.merge(sender_location, path);
-    commit_secret = next._tree_priv.update_secret;
+    commit_secret = std::move(next._tree_priv.update_secret);
   }
 
   // Update the transcripts and advance the key schedule
@@ -711,10 +717,10 @@ State::apply(LeafIndex target, const Update& update)
 }
 
 void
-State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
+State::apply(LeafIndex target, const Update& update, Secret&& leaf_secret)
 {
   _tree.update_leaf(target, update.leaf_node);
-  _tree_priv.set_leaf_secret(leaf_secret);
+  _tree_priv.set_leaf_secret(std::move(leaf_secret));
 }
 
 LeafIndex
@@ -844,7 +850,8 @@ State::apply(const std::vector<CachedProposal>& proposals,
           throw ProtocolError("Self-update with no cached secret");
         }
 
-        apply(target, update, _update_secrets[cached.ref]);
+        apply(target, update, std::move(_update_secrets.at(ref)));
+        _update_secrets.erase(ref);
         locations.push_back(target);
         break;
       }
@@ -946,9 +953,9 @@ operator!=(const State& lhs, const State& rhs)
 }
 
 void
-State::update_epoch_secrets(const bytes& commit_secret,
+State::update_epoch_secrets(const Secret& commit_secret,
                             const std::vector<PSKWithSecret>& psks,
-                            const std::optional<bytes>& force_init_secret)
+                            const std::optional<Secret>& force_init_secret)
 {
   auto ctx = tls::marshal(GroupContext{
     _group_id,
@@ -1047,7 +1054,7 @@ State::do_export(const std::string& label,
                  const bytes& context,
                  size_t size) const
 {
-  return _key_schedule.do_export(label, context, size);
+  return _key_schedule.do_export(label, context, size).data();
 }
 
 PublicGroupState
@@ -1090,7 +1097,9 @@ State::roster() const
 bytes
 State::authentication_secret() const
 {
-  return _key_schedule.authentication_secret;
+  // It's OK to copy out this secret because it is intended to be shared outside
+  // the MLS envelope to confirm agreement.
+  return _key_schedule.authentication_secret.data();
 }
 
 MLSCiphertext

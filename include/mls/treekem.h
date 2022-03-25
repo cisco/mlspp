@@ -72,8 +72,8 @@ struct TreeKEMPrivateKey
 {
   CipherSuite suite;
   LeafIndex index;
-  bytes update_secret;
-  std::map<NodeIndex, bytes> path_secrets;
+  Secret update_secret;
+  std::map<NodeIndex, Secret> path_secrets;
   std::map<NodeIndex, HPKEPrivateKey> private_key_cache;
 
   static TreeKEMPrivateKey solo(CipherSuite suite,
@@ -82,16 +82,16 @@ struct TreeKEMPrivateKey
   static TreeKEMPrivateKey create(CipherSuite suite,
                                   LeafCount size,
                                   LeafIndex index,
-                                  const bytes& leaf_secret);
+                                  Secret leaf_secret);
   static TreeKEMPrivateKey joiner(CipherSuite suite,
                                   LeafCount size,
                                   LeafIndex index,
                                   HPKEPrivateKey leaf_priv,
                                   NodeIndex intersect,
-                                  const std::optional<bytes>& path_secret);
+                                  std::optional<Secret>&& path_secret);
 
-  void set_leaf_secret(const bytes& secret);
-  std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
+  void set_leaf_secret(Secret secret);
+  std::tuple<NodeIndex, Secret, bool> shared_path_secret(LeafIndex to) const;
 
   bool have_private_key(NodeIndex n) const;
   std::optional<HPKEPrivateKey> private_key(NodeIndex n);
@@ -111,7 +111,7 @@ struct TreeKEMPrivateKey
   void dump() const;
 
 private:
-  void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
+  void implant(NodeIndex start, LeafCount size, Secret&& path_secret);
 };
 
 struct TreeKEMPublicKey
@@ -149,7 +149,7 @@ struct TreeKEMPublicKey
     LeafIndex from,
     const bytes& group_id,
     const bytes& context,
-    const bytes& leaf_secret,
+    Secret leaf_secret,
     const SignaturePrivateKey& sig_priv,
     const std::vector<LeafIndex>& except,
     const LeafNodeOptions& opts);

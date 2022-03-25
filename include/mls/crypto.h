@@ -25,13 +25,45 @@ enum struct SignatureScheme : uint16_t
 SignatureScheme
 tls_signature_scheme(hpke::Signature::ID id);
 
-/// Cipher suites
+/// Secrets and Keys
+
+// Secret encapsulates a value that (a) should not be copied and (b) should be
+// zeroized before destruction.  The raw bytes can be accessed using the data()
+// method.  This is required for input into cryptographic operations, but should
+// not be used to copy out the value.
+//
+// TODO(rlb): Move method bodies to .cpp
+struct Secret
+{
+  Secret() = default;
+  Secret(bytes&& data_in);
+  Secret& operator=(bytes&& new_data);
+  ~Secret();
+
+  bytes& data();
+  const bytes& data() const;
+
+  bool operator==(const Secret& other) const;
+  bool operator!=(const Secret& other) const;
+
+private:
+  bytes _data;
+
+  friend tls::istream& operator>>(tls::istream& str, Secret& obj);
+};
+
+tls::ostream&
+operator<<(tls::ostream& str, const Secret& obj);
+tls::istream&
+operator>>(tls::istream& str, Secret& obj);
 
 struct KeyAndNonce
 {
-  bytes key;
-  bytes nonce;
+  Secret key;
+  Secret nonce;
 };
+
+/// Cipher suites
 
 // opaque HashReference[16];
 // HashReference KeyPackageRef;
@@ -132,10 +164,10 @@ struct HPKEPublicKey
                          const bytes& aad,
                          const bytes& pt) const;
 
-  std::tuple<bytes, bytes> do_export(CipherSuite suite,
-                                     const bytes& info,
-                                     const std::string& label,
-                                     size_t size) const;
+  std::tuple<bytes, Secret> do_export(CipherSuite suite,
+                                      const bytes& info,
+                                      const std::string& label,
+                                      size_t size) const;
 
   TLS_SERIALIZABLE(data)
 };
@@ -148,7 +180,7 @@ struct HPKEPrivateKey
 
   HPKEPrivateKey() = default;
 
-  bytes data;
+  Secret data;
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
@@ -165,7 +197,7 @@ struct HPKEPrivateKey
   TLS_SERIALIZABLE(data, public_key)
 
 private:
-  HPKEPrivateKey(bytes priv_data, bytes pub_data);
+  HPKEPrivateKey(Secret priv_data, bytes pub_data);
 };
 
 // Signature Keys
@@ -186,7 +218,7 @@ struct SignaturePrivateKey
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
 
-  bytes data;
+  Secret data;
   SignaturePublicKey public_key;
 
   bytes sign(const CipherSuite& suite, const bytes& message) const;
@@ -194,7 +226,7 @@ struct SignaturePrivateKey
   TLS_SERIALIZABLE(data, public_key)
 
 private:
-  SignaturePrivateKey(bytes priv_data, bytes pub_data);
+  SignaturePrivateKey(Secret priv_data, bytes pub_data);
 };
 
 } // namespace mls

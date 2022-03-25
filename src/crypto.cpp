@@ -40,6 +40,62 @@ tls_signature_scheme(Signature::ID id)
 }
 
 ///
+/// Secrets
+///
+
+Secret::Secret(bytes&& data_in)
+  : _data(data_in)
+{}
+
+Secret&
+Secret::operator=(bytes&& new_data)
+{
+  _data = new_data;
+  return *this;
+}
+
+bytes&
+Secret::data()
+{
+  return _data;
+}
+
+Secret::~Secret()
+{
+  std::fill(_data.begin(), _data.end(), 0);
+}
+
+const bytes&
+Secret::data() const
+{
+  return _data;
+}
+
+bool
+Secret::operator==(const Secret& other) const
+{
+  return _data == other._data;
+}
+
+bool
+Secret::operator!=(const Secret& other) const
+{
+  return !(*this == other);
+}
+
+tls::ostream&
+operator<<(tls::ostream& str, const Secret& obj)
+{
+  return str << obj.data();
+}
+
+tls::istream&
+operator>>(tls::istream& str, Secret& obj)
+{
+  return str >> obj._data;
+}
+
+///
 /// CipherSuites and details
 ///
 
@@ -263,7 +319,7 @@ HPKEPublicKey::encrypt(CipherSuite suite,
   return HPKECiphertext{ enc, ct };
 }
 
-std::tuple<bytes, bytes>
+std::tuple<bytes, Secret>
 HPKEPublicKey::do_export(CipherSuite suite,
                          const bytes& info,
                          const std::string& label,
@@ -273,7 +329,7 @@ HPKEPublicKey::do_export(CipherSuite suite,
 
   auto pkR = suite.hpke().kem.deserialize(data);
   auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
-  auto exported = ctx.do_export(label_data, size);
+  auto exported = Secret{ ctx.do_export(label_data, size) };
   return std::make_tuple(enc, exported);
 }
 
@@ -281,29 +337,30 @@ HPKEPrivateKey
 HPKEPrivateKey::generate(CipherSuite suite)
 {
   auto priv = suite.hpke().kem.generate_key_pair();
-  auto priv_data = suite.hpke().kem.serialize_private(*priv);
+  auto priv_data = Secret{ suite.hpke().kem.serialize_private(*priv) };
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return { priv_data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 HPKEPrivateKey
 HPKEPrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  auto priv = suite.hpke().kem.deserialize_private(data);
+  auto priv_data = Secret{ bytes(data) };
+  auto priv = suite.hpke().kem.deserialize_private(priv_data.data());
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return { data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 HPKEPrivateKey
 HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto priv = suite.hpke().kem.derive_key_pair(secret);
-  auto priv_data = suite.hpke().kem.serialize_private(*priv);
+  auto priv_data = Secret{ suite.hpke().kem.serialize_private(*priv) };
   auto pub = priv->public_key();
   auto pub_data = suite.hpke().kem.serialize(*pub);
-  return { priv_data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 bytes
@@ -312,7 +369,7 @@ HPKEPrivateKey::decrypt(CipherSuite suite,
                         const bytes& aad,
                         const HPKECiphertext& ct) const
 {
-  auto skR = suite.hpke().kem.deserialize_private(data);
+  auto skR = suite.hpke().kem.deserialize_private(data.data());
   auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, info);
   auto pt = ctx.open(aad, ct.ciphertext);
   if (!pt) {
@@ -331,12 +388,12 @@ HPKEPrivateKey::do_export(CipherSuite suite,
 {
   auto label_data = bytes(label.begin(), label.end());
 
-  auto skR = suite.hpke().kem.deserialize_private(data);
+  auto skR = suite.hpke().kem.deserialize_private(data.data());
   auto ctx = suite.hpke().setup_base_r(kem_output, *skR, info);
   return ctx.do_export(label_data, size);
 }
 
-HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
+HPKEPrivateKey::HPKEPrivateKey(Secret priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
 {}
@@ -357,39 +414,40 @@ SignaturePrivateKey
 SignaturePrivateKey::generate(CipherSuite suite)
 {
   auto priv = suite.sig().generate_key_pair();
-  auto priv_data = suite.sig().serialize_private(*priv);
+  auto priv_data = Secret{ suite.sig().serialize_private(*priv) };
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return { priv_data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 SignaturePrivateKey
 SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 {
-  auto priv = suite.sig().deserialize_private(data);
+  auto priv_data = Secret{ bytes(data) };
+  auto priv = suite.sig().deserialize_private(priv_data.data());
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return { data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 SignaturePrivateKey
 SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto priv = suite.sig().derive_key_pair(secret);
-  auto priv_data = suite.sig().serialize_private(*priv);
+  auto priv_data = Secret{ suite.sig().serialize_private(*priv) };
   auto pub = priv->public_key();
   auto pub_data = suite.sig().serialize(*pub);
-  return { priv_data, pub_data };
+  return { std::move(priv_data), std::move(pub_data) };
 }
 
 bytes
 SignaturePrivateKey::sign(const CipherSuite& suite, const bytes& message) const
 {
-  auto priv = suite.sig().deserialize_private(data);
+  auto priv = suite.sig().deserialize_private(data.data());
   return suite.sig().sign(message, *priv);
 }
 
-SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
+SignaturePrivateKey::SignaturePrivateKey(Secret priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
 {}

@@ -92,7 +92,7 @@ struct PreSharedKeys
 struct PSKWithSecret
 {
   PreSharedKeyID id;
-  bytes secret;
+  Secret secret;
 };
 
 // struct {
@@ -206,15 +206,8 @@ public:
 // } GroupSecrets;
 struct GroupSecrets
 {
-  struct PathSecret
-  {
-    bytes secret;
-
-    TLS_SERIALIZABLE(secret)
-  };
-
-  bytes joiner_secret;
-  std::optional<PathSecret> path_secret;
+  Secret joiner_secret;
+  std::optional<Secret> path_secret;
   PreSharedKeys psks;
 
   TLS_SERIALIZABLE(joiner_secret, path_secret, psks)
@@ -247,22 +240,22 @@ struct Welcome
 
   Welcome();
   Welcome(CipherSuite suite,
-          const bytes& joiner_secret,
+          Secret joiner_secret,
           const std::vector<PSKWithSecret>& psks,
           const GroupInfo& group_info);
 
-  void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
+  void encrypt(const KeyPackage& kp, const std::optional<Secret>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
-  GroupInfo decrypt(const bytes& joiner_secret,
+  GroupInfo decrypt(const Secret& joiner_secret,
                     const std::vector<PSKWithSecret>& psks) const;
 
   TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
 
 private:
-  bytes _joiner_secret;
+  Secret _joiner_secret;
   static KeyAndNonce group_info_key_nonce(
     CipherSuite suite,
-    const bytes& joiner_secret,
+    const Secret& joiner_secret,
     const std::vector<PSKWithSecret>& psks);
 };
 

@@ -169,7 +169,7 @@ protected:
     std::optional<LeafIndex> sender;
   };
   std::list<CachedProposal> _pending_proposals;
-  std::map<LeafNodeRef, bytes> _update_secrets;
+  std::map<LeafNodeRef, Secret> _update_secrets;
 
   // Assemble a preliminary, unjoined group state
   State(SignaturePrivateKey sig_priv,
@@ -192,9 +192,9 @@ protected:
   // transition
   MLSPlaintext ratchet_and_sign(const Sender& sender,
                                 const Commit& op,
-                                const bytes& commit_secret,
+                                const Secret& commit_secret,
                                 const std::vector<PSKWithSecret>& psks,
-                                const std::optional<bytes>& force_init_secret,
+                                const std::optional<Secret>& force_init_secret,
                                 bool encrypt_handshake,
                                 const GroupContext& prev_ctx);
 
@@ -209,7 +209,7 @@ protected:
                               LeafNodeSource required_source) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
+  void apply(LeafIndex target, const Update& update, Secret&& leaf_secret);
   LeafIndex apply(const Remove& remove);
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
@@ -235,9 +235,9 @@ protected:
   friend bool operator!=(const State& lhs, const State& rhs);
 
   // Derive and set the secrets for an epoch, given some new entropy
-  void update_epoch_secrets(const bytes& commit_secret,
+  void update_epoch_secrets(const Secret& commit_secret,
                             const std::vector<PSKWithSecret>& psks,
-                            const std::optional<bytes>& force_init_secret);
+                            const std::optional<Secret>& force_init_secret);
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSPlaintext& pt) const;

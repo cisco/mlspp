@@ -6,15 +6,6 @@ static const auto log_mod = "key_schedule"s;
 
 namespace mls {
 
-static void
-zeroize(bytes& data) // NOLINT(google-runtime-references)
-{
-  for (auto& val : data) {
-    val = 0;
-  }
-  data.resize(0);
-}
-
 ///
 /// Key Derivation Functions
 ///
@@ -27,19 +18,19 @@ struct TreeContext
   TLS_SERIALIZABLE(node, generation)
 };
 
-static bytes
+static Secret
 derive_tree_secret(CipherSuite suite,
-                   const bytes& secret,
+                   const Secret& secret,
                    const std::string& label,
                    NodeIndex node,
                    uint32_t generation,
                    size_t length)
 {
   auto ctx = tls::marshal(TreeContext{ node, generation });
-  auto derived = suite.expand_with_label(secret, label, ctx, length);
+  auto derived = suite.expand_with_label(secret.data(), label, ctx, length);
 
   Log::crypto(log_mod, "=== DeriveTreeSecret ===");
-  Log::crypto(log_mod, "  secret       ", to_hex(secret));
+  Log::crypto(log_mod, "  secret       ", to_hex(secret.data()));
   Log::crypto(log_mod, "  label        ", label);
   Log::crypto(log_mod, "  node         ", node.val);
   Log::crypto(log_mod, "  generation   ", generation);
@@ -54,7 +45,7 @@ derive_tree_secret(CipherSuite suite,
 
 HashRatchet::HashRatchet(CipherSuite suite_in,
                          NodeIndex node_in,
-                         bytes base_secret_in)
+                         Secret&& base_secret_in)
   : suite(suite_in)
   , node(node_in)
   , next_secret(std::move(base_secret_in))
@@ -77,10 +68,9 @@ HashRatchet::next()
   auto generation = next_generation;
 
   next_generation += 1;
-  zeroize(next_secret);
-  next_secret = secret;
+  next_secret = std::move(secret);
 
-  cache[generation] = { key, nonce };
+  cache[generation] = { std::move(key), std::move(nonce) };
   return { generation, cache[generation] };
 }
 
@@ -116,8 +106,6 @@ HashRatchet::erase(uint32_t generation)
     return;
   }
 
-  zeroize(cache[generation].key);
-  zeroize(cache[generation].nonce);
   cache.erase(generation);
 }
 
@@ -127,17 +115,17 @@ HashRatchet::erase(uint32_t generation)
 
 SecretTree::SecretTree(CipherSuite suite_in,
                        LeafCount group_size_in,
-                       bytes encryption_secret_in)
+                       Secret&& encryption_secret_in)
   : suite(suite_in)
   , root(tree_math::root(group_size_in))
   , group_size(group_size_in)
   , secrets(NodeCount{ group_size }.val)
   , secret_size(suite_in.secret_size())
 {
-  secrets[root.val] = std::move(encryption_secret_in);
+  secrets[root.val] = encryption_secret_in;
 }
 
-bytes
+Secret
 SecretTree::get(LeafIndex sender)
 {
   auto node = NodeIndex(sender);
@@ -148,7 +136,7 @@ SecretTree::get(LeafIndex sender)
   dirpath.push_back(root);
   uint32_t curr = 0;
   for (; curr < dirpath.size(); ++curr) {
-    if (!secrets[dirpath[curr].val].empty()) {
+    if (!secrets[dirpath[curr].val].data().empty()) {
       break;
     }
   }
@@ -173,9 +161,9 @@ SecretTree::get(LeafIndex sender)
   // Copy the leaf
   auto out = secrets[node.val];
 
-  // Zeroize along the direct path
+  // Erase along the direct path
   for (auto i : dirpath) {
-    zeroize(secrets[i.val]);
+    secrets[i.val] = Secret{};
   }
 
   return out;
@@ -187,7 +175,7 @@ SecretTree::get(LeafIndex sender)
 
 GroupKeySource::GroupKeySource(CipherSuite suite_in,
                                LeafCount group_size,
-                               bytes encryption_secret)
+                               Secret&& encryption_secret)
   : suite(suite_in)
   , secret_tree(suite, group_size, std::move(encryption_secret))
 {}
@@ -206,15 +194,15 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
 
   auto handshake_secret = derive_tree_secret(
     suite, leaf_secret, "handshake", sender_node, 0, secret_size);
-  chains.emplace(
-    std::make_pair(Key{ RatchetType::handshake, sender },
-                   HashRatchet{ suite, sender_node, handshake_secret }));
+  chains.emplace(std::make_pair(
+    Key{ RatchetType::handshake, sender },
+    HashRatchet{ suite, sender_node, std::move(handshake_secret) }));
 
   auto application_secret = derive_tree_secret(
     suite, leaf_secret, "application", sender_node, 0, secret_size);
-  chains.emplace(
-    std::make_pair(Key{ RatchetType::application, sender },
-                   HashRatchet{ suite, sender_node, application_secret }));
+  chains.emplace(std::make_pair(
+    Key{ RatchetType::application, sender },
+    HashRatchet{ suite, sender_node, std::move(application_secret) }));
 
   return chains[key];
 }
@@ -303,7 +291,7 @@ struct MLSSenderDataAAD
 MLSCiphertext
 GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
                         LeafIndex index,
-                        const bytes& sender_data_secret,
+                        const Secret& sender_data_secret,
                         const MLSPlaintext& pt)
 {
   if (pt.wire_format != WireFormat::mls_ciphertext) {
@@ -335,10 +323,10 @@ GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
     pt.group_id, pt.epoch, content_type_val, pt.authenticated_data });
 
   auto reuse_guard = new_reuse_guard();
-  apply_reuse_guard(reuse_guard, content_keys.nonce);
+  apply_reuse_guard(reuse_guard, content_keys.nonce.data());
 
   auto content_ct = suite.hpke().aead.seal(
-    content_keys.key, content_keys.nonce, content_aad, content);
+    content_keys.key.data(), content_keys.nonce.data(), content_aad, content);
 
   // Encrypt the sender data
   auto maybe_sender_leaf = tree.leaf_node(index);
@@ -354,8 +342,11 @@ GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, content_type_val });
 
-  auto encrypted_sender_data = suite.hpke().aead.seal(
-    sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
+  auto encrypted_sender_data =
+    suite.hpke().aead.seal(sender_data_keys.key.data(),
+                           sender_data_keys.nonce.data(),
+                           sender_data_aad,
+                           sender_data);
 
   // Assemble the MLSCiphertext
   return MLSCiphertext{
@@ -371,7 +362,7 @@ GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
 
 MLSPlaintext
 GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
-                        const bytes& sender_data_secret,
+                        const Secret& sender_data_secret,
                         const MLSCiphertext& ct)
 {
   // Decrypt and parse the sender data
@@ -379,8 +370,8 @@ GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
     suite, sender_data_secret, ct.ciphertext);
   auto sender_data_aad =
     tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
-  auto sender_data_pt = suite.hpke().aead.open(sender_data_keys.key,
-                                               sender_data_keys.nonce,
+  auto sender_data_pt = suite.hpke().aead.open(sender_data_keys.key.data(),
+                                               sender_data_keys.nonce.data(),
                                                sender_data_aad,
                                                ct.encrypted_sender_data);
   if (!sender_data_pt) {
@@ -413,7 +404,7 @@ GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
 
   auto content_keys = get(key_type, sender, sender_data.generation);
   erase(key_type, sender, sender_data.generation);
-  apply_reuse_guard(sender_data.reuse_guard, content_keys.nonce);
+  apply_reuse_guard(sender_data.reuse_guard, content_keys.nonce.data());
 
   // Compute the plaintext AAD and decrypt
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
@@ -422,8 +413,10 @@ GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
     ct.content_type,
     ct.authenticated_data,
   });
-  auto content = suite.hpke().aead.open(
-    content_keys.key, content_keys.nonce, content_aad, ct.ciphertext);
+  auto content = suite.hpke().aead.open(content_keys.key.data(),
+                                        content_keys.nonce.data(),
+                                        content_aad,
+                                        ct.ciphertext);
   if (!content) {
     throw ProtocolError("Content decryption failed");
   }
@@ -457,7 +450,8 @@ make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
   auto count = uint16_t(psks.size());
   auto index = uint16_t(0);
   for (const auto& psk : psks) {
-    auto psk_extracted = suite.hpke().kdf.extract(suite.zero(), psk.secret);
+    auto psk_extracted =
+      suite.hpke().kdf.extract(suite.zero(), psk.secret.data());
     auto psk_label = tls::marshal(PSKLabel{ psk.id, index, count });
     auto psk_input = suite.expand_with_label(
       psk_extracted, "derived psk", psk_label, suite.secret_size());
@@ -470,27 +464,29 @@ make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
 static bytes
 make_joiner_secret(CipherSuite suite,
                    const bytes& context,
-                   const bytes& init_secret,
-                   const bytes& commit_secret)
+                   const Secret& init_secret,
+                   const Secret& commit_secret)
 {
-  auto pre_joiner_secret = suite.hpke().kdf.extract(init_secret, commit_secret);
+  auto pre_joiner_secret =
+    suite.hpke().kdf.extract(init_secret.data(), commit_secret.data());
   return suite.expand_with_label(
     pre_joiner_secret, "joiner", context, suite.secret_size());
 }
 
 static bytes
 make_epoch_secret(CipherSuite suite,
-                  const bytes& joiner_secret,
-                  const bytes& psk_secret,
+                  const Secret& joiner_secret,
+                  const Secret& psk_secret,
                   const bytes& context)
 {
-  auto member_secret = suite.hpke().kdf.extract(joiner_secret, psk_secret);
+  auto member_secret =
+    suite.hpke().kdf.extract(joiner_secret.data(), psk_secret.data());
   return suite.expand_with_label(
     member_secret, "epoch", context, suite.secret_size());
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
-                                   const bytes& joiner_secret,
+                                   const Secret& joiner_secret,
                                    const std::vector<PSKWithSecret>& psks,
                                    const bytes& context)
   : suite(suite_in)
@@ -498,16 +494,17 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , psk_secret(make_psk_secret(suite_in, psks))
   , epoch_secret(
       make_epoch_secret(suite_in, joiner_secret, psk_secret, context))
-  , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
-  , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
-  , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))
-  , authentication_secret(suite.derive_secret(epoch_secret, "authentication"))
-  , external_secret(suite.derive_secret(epoch_secret, "external"))
-  , confirmation_key(suite.derive_secret(epoch_secret, "confirm"))
-  , membership_key(suite.derive_secret(epoch_secret, "membership"))
-  , resumption_secret(suite.derive_secret(epoch_secret, "resumption"))
-  , init_secret(suite.derive_secret(epoch_secret, "init"))
-  , external_priv(HPKEPrivateKey::derive(suite, external_secret))
+  , sender_data_secret(suite.derive_secret(epoch_secret.data(), "sender data"))
+  , encryption_secret(suite.derive_secret(epoch_secret.data(), "encryption"))
+  , exporter_secret(suite.derive_secret(epoch_secret.data(), "exporter"))
+  , authentication_secret(
+      suite.derive_secret(epoch_secret.data(), "authentication"))
+  , external_secret(suite.derive_secret(epoch_secret.data(), "external"))
+  , confirmation_key(suite.derive_secret(epoch_secret.data(), "confirm"))
+  , membership_key(suite.derive_secret(epoch_secret.data(), "membership"))
+  , resumption_secret(suite.derive_secret(epoch_secret.data(), "resumption"))
+  , init_secret(suite.derive_secret(epoch_secret.data(), "init"))
+  , external_priv(HPKEPrivateKey::derive(suite, external_secret.data()))
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
@@ -515,7 +512,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
-                                   const bytes& init_secret,
+                                   const Secret& init_secret,
                                    const bytes& context)
   : KeyScheduleEpoch(
       suite_in,
@@ -525,8 +522,8 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
 {}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
-                                   const bytes& init_secret,
-                                   const bytes& commit_secret,
+                                   const Secret& init_secret,
+                                   const Secret& commit_secret,
                                    const std::vector<PSKWithSecret>& psks,
                                    const bytes& context)
   : KeyScheduleEpoch(
@@ -536,16 +533,17 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
       context)
 {}
 
-std::tuple<bytes, bytes>
+std::tuple<bytes, Secret>
 KeyScheduleEpoch::external_init(CipherSuite suite,
                                 const HPKEPublicKey& external_pub)
 {
   auto size = suite.secret_size();
-  return external_pub.do_export(
-    suite, {}, "MLS 1.0 external init secret", size);
+  auto [enc, secret] =
+    external_pub.do_export(suite, {}, "MLS 1.0 external init secret", size);
+  return std::make_tuple(enc, std::move(secret));
 }
 
-bytes
+Secret
 KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
 {
   auto size = suite.secret_size();
@@ -554,9 +552,9 @@ KeyScheduleEpoch::receive_external_init(const bytes& kem_output) const
 }
 
 KeyScheduleEpoch
-KeyScheduleEpoch::next(const bytes& commit_secret,
+KeyScheduleEpoch::next(const Secret& commit_secret,
                        const std::vector<PSKWithSecret>& psks,
-                       const std::optional<bytes>& force_init_secret,
+                       const std::optional<Secret>& force_init_secret,
                        const bytes& context) const
 {
   auto actual_init_secret = init_secret;
@@ -570,7 +568,10 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
 GroupKeySource
 KeyScheduleEpoch::encryption_keys(LeafCount size) const
 {
-  return { suite, size, encryption_secret };
+  // TODO(rlb) Clean this up
+  auto encryption_secret_copy = encryption_secret;
+  auto encryption_secret_secret = Secret{ std::move(encryption_secret_copy) };
+  return { suite, size, std::move(encryption_secret_secret) };
 }
 
 bytes
@@ -578,21 +579,22 @@ KeyScheduleEpoch::membership_tag(const GroupContext& context,
                                  const MLSPlaintext& pt) const
 {
   auto tbm = pt.membership_tag_input(context);
-  return suite.digest().hmac(membership_key, tbm);
+  return suite.digest().hmac(membership_key.data(), tbm);
 }
 
 bytes
 KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
 {
-  return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
+  return suite.digest().hmac(confirmation_key.data(),
+                             confirmed_transcript_hash);
 }
 
-bytes
+Secret
 KeyScheduleEpoch::do_export(const std::string& label,
                             const bytes& context,
                             size_t size) const
 {
-  auto secret = suite.derive_secret(exporter_secret, label);
+  auto secret = suite.derive_secret(exporter_secret.data(), label);
   auto context_hash = suite.digest().hash(context);
   return suite.expand_with_label(secret, "exporter", context_hash, size);
 }
@@ -611,19 +613,19 @@ KeyScheduleEpoch::reinit_psk(const bytes& group_id, epoch_t epoch)
   return { { ReInitPSK{ group_id, epoch }, nonce }, resumption_secret };
 }
 
-bytes
+Secret
 KeyScheduleEpoch::welcome_secret(CipherSuite suite,
-                                 const bytes& joiner_secret,
+                                 const Secret& joiner_secret,
                                  const std::vector<PSKWithSecret>& psks)
 {
   auto psk_secret = make_psk_secret(suite, psks);
-  auto extract = suite.hpke().kdf.extract(joiner_secret, psk_secret);
+  auto extract = suite.hpke().kdf.extract(joiner_secret.data(), psk_secret);
   return suite.derive_secret(extract, "welcome");
 }
 
 KeyAndNonce
 KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
-                                   const bytes& sender_data_secret,
+                                   const Secret& sender_data_secret,
                                    const bytes& ciphertext)
 {
   auto sample_size = suite.secret_size();
@@ -641,8 +643,9 @@ KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
   auto key_size = suite.hpke().aead.key_size;
   auto nonce_size = suite.hpke().aead.nonce_size;
   return {
-    suite.expand_with_label(sender_data_secret, "key", sample, key_size),
-    suite.expand_with_label(sender_data_secret, "nonce", sample, nonce_size),
+    suite.expand_with_label(sender_data_secret.data(), "key", sample, key_size),
+    suite.expand_with_label(
+      sender_data_secret.data(), "nonce", sample, nonce_size),
   };
 }
 
