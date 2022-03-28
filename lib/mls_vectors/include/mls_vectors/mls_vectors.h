@@ -32,9 +32,6 @@ struct HexBytes
   operator mls::Secret() const { return bytes(data); }
 };
 
-bool
-operator==(const bytes& b, const HexBytes& hb);
-
 struct TreeMathTestVector
 {
   using OptionalNode = std::optional<mls::NodeIndex>;

@@ -67,13 +67,13 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
   return str << "[TreeKEMPublicKey]";
 }
 
-bool
+static bool
 operator==(const Secret& s, const HexBytes& hb)
 {
   return s.data() == hb.data;
 }
 
-bool
+static bool
 operator==(const bytes& b, const HexBytes& hb)
 {
   return b == hb.data;
