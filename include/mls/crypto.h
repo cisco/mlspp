@@ -31,8 +31,6 @@ tls_signature_scheme(hpke::Signature::ID id);
 // zeroized before destruction.  The raw bytes can be accessed using the data()
 // method.  This is required for input into cryptographic operations, but should
 // not be used to copy out the value.
-//
-// TODO(rlb): Move method bodies to .cpp
 struct Secret
 {
   Secret() = default;
