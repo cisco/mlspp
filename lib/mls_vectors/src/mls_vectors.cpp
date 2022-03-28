@@ -41,6 +41,21 @@ operator<<(std::ostream& str, const bytes& obj)
 }
 
 static std::ostream&
+operator<<(std::ostream& str, const Secret& obj)
+{
+  return str << to_hex(obj.data());
+}
+
+// This operator is necessary to avoid ambiguity between the `bytes` and
+// `Secret` operators above, given that HexBytes can be freely converted to both
+// types.
+static std::ostream&
+operator<<(std::ostream& str, const HexBytes& obj)
+{
+  return str << to_hex(obj.data);
+}
+
+static std::ostream&
 operator<<(std::ostream& str, const HPKEPublicKey& obj)
 {
   return str << to_hex(tls::marshal(obj));
@@ -50,6 +65,12 @@ static std::ostream&
 operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
 {
   return str << "[TreeKEMPublicKey]";
+}
+
+bool
+operator==(const Secret& s, const HexBytes& hb)
+{
+  return s.data() == hb.data;
 }
 
 bool
@@ -215,8 +236,8 @@ EncryptionTestVector::create(CipherSuite suite,
     suite, tv.sender_data_secret, ciphertext);
   tv.sender_data_info = {
     ciphertext,
-    sender_data_key_nonce.key.data(),
-    sender_data_key_nonce.nonce.data(),
+    sender_data_key_nonce.key,
+    sender_data_key_nonce.nonce,
   };
 
   auto tree = TreeKEMPublicKey(suite);
@@ -270,8 +291,8 @@ EncryptionTestVector::create(CipherSuite suite,
       src.erase(handshake_type, N, j);
 
       tv.leaves[i].handshake[j] = {
-        hs_key_nonce.key.data(),
-        hs_key_nonce.nonce.data(),
+        hs_key_nonce.key,
+        hs_key_nonce.nonce,
         hs_pt_data,
         tls::marshal(hs_ct),
       };
@@ -282,8 +303,8 @@ EncryptionTestVector::create(CipherSuite suite,
       src.erase(application_type, N, j);
 
       tv.leaves[i].application[j] = {
-        app_key_nonce.key.data(),
-        app_key_nonce.nonce.data(),
+        app_key_nonce.key,
+        app_key_nonce.nonce,
         app_pt_data,
         tls::marshal(app_ct),
       };
@@ -299,10 +320,9 @@ EncryptionTestVector::verify() const
   auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
     cipher_suite, sender_data_secret, sender_data_info.ciphertext);
   VERIFY_EQUAL(
-    "sender data key", sender_data_key_nonce.key.data(), sender_data_info.key);
-  VERIFY_EQUAL("sender data nonce",
-               sender_data_key_nonce.nonce.data(),
-               sender_data_info.nonce);
+    "sender data key", sender_data_key_nonce.key, sender_data_info.key);
+  VERIFY_EQUAL(
+    "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
 
   auto ratchet_tree = tls::get<TreeKEMPublicKey>(tree);
   ratchet_tree.suite = cipher_suite;
@@ -319,8 +339,8 @@ EncryptionTestVector::verify() const
       // Handshake
       const auto& hs_step = leaves[i].handshake[j];
       auto hs_key_nonce = src.get(handshake_type, N, j);
-      VERIFY_EQUAL("hs key", hs_key_nonce.key.data(), hs_step.key);
-      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce.data(), hs_step.nonce);
+      VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
+      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
 
       auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
       auto hs_pt = src.decrypt(ratchet_tree, sender_data_secret, hs_ct);
@@ -330,8 +350,8 @@ EncryptionTestVector::verify() const
       // Application
       const auto& app_step = leaves[i].application[j];
       auto app_key_nonce = src.get(application_type, N, j);
-      VERIFY_EQUAL("app key", app_key_nonce.key.data(), app_step.key);
-      VERIFY_EQUAL("app nonce", app_key_nonce.nonce.data(), app_step.nonce);
+      VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
+      VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
 
       auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
       auto app_pt = src.decrypt(ratchet_tree, sender_data_secret, app_ct);
@@ -456,34 +476,27 @@ KeyScheduleTestVector::verify() const
     epoch = epoch.next(tve.commit_secret, psks, std::nullopt, ctx);
 
     // Verify the rest of the epoch
-    VERIFY_EQUAL(
-      "joiner secret", epoch.joiner_secret.data(), tve.joiner_secret);
+    VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
     auto welcome_secret =
       KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, psks);
-    VERIFY_EQUAL("welcome secret", welcome_secret.data(), tve.welcome_secret);
+    VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
-    VERIFY_EQUAL("sender data secret",
-                 epoch.sender_data_secret.data(),
-                 tve.sender_data_secret);
-    VERIFY_EQUAL("encryption secret",
-                 epoch.encryption_secret.data(),
-                 tve.encryption_secret);
     VERIFY_EQUAL(
-      "exporter secret", epoch.exporter_secret.data(), tve.exporter_secret);
+      "sender data secret", epoch.sender_data_secret, tve.sender_data_secret);
+    VERIFY_EQUAL(
+      "encryption secret", epoch.encryption_secret, tve.encryption_secret);
+    VERIFY_EQUAL("exporter secret", epoch.exporter_secret, tve.exporter_secret);
     VERIFY_EQUAL("authentication secret",
-                 epoch.authentication_secret.data(),
+                 epoch.authentication_secret,
                  tve.authentication_secret);
+    VERIFY_EQUAL("external secret", epoch.external_secret, tve.external_secret);
     VERIFY_EQUAL(
-      "external secret", epoch.external_secret.data(), tve.external_secret);
+      "confirmation key", epoch.confirmation_key, tve.confirmation_key);
+    VERIFY_EQUAL("membership key", epoch.membership_key, tve.membership_key);
     VERIFY_EQUAL(
-      "confirmation key", epoch.confirmation_key.data(), tve.confirmation_key);
-    VERIFY_EQUAL(
-      "membership key", epoch.membership_key.data(), tve.membership_key);
-    VERIFY_EQUAL("resumption secret",
-                 epoch.resumption_secret.data(),
-                 tve.resumption_secret);
-    VERIFY_EQUAL("init secret", epoch.init_secret.data(), tve.init_secret);
+      "resumption secret", epoch.resumption_secret, tve.resumption_secret);
+    VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
@@ -749,7 +762,7 @@ TreeKEMTestVector::verify() const
   VERIFY("private key consistent with tree before",
          priv.consistent(ratchet_tree_before));
   VERIFY_EQUAL(
-    "root secret after add", priv.update_secret.data(), root_secret_after_add);
+    "root secret after add", priv.update_secret, root_secret_after_add);
 
   // Process the UpdatePath
   priv.decap(
@@ -759,9 +772,8 @@ TreeKEMTestVector::verify() const
   my_tree_after.merge(update_sender, update_path);
 
   // Verify that we ended up in the right place
-  VERIFY_EQUAL("root secret after update",
-               priv.update_secret.data(),
-               root_secret_after_update);
+  VERIFY_EQUAL(
+    "root secret after update", priv.update_secret, root_secret_after_update);
   VERIFY_EQUAL("tree after", my_tree_after, ratchet_tree_after);
 
   return std::nullopt;
