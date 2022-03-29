@@ -277,23 +277,20 @@ TEST_CASE("Session with X509 Credential")
     mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256
   };
 
-  std::string alice_name = "alice";
-  auto alice_id = bytes(alice_name.begin(), alice_name.end());
-
-  mls::Credential alice_cred = mls::Credential::x509(der_chain);
+  auto alice_id = from_ascii("alice");
   auto alice_sig_priv = mls::SignaturePrivateKey::parse(suite, key_raw);
-  mls::Client alice_client(suite, alice_sig_priv, alice_cred);
+  auto alice_cred = mls::Credential::x509(der_chain);
+  auto alice_client = mls::Client(suite, alice_sig_priv, alice_cred);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto alice_session = alice_client.begin_session(group_id);
 
-  std::string bob_name = "bob";
-  auto bob_id = bytes(bob_name.begin(), bob_name.end());
+  auto bob_id = from_ascii("bob");
   auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
   auto bob_cred =
     mls::Credential::basic(bob_id, suite, bob_sig_priv.public_key);
 
-  mls::Client bob_client(suite, bob_sig_priv, bob_cred);
+  auto bob_client = mls::Client(suite, bob_sig_priv, bob_cred);
 
   auto bob_pending_join = bob_client.start_join();
 

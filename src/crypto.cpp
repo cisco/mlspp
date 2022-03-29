@@ -269,8 +269,7 @@ HPKEPublicKey::do_export(CipherSuite suite,
                          const std::string& label,
                          size_t size) const
 {
-  auto label_data = bytes(label.begin(), label.end());
-
+  auto label_data = from_ascii(label);
   auto pkR = suite.hpke().kem.deserialize(data);
   auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
   auto exported = ctx.do_export(label_data, size);
@@ -329,8 +328,7 @@ HPKEPrivateKey::do_export(CipherSuite suite,
                           const std::string& label,
                           size_t size) const
 {
-  auto label_data = bytes(label.begin(), label.end());
-
+  auto label_data = from_ascii(label);
   auto skR = suite.hpke().kem.deserialize_private(data);
   auto ctx = suite.hpke().setup_base_r(kem_output, *skR, info);
   return ctx.do_export(label_data, size);

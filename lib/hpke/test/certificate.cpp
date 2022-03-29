@@ -571,7 +571,7 @@ M47y2/ODpJMZEhfUAiA1BWctSI6jNqcL6GjOtp29Fj9DeUL7TqPvGoRMtJJ9Dg==
                                                   Certificate{ issuing_der },
                                                   Certificate{ leaf_der } };
 
-  const auto pem_bytes = bytes(pem_string.begin(), pem_string.end());
+  const auto pem_bytes = from_ascii(pem_string);
   const auto from_pem = Certificate::parse_pem(pem_bytes);
 
   REQUIRE(from_der == from_pem);

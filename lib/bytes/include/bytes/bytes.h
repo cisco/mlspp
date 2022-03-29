@@ -16,12 +16,10 @@ struct bytes
   bytes& operator=(bytes&&) = default;
 
   // Zeroize on drop
-  ~bytes() {
-    std::fill(_data.begin(), _data.end(), uint8_t(0));
-  }
+  ~bytes() { std::fill(_data.begin(), _data.end(), uint8_t(0)); }
 
   // Mimic std::vector ctors
-  bytes(size_t count, uint8_t value = 0)
+  bytes(size_t count, const uint8_t& value = 0)
     : _data(count, value)
   {}
 
@@ -29,10 +27,13 @@ struct bytes
     : _data(init)
   {}
 
-  template<class InputIt>
-  bytes(InputIt first, InputIt last)
-    : _data(first, last)
-  {}
+  // Slice out sub-vectors (to avoid an iterator ctor)
+  bytes slice(size_t begin_index, size_t end_index) const
+  {
+    const auto begin_it = _data.begin() + begin_index;
+    const auto end_it = _data.begin() + end_index;
+    return std::vector<uint8_t>(begin_it, end_it);
+  }
 
   // Freely convert to/from std::vector
   bytes(const std::vector<uint8_t>& vec)

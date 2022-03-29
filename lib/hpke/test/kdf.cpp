@@ -24,8 +24,7 @@ TEST_CASE("KDF Known-Answer")
   const auto info = from_hex("f0f1f2f3f4f5f6f7f8f9");
 
   // see scripts/hkdf-tests.go
-  const auto label_str = std::string("test");
-  const auto label = bytes(label_str.begin(), label_str.end());
+  const auto label = from_ascii("test");
   const auto cases = std::vector<KnownAnswerTest>{
     {
       KDF::ID::HKDF_SHA256,

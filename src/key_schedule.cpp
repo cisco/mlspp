@@ -616,14 +616,10 @@ KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
 {
   auto sample_size = suite.secret_size();
   auto sample = bytes(sample_size);
-  if (ciphertext.size() < sample_size) {
+  if (ciphertext.size() <= sample_size) {
     sample = ciphertext;
   } else {
-    sample = bytes(
-      ciphertext.begin(),
-      ciphertext.begin() +
-        sample_size); // NOLINT
-                      // (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    sample = ciphertext.slice(0, sample_size);
   }
 
   auto key_size = suite.hpke().aead.key_size;

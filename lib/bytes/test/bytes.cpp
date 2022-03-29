@@ -15,13 +15,15 @@ TEST_CASE("Zeroization")
   const auto canary = uint8_t(0xff);
   auto vec = std::make_unique<bytes>(32, canary);
   const auto size = vec->size();
-  const auto ptr = vec->data();
+  const auto* ptr = vec->data();
   vec.reset();
 
   for (size_t i = 0; i < size; i++) {
-    // We test for inequality instead of zero because the vector might already be
-    // partially overwritten at this point.
-    REQUIRE(*(ptr+i) != canary);
+    // We test for inequality instead of zero because the vector might already
+    // be partially overwritten at this point.
+    //
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    REQUIRE(*(ptr + i) != canary);
   }
 }
 #endif

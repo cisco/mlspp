@@ -7,6 +7,8 @@
 
 namespace bytes_ns {
 
+
+
 bool
 bytes::operator==(const bytes& other) const
 {
@@ -65,7 +67,7 @@ bytes::operator^(const bytes& rhs) const
 bytes
 from_ascii(const std::string& ascii)
 {
-  return { ascii.begin(), ascii.end() };
+  return std::vector<uint8_t>(ascii.begin(), ascii.end());
 }
 
 std::string
@@ -107,13 +109,7 @@ operator<<(std::ostream& out, const bytes& data)
     return out << to_hex(data);
   }
 
-  bytes abbrev(
-    data.begin(),
-    data.begin() +
-      threshold); // NOLINT
-                  // (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
-
-  return out << to_hex(abbrev) << "...";
+  return out << to_hex(data.slice(0, threshold)) << "...";
 }
 
 bool

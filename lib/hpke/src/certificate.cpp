@@ -24,7 +24,7 @@ asn1_octet_string_to_bytes(const ASN1_OCTET_STRING* octets)
   const auto* ptr = ASN1_STRING_get0_data(octets);
   const auto len = ASN1_STRING_length(octets);
   // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
-  return bytes(ptr, ptr + len);
+  return std::vector<uint8_t>(ptr, ptr + len);
 }
 
 static std::string
