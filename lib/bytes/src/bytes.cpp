@@ -7,8 +7,6 @@
 
 namespace bytes_ns {
 
-
-
 bool
 bytes::operator==(const bytes& other) const
 {
