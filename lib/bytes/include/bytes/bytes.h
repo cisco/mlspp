@@ -1,11 +1,86 @@
 #pragma once
 
 #include <string>
+#include <tls/tls_syntax.h>
 #include <vector>
 
 namespace bytes_ns {
 
-using bytes = std::vector<uint8_t>;
+struct bytes
+{
+  // Ensure defaults
+  bytes() = default;
+  bytes(const bytes&) = default;
+  bytes& operator=(const bytes&) = default;
+  bytes(bytes&&) = default;
+  bytes& operator=(bytes&&) = default;
+
+  // Mimic std::vector ctors
+  bytes(size_t count, uint8_t value = 0)
+    : _data(count, value)
+  {}
+
+  bytes(std::initializer_list<uint8_t> init)
+    : _data(init)
+  {}
+
+  template<class InputIt>
+  bytes(InputIt first, InputIt last)
+    : _data(first, last)
+  {}
+
+  // Freely convert to/from std::vector
+  bytes(const std::vector<uint8_t>& vec)
+    : _data(vec)
+  {}
+
+  bytes(std::vector<uint8_t>&& vec)
+    : _data(vec)
+  {}
+
+  operator const std::vector<uint8_t>&() const { return _data; }
+  operator std::vector<uint8_t>&() { return _data; }
+  operator std::vector<uint8_t>&&() && { return std::move(_data); }
+
+  const std::vector<uint8_t>& as_vec() const { return _data; }
+  std::vector<uint8_t>& as_vec() { return _data; }
+
+  // Pass through methods
+  auto data() const { return _data.data(); }
+  auto data() { return _data.data(); }
+
+  auto size() const { return _data.size(); }
+  auto empty() const { return _data.empty(); }
+
+  auto begin() const { return _data.begin(); }
+  auto begin() { return _data.begin(); }
+
+  auto end() const { return _data.end(); }
+  auto end() { return _data.end(); }
+
+  const auto& at(size_t pos) const { return _data.at(pos); }
+  auto& at(size_t pos) { return _data.at(pos); }
+
+  void resize(size_t count) { _data.resize(count); }
+
+  // Equality operators
+  bool operator==(const bytes& other) const;
+  bool operator!=(const bytes& other) const;
+
+  bool operator==(const std::vector<uint8_t>& other) const;
+  bool operator!=(const std::vector<uint8_t>& other) const;
+
+  // Arithmetic operators
+  bytes& operator+=(const bytes& other);
+  bytes operator+(const bytes& rhs) const;
+  bytes operator^(const bytes& rhs) const;
+
+  // TLS syntax serialization
+  TLS_SERIALIZABLE(_data);
+
+private:
+  std::vector<uint8_t> _data;
+};
 
 bytes
 from_ascii(const std::string& ascii);
@@ -20,17 +95,15 @@ from_hex(const std::string& hex);
 // resolution requires them to be in the caller namespace.
 namespace operators {
 
-bytes_ns::bytes&
-operator+=(bytes_ns::bytes& lhs, const bytes_ns::bytes& rhs);
-
-bytes_ns::bytes
-operator+(const bytes_ns::bytes& lhs, const bytes_ns::bytes& rhs);
-
-bytes_ns::bytes
-operator^(const bytes_ns::bytes& lhs, const bytes_ns::bytes& rhs);
-
 std::ostream&
 operator<<(std::ostream& out, const bytes_ns::bytes& data);
+
+bool
+operator==(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs);
+
+bool
+operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs);
+
 } // namespace operators
 
 } // namespace bytes_ns

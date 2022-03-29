@@ -189,7 +189,7 @@ AEADCipher::seal(const bytes& key,
     throw openssl_error();
   }
 
-  ct.insert(ct.end(), tag.begin(), tag.end());
+  ct += tag;
   return ct;
 }
 

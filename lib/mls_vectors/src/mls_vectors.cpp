@@ -736,7 +736,7 @@ TreeKEMTestVector::verify() const
                                         my_index,
                                         leaf_priv,
                                         ancestor,
-                                        my_path_secret);
+                                        (const bytes&)(my_path_secret));
   VERIFY("private key consistent with tree before",
          priv.consistent(ratchet_tree_before));
   VERIFY_EQUAL(

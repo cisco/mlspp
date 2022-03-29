@@ -20,9 +20,16 @@ struct HexBytes
   bytes data;
 
   HexBytes() = default;
+
   HexBytes(bytes data_in)
     : data(std::move(data_in))
   {}
+
+  HexBytes(std::vector<uint8_t> data_in)
+    : data(std::move(data_in))
+  {}
+
+  operator const std::vector<uint8_t>&() const { return data; }
   operator const bytes&() const { return data; }
   operator bytes&() { return data; }
 };

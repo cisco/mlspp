@@ -243,7 +243,7 @@ constant_time_eq(const bytes& lhs, const bytes& rhs)
   for (size_t i = 0; i < size; ++i) {
     // Not sure why the linter thinks `diff` is signed
     // NOLINTNEXTLINE(hicpp-signed-bitwise)
-    diff |= (lhs[i] ^ rhs[i]);
+    diff |= (lhs.at(i) ^ rhs.at(i));
   }
   return (diff == 0);
 }
