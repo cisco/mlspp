@@ -7,10 +7,65 @@
 
 namespace bytes_ns {
 
+bool
+bytes::operator==(const bytes& other) const
+{
+  return _data == other._data;
+}
+
+bool
+bytes::operator!=(const bytes& other) const
+{
+  return _data != other._data;
+}
+
+bool
+bytes::operator==(const std::vector<uint8_t>& other) const
+{
+  return other == _data;
+}
+
+bool
+bytes::operator!=(const std::vector<uint8_t>& other) const
+{
+  return other != _data;
+}
+
+bytes&
+bytes::operator+=(const bytes& other)
+{
+  // Not sure what the default argument is here
+  // NOLINTNEXTLINE(fuchsia-default-arguments)
+  _data.insert(end(), other.begin(), other.end());
+  return *this;
+}
+
+bytes
+bytes::operator+(const bytes& rhs) const
+{
+  bytes out = *this;
+  out += rhs;
+  return out;
+}
+
+bytes
+bytes::operator^(const bytes& rhs) const
+{
+  if (size() != rhs.size()) {
+    throw std::invalid_argument("XOR with unequal size");
+  }
+
+  bytes out = *this;
+  for (size_t i = 0; i < size(); ++i) {
+    out.at(i) ^= rhs.at(i);
+  }
+  return out;
+}
+
 bytes
 from_ascii(const std::string& ascii)
 {
-  return { ascii.begin(), ascii.end() };
+  return std::vector<uint8_t>(ascii.begin(), ascii.end());
 }
 
 std::string
@@ -35,44 +90,13 @@ from_hex(const std::string& hex)
   auto out = bytes(len);
   for (size_t i = 0; i < len; i += 1) {
     std::string byte = hex.substr(2 * i, 2);
-    out[i] = static_cast<bytes::value_type>(strtol(byte.c_str(), nullptr, 16));
+    out.at(i) = static_cast<uint8_t>(strtol(byte.c_str(), nullptr, 16));
   }
 
   return out;
 }
 
 namespace operators {
-
-bytes&
-operator+=(bytes& lhs, const bytes& rhs)
-{
-  // Not sure what the default argument is here
-  // NOLINTNEXTLINE(fuchsia-default-arguments)
-  lhs.insert(lhs.end(), rhs.begin(), rhs.end());
-  return lhs;
-}
-
-bytes
-operator+(const bytes& lhs, const bytes& rhs)
-{
-  bytes out = lhs;
-  out += rhs;
-  return out;
-}
-
-bytes
-operator^(const bytes& lhs, const bytes& rhs)
-{
-  if (lhs.size() != rhs.size()) {
-    throw std::invalid_argument("XOR with unequal size");
-  }
-
-  bytes out(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    out[i] = lhs[i] ^ rhs[i];
-  }
-  return out;
-}
 
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
@@ -83,13 +107,19 @@ operator<<(std::ostream& out, const bytes& data)
     return out << to_hex(data);
   }
 
-  bytes abbrev(
-    data.begin(),
-    data.begin() +
-      threshold); // NOLINT
-                  // (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+  return out << to_hex(data.slice(0, threshold)) << "...";
+}
 
-  return out << to_hex(abbrev) << "...";
+bool
+operator==(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs)
+{
+  return rhs == lhs;
+}
+
+bool
+operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs)
+{
+  return rhs != lhs;
 }
 
 } // namespace operators

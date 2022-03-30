@@ -176,7 +176,7 @@ struct ECKeyGroup : public EVPGroup
       auto ctr = i2osp(counter, 1);
       auto candidate =
         kdf.labeled_expand(suite_id, dkp_prk, label_candidate, ctr, sk_size);
-      candidate[0] &= bitmask();
+      candidate.at(0) &= bitmask();
       sk.reset(BN_bin2bn(
         candidate.data(), static_cast<int>(candidate.size()), nullptr));
 

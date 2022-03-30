@@ -6,6 +6,28 @@ using namespace bytes_ns;
 using namespace bytes_ns::operators;
 using namespace std::literals::string_literals;
 
+// To check that memory is safely zeroized on destroy, we have to deliberately
+// do a use-after-free.  This will be caught by the sanitizers, so we only do it
+// when sanitizers are not enabled.
+#ifndef SANITIZERS
+TEST_CASE("Zeroization")
+{
+  const auto canary = uint8_t(0xff);
+  auto vec = std::make_unique<bytes>(32, canary);
+  const auto size = vec->size();
+  const auto* ptr = vec->data();
+  vec.reset();
+
+  for (size_t i = 0; i < size; i++) {
+    // We test for inequality instead of zero because the vector might already
+    // be partially overwritten at this point.
+    //
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    REQUIRE(*(ptr + i) != canary);
+  }
+}
+#endif
+
 TEST_CASE("From ASCII")
 {
   const auto str = "hello"s;

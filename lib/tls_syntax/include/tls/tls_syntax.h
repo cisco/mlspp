@@ -40,7 +40,7 @@ public:
 
   void write_raw(const std::vector<uint8_t>& bytes);
 
-  std::vector<uint8_t> bytes() const { return _buffer; }
+  const std::vector<uint8_t>& bytes() const { return _buffer; }
   size_t size() const { return _buffer.size(); }
   bool empty() const { return _buffer.empty(); }
 

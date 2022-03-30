@@ -12,7 +12,7 @@ i2osp(uint64_t val, size_t size)
   }
 
   for (size_t i = 0; i < max; i++) {
-    out[size - i - 1] = static_cast<bytes::value_type>(val >> (8 * i));
+    out.at(size - i - 1) = static_cast<uint8_t>(val >> (8 * i));
   }
   return out;
 }

@@ -189,7 +189,7 @@ AEADCipher::seal(const bytes& key,
     throw openssl_error();
   }
 
-  ct.insert(ct.end(), tag.begin(), tag.end());
+  ct += tag;
   return ct;
 }
 
@@ -214,8 +214,7 @@ AEADCipher::open(const bytes& key,
   }
 
   auto inner_ct_size = ct.size() - tag_size;
-  // NOLINTNEXTLINE (cppcoreguidelines-narrowing-conversion)
-  auto tag = bytes(ct.begin() + inner_ct_size, ct.end());
+  auto tag = ct.slice(inner_ct_size, ct.size());
   if (1 != EVP_CIPHER_CTX_ctrl(ctx.get(),
                                EVP_CTRL_GCM_SET_TAG,
                                static_cast<int>(tag_size),

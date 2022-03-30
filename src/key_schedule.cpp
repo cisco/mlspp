@@ -6,15 +6,6 @@ static const auto log_mod = "key_schedule"s;
 
 namespace mls {
 
-static void
-zeroize(bytes& data) // NOLINT(google-runtime-references)
-{
-  for (auto& val : data) {
-    val = 0;
-  }
-  data.resize(0);
-}
-
 ///
 /// Key Derivation Functions
 ///
@@ -77,7 +68,6 @@ HashRatchet::next()
   auto generation = next_generation;
 
   next_generation += 1;
-  zeroize(next_secret);
   next_secret = secret;
 
   cache[generation] = { key, nonce };
@@ -116,8 +106,6 @@ HashRatchet::erase(uint32_t generation)
     return;
   }
 
-  zeroize(cache[generation].key);
-  zeroize(cache[generation].nonce);
   cache.erase(generation);
 }
 
@@ -175,7 +163,7 @@ SecretTree::get(LeafIndex sender)
 
   // Zeroize along the direct path
   for (auto i : dirpath) {
-    zeroize(secrets[i.val]);
+    secrets[i.val] = {};
   }
 
   return out;
@@ -628,14 +616,10 @@ KeyScheduleEpoch::sender_data_keys(CipherSuite suite,
 {
   auto sample_size = suite.secret_size();
   auto sample = bytes(sample_size);
-  if (ciphertext.size() < sample_size) {
+  if (ciphertext.size() <= sample_size) {
     sample = ciphertext;
   } else {
-    sample = bytes(
-      ciphertext.begin(),
-      ciphertext.begin() +
-        sample_size); // NOLINT
-                      // (bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    sample = ciphertext.slice(0, sample_size);
   }
 
   auto key_size = suite.hpke().aead.key_size;
