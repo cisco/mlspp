@@ -80,10 +80,7 @@ struct adl_serializer<mls::CipherSuite>
 template<typename T>
 struct tls_serializer
 {
-  static void to_json(json& j, const T& v)
-  {
-    j = bytes(tls::marshal(v));
-  }
+  static void to_json(json& j, const T& v) { j = bytes(tls::marshal(v)); }
 
   static void from_json(const json& j, T& v)
   {
