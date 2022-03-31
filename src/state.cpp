@@ -75,24 +75,22 @@ State::import_tree(const bytes& tree_hash,
 }
 
 State::State(SignaturePrivateKey sig_priv,
-             const PublicGroupState& pgs,
+             const GroupInfo& group_info,
              const std::optional<TreeKEMPublicKey>& tree)
-  : _suite(pgs.cipher_suite)
-  , _group_id(pgs.group_id)
-  , _epoch(pgs.epoch)
-  , _tree(import_tree(pgs.tree_hash, tree, pgs.other_extensions))
-  , _transcript_hash(pgs.cipher_suite)
-  , _extensions(pgs.group_context_extensions)
-  , _key_schedule(pgs.cipher_suite)
+  : _suite(group_info.cipher_suite)
+  , _group_id(group_info.group_id)
+  , _epoch(group_info.epoch)
+  , _tree(import_tree(group_info.tree_hash, tree, group_info.other_extensions))
+  , _transcript_hash(group_info.cipher_suite,
+                     group_info.confirmed_transcript_hash,
+                     group_info.confirmation_tag)
+  , _extensions(group_info.group_context_extensions)
+  , _key_schedule(group_info.cipher_suite)
   , _index(0)
   , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
-  // Import the interim transcript hash
-  _transcript_hash.interim = pgs.interim_transcript_hash;
-
   // The following are not set:
-  //    _transcript_hash.confirmed
   //    _index
   //    _tree_priv
   //
@@ -178,7 +176,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
-  if (!verify_confirmation(group_info.confirmation_tag.mac_value)) {
+  if (!verify_confirmation(group_info.confirmation_tag)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 }
@@ -188,14 +186,23 @@ std::tuple<MLSPlaintext, State>
 State::external_join(const bytes& leaf_secret,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& kp,
-                     const PublicGroupState& pgs,
+                     const GroupInfo& group_info,
                      const std::optional<TreeKEMPublicKey>& tree)
 {
-  auto initial_state = State(std::move(sig_priv), pgs, tree);
+  auto initial_state = State(std::move(sig_priv), group_info, tree);
+
+  const auto maybe_external_pub =
+    group_info.other_extensions.find<ExternalPubExtension>();
+  if (!maybe_external_pub) {
+    throw InvalidParameterError("No external pub in GroupInfo");
+  }
+
+  const auto& external_pub = opt::get(maybe_external_pub).external_pub;
+
   auto add = initial_state.add_proposal(kp);
   auto opts = CommitOpts{ { add }, false, false, {} };
   auto [commit_pt, welcome, state] =
-    initial_state.commit(leaf_secret, opts, kp, pgs.external_pub);
+    initial_state.commit(leaf_secret, opts, kp, external_pub);
   silence_unused(welcome);
   return { commit_pt, state };
 }
@@ -436,6 +443,7 @@ State::commit(const bytes& leaf_secret,
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
+    next._suite,
     next._group_id,
     next._epoch,
     next._tree.root_hash(),
@@ -639,7 +647,7 @@ State::handle(const MLSPlaintext& pt)
     throw ProtocolError("Missing confirmation on Commit");
   }
 
-  if (!next.verify_confirmation(opt::get(pt.confirmation_tag).mac_value)) {
+  if (!next.verify_confirmation(opt::get(pt.confirmation_tag))) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -1050,22 +1058,25 @@ State::do_export(const std::string& label,
   return _key_schedule.do_export(label, context, size);
 }
 
-PublicGroupState
-State::public_group_state() const
+GroupInfo
+State::group_info() const
 {
-  auto pgs = PublicGroupState{
+  auto group_info = GroupInfo{
     _suite,
     _group_id,
     _epoch,
     _tree.root_hash(),
-    _transcript_hash.interim,
+    _transcript_hash.confirmed,
     _extensions,
     { /* No other extensions */ },
-    _key_schedule.external_priv.public_key,
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed),
   };
-  pgs.other_extensions.add(RatchetTreeExtension{ _tree });
-  pgs.sign(_tree, _ref, _identity_priv);
-  return pgs;
+
+  group_info.other_extensions.add(
+    ExternalPubExtension{ _key_schedule.external_priv.public_key });
+  group_info.other_extensions.add(RatchetTreeExtension{ _tree });
+  group_info.sign(_tree, _ref, _identity_priv);
+  return group_info;
 }
 
 std::vector<LeafNode>

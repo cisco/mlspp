@@ -7,6 +7,7 @@ namespace mls {
 
 // Extensions
 
+const uint16_t ExternalPubExtension::type = ExtensionType::external_pub;
 const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
 const uint16_t SFrameParameters::type = ExtensionType::sframe_parameters;
 const uint16_t SFrameCapabilities::type = ExtensionType::sframe_parameters;
@@ -19,84 +20,21 @@ SFrameCapabilities::compatible(const SFrameParameters& params) const
   return std::find(begin, end, params.cipher_suite) != end;
 }
 
-// PublicGroupState
+// GroupInfo
 
 static const auto zero_ref =
   LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-PublicGroupState::PublicGroupState(CipherSuite cipher_suite_in,
-                                   bytes group_id_in,
-                                   epoch_t epoch_in,
-                                   bytes tree_hash_in,
-                                   bytes interim_transcript_hash_in,
-                                   ExtensionList group_context_extensions_in,
-                                   ExtensionList other_extensions_in,
-                                   HPKEPublicKey external_pub_in)
-  : cipher_suite(cipher_suite_in)
-  , group_id(std::move(group_id_in))
-  , epoch(epoch_in)
-  , tree_hash(std::move(tree_hash_in))
-  , interim_transcript_hash(std::move(interim_transcript_hash_in))
-  , group_context_extensions(std::move(group_context_extensions_in))
-  , other_extensions(std::move(other_extensions_in))
-  , external_pub(std::move(external_pub_in))
-  , signer(zero_ref)
-{}
-
-bytes
-PublicGroupState::to_be_signed() const
-{
-  tls::ostream w;
-  w << cipher_suite << group_id << epoch << tree_hash << interim_transcript_hash
-    << group_context_extensions << other_extensions << external_pub << signer;
-  return w.bytes();
-}
-
-void
-PublicGroupState::sign(const TreeKEMPublicKey& tree,
-                       LeafNodeRef signer_ref,
-                       const SignaturePrivateKey& priv)
-{
-  auto maybe_leaf = tree.leaf_node(signer_ref);
-  if (!maybe_leaf) {
-    throw InvalidParameterError("Cannot sign from a blank leaf");
-  }
-
-  auto cred = opt::get(maybe_leaf).credential;
-  if (cred.public_key() != priv.public_key) {
-    throw InvalidParameterError("Bad key for index");
-  }
-
-  signer = signer_ref;
-  signature = priv.sign(tree.suite, to_be_signed());
-}
-
-bool
-PublicGroupState::verify(const TreeKEMPublicKey& tree) const
-{
-  if (tree.suite != cipher_suite) {
-    throw InvalidParameterError("Cipher suite mismatch");
-  }
-
-  auto maybe_leaf = tree.leaf_node(signer);
-  if (!maybe_leaf) {
-    throw InvalidParameterError("Cannot sign from a blank leaf");
-  }
-
-  auto cred = opt::get(maybe_leaf).credential;
-  return cred.public_key().verify(cipher_suite, to_be_signed(), signature);
-}
-
-// GroupInfo
-
-GroupInfo::GroupInfo(bytes group_id_in,
+GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
+                     bytes group_id_in,
                      epoch_t epoch_in,
                      bytes tree_hash_in,
                      bytes confirmed_transcript_hash_in,
                      ExtensionList group_context_extensions_in,
                      ExtensionList other_extensions_in,
-                     MAC confirmation_tag_in)
-  : group_id(std::move(group_id_in))
+                     bytes confirmation_tag_in)
+  : cipher_suite(cipher_suite_in)
+  , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
@@ -106,14 +44,42 @@ GroupInfo::GroupInfo(bytes group_id_in,
   , signer(zero_ref)
 {}
 
+struct GroupInfoTBS
+{
+  CipherSuite cipher_suite;
+  const bytes& group_id;
+  epoch_t epoch{ 0 };
+  const bytes& tree_hash;
+  const bytes& confirmed_transcript_hash;
+  const ExtensionList& group_context_extensions;
+  const ExtensionList& other_extensions;
+
+  const bytes& confirmation_tag;
+  const LeafNodeRef& signer;
+
+  TLS_SERIALIZABLE(cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   group_context_extensions,
+                   other_extensions,
+                   confirmation_tag,
+                   signer)
+};
+
 bytes
 GroupInfo::to_be_signed() const
 {
-  tls::ostream w;
-  w << group_id << epoch << tree_hash << confirmed_transcript_hash
-    << group_context_extensions << other_extensions << confirmation_tag
-    << signer;
-  return w.bytes();
+  return tls::marshal(GroupInfoTBS{ cipher_suite,
+                                    group_id,
+                                    epoch,
+                                    tree_hash,
+                                    confirmed_transcript_hash,
+                                    group_context_extensions,
+                                    other_extensions,
+                                    confirmation_tag,
+                                    signer });
 }
 
 void
@@ -462,7 +428,7 @@ MLSPlaintext::verify_membership_tag(const bytes& tag) const
     return false;
   }
 
-  return constant_time_eq(tag, opt::get(membership_tag).mac_value);
+  return constant_time_eq(tag, opt::get(membership_tag));
 }
 
 } // namespace mls

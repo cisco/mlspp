@@ -170,11 +170,17 @@ struct TranscriptHash
   bytes confirmed;
   bytes interim;
 
+  // For a new group
   TranscriptHash(CipherSuite suite_in);
+
+  // For joining a group
+  TranscriptHash(CipherSuite suite_in,
+                 bytes confirmed_in,
+                 const bytes& confirmation_tag);
 
   void update(const MLSPlaintext& pt);
   void update_confirmed(const MLSPlaintext& pt);
-  void update_interim(const MAC& confirmation_tag);
+  void update_interim(const bytes& confirmation_tag);
   void update_interim(const MLSPlaintext& pt);
 };
 

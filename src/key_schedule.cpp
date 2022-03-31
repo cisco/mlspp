@@ -649,6 +649,15 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in)
   : suite(suite_in)
 {}
 
+TranscriptHash::TranscriptHash(CipherSuite suite_in,
+                               bytes confirmed_in,
+                               const bytes& confirmation_tag)
+  : suite(suite_in)
+  , confirmed(std::move(confirmed_in))
+{
+  update_interim(confirmation_tag);
+}
+
 void
 TranscriptHash::update(const MLSPlaintext& pt)
 {
@@ -664,9 +673,9 @@ TranscriptHash::update_confirmed(const MLSPlaintext& pt)
 }
 
 void
-TranscriptHash::update_interim(const MAC& confirmation_tag)
+TranscriptHash::update_interim(const bytes& confirmation_tag)
 {
-  const auto opt_tag = std::optional<MAC>(confirmation_tag);
+  const auto opt_tag = std::optional<bytes>(confirmation_tag);
   const auto transcript = confirmed + tls::marshal(opt_tag);
   interim = suite.digest().hash(transcript);
 }
