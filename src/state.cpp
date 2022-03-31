@@ -43,6 +43,10 @@ State::State(bytes group_id,
   _key_schedule =
     KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
   _keys = _key_schedule.encryption_keys(_tree.size());
+
+  // Update the interim transcript hash with a virtual confirmation tag
+  _transcript_hash.update_interim(
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed));
 }
 
 TreeKEMPublicKey

@@ -202,8 +202,6 @@ struct MessagesTestVector
   HexBytes group_secrets;
   HexBytes welcome;
 
-  HexBytes public_group_state;
-
   HexBytes add_proposal;
   HexBytes update_proposal;
   HexBytes remove_proposal;

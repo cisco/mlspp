@@ -106,7 +106,7 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
 {
   auto maybe_leaf = tree.leaf_node(signer);
   if (!maybe_leaf) {
-    throw InvalidParameterError("Cannot sign from a blank leaf");
+    throw InvalidParameterError("Signer not found");
   }
 
   auto cred = opt::get(maybe_leaf).credential;

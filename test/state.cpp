@@ -237,13 +237,13 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
                        identity_privs[0],
                        key_packages[0].leaf_node,
                        {} };
-  auto public_group_state = first0.public_group_state();
+  auto group_info = first0.group_info();
 
   // Initialize the second participant as an external joiner
   auto [commit, second0] = State::external_join(fresh_secret(),
                                                 identity_privs[1],
                                                 key_packages[1],
-                                                public_group_state,
+                                                group_info,
                                                 std::nullopt);
 
   // Creator processes the commit
@@ -262,15 +262,12 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
                        identity_privs[0],
                        key_packages[0].leaf_node,
                        {} };
-  auto public_group_state = first0.public_group_state();
+  auto group_info = first0.group_info();
   auto tree = first0.tree();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(fresh_secret(),
-                                                identity_privs[1],
-                                                key_packages[1],
-                                                public_group_state,
-                                                tree);
+  auto [commit, second0] = State::external_join(
+    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree);
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));

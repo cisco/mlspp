@@ -139,7 +139,8 @@ struct GroupInfo
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
-  TLS_SERIALIZABLE(group_id,
+  TLS_SERIALIZABLE(cipher_suite,
+                   group_id,
                    epoch,
                    tree_hash,
                    confirmed_transcript_hash,
