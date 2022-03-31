@@ -511,12 +511,11 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
     sig_priv,
   };
 
-  auto kp =
-    mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
+  auto kp = mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
 
   auto leaf_secret = mls::random_bytes(suite.secret_size());
-  auto [commit, state] =
-    mls::State::external_join(leaf_secret, sig_priv, kp, group_info, std::nullopt);
+  auto [commit, state] = mls::State::external_join(
+    leaf_secret, sig_priv, kp, group_info, std::nullopt);
   auto commit_data = tls::marshal(commit);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
