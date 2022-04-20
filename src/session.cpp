@@ -47,8 +47,7 @@ struct Session::Inner
                       const bytes& welcome_data);
 
   bytes fresh_secret() const;
-  bytes export_message(const MLSPlaintext& plaintext);
-  MLSPlaintext import_message(const bytes& encoded);
+  MLSMessageContentAuth import_message(const bytes& encoded);
   void add_state(epoch_t prior_epoch, const State& group_state);
   State& for_epoch(epoch_t epoch);
 };
@@ -190,39 +189,26 @@ Session::Inner::fresh_secret() const
   return random_bytes(suite.secret_size());
 }
 
-bytes
-Session::Inner::export_message(const MLSPlaintext& plaintext)
-{
-  if (!encrypt_handshake) {
-    return tls::marshal(plaintext);
-  }
-
-  auto ciphertext = history.front().encrypt(plaintext);
-  return tls::marshal(ciphertext);
-}
-
-MLSPlaintext
+MLSMessageContentAuth
 Session::Inner::import_message(const bytes& encoded)
 {
-  auto wire_format = WireFormat::reserved;
-  auto r = tls::istream(encoded);
-  r >> wire_format;
+  auto mls_message = tls::get<MLSMessage>(encoded);
+  auto content_auth = history.front().unprotect(std::move(mls_message));
 
-  switch (wire_format) {
+  switch (content_auth.wire_format) {
     case WireFormat::mls_plaintext:
       if (encrypt_handshake) {
         throw ProtocolError("Handshake not encrypted as required");
       }
 
-      return tls::get<MLSPlaintext>(encoded);
+      return content_auth;
 
     case WireFormat::mls_ciphertext: {
       if (!encrypt_handshake) {
         throw ProtocolError("Unexpected handshake encryption");
       }
 
-      auto ciphertext = tls::get<MLSCiphertext>(encoded);
-      return history.front().decrypt(ciphertext);
+      return content_auth;
     }
 
     default:
@@ -275,30 +261,34 @@ bytes
 Session::add(const bytes& key_package_data)
 {
   auto key_package = tls::get<KeyPackage>(key_package_data);
-  auto proposal = inner->history.front().add(key_package);
-  return inner->export_message(proposal);
+  auto proposal = inner->history.front().add(
+    key_package, { inner->encrypt_handshake, {}, 0 });
+  return tls::marshal(proposal);
 }
 
 bytes
 Session::update()
 {
   auto leaf_secret = inner->fresh_secret();
-  auto proposal = inner->history.front().update(leaf_secret, {});
-  return inner->export_message(proposal);
+  auto proposal = inner->history.front().update(
+    leaf_secret, {}, { inner->encrypt_handshake, {}, 0 });
+  return tls::marshal(proposal);
 }
 
 bytes
 Session::remove(uint32_t index)
 {
-  auto proposal = inner->history.front().remove(RosterIndex{ index });
-  return inner->export_message(proposal);
+  auto proposal = inner->history.front().remove(
+    RosterIndex{ index }, { inner->encrypt_handshake, {}, 0 });
+  return tls::marshal(proposal);
 }
 
 bytes
 Session::remove(const LeafNodeRef& ref)
 {
-  auto proposal = inner->history.front().remove(ref);
-  return inner->export_message(proposal);
+  auto proposal =
+    inner->history.front().remove(ref, { inner->encrypt_handshake, {}, 0 });
+  return tls::marshal(proposal);
 }
 
 std::tuple<bytes, bytes>
@@ -311,12 +301,12 @@ std::tuple<bytes, bytes>
 Session::commit(const std::vector<bytes>& proposals)
 {
   for (const auto& proposal_data : proposals) {
-    const auto pt = inner->import_message(proposal_data);
-    if (!var::holds_alternative<Proposal>(pt.content)) {
+    auto content_auth = inner->import_message(proposal_data);
+    if (content_auth.content.content_type() != ContentType::proposal) {
       throw ProtocolError("Only proposals can be committed");
     }
 
-    inner->history.front().handle(pt);
+    inner->history.front().handle(std::move(content_auth));
   }
 
   return commit();
@@ -328,9 +318,9 @@ Session::commit()
   auto commit_secret = inner->fresh_secret();
   auto encrypt = inner->encrypt_handshake;
   auto [commit, welcome, new_state] = inner->history.front().commit(
-    commit_secret, CommitOpts{ {}, true, encrypt, {} });
+    commit_secret, CommitOpts{ {}, true, encrypt, {} }, { encrypt, {}, 0 });
 
-  auto commit_msg = inner->export_message(commit);
+  auto commit_msg = tls::marshal(commit);
   auto welcome_msg = tls::marshal(welcome);
 
   inner->outbound_cache = std::make_tuple(commit_msg, new_state);
@@ -340,14 +330,17 @@ Session::commit()
 bool
 Session::handle(const bytes& handshake_data)
 {
-  auto pt = inner->import_message(handshake_data);
+  auto content_auth = inner->import_message(handshake_data);
 
-  if (pt.sender.sender_type() != SenderType::member) {
+  if (content_auth.content.sender.sender_type() != SenderType::member) {
     throw ProtocolError("External senders not supported");
   }
 
-  const auto is_commit = var::holds_alternative<Commit>(pt.content);
-  if (is_commit && pt.sender.sender == inner->history.front().ref()) {
+  const auto is_commit =
+    content_auth.content.content_type() == ContentType::commit;
+  const auto is_self =
+    content_auth.content.sender.sender == inner->history.front().ref();
+  if (is_commit && is_self) {
     if (!inner->outbound_cache) {
       throw ProtocolError("Received from self without sending");
     }
@@ -357,17 +350,19 @@ Session::handle(const bytes& handshake_data)
       throw ProtocolError("Received message different from cached");
     }
 
-    inner->add_state(pt.epoch, state);
+    inner->add_state(content_auth.content.epoch, state);
     inner->outbound_cache = std::nullopt;
     return true;
   }
 
-  auto maybe_next_state = inner->history.front().handle(pt);
+  auto prior_epoch = content_auth.content.epoch;
+  auto maybe_next_state =
+    inner->history.front().handle(std::move(content_auth));
   if (!maybe_next_state) {
     return false;
   }
 
-  inner->add_state(pt.epoch, opt::get(maybe_next_state));
+  inner->add_state(prior_epoch, opt::get(maybe_next_state));
   return true;
 }
 
@@ -430,7 +425,8 @@ Session::authentication_secret() const
 bytes
 Session::protect(const bytes& plaintext)
 {
-  auto ciphertext = inner->history.front().protect(plaintext);
+  auto ciphertext =
+    inner->history.front().protect_app(plaintext, { true, {}, 0 });
   return tls::marshal(ciphertext);
 }
 
@@ -440,9 +436,9 @@ Session::protect(const bytes& plaintext)
 bytes
 Session::unprotect(const bytes& ciphertext)
 {
-  auto ciphertext_obj = tls::get<MLSCiphertext>(ciphertext);
-  auto& state = inner->for_epoch(ciphertext_obj.epoch);
-  return state.unprotect(ciphertext_obj);
+  auto ciphertext_obj = tls::get<MLSMessage>(ciphertext);
+  auto& state = inner->for_epoch(ciphertext_obj.epoch());
+  return state.unprotect_app(ciphertext_obj);
 }
 
 bool
