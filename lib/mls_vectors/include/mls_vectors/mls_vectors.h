@@ -10,33 +10,6 @@
 
 namespace mls_vectors {
 
-// XXX(RLB) This construction is a little awkward, but otherwise, when we go to
-// serialize as JSON, some compilers have a hard time distinguishing between
-// `bytes` and `std::vector<uint8_t>` (perhaps because type aliasing rules say
-// they shouldn't!).  So we need to tag these vectors explicitly by wrapping
-// them in a different type.
-struct HexBytes
-{
-  bytes data;
-
-  HexBytes() = default;
-
-  HexBytes(bytes data_in)
-    : data(std::move(data_in))
-  {}
-
-  HexBytes(std::vector<uint8_t> data_in)
-    : data(std::move(data_in))
-  {}
-
-  operator const std::vector<uint8_t>&() const { return data; }
-  operator const bytes&() const { return data; }
-  operator bytes&() { return data; }
-};
-
-bool
-operator==(const bytes& b, const HexBytes& hb);
-
 struct TreeMathTestVector
 {
   using OptionalNode = std::optional<mls::NodeIndex>;
@@ -57,17 +30,17 @@ struct EncryptionTestVector
 {
   struct SenderDataInfo
   {
-    HexBytes ciphertext;
-    HexBytes key;
-    HexBytes nonce;
+    bytes ciphertext;
+    bytes key;
+    bytes nonce;
   };
 
   struct RatchetStep
   {
-    HexBytes key;
-    HexBytes nonce;
-    HexBytes plaintext;
-    HexBytes ciphertext;
+    bytes key;
+    bytes nonce;
+    bytes plaintext;
+    bytes ciphertext;
   };
 
   struct LeafInfo
@@ -79,9 +52,9 @@ struct EncryptionTestVector
 
   mls::CipherSuite cipher_suite;
 
-  HexBytes tree;
-  HexBytes encryption_secret;
-  HexBytes sender_data_secret;
+  bytes tree;
+  bytes encryption_secret;
+  bytes sender_data_secret;
   SenderDataInfo sender_data_info;
 
   std::vector<LeafInfo> leaves;
@@ -96,44 +69,44 @@ struct KeyScheduleTestVector
 {
   struct ExternalPSKInfo
   {
-    HexBytes id;
-    HexBytes nonce;
-    HexBytes secret;
+    bytes id;
+    bytes nonce;
+    bytes secret;
   };
 
   struct Epoch
   {
     // Chosen by the generator
-    HexBytes tree_hash;
-    HexBytes commit_secret;
-    HexBytes confirmed_transcript_hash;
+    bytes tree_hash;
+    bytes commit_secret;
+    bytes confirmed_transcript_hash;
     std::vector<ExternalPSKInfo> external_psks;
-    HexBytes branch_psk_nonce;
+    bytes branch_psk_nonce;
 
     // Computed values
-    HexBytes group_context;
+    bytes group_context;
 
-    HexBytes psk_secret;
-    HexBytes joiner_secret;
-    HexBytes welcome_secret;
-    HexBytes init_secret;
+    bytes psk_secret;
+    bytes joiner_secret;
+    bytes welcome_secret;
+    bytes init_secret;
 
-    HexBytes sender_data_secret;
-    HexBytes encryption_secret;
-    HexBytes exporter_secret;
-    HexBytes authentication_secret;
-    HexBytes external_secret;
-    HexBytes confirmation_key;
-    HexBytes membership_key;
-    HexBytes resumption_secret;
+    bytes sender_data_secret;
+    bytes encryption_secret;
+    bytes exporter_secret;
+    bytes authentication_secret;
+    bytes external_secret;
+    bytes confirmation_key;
+    bytes membership_key;
+    bytes resumption_secret;
 
     mls::HPKEPublicKey external_pub;
   };
 
   mls::CipherSuite cipher_suite;
 
-  HexBytes group_id;
-  HexBytes initial_init_secret;
+  bytes group_id;
+  bytes initial_init_secret;
 
   std::vector<Epoch> epochs;
 
@@ -147,20 +120,20 @@ struct TranscriptTestVector
 {
   mls::CipherSuite cipher_suite;
 
-  HexBytes group_id;
+  bytes group_id;
   mls::epoch_t epoch;
-  HexBytes tree_hash_before;
-  HexBytes confirmed_transcript_hash_before;
-  HexBytes interim_transcript_hash_before;
+  bytes tree_hash_before;
+  bytes confirmed_transcript_hash_before;
+  bytes interim_transcript_hash_before;
 
-  HexBytes membership_key;
-  HexBytes confirmation_key;
+  bytes membership_key;
+  bytes confirmation_key;
   mls::Credential credential;
   mls::MLSPlaintext commit;
 
-  HexBytes group_context;
-  HexBytes confirmed_transcript_hash_after;
-  HexBytes interim_transcript_hash_after;
+  bytes group_context;
+  bytes confirmed_transcript_hash_after;
+  bytes interim_transcript_hash_after;
 
   static TranscriptTestVector create(mls::CipherSuite suite);
   std::optional<std::string> verify() const;
@@ -169,24 +142,24 @@ struct TranscriptTestVector
 struct TreeKEMTestVector
 {
   mls::CipherSuite cipher_suite;
-  HexBytes group_id;
+  bytes group_id;
 
   mls::TreeKEMPublicKey ratchet_tree_before;
 
   mls::LeafIndex add_sender;
-  HexBytes my_leaf_secret;
+  bytes my_leaf_secret;
   mls::LeafNode my_leaf_node;
-  HexBytes my_path_secret;
+  bytes my_path_secret;
 
   mls::LeafIndex update_sender;
   mls::UpdatePath update_path;
-  HexBytes update_group_context;
+  bytes update_group_context;
 
-  HexBytes tree_hash_before;
-  HexBytes root_secret_after_add;
-  HexBytes root_secret_after_update;
+  bytes tree_hash_before;
+  bytes root_secret_after_add;
+  bytes root_secret_after_update;
   mls::TreeKEMPublicKey ratchet_tree_after;
-  HexBytes tree_hash_after;
+  bytes tree_hash_after;
 
   static TreeKEMTestVector create(mls::CipherSuite suite, size_t n_leaves);
   void initialize_trees();
@@ -195,29 +168,29 @@ struct TreeKEMTestVector
 
 struct MessagesTestVector
 {
-  HexBytes key_package;
-  HexBytes ratchet_tree;
+  bytes key_package;
+  bytes ratchet_tree;
 
-  HexBytes group_info;
-  HexBytes group_secrets;
-  HexBytes welcome;
+  bytes group_info;
+  bytes group_secrets;
+  bytes welcome;
 
-  HexBytes public_group_state;
+  bytes public_group_state;
 
-  HexBytes add_proposal;
-  HexBytes update_proposal;
-  HexBytes remove_proposal;
-  HexBytes pre_shared_key_proposal;
-  HexBytes re_init_proposal;
-  HexBytes external_init_proposal;
-  HexBytes app_ack_proposal;
+  bytes add_proposal;
+  bytes update_proposal;
+  bytes remove_proposal;
+  bytes pre_shared_key_proposal;
+  bytes re_init_proposal;
+  bytes external_init_proposal;
+  bytes app_ack_proposal;
 
-  HexBytes commit;
+  bytes commit;
 
-  HexBytes mls_plaintext_application;
-  HexBytes mls_plaintext_proposal;
-  HexBytes mls_plaintext_commit;
-  HexBytes mls_ciphertext;
+  bytes mls_plaintext_application;
+  bytes mls_plaintext_proposal;
+  bytes mls_plaintext_commit;
+  bytes mls_ciphertext;
 
   static MessagesTestVector create();
   std::optional<std::string> verify() const;

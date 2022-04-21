@@ -9,15 +9,13 @@ using nlohmann::json;
 /// Serializers for foreign types
 ///
 
-// HexBytes
-namespace mls_vectors {
-void
-to_json(json& j, const HexBytes& v);
-void
-from_json(const json& j, HexBytes& v);
-}
-
 namespace nlohmann {
+
+// bytes
+void
+to_json(json& j, const bytes& v);
+void
+from_json(const json& j, bytes& v);
 
 // std::optional<T>
 template<typename T>
@@ -82,13 +80,11 @@ struct adl_serializer<mls::CipherSuite>
 template<typename T>
 struct tls_serializer
 {
-  static void to_json(json& j, const T& v)
-  {
-    j = mls_vectors::HexBytes(tls::marshal(v));
-  }
+  static void to_json(json& j, const T& v) { j = bytes(tls::marshal(v)); }
+
   static void from_json(const json& j, T& v)
   {
-    v = tls::get<T>(j.get<mls_vectors::HexBytes>());
+    v = tls::get<T>(j.get<bytes>());
   }
 };
 

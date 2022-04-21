@@ -52,12 +52,6 @@ operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
   return str << "[TreeKEMPublicKey]";
 }
 
-bool
-operator==(const bytes& b, const HexBytes& hb)
-{
-  return b == hb.data;
-}
-
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY(label, test)                                                    \
   if (!(test)) {                                                               \
