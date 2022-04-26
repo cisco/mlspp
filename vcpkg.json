@@ -3,7 +3,7 @@
   "version-string": "0.1",
   "description": "Cisco MLS C++ library",
   "dependencies": [
-    "openssl",
+    "openssl1",
     "doctest"
   ]
 }
