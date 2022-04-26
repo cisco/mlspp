@@ -3,7 +3,7 @@
   "version-string": "0.1",
   "description": "Interop harness for Cisco MLS C++ library",
   "dependencies": [
-    "openssl",
+    "openssl1",
     "protobuf",
     "grpc",
     "gflags",
