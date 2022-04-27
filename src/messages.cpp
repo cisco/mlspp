@@ -462,7 +462,7 @@ MLSPlaintext::verify_membership_tag(const bytes& tag) const
     return false;
   }
 
-  return constant_time_eq(tag, opt::get(membership_tag).mac_value);
+  return tag == opt::get(membership_tag).mac_value;
 }
 
 } // namespace mls

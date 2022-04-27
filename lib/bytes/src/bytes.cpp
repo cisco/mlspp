@@ -10,25 +10,36 @@ namespace bytes_ns {
 bool
 bytes::operator==(const bytes& other) const
 {
-  return _data == other._data;
+  return *this == other._data;
 }
 
 bool
 bytes::operator!=(const bytes& other) const
 {
-  return _data != other._data;
+  return !(*this == other._data);
 }
 
 bool
 bytes::operator==(const std::vector<uint8_t>& other) const
 {
-  return other == _data;
+  size_t size = other.size();
+  if (_data.size() != size) {
+    return false;
+  }
+
+  unsigned char diff = 0;
+  for (size_t i = 0; i < size; ++i) {
+    // Not sure why the linter thinks `diff` is signed
+    // NOLINTNEXTLINE(hicpp-signed-bitwise)
+    diff |= (_data.at(i) ^ other.at(i));
+  }
+  return (diff == 0);
 }
 
 bool
 bytes::operator!=(const std::vector<uint8_t>& other) const
 {
-  return other != _data;
+  return !(*this == other);
 }
 
 bytes&
