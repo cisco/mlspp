@@ -175,8 +175,6 @@ struct MessagesTestVector
   bytes group_secrets;
   bytes welcome;
 
-  bytes public_group_state;
-
   bytes add_proposal;
   bytes update_proposal;
   bytes remove_proposal;

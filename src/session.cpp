@@ -415,12 +415,6 @@ Session::do_export(const std::string& label,
   return inner->history.front().do_export(label, context, size);
 }
 
-PublicGroupState
-Session::public_group_state() const
-{
-  return inner->history.front().public_group_state();
-}
-
 std::vector<LeafNode>
 Session::roster() const
 {

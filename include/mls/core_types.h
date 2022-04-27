@@ -34,10 +34,10 @@ struct Extension
 
 struct ExtensionType
 {
-  static constexpr Extension::Type key_id = 3;
-  static constexpr Extension::Type parent_hash = 4;
-  static constexpr Extension::Type ratchet_tree = 5;
-  static constexpr Extension::Type required_capabilities = 6;
+  static constexpr Extension::Type external_key_id = 1;
+  static constexpr Extension::Type ratchet_tree = 2;
+  static constexpr Extension::Type required_capabilities = 3;
+  static constexpr Extension::Type external_pub = 4;
 
   // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
   // a value from the vendor-specific space
@@ -244,7 +244,7 @@ struct RequiredCapabilitiesExtension
   TLS_SERIALIZABLE(extensions, proposals)
 };
 
-struct KeyIDExtension
+struct ExternalKeyIDExtension
 {
   bytes key_id;
 

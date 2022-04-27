@@ -10,6 +10,14 @@
 
 namespace mls {
 
+struct ExternalPubExtension
+{
+  HPKEPublicKey external_pub;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(external_pub)
+};
+
 struct RatchetTreeExtension
 {
   TreeKEMPublicKey tree;
@@ -35,13 +43,6 @@ struct SFrameCapabilities
 
   static const uint16_t type;
   TLS_SERIALIZABLE(cipher_suites)
-};
-
-struct MAC
-{
-  bytes mac_value;
-
-  TLS_SERIALIZABLE(mac_value)
 };
 
 ///
@@ -97,38 +98,40 @@ struct PSKWithSecret
 
 // struct {
 //     CipherSuite cipher_suite;
-//     opaque group_id<0..255>;
+//     opaque group_id<V>;
 //     uint64 epoch;
-//     opaque tree_hash<0..255>;
-//     opaque interim_transcript_hash<0..255>;
-//     Extension group_context_extensions<0..2^32-1>;
-//     Extension other_extensions<0..2^32-1>;
-//     HPKEPublicKey external_pub;
+//     opaque tree_hash<V>;
+//     opaque confirmed_transcript_hash<V>;
+//     Extension group_context_extensions<V>;
+//     Extension other_extensions<V>;
+//     MAC confirmation_tag;
 //     LeafNodeRef signer;
-//     opaque signature<0..2^16-1>;
-// } PublicGroupState;
-struct PublicGroupState
+//     // SignWithLabel(., "GroupInfoTBS", GroupInfoTBS)
+//     opaque signature<V>;
+// } GroupInfo;
+struct GroupInfo
 {
   CipherSuite cipher_suite;
   bytes group_id;
   epoch_t epoch;
   bytes tree_hash;
-  bytes interim_transcript_hash;
+  bytes confirmed_transcript_hash;
   ExtensionList group_context_extensions;
   ExtensionList other_extensions;
-  HPKEPublicKey external_pub;
+
+  bytes confirmation_tag;
   LeafNodeRef signer;
   bytes signature;
 
-  PublicGroupState() = default;
-  PublicGroupState(CipherSuite cipher_suite_in,
-                   bytes group_id_in,
-                   epoch_t epoch_in,
-                   bytes tree_hash_in,
-                   bytes interim_transcript_hash_in,
-                   ExtensionList group_context_extensions_in,
-                   ExtensionList other_extensions_in,
-                   HPKEPublicKey external_pub_in);
+  GroupInfo() = default;
+  GroupInfo(CipherSuite cipher_suite_in,
+            bytes group_id_in,
+            epoch_t epoch_in,
+            bytes tree_hash_in,
+            bytes confirmed_transcript_hash_in,
+            ExtensionList group_context_extensions_in,
+            ExtensionList other_extensions_in,
+            bytes confirmation_tag_in);
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
@@ -138,57 +141,6 @@ struct PublicGroupState
 
   TLS_SERIALIZABLE(cipher_suite,
                    group_id,
-                   epoch,
-                   tree_hash,
-                   interim_transcript_hash,
-                   group_context_extensions,
-                   other_extensions,
-                   external_pub,
-                   signer,
-                   signature)
-};
-
-// struct {
-//   opaque group_id<0..255>;
-//   uint64 epoch;
-//   opaque tree_hash<0..255>;
-//   opaque confirmed_transcript_hash<0..255>;
-//   Extension group_context_extensions<0..2^32-1>;
-//   Extension other_extensions<0..2^32-1>;
-//   MAC confirmation_tag;
-//   LeafNodeRef signer;
-//   opaque signature<0..2^16-1>;
-// } GroupInfo;
-struct GroupInfo
-{
-public:
-  bytes group_id;
-  epoch_t epoch;
-  bytes tree_hash;
-  bytes confirmed_transcript_hash;
-  ExtensionList group_context_extensions;
-  ExtensionList other_extensions;
-
-  MAC confirmation_tag;
-  LeafNodeRef signer;
-  bytes signature;
-
-  GroupInfo() = default;
-  GroupInfo(bytes group_id_in,
-            epoch_t epoch_in,
-            bytes tree_hash_in,
-            bytes confirmed_transcript_hash_in,
-            ExtensionList group_context_extensions_in,
-            ExtensionList other_extensions_in,
-            MAC confirmation_tag_in);
-
-  bytes to_be_signed() const;
-  void sign(const TreeKEMPublicKey& tree,
-            LeafNodeRef signer_ref,
-            const SignaturePrivateKey& priv);
-  bool verify(const TreeKEMPublicKey& tree) const;
-
-  TLS_SERIALIZABLE(group_id,
                    epoch,
                    tree_hash,
                    confirmed_transcript_hash,
@@ -494,8 +446,8 @@ struct MLSPlaintext
   var::variant<ApplicationData, Proposal, Commit> content;
 
   bytes signature;
-  std::optional<MAC> confirmation_tag;
-  std::optional<MAC> membership_tag;
+  std::optional<bytes> confirmation_tag;
+  std::optional<bytes> membership_tag;
 
   // Constructor for unmarshaling directly
   MLSPlaintext();

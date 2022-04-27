@@ -492,16 +492,17 @@ Status
 MLSClientImpl::external_join(const ExternalJoinRequest* request,
                              ExternalJoinResponse* response)
 {
-  auto pgs_data = string_to_bytes(request->public_group_state());
-  auto pgs = tls::get<mls::PublicGroupState>(pgs_data);
+  const auto group_info_data = string_to_bytes(request->public_group_state());
+  const auto group_info = tls::get<mls::GroupInfo>(group_info_data);
+  const auto suite = group_info.cipher_suite;
 
-  auto init_priv = mls::HPKEPrivateKey::generate(pgs.cipher_suite);
-  auto leaf_priv = mls::HPKEPrivateKey::generate(pgs.cipher_suite);
-  auto sig_priv = mls::SignaturePrivateKey::generate(pgs.cipher_suite);
-  auto cred = mls::Credential::basic({}, pgs.cipher_suite, sig_priv.public_key);
+  auto init_priv = mls::HPKEPrivateKey::generate(suite);
+  auto leaf_priv = mls::HPKEPrivateKey::generate(suite);
+  auto sig_priv = mls::SignaturePrivateKey::generate(suite);
+  auto cred = mls::Credential::basic({}, suite, sig_priv.public_key);
 
   auto leaf = mls::LeafNode{
-    pgs.cipher_suite,
+    suite,
     leaf_priv.public_key,
     cred,
     mls::Capabilities::create_default(),
@@ -510,12 +511,11 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
     sig_priv,
   };
 
-  auto kp =
-    mls::KeyPackage(pgs.cipher_suite, init_priv.public_key, leaf, {}, sig_priv);
+  auto kp = mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
 
-  auto leaf_secret = mls::random_bytes(pgs.cipher_suite.secret_size());
-  auto [commit, state] =
-    mls::State::external_join(leaf_secret, sig_priv, kp, pgs, std::nullopt);
+  auto leaf_secret = mls::random_bytes(suite.secret_size());
+  auto [commit, state] = mls::State::external_join(
+    leaf_secret, sig_priv, kp, group_info, std::nullopt);
   auto commit_data = tls::marshal(commit);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
@@ -530,8 +530,8 @@ MLSClientImpl::public_group_state(CachedState& entry,
                                   const PublicGroupStateRequest* /* request */,
                                   PublicGroupStateResponse* response)
 {
-  auto pgs = tls::marshal(entry.state.public_group_state());
-  response->set_public_group_state(bytes_to_string(pgs));
+  auto group_info_data = tls::marshal(entry.state.group_info());
+  response->set_public_group_state(bytes_to_string(group_info_data));
   return Status::OK;
 }
 

@@ -513,11 +513,10 @@ TranscriptTestVector::create(CipherSuite suite)
   commit.sign(suite, group_context, sig_priv);
 
   transcript.update_confirmed(commit);
-  commit.confirmation_tag =
-    MAC{ ks_epoch.confirmation_tag(transcript.confirmed) };
+  commit.confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
 
   transcript.update_interim(commit);
-  commit.membership_tag = MAC{ ks_epoch.membership_tag(group_context, commit) };
+  commit.membership_tag = ks_epoch.membership_tag(group_context, commit);
 
   return {
     suite,
@@ -567,13 +566,11 @@ TranscriptTestVector::verify() const
   ks_epoch.membership_key = membership_key;
 
   auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  VERIFY_EQUAL("confirmation",
-               confirmation_tag,
-               opt::get(commit.confirmation_tag).mac_value);
+  VERIFY_EQUAL(
+    "confirmation", confirmation_tag, opt::get(commit.confirmation_tag));
 
   auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit);
-  VERIFY_EQUAL(
-    "membership", membership_tag, opt::get(commit.membership_tag).mac_value);
+  VERIFY_EQUAL("membership", membership_tag, opt::get(commit.membership_tag));
 
   return std::nullopt;
 }
@@ -765,7 +762,7 @@ MessagesTestVector::create()
   auto group_id = bytes(16, 0xD2);
   auto opaque = bytes(32, 0xD3);
   auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
-  auto mac = MAC{ bytes(32, 0xD5) };
+  auto mac = bytes(32, 0xD5);
 
   auto version = ProtocolVersion::mls10;
   auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
@@ -794,7 +791,7 @@ MessagesTestVector::create()
   auto leaf_node_ref = leaf_node.ref(suite);
   auto sender = Sender{ leaf_node_ref };
 
-  auto key_id_ext = KeyIDExtension{ opaque };
+  auto key_id_ext = ExternalKeyIDExtension{ opaque };
 
   auto ext_list = ExtensionList{};
   ext_list.add(key_id_ext);
@@ -805,8 +802,8 @@ MessagesTestVector::create()
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info =
-    GroupInfo{ group_id, epoch, opaque, opaque, ext_list, ext_list, mac };
+  auto group_info = GroupInfo{ suite,  group_id, epoch,    opaque,
+                               opaque, ext_list, ext_list, mac };
   auto group_secrets = GroupSecrets{ opaque,
                                      { { opaque } },
                                      PreSharedKeys{ {
@@ -815,12 +812,6 @@ MessagesTestVector::create()
                                      } } };
   auto welcome = Welcome{ suite, opaque, {}, group_info };
   welcome.encrypt(key_package, opaque);
-
-  // PublicGroupState
-  auto public_group_state =
-    PublicGroupState{ suite,  group_id, epoch,    opaque,
-                      opaque, ext_list, ext_list, hpke_pub };
-  public_group_state.sign(tree, leaf_node_ref, sig_priv);
 
   // Proposals
   auto add = Add{ key_package };
@@ -878,8 +869,6 @@ MessagesTestVector::create()
     tls::marshal(group_secrets),
     tls::marshal(welcome),
 
-    tls::marshal(public_group_state),
-
     tls::marshal(add),
     tls::marshal(update),
     tls::marshal(remove),
@@ -906,8 +895,6 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info);
   VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets);
   VERIFY_TLS_RTT("Welcome", Welcome, welcome);
-
-  VERIFY_TLS_RTT("PublicGroupState", PublicGroupState, public_group_state);
 
   VERIFY_TLS_RTT("Add", Add, add_proposal);
   VERIFY_TLS_RTT("Update", Update, update_proposal);

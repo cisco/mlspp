@@ -10,14 +10,14 @@ using namespace mls_vectors;
 
 TEST_CASE("Extensions")
 {
-  auto kid0 = KeyIDExtension{ { 0, 1, 2, 3 } };
+  auto kid0 = ExternalKeyIDExtension{ { 0, 1, 2, 3 } };
   auto tree0 = RatchetTreeExtension{};
 
   ExtensionList exts;
   exts.add(kid0);
   exts.add(tree0);
 
-  auto kid1 = exts.find<KeyIDExtension>();
+  auto kid1 = exts.find<ExternalKeyIDExtension>();
   auto tree1 = exts.find<RatchetTreeExtension>();
 
   REQUIRE(kid0 == kid1);
