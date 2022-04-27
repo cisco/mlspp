@@ -3,7 +3,17 @@
   "version-string": "0.1",
   "description": "Cisco MLS C++ library",
   "dependencies": [
-    "openssl",
+    {
+      "name": "openssl",
+      "version>=": "1.1.1n"
+    },
     "doctest"
+  ],
+  "builtin-baseline": "3b3bd424827a1f7f4813216f6b32b6c61e386b2e",
+  "overrides": [
+    {
+      "name": "openssl",
+      "version-string": "1.1.1n"
+    }
   ]
 }

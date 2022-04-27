@@ -229,26 +229,6 @@ CipherSuite::reference_label<MLSPlaintext>()
 }
 
 ///
-/// Utilities
-///
-bool
-constant_time_eq(const bytes& lhs, const bytes& rhs)
-{
-  size_t size = lhs.size();
-  if (rhs.size() > size) {
-    size = rhs.size();
-  }
-
-  unsigned char diff = 0;
-  for (size_t i = 0; i < size; ++i) {
-    // Not sure why the linter thinks `diff` is signed
-    // NOLINTNEXTLINE(hicpp-signed-bitwise)
-    diff |= (lhs.at(i) ^ rhs.at(i));
-  }
-  return (diff == 0);
-}
-
-///
 /// HPKEPublicKey and HPKEPrivateKey
 ///
 HPKECiphertext

@@ -111,9 +111,6 @@ extern const std::array<CipherSuite::ID, 6> all_supported_suites;
 // Utilities
 using hpke::random_bytes;
 
-bool
-constant_time_eq(const bytes& lhs, const bytes& rhs);
-
 // HPKE Keys
 struct HPKECiphertext
 {

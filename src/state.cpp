@@ -1051,7 +1051,7 @@ bool
 State::verify_confirmation(const bytes& confirmation) const
 {
   auto confirm = _key_schedule.confirmation_tag(_transcript_hash.confirmed);
-  return constant_time_eq(confirm, confirmation);
+  return confirm == confirmation;
 }
 
 bytes

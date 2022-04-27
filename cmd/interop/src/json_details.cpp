@@ -4,18 +4,18 @@
 /// Bytes
 ///
 
-namespace mls_vectors {
+namespace nlohmann {
 
 void
-to_json(json& j, const HexBytes& v)
+to_json(json& j, const bytes& v)
 {
-  j = to_hex(v.data);
+  j = to_hex(v);
 }
 
 void
-from_json(const json& j, HexBytes& v)
+from_json(const json& j, bytes& v)
 {
-  v.data = from_hex(j.get<std::string>());
+  v = from_hex(j.get<std::string>());
 }
 
 } // namespace mls_vectors
