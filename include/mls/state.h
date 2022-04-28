@@ -253,9 +253,9 @@ protected:
                             const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
-  bool verify_internal(const MLSMessageContentAuth& pt) const;
-  bool verify_new_member(const MLSMessageContentAuth& pt) const;
-  bool verify(const MLSMessageContentAuth& pt) const;
+  bool verify_internal(const MLSMessageContentAuth& content_auth) const;
+  bool verify_new_member(const MLSMessageContentAuth& content_auth) const;
+  bool verify(const MLSMessageContentAuth& content_auth) const;
 
   // Convert a Roster entry into LeafNodeRef
   LeafNodeRef leaf_for_roster_entry(RosterIndex index) const;

@@ -322,7 +322,7 @@ operator==(const MLSMessageAuth& lhs, const MLSMessageAuth& rhs)
 // } MLSMessageContentTBS;
 struct MLSMessageContentTBS
 {
-  WireFormat wire_format;
+  WireFormat wire_format = WireFormat::reserved;
   const MLSMessageContent& content;
   const std::optional<GroupContext>& context;
 };
@@ -533,8 +533,8 @@ MLSPlaintext::unprotect(CipherSuite suite,
 
   return MLSMessageContentAuth{
     WireFormat::mls_plaintext,
-    std::move(content),
-    std::move(auth),
+    content,
+    auth,
   };
 }
 
@@ -800,8 +800,8 @@ MLSCiphertext::MLSCiphertext(MLSMessageContent content,
                              bytes encrypted_sender_data_in,
                              bytes ciphertext_in)
   : group_id(std::move(content.group_id))
-  , epoch(std::move(content.epoch))
-  , content_type(std::move(content.content_type()))
+  , epoch(content.epoch)
+  , content_type(content.content_type())
   , authenticated_data(std::move(content.authenticated_data))
   , encrypted_sender_data(std::move(encrypted_sender_data_in))
   , ciphertext(std::move(ciphertext_in))

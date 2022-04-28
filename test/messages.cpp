@@ -87,7 +87,7 @@ protected:
   const LeafIndex index{ 0 };
   const size_t padding_size = 1024;
 
-  LeafNodeRef leaf_node_ref;
+  LeafNodeRef leaf_node_ref{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   TreeKEMPublicKey tree{ suite };
   GroupKeySource keys;
 
@@ -105,6 +105,7 @@ TEST_CASE_FIXTURE(MLSMessageTest, "MLSMessageContentAuth Sign/Verify")
   REQUIRE(content_auth.content == application_content);
 
   // Verify that `mls_plaintext` is forbidden for ApplicationData
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
   REQUIRE_THROWS(MLSMessageContentAuth::sign(
     WireFormat::mls_plaintext, application_content, suite, sig_priv, context));
 }

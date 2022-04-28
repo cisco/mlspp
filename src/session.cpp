@@ -193,7 +193,7 @@ MLSMessageContentAuth
 Session::Inner::import_message(const bytes& encoded)
 {
   auto mls_message = tls::get<MLSMessage>(encoded);
-  auto content_auth = history.front().unprotect(std::move(mls_message));
+  auto content_auth = history.front().unprotect(mls_message);
 
   switch (content_auth.wire_format) {
     case WireFormat::mls_plaintext:
@@ -306,7 +306,7 @@ Session::commit(const std::vector<bytes>& proposals)
       throw ProtocolError("Only proposals can be committed");
     }
 
-    inner->history.front().handle(std::move(content_auth));
+    inner->history.front().handle(content_auth);
   }
 
   return commit();
@@ -356,8 +356,7 @@ Session::handle(const bytes& handshake_data)
   }
 
   auto prior_epoch = content_auth.content.epoch;
-  auto maybe_next_state =
-    inner->history.front().handle(std::move(content_auth));
+  auto maybe_next_state = inner->history.front().handle(content_auth);
   if (!maybe_next_state) {
     return false;
   }

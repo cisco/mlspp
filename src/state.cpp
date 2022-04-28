@@ -296,7 +296,7 @@ State::unprotect(const MLSMessage& msg)
     },
   };
 
-  return var::visit(unprotect, std::move(msg.message));
+  return var::visit(unprotect, msg.message);
 }
 
 Proposal
@@ -543,7 +543,7 @@ State::commit(const bytes& leaf_secret,
     next._transcript_hash.confirmed,
     next._extensions,
     { /* No other extensions */ },
-    { std::move(confirmation_tag) },
+    { confirmation_tag },
   };
   if (opts && opt::get(opts).inline_tree) {
     group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
@@ -997,9 +997,9 @@ State::protect_app(const bytes& pt, const MessageOpts& msg_opts)
 }
 
 bytes
-State::unprotect_app(const MLSMessage& msg)
+State::unprotect_app(const MLSMessage& ct)
 {
-  auto content_auth = unprotect(msg);
+  auto content_auth = unprotect(ct);
 
   if (!verify(content_auth)) {
     // TODO(rlb): Verify that sender is internal (!)

@@ -173,7 +173,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
   auto gce = first1.group_context_extensions_proposal(second_exts);
   auto [commit2, welcome2, first2_] =
     first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false, {} }, {});
-  auto second2 = second1.handle(std::move(commit2));
+  auto second2 = second1.handle(commit2);
   silence_unused(welcome2);
   auto first2 = first2_;
   REQUIRE(first2 == second2);
@@ -249,7 +249,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
                                                 {});
 
   // Creator processes the commit
-  auto first1 = opt::get(first0.handle(std::move(commit)));
+  auto first1 = opt::get(first0.handle(commit));
 
   auto group = std::vector<State>{ first1, second0 };
   verify_group_functionality(group);
@@ -272,7 +272,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
     fresh_secret(), identity_privs[1], key_packages[1], group_info, tree, {});
 
   // Creator processes the commit
-  auto first1 = opt::get(first0.handle(std::move(commit)));
+  auto first1 = opt::get(first0.handle(commit));
 
   auto group = std::vector<State>{ first1, second0 };
   verify_group_functionality(group);
