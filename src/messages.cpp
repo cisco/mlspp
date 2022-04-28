@@ -327,7 +327,7 @@ struct MLSMessageContentTBS
   const std::optional<GroupContext>& context;
 };
 
-tls::ostream&
+static tls::ostream&
 operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
 {
   str << ProtocolVersion::mls10 << obj.wire_format << obj.content;
@@ -603,7 +603,7 @@ operator>>(tls::istream& str, MLSPlaintext& obj)
 //     MLSMessageAuth auth;
 //     opaque padding<V>;
 // } MLSCiphertextContent;
-bytes
+static bytes
 marshal_ciphertext_content(const MLSMessageContent& content,
                            const MLSMessageAuth& auth,
                            size_t padding_size)
@@ -614,7 +614,7 @@ marshal_ciphertext_content(const MLSMessageContent& content,
   return w.bytes();
 }
 
-void
+static void
 unmarshal_ciphertext_content(const bytes& content_pt,
                              MLSMessageContent& content,
                              MLSMessageAuth& auth)
