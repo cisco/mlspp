@@ -45,8 +45,11 @@ State::State(bytes group_id,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Update the interim transcript hash with a virtual confirmation tag
-  _transcript_hash.update_interim(
-    _key_schedule.confirmation_tag(_transcript_hash.confirmed));
+  const auto& confirmation_key = _key_schedule.confirmation_key;
+  const auto& confirmed_transcript_hash = _transcript_hash.confirmed;
+  const auto confirmation_tag = MLSMessageContentAuth::confirmation_mac(
+    _suite, confirmation_key, confirmed_transcript_hash);
+  _transcript_hash.update_interim(confirmation_tag);
 }
 
 TreeKEMPublicKey
@@ -150,7 +153,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _group_id = group_info.group_id;
 
   _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
-  _transcript_hash.update_interim(group_info.confirmation_tag.mac_value);
+  _transcript_hash.update_interim(group_info.confirmation_tag);
 
   _extensions = group_info.group_context_extensions;
 
@@ -193,15 +196,24 @@ std::tuple<MLSMessage, State>
 State::external_join(const bytes& leaf_secret,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& kp,
-                     const PublicGroupState& pgs,
+                     const GroupInfo& group_info,
                      const std::optional<TreeKEMPublicKey>& tree,
                      const MessageOpts& msg_opts)
 {
-  auto initial_state = State(std::move(sig_priv), pgs, tree);
+  auto initial_state = State(std::move(sig_priv), group_info, tree);
+
+  const auto maybe_external_pub =
+    group_info.other_extensions.find<ExternalPubExtension>();
+  if (!maybe_external_pub) {
+    throw InvalidParameterError("No external pub in GroupInfo");
+  }
+
+  const auto& external_pub = opt::get(maybe_external_pub).external_pub;
+
   auto add = initial_state.add_proposal(kp);
   auto opts = CommitOpts{ { add }, false, false, {} };
   auto [commit_msg, welcome, state] =
-    initial_state.commit(leaf_secret, opts, msg_opts, kp, pgs.external_pub);
+    initial_state.commit(leaf_secret, opts, msg_opts, kp, external_pub);
   silence_unused(welcome);
   return { commit_msg, state };
 }
@@ -531,6 +543,7 @@ State::commit(const bytes& leaf_secret,
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
+    next._suite,
     next._group_id,
     next._epoch,
     next._tree.root_hash(),
@@ -1128,6 +1141,11 @@ State::do_export(const std::string& label,
 GroupInfo
 State::group_info() const
 {
+  const auto& confirmation_key = _key_schedule.confirmation_key;
+  const auto& confirmed_transcript_hash = _transcript_hash.confirmed;
+  auto confiirmation_tag = MLSMessageContentAuth::confirmation_mac(
+    _suite, confirmation_key, confirmed_transcript_hash);
+
   auto group_info = GroupInfo{
     _suite,
     _group_id,
@@ -1136,7 +1154,7 @@ State::group_info() const
     _transcript_hash.confirmed,
     _extensions,
     { /* No other extensions */ },
-    _key_schedule.confirmation_tag(_transcript_hash.confirmed),
+    confiirmation_tag,
   };
 
   group_info.other_extensions.add(

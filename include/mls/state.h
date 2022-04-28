@@ -83,7 +83,7 @@ public:
     const bytes& leaf_secret,
     SignaturePrivateKey sig_priv,
     const KeyPackage& kp,
-    const PublicGroupState& pgs,
+    const GroupInfo& group_info,
     const std::optional<TreeKEMPublicKey>& tree,
     const MessageOpts& msg_opts);
 

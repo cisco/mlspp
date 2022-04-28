@@ -170,6 +170,10 @@ struct TranscriptHash
   TranscriptHash(CipherSuite suite_in);
 
   // For joining a group
+  TranscriptHash(CipherSuite suite_in,
+                 bytes confirmed_in,
+                 const bytes& confirmation_tag);
+
   void update(const MLSMessageContentAuth& content_auth);
   void update_confirmed(const MLSMessageContentAuth& content_auth);
   void update_interim(const bytes& confirmation_tag);

@@ -498,6 +498,15 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in)
   : suite(suite_in)
 {}
 
+TranscriptHash::TranscriptHash(CipherSuite suite_in,
+                               bytes confirmed_in,
+                               const bytes& confirmation_tag)
+  : suite(suite_in)
+  , confirmed(std::move(confirmed_in))
+{
+  update_interim(confirmation_tag);
+}
+
 void
 TranscriptHash::update(const MLSMessageContentAuth& content_auth)
 {
