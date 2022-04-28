@@ -45,11 +45,8 @@ State::State(bytes group_id,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Update the interim transcript hash with a virtual confirmation tag
-  const auto& confirmation_key = _key_schedule.confirmation_key;
-  const auto& confirmed_transcript_hash = _transcript_hash.confirmed;
-  const auto confirmation_tag = MLSMessageContentAuth::confirmation_mac(
-    _suite, confirmation_key, confirmed_transcript_hash);
-  _transcript_hash.update_interim(confirmation_tag);
+  _transcript_hash.update_interim(
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed));
 }
 
 TreeKEMPublicKey
@@ -183,10 +180,8 @@ State::State(const HPKEPrivateKey& init_priv,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
-  const auto& confirmation_key = _key_schedule.confirmation_key;
-  const auto& confirmed_transcript_hash = _transcript_hash.confirmed;
-  auto confirmation_tag = MLSMessageContentAuth::confirmation_mac(
-    _suite, confirmation_key, confirmed_transcript_hash);
+  const auto confirmation_tag =
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed);
   if (confirmation_tag != group_info.confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
@@ -530,14 +525,12 @@ State::commit(const bytes& leaf_secret,
   next.update_epoch_secrets(
     commit_secret, { /* no PSKs */ }, force_init_secret);
 
-  const auto& confirmation_key = next._key_schedule.confirmation_key;
-  const auto& confirmed_transcript_hash = next._transcript_hash.confirmed;
-  commit_content_auth.set_confirmation_tag(
-    _suite, confirmation_key, confirmed_transcript_hash);
+  const auto confirmation_tag =
+    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
+  commit_content_auth.set_confirmation_tag(confirmation_tag);
 
   next._transcript_hash.update_interim(commit_content_auth);
 
-  auto confirmation_tag = opt::get(commit_content_auth.auth.confirmation_tag);
   auto commit_message =
     protect(std::move(commit_content_auth), msg_opts.padding_size);
 
@@ -736,10 +729,9 @@ State::handle(const MLSMessageContentAuth& content_auth)
     commit_secret, { /* no PSKs */ }, force_init_secret);
 
   // Verify the confirmation MAC
-  const auto& confirmation_key = next._key_schedule.confirmation_key;
-  const auto& confirmed_transcript_hash = next._transcript_hash.confirmed;
-  if (!content_auth.check_confirmation_tag(
-        _suite, confirmation_key, confirmed_transcript_hash)) {
+  const auto confirmation_tag =
+    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
+  if (!content_auth.check_confirmation_tag(confirmation_tag)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -1141,11 +1133,6 @@ State::do_export(const std::string& label,
 GroupInfo
 State::group_info() const
 {
-  const auto& confirmation_key = _key_schedule.confirmation_key;
-  const auto& confirmed_transcript_hash = _transcript_hash.confirmed;
-  auto confiirmation_tag = MLSMessageContentAuth::confirmation_mac(
-    _suite, confirmation_key, confirmed_transcript_hash);
-
   auto group_info = GroupInfo{
     _suite,
     _group_id,
@@ -1154,7 +1141,7 @@ State::group_info() const
     _transcript_hash.confirmed,
     _extensions,
     { /* No other extensions */ },
-    confiirmation_tag,
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed),
   };
 
   group_info.other_extensions.add(

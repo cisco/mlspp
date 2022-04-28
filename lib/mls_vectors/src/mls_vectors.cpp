@@ -567,10 +567,8 @@ TranscriptTestVector::create(CipherSuite suite)
 
   transcript.update_confirmed(commit_content_auth);
 
-  const auto& confirmation_key = ks_epoch.confirmation_key;
-  const auto& confirmed_transcript_hash = transcript.confirmed;
-  commit_content_auth.set_confirmation_tag(
-    suite, confirmation_key, confirmed_transcript_hash);
+  const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
+  commit_content_auth.set_confirmation_tag(confirmation_tag);
 
   transcript.update_interim(commit_content_auth);
 
@@ -615,10 +613,12 @@ TranscriptTestVector::verify() const
     commit.verify(cipher_suite, credential.public_key(), group_context_obj);
   VERIFY("commit signature valid", commit_valid);
 
-  // Verify the Commit tags
-  VERIFY("confirmation",
-         commit.check_confirmation_tag(
-           cipher_suite, confirmation_key, transcript.confirmed));
+  // Verify the confirmation tag
+  auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
+  ks_epoch.confirmation_key = confirmation_key;
+
+  auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
+  VERIFY("confirmation", commit.check_confirmation_tag(confirmation_tag));
 
   return std::nullopt;
 }
@@ -908,7 +908,7 @@ MessagesTestVector::create()
                                 suite,
                                 sig_priv,
                                 group_context);
-  content_auth_commit.set_confirmation_tag(suite, opaque, opaque);
+  content_auth_commit.set_confirmation_tag(opaque);
 
   // MLSMessage(MLSPlaintext)
   auto mls_plaintext = MLSMessage{ MLSPlaintext::protect(

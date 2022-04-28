@@ -425,6 +425,12 @@ KeyScheduleEpoch::encryption_keys(LeafCount size) const
 }
 
 bytes
+KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
+{
+  return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
+}
+
+bytes
 KeyScheduleEpoch::do_export(const std::string& label,
                             const bytes& context,
                             size_t size) const

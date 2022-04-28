@@ -143,6 +143,7 @@ public:
                         const bytes& context) const;
 
   GroupKeySource encryption_keys(LeafCount size) const;
+  bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;

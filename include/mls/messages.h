@@ -493,16 +493,8 @@ struct MLSMessageContentAuth
   bytes commit_content() const;
   bytes commit_auth_data() const;
 
-  void set_confirmation_tag(CipherSuite suite,
-                            const bytes& confirmation_key,
-                            const bytes& confirmed_transcript_hash);
-  bool check_confirmation_tag(CipherSuite suite,
-                              const bytes& confirmation_key,
-                              const bytes& confirmed_transcript_hash) const;
-
-  static bytes confirmation_mac(CipherSuite suite,
-                                const bytes& confirmation_key,
-                                const bytes& confirmed_transcript_hash);
+  void set_confirmation_tag(const bytes& confirmation_tag);
+  bool check_confirmation_tag(const bytes& confirmation_tag) const;
 
   friend tls::ostream& operator<<(tls::ostream& str,
                                   const MLSMessageContentAuth& obj);

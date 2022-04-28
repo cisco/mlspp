@@ -431,32 +431,16 @@ MLSMessageContentAuth::commit_auth_data() const
 }
 
 void
-MLSMessageContentAuth::set_confirmation_tag(
-  CipherSuite suite,
-  const bytes& confirmation_key,
-  const bytes& confirmed_transcript_hash)
+MLSMessageContentAuth::set_confirmation_tag(const bytes& confirmation_tag)
 {
-  auth.confirmation_tag =
-    confirmation_mac(suite, confirmation_key, confirmed_transcript_hash);
+  auth.confirmation_tag = confirmation_tag;
 }
 
 bool
 MLSMessageContentAuth::check_confirmation_tag(
-  CipherSuite suite,
-  const bytes& confirmation_key,
-  const bytes& confirmed_transcript_hash) const
+  const bytes& confirmation_tag) const
 {
-  auto candidate =
-    confirmation_mac(suite, confirmation_key, confirmed_transcript_hash);
-  return candidate == opt::get(auth.confirmation_tag);
-}
-
-bytes
-MLSMessageContentAuth::confirmation_mac(CipherSuite suite,
-                                        const bytes& confirmation_key,
-                                        const bytes& confirmed_transcript_hash)
-{
-  return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
+  return confirmation_tag == opt::get(auth.confirmation_tag);
 }
 
 tls::ostream&
