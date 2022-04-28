@@ -274,7 +274,7 @@ struct MessageRange
   uint32_t sender;
   uint32_t first_generation;
   uint32_t last_generation;
-  TLS_SERIALIZABLE(sender, first_generation, last_generation);
+  TLS_SERIALIZABLE(sender, first_generation, last_generation)
 };
 
 struct AppAck
@@ -287,7 +287,7 @@ struct AppAck
 struct GroupContextExtensions
 {
   ExtensionList group_context_extensions;
-  TLS_SERIALIZABLE(group_context_extensions);
+  TLS_SERIALIZABLE(group_context_extensions)
 };
 
 struct ProposalType;
@@ -333,7 +333,7 @@ struct ProposalType
   {}
 
   Proposal::Type val;
-  TLS_SERIALIZABLE(val);
+  TLS_SERIALIZABLE(val)
 };
 
 enum struct ProposalOrRefType : uint8_t
@@ -636,10 +636,10 @@ TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageRef, member)
 TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
 TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberID, new_member)
 
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext);
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext);
-TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome);
-TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info);
-TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package);
+TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext)
+TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext)
+TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome)
+TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info)
+TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package)
 
 } // namespace tls

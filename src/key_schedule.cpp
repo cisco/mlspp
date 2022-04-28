@@ -205,15 +205,15 @@ HashRatchet&
 GroupKeySource::chain(ContentType type, LeafIndex sender)
 {
   switch (type) {
-    case ContentType::invalid:
-      throw InvalidParameterError("Invalid content type");
-
     case ContentType::proposal:
     case ContentType::commit:
       return chain(RatchetType::handshake, sender);
 
     case ContentType::application:
       return chain(RatchetType::application, sender);
+
+    default:
+      throw InvalidParameterError("Invalid content type");
   }
 }
 
