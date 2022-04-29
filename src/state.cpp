@@ -271,7 +271,6 @@ State::protect(MLSMessageContentAuth&& content_auth, size_t padding_size)
 MLSMessageContentAuth
 State::unprotect(const MLSMessage& msg)
 {
-
   const auto unprotect = overloaded{
     [&](const MLSPlaintext& pt) -> MLSMessageContentAuth {
       auto maybe_content_auth =
@@ -292,7 +291,7 @@ State::unprotect(const MLSMessage& msg)
     },
 
     [](const auto& /* unused */) -> MLSMessageContentAuth {
-      throw ProtocolError("Invalid message type");
+      throw ProtocolError("Invalid wire format");
     },
   };
 
@@ -516,7 +515,6 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Create the Commit message and advance the transcripts / key schedule
-  // TODO(rlb) move this back into ratchet_and_sign?
   auto commit_content_auth =
     sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
 
@@ -587,7 +585,7 @@ State::handle(const MLSMessage& msg)
 std::optional<State>
 State::handle(const MLSMessageContentAuth& content_auth)
 {
-  // Verify the signature on the message and basic parameters
+  // Verify the signature on the message
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
@@ -857,8 +855,8 @@ State::cache_proposal(MLSMessageContentAuth content_auth)
 {
   auto sender_location = std::optional<LeafIndex>();
   if (content_auth.content.sender.sender_type() == SenderType::member) {
-    sender_location =
-      _tree.find(var::get<LeafNodeRef>(content_auth.content.sender.sender));
+    const auto& sender = content_auth.content.sender.sender;
+    sender_location = _tree.find(var::get<LeafNodeRef>(sender));
   }
 
   _pending_proposals.push_back({

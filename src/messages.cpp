@@ -307,19 +307,6 @@ operator==(const MLSMessageAuth& lhs, const MLSMessageAuth& rhs)
          lhs.confirmation_tag == rhs.confirmation_tag;
 }
 
-// struct {
-//     ProtocolVersion version = mls10;
-//     WireFormat wire_format;
-//     MLSMessageContent content;
-//     select (MLSMessageContentTBS.content.sender.sender_type) {
-//         case member:
-//         case new_member:
-//             GroupContext context;
-//
-//         case external:
-//             struct{};
-//     }
-// } MLSMessageContentTBS;
 struct MLSMessageContentTBS
 {
   WireFormat wire_format = WireFormat::reserved;
@@ -345,10 +332,6 @@ operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
   return str;
 }
 
-// struct {
-//   MLSMessageContentTBS content_tbs;
-//   MLSMessageAuth auth;
-// } MLSMessageContentTBM;
 struct MLSMessageContentTBM
 {
   MLSMessageContentTBS content_tbs;
@@ -588,21 +571,6 @@ operator>>(tls::istream& str, MLSPlaintext& obj)
   return str;
 }
 
-// struct {
-//     select (MLSCiphertext.content_type) {
-//         case application:
-//           opaque application_data<V>;
-//
-//         case proposal:
-//           Proposal proposal;
-//
-//         case commit:
-//           Commit commit;
-//     }
-//
-//     MLSMessageAuth auth;
-//     opaque padding<V>;
-// } MLSCiphertextContent;
 static bytes
 marshal_ciphertext_content(const MLSMessageContent& content,
                            const MLSMessageAuth& auth,

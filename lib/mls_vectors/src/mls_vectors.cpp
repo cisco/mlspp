@@ -3,8 +3,6 @@
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
-#include <iostream>
-
 namespace mls_vectors {
 
 using namespace mls;
@@ -209,7 +207,6 @@ EncryptionTestVector::create(CipherSuite suite,
                              uint32_t n_generations)
 {
   auto tv = EncryptionTestVector{};
-
   tv.cipher_suite = suite;
   tv.encryption_secret = random_bytes(suite.secret_size());
   tv.sender_data_secret = random_bytes(suite.secret_size());
