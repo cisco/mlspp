@@ -81,6 +81,9 @@ struct bytes
   bytes operator+(const bytes& rhs) const;
   bytes operator^(const bytes& rhs) const;
 
+  // Sorting operators (to allow usage as map keys)
+  bool operator<(const bytes& rhs) const;
+
   // TLS syntax serialization
   TLS_SERIALIZABLE(_data);
 

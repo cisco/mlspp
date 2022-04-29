@@ -442,15 +442,29 @@ struct Sender
 ///
 /// MLSMessage and friends
 ///
-struct GroupKeySource; // XXX
+struct GroupKeySource;
 
 struct MLSMessageContent
 {
+  using RawContent = var::variant<ApplicationData, Proposal, Commit>;
+
   bytes group_id;
   epoch_t epoch;
   Sender sender;
   bytes authenticated_data;
-  var::variant<ApplicationData, Proposal, Commit> content;
+  RawContent content;
+
+  MLSMessageContent() = default;
+  MLSMessageContent(bytes group_id_in,
+                    epoch_t epoch_in,
+                    Sender sender_in,
+                    bytes authenticated_data_in,
+                    RawContent content_in);
+  MLSMessageContent(bytes group_id_in,
+                    epoch_t epoch_in,
+                    Sender sender_in,
+                    bytes authenticated_data_in,
+                    ContentType content_type);
 
   ContentType content_type() const;
 
@@ -502,8 +516,6 @@ struct MLSMessageContentAuth
                                   MLSMessageContentAuth& obj);
   friend bool operator==(const MLSMessageContentAuth& lhs,
                          const MLSMessageContentAuth& rhs);
-
-  TLS_SERIALIZABLE(wire_format, content, auth)
 
 private:
   MLSMessageContentAuth(WireFormat wire_format_in,

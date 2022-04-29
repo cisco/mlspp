@@ -269,7 +269,7 @@ State::protect(MLSMessageContentAuth&& content_auth, size_t padding_size)
 }
 
 MLSMessageContentAuth
-State::unprotect(const MLSMessage& msg)
+State::unprotect_to_content_auth(const MLSMessage& msg)
 {
   const auto unprotect = overloaded{
     [&](const MLSPlaintext& pt) -> MLSMessageContentAuth {
@@ -574,25 +574,26 @@ State::group_context() const
 std::optional<State>
 State::handle(const MLSMessage& msg)
 {
+  return handle(msg, std::nullopt);
+}
+
+std::optional<State>
+State::handle(const MLSMessage& msg, std::optional<State> cached_state)
+{
   // Check the version
   if (msg.version != ProtocolVersion::mls10) {
     throw InvalidParameterError("Unsupported version");
   }
 
-  return handle(unprotect(msg));
-}
-
-std::optional<State>
-State::handle(const MLSMessageContentAuth& content_auth)
-{
   // Verify the signature on the message
+  auto content_auth = unprotect_to_content_auth(msg);
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-  const auto& content = content_auth.content;
 
   // Validate the MLSMessageContent
+  const auto& content = content_auth.content;
   if (content.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
   }
@@ -635,9 +636,20 @@ State::handle(const MLSMessageContentAuth& content_auth)
     // This optional is guaranteed to be present because we just did this same
     // lookup for signature verification.
     sender = opt::get(_tree.find(sender_ref));
+
   }
 
   if (sender == _index) {
+    if (cached_state) {
+      // Verify that the cached state is a plausible successor to this state
+      const auto& next = opt::get(cached_state);
+      if (next._group_id != _group_id || next._epoch != _epoch + 1 || next._index != _index) {
+        throw InvalidParameterError("Invalid successor state");
+      }
+
+      return next;
+    }
+
     throw InvalidParameterError("Handle own commits with caching");
   }
 
@@ -985,22 +997,18 @@ State::apply(const std::vector<CachedProposal>& proposals)
 ///
 
 MLSMessage
-State::protect_app(const bytes& pt, const MessageOpts& msg_opts)
+State::protect(const bytes& authenticated_data, const bytes& pt, size_t padding_size)
 {
-  if (!msg_opts.encrypt) {
-    throw InvalidParameterError("Application data cannot be sent as plaintext");
-  }
-
+  auto msg_opts = MessageOpts{ true, authenticated_data, padding_size };
   return protect_full(ApplicationData{ pt }, msg_opts);
 }
 
-bytes
-State::unprotect_app(const MLSMessage& ct)
+std::tuple<bytes, bytes>
+State::unprotect(const MLSMessage& ct)
 {
-  auto content_auth = unprotect(ct);
+  auto content_auth = unprotect_to_content_auth(ct);
 
   if (!verify(content_auth)) {
-    // TODO(rlb): Verify that sender is internal (!)
     throw InvalidParameterError("Message signature failed to verify");
   }
 
@@ -1012,7 +1020,10 @@ State::unprotect_app(const MLSMessage& ct)
     throw ProtocolError("Application data not sent as MLSCiphertext");
   }
 
-  return var::get<ApplicationData>(content_auth.content.content).data;
+  return {
+    std::move(content_auth.content.authenticated_data),
+    std::move(var::get<ApplicationData>(content_auth.content.content).data),
+  };
 }
 
 ///

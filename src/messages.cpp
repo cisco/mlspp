@@ -268,35 +268,34 @@ Sender::sender_type() const
 tls::ostream&
 operator<<(tls::ostream& str, const MLSMessageAuth& obj)
 {
-  if (obj.content_type == ContentType::invalid) {
-    throw InvalidParameterError("MLSMessageAuth without content type");
+  switch (obj.content_type) {
+    case ContentType::proposal:
+    case ContentType::application:
+      return str << obj.signature;
+
+    case ContentType::commit:
+     return str << obj.signature << opt::get(obj.confirmation_tag);
+
+    default:
+      throw InvalidParameterError("Invalid content type");
   }
-
-  str << obj.signature;
-
-  if (obj.content_type == ContentType::commit) {
-    str << opt::get(obj.confirmation_tag);
-  }
-
-  return str;
 }
 
 tls::istream&
 operator>>(tls::istream& str, MLSMessageAuth& obj)
 {
-  if (obj.content_type == ContentType::invalid) {
-    throw InvalidParameterError("MLSMessageAuth without content type");
+  switch (obj.content_type) {
+    case ContentType::proposal:
+    case ContentType::application:
+      return str >> obj.signature;
+
+    case ContentType::commit:
+      obj.confirmation_tag.emplace();
+      return str >> obj.signature >> opt::get(obj.confirmation_tag);
+
+    default:
+      throw InvalidParameterError("Invalid content type");
   }
-
-  str >> obj.signature;
-
-  if (obj.content_type == ContentType::commit) {
-    bytes confirmation_tag;
-    str >> confirmation_tag;
-    obj.confirmation_tag = confirmation_tag;
-  }
-
-  return str;
 }
 
 bool
@@ -307,38 +306,45 @@ operator==(const MLSMessageAuth& lhs, const MLSMessageAuth& rhs)
          lhs.confirmation_tag == rhs.confirmation_tag;
 }
 
-struct MLSMessageContentTBS
-{
-  WireFormat wire_format = WireFormat::reserved;
-  const MLSMessageContent& content;
-  const std::optional<GroupContext>& context;
-};
+MLSMessageContent::MLSMessageContent(bytes group_id_in,
+                  epoch_t epoch_in,
+                  Sender sender_in,
+                  bytes authenticated_data_in,
+                  RawContent content_in)
+  : group_id(std::move(group_id_in))
+  , epoch(std::move(epoch_in))
+  , sender(std::move(sender_in))
+  , authenticated_data(std::move(authenticated_data_in))
+  , content(std::move(content_in))
+{}
 
-static tls::ostream&
-operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
+MLSMessageContent::MLSMessageContent(bytes group_id_in,
+                  epoch_t epoch_in,
+                  Sender sender_in,
+                  bytes authenticated_data_in,
+                  ContentType content_type)
+  : group_id(std::move(group_id_in))
+  , epoch(std::move(epoch_in))
+  , sender(std::move(sender_in))
+  , authenticated_data(std::move(authenticated_data_in))
 {
-  str << ProtocolVersion::mls10 << obj.wire_format << obj.content;
+  switch (content_type) {
+    case ContentType::commit:
+      content.emplace<Commit>();
+      break;
 
-  switch (obj.content.sender.sender_type()) {
-    case SenderType::member:
-    case SenderType::new_member:
-      str << opt::get(obj.context);
+    case ContentType::proposal:
+      content.emplace<Proposal>();
+      break;
+
+    case ContentType::application:
+      content.emplace<ApplicationData>();
       break;
 
     default:
-      break;
+      throw InvalidParameterError("Invalid content type");
   }
-
-  return str;
 }
-
-struct MLSMessageContentTBM
-{
-  MLSMessageContentTBS content_tbs;
-  MLSMessageAuth auth;
-
-  TLS_SERIALIZABLE(content_tbs, auth);
-};
 
 ContentType
 MLSMessageContent::content_type() const
@@ -361,7 +367,6 @@ MLSMessageContentAuth::sign(WireFormat wire_format,
 
   auto content_auth = MLSMessageContentAuth{ wire_format, std::move(content) };
   auto tbs = content_auth.to_be_signed(context);
-  content_auth.auth.content_type = content_auth.content.content_type();
   content_auth.auth.signature = sig_priv.sign(suite, tbs);
   return content_auth;
 }
@@ -452,7 +457,9 @@ MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
                                              MLSMessageContent content_in)
   : wire_format(wire_format_in)
   , content(std::move(content_in))
-{}
+{
+  auth.content_type = content.content_type();
+}
 
 MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
                                              MLSMessageContent content_in,
@@ -461,6 +468,31 @@ MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
   , content(std::move(content_in))
   , auth(std::move(auth_in))
 {}
+
+struct MLSMessageContentTBS
+{
+  WireFormat wire_format = WireFormat::reserved;
+  const MLSMessageContent& content;
+  const std::optional<GroupContext>& context;
+};
+
+static tls::ostream&
+operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
+{
+  str << ProtocolVersion::mls10 << obj.wire_format << obj.content;
+
+  switch (obj.content.sender.sender_type()) {
+    case SenderType::member:
+    case SenderType::new_member:
+      str << opt::get(obj.context);
+      break;
+
+    default:
+      break;
+  }
+
+  return str;
+}
 
 bytes
 MLSMessageContentAuth::to_be_signed(
@@ -530,6 +562,14 @@ MLSPlaintext::MLSPlaintext(MLSMessageContentAuth content_auth)
   }
 }
 
+struct MLSMessageContentTBM
+{
+  MLSMessageContentTBS content_tbs;
+  MLSMessageAuth auth;
+
+  TLS_SERIALIZABLE(content_tbs, auth);
+};
+
 bytes
 MLSPlaintext::membership_mac(CipherSuite suite,
                              const bytes& membership_key,
@@ -546,13 +586,17 @@ MLSPlaintext::membership_mac(CipherSuite suite,
 tls::ostream&
 operator<<(tls::ostream& str, const MLSPlaintext& obj)
 {
-  str << obj.content << obj.auth;
+  switch (obj.content.sender.sender_type()) {
+    case SenderType::member:
+      return str << obj.content << obj.auth << opt::get(obj.membership_tag);
 
-  if (obj.content.sender.sender_type() == SenderType::member) {
-    str << opt::get(obj.membership_tag);
+    case SenderType::new_member:
+    case SenderType::preconfigured:
+      return str << obj.content << obj.auth;
+
+    default:
+      throw InvalidParameterError("Invalid sender type");
   }
-
-  return str;
 }
 
 tls::istream&
@@ -582,6 +626,8 @@ marshal_ciphertext_content(const MLSMessageContent& content,
   return w.bytes();
 }
 
+
+
 static void
 unmarshal_ciphertext_content(const bytes& content_pt,
                              MLSMessageContent& content,
@@ -589,22 +635,6 @@ unmarshal_ciphertext_content(const bytes& content_pt,
 {
   auto r = tls::istream(content_pt);
 
-  switch (auth.content_type) {
-    case ContentType::application:
-      content.content.emplace<ApplicationData>();
-      break;
-
-    case ContentType::proposal:
-      content.content.emplace<Proposal>();
-      break;
-
-    case ContentType::commit:
-      content.content.emplace<Commit>();
-      break;
-
-    default:
-      throw InvalidParameterError("Unknown content type");
-  }
 
   auto padding = bytes{};
   var::visit([&r](auto& val) { r >> val; }, content.content);
@@ -747,13 +777,9 @@ MLSCiphertext::unprotect(CipherSuite suite,
   // Parse the content
   auto content = MLSMessageContent{
     group_id,          epoch, { sender_data.sender }, authenticated_data,
-    ApplicationData{}, // To be overwritten
+    content_type
   };
-  auto auth = MLSMessageAuth{
-    content_type,
-    {},
-    {},
-  };
+  auto auth = MLSMessageAuth{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);
 

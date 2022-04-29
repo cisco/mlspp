@@ -47,6 +47,12 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
 }
 
 static std::ostream&
+operator<<(std::ostream& str, const MLSMessageContentAuth& obj)
+{
+  return str << to_hex(tls::marshal(obj));
+}
+
+static std::ostream&
 operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
 {
   return str << "[TreeKEMPublicKey]";

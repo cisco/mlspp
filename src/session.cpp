@@ -30,7 +30,7 @@ struct PendingJoin::Inner
 struct Session::Inner
 {
   std::deque<State> history;
-  std::optional<std::tuple<bytes, State>> outbound_cache;
+  std::map<bytes, State> outbound_cache;
   bool encrypt_handshake;
 
   explicit Inner(State state);
@@ -47,8 +47,7 @@ struct Session::Inner
                       const bytes& welcome_data);
 
   bytes fresh_secret() const;
-  MLSMessageContentAuth import_message(const bytes& encoded);
-  void add_state(epoch_t prior_epoch, const State& group_state);
+  MLSMessage import_handshake(const bytes& encoded);
   State& for_epoch(epoch_t epoch);
 };
 
@@ -189,43 +188,30 @@ Session::Inner::fresh_secret() const
   return random_bytes(suite.secret_size());
 }
 
-MLSMessageContentAuth
-Session::Inner::import_message(const bytes& encoded)
+MLSMessage
+Session::Inner::import_handshake(const bytes& encoded)
 {
-  auto mls_message = tls::get<MLSMessage>(encoded);
-  auto content_auth = history.front().unprotect(mls_message);
+  auto msg = tls::get<MLSMessage>(encoded);
 
-  switch (content_auth.wire_format) {
+  switch (msg.wire_format()) {
     case WireFormat::mls_plaintext:
       if (encrypt_handshake) {
         throw ProtocolError("Handshake not encrypted as required");
       }
 
-      return content_auth;
+      return msg;
 
     case WireFormat::mls_ciphertext: {
       if (!encrypt_handshake) {
         throw ProtocolError("Unexpected handshake encryption");
       }
 
-      return content_auth;
+      return msg;
     }
 
     default:
       throw InvalidParameterError("Illegal wire format");
   }
-}
-
-void
-Session::Inner::add_state(epoch_t prior_epoch, const State& state)
-{
-  if (!history.empty() && prior_epoch != history.front().epoch()) {
-    throw MissingStateError("Discontinuity in history");
-  }
-
-  history.emplace_front(state);
-
-  // TODO(rlb) bound the size of the queue
 }
 
 State&
@@ -300,15 +286,16 @@ Session::commit(const bytes& proposal)
 std::tuple<bytes, bytes>
 Session::commit(const std::vector<bytes>& proposals)
 {
+  auto provisional_state = inner->history.front();
   for (const auto& proposal_data : proposals) {
-    auto content_auth = inner->import_message(proposal_data);
-    if (content_auth.content.content_type() != ContentType::proposal) {
-      throw ProtocolError("Only proposals can be committed");
+    auto msg = inner->import_handshake(proposal_data);
+    auto maybe_state = provisional_state.handle(msg);
+    if (maybe_state) {
+      throw InvalidParameterError("Invalid proposal; actually a commit");
     }
-
-    inner->history.front().handle(content_auth);
   }
 
+  inner->history.front() = std::move(provisional_state);
   return commit();
 }
 
@@ -323,45 +310,27 @@ Session::commit()
   auto commit_msg = tls::marshal(commit);
   auto welcome_msg = tls::marshal(welcome);
 
-  inner->outbound_cache = std::make_tuple(commit_msg, new_state);
+  inner->outbound_cache.insert({ commit_msg, new_state });
   return std::make_tuple(welcome_msg, commit_msg);
 }
 
 bool
 Session::handle(const bytes& handshake_data)
 {
-  auto content_auth = inner->import_message(handshake_data);
+  auto msg = inner->import_handshake(handshake_data);
 
-  if (content_auth.content.sender.sender_type() != SenderType::member) {
-    throw ProtocolError("External senders not supported");
+  auto maybe_cached_state = std::optional<State>{};
+  auto node = inner->outbound_cache.extract(handshake_data);
+  if (!node.empty()) {
+    maybe_cached_state = node.mapped();
   }
 
-  const auto is_commit =
-    content_auth.content.content_type() == ContentType::commit;
-  const auto is_self =
-    content_auth.content.sender.sender == inner->history.front().ref();
-  if (is_commit && is_self) {
-    if (!inner->outbound_cache) {
-      throw ProtocolError("Received from self without sending");
-    }
-
-    const auto& [msg, state] = opt::get(inner->outbound_cache);
-    if (msg != handshake_data) {
-      throw ProtocolError("Received message different from cached");
-    }
-
-    inner->add_state(content_auth.content.epoch, state);
-    inner->outbound_cache = std::nullopt;
-    return true;
-  }
-
-  auto prior_epoch = content_auth.content.epoch;
-  auto maybe_next_state = inner->history.front().handle(content_auth);
+  auto maybe_next_state = inner->history.front().handle(msg, maybe_cached_state);
   if (!maybe_next_state) {
     return false;
   }
 
-  inner->add_state(prior_epoch, opt::get(maybe_next_state));
+  inner->history.emplace_front(opt::get(maybe_next_state));
   return true;
 }
 
@@ -424,9 +393,8 @@ Session::authentication_secret() const
 bytes
 Session::protect(const bytes& plaintext)
 {
-  auto ciphertext =
-    inner->history.front().protect_app(plaintext, { true, {}, 0 });
-  return tls::marshal(ciphertext);
+  auto msg = inner->history.front().protect({}, plaintext, 0 );
+  return tls::marshal(msg);
 }
 
 // TODO(rlb@ipv.sx): It would be good to expose identity information
@@ -437,7 +405,9 @@ Session::unprotect(const bytes& ciphertext)
 {
   auto ciphertext_obj = tls::get<MLSMessage>(ciphertext);
   auto& state = inner->for_epoch(ciphertext_obj.epoch());
-  return state.unprotect_app(ciphertext_obj);
+  auto [aad, pt] = state.unprotect(ciphertext_obj);
+  silence_unused(aad);
+  return pt;
 }
 
 bool

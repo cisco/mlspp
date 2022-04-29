@@ -41,7 +41,8 @@ protected:
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
-  const bytes test_message = from_hex("01020304");
+  const bytes test_aad = from_hex("01020304");
+  const bytes test_message = from_hex("11121314");
   const std::string export_label = "test";
   const bytes export_context = from_hex("05060708");
   const size_t export_size = 16;
@@ -87,9 +88,13 @@ protected:
 
     // Verify that they can all send and be received
     for (auto& state : group_states) {
-      auto encrypted = state.protect_app(test_message, { true, {}, 0 });
+      auto encrypted = state.protect(test_aad, test_message, 0);
       for (auto& other : group_states) {
-        auto decrypted = other.unprotect_app(encrypted);
+        auto [aad_, decrypted_] = other.unprotect(encrypted);
+        auto aad = aad_;
+        auto decrypted = decrypted_;
+
+        REQUIRE(aad == test_aad);
         REQUIRE(decrypted == test_message);
       }
     }

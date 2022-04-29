@@ -116,7 +116,7 @@ public:
   /// Generic handshake message handler
   ///
   std::optional<State> handle(const MLSMessage& msg);
-  std::optional<State> handle(const MLSMessageContentAuth& content_auth);
+  std::optional<State> handle(const MLSMessage& msg, std::optional<State> cached);
 
   ///
   /// Accessors
@@ -139,18 +139,10 @@ public:
   bytes authentication_secret() const;
 
   ///
-  /// General encryption and decryption
-  ///
-  // XXX(RLB) It would be good to hide this from upper layers.  However, Session
-  // wants it to detect self-commits.  Maybe we can pass in an optional<State>
-  // next_state option into CommitOpts to pull this into State?
-  MLSMessageContentAuth unprotect(const MLSMessage& msg);
-
-  ///
   /// Application encryption and decryption
   ///
-  MLSMessage protect_app(const bytes& pt, const MessageOpts& msg_opts);
-  bytes unprotect_app(const MLSMessage& ct);
+  MLSMessage protect(const bytes& authenticated_data, const bytes& pt, size_t padding_size);
+  std::tuple<bytes, bytes> unprotect(const MLSMessage& ct);
 
   // Assemble a group context for this state
   GroupContext group_context() const;
@@ -213,6 +205,8 @@ protected:
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
+
+  MLSMessageContentAuth unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   void check_add_leaf_node(const LeafNode& leaf,

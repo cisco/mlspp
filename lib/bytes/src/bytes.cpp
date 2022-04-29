@@ -59,6 +59,12 @@ bytes::operator+(const bytes& rhs) const
   return out;
 }
 
+bool
+bytes::operator<(const bytes& rhs) const
+{
+  return _data < rhs._data;
+}
+
 bytes
 bytes::operator^(const bytes& rhs) const
 {
