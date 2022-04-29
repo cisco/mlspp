@@ -537,7 +537,7 @@ MLSPlaintext::unprotect(CipherSuite suite,
     case SenderType::member: {
       auto candidate = membership_mac(suite, opt::get(membership_key), context);
       if (candidate != opt::get(membership_tag)) {
-        return {};
+        return std::nullopt;
       }
       break;
     }
@@ -742,13 +742,13 @@ MLSCiphertext::unprotect(CipherSuite suite,
                                                sender_data_aad,
                                                encrypted_sender_data);
   if (!sender_data_pt) {
-    return {};
+    return std::nullopt;
   }
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
   auto maybe_sender = tree.find(sender_data.sender);
   if (!maybe_sender) {
-    return {};
+    return std::nullopt;
   }
 
   auto sender = opt::get(maybe_sender);
@@ -768,7 +768,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
   auto content_pt = suite.hpke().aead.open(
     content_keys.key, content_keys.nonce, content_aad, ciphertext);
   if (!content_pt) {
-    return {};
+    return std::nullopt;
   }
 
   // Parse the content
