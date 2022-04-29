@@ -312,7 +312,7 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
                   bytes authenticated_data_in,
                   RawContent content_in)
   : group_id(std::move(group_id_in))
-  , epoch(std::move(epoch_in))
+  , epoch(epoch_in)
   , sender(std::move(sender_in))
   , authenticated_data(std::move(authenticated_data_in))
   , content(std::move(content_in))
@@ -324,7 +324,7 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
                   bytes authenticated_data_in,
                   ContentType content_type)
   : group_id(std::move(group_id_in))
-  , epoch(std::move(epoch_in))
+  , epoch(epoch_in)
   , sender(std::move(sender_in))
   , authenticated_data(std::move(authenticated_data_in))
 {
