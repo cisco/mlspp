@@ -116,7 +116,8 @@ public:
   /// Generic handshake message handler
   ///
   std::optional<State> handle(const MLSMessage& msg);
-  std::optional<State> handle(const MLSMessage& msg, std::optional<State> cached);
+  std::optional<State> handle(const MLSMessage& msg,
+                              std::optional<State> cached);
 
   ///
   /// Accessors
@@ -141,7 +142,9 @@ public:
   ///
   /// Application encryption and decryption
   ///
-  MLSMessage protect(const bytes& authenticated_data, const bytes& pt, size_t padding_size);
+  MLSMessage protect(const bytes& authenticated_data,
+                     const bytes& pt,
+                     size_t padding_size);
   std::tuple<bytes, bytes> unprotect(const MLSMessage& ct);
 
   // Assemble a group context for this state

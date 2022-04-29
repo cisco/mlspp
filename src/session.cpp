@@ -325,7 +325,8 @@ Session::handle(const bytes& handshake_data)
     maybe_cached_state = node.mapped();
   }
 
-  auto maybe_next_state = inner->history.front().handle(msg, maybe_cached_state);
+  auto maybe_next_state =
+    inner->history.front().handle(msg, maybe_cached_state);
   if (!maybe_next_state) {
     return false;
   }
@@ -393,7 +394,7 @@ Session::authentication_secret() const
 bytes
 Session::protect(const bytes& plaintext)
 {
-  auto msg = inner->history.front().protect({}, plaintext, 0 );
+  auto msg = inner->history.front().protect({}, plaintext, 0);
   return tls::marshal(msg);
 }
 

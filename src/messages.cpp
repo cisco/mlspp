@@ -274,7 +274,7 @@ operator<<(tls::ostream& str, const MLSMessageAuth& obj)
       return str << obj.signature;
 
     case ContentType::commit:
-     return str << obj.signature << opt::get(obj.confirmation_tag);
+      return str << obj.signature << opt::get(obj.confirmation_tag);
 
     default:
       throw InvalidParameterError("Invalid content type");
@@ -307,10 +307,10 @@ operator==(const MLSMessageAuth& lhs, const MLSMessageAuth& rhs)
 }
 
 MLSMessageContent::MLSMessageContent(bytes group_id_in,
-                  epoch_t epoch_in,
-                  Sender sender_in,
-                  bytes authenticated_data_in,
-                  RawContent content_in)
+                                     epoch_t epoch_in,
+                                     Sender sender_in,
+                                     bytes authenticated_data_in,
+                                     RawContent content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -319,10 +319,10 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
 {}
 
 MLSMessageContent::MLSMessageContent(bytes group_id_in,
-                  epoch_t epoch_in,
-                  Sender sender_in,
-                  bytes authenticated_data_in,
-                  ContentType content_type)
+                                     epoch_t epoch_in,
+                                     Sender sender_in,
+                                     bytes authenticated_data_in,
+                                     ContentType content_type)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -626,15 +626,12 @@ marshal_ciphertext_content(const MLSMessageContent& content,
   return w.bytes();
 }
 
-
-
 static void
 unmarshal_ciphertext_content(const bytes& content_pt,
                              MLSMessageContent& content,
                              MLSMessageAuth& auth)
 {
   auto r = tls::istream(content_pt);
-
 
   auto padding = bytes{};
   var::visit([&r](auto& val) { r >> val; }, content.content);
@@ -776,8 +773,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
 
   // Parse the content
   auto content = MLSMessageContent{
-    group_id,          epoch, { sender_data.sender }, authenticated_data,
-    content_type
+    group_id, epoch, { sender_data.sender }, authenticated_data, content_type
   };
   auto auth = MLSMessageAuth{ content_type, {}, {} };
 

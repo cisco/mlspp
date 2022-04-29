@@ -591,7 +591,6 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-
   // Validate the MLSMessageContent
   const auto& content = content_auth.content;
   if (content.group_id != _group_id) {
@@ -636,14 +635,14 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     // This optional is guaranteed to be present because we just did this same
     // lookup for signature verification.
     sender = opt::get(_tree.find(sender_ref));
-
   }
 
   if (sender == _index) {
     if (cached_state) {
       // Verify that the cached state is a plausible successor to this state
       const auto& next = opt::get(cached_state);
-      if (next._group_id != _group_id || next._epoch != _epoch + 1 || next._index != _index) {
+      if (next._group_id != _group_id || next._epoch != _epoch + 1 ||
+          next._index != _index) {
         throw InvalidParameterError("Invalid successor state");
       }
 
@@ -997,7 +996,9 @@ State::apply(const std::vector<CachedProposal>& proposals)
 ///
 
 MLSMessage
-State::protect(const bytes& authenticated_data, const bytes& pt, size_t padding_size)
+State::protect(const bytes& authenticated_data,
+               const bytes& pt,
+               size_t padding_size)
 {
   auto msg_opts = MessageOpts{ true, authenticated_data, padding_size };
   return protect_full(ApplicationData{ pt }, msg_opts);
