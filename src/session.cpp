@@ -415,6 +415,12 @@ Session::do_export(const std::string& label,
   return inner->history.front().do_export(label, context, size);
 }
 
+GroupInfo
+Session::group_info() const
+{
+  return inner->history.front().group_info();
+}
+
 std::vector<LeafNode>
 Session::roster() const
 {
