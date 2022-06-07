@@ -93,7 +93,7 @@ template<typename T>
 static std::optional<std::string>
 verify_round_trip(const std::string& label, const bytes& expected)
 {
-  auto noop = [](const auto&) { return true; };
+  auto noop = [](const auto& /* unused */) { return true; };
   return verify_round_trip<T>(label, expected, noop);
 }
 
