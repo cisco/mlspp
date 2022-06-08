@@ -669,7 +669,10 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
-
+  if (size().val == 0) {
+    return;
+  }
+  
   // clear the parent hashes across blank leaves before truncating
   auto index = LeafIndex{ size().val - 1 };
   for (; index.val > 0; index.val--) {
