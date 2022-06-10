@@ -682,18 +682,12 @@ TreeKEMPublicKey::truncate()
     clear_hash_path(index);
   }
 
-  auto leaf = false;
-  // Find the first rightmost non blank leaf node index
-  auto it = std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
-    leaf = !leaf;
-    return (leaf && !node.blank());
-  });
-
-  if (it == nodes.rbegin()) {
+  if(node_at(index).blank()) {
+    nodes.clear();
     return;
   }
 
-  nodes.erase(it.base(), nodes.end());
+  nodes.resize(NodeIndex(index).val);
 }
 
 void
