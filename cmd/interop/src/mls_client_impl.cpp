@@ -512,7 +512,7 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   auto encrypt = request->encrypt_handshake();
   auto leaf_secret = mls::random_bytes(suite.secret_size());
   auto [commit, state] = mls::State::external_join(
-    leaf_secret, sig_priv, kp, group_info, std::nullopt, {{}, encrypt, 0} );
+    leaf_secret, sig_priv, kp, group_info, std::nullopt, { {}, encrypt, 0 });
   auto commit_data = tls::marshal(commit);
   auto state_id = store_state(std::move(state), encrypt);
 

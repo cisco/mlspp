@@ -47,7 +47,7 @@ struct Session::Inner
                       const bytes& welcome_data);
 
   bytes fresh_secret() const;
-  MLSMessage import_handshake(const bytes& encoded);
+  MLSMessage import_handshake(const bytes& encoded) const;
   State& for_epoch(epoch_t epoch);
 };
 
@@ -189,7 +189,7 @@ Session::Inner::fresh_secret() const
 }
 
 MLSMessage
-Session::Inner::import_handshake(const bytes& encoded)
+Session::Inner::import_handshake(const bytes& encoded) const
 {
   auto msg = tls::get<MLSMessage>(encoded);
 
