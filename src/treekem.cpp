@@ -682,7 +682,12 @@ TreeKEMPublicKey::truncate()
     clear_hash_path(index);
   }
 
-  nodes.resize(NodeIndex(index).val);
+  if (node_at(index).blank()) {
+    nodes.clear();
+    return;
+  }
+
+  nodes.resize(NodeIndex(index).val + 1);
 }
 
 void
