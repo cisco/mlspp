@@ -672,7 +672,7 @@ TreeKEMPublicKey::truncate()
   if (size().val == 0) {
     return;
   }
-  
+
   // clear the parent hashes across blank leaves before truncating
   auto index = LeafIndex{ size().val - 1 };
   for (; index.val > 0; index.val--) {
@@ -680,11 +680,6 @@ TreeKEMPublicKey::truncate()
       break;
     }
     clear_hash_path(index);
-  }
-
-  if(node_at(index).blank()) {
-    nodes.clear();
-    return;
   }
 
   nodes.resize(NodeIndex(index).val);
