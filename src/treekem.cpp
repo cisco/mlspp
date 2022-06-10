@@ -669,18 +669,25 @@ TreeKEMPublicKey::encap(LeafIndex from,
 void
 TreeKEMPublicKey::truncate()
 {
-  auto leaf = false;
-  // Find the first rightmost non blank leaf node index
-  auto it = std::find_if(nodes.rbegin(), nodes.rend(), [&](const auto& node) {
-    leaf = !leaf;
-    return (leaf && !node.blank());
-  });
-
-  if (it == nodes.rbegin()) {
+  if (size().val == 0) {
     return;
   }
 
-  nodes.erase(it.base(), nodes.end());
+  // clear the parent hashes across blank leaves before truncating
+  auto index = LeafIndex{ size().val - 1 };
+  for (; index.val > 0; index.val--) {
+    if (!node_at(index).blank()) {
+      break;
+    }
+    clear_hash_path(index);
+  }
+
+  if (node_at(index).blank()) {
+    nodes.clear();
+    return;
+  }
+
+  nodes.resize(NodeIndex(index).val + 1);
 }
 
 void
