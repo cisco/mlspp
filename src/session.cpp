@@ -31,7 +31,7 @@ struct Session::Inner
 {
   std::deque<State> history;
   std::optional<std::tuple<bytes, State>> outbound_cache;
-  bool encrypt_handshake{false};
+  bool encrypt_handshake{ false };
 
   explicit Inner(State state);
 
