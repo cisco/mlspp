@@ -54,7 +54,8 @@ struct uint_serializer
 #define UINT_SERIALIZER(T)                                                     \
   template<>                                                                   \
   struct adl_serializer<T> : uint_serializer<T>                                \
-  {};
+  {                                                                            \
+  };
 
 UINT_SERIALIZER(mls::LeafCount)
 UINT_SERIALIZER(mls::NodeCount)
@@ -91,7 +92,8 @@ struct tls_serializer
 #define TLS_SERIALIZER(T)                                                      \
   template<>                                                                   \
   struct adl_serializer<T> : tls_serializer<T>                                 \
-  {};
+  {                                                                            \
+  };
 
 TLS_SERIALIZER(mls::HPKEPublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
