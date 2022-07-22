@@ -18,7 +18,6 @@ Checks:            '*,
                     -modernize-use-nodiscard,
                     -modernize-use-trailing-return-type,
                     -readability-magic-numbers,
-                    -readability-identifier-length,
                     -readability-function-cognitive-complexity,
                     -bugprone-easily-swappable-parameters,
                     -google-readability-casting
