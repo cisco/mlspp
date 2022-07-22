@@ -20,6 +20,10 @@ class WriteError : public std::invalid_argument
 public:
   using parent = std::invalid_argument;
   using parent::parent;
+
+  WriteError()
+    : parent("WriteError")
+  {}
 };
 
 class ReadError : public std::invalid_argument
@@ -27,6 +31,10 @@ class ReadError : public std::invalid_argument
 public:
   using parent = std::invalid_argument;
   using parent::parent;
+
+  ReadError()
+    : parent("ReadError")
+  {}
 };
 
 ///
@@ -39,10 +47,6 @@ public:
   static const size_t none = std::numeric_limits<size_t>::max();
 
   void write_raw(const std::vector<uint8_t>& bytes);
-
-  const std::vector<uint8_t>& bytes() const { return _buffer; }
-  size_t size() const { return _buffer.size(); }
-  bool empty() const { return _buffer.empty(); }
 
 private:
   std::vector<uint8_t> _buffer;
@@ -70,11 +74,7 @@ public:
     std::reverse(_buffer.begin(), _buffer.end());
   }
 
-  size_t size() const { return _buffer.size(); }
-  bool empty() const { return _buffer.empty(); }
-
 private:
-  istream() {}
   std::vector<uint8_t> _buffer;
   uint8_t next();
 
