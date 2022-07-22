@@ -21,7 +21,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
 elseif(MSVC)
-  add_compile_options(/W4 /WX)
+  add_compile_options(/Wall /WX)
 
   # MSVC helpfully recommends safer equivalents for things like
   # getenv, but they are not portable.
@@ -36,6 +36,8 @@ if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_
   set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} ${SANITIZERS}")
   set(CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} ${SANITIZERS}")
   add_definitions(-DSANITIZERS)
+elseif (SANITIZERS AND MSVC)
+  add_definitions("/fsanitize:address")
 endif()
 
 if(CLANG_TIDY)
