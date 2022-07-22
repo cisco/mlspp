@@ -91,7 +91,7 @@ to_hex(const bytes& data)
   std::stringstream hex(std::ios_base::out);
   hex.flags(std::ios::hex);
   for (const auto& byte : data) {
-    hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+    hex << std::setw(2) << std::setfill('0') << int(byte);
   }
   return hex.str();
 }
