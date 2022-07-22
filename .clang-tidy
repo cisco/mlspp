@@ -8,7 +8,7 @@ Checks:            '*,
                     -cppcoreguidelines-non-private-member-variables-in-classes,
                     -cppcoreguidelines-special-member-functions,
                     -google-build-using-namespace,
-                    -google-readability-casting
+                    -google-readability-casting,
                     -google-runtime-references,
                     -hicpp-no-assembler,
                     -hicpp-special-member-functions,-warnings-as-errors,
