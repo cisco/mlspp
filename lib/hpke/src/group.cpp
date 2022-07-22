@@ -22,15 +22,18 @@ group_dh_size(Group::ID group_id);
 
 EVPGroup::EVPGroup(Group::ID group_id, const KDF& kdf)
   : Group(group_id, kdf)
-{}
+{
+}
 
 EVPGroup::PublicKey::PublicKey(EVP_PKEY* pkey_in)
   : pkey(pkey_in, typed_delete<EVP_PKEY>)
-{}
+{
+}
 
 EVPGroup::PrivateKey::PrivateKey(EVP_PKEY* pkey_in)
   : pkey(pkey_in, typed_delete<EVP_PKEY>)
-{}
+{
+}
 
 std::unique_ptr<Group::PublicKey>
 EVPGroup::PrivateKey::public_key() const
@@ -146,7 +149,8 @@ struct ECKeyGroup : public EVPGroup
   ECKeyGroup(Group::ID group_id, const KDF& kdf)
     : EVPGroup(group_id, kdf)
     , curve_nid(group_to_nid(group_id))
-  {}
+  {
+  }
 
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
     const bytes& suite_id,
@@ -314,7 +318,8 @@ struct RawKeyGroup : public EVPGroup
   RawKeyGroup(Group::ID group_id, const KDF& kdf)
     : EVPGroup(group_id, kdf)
     , evp_type(group_to_evp(group_id))
-  {}
+  {
+  }
 
   template<Group::ID id>
   static const RawKeyGroup instance;
@@ -548,6 +553,7 @@ Group::Group(ID group_id_in, const KDF& kdf_in)
   , pk_size(group_pk_size(group_id_in))
   , sk_size(group_sk_size(group_id_in))
   , kdf(kdf_in)
-{}
+{
+}
 
 } // namespace hpke

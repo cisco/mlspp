@@ -19,7 +19,8 @@ struct BasicCredential
     : identity(std::move(identity_in))
     , scheme(suite_in.signature_scheme())
     , public_key(std::move(public_key_in))
-  {}
+  {
+  }
 
   bytes identity;
   SignatureScheme scheme;

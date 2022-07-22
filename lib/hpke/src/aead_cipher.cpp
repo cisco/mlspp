@@ -28,7 +28,8 @@ ExportOnlyCipher::open(const bytes& /* key */,
 
 ExportOnlyCipher::ExportOnlyCipher()
   : AEAD(AEAD::ID::export_only, 0, 0)
-{}
+{
+}
 
 ///
 /// AEADCipher
@@ -137,7 +138,8 @@ openssl_cipher(AEAD::ID cipher)
 AEADCipher::AEADCipher(AEAD::ID id_in)
   : AEAD(id_in, cipher_key_size(id_in), cipher_nonce_size(id_in))
   , tag_size(cipher_tag_size(id))
-{}
+{
+}
 
 bytes
 AEADCipher::seal(const bytes& key,

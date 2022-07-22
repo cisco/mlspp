@@ -42,7 +42,8 @@ GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
   , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
   , signer(zero_ref)
-{}
+{
+}
 
 struct GroupInfoTBS
 {
@@ -118,7 +119,8 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
   , cipher_suite(CipherSuite::ID::unknown)
-{}
+{
+}
 
 Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
@@ -316,7 +318,8 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
   , sender(std::move(sender_in))
   , authenticated_data(std::move(authenticated_data_in))
   , content(std::move(content_in))
-{}
+{
+}
 
 MLSMessageContent::MLSMessageContent(bytes group_id_in,
                                      epoch_t epoch_in,
@@ -467,7 +470,8 @@ MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
   : wire_format(wire_format_in)
   , content(std::move(content_in))
   , auth(std::move(auth_in))
-{}
+{
+}
 
 struct MLSMessageContentTBS
 {
@@ -795,7 +799,8 @@ MLSCiphertext::MLSCiphertext(MLSMessageContent content,
   , authenticated_data(std::move(content.authenticated_data))
   , encrypted_sender_data(std::move(encrypted_sender_data_in))
   , ciphertext(std::move(ciphertext_in))
-{}
+{
+}
 
 epoch_t
 MLSMessage::epoch() const
@@ -819,22 +824,27 @@ MLSMessage::wire_format() const
 
 MLSMessage::MLSMessage(MLSPlaintext mls_plaintext)
   : message(std::move(mls_plaintext))
-{}
+{
+}
 
 MLSMessage::MLSMessage(MLSCiphertext mls_ciphertext)
   : message(std::move(mls_ciphertext))
-{}
+{
+}
 
 MLSMessage::MLSMessage(Welcome welcome)
   : message(std::move(welcome))
-{}
+{
+}
 
 MLSMessage::MLSMessage(GroupInfo group_info)
   : message(std::move(group_info))
-{}
+{
+}
 
 MLSMessage::MLSMessage(KeyPackage key_package)
   : message(std::move(key_package))
-{}
+{
+}
 
 } // namespace mls

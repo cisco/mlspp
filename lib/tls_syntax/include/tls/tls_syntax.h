@@ -321,8 +321,14 @@ get(const std::vector<uint8_t>& data, Tp... args)
 // Use this macro to define struct serialization with minimal boilerplate
 #define TLS_SERIALIZABLE(...)                                                  \
   static const bool _tls_serializable = true;                                  \
-  auto _tls_fields_r() { return std::forward_as_tuple(__VA_ARGS__); }          \
-  auto _tls_fields_w() const { return std::forward_as_tuple(__VA_ARGS__); }
+  auto _tls_fields_r()                                                         \
+  {                                                                            \
+    return std::forward_as_tuple(__VA_ARGS__);                                 \
+  }                                                                            \
+  auto _tls_fields_w() const                                                   \
+  {                                                                            \
+    return std::forward_as_tuple(__VA_ARGS__);                                 \
+  }
 
 // If your struct contains nontrivial members (e.g., vectors), use this to
 // define traits for them.
@@ -449,7 +455,8 @@ variant<Ts>::decode(istream& str, var::variant<Tp...>& data)
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 write_tuple(ostream&, const std::tuple<Tp...>&)
-{}
+{
+}
 
 template<size_t I = 0, typename... Tp>
   inline typename std::enable_if <
@@ -474,7 +481,8 @@ inline
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 write_tuple_traits(ostream&, const std::tuple<Tp...>&)
-{}
+{
+}
 
 template<typename Tr, size_t I = 0, typename... Tp>
   inline typename std::enable_if <
@@ -499,7 +507,8 @@ inline
 template<size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 read_tuple(istream&, const std::tuple<Tp...>&)
-{}
+{
+}
 
 template<size_t I = 0, typename... Tp>
   inline
@@ -524,7 +533,8 @@ inline
 template<typename Tr, size_t I = 0, typename... Tp>
 inline typename std::enable_if<I == sizeof...(Tp), void>::type
 read_tuple_traits(istream&, const std::tuple<Tp...>&)
-{}
+{
+}
 
 template<typename Tr, size_t I = 0, typename... Tp>
   inline typename std::enable_if <

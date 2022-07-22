@@ -61,7 +61,8 @@ Client::Client(CipherSuite suite_in,
   : suite(suite_in)
   , sig_priv(std::move(sig_priv_in))
   , cred(std::move(cred_in))
-{}
+{
+}
 
 Session
 Client::begin_session(const bytes& group_id) const
@@ -106,7 +107,8 @@ PendingJoin::Inner::Inner(CipherSuite suite_in,
                          sig_priv),
                 {},
                 sig_priv)
-{}
+{
+}
 
 PendingJoin
 PendingJoin::Inner::create(CipherSuite suite,
@@ -127,7 +129,8 @@ PendingJoin::~PendingJoin() = default;
 
 PendingJoin::PendingJoin(Inner* inner_in)
   : inner(inner_in)
-{}
+{
+}
 
 bytes
 PendingJoin::key_package() const
@@ -152,7 +155,8 @@ PendingJoin::complete(const bytes& welcome) const
 Session::Inner::Inner(State state)
   : history{ std::move(state) }
   , encrypt_handshake(true)
-{}
+{
+}
 
 Session
 Session::Inner::begin(CipherSuite suite,
@@ -235,7 +239,8 @@ Session::~Session() = default;
 
 Session::Session(Inner* inner_in)
   : inner(inner_in)
-{}
+{
+}
 
 void
 Session::encrypt_handshake(bool enabled)
