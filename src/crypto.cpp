@@ -45,11 +45,13 @@ tls_signature_scheme(Signature::ID id)
 
 CipherSuite::CipherSuite()
   : id(ID::unknown)
-{}
+{
+}
 
 CipherSuite::CipherSuite(ID id_in)
   : id(id_in)
-{}
+{
+}
 
 SignatureScheme
 CipherSuite::signature_scheme() const
@@ -317,7 +319,8 @@ HPKEPrivateKey::do_export(CipherSuite suite,
 HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
-{}
+{
+}
 
 ///
 /// SignaturePublicKey and SignaturePrivateKey
@@ -370,6 +373,7 @@ SignaturePrivateKey::sign(const CipherSuite& suite, const bytes& message) const
 SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
-{}
+{
+}
 
 } // namespace mls

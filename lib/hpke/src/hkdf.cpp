@@ -51,7 +51,8 @@ digest_to_kdf(Digest::ID digest_id)
 HKDF::HKDF(const Digest& digest_in)
   : KDF(digest_to_kdf(digest_in.id), digest_in.hash_size)
   , digest(digest_in)
-{}
+{
+}
 
 bytes
 HKDF::extract(const bytes& salt, const bytes& ikm) const

@@ -19,7 +19,8 @@ struct RSASignature : public Signature
   {
     explicit PublicKey(EVP_PKEY* pkey_in)
       : pkey(pkey_in, typed_delete<EVP_PKEY>)
-    {}
+    {
+    }
 
     ~PublicKey() override = default;
 
@@ -30,7 +31,8 @@ struct RSASignature : public Signature
   {
     explicit PrivateKey(EVP_PKEY* pkey_in)
       : pkey(pkey_in, typed_delete<EVP_PKEY>)
-    {}
+    {
+    }
 
     ~PrivateKey() override = default;
 
@@ -48,7 +50,8 @@ struct RSASignature : public Signature
   explicit RSASignature(Digest::ID digest)
     : Signature(digest_to_sig(digest))
     , md(digest_to_md(digest))
-  {}
+  {
+  }
 
   std::unique_ptr<Signature::PrivateKey> generate_key_pair() const override;
 

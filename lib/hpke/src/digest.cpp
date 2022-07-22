@@ -52,7 +52,8 @@ Digest::get<Digest::ID::SHA512>()
 Digest::Digest(Digest::ID id_in)
   : id(id_in)
   , hash_size(EVP_MD_size(openssl_digest_type(id_in)))
-{}
+{
+}
 
 bytes
 Digest::hash(const bytes& data) const

@@ -23,7 +23,8 @@ LeafCount::LeafCount(const NodeCount w)
 
 NodeCount::NodeCount(const LeafCount n)
   : UInt32(2 * (n.val - 1) + 1)
-{}
+{
+}
 
 LeafIndex::LeafIndex(NodeIndex x)
   : UInt32(0)
@@ -37,7 +38,8 @@ LeafIndex::LeafIndex(NodeIndex x)
 
 NodeIndex::NodeIndex(LeafIndex x)
   : UInt32(2 * x.val)
-{}
+{
+}
 
 tls::ostream&
 operator<<(tls::ostream& str, const LeafIndex& obj)

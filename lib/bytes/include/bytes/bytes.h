@@ -21,11 +21,13 @@ struct bytes
   // Mimic std::vector ctors
   bytes(size_t count, const uint8_t& value = 0)
     : _data(count, value)
-  {}
+  {
+  }
 
   bytes(std::initializer_list<uint8_t> init)
     : _data(init)
-  {}
+  {
+  }
 
   // Slice out sub-vectors (to avoid an iterator ctor)
   bytes slice(size_t begin_index, size_t end_index) const
@@ -38,11 +40,13 @@ struct bytes
   // Freely convert to/from std::vector
   bytes(const std::vector<uint8_t>& vec)
     : _data(vec)
-  {}
+  {
+  }
 
   bytes(std::vector<uint8_t>&& vec)
     : _data(vec)
-  {}
+  {
+  }
 
   operator const std::vector<uint8_t>&() const { return _data; }
   operator std::vector<uint8_t>&() { return _data; }

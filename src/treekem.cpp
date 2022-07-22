@@ -391,7 +391,8 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
 
 TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
   : suite(suite_in)
-{}
+{
+}
 
 LeafIndex
 TreeKEMPublicKey::add_leaf(const LeafNode& leaf)

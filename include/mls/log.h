@@ -86,7 +86,8 @@ public:
 #else
   template<typename... Ts>
   static void crypto(const std::string& /*mod*/, const Ts&... /*vals*/)
-  {}
+  {
+  }
 #endif
 };
 

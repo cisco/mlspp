@@ -201,7 +201,8 @@ struct Certificate::ParsedCertificate
     , hash(compute_digest(x509.get()))
     , not_before(asn1_time_to_chrono(X509_get_notBefore(x509.get())))
     , not_after(asn1_time_to_chrono(X509_get_notAfter(x509.get())))
-  {}
+  {
+  }
 
   ParsedCertificate(const ParsedCertificate& other)
     : x509(nullptr, typed_delete<X509>)
@@ -352,19 +353,22 @@ Certificate::Certificate(std::unique_ptr<ParsedCertificate>&& parsed_cert_in)
   : parsed_cert(std::move(parsed_cert_in))
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(parsed_cert->raw())
-{}
+{
+}
 
 Certificate::Certificate(const bytes& der)
   : parsed_cert(ParsedCertificate::parse(der))
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(der)
-{}
+{
+}
 
 Certificate::Certificate(const Certificate& other)
   : parsed_cert(std::make_unique<ParsedCertificate>(*other.parsed_cert))
   , public_key(signature_key(parsed_cert->public_key().release()))
   , raw(other.raw)
-{}
+{
+}
 
 Certificate::~Certificate() = default;
 
