@@ -8,6 +8,7 @@ Checks:            '*,
                     -cppcoreguidelines-non-private-member-variables-in-classes,
                     -cppcoreguidelines-special-member-functions,
                     -google-build-using-namespace,
+                    -google-readability-casting
                     -google-runtime-references,
                     -hicpp-no-assembler,
                     -hicpp-special-member-functions,-warnings-as-errors,
@@ -17,10 +18,10 @@ Checks:            '*,
                     -misc-non-private-member-variables-in-classes,
                     -modernize-use-nodiscard,
                     -modernize-use-trailing-return-type,
+                    -readability-identifier-length,
                     -readability-magic-numbers,
                     -readability-function-cognitive-complexity,
                     -bugprone-easily-swappable-parameters,
-                    -google-readability-casting
                     '
 WarningsAsErrors:  '*'
 HeaderFilterRegex: '*'
