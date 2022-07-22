@@ -17,7 +17,8 @@ struct GroupSignature : public Signature
   {
     explicit PrivateKey(Group::PrivateKey* group_priv_in)
       : group_priv(group_priv_in)
-    {}
+    {
+    }
 
     std::unique_ptr<Signature::PublicKey> public_key() const override
     {
@@ -48,7 +49,8 @@ struct GroupSignature : public Signature
   explicit GroupSignature(const Group& group_in)
     : Signature(group_to_sig(group_in.id))
     , group(group_in)
-  {}
+  {
+  }
 
   std::unique_ptr<Signature::PrivateKey> generate_key_pair() const override
   {
@@ -171,7 +173,8 @@ Signature::get<Signature::ID::RSA_SHA512>()
 
 Signature::Signature(Signature::ID id_in)
   : id(id_in)
-{}
+{
+}
 
 bytes
 Signature::serialize_private(const PrivateKey& /* unused */) const

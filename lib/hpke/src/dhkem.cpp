@@ -8,7 +8,8 @@ using namespace bytes_ns::operators;
 
 DHKEM::PrivateKey::PrivateKey(Group::PrivateKey* group_priv_in)
   : group_priv(group_priv_in)
-{}
+{
+}
 
 std::unique_ptr<KEM::PublicKey>
 DHKEM::PrivateKey::public_key() const

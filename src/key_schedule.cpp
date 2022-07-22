@@ -53,7 +53,8 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
   , key_size(suite.hpke().aead.key_size)
   , nonce_size(suite.hpke().aead.nonce_size)
   , secret_size(suite.secret_size())
-{}
+{
+}
 
 std::tuple<uint32_t, KeyAndNonce>
 HashRatchet::next()
@@ -178,7 +179,8 @@ GroupKeySource::GroupKeySource(CipherSuite suite_in,
                                bytes encryption_secret)
   : suite(suite_in)
   , secret_tree(suite, group_size, std::move(encryption_secret))
-{}
+{
+}
 
 HashRatchet&
 GroupKeySource::chain(RatchetType type, LeafIndex sender)
@@ -496,11 +498,13 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , resumption_secret(suite.derive_secret(epoch_secret, "resumption"))
   , init_secret(suite.derive_secret(epoch_secret, "init"))
   , external_priv(HPKEPrivateKey::derive(suite, external_secret))
-{}
+{
+}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
   : suite(suite_in)
-{}
+{
+}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
@@ -510,7 +514,8 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
       make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
       { /* no PSKs */ },
       context)
-{}
+{
+}
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
@@ -522,7 +527,8 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
       make_joiner_secret(suite_in, context, init_secret, commit_secret),
       psks,
       context)
-{}
+{
+}
 
 std::tuple<bytes, bytes>
 KeyScheduleEpoch::external_init(CipherSuite suite,
@@ -647,7 +653,8 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 
 TranscriptHash::TranscriptHash(CipherSuite suite_in)
   : suite(suite_in)
-{}
+{
+}
 
 TranscriptHash::TranscriptHash(CipherSuite suite_in,
                                bytes confirmed_in,

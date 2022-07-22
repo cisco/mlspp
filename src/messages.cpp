@@ -42,7 +42,8 @@ GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
   , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
   , signer(zero_ref)
-{}
+{
+}
 
 struct GroupInfoTBS
 {
@@ -118,7 +119,8 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
 Welcome::Welcome()
   : version(ProtocolVersion::mls10)
   , cipher_suite(CipherSuite::ID::unknown)
-{}
+{
+}
 
 Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
@@ -268,7 +270,8 @@ Sender::sender_type() const
 MLSPlaintext::MLSPlaintext()
   : wire_format(WireFormat::mls_plaintext)
   , epoch(0)
-{}
+{
+}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -320,7 +323,8 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(std::move(sender_in))
   , content(std::move(application_data_in))
-{}
+{
+}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -331,7 +335,8 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(std::move(sender_in))
   , content(std::move(proposal))
-{}
+{
+}
 
 MLSPlaintext::MLSPlaintext(bytes group_id_in,
                            epoch_t epoch_in,
@@ -342,7 +347,8 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
   , epoch(epoch_in)
   , sender(std::move(sender_in))
   , content(std::move(commit))
-{}
+{
+}
 
 ContentType
 MLSPlaintext::content_type() const

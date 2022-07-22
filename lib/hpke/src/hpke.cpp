@@ -95,7 +95,8 @@ KEM::KEM(ID id_in,
   , enc_size(enc_size_in)
   , pk_size(pk_size_in)
   , sk_size(sk_size_in)
-{}
+{
+}
 
 template<>
 const KEM&
@@ -183,7 +184,8 @@ KDF::get<KDF::ID::HKDF_SHA512>()
 KDF::KDF(ID id_in, size_t hash_size_in)
   : id(id_in)
   , hash_size(hash_size_in)
-{}
+{
+}
 
 bytes
 KDF::labeled_extract(const bytes& suite_id,
@@ -240,7 +242,8 @@ AEAD::AEAD(ID id_in, size_t key_size_in, size_t nonce_size_in)
   : id(id_in)
   , key_size(key_size_in)
   , nonce_size(nonce_size_in)
-{}
+{
+}
 
 ///
 /// Encryption Contexts
@@ -283,7 +286,8 @@ Context::Context(bytes suite_in,
   , kdf(kdf_in)
   , aead(aead_in)
   , seq(0)
-{}
+{
+}
 
 bool
 operator==(const Context& lhs, const Context& rhs)
@@ -299,7 +303,8 @@ operator==(const Context& lhs, const Context& rhs)
 
 SenderContext::SenderContext(Context&& c)
   : Context(std::move(c))
-{}
+{
+}
 
 bytes
 SenderContext::seal(const bytes& aad, const bytes& pt)
@@ -311,7 +316,8 @@ SenderContext::seal(const bytes& aad, const bytes& pt)
 
 ReceiverContext::ReceiverContext(Context&& c)
   : Context(std::move(c))
-{}
+{
+}
 
 std::optional<bytes>
 ReceiverContext::open(const bytes& aad, const bytes& ct)
@@ -392,7 +398,8 @@ HPKE::HPKE(KEM::ID kem_id, KDF::ID kdf_id, AEAD::ID aead_id)
   , kem(select_kem(kem_id))
   , kdf(select_kdf(kdf_id))
   , aead(select_aead(aead_id))
-{}
+{
+}
 
 HPKE::SenderInfo
 HPKE::setup_base_s(const KEM::PublicKey& pkR, const bytes& info) const

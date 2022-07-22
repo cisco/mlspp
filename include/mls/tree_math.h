@@ -38,11 +38,13 @@ struct UInt32
 
   UInt32()
     : val(0)
-  {}
+  {
+  }
 
   explicit UInt32(uint32_t val_in)
     : val(val_in)
-  {}
+  {
+  }
 
   TLS_SERIALIZABLE(val)
 };

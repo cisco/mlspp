@@ -326,11 +326,13 @@ struct ProposalType
 
   constexpr ProposalType()
     : val(invalid)
-  {}
+  {
+  }
 
   constexpr ProposalType(Proposal::Type pt)
     : val(pt)
-  {}
+  {
+  }
 
   Proposal::Type val;
   TLS_SERIALIZABLE(val);

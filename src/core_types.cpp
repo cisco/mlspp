@@ -350,7 +350,8 @@ ParentNode::hash(CipherSuite suite) const
 KeyPackage::KeyPackage()
   : version(ProtocolVersion::mls10)
   , cipher_suite(CipherSuite::ID::unknown)
-{}
+{
+}
 
 KeyPackage::KeyPackage(CipherSuite suite_in,
                        HPKEPublicKey init_key_in,
