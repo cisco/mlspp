@@ -21,6 +21,7 @@ Checks:            '*,
                     -readability-identifier-length,
                     -readability-function-cognitive-complexity,
                     -bugprone-easily-swappable-parameters,
+                    -google-readability-casting
                     '
 WarningsAsErrors:  '*'
 HeaderFilterRegex: '*'
