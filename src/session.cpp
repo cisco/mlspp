@@ -31,7 +31,7 @@ struct Session::Inner
 {
   std::deque<State> history;
   std::map<bytes, State> outbound_cache;
-  bool encrypt_handshake;
+  bool encrypt_handshake{ false };
 
   explicit Inner(State state);
 
@@ -382,6 +382,12 @@ Session::do_export(const std::string& label,
                    size_t size) const
 {
   return inner->history.front().do_export(label, context, size);
+}
+
+GroupInfo
+Session::group_info() const
+{
+  return inner->history.front().group_info();
 }
 
 std::vector<LeafNode>

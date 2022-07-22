@@ -77,6 +77,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
+  GroupInfo group_info() const;
   std::vector<LeafNode> roster() const;
   bytes authentication_secret() const;
 
