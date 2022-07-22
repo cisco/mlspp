@@ -29,6 +29,7 @@ elseif(MSVC)
 endif()
 
 if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"))
+  message("Enabling sanitizers")
   set(SANITIZERS "-fsanitize=address -fsanitize=undefined")
   set(CMAKE_C_FLAGS              "${CMAKE_C_FLAGS}             ${SANITIZERS}")
   set(CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS}           ${SANITIZERS}")
@@ -36,6 +37,9 @@ if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_
   set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} ${SANITIZERS}")
   set(CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} ${SANITIZERS}")
   add_definitions(-DSANITIZERS)
+elseif (SANITIZERS AND MSVC)
+  message("Enabling sanitizers")
+  add_definitions("/fsanitize=address")
 endif()
 
 if(CLANG_TIDY)
