@@ -15,7 +15,7 @@ ostream&
 ostream::write_uint(uint64_t value, int length)
 {
   for (int i = length - 1; i >= 0; --i) {
-    _buffer.push_back(static_cast<uint8_t>(value >> unsigned(8 * i)));
+    _buffer.push_back(static_cast<uint8_t>(value >> static_cast<unsigned>(8 * i)));
   }
   return *this;
 }
@@ -24,10 +24,10 @@ ostream&
 operator<<(ostream& out, bool data)
 {
   if (data) {
-    return out << uint8_t(1);
+    return out << static_cast<uint8_t>(1);
   }
 
-  return out << uint8_t(0);
+  return out << static_cast<uint8_t>(0);
 }
 
 ostream&
@@ -139,13 +139,13 @@ varint::encode(ostream& str, const uint64_t& val)
 istream&
 varint::decode(istream& str, uint64_t& val)
 {
-  auto log_size = size_t(str._buffer.back() >> VARINT_HEADER_OFFSET);
+  auto log_size = static_cast<size_t>(str._buffer.back() >> VARINT_HEADER_OFFSET);
   if (log_size > 2) {
     throw ReadError("Malformed varint header");
   }
 
-  auto read = uint64_t(0);
-  auto read_bytes = size_t(size_t(1) << log_size);
+  auto read = static_cast<uint64_t>(0);
+  auto read_bytes = static_cast<size_t>(1) << log_size;
   str.read_uint(read, read_bytes);
 
   switch (log_size) {
