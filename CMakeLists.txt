@@ -37,7 +37,8 @@ if (SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_
   set(CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} ${SANITIZERS}")
   add_definitions(-DSANITIZERS)
 elseif (SANITIZERS AND MSVC)
-  add_definitions("/fsanitize:address")
+  message("Enabling sanitizers")
+  add_definitions("/fsanitize=address")
 endif()
 
 if(CLANG_TIDY)
