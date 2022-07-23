@@ -29,6 +29,11 @@ struct bytes
   {
   }
 
+  template< class InputIt >
+  bytes(InputIt first, InputIt last)
+    : _data(first, last)
+  {}
+
   // Slice out sub-vectors (to avoid an iterator ctor)
   bytes slice(size_t begin_index, size_t end_index) const
   {
