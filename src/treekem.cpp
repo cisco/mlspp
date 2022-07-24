@@ -34,7 +34,7 @@ Node::public_key() const
 std::optional<bytes>
 Node::parent_hash() const
 {
-  static const auto get_leaf_ph = overloaded{
+  const auto get_leaf_ph = overloaded{
     [](const ParentHash& ph) -> std::optional<bytes> { return ph.parent_hash; },
     [](const auto& /* other */) -> std::optional<bytes> {
       return std::nullopt;

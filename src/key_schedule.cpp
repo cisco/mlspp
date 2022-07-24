@@ -302,7 +302,7 @@ GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
   }
 
   // Pull from the key schedule
-  static const auto get_key_type = overloaded{
+  const auto get_key_type = overloaded{
     [](const ApplicationData& /*unused*/) {
       return GroupKeySource::RatchetType::application;
     },
