@@ -1,168 +1,209 @@
 package main
 
+// This script reads the test vectors in JSON format and re-encodes them in TLS
+// format readable by the `tls` library, to avoid having to have a JSON parser
+// as a dependency of the tests.
+//
+// XXX(RLB) There is a fair bit of silliness with array header encoding because
+// the varint encoding that is currently in the Go TLS Syntax library doesn't
+// match the encoding used by MLS.  Given that the Go TLS Syntax library's
+// version is non-standard, we should probably update that to match what MLS
+// requires, at which point we can simplify this script.  However, this would be
+// a breaking change for any users of the Go library, so just in case there are
+// some (I don't expect there are), I held off making the change.
+
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
+
+	"github.com/cisco/go-tls-syntax"
 )
 
-var (
-	encryptionThreshold = 10
-	header              = `#include "test_vectors.h"
+func varintEncode(val int) []byte {
+	switch {
+	case val <= 0x3f:
+		return []byte{byte(val)}
 
-std::vector<HPKETestVector> test_vectors{`
-	footer = `};`
-)
+	case val <= 0x3fff:
+		return []byte{0x40 | byte(val>>8), byte(val)}
+
+	case val <= 0x3fffffff:
+		return []byte{0x80 | byte(val>>24), byte(val >> 16), byte(val >> 8), byte(val)}
+
+	default:
+		panic("Un-encodable varint value")
+	}
+}
+
+func addVarintHeader(data []byte) []byte {
+	header := varintEncode(len(data))
+	return append(header, data...)
+}
+
+type ByteString struct {
+	Data []byte `tls:"head=varint"`
+}
+
+func (b *ByteString) UnmarshalJSON(data []byte) error {
+	hexString := ""
+	err := json.Unmarshal(data, &hexString)
+	if err != nil {
+		return err
+	}
+
+	b.Data, err = hex.DecodeString(hexString)
+	return err
+}
+
+func (b ByteString) MarhsalTLS() ([]byte, error) {
+	return addVarintHeader(b.Data), nil
+}
 
 type EncryptionTestVector struct {
-	Plaintext  string `json:"plaintext"`
-	AAD        string `json:"aad"`
-	Nonce      string `json:"nonce"`
-	Ciphertext string `json:"ciphertext"`
+	Plaintext  ByteString `json:"plaintext"`
+	AAD        ByteString `json:"aad"`
+	Nonce      ByteString `json:"nonce"`
+	Ciphertext ByteString `json:"ciphertext"`
+}
+
+type EncryptionTestVectors []EncryptionTestVector
+
+func (etvs EncryptionTestVectors) MarshalTLS() ([]byte, error) {
+	data := []byte{}
+	for _, etv := range etvs {
+		item, err := syntax.Marshal(etv)
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, item...)
+	}
+
+	return addVarintHeader(data), nil
 }
 
 type ExporterTestVector struct {
-	Context string `json:"exporter_context"`
-	Length  int    `json:"L"`
-	Value   string `json:"exported_value"`
+	Context ByteString `json:"exporter_context"`
+	Length  uint32     `json:"L"`
+	Value   ByteString `json:"exported_value"`
+}
+
+type ExporterTestVectors []ExporterTestVector
+
+func (etvs ExporterTestVectors) MarshalTLS() ([]byte, error) {
+	data := []byte{}
+	for _, etv := range etvs {
+		item, err := syntax.Marshal(etv)
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, item...)
+	}
+
+	return addVarintHeader(data), nil
 }
 
 type HPKETestVector struct {
 	// Parameters
-	Mode   int    `json:"mode"`
-	KEMID  int    `json:"kem_id"`
-	KDFID  int    `json:"kdf_id"`
-	AEADID int    `json:"aead_id"`
-	Info   string `json:"info"`
+	Mode   uint8      `json:"mode"`
+	KEMID  uint16     `json:"kem_id"`
+	KDFID  uint16     `json:"kdf_id"`
+	AEADID uint16     `json:"aead_id"`
+	Info   ByteString `json:"info"`
 
 	// Private keys
-	IKMR  string `json:"ikmR"`
-	IKMS  string `json:"ikmS"`
-	IKME  string `json:"ikmE"`
-	SKR   string `json:"skRm"`
-	SKS   string `json:"skSm"`
-	SKE   string `json:"skEm"`
-	PSK   string `json:"psk"`
-	PSKID string `json:"psk_id"`
+	IKMR  ByteString `json:"ikmR"`
+	IKMS  ByteString `json:"ikmS"`
+	IKME  ByteString `json:"ikmE"`
+	SKR   ByteString `json:"skRm"`
+	SKS   ByteString `json:"skSm"`
+	SKE   ByteString `json:"skEm"`
+	PSK   ByteString `json:"psk"`
+	PSKID ByteString `json:"psk_id"`
 
 	// Public keys
-	PKR string `json:"pkRm"`
-	PKS string `json:"pkSm"`
-	PKE string `json:"pkEm"`
+	PKR ByteString `json:"pkRm"`
+	PKS ByteString `json:"pkSm"`
+	PKE ByteString `json:"pkEm"`
 
 	// Key schedule inputs and computations
-	Enc                string `json:"enc"`
-	SharedSecret       string `json:"shared_secret"`
-	KeyScheduleContext string `json:"key_schedule_context"`
-	Secret             string `json:"secret"`
-	Key                string `json:"key"`
-	Nonce              string `json:"base_nonce"`
-	ExporterSecret     string `json:"exporter_secret"`
+	Enc                ByteString `json:"enc"`
+	SharedSecret       ByteString `json:"shared_secret"`
+	KeyScheduleContext ByteString `json:"key_schedule_context"`
+	Secret             ByteString `json:"secret"`
+	Key                ByteString `json:"key"`
+	Nonce              ByteString `json:"base_nonce"`
+	ExporterSecret     ByteString `json:"exporter_secret"`
 
-	Encryptions []EncryptionTestVector `json:"encryptions"`
-	Exports     []ExporterTestVector   `json:"exports"`
+	Encryptions EncryptionTestVectors `json:"encryptions"`
+	Exports     ExporterTestVectors   `json:"exports"`
 }
 
-func writeHexLine(hex string, indent int) {
-	pad := strings.Repeat(" ", indent)
+type HPKETestVectors []HPKETestVector
 
-	if len(hex) == 0 {
-		fmt.Printf("%s{},\n", pad)
-		return
-	}
-
-	fmt.Printf("%sfrom_hex(\"%s\"),\n", pad, hex)
-}
-
-func writeEncryption(enc EncryptionTestVector, indent int) {
-	pad := strings.Repeat(" ", indent)
-	fmt.Printf("%s{\n", pad)
-	writeHexLine(enc.Plaintext, indent+2)
-	writeHexLine(enc.AAD, indent+2)
-	writeHexLine(enc.Nonce, indent+2)
-	writeHexLine(enc.Ciphertext, indent+2)
-	fmt.Printf("%s},\n", pad)
-}
-
-func writeExport(exp ExporterTestVector, indent int) {
-	pad := strings.Repeat(" ", indent)
-	fmt.Printf("%s{\n", pad)
-	writeHexLine(exp.Context, indent+2)
-	fmt.Printf("%s  %d,\n", pad, exp.Length)
-	writeHexLine(exp.Value, indent+2)
-	fmt.Printf("%s},\n", pad)
-}
-
-func writeTestVector(tv HPKETestVector, indent int) {
-	pad := strings.Repeat(" ", indent)
-	fmt.Printf("%s{\n", pad)
-	fmt.Printf("%s  HPKE::Mode(%d),\n", pad, tv.Mode)
-	fmt.Printf("%s  KEM::ID(%d),\n", pad, tv.KEMID)
-	fmt.Printf("%s  KDF::ID(%d),\n", pad, tv.KDFID)
-	fmt.Printf("%s  AEAD::ID(%d),\n", pad, tv.AEADID)
-	writeHexLine(tv.Info, indent+2)
-
-	writeHexLine(tv.IKMR, indent+2)
-	writeHexLine(tv.IKMS, indent+2)
-	writeHexLine(tv.IKME, indent+2)
-
-	writeHexLine(tv.SKR, indent+2)
-	writeHexLine(tv.SKS, indent+2)
-	writeHexLine(tv.SKE, indent+2)
-
-	writeHexLine(tv.PSK, indent+2)
-	writeHexLine(tv.PSKID, indent+2)
-
-	writeHexLine(tv.PKR, indent+2)
-	writeHexLine(tv.PKS, indent+2)
-	writeHexLine(tv.PKE, indent+2)
-
-	writeHexLine(tv.Enc, indent+2)
-	writeHexLine(tv.SharedSecret, indent+2)
-	writeHexLine(tv.KeyScheduleContext, indent+2)
-	writeHexLine(tv.Secret, indent+2)
-	writeHexLine(tv.Key, indent+2)
-	writeHexLine(tv.Nonce, indent+2)
-	writeHexLine(tv.ExporterSecret, indent+2)
-
-	fmt.Printf("%s  {\n", pad)
-	for i, enc := range tv.Encryptions {
-		writeEncryption(enc, indent+4)
-
-		if i > encryptionThreshold {
-			break
+func (htvs HPKETestVectors) MarshalTLS() ([]byte, error) {
+	data := []byte{}
+	for _, htv := range htvs {
+		item, err := syntax.Marshal(htv)
+		if err != nil {
+			return nil, err
 		}
-	}
-	fmt.Printf("%s  },\n", pad)
 
-	fmt.Printf("%s  {\n", pad)
-	for _, exp := range tv.Exports {
-		writeExport(exp, indent+4)
+		data = append(data, item...)
 	}
-	fmt.Printf("%s  },\n", pad)
 
-	fmt.Printf("%s},\n", pad)
+	return addVarintHeader(data), nil
+}
+
+var (
+	encryptionThreshold = 10
+	header              = `#include "test_vectors.h"
+#include <array>
+
+const std::array<uint8_t, %d> test_vector_data{
+`
+	footer = `};`
+)
+
+func main() {
+	tvJSON, err := ioutil.ReadAll(os.Stdin)
+	chk(err)
+
+	tvs := []HPKETestVector{}
+	err = json.Unmarshal(tvJSON, &tvs)
+	chk(err)
+
+	tvTLS, err := syntax.Marshal(HPKETestVectors(tvs))
+	chk(err)
+
+	fmt.Printf(header, len(tvTLS))
+
+	width := 16
+	start := 0
+	for start < len(tvTLS) {
+		end := start + width
+		if end > len(tvTLS) {
+			end = len(tvTLS)
+		}
+
+		fmt.Printf("  ")
+		for i := start; i < end-1; i++ {
+			fmt.Printf("0x%02x, ", tvTLS[i])
+		}
+		fmt.Printf("0x%02x,\n", tvTLS[end-1])
+
+		start = end
+	}
+
+	fmt.Printf("%s\n", footer)
 }
 
 func chk(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func main() {
-	tvJ, err := ioutil.ReadAll(os.Stdin)
-	chk(err)
-
-	tvs := []HPKETestVector{}
-	err = json.Unmarshal(tvJ, &tvs)
-	chk(err)
-
-	fmt.Printf("%s\n", header)
-	for _, tv := range tvs {
-		writeTestVector(tv, 2)
-	}
-	fmt.Printf("%s\n", footer)
 }

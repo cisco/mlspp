@@ -134,7 +134,10 @@ TEST_CASE("HPKE Test Vectors")
 {
   ensure_fips_if_required();
 
-  for (const auto& tv : test_vectors) {
+  auto test_vector_bytes = bytes(test_vector_data);
+  auto test_vectors = tls::get<HPKETestVectors>(test_vector_bytes);
+
+  for (const auto& tv : test_vectors.vectors) {
     if (fips() && fips_disable(tv.aead_id)) {
       continue;
     }

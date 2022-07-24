@@ -213,7 +213,7 @@ LeafNode::verify(CipherSuite cipher_suite,
 bool
 LeafNode::verify_expiry(uint64_t now) const
 {
-  static const auto valid = overloaded{
+  const auto valid = overloaded{
     [now](const Lifetime& lt) {
       return lt.not_before <= now && now <= lt.not_after;
     },

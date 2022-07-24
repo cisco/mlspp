@@ -9,8 +9,10 @@
 struct ExportTestVector
 {
   bytes context;
-  size_t length;
+  uint32_t length;
   bytes value;
+
+  TLS_SERIALIZABLE(context, length, value)
 };
 
 struct EncryptionTestVector
@@ -19,6 +21,8 @@ struct EncryptionTestVector
   bytes aad;
   bytes nonce;
   bytes ciphertext;
+
+  TLS_SERIALIZABLE(plaintext, aad, nonce, ciphertext)
 };
 
 struct HPKETestVector
@@ -48,6 +52,38 @@ struct HPKETestVector
   bytes exporter_secret;
   std::vector<EncryptionTestVector> encryptions;
   std::vector<ExportTestVector> exports;
+
+  TLS_SERIALIZABLE(mode,
+                   kem_id,
+                   kdf_id,
+                   aead_id,
+                   info,
+                   ikmR,
+                   ikmS,
+                   ikmE,
+                   skRm,
+                   skSm,
+                   skEm,
+                   psk,
+                   psk_id,
+                   pkRm,
+                   pkSm,
+                   pkEm,
+                   enc,
+                   shared_secret,
+                   key_schedule_context,
+                   secret,
+                   key,
+                   nonce,
+                   exporter_secret,
+                   encryptions,
+                   exports)
 };
 
-extern std::vector<HPKETestVector> test_vectors;
+struct HPKETestVectors
+{
+  std::vector<HPKETestVector> vectors;
+  TLS_SERIALIZABLE(vectors);
+};
+
+extern const std::array<uint8_t, 2555172> test_vector_data;
