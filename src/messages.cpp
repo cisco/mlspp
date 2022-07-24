@@ -353,7 +353,7 @@ MLSPlaintext::MLSPlaintext(bytes group_id_in,
 ContentType
 MLSPlaintext::content_type() const
 {
-  static const auto get_content_type = overloaded{
+  const auto get_content_type = overloaded{
     [](const ApplicationData& /*unused*/) { return ContentType::application; },
     [](const Proposal& /*unused*/) { return ContentType::proposal; },
     [](const Commit& /*unused*/) { return ContentType::commit; },
