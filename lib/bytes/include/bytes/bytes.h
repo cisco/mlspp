@@ -32,7 +32,8 @@ struct bytes
   template<size_t N>
   bytes(const std::array<uint8_t, N>& data)
     : _data(data.begin(), data.end())
-  {}
+  {
+  }
 
   // Slice out sub-vectors (to avoid an iterator ctor)
   bytes slice(size_t begin_index, size_t end_index) const

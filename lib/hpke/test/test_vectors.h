@@ -80,7 +80,8 @@ struct HPKETestVector
                    exports)
 };
 
-struct HPKETestVectors {
+struct HPKETestVectors
+{
   std::vector<HPKETestVector> vectors;
   TLS_SERIALIZABLE(vectors);
 };
