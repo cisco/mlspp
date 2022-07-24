@@ -41,8 +41,8 @@ Node::parent_hash() const
     },
   };
 
-  static const auto get_ph = overloaded{
-    [](const LeafNode& node) -> std::optional<bytes> {
+  const auto get_ph = overloaded{
+    [&](const LeafNode& node) -> std::optional<bytes> {
       return var::visit(get_leaf_ph, node.content);
     },
     [](const ParentNode& node) -> std::optional<bytes> {
