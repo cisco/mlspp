@@ -134,7 +134,7 @@ TEST_CASE("HPKE Test Vectors")
 {
   ensure_fips_if_required();
 
-  auto test_vector_bytes = bytes(test_vector_data.begin(), test_vector_data.end());
+  auto test_vector_bytes = bytes(test_vector_data);
   auto test_vectors = tls::get<HPKETestVectors>(test_vector_bytes);
 
   for (const auto& tv : test_vectors.vectors) {
