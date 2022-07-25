@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <mls/messages.h>
+#include <mls/state.h>
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 
@@ -28,6 +29,115 @@ TEST_CASE("Extensions")
 // * KeyPackage
 // * GroupInfo
 // * PublicGroupState
+
+class MLSMessageTest
+{
+public:
+  MLSMessageTest()
+  {
+    auto hpke_priv = HPKEPrivateKey::generate(suite);
+    auto leaf_node = LeafNode{
+      suite,
+      hpke_priv.public_key,
+      Credential::basic({}, suite, sig_priv.public_key),
+      Capabilities::create_default(),
+      Lifetime::create_default(),
+      {},
+      sig_priv,
+    };
+
+    tree.add_leaf(leaf_node);
+    leaf_node_ref = leaf_node.ref(suite);
+    keys = GroupKeySource{ suite,
+                           LeafCount{ 1 },
+                           random_bytes(suite.secret_size()) };
+
+    application_content = MLSMessageContent{
+      group_id, epoch, { leaf_node_ref }, authenticated_data, application_data,
+    };
+
+    proposal_content = MLSMessageContent{
+      group_id,
+      epoch,
+      { leaf_node_ref },
+      authenticated_data,
+      Proposal{ GroupContextExtensions{} },
+    };
+  }
+
+protected:
+  const bytes group_id = from_ascii("group_id");
+  const epoch_t epoch = 0xA0A0A0A0A0A0A0A0;
+  const bytes authenticated_data = from_ascii("authenticated_data");
+  const ApplicationData application_data{ from_ascii("application_data") };
+  const Proposal proposal{ GroupContextExtensions{} };
+
+  const CipherSuite suite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
+  const SignaturePrivateKey sig_priv = SignaturePrivateKey::generate(suite);
+  const GroupContext context{
+    group_id,
+    epoch,
+    random_bytes(suite.secret_size()),
+    random_bytes(suite.secret_size()),
+    {},
+  };
+  const bytes membership_key = from_ascii("membership_key");
+  const bytes sender_data_secret = from_ascii("sender_data_secret");
+
+  const LeafIndex index{ 0 };
+  const size_t padding_size = 1024;
+
+  LeafNodeRef leaf_node_ref{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  TreeKEMPublicKey tree{ suite };
+  GroupKeySource keys;
+
+  MLSMessageContent application_content;
+  MLSMessageContent proposal_content;
+};
+
+TEST_CASE_FIXTURE(MLSMessageTest, "MLSMessageContentAuth Sign/Verify")
+{
+  // Verify that a sign / verify round-trip works
+  auto content_auth = MLSMessageContentAuth::sign(
+    WireFormat::mls_ciphertext, application_content, suite, sig_priv, context);
+
+  REQUIRE(content_auth.verify(suite, sig_priv.public_key, context));
+  REQUIRE(content_auth.content == application_content);
+
+  // Verify that `mls_plaintext` is forbidden for ApplicationData
+  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+  REQUIRE_THROWS(MLSMessageContentAuth::sign(
+    WireFormat::mls_plaintext, application_content, suite, sig_priv, context));
+}
+
+TEST_CASE_FIXTURE(MLSMessageTest, "MLSPlaintext Protect/Unprotect")
+{
+  auto content = proposal_content;
+  auto content_auth_original = MLSMessageContentAuth::sign(
+    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, context);
+
+  auto pt = MLSPlaintext::protect(
+    content_auth_original, suite, membership_key, context);
+  auto content_auth_unprotected = pt.unprotect(suite, membership_key, context);
+  REQUIRE(content_auth_unprotected == content_auth_original);
+}
+
+TEST_CASE_FIXTURE(MLSMessageTest, "MLSCiphertext Protect/Unprotect")
+{
+  auto content = proposal_content;
+  auto content_auth_original = MLSMessageContentAuth::sign(
+    WireFormat::mls_ciphertext, std::move(content), suite, sig_priv, context);
+
+  auto ct = MLSCiphertext::protect(content_auth_original,
+                                   suite,
+                                   index,
+                                   keys,
+                                   sender_data_secret,
+                                   padding_size);
+  auto content_auth_unprotected =
+    ct.unprotect(suite, tree, keys, sender_data_secret);
+  REQUIRE(content_auth_unprotected == content_auth_original);
+}
 
 TEST_CASE("Messages Interop")
 {

@@ -218,13 +218,10 @@ CipherSuite::reference_label<LeafNode>()
 //   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
 //
 // Even though the label says "Proposal", we actually hash the entire enclosing
-// MLSPlaintext object.
-//
-// XXX(RLB): Is this still the case with the MLSMessage transition?  Does the
-// spec reflect this accurately?
+// MLSMessageContentAuth object.
 template<>
 const bytes&
-CipherSuite::reference_label<MLSPlaintext>()
+CipherSuite::reference_label<MLSMessageContentAuth>()
 {
   static const auto label = from_ascii("MLS 1.0 Proposal Reference");
   return label;

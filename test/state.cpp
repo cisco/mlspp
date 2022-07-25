@@ -41,10 +41,12 @@ protected:
   const size_t group_size = 5;
   const bytes group_id = { 0, 1, 2, 3 };
   const bytes user_id = { 4, 5, 6, 7 };
-  const bytes test_message = from_hex("01020304");
+  const bytes test_aad = from_hex("01020304");
+  const bytes test_message = from_hex("11121314");
   const std::string export_label = "test";
   const bytes export_context = from_hex("05060708");
   const size_t export_size = 16;
+  const MessageOpts msg_opts{ false, {}, 0 };
 
   std::vector<HPKEPrivateKey> init_privs;
   std::vector<HPKEPrivateKey> leaf_privs;
@@ -86,9 +88,13 @@ protected:
 
     // Verify that they can all send and be received
     for (auto& state : group_states) {
-      auto encrypted = state.protect(test_message);
+      auto encrypted = state.protect(test_aad, test_message, 0);
       for (auto& other : group_states) {
-        auto decrypted = other.unprotect(encrypted);
+        auto [aad_, decrypted_] = other.unprotect(encrypted);
+        auto aad = aad_;
+        auto decrypted = decrypted_;
+
+        REQUIRE(aad == test_aad);
         REQUIRE(decrypted == test_message);
       }
     }
@@ -123,7 +129,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   auto [commit, welcome, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
   silence_unused(commit);
   auto first1 = first1_;
 
@@ -152,7 +158,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   auto [commit1, welcome1, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
   auto first1 = first1_;
   silence_unused(commit1);
 
@@ -171,7 +177,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
 
   auto gce = first1.group_context_extensions_proposal(second_exts);
   auto [commit2, welcome2, first2_] =
-    first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false, {} });
+    first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false, {} }, {});
   auto second2 = second1.handle(commit2);
   silence_unused(welcome2);
   auto first2 = first2_;
@@ -193,7 +199,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   auto add = first0.add_proposal(key_packages[1]);
   // Don't generate RatchetTree extension
   auto [commit, welcome_, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, false, false, {} });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, false, false, {} }, {});
   auto welcome = welcome_;
   auto first1 = first1_;
   silence_unused(commit);
@@ -244,7 +250,8 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
                                                 identity_privs[1],
                                                 key_packages[1],
                                                 group_info,
-                                                std::nullopt);
+                                                std::nullopt,
+                                                {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
@@ -267,7 +274,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
 
   // Initialize the second participant as an external joiner
   auto [commit, second0] = State::external_join(
-    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree);
+    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree, {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
@@ -301,7 +308,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   // Add the second member
   auto add = first0.add_proposal(kp1);
   auto [commit, welcome, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} });
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
   auto first1 = first1_;
   silence_unused(commit);
 
@@ -372,7 +379,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
 
   // When a client is added who does support the required extensions, it should
   // work.
-  state.handle(state.add(kp_yes_2));
+  state.handle(state.add(kp_yes_2, msg_opts));
 }
 
 TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
@@ -393,7 +400,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
 
   // Create a Commit that adds everybody
   auto [commit, welcome, new_state] =
-    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} });
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
   silence_unused(commit);
   states[0] = new_state;
 
@@ -426,7 +433,7 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
 
     auto add = states[sender].add_proposal(key_packages[i]);
     auto [commit, welcome, new_state] = states[sender].commit(
-      fresh_secret(), CommitOpts{ { add }, true, false, {} });
+      fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
     for (size_t j = 0; j < states.size(); j += 1) {
       if (j == sender) {
         states[j] = new_state;
@@ -471,7 +478,7 @@ protected:
     }
 
     auto [commit, welcome, new_state] =
-      states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} });
+      states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
@@ -500,7 +507,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone via Empty Commit")
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = fresh_secret();
-    auto [commit, welcome, new_state] = states[i].commit(new_leaf, {});
+    auto [commit, welcome, new_state] = states[i].commit(new_leaf, {}, {});
     silence_unused(welcome);
 
     for (auto& state : states) {
@@ -521,7 +528,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
     auto new_leaf = fresh_secret();
     auto update = states[i].update_proposal(new_leaf, {});
     auto [commit, welcome, new_state] =
-      states[i].commit(new_leaf, CommitOpts{ { update }, true, false, {} });
+      states[i].commit(new_leaf, CommitOpts{ { update }, true, false, {} }, {});
     silence_unused(welcome);
 
     for (auto& state : states) {
@@ -541,7 +548,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   for (uint32_t i = uint32_t(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(states[i + 1].ref());
     auto [commit, welcome, new_state] = states[i].commit(
-      fresh_secret(), CommitOpts{ { remove }, true, false, {} });
+      fresh_secret(), CommitOpts{ { remove }, true, false, {} }, {});
     silence_unused(welcome);
 
     states.pop_back();
@@ -570,7 +577,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 1
   auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
   auto [commit_1, welcome_1, new_state_1_] = states[0].commit(
-    fresh_secret(), CommitOpts{ { remove_1 }, true, false, {} });
+    fresh_secret(), CommitOpts{ { remove_1 }, true, false, {} }, {});
   auto new_state_1 = new_state_1_;
   silence_unused(welcome_1);
   silence_unused(commit_1);
@@ -586,7 +593,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
   // remove member at position 2
   auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
   auto [commit_2, welcome_2, new_state_2_] = new_state_1.commit(
-    fresh_secret(), CommitOpts{ { remove_2 }, true, false, {} });
+    fresh_secret(), CommitOpts{ { remove_2 }, true, false, {} }, {});
   auto new_state_2 = new_state_2_;
   silence_unused(welcome_2);
   // roster should be 0, 2, 4
@@ -604,6 +611,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
       // skip since we removed
       continue;
     }
+
     states[i] = opt::get(states[i].handle(commit_1));
     states[i] = opt::get(states[i].handle(commit_2));
     REQUIRE(expected_creds == get_creds(states[i].roster()));

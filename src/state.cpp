@@ -180,18 +180,20 @@ State::State(const HPKEPrivateKey& init_priv,
   _keys = _key_schedule.encryption_keys(_tree.size());
 
   // Verify the confirmation
-  if (!verify_confirmation(group_info.confirmation_tag)) {
+  const auto confirmation_tag =
+    _key_schedule.confirmation_tag(_transcript_hash.confirmed);
+  if (confirmation_tag != group_info.confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
 }
 
-// Join a group from outside
-std::tuple<MLSPlaintext, State>
+std::tuple<MLSMessage, State>
 State::external_join(const bytes& leaf_secret,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& kp,
                      const GroupInfo& group_info,
-                     const std::optional<TreeKEMPublicKey>& tree)
+                     const std::optional<TreeKEMPublicKey>& tree,
+                     const MessageOpts& msg_opts)
 {
   auto initial_state = State(std::move(sig_priv), group_info, tree);
 
@@ -205,23 +207,95 @@ State::external_join(const bytes& leaf_secret,
 
   auto add = initial_state.add_proposal(kp);
   auto opts = CommitOpts{ { add }, false, false, {} };
-  auto [commit_pt, welcome, state] =
-    initial_state.commit(leaf_secret, opts, kp, external_pub);
+  auto [commit_msg, welcome, state] =
+    initial_state.commit(leaf_secret, opts, msg_opts, kp, external_pub);
   silence_unused(welcome);
-  return { commit_pt, state };
+  return { commit_msg, state };
 }
 
 ///
 /// Proposal and commit factories
 ///
-
-MLSPlaintext
-State::sign(const Proposal& proposal) const
+template<typename Inner>
+MLSMessage
+State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 {
-  auto pt = MLSPlaintext{ _group_id, _epoch, Sender{ _ref }, proposal };
-  pt.sign(_suite, group_context(), _identity_priv);
-  pt.membership_tag = { _key_schedule.membership_tag(group_context(), pt) };
-  return pt;
+  auto content_auth = sign(
+    { _ref }, inner_content, msg_opts.authenticated_data, msg_opts.encrypt);
+  return protect(std::move(content_auth), msg_opts.padding_size);
+}
+
+template<typename Inner>
+MLSMessageContentAuth
+State::sign(const Sender& sender,
+            Inner&& inner_content,
+            const bytes& authenticated_data,
+            bool encrypt) const
+{
+  auto content = MLSMessageContent{
+    _group_id, _epoch, sender, authenticated_data, { inner_content }
+  };
+
+  auto wire_format =
+    (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
+
+  auto content_auth = MLSMessageContentAuth::sign(
+    wire_format, std::move(content), _suite, _identity_priv, group_context());
+
+  return content_auth;
+}
+
+MLSMessage
+State::protect(MLSMessageContentAuth&& content_auth, size_t padding_size)
+{
+  switch (content_auth.wire_format) {
+    case WireFormat::mls_plaintext:
+      return MLSPlaintext::protect(std::move(content_auth),
+                                   _suite,
+                                   _key_schedule.membership_key,
+                                   group_context());
+
+    case WireFormat::mls_ciphertext:
+      return MLSCiphertext::protect(std::move(content_auth),
+                                    _suite,
+                                    _index,
+                                    _keys,
+                                    _key_schedule.sender_data_secret,
+                                    padding_size);
+
+    default:
+      throw InvalidParameterError("Malformed MLSMessageContentAuth");
+  }
+}
+
+MLSMessageContentAuth
+State::unprotect_to_content_auth(const MLSMessage& msg)
+{
+  const auto unprotect = overloaded{
+    [&](const MLSPlaintext& pt) -> MLSMessageContentAuth {
+      auto maybe_content_auth =
+        pt.unprotect(_suite, _key_schedule.membership_key, group_context());
+      if (!maybe_content_auth) {
+        throw ProtocolError("Membership tag failed to verify");
+      }
+      return opt::get(maybe_content_auth);
+    },
+
+    [&](const MLSCiphertext& ct) -> MLSMessageContentAuth {
+      auto maybe_content_auth =
+        ct.unprotect(_suite, _tree, _keys, _key_schedule.sender_data_secret);
+      if (!maybe_content_auth) {
+        throw ProtocolError("MLSCiphertext decryption failure");
+      }
+      return opt::get(maybe_content_auth);
+    },
+
+    [](const auto& /* unused */) -> MLSMessageContentAuth {
+      throw ProtocolError("Invalid wire format");
+    },
+  };
+
+  return var::visit(unprotect, msg.message);
 }
 
 Proposal
@@ -286,48 +360,53 @@ State::group_context_extensions_proposal(ExtensionList exts) const
   return { GroupContextExtensions{ std::move(exts) } };
 }
 
-MLSPlaintext
-State::add(const KeyPackage& key_package) const
+MLSMessage
+State::add(const KeyPackage& key_package, const MessageOpts& msg_opts)
 {
-  return sign(add_proposal(key_package));
+  return protect_full(add_proposal(key_package), msg_opts);
 }
 
-MLSPlaintext
-State::update(const bytes& leaf_secret, const LeafNodeOptions& opts)
+MLSMessage
+State::update(const bytes& leaf_secret,
+              const LeafNodeOptions& opts,
+              const MessageOpts& msg_opts)
 {
-  return sign(update_proposal(leaf_secret, opts));
+  return protect_full(update_proposal(leaf_secret, opts), msg_opts);
 }
 
-MLSPlaintext
-State::remove(RosterIndex index) const
+MLSMessage
+State::remove(RosterIndex index, const MessageOpts& msg_opts)
 {
-  return sign(remove_proposal(index));
+  return protect_full(remove_proposal(index), msg_opts);
 }
 
-MLSPlaintext
-State::remove(LeafNodeRef removed) const
+MLSMessage
+State::remove(LeafNodeRef removed, const MessageOpts& msg_opts)
 {
-  return sign(remove_proposal(removed));
+  return protect_full(remove_proposal(removed), msg_opts);
 }
 
-MLSPlaintext
-State::group_context_extensions(ExtensionList exts) const
+MLSMessage
+State::group_context_extensions(ExtensionList exts, const MessageOpts& msg_opts)
 {
-  return sign(group_context_extensions_proposal(std::move(exts)));
+  return protect_full(group_context_extensions_proposal(std::move(exts)),
+                      msg_opts);
 }
 
-std::tuple<MLSPlaintext, Welcome, State>
-State::commit(const bytes& leaf_secret,
-              const std::optional<CommitOpts>& opts) const
-{
-  return commit(leaf_secret, opts, std::nullopt, std::nullopt);
-}
-
-std::tuple<MLSPlaintext, Welcome, State>
+std::tuple<MLSMessage, Welcome, State>
 State::commit(const bytes& leaf_secret,
               const std::optional<CommitOpts>& opts,
+              const MessageOpts& msg_opts)
+{
+  return commit(leaf_secret, opts, msg_opts, std::nullopt, std::nullopt);
+}
+
+std::tuple<MLSMessage, Welcome, State>
+State::commit(const bytes& leaf_secret,
+              const std::optional<CommitOpts>& opts,
+              const MessageOpts& msg_opts,
               const std::optional<KeyPackage>& joiner_key_package,
-              const std::optional<HPKEPublicKey>& external_pub) const
+              const std::optional<HPKEPublicKey>& external_pub)
 {
   // Construct a commit from cached proposals
   // TODO(rlb) ignore some proposals:
@@ -436,14 +515,22 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Create the Commit message and advance the transcripts / key schedule
-  auto encrypt_handshake = opts && opt::get(opts).encrypt_handshake;
-  auto pt = next.ratchet_and_sign(sender,
-                                  commit,
-                                  commit_secret,
-                                  { /* no PSKs */ },
-                                  force_init_secret,
-                                  encrypt_handshake,
-                                  group_context());
+  auto commit_content_auth =
+    sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
+
+  next._transcript_hash.update_confirmed(commit_content_auth);
+  next._epoch += 1;
+  next.update_epoch_secrets(
+    commit_secret, { /* no PSKs */ }, force_init_secret);
+
+  const auto confirmation_tag =
+    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
+  commit_content_auth.set_confirmation_tag(confirmation_tag);
+
+  next._transcript_hash.update_interim(commit_content_auth);
+
+  auto commit_message =
+    protect(std::move(commit_content_auth), msg_opts.padding_size);
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
@@ -454,7 +541,7 @@ State::commit(const bytes& leaf_secret,
     next._transcript_hash.confirmed,
     next._extensions,
     { /* No other extensions */ },
-    opt::get(pt.confirmation_tag),
+    { confirmation_tag },
   };
   if (opts && opt::get(opts).inline_tree) {
     group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
@@ -468,7 +555,7 @@ State::commit(const bytes& leaf_secret,
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
 
-  return std::make_tuple(pt, welcome, next);
+  return std::make_tuple(commit_message, welcome, next);
 }
 
 ///
@@ -484,63 +571,56 @@ State::group_context() const
   };
 }
 
-MLSPlaintext
-State::ratchet_and_sign(const Sender& sender,
-                        const Commit& op,
-                        const bytes& commit_secret,
-                        const std::vector<PSKWithSecret>& psks,
-                        const std::optional<bytes>& force_init_secret,
-                        bool encrypt_handshake,
-                        const GroupContext& prev_ctx)
+std::optional<State>
+State::handle(const MLSMessage& msg)
 {
-  auto prev_key_schedule = _key_schedule;
-
-  auto pt = MLSPlaintext{ _group_id, _epoch, sender, op };
-  if (encrypt_handshake) {
-    pt.wire_format = WireFormat::mls_ciphertext;
-  }
-  pt.sign(_suite, prev_ctx, _identity_priv);
-
-  _transcript_hash.update_confirmed(pt);
-  _epoch += 1;
-  update_epoch_secrets(commit_secret, psks, force_init_secret);
-
-  pt.confirmation_tag = { _key_schedule.confirmation_tag(
-    _transcript_hash.confirmed) };
-  pt.membership_tag = { prev_key_schedule.membership_tag(prev_ctx, pt) };
-
-  _transcript_hash.update_interim(pt);
-
-  return pt;
+  return handle(msg, std::nullopt);
 }
 
 std::optional<State>
-State::handle(const MLSPlaintext& pt)
+State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 {
-  // Pre-validate the MLSPlaintext
-  if (pt.group_id != _group_id) {
+  // Check the version
+  if (msg.version != ProtocolVersion::mls10) {
+    throw InvalidParameterError("Unsupported version");
+  }
+
+  // Verify the signature on the message
+  auto content_auth = unprotect_to_content_auth(msg);
+  if (!verify(content_auth)) {
+    throw InvalidParameterError("Message signature failed to verify");
+  }
+
+  // Validate the MLSMessageContent
+  const auto& content = content_auth.content;
+  if (content.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
   }
 
-  if (pt.epoch != _epoch) {
+  if (content.epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
   }
 
-  if (!verify(pt)) {
-    throw ProtocolError("Invalid handshake message signature");
+  // Dispatch on content type
+  switch (content.content_type()) {
+    // Proposals get queued, do not result in a state transition
+    // TODO(RLB): We should validate that the proposal makes sense here, e.g.,
+    // that an Add KeyPackage is for the right CipherSuite or that a Remove
+    // target is actually in the group.
+    case ContentType::proposal:
+      cache_proposal(content_auth);
+      return std::nullopt;
+
+    // Commits are handled in the remainder of this method
+    case ContentType::commit:
+      break;
+
+    // Any other content type in this method is an error
+    default:
+      throw InvalidParameterError("Invalid content type");
   }
 
-  // Proposals get queued, do not result in a state transition
-  if (var::holds_alternative<Proposal>(pt.content)) {
-    cache_proposal(pt);
-    return std::nullopt;
-  }
-
-  if (!var::holds_alternative<Commit>(pt.content)) {
-    throw InvalidParameterError("Incorrect content type");
-  }
-
-  switch (pt.sender.sender_type()) {
+  switch (content.sender.sender_type()) {
     case SenderType::member:
     case SenderType::new_member:
       break;
@@ -550,19 +630,30 @@ State::handle(const MLSPlaintext& pt)
   }
 
   auto sender = std::optional<LeafIndex>();
-  if (pt.sender.sender_type() == SenderType::member) {
-    const auto& sender_ref = var::get<LeafNodeRef>(pt.sender.sender);
+  if (content.sender.sender_type() == SenderType::member) {
+    const auto& sender_ref = var::get<LeafNodeRef>(content.sender.sender);
     // This optional is guaranteed to be present because we just did this same
     // lookup for signature verification.
     sender = opt::get(_tree.find(sender_ref));
   }
 
   if (sender == _index) {
+    if (cached_state) {
+      // Verify that the cached state is a plausible successor to this state
+      const auto& next = opt::get(cached_state);
+      if (next._group_id != _group_id || next._epoch != _epoch + 1 ||
+          next._index != _index) {
+        throw InvalidParameterError("Invalid successor state");
+      }
+
+      return next;
+    }
+
     throw InvalidParameterError("Handle own commits with caching");
   }
 
   // Apply the commit
-  const auto& commit = var::get<Commit>(pt.content);
+  const auto& commit = var::get<Commit>(content.content);
   const auto proposals = must_resolve(commit.proposals, sender);
 
   auto next = successor();
@@ -578,7 +669,7 @@ State::handle(const MLSPlaintext& pt)
     sender_location = opt::get(sender);
   }
 
-  if (pt.sender.sender_type() == SenderType::new_member) {
+  if (content.sender.sender_type() == SenderType::new_member) {
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
     if (!kem_output) {
@@ -641,17 +732,15 @@ State::handle(const MLSPlaintext& pt)
   }
 
   // Update the transcripts and advance the key schedule
-  next._transcript_hash.update(pt);
+  next._transcript_hash.update(content_auth);
   next._epoch += 1;
   next.update_epoch_secrets(
     commit_secret, { /* no PSKs */ }, force_init_secret);
 
   // Verify the confirmation MAC
-  if (!pt.confirmation_tag) {
-    throw ProtocolError("Missing confirmation on Commit");
-  }
-
-  if (!next.verify_confirmation(opt::get(pt.confirmation_tag))) {
+  const auto confirmation_tag =
+    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
+  if (!content_auth.check_confirmation_tag(confirmation_tag)) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -773,16 +862,17 @@ State::extensions_supported(const ExtensionList& exts) const
 }
 
 void
-State::cache_proposal(const MLSPlaintext& pt)
+State::cache_proposal(MLSMessageContentAuth content_auth)
 {
   auto sender_location = std::optional<LeafIndex>();
-  if (pt.sender.sender_type() == SenderType::member) {
-    sender_location = _tree.find(var::get<LeafNodeRef>(pt.sender.sender));
+  if (content_auth.content.sender.sender_type() == SenderType::member) {
+    const auto& sender = content_auth.content.sender.sender;
+    sender_location = _tree.find(var::get<LeafNodeRef>(sender));
   }
 
   _pending_proposals.push_back({
-    _suite.ref(pt),
-    var::get<Proposal>(pt.content),
+    _suite.ref(content_auth),
+    var::get<Proposal>(content_auth.content.content),
     sender_location,
   });
 }
@@ -905,31 +995,36 @@ State::apply(const std::vector<CachedProposal>& proposals)
 /// Message protection
 ///
 
-MLSCiphertext
-State::protect(const bytes& pt)
+MLSMessage
+State::protect(const bytes& authenticated_data,
+               const bytes& pt,
+               size_t padding_size)
 {
-  MLSPlaintext mpt{ _group_id, _epoch, Sender{ _ref }, ApplicationData{ pt } };
-  mpt.wire_format = WireFormat::mls_ciphertext;
-  mpt.sign(_suite, group_context(), _identity_priv);
-  mpt.membership_tag = { _key_schedule.membership_tag(group_context(), mpt) };
-  return encrypt(mpt);
+  auto msg_opts = MessageOpts{ true, authenticated_data, padding_size };
+  return protect_full(ApplicationData{ pt }, msg_opts);
 }
 
-bytes
-State::unprotect(const MLSCiphertext& ct)
+std::tuple<bytes, bytes>
+State::unprotect(const MLSMessage& ct)
 {
-  MLSPlaintext pt = decrypt(ct);
+  auto content_auth = unprotect_to_content_auth(ct);
 
-  if (!verify(pt)) {
-    throw ProtocolError("Invalid message signature");
+  if (!verify(content_auth)) {
+    throw InvalidParameterError("Message signature failed to verify");
   }
 
-  if (!var::holds_alternative<ApplicationData>(pt.content)) {
-    throw ProtocolError("Unprotect of non-application message");
+  if (content_auth.content.content_type() != ContentType::application) {
+    throw ProtocolError("Unprotect of handshake message");
   }
 
-  // NOLINTNEXTLINE(cppcoreguidelines-slicing)
-  return var::get<ApplicationData>(pt.content).data;
+  if (content_auth.wire_format != WireFormat::mls_ciphertext) {
+    throw ProtocolError("Application data not sent as MLSCiphertext");
+  }
+
+  return {
+    std::move(content_auth.content.authenticated_data),
+    std::move(var::get<ApplicationData>(content_auth.content.content).data),
+  };
 }
 
 ///
@@ -977,32 +1072,22 @@ State::update_epoch_secrets(const bytes& commit_secret,
 ///
 /// Message encryption and decryption
 ///
-
 bool
-State::verify_internal(const MLSPlaintext& pt) const
+State::verify_internal(const MLSMessageContentAuth& content_auth) const
 {
-  if (pt.sender.sender_type() != SenderType::member) {
-    // TODO(RLB) Support external senders
-    throw InvalidParameterError("External senders not supported");
-  }
-
-  auto membership_tag = _key_schedule.membership_tag(group_context(), pt);
-  if (!pt.verify_membership_tag(membership_tag)) {
-    return false;
-  }
-
-  auto sender_ref = var::get<LeafNodeRef>(pt.sender.sender);
+  const auto& sender_ref =
+    var::get<LeafNodeRef>(content_auth.content.sender.sender);
   auto maybe_leaf = _tree.leaf_node(sender_ref);
   if (!maybe_leaf) {
     throw InvalidParameterError("Signature from blank node");
   }
 
   const auto& pub = opt::get(maybe_leaf).credential.public_key();
-  return pt.verify(_suite, group_context(), pub);
+  return content_auth.verify(_suite, pub, group_context());
 }
 
 bool
-State::verify_new_member(const MLSPlaintext& pt) const
+State::verify_new_member(const MLSMessageContentAuth& content_auth) const
 {
   const auto& pub = var::visit(
     overloaded{
@@ -1027,31 +1112,24 @@ State::verify_new_member(const MLSPlaintext& pt) const
         throw ProtocolError("New member message of unknown type");
       },
     },
-    pt.content);
-  return pt.verify(_suite, group_context(), pub);
+    content_auth.content.content);
+  return content_auth.verify(_suite, pub, group_context());
 }
 
 bool
-State::verify(const MLSPlaintext& pt) const
+State::verify(const MLSMessageContentAuth& content_auth) const
 {
-  switch (pt.sender.sender_type()) {
+  switch (content_auth.content.sender.sender_type()) {
     case SenderType::member:
-      return verify_internal(pt);
+      return verify_internal(content_auth);
 
     case SenderType::new_member:
-      return verify_new_member(pt);
+      return verify_new_member(content_auth);
 
     default:
       // TODO(RLB) Support other sender types
       throw NotImplementedError();
   }
-}
-
-bool
-State::verify_confirmation(const bytes& confirmation) const
-{
-  auto confirm = _key_schedule.confirmation_tag(_transcript_hash.confirmed);
-  return confirm == confirmation;
 }
 
 bytes
@@ -1106,50 +1184,6 @@ bytes
 State::authentication_secret() const
 {
   return _key_schedule.authentication_secret;
-}
-
-MLSCiphertext
-State::encrypt(const MLSPlaintext& pt)
-{
-  if (pt.sender.sender != _ref) {
-    throw InvalidParameterError("Cannot encrypt a plaintext from someone else");
-  }
-
-  if (pt.wire_format == WireFormat::mls_ciphertext) {
-    return _keys.encrypt(_tree, _index, _key_schedule.sender_data_secret, pt);
-  }
-
-  // If a plaintext has been created without the prior intent to encrypt it,
-  // then it needs to be re-signed.
-  //
-  // XXX(RLB): This is currently true for all MLSPlaintexts generated with the
-  // X_proposal() methods.  There is a trade-off here between API decoupling
-  // (when do you need to know you're going to encrypt?) and the work of
-  // re-signing.
-  auto pt_copy = pt;
-  pt_copy.wire_format = WireFormat::mls_ciphertext;
-  pt_copy.sign(_suite, group_context(), _identity_priv);
-  return _keys.encrypt(
-    _tree, _index, _key_schedule.sender_data_secret, pt_copy);
-}
-
-MLSPlaintext
-State::decrypt(const MLSCiphertext& ct)
-{
-  if (ct.wire_format != WireFormat::mls_ciphertext) {
-    throw InvalidParameterError("Invalid wire format for MLSCiphertext");
-  }
-
-  // Verify the epoch
-  if (ct.group_id != _group_id) {
-    throw InvalidParameterError("Ciphertext not from this group");
-  }
-
-  if (ct.epoch != _epoch) {
-    throw InvalidParameterError("Ciphertext not from this epoch");
-  }
-
-  return _keys.decrypt(_tree, _key_schedule.sender_data_secret, ct);
 }
 
 LeafNodeRef

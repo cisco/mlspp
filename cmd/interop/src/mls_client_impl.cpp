@@ -241,6 +241,12 @@ MLSClientImpl::load_join(uint32_t join_id)
 }
 
 // Cached group state
+mls::MessageOpts
+MLSClientImpl::CachedState::message_opts() const
+{
+  return { {}, encrypt_handshake, 0 };
+}
+
 void
 MLSClientImpl::CachedState::reset_pending()
 {
@@ -249,25 +255,15 @@ MLSClientImpl::CachedState::reset_pending()
 }
 
 std::string
-MLSClientImpl::CachedState::marshal(const mls::MLSPlaintext& pt)
+MLSClientImpl::CachedState::marshal(const mls::MLSMessage& msg)
 {
-  if (encrypt_handshake) {
-    auto ct = state.encrypt(pt);
-    return bytes_to_string(tls::marshal(ct));
-  }
-
-  return bytes_to_string(tls::marshal(pt));
+  return bytes_to_string(tls::marshal(msg));
 }
 
-mls::MLSPlaintext
+mls::MLSMessage
 MLSClientImpl::CachedState::unmarshal(const std::string& wire)
 {
-  if (encrypt_handshake) {
-    auto ct = tls::get<mls::MLSCiphertext>(string_to_bytes(wire));
-    return state.decrypt(ct);
-  }
-
-  return tls::get<mls::MLSPlaintext>(string_to_bytes(wire));
+  return tls::get<mls::MLSMessage>(string_to_bytes(wire));
 }
 
 uint32_t
@@ -513,11 +509,12 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 
   auto kp = mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
 
+  auto encrypt = request->encrypt_handshake();
   auto leaf_secret = mls::random_bytes(suite.secret_size());
   auto [commit, state] = mls::State::external_join(
-    leaf_secret, sig_priv, kp, group_info, std::nullopt);
+    leaf_secret, sig_priv, kp, group_info, std::nullopt, { {}, encrypt, 0 });
   auto commit_data = tls::marshal(commit);
-  auto state_id = store_state(std::move(state), request->encrypt_handshake());
+  auto state_id = store_state(std::move(state), encrypt);
 
   response->set_state_id(state_id);
   response->set_commit(bytes_to_string(commit_data));
@@ -564,7 +561,7 @@ MLSClientImpl::protect(CachedState& entry,
                        ProtectResponse* response)
 {
   auto pt = string_to_bytes(request->application_data());
-  auto ct = entry.state.protect(pt);
+  auto ct = entry.state.protect({}, pt, 0);
   auto ct_data = tls::marshal(ct);
   response->set_ciphertext(bytes_to_string(ct_data));
   return Status::OK;
@@ -577,7 +574,11 @@ MLSClientImpl::unprotect(CachedState& entry,
 {
   auto ct_data = string_to_bytes(request->ciphertext());
   auto ct = tls::get<mls::MLSCiphertext>(ct_data);
-  auto pt = entry.state.unprotect(ct);
+  auto [aad, pt] = entry.state.unprotect(ct);
+  mls::silence_unused(aad);
+
+  // TODO(RLB) We should update the gRPC spec so that it returns the AAD as well
+  // as the plaintext.
   response->set_application_data(bytes_to_string(pt));
   return Status::OK;
 }
@@ -591,9 +592,9 @@ MLSClientImpl::add_proposal(CachedState& entry,
   auto key_package_data = string_to_bytes(request->key_package());
   auto key_package = tls::get<mls::KeyPackage>(key_package_data);
 
-  auto proposal = entry.state.add(key_package);
+  auto message = entry.state.add(key_package, entry.message_opts());
 
-  response->set_proposal(entry.marshal(proposal));
+  response->set_proposal(entry.marshal(message));
   return Status::OK;
 }
 
@@ -605,16 +606,18 @@ MLSClientImpl::commit(CachedState& entry,
   // Unmarshal and handle external / by_reference proposals
   const auto by_reference_size = request->by_reference_size();
   for (int i = 0; i < by_reference_size; i++) {
-    auto pt = entry.unmarshal(request->by_reference(i));
-    auto should_be_null = entry.state.handle(pt);
+    auto msg = entry.unmarshal(request->by_reference(i));
+    auto should_be_null = entry.state.handle(msg);
     if (should_be_null) {
       throw std::runtime_error("Commit included among proposals");
     }
   }
 
-  auto inline_proposals = std::vector<mls::Proposal>(request->by_value_size());
+  auto inline_proposals = std::vector<mls::Proposal>();
+#if 0
+  // TODO(#265): Re-enable
   for (size_t i = 0; i < inline_proposals.size(); i++) {
-    auto pt = entry.unmarshal(request->by_value(i));
+    auto msg = entry.unmarshal(request->by_value(i));
     if (pt.sender.sender != entry.state.index().val) {
       return Status(grpc::INVALID_ARGUMENT,
                     "Inline proposal not from this member");
@@ -627,12 +630,14 @@ MLSClientImpl::commit(CachedState& entry,
 
     inline_proposals[i] = std::move(*proposal);
   }
+#endif // 0
 
   auto leaf_secret =
     mls::random_bytes(entry.state.cipher_suite().secret_size());
   auto [commit, welcome, next] = entry.state.commit(
     leaf_secret,
-    mls::CommitOpts{ inline_proposals, true, entry.encrypt_handshake, {} });
+    mls::CommitOpts{ inline_proposals, true, entry.encrypt_handshake, {} },
+    entry.message_opts());
 
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 
@@ -667,8 +672,8 @@ MLSClientImpl::handle_commit(CachedState& entry,
   // Handle the provided proposals, then the commit
   const auto proposal_size = request->proposal_size();
   for (int i = 0; i < proposal_size; i++) {
-    auto pt = entry.unmarshal(request->proposal(i));
-    auto should_be_null = entry.state.handle(pt);
+    auto msg = entry.unmarshal(request->proposal(i));
+    auto should_be_null = entry.state.handle(msg);
     if (should_be_null) {
       throw std::runtime_error("Commit included among proposals");
     }
@@ -693,7 +698,7 @@ MLSClientImpl::handle_external_commit(
   HandleExternalCommitResponse* response)
 {
   auto commit_data = string_to_bytes(request->commit());
-  auto commit = tls::get<mls::MLSPlaintext>(commit_data);
+  auto commit = tls::get<mls::MLSMessage>(commit_data);
   auto should_be_next = entry.state.handle(commit);
   if (!should_be_next) {
     throw std::runtime_error("Commit failed to produce a new state");
