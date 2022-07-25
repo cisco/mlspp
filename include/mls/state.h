@@ -123,7 +123,6 @@ public:
   /// Accessors
   ///
   epoch_t epoch() const { return _epoch; }
-  LeafNodeRef ref() const { return _ref; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
@@ -167,7 +166,6 @@ protected:
 
   // Per-participant state
   LeafIndex _index;
-  LeafNodeRef _ref;
   SignaturePrivateKey _identity_priv;
 
   // Cache of Proposals and update secrets
@@ -178,7 +176,13 @@ protected:
     std::optional<LeafIndex> sender;
   };
   std::list<CachedProposal> _pending_proposals;
-  std::map<LeafNodeRef, bytes> _update_secrets;
+
+  struct CachedUpdate
+  {
+    bytes update_secret;
+    Update proposal;
+  };
+  std::optional<CachedUpdate> _cached_update;
 
   // Assemble a preliminary, unjoined group state
   State(SignaturePrivateKey sig_priv,
@@ -254,7 +258,7 @@ protected:
   bool verify_new_member(const MLSMessageContentAuth& content_auth) const;
   bool verify(const MLSMessageContentAuth& content_auth) const;
 
-  // Convert a Roster entry into LeafNodeRef
+  // Convert a Roster entry into LeafIndex
   LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 
   // Create a draft successor state

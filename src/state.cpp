@@ -6,9 +6,6 @@ namespace mls {
 /// Constructors
 ///
 
-static const auto zero_ref =
-  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 State::State(bytes group_id,
              CipherSuite suite,
              const HPKEPrivateKey& init_priv,
@@ -22,7 +19,6 @@ State::State(bytes group_id,
   , _transcript_hash(suite)
   , _extensions(std::move(extensions))
   , _index(0)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   // Verify that the client supports the proposed group extensions
@@ -30,7 +26,6 @@ State::State(bytes group_id,
     throw InvalidParameterError("Client doesn't support required extensions");
   }
 
-  _ref = leaf_node.ref(_suite);
   _index = _tree.add_leaf(leaf_node);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, _index, init_priv);
@@ -91,7 +86,6 @@ State::State(SignaturePrivateKey sig_priv,
   , _extensions(group_info.group_context_extensions)
   , _key_schedule(group_info.cipher_suite)
   , _index(0)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   // The following are not set:
@@ -113,7 +107,6 @@ State::State(const HPKEPrivateKey& init_priv,
   , _epoch(0)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
@@ -154,14 +147,13 @@ State::State(const HPKEPrivateKey& init_priv,
 
   _extensions = group_info.group_context_extensions;
 
-  // Construct TreeKEM private key from partrs provided
+  // Construct TreeKEM private key from parts provided
   auto maybe_index = _tree.find(kp.leaf_node);
   if (!maybe_index) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
   _index = opt::get(maybe_index);
-  _ref = kp.leaf_node.ref(_suite);
 
   auto ancestor = tree_math::ancestor(_index, group_info.signer);
   auto path_secret = std::optional<bytes>{};
@@ -323,14 +315,19 @@ State::add_proposal(const KeyPackage& key_package) const
 Proposal
 State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
 {
+  if (_cached_update) {
+    return { opt::get(_cached_update).proposal };
+  }
+
   auto leaf = opt::get(_tree.leaf_node(_index));
 
   auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   auto new_leaf =
     leaf.for_update(_suite, _group_id, public_key, opts, _identity_priv);
 
-  _update_secrets[new_leaf.ref(_suite)] = leaf_secret;
-  return { Update{ new_leaf } };
+  auto update = Update{ new_leaf };
+  _cached_update = CachedUpdate{ leaf_secret, update };
+  return { update };
 }
 
 Proposal
@@ -466,7 +463,6 @@ State::commit(const bytes& leaf_secret,
 
     const auto pos = it - joiners.begin();
     next._index = joiner_locations[pos];
-    next._ref = kp.leaf_node.ref(next._suite);
     sender = Sender{ NewMemberSender{} };
   }
 
@@ -499,7 +495,6 @@ State::commit(const bytes& leaf_secret,
                                              joiner_locations,
                                              leaf_node_opts);
     next._tree_priv = new_priv;
-    next._ref = path.leaf_node.ref(_suite);
     commit.path = path;
     commit_secret = new_priv.update_secret;
 
@@ -935,12 +930,16 @@ State::apply(const std::vector<CachedProposal>& proposals,
           break;
         }
 
-        const auto ref = update.leaf_node.ref(_suite);
-        if (_update_secrets.count(ref) == 0) {
+        if (!_cached_update) {
           throw ProtocolError("Self-update with no cached secret");
         }
 
-        apply(target, update, _update_secrets[cached.ref]);
+        const auto& cached_update = opt::get(_cached_update);
+        if (update != cached_update.proposal) {
+          throw ProtocolError("Self-update does not match cached data");
+        }
+
+        apply(target, update, cached_update.update_secret);
         locations.push_back(target);
         break;
       }

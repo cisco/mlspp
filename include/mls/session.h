@@ -68,7 +68,6 @@ public:
 
   // Information about the current state
   epoch_t epoch() const;
-  LeafNodeRef ref() const;
   LeafIndex index() const;
   CipherSuite cipher_suite() const;
   const ExtensionList& extensions() const;

@@ -338,12 +338,6 @@ Session::epoch() const
   return inner->history.front().epoch();
 }
 
-LeafNodeRef
-Session::ref() const
-{
-  return inner->history.front().ref();
-}
-
 LeafIndex
 Session::index() const
 {
