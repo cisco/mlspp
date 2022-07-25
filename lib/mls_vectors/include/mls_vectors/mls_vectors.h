@@ -39,13 +39,14 @@ struct EncryptionTestVector
   {
     bytes key;
     bytes nonce;
-    bytes plaintext;
     bytes ciphertext;
   };
 
   struct LeafInfo
   {
     uint32_t generations;
+    bytes handshake_content_auth;
+    bytes application_content_auth;
     std::vector<RatchetStep> handshake;
     std::vector<RatchetStep> application;
   };
@@ -55,7 +56,9 @@ struct EncryptionTestVector
   bytes tree;
   bytes encryption_secret;
   bytes sender_data_secret;
+  size_t padding_size = 0;
   SenderDataInfo sender_data_info;
+  bytes authenticated_data;
 
   std::vector<LeafInfo> leaves;
 
@@ -126,10 +129,9 @@ struct TranscriptTestVector
   bytes confirmed_transcript_hash_before;
   bytes interim_transcript_hash_before;
 
-  bytes membership_key;
   bytes confirmation_key;
   mls::Credential credential;
-  mls::MLSPlaintext commit;
+  mls::MLSMessageContentAuth commit;
 
   bytes group_context;
   bytes confirmed_transcript_hash_after;
@@ -185,9 +187,10 @@ struct MessagesTestVector
 
   bytes commit;
 
-  bytes mls_plaintext_application;
-  bytes mls_plaintext_proposal;
-  bytes mls_plaintext_commit;
+  bytes content_auth_app;
+  bytes content_auth_proposal;
+  bytes content_auth_commit;
+  bytes mls_plaintext;
   bytes mls_ciphertext;
 
   static MessagesTestVector create();

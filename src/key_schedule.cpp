@@ -171,6 +171,27 @@ SecretTree::get(LeafIndex sender)
 }
 
 ///
+/// ReuseGuard
+///
+
+static ReuseGuard
+new_reuse_guard()
+{
+  auto random = random_bytes(4);
+  auto guard = ReuseGuard();
+  std::copy(random.begin(), random.end(), guard.begin());
+  return guard;
+}
+
+static void
+apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
+{
+  for (size_t i = 0; i < guard.size(); i++) {
+    nonce.at(i) ^= guard.at(i);
+  }
+}
+
+///
 /// GroupKeySource
 ///
 
@@ -180,6 +201,22 @@ GroupKeySource::GroupKeySource(CipherSuite suite_in,
   : suite(suite_in)
   , secret_tree(suite, group_size, std::move(encryption_secret))
 {
+}
+
+HashRatchet&
+GroupKeySource::chain(ContentType type, LeafIndex sender)
+{
+  switch (type) {
+    case ContentType::proposal:
+    case ContentType::commit:
+      return chain(RatchetType::handshake, sender);
+
+    case ContentType::application:
+      return chain(RatchetType::application, sender);
+
+    default:
+      throw InvalidParameterError("Invalid content type");
+  }
 }
 
 HashRatchet&
@@ -209,20 +246,30 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
   return chains[key];
 }
 
-std::tuple<uint32_t, KeyAndNonce>
-GroupKeySource::next(RatchetType type, LeafIndex sender)
+std::tuple<uint32_t, ReuseGuard, KeyAndNonce>
+GroupKeySource::next(ContentType type, LeafIndex sender)
 {
-  return chain(type, sender).next();
+  auto [generation, keys] = chain(type, sender).next();
+
+  auto reuse_guard = new_reuse_guard();
+  apply_reuse_guard(reuse_guard, keys.nonce);
+
+  return { generation, reuse_guard, keys };
 }
 
 KeyAndNonce
-GroupKeySource::get(RatchetType type, LeafIndex sender, uint32_t generation)
+GroupKeySource::get(ContentType type,
+                    LeafIndex sender,
+                    uint32_t generation,
+                    ReuseGuard reuse_guard)
 {
-  return chain(type, sender).get(generation);
+  auto keys = chain(type, sender).get(generation);
+  apply_reuse_guard(reuse_guard, keys.nonce);
+  return keys;
 }
 
 void
-GroupKeySource::erase(RatchetType type, LeafIndex sender, uint32_t generation)
+GroupKeySource::erase(ContentType type, LeafIndex sender, uint32_t generation)
 {
   return chain(type, sender).erase(generation);
 }
@@ -242,190 +289,6 @@ struct MLSCiphertextContentAAD
 
   TLS_SERIALIZABLE(group_id, epoch, content_type, authenticated_data)
 };
-
-using ReuseGuard = std::array<uint8_t, 4>;
-
-static ReuseGuard
-new_reuse_guard()
-{
-  auto random = random_bytes(4);
-  auto guard = ReuseGuard();
-  std::copy(random.begin(), random.end(), guard.begin());
-  return guard;
-}
-
-static void
-apply_reuse_guard(const ReuseGuard& guard, bytes& nonce)
-{
-  for (size_t i = 0; i < guard.size(); i++) {
-    nonce.at(i) ^= guard.at(i);
-  }
-}
-
-// struct {
-//     uint32 sender;
-//     uint32 generation;
-//     opaque reuse_guard[4];
-// } MLSSenderData;
-struct MLSSenderData
-{
-  LeafNodeRef sender{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-  uint32_t generation{ 0 };
-  ReuseGuard reuse_guard{ 0, 0, 0, 0 };
-
-  TLS_SERIALIZABLE(sender, generation, reuse_guard)
-};
-
-// struct {
-//     opaque group_id<0..255>;
-//     uint64 epoch;
-//     ContentType content_type;
-// } MLSSenderDataAAD;
-struct MLSSenderDataAAD
-{
-  const bytes& group_id;
-  const epoch_t epoch;
-  const ContentType content_type;
-
-  TLS_SERIALIZABLE(group_id, epoch, content_type)
-};
-
-MLSCiphertext
-GroupKeySource::encrypt(const TreeKEMPublicKey& tree,
-                        LeafIndex index,
-                        const bytes& sender_data_secret,
-                        const MLSPlaintext& pt)
-{
-  if (pt.wire_format != WireFormat::mls_ciphertext) {
-    throw InvalidParameterError(
-      "Encrypt on MLSPlaintext without wire_format signal");
-  }
-
-  // Pull from the key schedule
-  static const auto get_key_type = overloaded{
-    [](const ApplicationData& /*unused*/) {
-      return GroupKeySource::RatchetType::application;
-    },
-    [](const Proposal& /*unused*/) {
-      return GroupKeySource::RatchetType::handshake;
-    },
-    [](const Commit& /*unused*/) {
-      return GroupKeySource::RatchetType::handshake;
-    },
-  };
-
-  auto key_type = var::visit(get_key_type, pt.content);
-  auto [generation, content_keys] = next(key_type, index);
-
-  // Encrypt the content
-  // XXX(rlb@ipv.sx): Apply padding?
-  auto content = pt.marshal_content(0);
-  auto content_type_val = pt.content_type();
-  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    pt.group_id, pt.epoch, content_type_val, pt.authenticated_data });
-
-  auto reuse_guard = new_reuse_guard();
-  apply_reuse_guard(reuse_guard, content_keys.nonce);
-
-  auto content_ct = suite.hpke().aead.seal(
-    content_keys.key, content_keys.nonce, content_aad, content);
-
-  // Encrypt the sender data
-  auto maybe_sender_leaf = tree.leaf_node(index);
-  if (!maybe_sender_leaf) {
-    throw InvalidParameterError("Attempt to send from blank leaf");
-  }
-  auto sender_id = opt::get(maybe_sender_leaf).ref(suite);
-  auto sender_data_obj = MLSSenderData{ sender_id, generation, reuse_guard };
-  auto sender_data = tls::marshal(sender_data_obj);
-
-  auto sender_data_keys =
-    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, content_ct);
-  auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ pt.group_id, pt.epoch, content_type_val });
-
-  auto encrypted_sender_data = suite.hpke().aead.seal(
-    sender_data_keys.key, sender_data_keys.nonce, sender_data_aad, sender_data);
-
-  // Assemble the MLSCiphertext
-  return MLSCiphertext{
-    WireFormat::mls_ciphertext,
-    pt.group_id,
-    pt.epoch,
-    content_type_val,
-    pt.authenticated_data,
-    encrypted_sender_data,
-    content_ct,
-  };
-}
-
-MLSPlaintext
-GroupKeySource::decrypt(const TreeKEMPublicKey& tree,
-                        const bytes& sender_data_secret,
-                        const MLSCiphertext& ct)
-{
-  // Decrypt and parse the sender data
-  auto sender_data_keys = KeyScheduleEpoch::sender_data_keys(
-    suite, sender_data_secret, ct.ciphertext);
-  auto sender_data_aad =
-    tls::marshal(MLSSenderDataAAD{ ct.group_id, ct.epoch, ct.content_type });
-  auto sender_data_pt = suite.hpke().aead.open(sender_data_keys.key,
-                                               sender_data_keys.nonce,
-                                               sender_data_aad,
-                                               ct.encrypted_sender_data);
-  if (!sender_data_pt) {
-    throw ProtocolError("Sender data decryption failed");
-  }
-
-  auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  auto maybe_sender = tree.find(sender_data.sender);
-  if (!maybe_sender) {
-    throw ProtocolError("Send from unknown group member");
-  }
-
-  auto sender = opt::get(maybe_sender);
-
-  // Pull from the key schedule
-  auto key_type = GroupKeySource::RatchetType::handshake;
-  switch (ct.content_type) {
-    case ContentType::proposal:
-    case ContentType::commit:
-      key_type = GroupKeySource::RatchetType::handshake;
-      break;
-
-    case ContentType::application:
-      key_type = GroupKeySource::RatchetType::application;
-      break;
-
-    default:
-      throw ProtocolError("Unsupported content type");
-  }
-
-  auto content_keys = get(key_type, sender, sender_data.generation);
-  erase(key_type, sender, sender_data.generation);
-  apply_reuse_guard(sender_data.reuse_guard, content_keys.nonce);
-
-  // Compute the plaintext AAD and decrypt
-  auto content_aad = tls::marshal(MLSCiphertextContentAAD{
-    ct.group_id,
-    ct.epoch,
-    ct.content_type,
-    ct.authenticated_data,
-  });
-  auto content = suite.hpke().aead.open(
-    content_keys.key, content_keys.nonce, content_aad, ct.ciphertext);
-  if (!content) {
-    throw ProtocolError("Content decryption failed");
-  }
-
-  // Set up a new plaintext based on the content
-  return MLSPlaintext{ ct.group_id,
-                       ct.epoch,
-                       { sender_data.sender },
-                       ct.content_type,
-                       ct.authenticated_data,
-                       opt::get(content) };
-}
 
 ///
 /// KeyScheduleEpoch
@@ -568,14 +431,6 @@ KeyScheduleEpoch::encryption_keys(LeafCount size) const
 }
 
 bytes
-KeyScheduleEpoch::membership_tag(const GroupContext& context,
-                                 const MLSPlaintext& pt) const
-{
-  auto tbm = pt.membership_tag_input(context);
-  return suite.digest().hmac(membership_key, tbm);
-}
-
-bytes
 KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
 {
   return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
@@ -666,31 +521,30 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in,
 }
 
 void
-TranscriptHash::update(const MLSPlaintext& pt)
+TranscriptHash::update(const MLSMessageContentAuth& content_auth)
 {
-  update_confirmed(pt);
-  update_interim(pt);
+  update_confirmed(content_auth);
+  update_interim(content_auth);
 }
 
 void
-TranscriptHash::update_confirmed(const MLSPlaintext& pt)
+TranscriptHash::update_confirmed(const MLSMessageContentAuth& content_auth)
 {
-  const auto transcript = interim + pt.commit_content();
+  const auto transcript = interim + content_auth.commit_content();
   confirmed = suite.digest().hash(transcript);
 }
 
 void
 TranscriptHash::update_interim(const bytes& confirmation_tag)
 {
-  const auto opt_tag = std::optional<bytes>(confirmation_tag);
-  const auto transcript = confirmed + tls::marshal(opt_tag);
+  const auto transcript = confirmed + tls::marshal(confirmation_tag);
   interim = suite.digest().hash(transcript);
 }
 
 void
-TranscriptHash::update_interim(const MLSPlaintext& pt)
+TranscriptHash::update_interim(const MLSMessageContentAuth& content_auth)
 {
-  const auto transcript = confirmed + pt.commit_auth_data();
+  const auto transcript = confirmed + content_auth.commit_auth_data();
   interim = suite.digest().hash(transcript);
 }
 

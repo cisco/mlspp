@@ -98,6 +98,7 @@ struct tls_serializer
 TLS_SERIALIZER(mls::HPKEPublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
 TLS_SERIALIZER(mls::Credential)
+TLS_SERIALIZER(mls::MLSMessageContentAuth)
 TLS_SERIALIZER(mls::MLSPlaintext)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
@@ -126,10 +127,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
                                    key,
                                    nonce,
-                                   plaintext,
                                    ciphertext)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    generations,
+                                   handshake_content_auth,
+                                   application_content_auth,
                                    handshake,
                                    application)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
@@ -137,7 +139,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    tree,
                                    encryption_secret,
                                    sender_data_secret,
+                                   padding_size,
                                    sender_data_info,
+                                   authenticated_data,
                                    leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,
@@ -177,7 +181,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    tree_hash_before,
                                    confirmed_transcript_hash_before,
                                    interim_transcript_hash_before,
-                                   membership_key,
                                    confirmation_key,
                                    credential,
                                    commit,
@@ -216,9 +219,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
                                    external_init_proposal,
                                    app_ack_proposal,
                                    commit,
-                                   mls_plaintext_application,
-                                   mls_plaintext_proposal,
-                                   mls_plaintext_commit,
+                                   content_auth_app,
+                                   content_auth_proposal,
+                                   content_auth_commit,
+                                   mls_plaintext,
                                    mls_ciphertext)
 
 } // namespace mls_vectors

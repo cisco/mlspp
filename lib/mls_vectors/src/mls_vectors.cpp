@@ -47,9 +47,22 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
 }
 
 static std::ostream&
+operator<<(std::ostream& str, const MLSMessageContentAuth& obj)
+{
+  return str << to_hex(tls::marshal(obj));
+}
+
+static std::ostream&
 operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
 {
   return str << "[TreeKEMPublicKey]";
+}
+
+template<typename T>
+inline typename std::enable_if<T::_tls_serializable, std::ostream&>::type
+operator<<(std::ostream& str, const T& obj)
+{
+  return str << to_hex(tls::marshal(obj));
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
@@ -203,6 +216,7 @@ EncryptionTestVector::create(CipherSuite suite,
   tv.cipher_suite = suite;
   tv.encryption_secret = random_bytes(suite.secret_size());
   tv.sender_data_secret = random_bytes(suite.secret_size());
+  tv.padding_size = 10;
 
   auto ciphertext = random_bytes(suite.secret_size());
   auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
@@ -213,6 +227,7 @@ EncryptionTestVector::create(CipherSuite suite,
     sender_data_key_nonce.nonce,
   };
 
+  auto sig_privs = std::vector<SignaturePrivateKey>{};
   auto tree = TreeKEMPublicKey(suite);
   for (uint32_t i = 0; i < n_leaves; i++) {
     auto leaf_priv = HPKEPrivateKey::generate(suite);
@@ -225,20 +240,25 @@ EncryptionTestVector::create(CipherSuite suite,
                          Lifetime::create_default(),
                          {},
                          sig_priv);
+
+    sig_privs.emplace_back(std::move(sig_priv));
     tree.add_leaf(leaf);
   }
+  tree.set_hash_all();
   tv.tree = tls::marshal(tree);
 
   auto src = GroupKeySource(suite, tree.size(), tv.encryption_secret);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
-  auto handshake_type = GroupKeySource::RatchetType::handshake;
-  auto application_type = GroupKeySource::RatchetType::application;
+  auto group_context =
+    GroupContext{ group_id, epoch, {}, tree.root_hash(), {} };
   auto proposal = Proposal{ GroupContextExtensions{} };
   auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
+  auto authenticated_data = random_bytes(suite.secret_size());
 
   tv.leaves.resize(n_leaves);
+  auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
   for (uint32_t i = 0; i < n_leaves; i++) {
     tv.leaves[i].generations = n_generations;
     tv.leaves[i].handshake.resize(n_generations);
@@ -247,37 +267,57 @@ EncryptionTestVector::create(CipherSuite suite,
     auto N = LeafIndex{ i };
     auto sender_ref = opt::get(tree.leaf_node(LeafIndex{ i })).ref(suite);
     auto sender = Sender{ sender_ref };
-    auto hs_pt = MLSPlaintext{ group_id, epoch, sender, proposal };
-    hs_pt.wire_format = WireFormat::mls_ciphertext;
 
-    auto app_pt = MLSPlaintext{ group_id, epoch, sender, app_data };
-    app_pt.wire_format = WireFormat::mls_ciphertext;
+    auto hs_content = MLSMessageContent{
+      group_id, epoch, sender, authenticated_data, proposal
+    };
+    auto hs_content_auth =
+      MLSMessageContentAuth::sign(WireFormat::mls_ciphertext,
+                                  std::move(hs_content),
+                                  suite,
+                                  sig_privs[i],
+                                  group_context);
+    tv.leaves[i].handshake_content_auth = tls::marshal(hs_content_auth);
 
-    auto hs_pt_data = tls::marshal(hs_pt);
-    auto app_pt_data = tls::marshal(app_pt);
+    auto app_content = MLSMessageContent{
+      group_id, epoch, sender, authenticated_data, app_data
+    };
+    auto app_content_auth =
+      MLSMessageContentAuth::sign(WireFormat::mls_ciphertext,
+                                  std::move(app_content),
+                                  suite,
+                                  sig_privs[i],
+                                  group_context);
+    tv.leaves[i].application_content_auth = tls::marshal(app_content_auth);
 
     for (uint32_t j = 0; j < n_generations; ++j) {
       // Handshake
-      auto hs_ct = src.encrypt(tree, N, tv.sender_data_secret, hs_pt);
-      auto hs_key_nonce = src.get(handshake_type, N, j);
-      src.erase(handshake_type, N, j);
+      auto hs_ct = MLSCiphertext::protect(
+        hs_content_auth, suite, N, src, tv.sender_data_secret, tv.padding_size);
+      auto hs_key_nonce =
+        src.get(ContentType::proposal, N, j, zero_reuse_guard);
+      src.erase(ContentType::proposal, N, j);
 
       tv.leaves[i].handshake[j] = {
         std::move(hs_key_nonce.key),
         std::move(hs_key_nonce.nonce),
-        hs_pt_data,
         tls::marshal(hs_ct),
       };
 
       // Application
-      auto app_ct = src.encrypt(tree, N, tv.sender_data_secret, app_pt);
-      auto app_key_nonce = src.get(application_type, N, j);
-      src.erase(application_type, N, j);
+      auto app_ct = MLSCiphertext::protect(app_content_auth,
+                                           suite,
+                                           N,
+                                           src,
+                                           tv.sender_data_secret,
+                                           tv.padding_size);
+      auto app_key_nonce =
+        src.get(ContentType::application, N, j, zero_reuse_guard);
+      src.erase(ContentType::application, N, j);
 
       tv.leaves[i].application[j] = {
         std::move(app_key_nonce.key),
         std::move(app_key_nonce.nonce),
-        app_pt_data,
         tls::marshal(app_ct),
       };
     }
@@ -301,34 +341,44 @@ EncryptionTestVector::verify() const
   ratchet_tree.set_hash_all();
   auto n_leaves = ratchet_tree.size();
 
-  auto handshake_type = GroupKeySource::RatchetType::handshake;
-  auto application_type = GroupKeySource::RatchetType::application;
-
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+  auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
   for (uint32_t i = 0; i < n_leaves.val; i++) {
     auto N = LeafIndex{ i };
+
+    auto hs_content_auth =
+      tls::get<MLSMessageContentAuth>(leaves[i].handshake_content_auth);
+    auto app_content_auth =
+      tls::get<MLSMessageContentAuth>(leaves[i].application_content_auth);
+
     for (uint32_t j = 0; j < leaves[i].generations; ++j) {
       // Handshake
       const auto& hs_step = leaves[i].handshake[j];
-      auto hs_key_nonce = src.get(handshake_type, N, j);
+      auto hs_key_nonce =
+        src.get(ContentType::proposal, N, j, zero_reuse_guard);
       VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
       VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
 
       auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto hs_pt = src.decrypt(ratchet_tree, sender_data_secret, hs_ct);
-      VERIFY_EQUAL("hs pt", tls::marshal(hs_pt), hs_step.plaintext);
-      src.erase(handshake_type, N, j);
+      auto hs_pt =
+        hs_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
+      VERIFY("hs pt ok", hs_pt);
+      VERIFY_EQUAL("hs pt", opt::get(hs_pt), hs_content_auth);
+      src.erase(ContentType::proposal, N, j);
 
       // Application
       const auto& app_step = leaves[i].application[j];
-      auto app_key_nonce = src.get(application_type, N, j);
+      auto app_key_nonce =
+        src.get(ContentType::application, N, j, zero_reuse_guard);
       VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
       VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
 
       auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
-      auto app_pt = src.decrypt(ratchet_tree, sender_data_secret, app_ct);
-      VERIFY_EQUAL("app pt", tls::marshal(app_pt), app_step.plaintext);
-      src.erase(application_type, N, j);
+      auto app_pt =
+        app_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
+      VERIFY("app pt ok", app_pt);
+      VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
+      src.erase(ContentType::application, N, j);
     }
   }
 
@@ -508,15 +558,22 @@ TranscriptTestVector::create(CipherSuite suite)
     Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto leaf_node_ref = LeafNodeRef{};
   leaf_node_ref.fill(0xa0);
-  auto commit =
-    MLSPlaintext{ group_id, epoch, Sender{ leaf_node_ref }, Commit{} };
-  commit.sign(suite, group_context, sig_priv);
 
-  transcript.update_confirmed(commit);
-  commit.confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
+  auto commit_content =
+    MLSMessageContent{ group_id, epoch, { leaf_node_ref }, {}, Commit{} };
+  auto commit_content_auth =
+    MLSMessageContentAuth::sign(WireFormat::mls_plaintext,
+                                std::move(commit_content),
+                                suite,
+                                sig_priv,
+                                group_context);
 
-  transcript.update_interim(commit);
-  commit.membership_tag = ks_epoch.membership_tag(group_context, commit);
+  transcript.update_confirmed(commit_content_auth);
+
+  const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
+  commit_content_auth.set_confirmation_tag(confirmation_tag);
+
+  transcript.update_interim(commit_content_auth);
 
   return {
     suite,
@@ -527,10 +584,9 @@ TranscriptTestVector::create(CipherSuite suite)
     confirmed_transcript_hash_before,
     interim_transcript_hash_before,
 
-    ks_epoch.membership_key,
     ks_epoch.confirmation_key,
     credential,
-    commit,
+    commit_content_auth,
 
     ctx,
     transcript.confirmed,
@@ -557,20 +613,15 @@ TranscriptTestVector::verify() const
 
   // Verify that the commit signature is valid
   auto commit_valid =
-    commit.verify(cipher_suite, group_context_obj, credential.public_key());
+    commit.verify(cipher_suite, credential.public_key(), group_context_obj);
   VERIFY("commit signature valid", commit_valid);
 
-  // Verify the Commit tags
+  // Verify the confirmation tag
   auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
   ks_epoch.confirmation_key = confirmation_key;
-  ks_epoch.membership_key = membership_key;
 
   auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  VERIFY_EQUAL(
-    "confirmation", confirmation_tag, opt::get(commit.confirmation_tag));
-
-  auto membership_tag = ks_epoch.membership_tag(group_context_obj, commit);
-  VERIFY_EQUAL("membership", membership_tag, opt::get(commit.membership_tag));
+  VERIFY("confirmation", commit.check_confirmation_tag(confirmation_tag));
 
   return std::nullopt;
 }
@@ -757,12 +808,13 @@ MessagesTestVector
 MessagesTestVector::create()
 {
   auto epoch = epoch_t(0xA0A1A2A3A4A5A6A7);
-  auto index = LeafIndex{ 0xB0B1B2B3 };
+  auto index = LeafIndex{ 0xB0 };
   auto user_id = bytes(16, 0xD1);
   auto group_id = bytes(16, 0xD2);
   auto opaque = bytes(32, 0xD3);
   auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
   auto mac = bytes(32, 0xD5);
+  auto group_context = GroupContext{ group_id, epoch, opaque, opaque, {} };
 
   auto version = ProtocolVersion::mls10;
   auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
@@ -838,28 +890,37 @@ MessagesTestVector::create()
                           },
                         } };
 
-  // MLSPlaintext and MLSCiphertext
-  auto pt_application =
-    MLSPlaintext{ group_id, epoch, sender, ApplicationData{} };
-  pt_application.membership_tag = mac;
-
-  auto pt_proposal =
-    MLSPlaintext{ group_id, epoch, sender, Proposal{ remove } };
-  pt_proposal.membership_tag = mac;
-
-  auto pt_commit = MLSPlaintext{ group_id, epoch, sender, commit };
-  pt_commit.confirmation_tag = mac;
-  pt_commit.membership_tag = mac;
-
-  auto ct = MLSCiphertext{
+  // MLSMessageContentAuth with Application / Proposal / Commit
+  auto content_auth_app = MLSMessageContentAuth::sign(
     WireFormat::mls_ciphertext,
-    group_id,
-    epoch,
-    ContentType::application,
-    opaque,
-    opaque,
-    opaque,
-  };
+    { group_id, epoch, sender, {}, ApplicationData{} },
+    suite,
+    sig_priv,
+    group_context);
+
+  auto content_auth_proposal = MLSMessageContentAuth::sign(
+    WireFormat::mls_plaintext,
+    { group_id, epoch, sender, {}, Proposal{ remove } },
+    suite,
+    sig_priv,
+    group_context);
+
+  auto content_auth_commit =
+    MLSMessageContentAuth::sign(WireFormat::mls_plaintext,
+                                { group_id, epoch, sender, {}, commit },
+                                suite,
+                                sig_priv,
+                                group_context);
+  content_auth_commit.set_confirmation_tag(opaque);
+
+  // MLSMessage(MLSPlaintext)
+  auto mls_plaintext = MLSMessage{ MLSPlaintext::protect(
+    content_auth_proposal, suite, opaque, group_context) };
+
+  // MLSMessage(MLSCiphertext)
+  auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
+  auto mls_ciphertext = MLSMessage{ MLSCiphertext::protect(
+    content_auth_app, suite, index, keys, opaque, 10) };
 
   return MessagesTestVector{
     tls::marshal(key_package),
@@ -879,10 +940,11 @@ MessagesTestVector::create()
 
     tls::marshal(commit),
 
-    tls::marshal(pt_application),
-    tls::marshal(pt_proposal),
-    tls::marshal(pt_commit),
-    tls::marshal(ct),
+    tls::marshal(content_auth_app),
+    tls::marshal(content_auth_proposal),
+    tls::marshal(content_auth_commit),
+    tls::marshal(mls_plaintext),
+    tls::marshal(mls_ciphertext),
   };
 }
 
@@ -906,21 +968,25 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  auto require_pt = [](const auto& pt) {
-    return pt.wire_format == WireFormat::mls_plaintext;
+  VERIFY_TLS_RTT(
+    "MLSMessageContentAuth/App", MLSMessageContentAuth, content_auth_app);
+  VERIFY_TLS_RTT("MLSMessageContentAuth/Proposal",
+                 MLSMessageContentAuth,
+                 content_auth_proposal);
+  VERIFY_TLS_RTT(
+    "MLSMessageContentAuth/Commit", MLSMessageContentAuth, content_auth_commit);
+
+  auto require_pt = [](const MLSMessage& msg) {
+    return msg.wire_format() == WireFormat::mls_plaintext;
   };
-  auto require_ct = [](const auto& pt) {
-    return pt.wire_format == WireFormat::mls_ciphertext;
+  auto require_ct = [](const MLSMessage& msg) {
+    return msg.wire_format() == WireFormat::mls_ciphertext;
   };
 
   VERIFY_TLS_RTT_VAL(
-    "MLSPlaintext/App", MLSPlaintext, mls_plaintext_application, require_pt);
+    "MLSMessage/MLSPlaintext", MLSMessage, mls_plaintext, require_pt);
   VERIFY_TLS_RTT_VAL(
-    "MLSPlaintext/Proposal", MLSPlaintext, mls_plaintext_proposal, require_pt);
-  VERIFY_TLS_RTT_VAL(
-    "MLSPlaintext/Commit", MLSPlaintext, mls_plaintext_commit, require_pt);
-  VERIFY_TLS_RTT_VAL(
-    "MLSCiphertext", MLSCiphertext, mls_ciphertext, require_ct);
+    "MLSMessage/MLSCiphertext", MLSMessage, mls_ciphertext, require_ct);
 
   return std::nullopt;
 }

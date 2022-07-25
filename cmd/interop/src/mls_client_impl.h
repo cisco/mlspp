@@ -100,14 +100,15 @@ private:
   {
     mls::State state;
     bool encrypt_handshake;
+    mls::MessageOpts message_opts() const;
 
     std::optional<std::string> pending_commit;
     std::optional<uint32_t> pending_state_id;
     void reset_pending();
 
     // Marshal/unmarshal with encryption as required
-    std::string marshal(const mls::MLSPlaintext& pt);
-    mls::MLSPlaintext unmarshal(const std::string& wire);
+    std::string marshal(const mls::MLSMessage& msg);
+    mls::MLSMessage unmarshal(const std::string& wire);
   };
 
   std::map<uint32_t, CachedState> state_cache;

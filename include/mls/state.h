@@ -46,6 +46,13 @@ struct CommitOpts
   LeafNodeOptions leaf_node_opts;
 };
 
+struct MessageOpts
+{
+  bool encrypt = false;
+  bytes authenticated_data;
+  size_t padding_size = 0;
+};
+
 class State
 {
 public:
@@ -70,15 +77,15 @@ public:
         const std::optional<TreeKEMPublicKey>& tree);
 
   // Join a group from outside
-  // XXX(RLB) For full generality, this should be capable of covering other
-  // proposals, and would need to return a Welcome as well as an MLSPlaintext,
-  // to cover any additional participants added in the Commit.
-  static std::tuple<MLSPlaintext, State> external_join(
+  // XXX(RLB) To be fully general, we would need a few more options here, e.g.,
+  // whether to include PSKs or evict our prior appearance.
+  static std::tuple<MLSMessage, State> external_join(
     const bytes& leaf_secret,
     SignaturePrivateKey sig_priv,
     const KeyPackage& kp,
     const GroupInfo& group_info,
-    const std::optional<TreeKEMPublicKey>& tree);
+    const std::optional<TreeKEMPublicKey>& tree,
+    const MessageOpts& msg_opts);
 
   ///
   /// Message factories
@@ -91,20 +98,26 @@ public:
   Proposal remove_proposal(LeafNodeRef removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
-  MLSPlaintext add(const KeyPackage& key_package) const;
-  MLSPlaintext update(const bytes& leaf_secret, const LeafNodeOptions& opts);
-  MLSPlaintext remove(RosterIndex index) const;
-  MLSPlaintext remove(LeafNodeRef removed) const;
-  MLSPlaintext group_context_extensions(ExtensionList exts) const;
+  MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
+  MLSMessage update(const bytes& leaf_secret,
+                    const LeafNodeOptions& opts,
+                    const MessageOpts& msg_opts);
+  MLSMessage remove(RosterIndex index, const MessageOpts& msg_opts);
+  MLSMessage remove(LeafNodeRef removed, const MessageOpts& msg_opts);
+  MLSMessage group_context_extensions(ExtensionList exts,
+                                      const MessageOpts& msg_opts);
 
-  std::tuple<MLSPlaintext, Welcome, State> commit(
+  std::tuple<MLSMessage, Welcome, State> commit(
     const bytes& leaf_secret,
-    const std::optional<CommitOpts>& opts) const;
+    const std::optional<CommitOpts>& opts,
+    const MessageOpts& msg_opts);
 
   ///
   /// Generic handshake message handler
   ///
-  std::optional<State> handle(const MLSPlaintext& pt);
+  std::optional<State> handle(const MLSMessage& msg);
+  std::optional<State> handle(const MLSMessage& msg,
+                              std::optional<State> cached);
 
   ///
   /// Accessors
@@ -127,16 +140,12 @@ public:
   bytes authentication_secret() const;
 
   ///
-  /// General encryption and decryption
-  ///
-  MLSCiphertext encrypt(const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const MLSCiphertext& ct);
-
-  ///
   /// Application encryption and decryption
   ///
-  MLSCiphertext protect(const bytes& pt);
-  bytes unprotect(const MLSCiphertext& ct);
+  MLSMessage protect(const bytes& authenticated_data,
+                     const bytes& pt,
+                     size_t padding_size);
+  std::tuple<bytes, bytes> unprotect(const MLSMessage& ct);
 
   // Assemble a group context for this state
   GroupContext group_context() const;
@@ -181,25 +190,26 @@ protected:
                                const std::optional<TreeKEMPublicKey>& external,
                                const ExtensionList& extensions);
 
-  // Form a commit that can be either internal or external
-  std::tuple<MLSPlaintext, Welcome, State> commit(
+  std::tuple<MLSMessage, Welcome, State> commit(
     const bytes& leaf_secret,
     const std::optional<CommitOpts>& opts,
+    const MessageOpts& msg_opts,
     const std::optional<KeyPackage>& joiner_key_package,
-    const std::optional<HPKEPublicKey>& external_pub) const;
+    const std::optional<HPKEPublicKey>& external_pub);
 
-  // Ratchet the key schedule forward and sign the commit that caused the
-  // transition
-  MLSPlaintext ratchet_and_sign(const Sender& sender,
-                                const Commit& op,
-                                const bytes& commit_secret,
-                                const std::vector<PSKWithSecret>& psks,
-                                const std::optional<bytes>& force_init_secret,
-                                bool encrypt_handshake,
-                                const GroupContext& prev_ctx);
+  // Create an MLSMessage encapsulating some content
+  template<typename Inner>
+  MLSMessageContentAuth sign(const Sender& sender,
+                             Inner&& content,
+                             const bytes& authenticated_data,
+                             bool encrypt) const;
 
-  // Create an MLSPlaintext with a signature over some content
-  MLSPlaintext sign(const Proposal& proposal) const;
+  MLSMessage protect(MLSMessageContentAuth&& content_auth, size_t padding_size);
+
+  template<typename Inner>
+  MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
+
+  MLSMessageContentAuth unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   void check_add_leaf_node(const LeafNode& leaf,
@@ -222,7 +232,7 @@ protected:
   bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract a proposal from the cache
-  void cache_proposal(const MLSPlaintext& pt);
+  void cache_proposal(MLSMessageContentAuth content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
     std::optional<LeafIndex> sender_index) const;
@@ -240,12 +250,9 @@ protected:
                             const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
-  bool verify_internal(const MLSPlaintext& pt) const;
-  bool verify_new_member(const MLSPlaintext& pt) const;
-  bool verify(const MLSPlaintext& pt) const;
-
-  // Verification of the confirmation MAC
-  bool verify_confirmation(const bytes& confirmation) const;
+  bool verify_internal(const MLSMessageContentAuth& content_auth) const;
+  bool verify_new_member(const MLSMessageContentAuth& content_auth) const;
+  bool verify(const MLSMessageContentAuth& content_auth) const;
 
   // Convert a Roster entry into LeafNodeRef
   LeafNodeRef leaf_for_roster_entry(RosterIndex index) const;

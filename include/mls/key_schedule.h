@@ -51,6 +51,8 @@ private:
   size_t secret_size;
 };
 
+using ReuseGuard = std::array<uint8_t, 4>;
+
 struct GroupKeySource
 {
   enum struct RatchetType
@@ -64,17 +66,13 @@ struct GroupKeySource
                  LeafCount group_size,
                  bytes encryption_secret);
 
-  std::tuple<uint32_t, KeyAndNonce> next(RatchetType type, LeafIndex sender);
-  KeyAndNonce get(RatchetType type, LeafIndex sender, uint32_t generation);
-  void erase(RatchetType type, LeafIndex sender, uint32_t generation);
-
-  MLSCiphertext encrypt(const TreeKEMPublicKey& tree,
-                        LeafIndex index,
-                        const bytes& sender_data_secret,
-                        const MLSPlaintext& pt);
-  MLSPlaintext decrypt(const TreeKEMPublicKey& tree,
-                       const bytes& sender_data_secret,
-                       const MLSCiphertext& ct);
+  std::tuple<uint32_t, ReuseGuard, KeyAndNonce> next(ContentType content_type,
+                                                     LeafIndex sender);
+  KeyAndNonce get(ContentType content_type,
+                  LeafIndex sender,
+                  uint32_t generation,
+                  ReuseGuard reuse_guard);
+  void erase(ContentType type, LeafIndex sender, uint32_t generation);
 
 private:
   CipherSuite suite;
@@ -84,6 +82,7 @@ private:
   std::map<Key, HashRatchet> chains;
 
   HashRatchet& chain(RatchetType type, LeafIndex sender);
+  HashRatchet& chain(ContentType type, LeafIndex sender);
 
   static const std::array<RatchetType, 2> all_ratchet_types;
 };
@@ -144,8 +143,6 @@ public:
                         const bytes& context) const;
 
   GroupKeySource encryption_keys(LeafCount size) const;
-  bytes membership_tag(const GroupContext& context,
-                       const MLSPlaintext& pt) const;
   bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
   bytes do_export(const std::string& label,
                   const bytes& context,
@@ -178,10 +175,10 @@ struct TranscriptHash
                  bytes confirmed_in,
                  const bytes& confirmation_tag);
 
-  void update(const MLSPlaintext& pt);
-  void update_confirmed(const MLSPlaintext& pt);
+  void update(const MLSMessageContentAuth& content_auth);
+  void update_confirmed(const MLSMessageContentAuth& content_auth);
   void update_interim(const bytes& confirmation_tag);
-  void update_interim(const MLSPlaintext& pt);
+  void update_interim(const MLSMessageContentAuth& content_auth);
 };
 
 bool

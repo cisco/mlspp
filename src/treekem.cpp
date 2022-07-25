@@ -34,15 +34,15 @@ Node::public_key() const
 std::optional<bytes>
 Node::parent_hash() const
 {
-  static const auto get_leaf_ph = overloaded{
+  const auto get_leaf_ph = overloaded{
     [](const ParentHash& ph) -> std::optional<bytes> { return ph.parent_hash; },
     [](const auto& /* other */) -> std::optional<bytes> {
       return std::nullopt;
     },
   };
 
-  static const auto get_ph = overloaded{
-    [](const LeafNode& node) -> std::optional<bytes> {
+  const auto get_ph = overloaded{
+    [&](const LeafNode& node) -> std::optional<bytes> {
       return var::visit(get_leaf_ph, node.content);
     },
     [](const ParentNode& node) -> std::optional<bytes> {

@@ -128,7 +128,7 @@ Credential::type() const
 SignaturePublicKey
 Credential::public_key() const
 {
-  static const auto get_public_key = overloaded{
+  const auto get_public_key = overloaded{
     [](const BasicCredential& cred) { return cred.public_key; },
     [](const X509Credential& cred) { return cred.public_key(); },
   };
