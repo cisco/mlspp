@@ -220,7 +220,7 @@ MLSMessage
 State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 {
   auto content_auth = sign(
-    { _ref }, inner_content, msg_opts.authenticated_data, msg_opts.encrypt);
+      { MemberSender{ _index } }, inner_content, msg_opts.authenticated_data, msg_opts.encrypt);
   return protect(std::move(content_auth), msg_opts.padding_size);
 }
 
@@ -456,7 +456,7 @@ State::commit(const bytes& leaf_secret,
   auto [has_updates, has_removes, joiner_locations] = next.apply(proposals);
 
   // If this is an external commit, see where the new joiner ended up
-  auto sender = Sender{ _ref };
+  auto sender = Sender{ MemberSender{ _index } };
   if (external_commit) {
     const auto& kp = opt::get(joiner_key_package);
     const auto it = std::find(joiners.begin(), joiners.end(), kp);
@@ -467,7 +467,7 @@ State::commit(const bytes& leaf_secret,
     const auto pos = it - joiners.begin();
     next._index = joiner_locations[pos];
     next._ref = kp.leaf_node.ref(next._suite);
-    sender = Sender{ NewMemberID{} };
+    sender = Sender{ NewMemberSender{} };
   }
 
   // KEM new entropy to the group and the new joiners
@@ -630,10 +630,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 
   auto sender = std::optional<LeafIndex>();
   if (content.sender.sender_type() == SenderType::member) {
-    const auto& sender_ref = var::get<LeafNodeRef>(content.sender.sender);
-    // This optional is guaranteed to be present because we just did this same
-    // lookup for signature verification.
-    sender = opt::get(_tree.find(sender_ref));
+    sender = var::get<MemberSender>(content.sender.sender).sender;
   }
 
   if (sender == _index) {
@@ -864,7 +861,7 @@ State::cache_proposal(MLSMessageContentAuth content_auth)
   auto sender_location = std::optional<LeafIndex>();
   if (content_auth.content.sender.sender_type() == SenderType::member) {
     const auto& sender = content_auth.content.sender.sender;
-    sender_location = _tree.find(var::get<LeafNodeRef>(sender));
+    sender_location = var::get<MemberSender>(sender).sender;
   }
 
   _pending_proposals.push_back({
@@ -1072,9 +1069,9 @@ State::update_epoch_secrets(const bytes& commit_secret,
 bool
 State::verify_internal(const MLSMessageContentAuth& content_auth) const
 {
-  const auto& sender_ref =
-    var::get<LeafNodeRef>(content_auth.content.sender.sender);
-  auto maybe_leaf = _tree.leaf_node(sender_ref);
+  const auto& sender =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
+  auto maybe_leaf = _tree.leaf_node(sender);
   if (!maybe_leaf) {
     throw InvalidParameterError("Signature from blank node");
   }

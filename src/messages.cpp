@@ -655,7 +655,7 @@ struct MLSCiphertextContentAAD
 
 struct MLSSenderData
 {
-  LeafNodeRef sender{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  LeafIndex sender{ 0 };
   uint32_t generation{ 0 };
   ReuseGuard reuse_guard{ 0, 0, 0, 0 };
 
@@ -697,8 +697,9 @@ MLSCiphertext::protect(MLSMessageContentAuth content_auth,
     content_keys.key, content_keys.nonce, content_aad, content_pt);
 
   // Encrypt the sender data
+  auto sender_index = var::get<MemberSender>(content_auth.content.sender.sender).sender;
   auto sender_data_pt = tls::marshal(MLSSenderData{
-    var::get<LeafNodeRef>(content_auth.content.sender.sender),
+    sender_index,
     generation,
     reuse_guard,
   });
@@ -747,17 +748,14 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  auto maybe_sender = tree.find(sender_data.sender);
-  if (!maybe_sender) {
+  if (!tree.has_leaf(sender_data.sender)) {
     return std::nullopt;
   }
 
-  auto sender = opt::get(maybe_sender);
-
   // Decrypt the content
   auto content_keys = keys.get(
-    content_type, sender, sender_data.generation, sender_data.reuse_guard);
-  keys.erase(content_type, sender, sender_data.generation);
+    content_type, sender_data.sender, sender_data.generation, sender_data.reuse_guard);
+  keys.erase(content_type, sender_data.sender, sender_data.generation);
 
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
     group_id,
@@ -774,7 +772,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
 
   // Parse the content
   auto content = MLSMessageContent{
-    group_id, epoch, { sender_data.sender }, authenticated_data, content_type
+    group_id, epoch, { MemberSender{ sender_data.sender } }, authenticated_data, content_type
   };
   auto auth = MLSMessageAuth{ content_type, {}, {} };
 
