@@ -239,7 +239,7 @@ struct Update
 // Remove
 struct Remove
 {
-  LeafNodeRef removed;
+  LeafIndex removed;
   TLS_SERIALIZABLE(removed)
 };
 

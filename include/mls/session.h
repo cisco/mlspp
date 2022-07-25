@@ -59,7 +59,6 @@ public:
   bytes add(const bytes& key_package_data);
   bytes update();
   bytes remove(uint32_t index);
-  bytes remove(const LeafNodeRef& ref);
   std::tuple<bytes, bytes> commit(const bytes& proposal);
   std::tuple<bytes, bytes> commit(const std::vector<bytes>& proposals);
   std::tuple<bytes, bytes> commit();

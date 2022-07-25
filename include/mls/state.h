@@ -95,7 +95,7 @@ public:
   Proposal update_proposal(const bytes& leaf_secret,
                            const LeafNodeOptions& opts);
   Proposal remove_proposal(RosterIndex index) const;
-  Proposal remove_proposal(LeafNodeRef removed) const;
+  Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
@@ -103,7 +103,7 @@ public:
                     const LeafNodeOptions& opts,
                     const MessageOpts& msg_opts);
   MLSMessage remove(RosterIndex index, const MessageOpts& msg_opts);
-  MLSMessage remove(LeafNodeRef removed, const MessageOpts& msg_opts);
+  MLSMessage remove(LeafIndex removed, const MessageOpts& msg_opts);
   MLSMessage group_context_extensions(ExtensionList exts,
                                       const MessageOpts& msg_opts);
 
@@ -255,7 +255,7 @@ protected:
   bool verify(const MLSMessageContentAuth& content_auth) const;
 
   // Convert a Roster entry into LeafNodeRef
-  LeafNodeRef leaf_for_roster_entry(RosterIndex index) const;
+  LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 
   // Create a draft successor state
   State successor() const;

@@ -341,9 +341,9 @@ State::remove_proposal(RosterIndex index) const
 }
 
 Proposal
-State::remove_proposal(LeafNodeRef removed) const
+State::remove_proposal(LeafIndex removed) const
 {
-  if (!_tree.find(removed)) {
+  if (!_tree.has_leaf(removed)) {
     throw InvalidParameterError("Remove on blank leaf");
   }
 
@@ -381,7 +381,7 @@ State::remove(RosterIndex index, const MessageOpts& msg_opts)
 }
 
 MLSMessage
-State::remove(LeafNodeRef removed, const MessageOpts& msg_opts)
+State::remove(LeafIndex removed, const MessageOpts& msg_opts)
 {
   return protect_full(remove_proposal(removed), msg_opts);
 }
@@ -821,14 +821,12 @@ State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
 LeafIndex
 State::apply(const Remove& remove)
 {
-  auto maybe_removed = _tree.find(remove.removed);
-  if (!maybe_removed) {
+  if (!_tree.has_leaf(remove.removed)) {
     throw ProtocolError("Attempt to remove non-member");
   }
 
-  auto removed = opt::get(maybe_removed);
-  _tree.blank_path(removed);
-  return removed;
+  _tree.blank_path(remove.removed);
+  return remove.removed;
 }
 
 void
@@ -1186,7 +1184,7 @@ State::authentication_secret() const
   return _key_schedule.authentication_secret;
 }
 
-LeafNodeRef
+LeafIndex
 State::leaf_for_roster_entry(RosterIndex index) const
 {
   auto non_blank_leaves = uint32_t(0);
@@ -1197,12 +1195,12 @@ State::leaf_for_roster_entry(RosterIndex index) const
       continue;
     }
     if (non_blank_leaves == index.val) {
-      return opt::get(maybe_leaf).ref(_suite);
+      return i;
     }
     non_blank_leaves += 1;
   }
 
-  throw InvalidParameterError("Leaf Index mismatch");
+  throw InvalidParameterError("Invalid roster index");
 }
 
 State

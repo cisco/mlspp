@@ -568,6 +568,12 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
   return l;
 }
 
+bool
+TreeKEMPublicKey::has_leaf(LeafIndex index) const
+{
+  return !node_at(index).blank();
+}
+
 std::optional<LeafIndex>
 TreeKEMPublicKey::find(const LeafNode& leaf) const
 {

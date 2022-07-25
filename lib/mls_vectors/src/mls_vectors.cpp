@@ -868,7 +868,7 @@ MessagesTestVector::create()
   // Proposals
   auto add = Add{ key_package };
   auto update = Update{ leaf_node_update };
-  auto remove = Remove{ leaf_node_ref };
+  auto remove = Remove{ index };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };
