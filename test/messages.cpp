@@ -53,7 +53,8 @@ public:
                            random_bytes(suite.secret_size()) };
 
     application_content = MLSMessageContent{
-      group_id, epoch, { MemberSender{ index } }, authenticated_data, application_data,
+      group_id,         epoch, { MemberSender{ index } }, authenticated_data,
+      application_data,
     };
 
     proposal_content = MLSMessageContent{

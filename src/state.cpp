@@ -211,8 +211,10 @@ template<typename Inner>
 MLSMessage
 State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 {
-  auto content_auth = sign(
-      { MemberSender{ _index } }, inner_content, msg_opts.authenticated_data, msg_opts.encrypt);
+  auto content_auth = sign({ MemberSender{ _index } },
+                           inner_content,
+                           msg_opts.authenticated_data,
+                           msg_opts.encrypt);
   return protect(std::move(content_auth), msg_opts.padding_size);
 }
 

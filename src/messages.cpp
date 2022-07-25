@@ -697,7 +697,8 @@ MLSCiphertext::protect(MLSMessageContentAuth content_auth,
     content_keys.key, content_keys.nonce, content_aad, content_pt);
 
   // Encrypt the sender data
-  auto sender_index = var::get<MemberSender>(content_auth.content.sender.sender).sender;
+  auto sender_index =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
   auto sender_data_pt = tls::marshal(MLSSenderData{
     sender_index,
     generation,
@@ -753,8 +754,10 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   // Decrypt the content
-  auto content_keys = keys.get(
-    content_type, sender_data.sender, sender_data.generation, sender_data.reuse_guard);
+  auto content_keys = keys.get(content_type,
+                               sender_data.sender,
+                               sender_data.generation,
+                               sender_data.reuse_guard);
   keys.erase(content_type, sender_data.sender, sender_data.generation);
 
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
@@ -771,9 +774,11 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   // Parse the content
-  auto content = MLSMessageContent{
-    group_id, epoch, { MemberSender{ sender_data.sender } }, authenticated_data, content_type
-  };
+  auto content = MLSMessageContent{ group_id,
+                                    epoch,
+                                    { MemberSender{ sender_data.sender } },
+                                    authenticated_data,
+                                    content_type };
   auto auth = MLSMessageAuth{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);

@@ -557,8 +557,9 @@ TranscriptTestVector::create(CipherSuite suite)
     Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content =
-    MLSMessageContent{ group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} };
+  auto commit_content = MLSMessageContent{
+    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
+  };
   auto commit_content_auth =
     MLSMessageContentAuth::sign(WireFormat::mls_plaintext,
                                 std::move(commit_content),
