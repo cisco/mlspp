@@ -125,13 +125,15 @@ ExtensionList::has(uint16_t type) const
 /// LeafNode
 ///
 LeafNode::LeafNode(CipherSuite cipher_suite,
-                   HPKEPublicKey public_key_in,
+                   HPKEPublicKey encryption_key_in,
+                   SignaturePublicKey signature_key_in,
                    Credential credential_in,
                    Capabilities capabilities_in,
                    Lifetime lifetime_in,
                    ExtensionList extensions_in,
                    const SignaturePrivateKey& sig_priv)
-  : public_key(std::move(public_key_in))
+  : encryption_key(std::move(encryption_key_in))
+  , signature_key(std::move(signature_key_in))
   , credential(std::move(credential_in))
   , capabilities(std::move(capabilities_in))
   , content(lifetime_in)
@@ -143,11 +145,11 @@ LeafNode::LeafNode(CipherSuite cipher_suite,
 LeafNode
 LeafNode::for_update(CipherSuite cipher_suite,
                      const bytes& group_id,
-                     HPKEPublicKey public_key_in,
+                     HPKEPublicKey encryption_key_in,
                      const LeafNodeOptions& opts,
                      const SignaturePrivateKey& sig_priv) const
 {
-  auto clone = clone_with_options(std::move(public_key_in), opts);
+  auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = Empty{};
   clone.sign(cipher_suite, sig_priv, group_id);
@@ -158,12 +160,12 @@ LeafNode::for_update(CipherSuite cipher_suite,
 LeafNode
 LeafNode::for_commit(CipherSuite cipher_suite,
                      const bytes& group_id,
-                     HPKEPublicKey public_key_in,
+                     HPKEPublicKey encryption_key_in,
                      const bytes& parent_hash,
                      const LeafNodeOptions& opts,
                      const SignaturePrivateKey& sig_priv) const
 {
-  auto clone = clone_with_options(std::move(public_key_in), opts);
+  auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = ParentHash{ parent_hash };
   clone.sign(cipher_suite, sig_priv, group_id);
@@ -189,6 +191,15 @@ LeafNode::sign(CipherSuite cipher_suite,
                const std::optional<bytes>& group_id)
 {
   const auto tbs = to_be_signed(group_id);
+
+  if (sig_priv.public_key != signature_key) {
+    throw InvalidParameterError("Signature key mismatch");
+  }
+
+  if (!credential.valid_for(signature_key)) {
+    throw InvalidParameterError("Credential not valid for signature key");
+  }
+
   signature = sig_priv.sign(cipher_suite, tbs);
 }
 
@@ -197,7 +208,6 @@ LeafNode::verify(CipherSuite cipher_suite,
                  const std::optional<bytes>& group_id) const
 {
   const auto tbs = to_be_signed(group_id);
-  const auto& identity_key = credential.public_key();
 
   if (CredentialType::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
@@ -207,7 +217,7 @@ LeafNode::verify(CipherSuite cipher_suite,
     }
   }
 
-  return identity_key.verify(cipher_suite, tbs, signature);
+  return signature_key.verify(cipher_suite, tbs, signature);
 }
 
 bool
@@ -248,12 +258,12 @@ LeafNode::verify_extension_support(const ExtensionList& ext_list) const
 }
 
 LeafNode
-LeafNode::clone_with_options(HPKEPublicKey public_key_in,
+LeafNode::clone_with_options(HPKEPublicKey encryption_key_in,
                              const LeafNodeOptions& opts) const
 {
   auto clone = *this;
 
-  clone.public_key = std::move(public_key_in);
+  clone.encryption_key = std::move(encryption_key_in);
 
   if (opts.credential) {
     clone.credential = opt::get(opts.credential);
@@ -271,7 +281,8 @@ LeafNode::clone_with_options(HPKEPublicKey public_key_in,
 }
 
 // struct {
-//     HPKEPublicKey public_key;
+//     HPKEPublicKey encryption_key;
+//     SignaturePublicKey signature_key;
 //     Credential credential;
 //     Capabilities capabilities;
 //
@@ -302,14 +313,21 @@ LeafNode::clone_with_options(HPKEPublicKey public_key_in,
 // } LeafNodeTBS;
 struct LeafNodeTBS
 {
-  const HPKEPublicKey& public_key;
+  const HPKEPublicKey& encryption_key;
+  const SignaturePublicKey& signature_key;
   const Credential& credential;
   const Capabilities& capabilities;
   const var::variant<Lifetime, Empty, ParentHash>& content;
   const ExtensionList& extensions;
 
-  TLS_SERIALIZABLE(public_key, credential, capabilities, content, extensions)
+  TLS_SERIALIZABLE(encryption_key,
+                   signature_key,
+                   credential,
+                   capabilities,
+                   content,
+                   extensions)
   TLS_TRAITS(tls::pass,
+             tls::pass,
              tls::pass,
              tls::pass,
              tls::variant<LeafNodeSource>,
@@ -322,7 +340,8 @@ LeafNode::to_be_signed(const std::optional<bytes>& group_id) const
   tls::ostream w;
 
   w << LeafNodeTBS{
-    public_key, credential, capabilities, content, extensions,
+    encryption_key, signature_key, credential,
+    capabilities,   content,       extensions,
   };
 
   switch (source()) {
@@ -395,7 +414,6 @@ KeyPackage::verify() const
 
   // Verify the KeyPackage
   const auto tbs = to_be_signed();
-  const auto& identity_key = leaf_node.credential.public_key();
 
   if (CredentialType::x509 == leaf_node.credential.type()) {
     const auto& cred = leaf_node.credential.get<X509Credential>();
@@ -405,7 +423,7 @@ KeyPackage::verify() const
     }
   }
 
-  return identity_key.verify(cipher_suite, tbs, signature);
+  return leaf_node.signature_key.verify(cipher_suite, tbs, signature);
 }
 
 bytes

@@ -93,8 +93,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
 
-  auto cred = opt::get(maybe_leaf).credential;
-  if (cred.public_key() != priv.public_key) {
+  if (priv.public_key != opt::get(maybe_leaf).signature_key) {
     throw InvalidParameterError("Bad key for index");
   }
 
@@ -110,8 +109,8 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
     throw InvalidParameterError("Signer not found");
   }
 
-  auto cred = opt::get(maybe_leaf).credential;
-  return cred.public_key().verify(tree.suite, to_be_signed(), signature);
+  const auto& leaf = opt::get(maybe_leaf);
+  return leaf.signature_key.verify(tree.suite, to_be_signed(), signature);
 }
 
 // Welcome

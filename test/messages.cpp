@@ -39,7 +39,8 @@ public:
     auto leaf_node = LeafNode{
       suite,
       hpke_priv.public_key,
-      Credential::basic({}, suite, sig_priv.public_key),
+      sig_priv.public_key,
+      Credential::basic({}),
       Capabilities::create_default(),
       Lifetime::create_default(),
       {},

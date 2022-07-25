@@ -126,7 +126,8 @@ struct Lifetime
 };
 
 // struct {
-//     HPKEPublicKey public_key;
+//     HPKEPublicKey encryption_key;
+//     SignaturePublicKey signature_key;
 //     Credential credential;
 //     Capabilities capabilities;
 //
@@ -167,7 +168,8 @@ struct LeafNodeOptions
 // TODO Move this to treekem.h
 struct LeafNode
 {
-  HPKEPublicKey public_key;
+  HPKEPublicKey encryption_key;
+  SignaturePublicKey signature_key;
   Credential credential;
   Capabilities capabilities;
 
@@ -183,7 +185,8 @@ struct LeafNode
   LeafNode& operator=(LeafNode&&) = default;
 
   LeafNode(CipherSuite cipher_suite,
-           HPKEPublicKey public_key_in,
+           HPKEPublicKey encryption_key_in,
+           SignaturePublicKey signature_key_in,
            Credential credential_in,
            Capabilities capabilities_in,
            Lifetime lifetime_in,
@@ -192,13 +195,13 @@ struct LeafNode
 
   LeafNode for_update(CipherSuite cipher_suite,
                       const bytes& group_id,
-                      HPKEPublicKey public_key,
+                      HPKEPublicKey encryption_key,
                       const LeafNodeOptions& opts,
                       const SignaturePrivateKey& sig_priv_in) const;
 
   LeafNode for_commit(CipherSuite cipher_suite,
                       const bytes& group_id,
-                      HPKEPublicKey public_key,
+                      HPKEPublicKey encryption_key,
                       const bytes& parent_hash,
                       const LeafNodeOptions& opts,
                       const SignaturePrivateKey& sig_priv_in) const;
@@ -215,7 +218,8 @@ struct LeafNode
   bool verify_expiry(uint64_t now) const;
   bool verify_extension_support(const ExtensionList& ext_list) const;
 
-  TLS_SERIALIZABLE(public_key,
+  TLS_SERIALIZABLE(encryption_key,
+                   signature_key,
                    credential,
                    capabilities,
                    content,
@@ -224,12 +228,13 @@ struct LeafNode
   TLS_TRAITS(tls::pass,
              tls::pass,
              tls::pass,
+             tls::pass,
              tls::variant<LeafNodeSource>,
              tls::pass,
              tls::pass)
 
 private:
-  LeafNode clone_with_options(HPKEPublicKey public_key,
+  LeafNode clone_with_options(HPKEPublicKey encryption_key,
                               const LeafNodeOptions& opts) const;
   bytes to_be_signed(const std::optional<bytes>& group_id) const;
 };
