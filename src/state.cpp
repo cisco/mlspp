@@ -163,8 +163,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _index = opt::get(maybe_index);
   _ref = kp.leaf_node.ref(_suite);
 
-  auto signer_index = opt::get(_tree.find(group_info.signer));
-  auto ancestor = tree_math::ancestor(_index, signer_index);
+  auto ancestor = tree_math::ancestor(_index, group_info.signer);
   auto path_secret = std::optional<bytes>{};
   if (secrets.path_secret) {
     path_secret = opt::get(secrets.path_secret).secret;
@@ -546,7 +545,7 @@ State::commit(const bytes& leaf_secret,
   if (opts && opt::get(opts).inline_tree) {
     group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
   }
-  group_info.sign(next._tree, next._ref, next._identity_priv);
+  group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome = Welcome{
     _suite, next._key_schedule.joiner_secret, { /* no PSKs */ }, group_info
@@ -1155,7 +1154,7 @@ State::group_info() const
   group_info.other_extensions.add(
     ExternalPubExtension{ _key_schedule.external_priv.public_key });
   group_info.other_extensions.add(RatchetTreeExtension{ _tree });
-  group_info.sign(_tree, _ref, _identity_priv);
+  group_info.sign(_tree, _index, _identity_priv);
   return group_info;
 }
 

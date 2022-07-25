@@ -22,9 +22,6 @@ SFrameCapabilities::compatible(const SFrameParameters& params) const
 
 // GroupInfo
 
-static const auto zero_ref =
-  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
                      bytes group_id_in,
                      epoch_t epoch_in,
@@ -41,7 +38,7 @@ GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
   , group_context_extensions(std::move(group_context_extensions_in))
   , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
-  , signer(zero_ref)
+  , signer(0)
 {
 }
 
@@ -56,7 +53,7 @@ struct GroupInfoTBS
   const ExtensionList& other_extensions;
 
   const bytes& confirmation_tag;
-  const LeafNodeRef& signer;
+  LeafIndex signer;
 
   TLS_SERIALIZABLE(cipher_suite,
                    group_id,
@@ -85,10 +82,10 @@ GroupInfo::to_be_signed() const
 
 void
 GroupInfo::sign(const TreeKEMPublicKey& tree,
-                LeafNodeRef signer_ref,
+                LeafIndex signer_index,
                 const SignaturePrivateKey& priv)
 {
-  auto maybe_leaf = tree.leaf_node(signer_ref);
+  auto maybe_leaf = tree.leaf_node(signer_index);
   if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -98,7 +95,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = signer_ref;
+  signer = signer_index;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 

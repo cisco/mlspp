@@ -105,7 +105,7 @@ struct PSKWithSecret
 //     Extension group_context_extensions<V>;
 //     Extension other_extensions<V>;
 //     MAC confirmation_tag;
-//     LeafNodeRef signer;
+//     LeafIndex signer;
 //     // SignWithLabel(., "GroupInfoTBS", GroupInfoTBS)
 //     opaque signature<V>;
 // } GroupInfo;
@@ -120,7 +120,7 @@ struct GroupInfo
   ExtensionList other_extensions;
 
   bytes confirmation_tag;
-  LeafNodeRef signer;
+  LeafIndex signer;
   bytes signature;
 
   GroupInfo() = default;
@@ -135,7 +135,7 @@ struct GroupInfo
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafNodeRef signer_ref,
+            LeafIndex signer_index,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
