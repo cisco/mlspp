@@ -662,10 +662,4 @@ TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome)
 TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info)
 TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package)
 
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext)
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext)
-TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome)
-TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info)
-TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package)
-
 } // namespace tls
