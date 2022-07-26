@@ -66,14 +66,17 @@ protected:
     capas.extensions.push_back(CustomExtension2::type);
 
     auto identity_priv = SignaturePrivateKey::generate(suite);
-    auto credential =
-      Credential::basic(user_id, suite, identity_priv.public_key);
+    auto credential = Credential::basic(user_id);
     auto init_priv = HPKEPrivateKey::generate(suite);
     auto leaf_priv = HPKEPrivateKey::generate(suite);
-    auto leaf_node =
-      LeafNode{ suite,        leaf_priv.public_key,       credential,
-                capas,        Lifetime::create_default(), {},
-                identity_priv };
+    auto leaf_node = LeafNode{ suite,
+                               leaf_priv.public_key,
+                               identity_priv.public_key,
+                               credential,
+                               capas,
+                               Lifetime::create_default(),
+                               {},
+                               identity_priv };
     auto key_package =
       KeyPackage{ suite, init_priv.public_key, leaf_node, {}, identity_priv };
 

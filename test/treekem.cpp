@@ -16,9 +16,10 @@ protected:
   {
     auto leaf_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
+    auto cred = Credential::basic({ 0, 1, 2, 3 });
     auto leaf = LeafNode(suite,
                          leaf_priv.public_key,
+                         sig_priv.public_key,
                          cred,
                          Capabilities::create_default(),
                          Lifetime::create_default(),
@@ -240,7 +241,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto joiner = LeafIndex{ i + 1 };
     auto context = bytes{ uint8_t(i) };
     auto [init_priv, sig_priv, leaf] = new_leaf_node();
-    silence_unused(init_priv);
     sig_privs.push_back(sig_priv);
 
     // Add the new joiner
@@ -249,7 +249,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     auto leaf_secret = random_bytes(32);
     auto [new_adder_priv, path_] = pubs[i].encap(
-      adder, group_id, context, leaf_secret, sig_privs.back(), {}, {});
+      adder, group_id, context, leaf_secret, sig_privs[i], {}, {});
     auto path = path_;
     privs[i] = new_adder_priv;
     REQUIRE(pubs[i].parent_hash_valid(adder, path));

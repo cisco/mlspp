@@ -25,8 +25,9 @@ remove_leaves(std::vector<NodeIndex>& res, const std::vector<LeafIndex>& except)
 const HPKEPublicKey&
 Node::public_key() const
 {
-  static const auto get_key = [](const auto& n) -> const HPKEPublicKey& {
-    return n.public_key;
+  const auto get_key = overloaded{
+    [](const LeafNode& n) -> const HPKEPublicKey& { return n.encryption_key; },
+    [](const ParentNode& n) -> const HPKEPublicKey& { return n.public_key; },
   };
   return var::visit(get_key, node);
 }
