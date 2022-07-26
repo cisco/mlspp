@@ -23,7 +23,7 @@ const std::array<uint16_t, 8> default_proposals = {
   ProposalType::add,     ProposalType::update,
   ProposalType::remove,  ProposalType::psk,
   ProposalType::reinit,  ProposalType::external_init,
-  ProposalType::app_ack, ProposalType::group_context_extensions,
+  ProposalType::group_context_extensions,
 };
 
 const std::array<ProtocolVersion, 1> all_supported_versions = {

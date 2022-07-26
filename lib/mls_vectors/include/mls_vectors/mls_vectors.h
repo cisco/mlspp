@@ -183,7 +183,6 @@ struct MessagesTestVector
   bytes pre_shared_key_proposal;
   bytes re_init_proposal;
   bytes external_init_proposal;
-  bytes app_ack_proposal;
 
   bytes commit;
 

@@ -268,21 +268,6 @@ struct ExternalInit
   TLS_SERIALIZABLE(kem_output)
 };
 
-// AppAck
-struct MessageRange
-{
-  uint32_t sender;
-  uint32_t first_generation;
-  uint32_t last_generation;
-  TLS_SERIALIZABLE(sender, first_generation, last_generation)
-};
-
-struct AppAck
-{
-  std::vector<MessageRange> received_ranges;
-  TLS_SERIALIZABLE(received_ranges)
-};
-
 // GroupContextExtensions
 struct GroupContextExtensions
 {
@@ -302,7 +287,6 @@ struct Proposal
                PreSharedKey,
                ReInit,
                ExternalInit,
-               AppAck,
                GroupContextExtensions>
     content;
 
@@ -321,8 +305,7 @@ struct ProposalType
   static constexpr Proposal::Type psk = 4;
   static constexpr Proposal::Type reinit = 5;
   static constexpr Proposal::Type external_init = 6;
-  static constexpr Proposal::Type app_ack = 7;
-  static constexpr Proposal::Type group_context_extensions = 8;
+  static constexpr Proposal::Type group_context_extensions = 7;
 
   constexpr ProposalType()
     : val(invalid)
@@ -643,7 +626,6 @@ TLS_VARIANT_MAP(mls::ProposalType, mls::Remove, remove)
 TLS_VARIANT_MAP(mls::ProposalType, mls::PreSharedKey, psk)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ReInit, reinit)
 TLS_VARIANT_MAP(mls::ProposalType, mls::ExternalInit, external_init)
-TLS_VARIANT_MAP(mls::ProposalType, mls::AppAck, app_ack)
 TLS_VARIANT_MAP(mls::ProposalType,
                 mls::GroupContextExtensions,
                 group_context_extensions)
