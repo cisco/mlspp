@@ -39,9 +39,6 @@ GroupContext::GroupContext(CipherSuite cipher_suite_in,
 
 // GroupInfo
 
-static const auto zero_ref =
-  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 GroupInfo::GroupInfo(GroupContext group_context_in,
                      ExtensionList extensions_in,
                      bytes confirmation_tag_in)
