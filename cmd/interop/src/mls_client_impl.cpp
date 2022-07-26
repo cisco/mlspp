@@ -405,11 +405,12 @@ MLSClientImpl::create_group(const CreateGroupRequest* request,
 
   auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({}, cipher_suite, sig_priv.public_key);
+  auto cred = mls::Credential::basic({});
 
   auto leaf_node = mls::LeafNode{
     cipher_suite,
     leaf_priv.public_key,
+    sig_priv.public_key,
     cred,
     mls::Capabilities::create_default(),
     mls::Lifetime::create_default(),
@@ -434,11 +435,12 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
   auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({}, cipher_suite, sig_priv.public_key);
+  auto cred = mls::Credential::basic({});
 
   auto leaf = mls::LeafNode{
     cipher_suite,
     leaf_priv.public_key,
+    sig_priv.public_key,
     cred,
     mls::Capabilities::create_default(),
     mls::Lifetime::create_default(),
@@ -495,11 +497,12 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   auto init_priv = mls::HPKEPrivateKey::generate(suite);
   auto leaf_priv = mls::HPKEPrivateKey::generate(suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(suite);
-  auto cred = mls::Credential::basic({}, suite, sig_priv.public_key);
+  auto cred = mls::Credential::basic({});
 
   auto leaf = mls::LeafNode{
     suite,
     leaf_priv.public_key,
+    sig_priv.public_key,
     cred,
     mls::Capabilities::create_default(),
     mls::Lifetime::create_default(),
