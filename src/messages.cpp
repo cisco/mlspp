@@ -784,7 +784,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
                              { MemberSender{ sender_data.sender } },
                              authenticated_data,
                              content_type };
-  auto auth = MLSMessageAuth{ content_type, {}, {} };
+  auto auth = MLSContentAuthData{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);
 
