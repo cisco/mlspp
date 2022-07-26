@@ -252,7 +252,7 @@ EncryptionTestVector::create(CipherSuite suite,
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
   auto group_context =
-    GroupContext{ group_id, epoch, {}, tree.root_hash(), {} };
+    GroupContext{ suite, group_id, epoch, {}, tree.root_hash(), {} };
   auto proposal = Proposal{ GroupContextExtensions{} };
   auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
   auto authenticated_data = random_bytes(suite.secret_size());
@@ -397,7 +397,7 @@ KeyScheduleTestVector::create(CipherSuite suite,
   tv.cipher_suite = suite;
   tv.group_id = from_hex("00010203");
 
-  auto group_context = GroupContext{ tv.group_id, 0, {}, {}, {} };
+  auto group_context = GroupContext{ suite, tv.group_id, 0, {}, {}, {} };
   auto epoch = KeyScheduleEpoch(suite, {}, random_bytes(suite.secret_size()));
   tv.initial_init_secret = epoch.init_secret;
 
@@ -467,7 +467,7 @@ KeyScheduleTestVector::create(CipherSuite suite,
 std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
-  auto group_context = GroupContext{ group_id, 0, {}, {}, {} };
+  auto group_context = GroupContext{ cipher_suite, group_id, 0, {}, {}, {} };
   auto epoch = KeyScheduleEpoch(cipher_suite, {}, {});
 
   // Manually correct the init secret
@@ -545,7 +545,8 @@ TranscriptTestVector::create(CipherSuite suite)
   transcript.interim = interim_transcript_hash_before;
 
   auto group_context = GroupContext{
-    group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {}
+    suite, group_id, epoch, tree_hash_before, confirmed_transcript_hash_before,
+    {}
   };
   auto ctx = tls::marshal(group_context);
 
@@ -596,9 +597,12 @@ TranscriptTestVector::create(CipherSuite suite)
 std::optional<std::string>
 TranscriptTestVector::verify() const
 {
-  auto group_context_obj = GroupContext{
-    group_id, epoch, tree_hash_before, confirmed_transcript_hash_before, {}
-  };
+  auto group_context_obj = GroupContext{ cipher_suite,
+                                         group_id,
+                                         epoch,
+                                         tree_hash_before,
+                                         confirmed_transcript_hash_before,
+                                         {} };
   auto ctx = tls::marshal(group_context_obj);
   VERIFY_EQUAL("group context", ctx, group_context);
 
@@ -813,10 +817,11 @@ MessagesTestVector::create()
   auto opaque = bytes(32, 0xD3);
   auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
   auto mac = bytes(32, 0xD5);
-  auto group_context = GroupContext{ group_id, epoch, opaque, opaque, {} };
+  auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
+  auto group_context =
+    GroupContext{ suite, group_id, epoch, opaque, opaque, {} };
 
   auto version = ProtocolVersion::mls10;
-  auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
   auto hpke_priv = HPKEPrivateKey::generate(suite);
   auto hpke_pub = hpke_priv.public_key;
   auto hpke_ct = HPKECiphertext{ opaque, opaque };
@@ -852,8 +857,9 @@ MessagesTestVector::create()
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{ suite,  group_id, epoch,    opaque,
-                               opaque, ext_list, ext_list, mac };
+  auto group_info = GroupInfo{
+    { suite, group_id, epoch, opaque, opaque, ext_list }, ext_list, mac
+  };
   auto group_secrets = GroupSecrets{ opaque,
                                      { { opaque } },
                                      PreSharedKeys{ {

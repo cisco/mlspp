@@ -97,40 +97,60 @@ struct PSKWithSecret
 };
 
 // struct {
+//     ProtocolVersion version = mls10;
 //     CipherSuite cipher_suite;
 //     opaque group_id<V>;
 //     uint64 epoch;
 //     opaque tree_hash<V>;
 //     opaque confirmed_transcript_hash<V>;
-//     Extension group_context_extensions<V>;
-//     Extension other_extensions<V>;
-//     MAC confirmation_tag;
-//     LeafIndex signer;
-//     // SignWithLabel(., "GroupInfoTBS", GroupInfoTBS)
-//     opaque signature<V>;
-// } GroupInfo;
-struct GroupInfo
+//     Extension extensions<V>;
+// } GroupContext;
+struct GroupContext
 {
+  ProtocolVersion version{ ProtocolVersion::mls10 };
   CipherSuite cipher_suite;
   bytes group_id;
   epoch_t epoch;
   bytes tree_hash;
   bytes confirmed_transcript_hash;
-  ExtensionList group_context_extensions;
-  ExtensionList other_extensions;
+  ExtensionList extensions;
 
+  GroupContext() = default;
+  GroupContext(CipherSuite cipher_suite_in,
+               bytes group_id_in,
+               epoch_t epoch_in,
+               bytes tree_hash_in,
+               bytes confirmed_transcript_hash_in,
+               ExtensionList extensions_in);
+
+  TLS_SERIALIZABLE(version,
+                   cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   extensions)
+};
+
+// struct {
+//     GroupContext group_context;
+//     Extension extensions<V>;
+//     MAC confirmation_tag;
+//     uint32 signer;
+//     // SignWithLabel(., "GroupInfoTBS", GroupInfoTBS)
+//     opaque signature<V>;
+// } GroupInfo;
+struct GroupInfo
+{
+  GroupContext group_context;
+  ExtensionList extensions;
   bytes confirmation_tag;
   LeafIndex signer;
   bytes signature;
 
   GroupInfo() = default;
-  GroupInfo(CipherSuite cipher_suite_in,
-            bytes group_id_in,
-            epoch_t epoch_in,
-            bytes tree_hash_in,
-            bytes confirmed_transcript_hash_in,
-            ExtensionList group_context_extensions_in,
-            ExtensionList other_extensions_in,
+  GroupInfo(GroupContext group_context_in,
+            ExtensionList extensions_in,
             bytes confirmation_tag_in);
 
   bytes to_be_signed() const;
@@ -139,13 +159,8 @@ struct GroupInfo
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
-  TLS_SERIALIZABLE(cipher_suite,
-                   group_id,
-                   epoch,
-                   tree_hash,
-                   confirmed_transcript_hash,
-                   group_context_extensions,
-                   other_extensions,
+  TLS_SERIALIZABLE(group_context,
+                   extensions,
                    confirmation_tag,
                    signer,
                    signature)

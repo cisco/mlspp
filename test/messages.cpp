@@ -76,6 +76,7 @@ protected:
   const CipherSuite suite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
   const SignaturePrivateKey sig_priv = SignaturePrivateKey::generate(suite);
   const GroupContext context{
+    suite,
     group_id,
     epoch,
     random_bytes(suite.secret_size()),
