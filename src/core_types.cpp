@@ -20,9 +20,12 @@ const std::array<uint16_t, 2> default_extensions = {
 };
 
 const std::array<uint16_t, 8> default_proposals = {
-  ProposalType::add,     ProposalType::update,
-  ProposalType::remove,  ProposalType::psk,
-  ProposalType::reinit,  ProposalType::external_init,
+  ProposalType::add,
+  ProposalType::update,
+  ProposalType::remove,
+  ProposalType::psk,
+  ProposalType::reinit,
+  ProposalType::external_init,
   ProposalType::group_context_extensions,
 };
 
