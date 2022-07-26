@@ -506,6 +506,30 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
          exporter_secret && confirmation_key && init_secret && external_priv;
 }
 
+// struct {
+//     WireFormat wire_format;
+//     MLSContent content; // with content.content_type == commit
+//     opaque signature<V>;
+// } ConfirmedTranscriptHashInput;
+struct ConfirmedTranscriptHashInput
+{
+  WireFormat wire_format;
+  const MLSContent& content;
+  const bytes& signature;
+
+  TLS_SERIALIZABLE(wire_format, content, signature)
+};
+
+// struct {
+//     MAC confirmation_tag;
+// } InterimTranscriptHashInput;
+struct InterimTranscriptHashInput
+{
+  bytes confirmation_tag;
+
+  TLS_SERIALIZABLE(confirmation_tag)
+};
+
 TranscriptHash::TranscriptHash(CipherSuite suite_in)
   : suite(suite_in)
 {
@@ -530,7 +554,7 @@ TranscriptHash::update(const MLSAuthenticatedContent& content_auth)
 void
 TranscriptHash::update_confirmed(const MLSAuthenticatedContent& content_auth)
 {
-  const auto transcript = interim + content_auth.commit_content();
+  const auto transcript = interim + content_auth.confirmed_transcript_hash_input();
   confirmed = suite.digest().hash(transcript);
 }
 
@@ -544,7 +568,7 @@ TranscriptHash::update_interim(const bytes& confirmation_tag)
 void
 TranscriptHash::update_interim(const MLSAuthenticatedContent& content_auth)
 {
-  const auto transcript = confirmed + content_auth.commit_auth_data();
+  const auto transcript = confirmed + content_auth.interim_transcript_hash_input();
   interim = suite.digest().hash(transcript);
 }
 

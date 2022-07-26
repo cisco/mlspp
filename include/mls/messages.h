@@ -506,8 +506,8 @@ struct MLSAuthenticatedContent
               const SignaturePublicKey& sig_pub,
               const std::optional<GroupContext>& context) const;
 
-  bytes commit_content() const;
-  bytes commit_auth_data() const;
+  bytes confirmed_transcript_hash_input() const;
+  bytes interim_transcript_hash_input() const;
 
   void set_confirmation_tag(const bytes& confirmation_tag);
   bool check_confirmation_tag(const bytes& confirmation_tag) const;

@@ -388,7 +388,7 @@ MLSAuthenticatedContent::verify(CipherSuite suite,
   return sig_pub.verify(suite, tbs, auth.signature);
 }
 
-struct MLSMessageCommitContent
+struct ConfirmedTranscriptHashInput
 {
   WireFormat wire_format;
   const MLSContent& content;
@@ -397,7 +397,7 @@ struct MLSMessageCommitContent
   TLS_SERIALIZABLE(wire_format, content, signature);
 };
 
-struct MLSMessageCommitAuthData
+struct InterimTranscriptHashInput
 {
   const bytes& confirmation_tag;
 
@@ -405,9 +405,9 @@ struct MLSMessageCommitAuthData
 };
 
 bytes
-MLSAuthenticatedContent::commit_content() const
+MLSAuthenticatedContent::confirmed_transcript_hash_input() const
 {
-  return tls::marshal(MLSMessageCommitContent{
+  return tls::marshal(ConfirmedTranscriptHashInput{
     wire_format,
     content,
     auth.signature,
@@ -415,10 +415,10 @@ MLSAuthenticatedContent::commit_content() const
 }
 
 bytes
-MLSAuthenticatedContent::commit_auth_data() const
+MLSAuthenticatedContent::interim_transcript_hash_input() const
 {
   return tls::marshal(
-    MLSMessageCommitAuthData{ opt::get(auth.confirmation_tag) });
+    InterimTranscriptHashInput{ opt::get(auth.confirmation_tag) });
 }
 
 void
