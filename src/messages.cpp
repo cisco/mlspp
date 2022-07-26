@@ -309,10 +309,10 @@ operator==(const MLSContentAuthData& lhs, const MLSContentAuthData& rhs)
 }
 
 MLSContent::MLSContent(bytes group_id_in,
-                                     epoch_t epoch_in,
-                                     Sender sender_in,
-                                     bytes authenticated_data_in,
-                                     RawContent content_in)
+                       epoch_t epoch_in,
+                       Sender sender_in,
+                       bytes authenticated_data_in,
+                       RawContent content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -322,10 +322,10 @@ MLSContent::MLSContent(bytes group_id_in,
 }
 
 MLSContent::MLSContent(bytes group_id_in,
-                                     epoch_t epoch_in,
-                                     Sender sender_in,
-                                     bytes authenticated_data_in,
-                                     ContentType content_type)
+                       epoch_t epoch_in,
+                       Sender sender_in,
+                       bytes authenticated_data_in,
+                       ContentType content_type)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -357,10 +357,10 @@ MLSContent::content_type() const
 
 MLSAuthenticatedContent
 MLSAuthenticatedContent::sign(WireFormat wire_format,
-                            MLSContent content,
-                            CipherSuite suite,
-                            const SignaturePrivateKey& sig_priv,
-                            const std::optional<GroupContext>& context)
+                              MLSContent content,
+                              CipherSuite suite,
+                              const SignaturePrivateKey& sig_priv,
+                              const std::optional<GroupContext>& context)
 {
   if (wire_format == WireFormat::mls_plaintext &&
       content.content_type() == ContentType::application) {
@@ -368,16 +368,18 @@ MLSAuthenticatedContent::sign(WireFormat wire_format,
       "Application data cannot be sent as MLSPlaintext");
   }
 
-  auto content_auth = MLSAuthenticatedContent{ wire_format, std::move(content) };
+  auto content_auth =
+    MLSAuthenticatedContent{ wire_format, std::move(content) };
   auto tbs = content_auth.to_be_signed(context);
   content_auth.auth.signature = sig_priv.sign(suite, tbs);
   return content_auth;
 }
 
 bool
-MLSAuthenticatedContent::verify(CipherSuite suite,
-                              const SignaturePublicKey& sig_pub,
-                              const std::optional<GroupContext>& context) const
+MLSAuthenticatedContent::verify(
+  CipherSuite suite,
+  const SignaturePublicKey& sig_pub,
+  const std::optional<GroupContext>& context) const
 {
   if (wire_format == WireFormat::mls_plaintext &&
       content.content_type() == ContentType::application) {
@@ -450,14 +452,15 @@ operator>>(tls::istream& str, MLSAuthenticatedContent& obj)
 }
 
 bool
-operator==(const MLSAuthenticatedContent& lhs, const MLSAuthenticatedContent& rhs)
+operator==(const MLSAuthenticatedContent& lhs,
+           const MLSAuthenticatedContent& rhs)
 {
   return lhs.wire_format == rhs.wire_format && lhs.content == rhs.content &&
          lhs.auth == rhs.auth;
 }
 
 MLSAuthenticatedContent::MLSAuthenticatedContent(WireFormat wire_format_in,
-                                             MLSContent content_in)
+                                                 MLSContent content_in)
   : wire_format(wire_format_in)
   , content(std::move(content_in))
 {
@@ -465,8 +468,8 @@ MLSAuthenticatedContent::MLSAuthenticatedContent(WireFormat wire_format_in,
 }
 
 MLSAuthenticatedContent::MLSAuthenticatedContent(WireFormat wire_format_in,
-                                             MLSContent content_in,
-                                             MLSContentAuthData auth_in)
+                                                 MLSContent content_in,
+                                                 MLSContentAuthData auth_in)
   : wire_format(wire_format_in)
   , content(std::move(content_in))
   , auth(std::move(auth_in))

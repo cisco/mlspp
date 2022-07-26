@@ -200,11 +200,12 @@ protected:
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
   MLSAuthenticatedContent sign(const Sender& sender,
-                             Inner&& content,
-                             const bytes& authenticated_data,
-                             bool encrypt) const;
+                               Inner&& content,
+                               const bytes& authenticated_data,
+                               bool encrypt) const;
 
-  MLSMessage protect(MLSAuthenticatedContent&& content_auth, size_t padding_size);
+  MLSMessage protect(MLSAuthenticatedContent&& content_auth,
+                     size_t padding_size);
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);

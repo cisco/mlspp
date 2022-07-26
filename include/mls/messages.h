@@ -458,15 +458,15 @@ struct MLSContent
 
   MLSContent() = default;
   MLSContent(bytes group_id_in,
-                    epoch_t epoch_in,
-                    Sender sender_in,
-                    bytes authenticated_data_in,
-                    RawContent content_in);
+             epoch_t epoch_in,
+             Sender sender_in,
+             bytes authenticated_data_in,
+             RawContent content_in);
   MLSContent(bytes group_id_in,
-                    epoch_t epoch_in,
-                    Sender sender_in,
-                    bytes authenticated_data_in,
-                    ContentType content_type);
+             epoch_t epoch_in,
+             Sender sender_in,
+             bytes authenticated_data_in,
+             ContentType content_type);
 
   ContentType content_type() const;
 
@@ -484,9 +484,11 @@ struct MLSContentAuthData
   bytes signature;
   std::optional<bytes> confirmation_tag;
 
-  friend tls::ostream& operator<<(tls::ostream& str, const MLSContentAuthData& obj);
+  friend tls::ostream& operator<<(tls::ostream& str,
+                                  const MLSContentAuthData& obj);
   friend tls::istream& operator>>(tls::istream& str, MLSContentAuthData& obj);
-  friend bool operator==(const MLSContentAuthData& lhs, const MLSContentAuthData& rhs);
+  friend bool operator==(const MLSContentAuthData& lhs,
+                         const MLSContentAuthData& rhs);
 };
 
 struct MLSAuthenticatedContent
@@ -497,11 +499,12 @@ struct MLSAuthenticatedContent
 
   MLSAuthenticatedContent() = default;
 
-  static MLSAuthenticatedContent sign(WireFormat wire_format,
-                                    MLSContent content,
-                                    CipherSuite suite,
-                                    const SignaturePrivateKey& sig_priv,
-                                    const std::optional<GroupContext>& context);
+  static MLSAuthenticatedContent sign(
+    WireFormat wire_format,
+    MLSContent content,
+    CipherSuite suite,
+    const SignaturePrivateKey& sig_priv,
+    const std::optional<GroupContext>& context);
   bool verify(CipherSuite suite,
               const SignaturePublicKey& sig_pub,
               const std::optional<GroupContext>& context) const;
@@ -520,11 +523,10 @@ struct MLSAuthenticatedContent
                          const MLSAuthenticatedContent& rhs);
 
 private:
+  MLSAuthenticatedContent(WireFormat wire_format_in, MLSContent content_in);
   MLSAuthenticatedContent(WireFormat wire_format_in,
-                        MLSContent content_in);
-  MLSAuthenticatedContent(WireFormat wire_format_in,
-                        MLSContent content_in,
-                        MLSContentAuthData auth_in);
+                          MLSContent content_in,
+                          MLSContentAuthData auth_in);
 
   bytes to_be_signed(const std::optional<GroupContext>& context) const;
 

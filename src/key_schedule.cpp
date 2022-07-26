@@ -554,7 +554,8 @@ TranscriptHash::update(const MLSAuthenticatedContent& content_auth)
 void
 TranscriptHash::update_confirmed(const MLSAuthenticatedContent& content_auth)
 {
-  const auto transcript = interim + content_auth.confirmed_transcript_hash_input();
+  const auto transcript =
+    interim + content_auth.confirmed_transcript_hash_input();
   confirmed = suite.digest().hash(transcript);
 }
 
@@ -568,7 +569,8 @@ TranscriptHash::update_interim(const bytes& confirmation_tag)
 void
 TranscriptHash::update_interim(const MLSAuthenticatedContent& content_auth)
 {
-  const auto transcript = confirmed + content_auth.interim_transcript_hash_input();
+  const auto transcript =
+    confirmed + content_auth.interim_transcript_hash_input();
   interim = suite.digest().hash(transcript);
 }
 
