@@ -105,7 +105,7 @@ struct PSKWithSecret
 //     Extension group_context_extensions<V>;
 //     Extension other_extensions<V>;
 //     MAC confirmation_tag;
-//     LeafNodeRef signer;
+//     LeafIndex signer;
 //     // SignWithLabel(., "GroupInfoTBS", GroupInfoTBS)
 //     opaque signature<V>;
 // } GroupInfo;
@@ -120,7 +120,7 @@ struct GroupInfo
   ExtensionList other_extensions;
 
   bytes confirmation_tag;
-  LeafNodeRef signer;
+  LeafIndex signer;
   bytes signature;
 
   GroupInfo() = default;
@@ -135,7 +135,7 @@ struct GroupInfo
 
   bytes to_be_signed() const;
   void sign(const TreeKEMPublicKey& tree,
-            LeafNodeRef signer_ref,
+            LeafIndex signer_index,
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
@@ -239,7 +239,7 @@ struct Update
 // Remove
 struct Remove
 {
-  LeafNodeRef removed;
+  LeafIndex removed;
   TLS_SERIALIZABLE(removed)
 };
 
@@ -420,20 +420,26 @@ enum struct SenderType : uint8_t
   new_member = 3,
 };
 
+struct MemberSender
+{
+  LeafIndex sender;
+  TLS_SERIALIZABLE(sender);
+};
+
 struct PreconfiguredKeyID
 {
   bytes id;
   TLS_SERIALIZABLE(id)
 };
 
-struct NewMemberID
+struct NewMemberSender
 {
   TLS_SERIALIZABLE()
 };
 
 struct Sender
 {
-  var::variant<LeafNodeRef, PreconfiguredKeyID, NewMemberID> sender;
+  var::variant<MemberSender, PreconfiguredKeyID, NewMemberSender> sender;
 
   SenderType sender_type() const;
 
@@ -648,9 +654,9 @@ TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
 TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
 
-TLS_VARIANT_MAP(mls::SenderType, mls::KeyPackageRef, member)
+TLS_VARIANT_MAP(mls::SenderType, mls::MemberSender, member)
 TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
-TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberID, new_member)
+TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberSender, new_member)
 
 TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext)
 TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext)

@@ -59,7 +59,6 @@ public:
   bytes add(const bytes& key_package_data);
   bytes update();
   bytes remove(uint32_t index);
-  bytes remove(const LeafNodeRef& ref);
   std::tuple<bytes, bytes> commit(const bytes& proposal);
   std::tuple<bytes, bytes> commit(const std::vector<bytes>& proposals);
   std::tuple<bytes, bytes> commit();
@@ -69,7 +68,6 @@ public:
 
   // Information about the current state
   epoch_t epoch() const;
-  LeafNodeRef ref() const;
   LeafIndex index() const;
   CipherSuite cipher_suite() const;
   const ExtensionList& extensions() const;

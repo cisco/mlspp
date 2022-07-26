@@ -204,16 +204,6 @@ CipherSuite::reference_label<KeyPackage>()
   return label;
 }
 
-// MakeLeafNodeRef(value) = KDF.expand(
-//   KDF.extract("", value), "MLS 1.0 Leaf Node Reference", 16)
-template<>
-const bytes&
-CipherSuite::reference_label<LeafNode>()
-{
-  static const auto label = from_ascii("MLS 1.0 Leaf Node Reference");
-  return label;
-}
-
 // MakeProposalRef(value) = KDF.expand(
 //   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
 //

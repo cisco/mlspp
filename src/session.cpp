@@ -274,14 +274,6 @@ Session::remove(uint32_t index)
   return tls::marshal(proposal);
 }
 
-bytes
-Session::remove(const LeafNodeRef& ref)
-{
-  auto proposal =
-    inner->history.front().remove(ref, { inner->encrypt_handshake, {}, 0 });
-  return tls::marshal(proposal);
-}
-
 std::tuple<bytes, bytes>
 Session::commit(const bytes& proposal)
 {
@@ -344,12 +336,6 @@ epoch_t
 Session::epoch() const
 {
   return inner->history.front().epoch();
-}
-
-LeafNodeRef
-Session::ref() const
-{
-  return inner->history.front().ref();
 }
 
 LeafIndex

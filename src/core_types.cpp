@@ -177,12 +177,6 @@ LeafNode::source() const
   return tls::variant<LeafNodeSource>::type(content);
 }
 
-LeafNodeRef
-LeafNode::ref(CipherSuite cipher_suite) const
-{
-  return cipher_suite.ref(*this);
-}
-
 void
 LeafNode::sign(CipherSuite cipher_suite,
                const SignaturePrivateKey& sig_priv,

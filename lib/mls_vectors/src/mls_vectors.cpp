@@ -265,8 +265,7 @@ EncryptionTestVector::create(CipherSuite suite,
     tv.leaves[i].application.resize(n_generations);
 
     auto N = LeafIndex{ i };
-    auto sender_ref = opt::get(tree.leaf_node(LeafIndex{ i })).ref(suite);
-    auto sender = Sender{ sender_ref };
+    auto sender = Sender{ MemberSender{ N } };
 
     auto hs_content =
       MLSContent{ group_id, epoch, sender, authenticated_data, proposal };
@@ -554,11 +553,11 @@ TranscriptTestVector::create(CipherSuite suite)
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto credential =
     Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
-  auto leaf_node_ref = LeafNodeRef{};
-  leaf_node_ref.fill(0xa0);
+  auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content =
-    MLSContent{ group_id, epoch, { leaf_node_ref }, {}, Commit{} };
+  auto commit_content = MLSContent{
+    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
+  };
   auto commit_content_auth =
     MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
                                   std::move(commit_content),
@@ -838,8 +837,7 @@ MessagesTestVector::create()
   auto leaf_node_commit =
     leaf_node.for_commit(suite, opaque, hpke_pub, opaque, {}, sig_priv);
 
-  auto leaf_node_ref = leaf_node.ref(suite);
-  auto sender = Sender{ leaf_node_ref };
+  auto sender = Sender{ MemberSender{ index } };
 
   auto key_id_ext = ExternalKeyIDExtension{ opaque };
 
@@ -866,7 +864,7 @@ MessagesTestVector::create()
   // Proposals
   auto add = Add{ key_package };
   auto update = Update{ leaf_node_update };
-  auto remove = Remove{ leaf_node_ref };
+  auto remove = Remove{ index };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };
