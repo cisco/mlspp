@@ -780,10 +780,10 @@ MLSCiphertext::unprotect(CipherSuite suite,
 
   // Parse the content
   auto content = MLSContent{ group_id,
-                                    epoch,
-                                    { MemberSender{ sender_data.sender } },
-                                    authenticated_data,
-                                    content_type };
+                             epoch,
+                             { MemberSender{ sender_data.sender } },
+                             authenticated_data,
+                             content_type };
   auto auth = MLSMessageAuth{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);
