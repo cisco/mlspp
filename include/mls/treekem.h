@@ -139,10 +139,9 @@ struct TreeKEMPublicKey
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
 
+  bool has_leaf(LeafIndex index) const;
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
-  std::optional<LeafIndex> find(const LeafNodeRef& ref) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
-  std::optional<LeafNode> leaf_node(const LeafNodeRef& ref) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
   std::tuple<TreeKEMPrivateKey, UpdatePath> encap(

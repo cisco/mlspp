@@ -6,9 +6,6 @@ namespace mls {
 /// Constructors
 ///
 
-static const auto zero_ref =
-  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 State::State(bytes group_id,
              CipherSuite suite,
              const HPKEPrivateKey& init_priv,
@@ -22,7 +19,6 @@ State::State(bytes group_id,
   , _transcript_hash(suite)
   , _extensions(std::move(extensions))
   , _index(0)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   // Verify that the client supports the proposed group extensions
@@ -30,7 +26,6 @@ State::State(bytes group_id,
     throw InvalidParameterError("Client doesn't support required extensions");
   }
 
-  _ref = leaf_node.ref(_suite);
   _index = _tree.add_leaf(leaf_node);
   _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, _index, init_priv);
@@ -91,7 +86,6 @@ State::State(SignaturePrivateKey sig_priv,
   , _extensions(group_info.group_context_extensions)
   , _key_schedule(group_info.cipher_suite)
   , _index(0)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   // The following are not set:
@@ -113,7 +107,6 @@ State::State(const HPKEPrivateKey& init_priv,
   , _epoch(0)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
-  , _ref(zero_ref)
   , _identity_priv(std::move(sig_priv))
 {
   auto maybe_kpi = welcome.find(kp);
@@ -154,17 +147,15 @@ State::State(const HPKEPrivateKey& init_priv,
 
   _extensions = group_info.group_context_extensions;
 
-  // Construct TreeKEM private key from partrs provided
+  // Construct TreeKEM private key from parts provided
   auto maybe_index = _tree.find(kp.leaf_node);
   if (!maybe_index) {
     throw InvalidParameterError("New joiner not in tree");
   }
 
   _index = opt::get(maybe_index);
-  _ref = kp.leaf_node.ref(_suite);
 
-  auto signer_index = opt::get(_tree.find(group_info.signer));
-  auto ancestor = tree_math::ancestor(_index, signer_index);
+  auto ancestor = tree_math::ancestor(_index, group_info.signer);
   auto path_secret = std::optional<bytes>{};
   if (secrets.path_secret) {
     path_secret = opt::get(secrets.path_secret).secret;
@@ -220,8 +211,10 @@ template<typename Inner>
 MLSMessage
 State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 {
-  auto content_auth = sign(
-    { _ref }, inner_content, msg_opts.authenticated_data, msg_opts.encrypt);
+  auto content_auth = sign({ MemberSender{ _index } },
+                           inner_content,
+                           msg_opts.authenticated_data,
+                           msg_opts.encrypt);
   return protect(std::move(content_auth), msg_opts.padding_size);
 }
 
@@ -324,14 +317,19 @@ State::add_proposal(const KeyPackage& key_package) const
 Proposal
 State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
 {
+  if (_cached_update) {
+    return { opt::get(_cached_update).proposal };
+  }
+
   auto leaf = opt::get(_tree.leaf_node(_index));
 
   auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   auto new_leaf =
     leaf.for_update(_suite, _group_id, public_key, opts, _identity_priv);
 
-  _update_secrets[new_leaf.ref(_suite)] = leaf_secret;
-  return { Update{ new_leaf } };
+  auto update = Update{ new_leaf };
+  _cached_update = CachedUpdate{ leaf_secret, update };
+  return { update };
 }
 
 Proposal
@@ -341,9 +339,9 @@ State::remove_proposal(RosterIndex index) const
 }
 
 Proposal
-State::remove_proposal(LeafNodeRef removed) const
+State::remove_proposal(LeafIndex removed) const
 {
-  if (!_tree.find(removed)) {
+  if (!_tree.has_leaf(removed)) {
     throw InvalidParameterError("Remove on blank leaf");
   }
 
@@ -381,7 +379,7 @@ State::remove(RosterIndex index, const MessageOpts& msg_opts)
 }
 
 MLSMessage
-State::remove(LeafNodeRef removed, const MessageOpts& msg_opts)
+State::remove(LeafIndex removed, const MessageOpts& msg_opts)
 {
   return protect_full(remove_proposal(removed), msg_opts);
 }
@@ -457,7 +455,7 @@ State::commit(const bytes& leaf_secret,
   auto [has_updates, has_removes, joiner_locations] = next.apply(proposals);
 
   // If this is an external commit, see where the new joiner ended up
-  auto sender = Sender{ _ref };
+  auto sender = Sender{ MemberSender{ _index } };
   if (external_commit) {
     const auto& kp = opt::get(joiner_key_package);
     const auto it = std::find(joiners.begin(), joiners.end(), kp);
@@ -467,8 +465,7 @@ State::commit(const bytes& leaf_secret,
 
     const auto pos = it - joiners.begin();
     next._index = joiner_locations[pos];
-    next._ref = kp.leaf_node.ref(next._suite);
-    sender = Sender{ NewMemberID{} };
+    sender = Sender{ NewMemberSender{} };
   }
 
   // KEM new entropy to the group and the new joiners
@@ -500,7 +497,6 @@ State::commit(const bytes& leaf_secret,
                                              joiner_locations,
                                              leaf_node_opts);
     next._tree_priv = new_priv;
-    next._ref = path.leaf_node.ref(_suite);
     commit.path = path;
     commit_secret = new_priv.update_secret;
 
@@ -546,7 +542,7 @@ State::commit(const bytes& leaf_secret,
   if (opts && opt::get(opts).inline_tree) {
     group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
   }
-  group_info.sign(next._tree, next._ref, next._identity_priv);
+  group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome = Welcome{
     _suite, next._key_schedule.joiner_secret, { /* no PSKs */ }, group_info
@@ -631,10 +627,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 
   auto sender = std::optional<LeafIndex>();
   if (content.sender.sender_type() == SenderType::member) {
-    const auto& sender_ref = var::get<LeafNodeRef>(content.sender.sender);
-    // This optional is guaranteed to be present because we just did this same
-    // lookup for signature verification.
-    sender = opt::get(_tree.find(sender_ref));
+    sender = var::get<MemberSender>(content.sender.sender).sender;
   }
 
   if (sender == _index) {
@@ -821,14 +814,12 @@ State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
 LeafIndex
 State::apply(const Remove& remove)
 {
-  auto maybe_removed = _tree.find(remove.removed);
-  if (!maybe_removed) {
+  if (!_tree.has_leaf(remove.removed)) {
     throw ProtocolError("Attempt to remove non-member");
   }
 
-  auto removed = opt::get(maybe_removed);
-  _tree.blank_path(removed);
-  return removed;
+  _tree.blank_path(remove.removed);
+  return remove.removed;
 }
 
 void
@@ -867,7 +858,7 @@ State::cache_proposal(MLSMessageContentAuth content_auth)
   auto sender_location = std::optional<LeafIndex>();
   if (content_auth.content.sender.sender_type() == SenderType::member) {
     const auto& sender = content_auth.content.sender.sender;
-    sender_location = _tree.find(var::get<LeafNodeRef>(sender));
+    sender_location = var::get<MemberSender>(sender).sender;
   }
 
   _pending_proposals.push_back({
@@ -941,12 +932,16 @@ State::apply(const std::vector<CachedProposal>& proposals,
           break;
         }
 
-        const auto ref = update.leaf_node.ref(_suite);
-        if (_update_secrets.count(ref) == 0) {
+        if (!_cached_update) {
           throw ProtocolError("Self-update with no cached secret");
         }
 
-        apply(target, update, _update_secrets[cached.ref]);
+        const auto& cached_update = opt::get(_cached_update);
+        if (update != cached_update.proposal) {
+          throw ProtocolError("Self-update does not match cached data");
+        }
+
+        apply(target, update, cached_update.update_secret);
         locations.push_back(target);
         break;
       }
@@ -1075,9 +1070,9 @@ State::update_epoch_secrets(const bytes& commit_secret,
 bool
 State::verify_internal(const MLSMessageContentAuth& content_auth) const
 {
-  const auto& sender_ref =
-    var::get<LeafNodeRef>(content_auth.content.sender.sender);
-  auto maybe_leaf = _tree.leaf_node(sender_ref);
+  const auto& sender =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
+  auto maybe_leaf = _tree.leaf_node(sender);
   if (!maybe_leaf) {
     throw InvalidParameterError("Signature from blank node");
   }
@@ -1157,7 +1152,7 @@ State::group_info() const
   group_info.other_extensions.add(
     ExternalPubExtension{ _key_schedule.external_priv.public_key });
   group_info.other_extensions.add(RatchetTreeExtension{ _tree });
-  group_info.sign(_tree, _ref, _identity_priv);
+  group_info.sign(_tree, _index, _identity_priv);
   return group_info;
 }
 
@@ -1186,7 +1181,7 @@ State::authentication_secret() const
   return _key_schedule.authentication_secret;
 }
 
-LeafNodeRef
+LeafIndex
 State::leaf_for_roster_entry(RosterIndex index) const
 {
   auto non_blank_leaves = uint32_t(0);
@@ -1197,12 +1192,12 @@ State::leaf_for_roster_entry(RosterIndex index) const
       continue;
     }
     if (non_blank_leaves == index.val) {
-      return opt::get(maybe_leaf).ref(_suite);
+      return i;
     }
     non_blank_leaves += 1;
   }
 
-  throw InvalidParameterError("Leaf Index mismatch");
+  throw InvalidParameterError("Invalid roster index");
 }
 
 State

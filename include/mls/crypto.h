@@ -35,11 +35,9 @@ struct KeyAndNonce
 
 // opaque HashReference[16];
 // HashReference KeyPackageRef;
-// HashReference LeafNodeRef;
 // HashReference ProposalRef;
 using HashReference = std::array<uint8_t, 16>;
 using KeyPackageRef = HashReference;
-using LeafNodeRef = HashReference;
 using ProposalRef = HashReference;
 
 struct CipherSuite

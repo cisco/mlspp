@@ -47,19 +47,20 @@ public:
     };
 
     tree.add_leaf(leaf_node);
-    leaf_node_ref = leaf_node.ref(suite);
+
     keys = GroupKeySource{ suite,
                            LeafCount{ 1 },
                            random_bytes(suite.secret_size()) };
 
     application_content = MLSMessageContent{
-      group_id, epoch, { leaf_node_ref }, authenticated_data, application_data,
+      group_id,         epoch, { MemberSender{ index } }, authenticated_data,
+      application_data,
     };
 
     proposal_content = MLSMessageContent{
       group_id,
       epoch,
-      { leaf_node_ref },
+      { MemberSender{ index } },
       authenticated_data,
       Proposal{ GroupContextExtensions{} },
     };
@@ -87,7 +88,6 @@ protected:
   const LeafIndex index{ 0 };
   const size_t padding_size = 1024;
 
-  LeafNodeRef leaf_node_ref{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   TreeKEMPublicKey tree{ suite };
   GroupKeySource keys;
 

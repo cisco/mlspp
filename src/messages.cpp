@@ -22,9 +22,6 @@ SFrameCapabilities::compatible(const SFrameParameters& params) const
 
 // GroupInfo
 
-static const auto zero_ref =
-  LeafNodeRef{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
                      bytes group_id_in,
                      epoch_t epoch_in,
@@ -41,7 +38,7 @@ GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
   , group_context_extensions(std::move(group_context_extensions_in))
   , other_extensions(std::move(other_extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
-  , signer(zero_ref)
+  , signer(0)
 {
 }
 
@@ -56,7 +53,7 @@ struct GroupInfoTBS
   const ExtensionList& other_extensions;
 
   const bytes& confirmation_tag;
-  const LeafNodeRef& signer;
+  LeafIndex signer;
 
   TLS_SERIALIZABLE(cipher_suite,
                    group_id,
@@ -85,10 +82,10 @@ GroupInfo::to_be_signed() const
 
 void
 GroupInfo::sign(const TreeKEMPublicKey& tree,
-                LeafNodeRef signer_ref,
+                LeafIndex signer_index,
                 const SignaturePrivateKey& priv)
 {
-  auto maybe_leaf = tree.leaf_node(signer_ref);
+  auto maybe_leaf = tree.leaf_node(signer_index);
   if (!maybe_leaf) {
     throw InvalidParameterError("Cannot sign from a blank leaf");
   }
@@ -98,7 +95,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
     throw InvalidParameterError("Bad key for index");
   }
 
-  signer = signer_ref;
+  signer = signer_index;
   signature = priv.sign(tree.suite, to_be_signed());
 }
 
@@ -658,7 +655,7 @@ struct MLSCiphertextContentAAD
 
 struct MLSSenderData
 {
-  LeafNodeRef sender{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  LeafIndex sender{ 0 };
   uint32_t generation{ 0 };
   ReuseGuard reuse_guard{ 0, 0, 0, 0 };
 
@@ -700,8 +697,10 @@ MLSCiphertext::protect(MLSMessageContentAuth content_auth,
     content_keys.key, content_keys.nonce, content_aad, content_pt);
 
   // Encrypt the sender data
+  auto sender_index =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
   auto sender_data_pt = tls::marshal(MLSSenderData{
-    var::get<LeafNodeRef>(content_auth.content.sender.sender),
+    sender_index,
     generation,
     reuse_guard,
   });
@@ -750,17 +749,16 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  auto maybe_sender = tree.find(sender_data.sender);
-  if (!maybe_sender) {
+  if (!tree.has_leaf(sender_data.sender)) {
     return std::nullopt;
   }
 
-  auto sender = opt::get(maybe_sender);
-
   // Decrypt the content
-  auto content_keys = keys.get(
-    content_type, sender, sender_data.generation, sender_data.reuse_guard);
-  keys.erase(content_type, sender, sender_data.generation);
+  auto content_keys = keys.get(content_type,
+                               sender_data.sender,
+                               sender_data.generation,
+                               sender_data.reuse_guard);
+  keys.erase(content_type, sender_data.sender, sender_data.generation);
 
   auto content_aad = tls::marshal(MLSCiphertextContentAAD{
     group_id,
@@ -776,9 +774,11 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   // Parse the content
-  auto content = MLSMessageContent{
-    group_id, epoch, { sender_data.sender }, authenticated_data, content_type
-  };
+  auto content = MLSMessageContent{ group_id,
+                                    epoch,
+                                    { MemberSender{ sender_data.sender } },
+                                    authenticated_data,
+                                    content_type };
   auto auth = MLSMessageAuth{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);

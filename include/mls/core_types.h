@@ -205,7 +205,6 @@ struct LeafNode
 
   LeafNodeSource source() const;
 
-  LeafNodeRef ref(CipherSuite suite) const;
   void sign(CipherSuite cipher_suite,
             const SignaturePrivateKey& sig_priv,
             const std::optional<bytes>& group_id);
