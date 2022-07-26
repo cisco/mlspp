@@ -98,7 +98,7 @@ struct tls_serializer
 TLS_SERIALIZER(mls::HPKEPublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
 TLS_SERIALIZER(mls::Credential)
-TLS_SERIALIZER(mls::MLSMessageContentAuth)
+TLS_SERIALIZER(mls::MLSAuthenticatedContent)
 TLS_SERIALIZER(mls::MLSPlaintext)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)

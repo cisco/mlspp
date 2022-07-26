@@ -131,7 +131,7 @@ struct TranscriptTestVector
 
   bytes confirmation_key;
   mls::Credential credential;
-  mls::MLSMessageContentAuth commit;
+  mls::MLSAuthenticatedContent commit;
 
   bytes group_context;
   bytes confirmed_transcript_hash_after;

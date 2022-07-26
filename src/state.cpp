@@ -226,27 +226,27 @@ State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 }
 
 template<typename Inner>
-MLSMessageContentAuth
+MLSAuthenticatedContent
 State::sign(const Sender& sender,
             Inner&& inner_content,
             const bytes& authenticated_data,
             bool encrypt) const
 {
-  auto content = MLSMessageContent{
+  auto content = MLSContent{
     _group_id, _epoch, sender, authenticated_data, { inner_content }
   };
 
   auto wire_format =
     (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
 
-  auto content_auth = MLSMessageContentAuth::sign(
+  auto content_auth = MLSAuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
 
   return content_auth;
 }
 
 MLSMessage
-State::protect(MLSMessageContentAuth&& content_auth, size_t padding_size)
+State::protect(MLSAuthenticatedContent&& content_auth, size_t padding_size)
 {
   switch (content_auth.wire_format) {
     case WireFormat::mls_plaintext:
@@ -264,15 +264,15 @@ State::protect(MLSMessageContentAuth&& content_auth, size_t padding_size)
                                     padding_size);
 
     default:
-      throw InvalidParameterError("Malformed MLSMessageContentAuth");
+      throw InvalidParameterError("Malformed MLSAuthenticatedContent");
   }
 }
 
-MLSMessageContentAuth
+MLSAuthenticatedContent
 State::unprotect_to_content_auth(const MLSMessage& msg)
 {
   const auto unprotect = overloaded{
-    [&](const MLSPlaintext& pt) -> MLSMessageContentAuth {
+    [&](const MLSPlaintext& pt) -> MLSAuthenticatedContent {
       auto maybe_content_auth =
         pt.unprotect(_suite, _key_schedule.membership_key, group_context());
       if (!maybe_content_auth) {
@@ -281,7 +281,7 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
       return opt::get(maybe_content_auth);
     },
 
-    [&](const MLSCiphertext& ct) -> MLSMessageContentAuth {
+    [&](const MLSCiphertext& ct) -> MLSAuthenticatedContent {
       auto maybe_content_auth =
         ct.unprotect(_suite, _tree, _keys, _key_schedule.sender_data_secret);
       if (!maybe_content_auth) {
@@ -290,7 +290,7 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
       return opt::get(maybe_content_auth);
     },
 
-    [](const auto& /* unused */) -> MLSMessageContentAuth {
+    [](const auto& /* unused */) -> MLSAuthenticatedContent {
       throw ProtocolError("Invalid wire format");
     },
   };
@@ -591,7 +591,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-  // Validate the MLSMessageContent
+  // Validate the MLSContent
   const auto& content = content_auth.content;
   if (content.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
@@ -862,7 +862,7 @@ State::extensions_supported(const ExtensionList& exts) const
 }
 
 void
-State::cache_proposal(MLSMessageContentAuth content_auth)
+State::cache_proposal(MLSAuthenticatedContent content_auth)
 {
   auto sender_location = std::optional<LeafIndex>();
   if (content_auth.content.sender.sender_type() == SenderType::member) {
@@ -1073,7 +1073,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
 /// Message encryption and decryption
 ///
 bool
-State::verify_internal(const MLSMessageContentAuth& content_auth) const
+State::verify_internal(const MLSAuthenticatedContent& content_auth) const
 {
   const auto& sender_ref =
     var::get<LeafNodeRef>(content_auth.content.sender.sender);
@@ -1087,7 +1087,7 @@ State::verify_internal(const MLSMessageContentAuth& content_auth) const
 }
 
 bool
-State::verify_new_member(const MLSMessageContentAuth& content_auth) const
+State::verify_new_member(const MLSAuthenticatedContent& content_auth) const
 {
   const auto& pub = var::visit(
     overloaded{
@@ -1117,7 +1117,7 @@ State::verify_new_member(const MLSMessageContentAuth& content_auth) const
 }
 
 bool
-State::verify(const MLSMessageContentAuth& content_auth) const
+State::verify(const MLSAuthenticatedContent& content_auth) const
 {
   switch (content_auth.content.sender.sender_type()) {
     case SenderType::member:

@@ -521,14 +521,14 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in,
 }
 
 void
-TranscriptHash::update(const MLSMessageContentAuth& content_auth)
+TranscriptHash::update(const MLSAuthenticatedContent& content_auth)
 {
   update_confirmed(content_auth);
   update_interim(content_auth);
 }
 
 void
-TranscriptHash::update_confirmed(const MLSMessageContentAuth& content_auth)
+TranscriptHash::update_confirmed(const MLSAuthenticatedContent& content_auth)
 {
   const auto transcript = interim + content_auth.commit_content();
   confirmed = suite.digest().hash(transcript);
@@ -542,7 +542,7 @@ TranscriptHash::update_interim(const bytes& confirmation_tag)
 }
 
 void
-TranscriptHash::update_interim(const MLSMessageContentAuth& content_auth)
+TranscriptHash::update_interim(const MLSAuthenticatedContent& content_auth)
 {
   const auto transcript = confirmed + content_auth.commit_auth_data();
   interim = suite.digest().hash(transcript);

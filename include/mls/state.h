@@ -199,17 +199,17 @@ protected:
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
-  MLSMessageContentAuth sign(const Sender& sender,
+  MLSAuthenticatedContent sign(const Sender& sender,
                              Inner&& content,
                              const bytes& authenticated_data,
                              bool encrypt) const;
 
-  MLSMessage protect(MLSMessageContentAuth&& content_auth, size_t padding_size);
+  MLSMessage protect(MLSAuthenticatedContent&& content_auth, size_t padding_size);
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
 
-  MLSMessageContentAuth unprotect_to_content_auth(const MLSMessage& msg);
+  MLSAuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   void check_add_leaf_node(const LeafNode& leaf,
@@ -232,7 +232,7 @@ protected:
   bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract a proposal from the cache
-  void cache_proposal(MLSMessageContentAuth content_auth);
+  void cache_proposal(MLSAuthenticatedContent content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
     std::optional<LeafIndex> sender_index) const;
@@ -250,9 +250,9 @@ protected:
                             const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
-  bool verify_internal(const MLSMessageContentAuth& content_auth) const;
-  bool verify_new_member(const MLSMessageContentAuth& content_auth) const;
-  bool verify(const MLSMessageContentAuth& content_auth) const;
+  bool verify_internal(const MLSAuthenticatedContent& content_auth) const;
+  bool verify_new_member(const MLSAuthenticatedContent& content_auth) const;
+  bool verify(const MLSAuthenticatedContent& content_auth) const;
 
   // Convert a Roster entry into LeafNodeRef
   LeafNodeRef leaf_for_roster_entry(RosterIndex index) const;
