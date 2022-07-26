@@ -626,7 +626,8 @@ marshal_ciphertext_content(const MLSMessageContent& content,
 {
   auto w = tls::ostream{};
   var::visit([&w](const auto& val) { w << val; }, content.content);
-  w << auth << bytes(padding_size, 0);
+  w << auth;
+  w.write_raw(bytes(padding_size, 0));
   return w.bytes();
 }
 
@@ -637,12 +638,13 @@ unmarshal_ciphertext_content(const bytes& content_pt,
 {
   auto r = tls::istream(content_pt);
 
-  auto padding = bytes{};
   var::visit([&r](auto& val) { r >> val; }, content.content);
-  r >> auth >> padding;
+  r >> auth;
 
-  if (!r.empty()) {
-    throw ProtocolError("Malformed MLSCiphertextContent");
+  auto padding = r.bytes();
+  auto nonzero = [](const auto& x) { return x != 0; };
+  if (std::any_of(padding.begin(), padding.end(), nonzero)) {
+    throw ProtocolError("Malformed MLSCiphertextContent padding");
   }
 }
 

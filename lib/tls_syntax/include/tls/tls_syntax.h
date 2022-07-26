@@ -73,6 +73,13 @@ public:
   size_t size() const { return _buffer.size(); }
   bool empty() const { return _buffer.empty(); }
 
+  std::vector<uint8_t> bytes()
+  {
+    auto bytes = _buffer;
+    std::reverse(bytes.begin(), bytes.end());
+    return bytes;
+  }
+
 private:
   istream() {}
   std::vector<uint8_t> _buffer;
