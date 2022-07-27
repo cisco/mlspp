@@ -20,23 +20,30 @@ SFrameCapabilities::compatible(const SFrameParameters& params) const
   return std::find(begin, end, params.cipher_suite) != end;
 }
 
-// GroupInfo
+// GroupContext
 
-GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
-                     bytes group_id_in,
-                     epoch_t epoch_in,
-                     bytes tree_hash_in,
-                     bytes confirmed_transcript_hash_in,
-                     ExtensionList group_context_extensions_in,
-                     ExtensionList other_extensions_in,
-                     bytes confirmation_tag_in)
+GroupContext::GroupContext(CipherSuite cipher_suite_in,
+                           bytes group_id_in,
+                           epoch_t epoch_in,
+                           bytes tree_hash_in,
+                           bytes confirmed_transcript_hash_in,
+                           ExtensionList extensions_in)
   : cipher_suite(cipher_suite_in)
   , group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , tree_hash(std::move(tree_hash_in))
   , confirmed_transcript_hash(std::move(confirmed_transcript_hash_in))
-  , group_context_extensions(std::move(group_context_extensions_in))
-  , other_extensions(std::move(other_extensions_in))
+  , extensions(std::move(extensions_in))
+{
+}
+
+// GroupInfo
+
+GroupInfo::GroupInfo(GroupContext group_context_in,
+                     ExtensionList extensions_in,
+                     bytes confirmation_tag_in)
+  : group_context(std::move(group_context_in))
+  , extensions(std::move(extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
   , signer(0)
 {
@@ -44,40 +51,19 @@ GroupInfo::GroupInfo(CipherSuite cipher_suite_in,
 
 struct GroupInfoTBS
 {
-  CipherSuite cipher_suite;
-  const bytes& group_id;
-  epoch_t epoch{ 0 };
-  const bytes& tree_hash;
-  const bytes& confirmed_transcript_hash;
-  const ExtensionList& group_context_extensions;
-  const ExtensionList& other_extensions;
-
-  const bytes& confirmation_tag;
+  GroupContext group_context;
+  ExtensionList extensions;
+  bytes confirmation_tag;
   LeafIndex signer;
 
-  TLS_SERIALIZABLE(cipher_suite,
-                   group_id,
-                   epoch,
-                   tree_hash,
-                   confirmed_transcript_hash,
-                   group_context_extensions,
-                   other_extensions,
-                   confirmation_tag,
-                   signer)
+  TLS_SERIALIZABLE(group_context, extensions, confirmation_tag, signer)
 };
 
 bytes
 GroupInfo::to_be_signed() const
 {
-  return tls::marshal(GroupInfoTBS{ cipher_suite,
-                                    group_id,
-                                    epoch,
-                                    tree_hash,
-                                    confirmed_transcript_hash,
-                                    group_context_extensions,
-                                    other_extensions,
-                                    confirmation_tag,
-                                    signer });
+  return tls::marshal(
+    GroupInfoTBS{ group_context, extensions, confirmation_tag, signer });
 }
 
 void

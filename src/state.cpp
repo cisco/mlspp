@@ -76,15 +76,17 @@ State::import_tree(const bytes& tree_hash,
 State::State(SignaturePrivateKey sig_priv,
              const GroupInfo& group_info,
              const std::optional<TreeKEMPublicKey>& tree)
-  : _suite(group_info.cipher_suite)
-  , _group_id(group_info.group_id)
-  , _epoch(group_info.epoch)
-  , _tree(import_tree(group_info.tree_hash, tree, group_info.other_extensions))
-  , _transcript_hash(group_info.cipher_suite,
-                     group_info.confirmed_transcript_hash,
+  : _suite(group_info.group_context.cipher_suite)
+  , _group_id(group_info.group_context.group_id)
+  , _epoch(group_info.group_context.epoch)
+  , _tree(import_tree(group_info.group_context.tree_hash,
+                      tree,
+                      group_info.extensions))
+  , _transcript_hash(_suite,
+                     group_info.group_context.confirmed_transcript_hash,
                      group_info.confirmation_tag)
-  , _extensions(group_info.group_context_extensions)
-  , _key_schedule(group_info.cipher_suite)
+  , _extensions(group_info.group_context.extensions)
+  , _key_schedule(_suite)
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
@@ -129,9 +131,13 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, { /* no PSKs */ });
+  if (group_info.group_context.cipher_suite != _suite) {
+    throw InvalidParameterError("GroupInfo and Welcome ciphersuites disagree");
+  }
 
   // Import the tree from the argument or from the extension
-  _tree = import_tree(group_info.tree_hash, tree, group_info.other_extensions);
+  _tree = import_tree(
+    group_info.group_context.tree_hash, tree, group_info.extensions);
 
   // Verify the signature on the GroupInfo
   if (!group_info.verify(_tree)) {
@@ -139,13 +145,14 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   // Ingest the GroupSecrets and GroupInfo
-  _epoch = group_info.epoch;
-  _group_id = group_info.group_id;
+  _epoch = group_info.group_context.epoch;
+  _group_id = group_info.group_context.group_id;
 
-  _transcript_hash.confirmed = group_info.confirmed_transcript_hash;
+  _transcript_hash.confirmed =
+    group_info.group_context.confirmed_transcript_hash;
   _transcript_hash.update_interim(group_info.confirmation_tag);
 
-  _extensions = group_info.group_context_extensions;
+  _extensions = group_info.group_context.extensions;
 
   // Construct TreeKEM private key from parts provided
   auto maybe_index = _tree.find(kp.leaf_node);
@@ -189,7 +196,7 @@ State::external_join(const bytes& leaf_secret,
   auto initial_state = State(std::move(sig_priv), group_info, tree);
 
   const auto maybe_external_pub =
-    group_info.other_extensions.find<ExternalPubExtension>();
+    group_info.extensions.find<ExternalPubExtension>();
   if (!maybe_external_pub) {
     throw InvalidParameterError("No external pub in GroupInfo");
   }
@@ -477,6 +484,7 @@ State::commit(const bytes& leaf_secret,
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
     auto ctx = tls::marshal(GroupContext{
+      next._suite,
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
@@ -530,17 +538,19 @@ State::commit(const bytes& leaf_secret,
 
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
-    next._suite,
-    next._group_id,
-    next._epoch,
-    next._tree.root_hash(),
-    next._transcript_hash.confirmed,
-    next._extensions,
+    {
+      next._suite,
+      next._group_id,
+      next._epoch,
+      next._tree.root_hash(),
+      next._transcript_hash.confirmed,
+      next._extensions,
+    },
     { /* No other extensions */ },
     { confirmation_tag },
   };
   if (opts && opt::get(opts).inline_tree) {
-    group_info.other_extensions.add(RatchetTreeExtension{ next._tree });
+    group_info.extensions.add(RatchetTreeExtension{ next._tree });
   }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
@@ -562,7 +572,11 @@ GroupContext
 State::group_context() const
 {
   return GroupContext{
-    _group_id,   _epoch, _tree.root_hash(), _transcript_hash.confirmed,
+    _suite,
+    _group_id,
+    _epoch,
+    _tree.root_hash(),
+    _transcript_hash.confirmed,
     _extensions,
   };
 }
@@ -712,6 +726,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
       sender_location, path.leaf_node, LeafNodeSource::commit);
 
     auto ctx = tls::marshal(GroupContext{
+      next._suite,
       next._group_id,
       next._epoch + 1,
       next._tree.root_hash(),
@@ -1052,6 +1067,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
                             const std::optional<bytes>& force_init_secret)
 {
   auto ctx = tls::marshal(GroupContext{
+    _suite,
     _group_id,
     _epoch,
     _tree.root_hash(),
@@ -1137,19 +1153,21 @@ GroupInfo
 State::group_info() const
 {
   auto group_info = GroupInfo{
-    _suite,
-    _group_id,
-    _epoch,
-    _tree.root_hash(),
-    _transcript_hash.confirmed,
-    _extensions,
+    {
+      _suite,
+      _group_id,
+      _epoch,
+      _tree.root_hash(),
+      _transcript_hash.confirmed,
+      _extensions,
+    },
     { /* No other extensions */ },
     _key_schedule.confirmation_tag(_transcript_hash.confirmed),
   };
 
-  group_info.other_extensions.add(
+  group_info.extensions.add(
     ExternalPubExtension{ _key_schedule.external_priv.public_key });
-  group_info.other_extensions.add(RatchetTreeExtension{ _tree });
+  group_info.extensions.add(RatchetTreeExtension{ _tree });
   group_info.sign(_tree, _index, _identity_priv);
   return group_info;
 }
