@@ -415,7 +415,8 @@ enum struct SenderType : uint8_t
   invalid = 0,
   member = 1,
   preconfigured = 2,
-  new_member = 3,
+  new_member_proposal = 3,
+  new_member_commit = 4,
 };
 
 struct MemberSender
@@ -430,14 +431,23 @@ struct PreconfiguredKeyID
   TLS_SERIALIZABLE(id)
 };
 
-struct NewMemberSender
+struct NewMemberProposalSender
+{
+  TLS_SERIALIZABLE()
+};
+
+struct NewMemberCommitSender
 {
   TLS_SERIALIZABLE()
 };
 
 struct Sender
 {
-  var::variant<MemberSender, PreconfiguredKeyID, NewMemberSender> sender;
+  var::variant<MemberSender,
+               PreconfiguredKeyID,
+               NewMemberProposalSender,
+               NewMemberCommitSender>
+    sender;
 
   SenderType sender_type() const;
 
@@ -653,7 +663,10 @@ TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
 
 TLS_VARIANT_MAP(mls::SenderType, mls::MemberSender, member)
 TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
-TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberSender, new_member)
+TLS_VARIANT_MAP(mls::SenderType,
+                mls::NewMemberProposalSender,
+                new_member_proposal)
+TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberCommitSender, new_member_commit)
 
 TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext)
 TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext)

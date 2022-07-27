@@ -234,7 +234,10 @@ protected:
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSAuthenticatedContent& content_auth) const;
-  bool verify_new_member(const MLSAuthenticatedContent& content_auth) const;
+  bool verify_new_member_proposal(
+    const MLSAuthenticatedContent& content_auth) const;
+  bool verify_new_member_commit(
+    const MLSAuthenticatedContent& content_auth) const;
   bool verify(const MLSAuthenticatedContent& content_auth) const;
 
   // Convert a Roster entry into LeafIndex

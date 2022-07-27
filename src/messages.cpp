@@ -472,12 +472,16 @@ operator<<(tls::ostream& str, const MLSContentTBS& obj)
 
   switch (obj.content.sender.sender_type()) {
     case SenderType::member:
-    case SenderType::new_member:
+    case SenderType::new_member_commit:
       str << opt::get(obj.context);
       break;
 
-    default:
+    case SenderType::preconfigured:
+    case SenderType::new_member_proposal:
       break;
+
+    default:
+      throw InvalidParameterError("Invalid sender type");
   }
 
   return str;
@@ -579,8 +583,9 @@ operator<<(tls::ostream& str, const MLSPlaintext& obj)
     case SenderType::member:
       return str << obj.content << obj.auth << opt::get(obj.membership_tag);
 
-    case SenderType::new_member:
     case SenderType::preconfigured:
+    case SenderType::new_member_proposal:
+    case SenderType::new_member_commit:
       return str << obj.content << obj.auth;
 
     default:
