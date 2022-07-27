@@ -43,6 +43,11 @@ const std::array<CipherSuite::ID, 6> all_supported_ciphersuites = {
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
 };
 
+const std::array<CredentialType, 2> all_supported_credentials = {
+  CredentialType::basic,
+  CredentialType::x509,
+};
+
 Capabilities
 Capabilities::create_default()
 {
@@ -51,6 +56,7 @@ Capabilities::create_default()
     { all_supported_ciphersuites.begin(), all_supported_ciphersuites.end() },
     { /* No non-default extensions */ },
     { /* No non-default proposals */ },
+    { all_supported_credentials.begin(), all_supported_credentials.end() },
   };
 }
 
@@ -93,6 +99,13 @@ Capabilities::proposals_supported(
       return std::find(proposals.begin(), proposals.end(), type) !=
              proposals.end();
     });
+}
+
+bool
+Capabilities::credential_supported(const Credential& credential) const
+{
+  const auto cred_type = credential.type();
+  return std::count(credentials.begin(), credentials.end(), cred_type) > 0;
 }
 
 Lifetime

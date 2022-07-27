@@ -97,6 +97,7 @@ enum struct LeafNodeSource : uint8_t
 //     CipherSuite ciphersuites<V>;
 //     ExtensionType extensions<V>;
 //     ProposalType proposals<V>;
+//     CredentialType credentials<V>;
 // } Capabilities;
 struct Capabilities
 {
@@ -104,12 +105,14 @@ struct Capabilities
   std::vector<CipherSuite::ID> cipher_suites;
   std::vector<Extension::Type> extensions;
   std::vector<uint16_t> proposals;
+  std::vector<CredentialType> credentials;
 
   static Capabilities create_default();
   bool extensions_supported(const std::vector<Extension::Type>& required) const;
   bool proposals_supported(const std::vector<uint16_t>& required) const;
+  bool credential_supported(const Credential& credential) const;
 
-  TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals)
+  TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals, credentials)
 };
 
 // struct {

@@ -775,7 +775,8 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 }
 
 // A LeafNode in an Add KeyPackage must not have the same leaf_node.public_key
-// or signature_key as any KeyPackage for a current member.
+// or signature_key as any KeyPackage for a current member.  The joiner must
+// support all credential types in use by other members, and vice versa.
 void
 State::check_add_leaf_node(const LeafNode& leaf,
                            std::optional<LeafIndex> except) const
@@ -795,6 +796,14 @@ State::check_add_leaf_node(const LeafNode& leaf,
     const auto sig_key_eq = tree_leaf.signature_key == leaf.signature_key;
     if (hpke_key_eq || sig_key_eq) {
       throw ProtocolError("Duplicate parameters in new KeyPackage");
+    }
+
+    if (!leaf.capabilities.credential_supported(tree_leaf.credential)) {
+      throw ProtocolError("Member credential not supported by joiner");
+    }
+
+    if (!tree_leaf.capabilities.credential_supported(leaf.credential)) {
+      throw ProtocolError("Joiner credential not supported by group member");
     }
   }
 }
