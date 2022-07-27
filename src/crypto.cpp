@@ -311,6 +311,9 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
+
+// This function produces a non-literal type, so it can't be constexpr.
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define SIGN_LABEL(label) from_ascii("MLS 1.0 " label)
 
 namespace sign_label {
@@ -318,7 +321,7 @@ const bytes mls_content = SIGN_LABEL("MLSContentTBS");
 const bytes leaf_node = SIGN_LABEL("LeafNodeTBS");
 const bytes key_package = SIGN_LABEL("KeyPackageTBS");
 const bytes group_info = SIGN_LABEL("GroupInfoTBS");
-}
+} // namespace sign_label
 
 struct SignContent
 {

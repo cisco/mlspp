@@ -169,7 +169,7 @@ extern const bytes mls_content;
 extern const bytes leaf_node;
 extern const bytes key_package;
 extern const bytes group_info;
-}
+} // namespace sign_label
 
 struct SignaturePublicKey
 {
