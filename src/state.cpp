@@ -211,6 +211,25 @@ State::external_join(const bytes& leaf_secret,
   return { commit_msg, state };
 }
 
+MLSMessage
+State::new_member_add(const bytes& group_id,
+                      epoch_t epoch,
+                      const KeyPackage& new_member,
+                      const SignaturePrivateKey& sig_priv)
+{
+  const auto suite = new_member.cipher_suite;
+  auto proposal = Proposal{ Add{ new_member } };
+  auto content = MLSContent{ group_id,
+                             epoch,
+                             { NewMemberProposalSender{} },
+                             { /* no authenticated data */ },
+                             { std::move(proposal) } };
+  auto content_auth = MLSAuthenticatedContent::sign(
+    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+
+  return MLSPlaintext::protect(std::move(content_auth), suite, {}, {});
+}
+
 ///
 /// Proposal and commit factories
 ///

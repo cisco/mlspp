@@ -65,6 +65,12 @@ public:
     const std::optional<TreeKEMPublicKey>& tree,
     const MessageOpts& msg_opts);
 
+  // Propose that a new member be added a group
+  static MLSMessage new_member_add(const bytes& group_id,
+                                   epoch_t epoch,
+                                   const KeyPackage& new_member,
+                                   const SignaturePrivateKey& sig_priv);
+
   ///
   /// Message factories
   ///
