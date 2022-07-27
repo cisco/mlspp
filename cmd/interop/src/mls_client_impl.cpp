@@ -492,7 +492,7 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 {
   const auto group_info_data = string_to_bytes(request->public_group_state());
   const auto group_info = tls::get<mls::GroupInfo>(group_info_data);
-  const auto suite = group_info.cipher_suite;
+  const auto suite = group_info.group_context.cipher_suite;
 
   auto init_priv = mls::HPKEPrivateKey::generate(suite);
   auto leaf_priv = mls::HPKEPrivateKey::generate(suite);
