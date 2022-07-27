@@ -1,7 +1,5 @@
 #include <mls/treekem.h>
 
-#include <iostream>
-
 namespace mls {
 
 // Utility method used for removing leaves from a resolution
@@ -203,7 +201,7 @@ TreeKEMPrivateKey::shared_path_secret(LeafIndex to) const
   return std::make_tuple(n, i->second, true);
 }
 
-#if 1
+#if 0
 // XXX(RLB) This should ultimately be deleted, but it is handy for interop
 // debugging, so I'm keeping it around for now.  If re-enabled, you'll also need
 // to add the appropriate declarations to treekem.h and include <iostream>

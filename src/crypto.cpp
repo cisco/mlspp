@@ -3,7 +3,6 @@
 #include <mls/log.h>
 #include <mls/messages.h>
 
-#include <iostream>
 #include <string>
 
 using hpke::AEAD;      // NOLINT(misc-unused-using-decls)
