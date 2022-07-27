@@ -85,6 +85,12 @@ X509Credential::public_key() const
   return _public_key;
 }
 
+bool
+X509Credential::valid_for(const SignaturePublicKey& pub) const
+{
+  return pub == public_key();
+}
+
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj)
 {
@@ -125,29 +131,11 @@ Credential::type() const
   return tls::variant<CredentialType>::type(_cred);
 }
 
-SignaturePublicKey
-Credential::public_key() const
-{
-  const auto get_public_key = overloaded{
-    [](const BasicCredential& cred) { return cred.public_key; },
-    [](const X509Credential& cred) { return cred.public_key(); },
-  };
-  return var::visit(get_public_key, _cred);
-}
-
-bool
-Credential::valid_for(const SignaturePrivateKey& priv) const
-{
-  return priv.public_key == public_key();
-}
-
 Credential
-Credential::basic(const bytes& identity,
-                  CipherSuite suite,
-                  const SignaturePublicKey& public_key)
+Credential::basic(const bytes& identity)
 {
   Credential cred;
-  cred._cred = BasicCredential{ identity, suite, public_key };
+  cred._cred = BasicCredential{ identity };
   return cred;
 }
 
@@ -157,6 +145,18 @@ Credential::x509(const std::vector<bytes>& der_chain)
   Credential cred;
   cred._cred = X509Credential{ der_chain };
   return cred;
+}
+
+bool
+Credential::valid_for(const SignaturePublicKey& pub) const
+{
+  const auto pub_key_match = overloaded{
+    [&](const X509Credential& x509) { return x509.valid_for(pub); },
+
+    [](const BasicCredential& /* basic */) { return true; },
+  };
+
+  return var::visit(pub_key_match, _cred);
 }
 
 } // namespace mls
