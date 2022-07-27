@@ -1099,7 +1099,8 @@ State::verify_internal(const MLSAuthenticatedContent& content_auth) const
 bool
 State::verify_external(const MLSAuthenticatedContent& content_auth) const
 {
-  const auto& ext_sender = var::get<ExternalSenderIndex>(content_auth.content.sender.sender);
+  const auto& ext_sender =
+    var::get<ExternalSenderIndex>(content_auth.content.sender.sender);
   const auto senders_ext = _extensions.find<ExternalSendersExtension>();
   const auto& senders = opt::get(senders_ext).senders;
   const auto& pub = senders.at(ext_sender.sender_index).signature_key;

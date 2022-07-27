@@ -13,10 +13,13 @@ const Extension::Type RequiredCapabilitiesExtension::type =
   ExtensionType::required_capabilities;
 const Extension::Type ExternalKeyIDExtension::type =
   ExtensionType::external_key_id;
+const Extension::Type ExternalSendersExtension::type =
+  ExtensionType::external_senders;
 
-const std::array<uint16_t, 2> default_extensions = {
+const std::array<uint16_t, 3> default_extensions = {
   RequiredCapabilitiesExtension::type,
   ExternalKeyIDExtension::type,
+  ExternalSendersExtension::type,
 };
 
 const std::array<uint16_t, 8> default_proposals = {

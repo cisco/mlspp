@@ -26,14 +26,16 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
-struct ExternalSender {
+struct ExternalSender
+{
   SignaturePublicKey signature_key;
   Credential credential;
 
   TLS_SERIALIZABLE(signature_key, credential);
 };
 
-struct ExternalSendersExtension {
+struct ExternalSendersExtension
+{
   std::vector<ExternalSender> senders;
 
   static const uint16_t type;
@@ -649,6 +651,14 @@ struct MLSMessage
   TLS_SERIALIZABLE(version, message)
   TLS_TRAITS(tls::pass, tls::variant<WireFormat>)
 };
+
+MLSMessage
+external_proposal(CipherSuite suite,
+                  const bytes& group_id,
+                  epoch_t epoch,
+                  const Proposal& proposal,
+                  uint32_t signer_index,
+                  const SignaturePrivateKey& sig_priv);
 
 } // namespace mls
 

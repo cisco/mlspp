@@ -145,6 +145,46 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   verify_group_functionality(group);
 }
 
+TEST_CASE_FIXTURE(StateTest, "Two Person with External Proposal")
+{
+  // Initialize the creator's state, with two trusted external parties
+  auto external_priv_0 = SignaturePrivateKey::generate(suite);
+  auto external_priv_1 = SignaturePrivateKey::generate(suite);
+
+  auto ext_list = ExtensionList{};
+  ext_list.add(ExternalSendersExtension{ {
+    { external_priv_0.public_key, Credential::basic({ 0 }) },
+    { external_priv_1.public_key, Credential::basic({ 1 }) },
+  } });
+
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       ext_list };
+
+  // Have the first external signer generate an add proposal
+  auto add_proposal = Proposal{ Add{ key_packages[1] } };
+  auto add =
+    external_proposal(suite, group_id, 0, add_proposal, 1, external_priv_1);
+
+  // Handle the Add proposal and create a Commit
+  first0.handle(add);
+  auto opts = CommitOpts{ {}, true, false, {} };
+  auto [commit, welcome, first1_] = first0.commit(fresh_secret(), opts, {});
+  silence_unused(commit);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
+                        key_packages[1], welcome,       std::nullopt };
+  REQUIRE(first1 == second0);
+
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
+}
+
 TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
 {
   // Initialize the creator's state
@@ -209,7 +249,8 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   // Initialize the second participant from the Welcome, pass in the
   // tree externally
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,
+  // readability-else-after-return)
   CHECK_THROWS_AS(State(init_privs[1],
                         leaf_privs[1],
                         identity_privs[1],
@@ -220,7 +261,8 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   auto incorrect_tree = TreeKEMPublicKey(suite);
   incorrect_tree.add_leaf(key_packages[1].leaf_node);
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,
+  // readability-else-after-return)
   CHECK_THROWS_AS(State(init_privs[1],
                         leaf_privs[1],
                         identity_privs[1],
@@ -361,27 +403,31 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   kp_yes_2.leaf_node.sign(suite, id_yes_2, std::nullopt);
   kp_yes_2.sign(id_yes_2);
 
-  // Creating a group with a first member that doesn't support the required
-  // capabilities should fail.
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+  // Creating a group with a first member that doesn't support the
+  // required capabilities should fail.
+  // NOLINTNEXTLINE(llvm-else-after-return,
+  // readability-else-after-return)
   REQUIRE_THROWS(State{
     group_id, suite, leaf_no, id_no, kp_no.leaf_node, group_extensions });
 
-  // State should refuse to create an Add for a new member that doesn't support
-  // the required capabilities for the group.
+  // State should refuse to create an Add for a new member that doesn't
+  // support the required capabilities for the group.
   auto state = State{ group_id,         suite,           leaf_yes, id_yes,
                       kp_yes.leaf_node, group_extensions };
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,
+  // readability-else-after-return)
   REQUIRE_THROWS(state.add_proposal(kp_no));
 
   // When State receives an add proposal for a new member that doesn't
-  // support the required capabilities for the group, it should reject it.
+  // support the required capabilities for the group, it should reject
+  // it.
   //
-  // TODO(RLB) We do not test this check right now, since it requires either (a)
-  // configuring State to generate an invalid Add, or (b) synthesizing one.
+  // TODO(RLB) We do not test this check right now, since it requires
+  // either (a) configuring State to generate an invalid Add, or (b)
+  // synthesizing one.
 
-  // When a client is added who does support the required extensions, it should
-  // work.
+  // When a client is added who does support the required extensions, it
+  // should work.
   state.handle(state.add(kp_yes_2, msg_opts));
 }
 
