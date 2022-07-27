@@ -211,6 +211,25 @@ State::external_join(const bytes& leaf_secret,
   return { commit_msg, state };
 }
 
+MLSMessage
+State::new_member_add(const bytes& group_id,
+                      epoch_t epoch,
+                      const KeyPackage& new_member,
+                      const SignaturePrivateKey& sig_priv)
+{
+  const auto suite = new_member.cipher_suite;
+  auto proposal = Proposal{ Add{ new_member } };
+  auto content = MLSContent{ group_id,
+                             epoch,
+                             { NewMemberProposalSender{} },
+                             { /* no authenticated data */ },
+                             { std::move(proposal) } };
+  auto content_auth = MLSAuthenticatedContent::sign(
+    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+
+  return MLSPlaintext::protect(std::move(content_auth), suite, {}, {});
+}
+
 ///
 /// Proposal and commit factories
 ///
@@ -472,7 +491,7 @@ State::commit(const bytes& leaf_secret,
 
     const auto pos = it - joiners.begin();
     next._index = joiner_locations[pos];
-    sender = Sender{ NewMemberSender{} };
+    sender = Sender{ NewMemberCommitSender{} };
   }
 
   // KEM new entropy to the group and the new joiners
@@ -632,11 +651,11 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 
   switch (content.sender.sender_type()) {
     case SenderType::member:
-    case SenderType::new_member:
+    case SenderType::new_member_commit:
       break;
 
     default:
-      throw ProtocolError("Commit must be either member or new_member");
+      throw ProtocolError("Invalid commit sender type");
   }
 
   auto sender = std::optional<LeafIndex>();
@@ -676,7 +695,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     sender_location = opt::get(sender);
   }
 
-  if (content.sender.sender_type() == SenderType::new_member) {
+  if (content.sender.sender_type() == SenderType::new_member_commit) {
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
     if (!kem_output) {
@@ -1097,31 +1116,22 @@ State::verify_internal(const MLSAuthenticatedContent& content_auth) const
 }
 
 bool
-State::verify_new_member(const MLSAuthenticatedContent& content_auth) const
+State::verify_new_member_proposal(
+  const MLSAuthenticatedContent& content_auth) const
 {
-  const auto& pub = var::visit(
-    overloaded{
-      [](const Commit& commit) {
-        if (!commit.path) {
-          throw ProtocolError("External Commit does not have a path");
-        }
+  const auto& proposal = var::get<Proposal>(content_auth.content.content);
+  const auto& add = var::get<Add>(proposal.content);
+  const auto& pub = add.key_package.leaf_node.signature_key;
+  return content_auth.verify(_suite, pub, group_context());
+}
 
-        // Verify with public key from update path leaf key package
-        return opt::get(commit.path).leaf_node.signature_key;
-      },
-      [](const Proposal& proposal) {
-        if (proposal.proposal_type() != ProposalType::add) {
-          throw ProtocolError("New member proposal is not an Add");
-        }
-
-        const auto& add = var::get<Add>(proposal.content);
-        return add.key_package.leaf_node.signature_key;
-      },
-      [](const ApplicationData& /*unused*/) -> SignaturePublicKey {
-        throw ProtocolError("New member message of unknown type");
-      },
-    },
-    content_auth.content.content);
+bool
+State::verify_new_member_commit(
+  const MLSAuthenticatedContent& content_auth) const
+{
+  const auto& commit = var::get<Commit>(content_auth.content.content);
+  const auto& path = opt::get(commit.path);
+  const auto& pub = path.leaf_node.signature_key;
   return content_auth.verify(_suite, pub, group_context());
 }
 
@@ -1132,8 +1142,11 @@ State::verify(const MLSAuthenticatedContent& content_auth) const
     case SenderType::member:
       return verify_internal(content_auth);
 
-    case SenderType::new_member:
-      return verify_new_member(content_auth);
+    case SenderType::new_member_proposal:
+      return verify_new_member_proposal(content_auth);
+
+    case SenderType::new_member_commit:
+      return verify_new_member_commit(content_auth);
 
     default:
       // TODO(RLB) Support other sender types
