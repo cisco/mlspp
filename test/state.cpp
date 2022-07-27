@@ -145,6 +145,34 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   verify_group_functionality(group);
 }
 
+TEST_CASE_FIXTURE(StateTest, "Two Person with New Member Add")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Have the new member create an Add proposal
+  auto add =
+    State::new_member_add(group_id, 0, key_packages[1], identity_privs[1]);
+  first0.handle(add);
+  auto opts = CommitOpts{ {}, true, false, {} };
+  auto [commit, welcome, first1_] = first0.commit(fresh_secret(), opts, {});
+  silence_unused(commit);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
+                        key_packages[1], welcome,       std::nullopt };
+  REQUIRE(first1 == second0);
+
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
+}
+
 TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
 {
   // Initialize the creator's state
