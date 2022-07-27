@@ -7,10 +7,13 @@ namespace mls {
 
 // Extensions
 
-const uint16_t ExternalPubExtension::type = ExtensionType::external_pub;
-const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
-const uint16_t SFrameParameters::type = ExtensionType::sframe_parameters;
-const uint16_t SFrameCapabilities::type = ExtensionType::sframe_parameters;
+const Extension::Type ExternalPubExtension::type = ExtensionType::external_pub;
+const Extension::Type RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+const Extension::Type ExternalSendersExtension::type =
+  ExtensionType::external_senders;
+const Extension::Type SFrameParameters::type = ExtensionType::sframe_parameters;
+const Extension::Type SFrameCapabilities::type =
+  ExtensionType::sframe_parameters;
 
 bool
 SFrameCapabilities::compatible(const SFrameParameters& params) const
