@@ -264,7 +264,7 @@ Sender::sender_type() const
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const MLSMessageAuth& obj)
+operator<<(tls::ostream& str, const MLSContentAuthData& obj)
 {
   switch (obj.content_type) {
     case ContentType::proposal:
@@ -280,7 +280,7 @@ operator<<(tls::ostream& str, const MLSMessageAuth& obj)
 }
 
 tls::istream&
-operator>>(tls::istream& str, MLSMessageAuth& obj)
+operator>>(tls::istream& str, MLSContentAuthData& obj)
 {
   switch (obj.content_type) {
     case ContentType::proposal:
@@ -297,18 +297,18 @@ operator>>(tls::istream& str, MLSMessageAuth& obj)
 }
 
 bool
-operator==(const MLSMessageAuth& lhs, const MLSMessageAuth& rhs)
+operator==(const MLSContentAuthData& lhs, const MLSContentAuthData& rhs)
 {
   return lhs.content_type == rhs.content_type &&
          lhs.signature == rhs.signature &&
          lhs.confirmation_tag == rhs.confirmation_tag;
 }
 
-MLSMessageContent::MLSMessageContent(bytes group_id_in,
-                                     epoch_t epoch_in,
-                                     Sender sender_in,
-                                     bytes authenticated_data_in,
-                                     RawContent content_in)
+MLSContent::MLSContent(bytes group_id_in,
+                       epoch_t epoch_in,
+                       Sender sender_in,
+                       bytes authenticated_data_in,
+                       RawContent content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -317,11 +317,11 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
 {
 }
 
-MLSMessageContent::MLSMessageContent(bytes group_id_in,
-                                     epoch_t epoch_in,
-                                     Sender sender_in,
-                                     bytes authenticated_data_in,
-                                     ContentType content_type)
+MLSContent::MLSContent(bytes group_id_in,
+                       epoch_t epoch_in,
+                       Sender sender_in,
+                       bytes authenticated_data_in,
+                       ContentType content_type)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
   , sender(std::move(sender_in))
@@ -346,17 +346,17 @@ MLSMessageContent::MLSMessageContent(bytes group_id_in,
 }
 
 ContentType
-MLSMessageContent::content_type() const
+MLSContent::content_type() const
 {
   return tls::variant<ContentType>::type(content);
 }
 
-MLSMessageContentAuth
-MLSMessageContentAuth::sign(WireFormat wire_format,
-                            MLSMessageContent content,
-                            CipherSuite suite,
-                            const SignaturePrivateKey& sig_priv,
-                            const std::optional<GroupContext>& context)
+MLSAuthenticatedContent
+MLSAuthenticatedContent::sign(WireFormat wire_format,
+                              MLSContent content,
+                              CipherSuite suite,
+                              const SignaturePrivateKey& sig_priv,
+                              const std::optional<GroupContext>& context)
 {
   if (wire_format == WireFormat::mls_plaintext &&
       content.content_type() == ContentType::application) {
@@ -364,16 +364,18 @@ MLSMessageContentAuth::sign(WireFormat wire_format,
       "Application data cannot be sent as MLSPlaintext");
   }
 
-  auto content_auth = MLSMessageContentAuth{ wire_format, std::move(content) };
+  auto content_auth =
+    MLSAuthenticatedContent{ wire_format, std::move(content) };
   auto tbs = content_auth.to_be_signed(context);
   content_auth.auth.signature = sig_priv.sign(suite, tbs);
   return content_auth;
 }
 
 bool
-MLSMessageContentAuth::verify(CipherSuite suite,
-                              const SignaturePublicKey& sig_pub,
-                              const std::optional<GroupContext>& context) const
+MLSAuthenticatedContent::verify(
+  CipherSuite suite,
+  const SignaturePublicKey& sig_pub,
+  const std::optional<GroupContext>& context) const
 {
   if (wire_format == WireFormat::mls_plaintext &&
       content.content_type() == ContentType::application) {
@@ -384,16 +386,16 @@ MLSMessageContentAuth::verify(CipherSuite suite,
   return sig_pub.verify(suite, tbs, auth.signature);
 }
 
-struct MLSMessageCommitContent
+struct ConfirmedTranscriptHashInput
 {
   WireFormat wire_format;
-  const MLSMessageContent& content;
+  const MLSContent& content;
   const bytes& signature;
 
   TLS_SERIALIZABLE(wire_format, content, signature);
 };
 
-struct MLSMessageCommitAuthData
+struct InterimTranscriptHashInput
 {
   const bytes& confirmation_tag;
 
@@ -401,9 +403,9 @@ struct MLSMessageCommitAuthData
 };
 
 bytes
-MLSMessageContentAuth::commit_content() const
+MLSAuthenticatedContent::confirmed_transcript_hash_input() const
 {
-  return tls::marshal(MLSMessageCommitContent{
+  return tls::marshal(ConfirmedTranscriptHashInput{
     wire_format,
     content,
     auth.signature,
@@ -411,33 +413,33 @@ MLSMessageContentAuth::commit_content() const
 }
 
 bytes
-MLSMessageContentAuth::commit_auth_data() const
+MLSAuthenticatedContent::interim_transcript_hash_input() const
 {
   return tls::marshal(
-    MLSMessageCommitAuthData{ opt::get(auth.confirmation_tag) });
+    InterimTranscriptHashInput{ opt::get(auth.confirmation_tag) });
 }
 
 void
-MLSMessageContentAuth::set_confirmation_tag(const bytes& confirmation_tag)
+MLSAuthenticatedContent::set_confirmation_tag(const bytes& confirmation_tag)
 {
   auth.confirmation_tag = confirmation_tag;
 }
 
 bool
-MLSMessageContentAuth::check_confirmation_tag(
+MLSAuthenticatedContent::check_confirmation_tag(
   const bytes& confirmation_tag) const
 {
   return confirmation_tag == opt::get(auth.confirmation_tag);
 }
 
 tls::ostream&
-operator<<(tls::ostream& str, const MLSMessageContentAuth& obj)
+operator<<(tls::ostream& str, const MLSAuthenticatedContent& obj)
 {
   return str << obj.wire_format << obj.content << obj.auth;
 }
 
 tls::istream&
-operator>>(tls::istream& str, MLSMessageContentAuth& obj)
+operator>>(tls::istream& str, MLSAuthenticatedContent& obj)
 {
   str >> obj.wire_format >> obj.content;
 
@@ -446,38 +448,39 @@ operator>>(tls::istream& str, MLSMessageContentAuth& obj)
 }
 
 bool
-operator==(const MLSMessageContentAuth& lhs, const MLSMessageContentAuth& rhs)
+operator==(const MLSAuthenticatedContent& lhs,
+           const MLSAuthenticatedContent& rhs)
 {
   return lhs.wire_format == rhs.wire_format && lhs.content == rhs.content &&
          lhs.auth == rhs.auth;
 }
 
-MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
-                                             MLSMessageContent content_in)
+MLSAuthenticatedContent::MLSAuthenticatedContent(WireFormat wire_format_in,
+                                                 MLSContent content_in)
   : wire_format(wire_format_in)
   , content(std::move(content_in))
 {
   auth.content_type = content.content_type();
 }
 
-MLSMessageContentAuth::MLSMessageContentAuth(WireFormat wire_format_in,
-                                             MLSMessageContent content_in,
-                                             MLSMessageAuth auth_in)
+MLSAuthenticatedContent::MLSAuthenticatedContent(WireFormat wire_format_in,
+                                                 MLSContent content_in,
+                                                 MLSContentAuthData auth_in)
   : wire_format(wire_format_in)
   , content(std::move(content_in))
   , auth(std::move(auth_in))
 {
 }
 
-struct MLSMessageContentTBS
+struct MLSContentTBS
 {
   WireFormat wire_format = WireFormat::reserved;
-  const MLSMessageContent& content;
+  const MLSContent& content;
   const std::optional<GroupContext>& context;
 };
 
 static tls::ostream&
-operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
+operator<<(tls::ostream& str, const MLSContentTBS& obj)
 {
   str << ProtocolVersion::mls10 << obj.wire_format << obj.content;
 
@@ -495,10 +498,10 @@ operator<<(tls::ostream& str, const MLSMessageContentTBS& obj)
 }
 
 bytes
-MLSMessageContentAuth::to_be_signed(
+MLSAuthenticatedContent::to_be_signed(
   const std::optional<GroupContext>& context) const
 {
-  return tls::marshal(MLSMessageContentTBS{
+  return tls::marshal(MLSContentTBS{
     wire_format,
     content,
     context,
@@ -506,7 +509,7 @@ MLSMessageContentAuth::to_be_signed(
 }
 
 MLSPlaintext
-MLSPlaintext::protect(MLSMessageContentAuth content_auth,
+MLSPlaintext::protect(MLSAuthenticatedContent content_auth,
                       CipherSuite suite,
                       const std::optional<bytes>& membership_key,
                       const std::optional<GroupContext>& context)
@@ -527,7 +530,7 @@ MLSPlaintext::protect(MLSMessageContentAuth content_auth,
   return pt;
 }
 
-std::optional<MLSMessageContentAuth>
+std::optional<MLSAuthenticatedContent>
 MLSPlaintext::unprotect(CipherSuite suite,
                         const std::optional<bytes>& membership_key,
                         const std::optional<GroupContext>& context) const
@@ -546,14 +549,14 @@ MLSPlaintext::unprotect(CipherSuite suite,
       break;
   }
 
-  return MLSMessageContentAuth{
+  return MLSAuthenticatedContent{
     WireFormat::mls_plaintext,
     content,
     auth,
   };
 }
 
-MLSPlaintext::MLSPlaintext(MLSMessageContentAuth content_auth)
+MLSPlaintext::MLSPlaintext(MLSAuthenticatedContent content_auth)
   : content(std::move(content_auth.content))
   , auth(std::move(content_auth.auth))
 {
@@ -562,10 +565,10 @@ MLSPlaintext::MLSPlaintext(MLSMessageContentAuth content_auth)
   }
 }
 
-struct MLSMessageContentTBM
+struct MLSContentTBM
 {
-  MLSMessageContentTBS content_tbs;
-  MLSMessageAuth auth;
+  MLSContentTBS content_tbs;
+  MLSContentAuthData auth;
 
   TLS_SERIALIZABLE(content_tbs, auth);
 };
@@ -575,7 +578,7 @@ MLSPlaintext::membership_mac(CipherSuite suite,
                              const bytes& membership_key,
                              const std::optional<GroupContext>& context) const
 {
-  auto tbm = tls::marshal(MLSMessageContentTBM{
+  auto tbm = tls::marshal(MLSContentTBM{
     { WireFormat::mls_plaintext, content, context },
     auth,
   });
@@ -616,8 +619,8 @@ operator>>(tls::istream& str, MLSPlaintext& obj)
 }
 
 static bytes
-marshal_ciphertext_content(const MLSMessageContent& content,
-                           const MLSMessageAuth& auth,
+marshal_ciphertext_content(const MLSContent& content,
+                           const MLSContentAuthData& auth,
                            size_t padding_size)
 {
   auto w = tls::ostream{};
@@ -629,8 +632,8 @@ marshal_ciphertext_content(const MLSMessageContent& content,
 
 static void
 unmarshal_ciphertext_content(const bytes& content_pt,
-                             MLSMessageContent& content,
-                             MLSMessageAuth& auth)
+                             MLSContent& content,
+                             MLSContentAuthData& auth)
 {
   auto r = tls::istream(content_pt);
 
@@ -673,7 +676,7 @@ struct MLSSenderDataAAD
 };
 
 MLSCiphertext
-MLSCiphertext::protect(MLSMessageContentAuth content_auth,
+MLSCiphertext::protect(MLSAuthenticatedContent content_auth,
                        CipherSuite suite,
                        const LeafIndex& index,
                        GroupKeySource& keys,
@@ -726,7 +729,7 @@ MLSCiphertext::protect(MLSMessageContentAuth content_auth,
   };
 }
 
-std::optional<MLSMessageContentAuth>
+std::optional<MLSAuthenticatedContent>
 MLSCiphertext::unprotect(CipherSuite suite,
                          const TreeKEMPublicKey& tree,
                          GroupKeySource& keys,
@@ -775,23 +778,23 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   // Parse the content
-  auto content = MLSMessageContent{ group_id,
-                                    epoch,
-                                    { MemberSender{ sender_data.sender } },
-                                    authenticated_data,
-                                    content_type };
-  auto auth = MLSMessageAuth{ content_type, {}, {} };
+  auto content = MLSContent{ group_id,
+                             epoch,
+                             { MemberSender{ sender_data.sender } },
+                             authenticated_data,
+                             content_type };
+  auto auth = MLSContentAuthData{ content_type, {}, {} };
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);
 
-  return MLSMessageContentAuth{
+  return MLSAuthenticatedContent{
     WireFormat::mls_ciphertext,
     std::move(content),
     std::move(auth),
   };
 }
 
-MLSCiphertext::MLSCiphertext(MLSMessageContent content,
+MLSCiphertext::MLSCiphertext(MLSContent content,
                              bytes encrypted_sender_data_in,
                              bytes ciphertext_in)
   : group_id(std::move(content.group_id))

@@ -175,10 +175,10 @@ struct TranscriptHash
                  bytes confirmed_in,
                  const bytes& confirmation_tag);
 
-  void update(const MLSMessageContentAuth& content_auth);
-  void update_confirmed(const MLSMessageContentAuth& content_auth);
+  void update(const MLSAuthenticatedContent& content_auth);
+  void update_confirmed(const MLSAuthenticatedContent& content_auth);
   void update_interim(const bytes& confirmation_tag);
-  void update_interim(const MLSMessageContentAuth& content_auth);
+  void update_interim(const MLSAuthenticatedContent& content_auth);
 };
 
 bool

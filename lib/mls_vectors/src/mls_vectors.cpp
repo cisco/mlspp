@@ -47,7 +47,7 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
 }
 
 static std::ostream&
-operator<<(std::ostream& str, const MLSMessageContentAuth& obj)
+operator<<(std::ostream& str, const MLSAuthenticatedContent& obj)
 {
   return str << to_hex(tls::marshal(obj));
 }
@@ -268,26 +268,24 @@ EncryptionTestVector::create(CipherSuite suite,
     auto N = LeafIndex{ i };
     auto sender = Sender{ MemberSender{ N } };
 
-    auto hs_content = MLSMessageContent{
-      group_id, epoch, sender, authenticated_data, proposal
-    };
+    auto hs_content =
+      MLSContent{ group_id, epoch, sender, authenticated_data, proposal };
     auto hs_content_auth =
-      MLSMessageContentAuth::sign(WireFormat::mls_ciphertext,
-                                  std::move(hs_content),
-                                  suite,
-                                  sig_privs[i],
-                                  group_context);
+      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
+                                    std::move(hs_content),
+                                    suite,
+                                    sig_privs[i],
+                                    group_context);
     tv.leaves[i].handshake_content_auth = tls::marshal(hs_content_auth);
 
-    auto app_content = MLSMessageContent{
-      group_id, epoch, sender, authenticated_data, app_data
-    };
+    auto app_content =
+      MLSContent{ group_id, epoch, sender, authenticated_data, app_data };
     auto app_content_auth =
-      MLSMessageContentAuth::sign(WireFormat::mls_ciphertext,
-                                  std::move(app_content),
-                                  suite,
-                                  sig_privs[i],
-                                  group_context);
+      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
+                                    std::move(app_content),
+                                    suite,
+                                    sig_privs[i],
+                                    group_context);
     tv.leaves[i].application_content_auth = tls::marshal(app_content_auth);
 
     for (uint32_t j = 0; j < n_generations; ++j) {
@@ -347,9 +345,9 @@ EncryptionTestVector::verify() const
     auto N = LeafIndex{ i };
 
     auto hs_content_auth =
-      tls::get<MLSMessageContentAuth>(leaves[i].handshake_content_auth);
+      tls::get<MLSAuthenticatedContent>(leaves[i].handshake_content_auth);
     auto app_content_auth =
-      tls::get<MLSMessageContentAuth>(leaves[i].application_content_auth);
+      tls::get<MLSAuthenticatedContent>(leaves[i].application_content_auth);
 
     for (uint32_t j = 0; j < leaves[i].generations; ++j) {
       // Handshake
@@ -556,15 +554,14 @@ TranscriptTestVector::create(CipherSuite suite)
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content = MLSMessageContent{
-    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
-  };
+  auto commit_content =
+    MLSContent{ group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} };
   auto commit_content_auth =
-    MLSMessageContentAuth::sign(WireFormat::mls_plaintext,
-                                std::move(commit_content),
-                                suite,
-                                sig_priv,
-                                group_context);
+    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                  std::move(commit_content),
+                                  suite,
+                                  sig_priv,
+                                  group_context);
 
   transcript.update_confirmed(commit_content_auth);
 
@@ -890,15 +887,15 @@ MessagesTestVector::create()
                           },
                         } };
 
-  // MLSMessageContentAuth with Application / Proposal / Commit
-  auto content_auth_app = MLSMessageContentAuth::sign(
+  // MLSAuthenticatedContent with Application / Proposal / Commit
+  auto content_auth_app = MLSAuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal = MLSMessageContentAuth::sign(
+  auto content_auth_proposal = MLSAuthenticatedContent::sign(
     WireFormat::mls_plaintext,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
@@ -906,11 +903,11 @@ MessagesTestVector::create()
     group_context);
 
   auto content_auth_commit =
-    MLSMessageContentAuth::sign(WireFormat::mls_plaintext,
-                                { group_id, epoch, sender, {}, commit },
-                                suite,
-                                sig_priv,
-                                group_context);
+    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                  { group_id, epoch, sender, {}, commit },
+                                  suite,
+                                  sig_priv,
+                                  group_context);
   content_auth_commit.set_confirmation_tag(opaque);
 
   // MLSMessage(MLSPlaintext)
@@ -969,12 +966,13 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
   VERIFY_TLS_RTT(
-    "MLSMessageContentAuth/App", MLSMessageContentAuth, content_auth_app);
-  VERIFY_TLS_RTT("MLSMessageContentAuth/Proposal",
-                 MLSMessageContentAuth,
+    "MLSAuthenticatedContent/App", MLSAuthenticatedContent, content_auth_app);
+  VERIFY_TLS_RTT("MLSAuthenticatedContent/Proposal",
+                 MLSAuthenticatedContent,
                  content_auth_proposal);
-  VERIFY_TLS_RTT(
-    "MLSMessageContentAuth/Commit", MLSMessageContentAuth, content_auth_commit);
+  VERIFY_TLS_RTT("MLSAuthenticatedContent/Commit",
+                 MLSAuthenticatedContent,
+                 content_auth_commit);
 
   auto require_pt = [](const MLSMessage& msg) {
     return msg.wire_format() == WireFormat::mls_plaintext;
