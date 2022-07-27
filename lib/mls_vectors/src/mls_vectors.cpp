@@ -845,10 +845,10 @@ MessagesTestVector::create()
 
   auto sender = Sender{ MemberSender{ index } };
 
-  auto key_id_ext = ExternalKeyIDExtension{ opaque };
+  auto app_id_ext = ApplicationIDExtension{ opaque };
 
   auto ext_list = ExtensionList{};
-  ext_list.add(key_id_ext);
+  ext_list.add(app_id_ext);
 
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);

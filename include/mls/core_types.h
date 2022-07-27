@@ -34,7 +34,7 @@ struct Extension
 
 struct ExtensionType
 {
-  static constexpr Extension::Type external_key_id = 1;
+  static constexpr Extension::Type application_id = 1;
   static constexpr Extension::Type ratchet_tree = 2;
   static constexpr Extension::Type required_capabilities = 3;
   static constexpr Extension::Type external_pub = 4;
@@ -249,12 +249,12 @@ struct RequiredCapabilitiesExtension
   TLS_SERIALIZABLE(extensions, proposals)
 };
 
-struct ExternalKeyIDExtension
+struct ApplicationIDExtension
 {
-  bytes key_id;
+  bytes id;
 
   static const Extension::Type type;
-  TLS_SERIALIZABLE(key_id)
+  TLS_SERIALIZABLE(id)
 };
 
 ///
