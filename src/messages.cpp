@@ -7,10 +7,13 @@ namespace mls {
 
 // Extensions
 
-const uint16_t ExternalPubExtension::type = ExtensionType::external_pub;
-const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
-const uint16_t SFrameParameters::type = ExtensionType::sframe_parameters;
-const uint16_t SFrameCapabilities::type = ExtensionType::sframe_parameters;
+const Extension::Type ExternalPubExtension::type = ExtensionType::external_pub;
+const Extension::Type RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+const Extension::Type ExternalSendersExtension::type =
+  ExtensionType::external_senders;
+const Extension::Type SFrameParameters::type = ExtensionType::sframe_parameters;
+const Extension::Type SFrameCapabilities::type =
+  ExtensionType::sframe_parameters;
 
 bool
 SFrameCapabilities::compatible(const SFrameParameters& params) const
@@ -297,7 +300,7 @@ MLSContent::MLSContent(bytes group_id_in,
                        RawContent content_in)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
   , content(std::move(content_in))
 {
@@ -310,7 +313,7 @@ MLSContent::MLSContent(bytes group_id_in,
                        ContentType content_type)
   : group_id(std::move(group_id_in))
   , epoch(epoch_in)
-  , sender(std::move(sender_in))
+  , sender(sender_in)
   , authenticated_data(std::move(authenticated_data_in))
 {
   switch (content_type) {
@@ -476,7 +479,7 @@ operator<<(tls::ostream& str, const MLSContentTBS& obj)
       str << opt::get(obj.context);
       break;
 
-    case SenderType::preconfigured:
+    case SenderType::external:
     case SenderType::new_member_proposal:
       break;
 
@@ -583,7 +586,7 @@ operator<<(tls::ostream& str, const MLSPlaintext& obj)
     case SenderType::member:
       return str << obj.content << obj.auth << opt::get(obj.membership_tag);
 
-    case SenderType::preconfigured:
+    case SenderType::external:
     case SenderType::new_member_proposal:
     case SenderType::new_member_commit:
       return str << obj.content << obj.auth;
@@ -840,6 +843,41 @@ MLSMessage::MLSMessage(GroupInfo group_info)
 MLSMessage::MLSMessage(KeyPackage key_package)
   : message(std::move(key_package))
 {
+}
+
+MLSMessage
+external_proposal(CipherSuite suite,
+                  const bytes& group_id,
+                  epoch_t epoch,
+                  const Proposal& proposal,
+                  uint32_t signer_index,
+                  const SignaturePrivateKey& sig_priv)
+{
+  switch (proposal.proposal_type()) {
+    // These proposal types are OK
+    case ProposalType::add:
+    case ProposalType::remove:
+    case ProposalType::psk:
+    case ProposalType::reinit:
+    case ProposalType::group_context_extensions:
+      break;
+
+    // These proposal types are forbidden
+    case ProposalType::invalid:
+    case ProposalType::update:
+    case ProposalType::external_init:
+      throw ProtocolError("External proposal has invalid type");
+  }
+
+  auto content = MLSContent{ group_id,
+                             epoch,
+                             { ExternalSenderIndex{ signer_index } },
+                             { /* no authenticated data */ },
+                             { proposal } };
+  auto content_auth = MLSAuthenticatedContent::sign(
+    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+
+  return MLSPlaintext::protect(std::move(content_auth), suite, {}, {});
 }
 
 } // namespace mls

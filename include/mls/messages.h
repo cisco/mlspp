@@ -26,6 +26,22 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
+struct ExternalSender
+{
+  SignaturePublicKey signature_key;
+  Credential credential;
+
+  TLS_SERIALIZABLE(signature_key, credential);
+};
+
+struct ExternalSendersExtension
+{
+  std::vector<ExternalSender> senders;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(senders);
+};
+
 struct SFrameParameters
 {
   uint16_t cipher_suite;
@@ -414,7 +430,7 @@ enum struct SenderType : uint8_t
 {
   invalid = 0,
   member = 1,
-  preconfigured = 2,
+  external = 2,
   new_member_proposal = 3,
   new_member_commit = 4,
 };
@@ -425,10 +441,10 @@ struct MemberSender
   TLS_SERIALIZABLE(sender);
 };
 
-struct PreconfiguredKeyID
+struct ExternalSenderIndex
 {
-  bytes id;
-  TLS_SERIALIZABLE(id)
+  uint32_t sender_index;
+  TLS_SERIALIZABLE(sender_index)
 };
 
 struct NewMemberProposalSender
@@ -444,7 +460,7 @@ struct NewMemberCommitSender
 struct Sender
 {
   var::variant<MemberSender,
-               PreconfiguredKeyID,
+               ExternalSenderIndex,
                NewMemberProposalSender,
                NewMemberCommitSender>
     sender;
@@ -636,6 +652,14 @@ struct MLSMessage
   TLS_TRAITS(tls::pass, tls::variant<WireFormat>)
 };
 
+MLSMessage
+external_proposal(CipherSuite suite,
+                  const bytes& group_id,
+                  epoch_t epoch,
+                  const Proposal& proposal,
+                  uint32_t signer_index,
+                  const SignaturePrivateKey& sig_priv);
+
 } // namespace mls
 
 namespace tls {
@@ -662,7 +686,7 @@ TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
 TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
 
 TLS_VARIANT_MAP(mls::SenderType, mls::MemberSender, member)
-TLS_VARIANT_MAP(mls::SenderType, mls::PreconfiguredKeyID, preconfigured)
+TLS_VARIANT_MAP(mls::SenderType, mls::ExternalSenderIndex, external)
 TLS_VARIANT_MAP(mls::SenderType,
                 mls::NewMemberProposalSender,
                 new_member_proposal)

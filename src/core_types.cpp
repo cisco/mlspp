@@ -14,9 +14,10 @@ const Extension::Type RequiredCapabilitiesExtension::type =
 const Extension::Type ExternalKeyIDExtension::type =
   ExtensionType::external_key_id;
 
-const std::array<uint16_t, 2> default_extensions = {
-  RequiredCapabilitiesExtension::type,
-  ExternalKeyIDExtension::type,
+const std::array<uint16_t, 5> default_extensions = {
+  ExtensionType::external_key_id,       ExtensionType::ratchet_tree,
+  ExtensionType::required_capabilities, ExtensionType::external_pub,
+  ExtensionType::external_senders,
 };
 
 const std::array<uint16_t, 8> default_proposals = {
