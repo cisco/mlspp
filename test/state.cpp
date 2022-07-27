@@ -249,8 +249,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   // Initialize the second participant from the Welcome, pass in the
   // tree externally
-  // NOLINTNEXTLINE(llvm-else-after-return,
-  // readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,readability-else-after-return)
   CHECK_THROWS_AS(State(init_privs[1],
                         leaf_privs[1],
                         identity_privs[1],
@@ -261,8 +260,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
 
   auto incorrect_tree = TreeKEMPublicKey(suite);
   incorrect_tree.add_leaf(key_packages[1].leaf_node);
-  // NOLINTNEXTLINE(llvm-else-after-return,
-  // readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,readability-else-after-return)
   CHECK_THROWS_AS(State(init_privs[1],
                         leaf_privs[1],
                         identity_privs[1],
@@ -405,8 +403,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
 
   // Creating a group with a first member that doesn't support the
   // required capabilities should fail.
-  // NOLINTNEXTLINE(llvm-else-after-return,
-  // readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,readability-else-after-return)
   REQUIRE_THROWS(State{
     group_id, suite, leaf_no, id_no, kp_no.leaf_node, group_extensions });
 
@@ -414,8 +411,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   // support the required capabilities for the group.
   auto state = State{ group_id,         suite,           leaf_yes, id_yes,
                       kp_yes.leaf_node, group_extensions };
-  // NOLINTNEXTLINE(llvm-else-after-return,
-  // readability-else-after-return)
+  // NOLINTNEXTLINE(llvm-else-after-return,readability-else-after-return)
   REQUIRE_THROWS(state.add_proposal(kp_no));
 
   // When State receives an add proposal for a new member that doesn't
