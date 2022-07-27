@@ -96,6 +96,7 @@ struct tls_serializer
   };
 
 TLS_SERIALIZER(mls::HPKEPublicKey)
+TLS_SERIALIZER(mls::SignaturePublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
 TLS_SERIALIZER(mls::Credential)
 TLS_SERIALIZER(mls::MLSAuthenticatedContent)
@@ -182,7 +183,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    confirmed_transcript_hash_before,
                                    interim_transcript_hash_before,
                                    confirmation_key,
-                                   credential,
+                                   signature_key,
                                    commit,
                                    group_context,
                                    confirmed_transcript_hash_after,

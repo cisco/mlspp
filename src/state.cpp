@@ -757,9 +757,8 @@ State::check_add_leaf_node(const LeafNode& leaf,
     }
 
     const auto& tree_leaf = opt::get(maybe_tree_leaf);
-    const auto hpke_key_eq = tree_leaf.public_key == leaf.public_key;
-    const auto sig_key_eq =
-      tree_leaf.credential.public_key() == leaf.credential.public_key();
+    const auto hpke_key_eq = tree_leaf.encryption_key == leaf.encryption_key;
+    const auto sig_key_eq = tree_leaf.signature_key == leaf.signature_key;
     if (hpke_key_eq || sig_key_eq) {
       throw ProtocolError("Duplicate parameters in new KeyPackage");
     }
@@ -785,7 +784,7 @@ State::check_update_leaf_node(LeafIndex target,
   }
 
   const auto& tree_leaf = opt::get(maybe_tree_leaf);
-  if (tree_leaf.public_key == leaf.public_key) {
+  if (tree_leaf.encryption_key == leaf.encryption_key) {
     throw ProtocolError("Update without a fresh init key");
   }
 }
@@ -1077,7 +1076,7 @@ State::verify_internal(const MLSAuthenticatedContent& content_auth) const
     throw InvalidParameterError("Signature from blank node");
   }
 
-  const auto& pub = opt::get(maybe_leaf).credential.public_key();
+  const auto& pub = opt::get(maybe_leaf).signature_key;
   return content_auth.verify(_suite, pub, group_context());
 }
 
@@ -1092,8 +1091,7 @@ State::verify_new_member(const MLSAuthenticatedContent& content_auth) const
         }
 
         // Verify with public key from update path leaf key package
-        const auto& leaf = opt::get(commit.path).leaf_node;
-        return leaf.credential.public_key();
+        return opt::get(commit.path).leaf_node.signature_key;
       },
       [](const Proposal& proposal) {
         if (proposal.proposal_type() != ProposalType::add) {
@@ -1101,7 +1099,7 @@ State::verify_new_member(const MLSAuthenticatedContent& content_auth) const
         }
 
         const auto& add = var::get<Add>(proposal.content);
-        return add.key_package.leaf_node.credential.public_key();
+        return add.key_package.leaf_node.signature_key;
       },
       [](const ApplicationData& /*unused*/) -> SignaturePublicKey {
         throw ProtocolError("New member message of unknown type");
