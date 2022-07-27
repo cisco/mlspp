@@ -84,7 +84,7 @@ struct KeyScheduleTestVector
     bytes commit_secret;
     bytes confirmed_transcript_hash;
     std::vector<ExternalPSKInfo> external_psks;
-    bytes branch_psk_nonce;
+    bytes psk_nonce;
 
     // Computed values
     bytes group_context;

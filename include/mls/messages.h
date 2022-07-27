@@ -68,8 +68,7 @@ enum struct PSKType : uint8_t
 {
   reserved = 0,
   external = 1,
-  reinit = 2,
-  branch = 3,
+  resumption = 2,
 };
 
 struct ExternalPSK
@@ -78,23 +77,25 @@ struct ExternalPSK
   TLS_SERIALIZABLE(psk_id)
 };
 
-struct ReInitPSK
+enum struct ResumptionPSKUsage : uint8_t
 {
-  bytes group_id;
-  epoch_t psk_epoch;
-  TLS_SERIALIZABLE(group_id, psk_epoch)
+  reserved = 0,
+  application = 1,
+  reinit = 2,
+  branch = 3,
 };
 
-struct BranchPSK
+struct ResumptionPSK
 {
-  bytes group_id;
+  ResumptionPSKUsage usage;
+  bytes psk_group_id;
   epoch_t psk_epoch;
-  TLS_SERIALIZABLE(group_id, psk_epoch)
+  TLS_SERIALIZABLE(usage, psk_group_id, psk_epoch)
 };
 
 struct PreSharedKeyID
 {
-  var::variant<ExternalPSK, ReInitPSK, BranchPSK> content;
+  var::variant<ExternalPSK, ResumptionPSK> content;
   bytes psk_nonce;
   TLS_SERIALIZABLE(content, psk_nonce)
   TLS_TRAITS(tls::variant<PSKType>, tls::pass)
@@ -665,8 +666,7 @@ external_proposal(CipherSuite suite,
 namespace tls {
 
 TLS_VARIANT_MAP(mls::PSKType, mls::ExternalPSK, external)
-TLS_VARIANT_MAP(mls::PSKType, mls::ReInitPSK, reinit)
-TLS_VARIANT_MAP(mls::PSKType, mls::BranchPSK, branch)
+TLS_VARIANT_MAP(mls::PSKType, mls::ResumptionPSK, resumption)
 
 TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::Proposal, value)
 TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::ProposalRef, reference)

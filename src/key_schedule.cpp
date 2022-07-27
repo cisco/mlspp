@@ -447,17 +447,13 @@ KeyScheduleEpoch::do_export(const std::string& label,
 }
 
 PSKWithSecret
-KeyScheduleEpoch::branch_psk(const bytes& group_id, epoch_t epoch)
+KeyScheduleEpoch::resumption_psk(ResumptionPSKUsage usage,
+                                 const bytes& group_id,
+                                 epoch_t epoch)
 {
   auto nonce = random_bytes(suite.secret_size());
-  return { { BranchPSK{ group_id, epoch }, nonce }, resumption_secret };
-}
-
-PSKWithSecret
-KeyScheduleEpoch::reinit_psk(const bytes& group_id, epoch_t epoch)
-{
-  auto nonce = random_bytes(suite.secret_size());
-  return { { ReInitPSK{ group_id, epoch }, nonce }, resumption_secret };
+  auto psk = ResumptionPSK{ usage, group_id, epoch };
+  return { { psk, nonce }, resumption_secret };
 }
 
 bytes
