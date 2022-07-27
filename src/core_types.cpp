@@ -11,11 +11,11 @@ namespace mls {
 
 const Extension::Type RequiredCapabilitiesExtension::type =
   ExtensionType::required_capabilities;
-const Extension::Type ExternalKeyIDExtension::type =
-  ExtensionType::external_key_id;
+const Extension::Type ApplicationIDExtension::type =
+  ExtensionType::application_id;
 
 const std::array<uint16_t, 5> default_extensions = {
-  ExtensionType::external_key_id,       ExtensionType::ratchet_tree,
+  ExtensionType::application_id,        ExtensionType::ratchet_tree,
   ExtensionType::required_capabilities, ExtensionType::external_pub,
   ExtensionType::external_senders,
 };
