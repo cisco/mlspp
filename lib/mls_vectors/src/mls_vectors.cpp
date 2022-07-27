@@ -875,7 +875,6 @@ MessagesTestVector::create()
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
   auto external_init = ExternalInit{ opaque };
-  auto app_ack = AppAck{ { { index.val, 0, 5 }, { index.val, 7, 10 } } };
 
   // Commit
   auto proposal_ref = ProposalRef{};
@@ -939,7 +938,6 @@ MessagesTestVector::create()
     tls::marshal(pre_shared_key),
     tls::marshal(reinit),
     tls::marshal(external_init),
-    tls::marshal(app_ack),
 
     tls::marshal(commit),
 
@@ -967,7 +965,6 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal);
   VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal);
   VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal);
-  VERIFY_TLS_RTT("AppAck", AppAck, app_ack_proposal);
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
