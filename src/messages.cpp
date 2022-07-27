@@ -9,6 +9,7 @@ namespace mls {
 
 const uint16_t ExternalPubExtension::type = ExtensionType::external_pub;
 const uint16_t RatchetTreeExtension::type = ExtensionType::ratchet_tree;
+const uint16_t ExternalSendersExtension::type = ExtensionType::external_senders;
 const uint16_t SFrameParameters::type = ExtensionType::sframe_parameters;
 const uint16_t SFrameCapabilities::type = ExtensionType::sframe_parameters;
 
@@ -476,7 +477,7 @@ operator<<(tls::ostream& str, const MLSContentTBS& obj)
       str << opt::get(obj.context);
       break;
 
-    case SenderType::preconfigured:
+    case SenderType::external:
     case SenderType::new_member_proposal:
       break;
 
@@ -583,7 +584,7 @@ operator<<(tls::ostream& str, const MLSPlaintext& obj)
     case SenderType::member:
       return str << obj.content << obj.auth << opt::get(obj.membership_tag);
 
-    case SenderType::preconfigured:
+    case SenderType::external:
     case SenderType::new_member_proposal:
     case SenderType::new_member_commit:
       return str << obj.content << obj.auth;

@@ -234,6 +234,7 @@ protected:
 
   // Signature verification over a handshake message
   bool verify_internal(const MLSAuthenticatedContent& content_auth) const;
+  bool verify_external(const MLSAuthenticatedContent& content_auth) const;
   bool verify_new_member_proposal(
     const MLSAuthenticatedContent& content_auth) const;
   bool verify_new_member_commit(

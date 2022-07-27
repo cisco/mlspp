@@ -1097,6 +1097,16 @@ State::verify_internal(const MLSAuthenticatedContent& content_auth) const
 }
 
 bool
+State::verify_external(const MLSAuthenticatedContent& content_auth) const
+{
+  const auto& ext_sender = var::get<ExternalSenderIndex>(content_auth.content.sender.sender);
+  const auto senders_ext = _extensions.find<ExternalSendersExtension>();
+  const auto& senders = opt::get(senders_ext).senders;
+  const auto& pub = senders.at(ext_sender.sender_index).signature_key;
+  return content_auth.verify(_suite, pub, group_context());
+}
+
+bool
 State::verify_new_member_proposal(
   const MLSAuthenticatedContent& content_auth) const
 {
@@ -1123,6 +1133,9 @@ State::verify(const MLSAuthenticatedContent& content_auth) const
     case SenderType::member:
       return verify_internal(content_auth);
 
+    case SenderType::external:
+      return verify_external(content_auth);
+
     case SenderType::new_member_proposal:
       return verify_new_member_proposal(content_auth);
 
@@ -1130,8 +1143,7 @@ State::verify(const MLSAuthenticatedContent& content_auth) const
       return verify_new_member_commit(content_auth);
 
     default:
-      // TODO(RLB) Support other sender types
-      throw NotImplementedError();
+      throw ProtocolError("Invalid sender type");
   }
 }
 

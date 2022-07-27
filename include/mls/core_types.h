@@ -38,6 +38,7 @@ struct ExtensionType
   static constexpr Extension::Type ratchet_tree = 2;
   static constexpr Extension::Type required_capabilities = 3;
   static constexpr Extension::Type external_pub = 4;
+  static constexpr Extension::Type external_senders = 5;
 
   // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
   // a value from the vendor-specific space
