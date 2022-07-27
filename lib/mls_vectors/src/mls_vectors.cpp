@@ -232,9 +232,10 @@ EncryptionTestVector::create(CipherSuite suite,
   for (uint32_t i = 0; i < n_leaves; i++) {
     auto leaf_priv = HPKEPrivateKey::generate(suite);
     auto sig_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic({}, suite, sig_priv.public_key);
+    auto cred = Credential::basic({});
     auto leaf = LeafNode(suite,
                          leaf_priv.public_key,
+                         sig_priv.public_key,
                          cred,
                          Capabilities::create_default(),
                          Lifetime::create_default(),
@@ -554,8 +555,6 @@ TranscriptTestVector::create(CipherSuite suite)
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
 
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto credential =
-    Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
   auto leaf_index = LeafIndex{ 0 };
 
   auto commit_content = MLSMessageContent{
@@ -585,7 +584,7 @@ TranscriptTestVector::create(CipherSuite suite)
     interim_transcript_hash_before,
 
     ks_epoch.confirmation_key,
-    credential,
+    sig_priv.public_key,
     commit_content_auth,
 
     ctx,
@@ -616,7 +615,7 @@ TranscriptTestVector::verify() const
 
   // Verify that the commit signature is valid
   auto commit_valid =
-    commit.verify(cipher_suite, credential.public_key(), group_context_obj);
+    commit.verify(cipher_suite, signature_key, group_context_obj);
   VERIFY("commit signature valid", commit_valid);
 
   // Verify the confirmation tag
@@ -640,9 +639,10 @@ new_leaf_node(CipherSuite suite)
   auto leaf_node_secret = suite.derive_secret(init_secret, "node");
   auto leaf_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
   auto sig_priv = SignaturePrivateKey::generate(suite);
-  auto cred = Credential::basic({ 0, 1, 2, 3 }, suite, sig_priv.public_key);
+  auto cred = Credential::basic({ 0, 1, 2, 3 });
   auto leaf = LeafNode(suite,
                        leaf_priv.public_key,
+                       sig_priv.public_key,
                        cred,
                        Capabilities::create_default(),
                        Lifetime::create_default(),
@@ -826,13 +826,15 @@ MessagesTestVector::create()
   auto hpke_pub = hpke_priv.public_key;
   auto hpke_ct = HPKECiphertext{ opaque, opaque };
   auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto sig_pub = sig_priv.public_key;
 
   auto psk_nonce = random_bytes(suite.secret_size());
 
   // KeyPackage and extensions
-  auto cred = Credential::basic(user_id, suite, sig_priv.public_key);
+  auto cred = Credential::basic(user_id);
   auto leaf_node = LeafNode{ suite,
                              hpke_pub,
+                             sig_pub,
                              cred,
                              Capabilities::create_default(),
                              Lifetime::create_default(),
