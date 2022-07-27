@@ -147,8 +147,9 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  PSKWithSecret branch_psk(const bytes& group_id, epoch_t epoch);
-  PSKWithSecret reinit_psk(const bytes& group_id, epoch_t epoch);
+  PSKWithSecret resumption_psk(ResumptionPSKUsage usage,
+                               const bytes& group_id,
+                               epoch_t epoch);
 
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& joiner_secret,

@@ -417,10 +417,10 @@ KeyScheduleTestVector::create(CipherSuite suite,
       external_psks.push_back({ id, nonce, secret });
     }
 
-    auto branch_psk_nonce = bytes{};
+    auto psk_nonce = bytes{};
     if (i > 0) {
-      auto psk = epoch.branch_psk(tv.group_id, epoch_t(i - 1));
-      branch_psk_nonce = psk.id.psk_nonce;
+      auto psk = epoch.resumption_psk(ResumptionPSKUsage::branch, tv.group_id, epoch_t(i - 1));
+      psk_nonce = psk.id.psk_nonce;
       psks.push_back(psk);
     }
 
@@ -436,7 +436,7 @@ KeyScheduleTestVector::create(CipherSuite suite,
       commit_secret,
       group_context.confirmed_transcript_hash,
       external_psks,
-      branch_psk_nonce,
+      psk_nonce,
 
       ctx,
 
@@ -487,8 +487,8 @@ KeyScheduleTestVector::verify() const
     }
 
     if (epoch_n > 0) {
-      auto psk = epoch.branch_psk(group_id, epoch_n - 1);
-      psk.id.psk_nonce = tve.branch_psk_nonce;
+      auto psk = epoch.resumption_psk(ResumptionPSKUsage::branch, group_id, epoch_n - 1);
+      psk.id.psk_nonce = tve.psk_nonce;
       psks.push_back(psk);
     }
 
