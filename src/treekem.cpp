@@ -379,11 +379,11 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
   if (index.val >= size.val) {
     if (size.val == 0) {
       size.val = 1;
+      nodes.resize(1);
     } else {
       size.val *= 2;
+      nodes.resize(2 * nodes.size() + 1);
     }
-
-    nodes.resize(2 * nodes.size() + 1);
   }
 
   // Set the leaf
