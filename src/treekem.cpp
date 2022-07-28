@@ -730,7 +730,7 @@ struct ParentNodeHashInput
 
 struct TreeHashInput
 {
-  std::variant<LeafNodeHashInput, ParentNodeHashInput> node;
+  var::variant<LeafNodeHashInput, ParentNodeHashInput> node;
   TLS_SERIALIZABLE(node);
   TLS_TRAITS(tls::variant<NodeType>)
 };
@@ -876,7 +876,7 @@ tls::istream&
 operator>>(tls::istream& str, TreeKEMPublicKey& obj)
 {
   str >> obj.nodes;
-  if (obj.nodes.size() == 0) {
+  if (obj.nodes.empty()) {
     return str;
   }
 

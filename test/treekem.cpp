@@ -130,7 +130,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 {
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
-  const auto root = tree_math::root(size);
   const auto root_resolution =
     std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 11 } };
 
@@ -186,7 +185,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   // Remove a node and verify that the resolution comes out right
   pub.blank_path(removed);
   REQUIRE_FALSE(pub.leaf_node(removed));
-  REQUIRE(root_resolution == pub.resolve(root));
+  REQUIRE(root_resolution == pub.resolve(tree_math::root(size)));
 }
 
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
