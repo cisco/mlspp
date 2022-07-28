@@ -172,9 +172,9 @@ TreeMathTestVector::create(uint32_t n_leaves)
   // Left, right, parent, sibling are relative
   for (NodeIndex x{ 0 }; x.val < tv.n_nodes.val; x.val++) {
     tv.left[x.val] = null_if_same(x, tree_math::left(x));
-    tv.right[x.val] = null_if_same(x, tree_math::right(x, tv.n_leaves));
-    tv.parent[x.val] = null_if_same(x, tree_math::parent(x, tv.n_leaves));
-    tv.sibling[x.val] = null_if_same(x, tree_math::sibling(x, tv.n_leaves));
+    tv.right[x.val] = null_if_same(x, tree_math::right(x));
+    tv.parent[x.val] = null_if_same(x, tree_math::parent(x));
+    tv.sibling[x.val] = null_if_same(x, tree_math::sibling(x));
   }
 
   return tv;
@@ -193,12 +193,12 @@ TreeMathTestVector::verify() const
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
     VERIFY_EQUAL("left", left[x.val], null_if_same(x, tree_math::left(x)));
     VERIFY_EQUAL(
-      "right", right[x.val], null_if_same(x, tree_math::right(x, n_leaves)));
+      "right", right[x.val], null_if_same(x, tree_math::right(x)));
     VERIFY_EQUAL(
-      "parent", parent[x.val], null_if_same(x, tree_math::parent(x, n_leaves)));
+      "parent", parent[x.val], null_if_same(x, tree_math::parent(x)));
     VERIFY_EQUAL("sibling",
                  sibling[x.val],
-                 null_if_same(x, tree_math::sibling(x, n_leaves)));
+                 null_if_same(x, tree_math::sibling(x)));
   }
 
   return std::nullopt;

@@ -100,13 +100,13 @@ NodeIndex
 left(NodeIndex x);
 
 NodeIndex
-right(NodeIndex x, LeafCount n);
+right(NodeIndex x);
 
 NodeIndex
-parent(NodeIndex x, LeafCount n);
+parent(NodeIndex x);
 
 NodeIndex
-sibling(NodeIndex x, LeafCount n);
+sibling(NodeIndex x);
 
 std::vector<NodeIndex>
 dirpath(NodeIndex x, LeafCount n);

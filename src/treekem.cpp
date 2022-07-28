@@ -143,7 +143,7 @@ TreeKEMPrivateKey::implant(NodeIndex start,
     path_secrets[n] = secret;
     private_key_cache.erase(n);
 
-    n = tree_math::parent(n, size);
+    n = tree_math::parent(n);
     secret = suite.derive_secret(secret, "path");
   }
 
@@ -282,7 +282,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   for (dpi = 0; dpi < dp.size(); dpi++) {
     if (tree_math::in_path(ni, dp[dpi])) {
       overlap_node = dp[dpi];
-      copath_node = tree_math::sibling(last, size);
+      copath_node = tree_math::sibling(last);
       break;
     }
 
@@ -518,7 +518,7 @@ TreeKEMPublicKey::parent_hash_valid() const
 
     const auto& parent = node_at(i).parent_node();
     auto l = tree_math::left(i);
-    auto r = tree_math::right(i, size);
+    auto r = tree_math::right(i);
 
     auto lh = parent_hash(parent, r);
     auto rh = parent_hash(parent, l);
@@ -567,7 +567,7 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
   }
 
   auto l = resolve(tree_math::left(index));
-  auto r = resolve(tree_math::right(index, size));
+  auto r = resolve(tree_math::right(index));
   l.insert(l.end(), r.begin(), r.end());
   return l;
 }
@@ -628,7 +628,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
     auto node_priv = opt::get(priv.private_key(n));
     auto node = UpdatePathNode{ node_priv.public_key, {} };
 
-    auto copath = tree_math::sibling(last, size);
+    auto copath = tree_math::sibling(last);
     auto res = resolve(copath);
     remove_leaves(res, except);
     for (auto nr : res) {
@@ -762,7 +762,7 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   }
 
   auto lh = get_hash(tree_math::left(index));
-  auto rh = get_hash(tree_math::right(index, size));
+  auto rh = get_hash(tree_math::right(index));
   node_at(index).set_tree_hash(suite, index, lh, rh);
   return node_at(index).hash;
 }
@@ -829,7 +829,7 @@ TreeKEMPublicKey::parent_hashes(
   auto ph = std::vector<bytes>(dp.size());
   for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
     auto n = dp[i];
-    auto s = tree_math::sibling(n, size);
+    auto s = tree_math::sibling(n);
 
     auto parent_node = ParentNode{ path_nodes[i].public_key, last_hash, {} };
     last_hash = parent_hash(parent_node, s);
