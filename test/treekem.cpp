@@ -149,16 +149,17 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 }
 
 //        _
-//    _
-//  X   _
-// X X _ X X
+//    _       X
+//  X   _   X   _
+// X X _ X X _ _ _
+// 0123456789abcde
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 {
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
   const auto root = tree_math::root(size);
   const auto root_resolution =
-    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 8 } };
+    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 11 } };
 
   // Construct a full tree using add_leaf and merge
   auto pub = TreeKEMPublicKey{ suite };
@@ -169,7 +170,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     silence_unused(init_priv);
 
     auto index = LeafIndex(i);
-    auto curr_size = LeafCount(i + 1);
+    auto root = tree_math::root(LeafCount(i + 1));
+    auto curr_size = LeafCount(1 << tree_math::level(root));
 
     auto add_index = pub.add_leaf(leaf_before);
     REQUIRE(add_index == index);

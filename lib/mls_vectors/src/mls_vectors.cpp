@@ -341,7 +341,7 @@ EncryptionTestVector::verify() const
 
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < n_leaves.val; i++) {
+  for (uint32_t i = 0; i < leaves.size(); i++) {
     auto N = LeafIndex{ i };
 
     auto hs_content_auth =

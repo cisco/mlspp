@@ -405,7 +405,7 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
   // Extend the tree if necessary
   auto ni = NodeIndex(index);
   if (index.val >= size().val) {
-    nodes.resize(ni.val + 1);
+    nodes.resize(2 * nodes.size() + 1);
   }
 
   // Set the leaf
@@ -662,7 +662,7 @@ TreeKEMPublicKey::truncate()
     return;
   }
 
-  // clear the parent hashes across blank leaves before truncating
+  // Clear the parent hashes across blank leaves before truncating
   auto index = LeafIndex{ size().val - 1 };
   for (; index.val > 0; index.val--) {
     if (!node_at(index).blank()) {
@@ -676,7 +676,11 @@ TreeKEMPublicKey::truncate()
     return;
   }
 
-  nodes.resize(NodeIndex(index).val + 1);
+  // Remove the right subtree until the tree is of minimal size
+  auto rightmost_non_blank_node = NodeIndex(index);
+  while (nodes.size() / 2 > rightmost_non_blank_node.val) {
+    nodes.resize(nodes.size() / 2);
+  }
 }
 
 void
