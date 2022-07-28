@@ -248,7 +248,7 @@ EncryptionTestVector::create(CipherSuite suite,
   tree.set_hash_all();
   tv.tree = tls::marshal(tree);
 
-  auto src = GroupKeySource(suite, tree.size(), tv.encryption_secret);
+  auto src = GroupKeySource(suite, tree.size, tv.encryption_secret);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto epoch = epoch_t(0x0001020304050607);
@@ -337,7 +337,7 @@ EncryptionTestVector::verify() const
   auto ratchet_tree = tls::get<TreeKEMPublicKey>(tree);
   ratchet_tree.suite = cipher_suite;
   ratchet_tree.set_hash_all();
-  auto n_leaves = ratchet_tree.size();
+  auto n_leaves = ratchet_tree.size;
 
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
@@ -777,7 +777,7 @@ TreeKEMTestVector::verify() const
   auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
   auto priv =
     TreeKEMPrivateKey::joiner(cipher_suite,
-                              ratchet_tree_before.size(),
+                              ratchet_tree_before.size,
                               my_index,
                               leaf_priv,
                               ancestor,

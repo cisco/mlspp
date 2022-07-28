@@ -265,7 +265,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     // New joiner initializes their private key
     auto joiner_priv = TreeKEMPrivateKey::joiner(
-      suite, pubs[i].size(), joiner, init_priv, overlap, path_secret);
+      suite, pubs[i].size, joiner, init_priv, overlap, path_secret);
     privs.push_back(joiner_priv);
     pubs.push_back(pubs[i]);
     REQUIRE(privs[i + 1].consistent(privs[i]));

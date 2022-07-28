@@ -37,7 +37,7 @@ State::State(bytes group_id,
   auto ctx = tls::marshal(group_context());
   _key_schedule =
     KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
-  _keys = _key_schedule.encryption_keys(_tree.size());
+  _keys = _key_schedule.encryption_keys(_tree.size);
 
   // Update the interim transcript hash with a virtual confirmation tag
   _transcript_hash.update_interim(
@@ -169,13 +169,13 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   _tree_priv = TreeKEMPrivateKey::joiner(
-    _suite, _tree.size(), _index, std::move(leaf_priv), ancestor, path_secret);
+    _suite, _tree.size, _index, std::move(leaf_priv), ancestor, path_secret);
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
   _key_schedule = KeyScheduleEpoch(
     _suite, secrets.joiner_secret, { /* no PSKs */ }, group_ctx);
-  _keys = _key_schedule.encryption_keys(_tree.size());
+  _keys = _key_schedule.encryption_keys(_tree.size);
 
   // Verify the confirmation
   const auto confirmation_tag =
@@ -781,7 +781,7 @@ void
 State::check_add_leaf_node(const LeafNode& leaf,
                            std::optional<LeafIndex> except) const
 {
-  for (LeafIndex i{ 0 }; i < _tree.size(); i.val++) {
+  for (LeafIndex i{ 0 }; i < _tree.size; i.val++) {
     if (i == except) {
       continue;
     }
@@ -879,7 +879,7 @@ State::apply(const GroupContextExtensions& gce)
 bool
 State::extensions_supported(const ExtensionList& exts) const
 {
-  for (LeafIndex i{ 0 }; i < _tree.size(); i.val++) {
+  for (LeafIndex i{ 0 }; i < _tree.size; i.val++) {
     const auto& maybe_leaf = _tree.leaf_node(i);
     if (!maybe_leaf) {
       continue;
@@ -1023,7 +1023,7 @@ State::apply(const std::vector<CachedProposal>& proposals)
   auto has_removes = !remove_locations.empty();
 
   _tree.truncate();
-  _tree_priv.truncate(_tree.size());
+  _tree_priv.truncate(_tree.size);
   _tree.set_hash_all();
   return std::make_tuple(has_updates, has_removes, joiner_locations);
 }
@@ -1104,7 +1104,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
   });
   _key_schedule =
     _key_schedule.next(commit_secret, psks, force_init_secret, ctx);
-  _keys = _key_schedule.encryption_keys(_tree.size());
+  _keys = _key_schedule.encryption_keys(_tree.size);
 }
 
 ///
@@ -1210,10 +1210,10 @@ State::group_info() const
 std::vector<LeafNode>
 State::roster() const
 {
-  auto leaves = std::vector<LeafNode>(_tree.size().val);
+  auto leaves = std::vector<LeafNode>(_tree.size.val);
   auto leaf_count = uint32_t(0);
 
-  for (uint32_t i = 0; i < _tree.size().val; i++) {
+  for (uint32_t i = 0; i < _tree.size.val; i++) {
     const auto& maybe_leaf = _tree.leaf_node(LeafIndex{ i });
     if (!maybe_leaf) {
       continue;
@@ -1237,7 +1237,7 @@ State::leaf_for_roster_entry(RosterIndex index) const
 {
   auto non_blank_leaves = uint32_t(0);
 
-  for (auto i = LeafIndex{ 0 }; i < _tree.size(); i.val++) {
+  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
     const auto& maybe_leaf = _tree.leaf_node(i);
     if (!maybe_leaf) {
       continue;
