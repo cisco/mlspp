@@ -58,33 +58,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
   REQUIRE(leaf_node.public_key() == leaf_priv.public_key);
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
-{
-  const auto [init_priv, sig_priv, leaf] = new_leaf_node();
-  silence_unused(sig_priv);
-
-  auto node_index = NodeIndex{ 7 };
-  auto child_hash = bytes{ 0, 1, 2, 3, 4 };
-
-  auto parent = ParentNode{ init_priv.public_key, {}, {} };
-  auto opt_parent = OptionalNode{ Node{ parent }, {} };
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS_AS(opt_parent.set_tree_hash(suite, node_index),
-                    var::bad_variant_access);
-
-  opt_parent.set_tree_hash(suite, node_index, child_hash, child_hash);
-  REQUIRE_FALSE(opt_parent.hash.empty());
-
-  auto opt_leaf = OptionalNode{ Node{ leaf }, {} };
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS_AS(
-    opt_leaf.set_tree_hash(suite, node_index, child_hash, child_hash),
-    var::bad_variant_access);
-
-  opt_leaf.set_tree_hash(suite, node_index);
-  REQUIRE_FALSE(opt_leaf.hash.empty());
-}
-
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 {
   const auto size = LeafCount{ 5 };

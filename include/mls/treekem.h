@@ -31,7 +31,6 @@ struct Node
 struct OptionalNode
 {
   std::optional<Node> node;
-  bytes hash;
 
   bool blank() const { return !node.has_value(); }
   bool leaf() const
@@ -55,15 +54,6 @@ struct OptionalNode
   {
     return var::get<ParentNode>(opt::get(node).node);
   }
-
-  // For leaf nodes
-  void set_tree_hash(CipherSuite suite, NodeIndex index);
-
-  // For parent nodes
-  void set_tree_hash(CipherSuite suite,
-                     NodeIndex index,
-                     const bytes& left,
-                     const bytes& right);
 
   TLS_SERIALIZABLE(node)
 };
@@ -171,6 +161,8 @@ struct TreeKEMPublicKey
 #endif
 
 private:
+  std::map<NodeIndex, bytes> hashes;
+
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
   bytes get_hash(NodeIndex index);
@@ -190,9 +182,15 @@ operator<<(tls::ostream& str, const TreeKEMPublicKey& obj);
 tls::istream&
 operator>>(tls::istream& str, TreeKEMPublicKey& obj);
 
+struct LeafNodeHashInput;
+struct ParentNodeHashInput;
+
 } // namespace mls
 
 namespace tls {
+
+TLS_VARIANT_MAP(mls::NodeType, mls::LeafNodeHashInput, leaf)
+TLS_VARIANT_MAP(mls::NodeType, mls::ParentNodeHashInput, parent)
 
 TLS_VARIANT_MAP(mls::NodeType, mls::LeafNode, leaf)
 TLS_VARIANT_MAP(mls::NodeType, mls::ParentNode, parent)

@@ -57,39 +57,6 @@ Node::parent_hash() const
 }
 
 ///
-/// OptionalNode
-///
-
-void
-OptionalNode::set_tree_hash(CipherSuite suite, NodeIndex index)
-{
-  auto leaf = std::optional<LeafNode>{};
-  if (node) {
-    leaf = var::get<LeafNode>(opt::get(node).node);
-  }
-
-  tls::ostream w;
-  w << index << leaf;
-  hash = suite.digest().hash(w.bytes());
-}
-
-void
-OptionalNode::set_tree_hash(CipherSuite suite,
-                            NodeIndex index,
-                            const bytes& left,
-                            const bytes& right)
-{
-  auto parent = std::optional<ParentNode>{};
-  if (node) {
-    parent = var::get<ParentNode>(opt::get(node).node);
-  }
-
-  tls::ostream w;
-  w << index << parent << left << right;
-  hash = suite.digest().hash(w.bytes());
-}
-
-///
 /// TreeKEMPrivateKey
 ///
 
@@ -499,12 +466,11 @@ bytes
 TreeKEMPublicKey::root_hash() const
 {
   auto r = tree_math::root(size);
-  auto hash = node_at(r).hash;
-  if (hash.empty()) {
+  if (hashes.count(r) == 0) {
     throw InvalidParameterError("Root hash not set");
   }
 
-  return hash;
+  return hashes.at(r);
 }
 
 bool
@@ -734,37 +700,74 @@ TreeKEMPublicKey::node_at(LeafIndex n) const
 void
 TreeKEMPublicKey::clear_hash_all()
 {
-  for (auto& node : nodes) {
-    node.hash.resize(0);
-  }
+  hashes.clear();
 }
 
 void
 TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 {
   auto dp = tree_math::dirpath(NodeIndex(index), size);
-  node_at(NodeIndex(index)).hash.resize(0);
+  hashes.erase(NodeIndex(index));
   for (auto n : dp) {
-    node_at(n).hash.resize(0);
+    hashes.erase(n);
   }
 }
+
+struct LeafNodeHashInput
+{
+  LeafIndex leaf_index;
+  std::optional<LeafNode> leaf_node;
+  TLS_SERIALIZABLE(leaf_index, leaf_node)
+};
+
+struct ParentNodeHashInput
+{
+  std::optional<ParentNode> parent_node;
+  const bytes& left_hash;
+  const bytes& right_hash;
+  TLS_SERIALIZABLE(parent_node, left_hash, right_hash)
+};
+
+struct TreeHashInput
+{
+  std::variant<LeafNodeHashInput, ParentNodeHashInput> node;
+  TLS_SERIALIZABLE(node);
+  TLS_TRAITS(tls::variant<NodeType>)
+};
 
 bytes
 TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 {
-  if (!node_at(index).hash.empty()) {
-    return node_at(index).hash;
+  if (hashes.count(index) > 0) {
+    return hashes.at(index);
   }
 
+  auto hash_input = bytes{};
+  const auto& node = node_at(index);
   if (tree_math::level(index) == 0) {
-    node_at(index).set_tree_hash(suite, index);
-    return node_at(index).hash;
+    auto input = LeafNodeHashInput{ LeafIndex(index), {} };
+    if (!node.blank()) {
+      input.leaf_node = node.leaf_node();
+    }
+
+    hash_input = tls::marshal(TreeHashInput{ input });
+  } else {
+    auto input = ParentNodeHashInput{
+      {},
+      get_hash(tree_math::left(index)),
+      get_hash(tree_math::right(index)),
+    };
+
+    if (!node.blank()) {
+      input.parent_node = node.parent_node();
+    }
+
+    hash_input = tls::marshal(TreeHashInput{ input });
   }
 
-  auto lh = get_hash(tree_math::left(index));
-  auto rh = get_hash(tree_math::right(index));
-  node_at(index).set_tree_hash(suite, index, lh, rh);
-  return node_at(index).hash;
+  auto hash = suite.digest().hash(hash_input);
+  hashes.insert_or_assign(index, hash);
+  return hash;
 }
 
 // struct {

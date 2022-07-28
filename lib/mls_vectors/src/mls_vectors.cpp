@@ -192,13 +192,11 @@ TreeMathTestVector::verify() const
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
     VERIFY_EQUAL("left", left[x.val], null_if_same(x, tree_math::left(x)));
-    VERIFY_EQUAL(
-      "right", right[x.val], null_if_same(x, tree_math::right(x)));
+    VERIFY_EQUAL("right", right[x.val], null_if_same(x, tree_math::right(x)));
     VERIFY_EQUAL(
       "parent", parent[x.val], null_if_same(x, tree_math::parent(x)));
-    VERIFY_EQUAL("sibling",
-                 sibling[x.val],
-                 null_if_same(x, tree_math::sibling(x)));
+    VERIFY_EQUAL(
+      "sibling", sibling[x.val], null_if_same(x, tree_math::sibling(x)));
   }
 
   return std::nullopt;
