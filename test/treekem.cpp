@@ -143,7 +143,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     auto index = LeafIndex(i);
     auto root = tree_math::root(LeafCount(i + 1));
-    auto curr_size = LeafCount(1 << tree_math::level(root));
+    auto curr_size = LeafCount(1U << tree_math::level(root));
 
     auto add_index = pub.add_leaf(leaf_before);
     REQUIRE(add_index == index);
