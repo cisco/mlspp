@@ -153,10 +153,10 @@ SecretTree::get(LeafIndex sender)
     auto right = tree_math::right(curr_node);
 
     auto& secret = secrets.at(curr_node);
-    secrets.insert_or_assign(left,
-      derive_tree_secret(suite, secret, "tree", left, 0, secret_size));
-    secrets.insert_or_assign(right,
-      derive_tree_secret(suite, secret, "tree", right, 0, secret_size));
+    secrets.insert_or_assign(
+      left, derive_tree_secret(suite, secret, "tree", left, 0, secret_size));
+    secrets.insert_or_assign(
+      right, derive_tree_secret(suite, secret, "tree", right, 0, secret_size));
   }
 
   // Copy the leaf

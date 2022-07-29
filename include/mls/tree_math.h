@@ -51,8 +51,6 @@ struct UInt32
 
 struct NodeCount;
 
-
-
 struct LeafCount : public UInt32
 {
   using UInt32::UInt32;
