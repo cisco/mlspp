@@ -5,6 +5,20 @@
 
 static const uint32_t one = 0x01;
 
+static uint32_t
+log2(uint32_t x)
+{
+  if (x == 0) {
+    return 0;
+  }
+
+  uint32_t k = 0;
+  while ((x >> k) > 0) {
+    k += 1;
+  }
+  return k - 1;
+}
+
 namespace mls {
 
 LeafCount::LeafCount(const NodeCount w)
@@ -19,6 +33,13 @@ LeafCount::LeafCount(const NodeCount w)
   }
 
   val = (w.val >> one) + 1;
+}
+
+LeafCount
+LeafCount::full(const LeafCount n)
+{
+  auto k = log2(n.val);
+  return LeafCount{ 1U << (k + 1) };
 }
 
 NodeCount::NodeCount(const LeafCount n)
@@ -57,20 +78,6 @@ operator>>(tls::istream& str, LeafIndex& obj)
 }
 
 namespace tree_math {
-
-static uint32_t
-log2(uint32_t x)
-{
-  if (x == 0) {
-    return 0;
-  }
-
-  uint32_t k = 0;
-  while ((x >> k) > 0) {
-    k += 1;
-  }
-  return k - 1;
-}
 
 uint32_t
 level(NodeIndex x)

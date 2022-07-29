@@ -51,10 +51,14 @@ struct UInt32
 
 struct NodeCount;
 
+
+
 struct LeafCount : public UInt32
 {
   using UInt32::UInt32;
   explicit LeafCount(const NodeCount w);
+
+  static LeafCount full(const LeafCount n);
 };
 
 struct NodeCount : public UInt32

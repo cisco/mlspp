@@ -735,7 +735,7 @@ struct TreeHashInput
   TLS_TRAITS(tls::variant<NodeType>)
 };
 
-bytes
+const bytes&
 TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 {
   if (hashes.count(index) > 0) {
@@ -767,7 +767,7 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 
   auto hash = suite.digest().hash(hash_input);
   hashes.insert_or_assign(index, hash);
-  return hash;
+  return hashes.at(index);
 }
 
 // struct {

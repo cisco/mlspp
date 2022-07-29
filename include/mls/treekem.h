@@ -165,7 +165,7 @@ private:
 
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
-  bytes get_hash(NodeIndex index);
+  const bytes& get_hash(NodeIndex index);
 
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(

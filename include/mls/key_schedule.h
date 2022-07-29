@@ -45,9 +45,9 @@ struct SecretTree
 
 private:
   CipherSuite suite;
-  NodeIndex root;
   LeafCount group_size;
-  std::vector<bytes> secrets;
+  NodeIndex root;
+  std::map<NodeIndex, bytes> secrets;
   size_t secret_size;
 };
 
