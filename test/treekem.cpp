@@ -142,8 +142,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     silence_unused(init_priv);
 
     auto index = LeafIndex(i);
-    auto root = tree_math::root(LeafCount(i + 1));
-    auto curr_size = LeafCount(1U << tree_math::level(root));
+    auto root = NodeIndex::root(LeafCount(i + 1));
+    auto curr_size = LeafCount(1U << root.level());
 
     auto add_index = pub.add_leaf(leaf_before);
     REQUIRE(add_index == index);
@@ -158,7 +158,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     // Manually construct a direct path to populate nodes above the new leaf
     auto path = UpdatePath{ leaf_before, {} };
-    auto dp = tree_math::dirpath(NodeIndex(index), curr_size);
+    auto dp = NodeIndex(index).dirpath(curr_size);
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });
@@ -185,7 +185,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   // Remove a node and verify that the resolution comes out right
   pub.blank_path(removed);
   REQUIRE_FALSE(pub.leaf_node(removed));
-  REQUIRE(root_resolution == pub.resolve(tree_math::root(size)));
+  REQUIRE(root_resolution == pub.resolve(NodeIndex::root(size)));
 }
 
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")

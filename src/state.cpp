@@ -162,7 +162,7 @@ State::State(const HPKEPrivateKey& init_priv,
 
   _index = opt::get(maybe_index);
 
-  auto ancestor = tree_math::ancestor(_index, group_info.signer);
+  auto ancestor = _index.ancestor(group_info.signer);
   auto path_secret = std::optional<bytes>{};
   if (secrets.path_secret) {
     path_secret = opt::get(secrets.path_secret).secret;
