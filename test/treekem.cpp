@@ -68,8 +68,15 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   const auto priv = HPKEPrivateKey::derive(suite, random);
   const auto hash_size = suite.digest().hash_size;
 
+  // Create a tree with N blank leaves
+  auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();
+  auto pub = TreeKEMPublicKey(suite);
+  for (auto i = uint32_t(0); i < size.val; i++) {
+    pub.add_leaf(leaf_node);
+  }
+
   // create() populates the direct path
-  auto priv_create = TreeKEMPrivateKey::create(suite, size, index, random);
+  auto priv_create = TreeKEMPrivateKey::create(pub, index, random);
   REQUIRE(priv_create.path_secrets.find(NodeIndex(4)) !=
           priv_create.path_secrets.end());
   REQUIRE(priv_create.path_secrets.find(NodeIndex(5)) !=
@@ -83,7 +90,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
   auto priv_joiner =
-    TreeKEMPrivateKey::joiner(suite, size, index, priv, intersect, random);
+    TreeKEMPrivateKey::joiner(pub, index, priv, intersect, random);
   REQUIRE(priv_joiner.private_key(NodeIndex(4)));
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
@@ -122,8 +129,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 }
 
 //        _
-//    _       X
-//  X   _   X   _
+//    _       _
+//  X   _   _   _
 // X X _ X X _ _ _
 // 0123456789abcde
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
@@ -131,7 +138,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
   const auto root_resolution =
-    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 11 } };
+    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 8 } };
 
   // Construct a full tree using add_leaf and merge
   auto pub = TreeKEMPublicKey{ suite };
@@ -142,8 +149,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     silence_unused(init_priv);
 
     auto index = LeafIndex(i);
-    auto root = NodeIndex::root(LeafCount(i + 1));
-    auto curr_size = LeafCount(1U << root.level());
 
     auto add_index = pub.add_leaf(leaf_before);
     REQUIRE(add_index == index);
@@ -158,7 +163,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     // Manually construct a direct path to populate nodes above the new leaf
     auto path = UpdatePath{ leaf_before, {} };
-    auto dp = NodeIndex(index).dirpath(curr_size);
+    auto dp = pub.filtered_direct_path(NodeIndex(index));
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });
@@ -173,8 +178,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     found = pub.find(leaf_after);
     REQUIRE(found);
     REQUIRE(found == index);
-    for (const auto& dpn : dp) {
-      REQUIRE(pub.node_at(dpn).node);
+    for (const auto& [n, _res] : dp) {
+      REQUIRE(pub.node_at(n).node);
     }
 
     found_leaf = pub.leaf_node(index);
@@ -237,7 +242,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     // New joiner initializes their private key
     auto joiner_priv = TreeKEMPrivateKey::joiner(
-      suite, pubs[i].size, joiner, init_priv, overlap, path_secret);
+      pubs[i], joiner, init_priv, overlap, path_secret);
     privs.push_back(joiner_priv);
     pubs.push_back(pubs[i]);
     REQUIRE(privs[i + 1].consistent(privs[i]));

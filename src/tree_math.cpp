@@ -155,11 +155,20 @@ NodeIndex::parent() const
 NodeIndex
 NodeIndex::sibling() const
 {
-  auto p = parent();
-  auto l = p.left();
-  auto r = p.right();
+  return sibling(parent());
+}
 
-  if (val == l.val) {
+NodeIndex
+NodeIndex::sibling(NodeIndex ancestor) const
+{
+  if (!is_below(ancestor)) {
+    throw InvalidParameterError("Node is not below claimed ancestor");
+  }
+
+  auto l = ancestor.left();
+  auto r = ancestor.right();
+
+  if (is_below(l)) {
     return r;
   }
 
@@ -203,7 +212,8 @@ NodeIndex::copath(LeafCount n)
   d.pop_back();
 
   auto c = std::vector<NodeIndex>(d.size());
-  std::transform(d.begin(), d.end(), c.begin(), [](auto x) { return x.sibling(); });
+  std::transform(
+    d.begin(), d.end(), c.begin(), [](auto x) { return x.sibling(); });
 
   return c;
 }

@@ -169,7 +169,7 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   _tree_priv = TreeKEMPrivateKey::joiner(
-    _suite, _tree.size, _index, std::move(leaf_priv), ancestor, path_secret);
+    _tree, _index, std::move(leaf_priv), ancestor, path_secret);
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());

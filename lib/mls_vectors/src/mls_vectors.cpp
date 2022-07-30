@@ -193,10 +193,8 @@ TreeMathTestVector::verify() const
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
     VERIFY_EQUAL("left", left[x.val], null_if_same(x, x.left()));
     VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
-    VERIFY_EQUAL(
-      "parent", parent[x.val], null_if_same(x, x.parent()));
-    VERIFY_EQUAL(
-      "sibling", sibling[x.val], null_if_same(x, x.sibling()));
+    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
+    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
   }
 
   return std::nullopt;
@@ -774,8 +772,7 @@ TreeKEMTestVector::verify() const
   auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");
   auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
   auto priv =
-    TreeKEMPrivateKey::joiner(cipher_suite,
-                              ratchet_tree_before.size,
+    TreeKEMPrivateKey::joiner(ratchet_tree_before,
                               my_index,
                               leaf_priv,
                               ancestor,
