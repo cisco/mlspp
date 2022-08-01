@@ -559,7 +559,7 @@ TreeKEMPublicKey::filtered_direct_path(NodeIndex index) const
       continue;
     }
 
-    fdp.push_back({ p, res });
+    fdp.emplace_back({ p, res });
   }
 
   return fdp;
@@ -618,7 +618,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
   auto path_nodes = std::vector<UpdatePathNode>{};
   std::transform(
     dp.begin(), dp.end(), std::back_inserter(path_nodes), [&](const auto& dpn) {
-      auto [n, res] = dpn;
+      const auto& [n, res] = dpn;
       remove_leaves(res, except);
 
       auto path_secret = priv.path_secrets.at(n);
