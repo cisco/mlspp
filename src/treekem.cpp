@@ -331,8 +331,7 @@ TreeKEMPrivateKey::consistent(const TreeKEMPrivateKey& other) const
 
     return entry.second == other_entry->second;
   };
-  return std::all_of(
-    path_secrets.begin(), path_secrets.end(), match_if_present);
+  return stdx::all_of(path_secrets, match_if_present);
 }
 
 bool
@@ -346,23 +345,21 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
     private_key(node);
   }
 
-  return std::all_of(private_key_cache.begin(),
-                     private_key_cache.end(),
-                     [other](const auto& entry) {
-                       const auto& [node, priv] = entry;
-                       const auto& opt_node = other.node_at(node).node;
-                       if (!opt_node) {
-                         // It's OK for a TreeKEMPrivateKey to have private keys
-                         // for nodes that are blank in the TreeKEMPublicKey.
-                         // This will happen traniently during Commit
-                         // processing, since proposals will be applied in the
-                         // public tree and not in the private tree.
-                         return true;
-                       }
+  return stdx::all_of(private_key_cache, [other](const auto& entry) {
+    const auto& [node, priv] = entry;
+    const auto& opt_node = other.node_at(node).node;
+    if (!opt_node) {
+      // It's OK for a TreeKEMPrivateKey to have private keys
+      // for nodes that are blank in the TreeKEMPublicKey.
+      // This will happen traniently during Commit
+      // processing, since proposals will be applied in the
+      // public tree and not in the private tree.
+      return true;
+    }
 
-                       const auto& pub = opt::get(opt_node).public_key();
-                       return priv.public_key == pub;
-                     });
+    const auto& pub = opt::get(opt_node).public_key();
+    return priv.public_key == pub;
+  });
 }
 
 ///
@@ -485,7 +482,7 @@ bool
 TreeKEMPublicKey::has_parent_hash(NodeIndex child, const bytes& target_ph) const
 {
   const auto res = resolve(child);
-  return std::any_of(res.begin(), res.end(), [&](auto nr) {
+  return stdx::any_of(res, [&](auto nr) {
     return opt::get(node_at(nr).node).parent_hash() == target_ph;
   });
 }
@@ -519,18 +516,17 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
 {
   auto at_leaf = (index.level() == 0);
   if (!node_at(index).blank()) {
-    const auto& node = node_at(index);
-    if (node.leaf()) {
-      return { index };
+    auto out = std::vector<NodeIndex>{ index };
+    if (index.is_leaf()) {
+      return out;
     }
 
-    const auto& unmerged = node.parent_node().unmerged_leaves;
-    auto out = std::vector<NodeIndex>{ index };
-    std::transform(unmerged.begin(),
-                   unmerged.end(),
-                   std::back_inserter(out),
-                   [](LeafIndex x) -> NodeIndex { return NodeIndex(x); });
+    const auto& node = node_at(index);
+    auto unmerged =
+      stdx::transform<NodeIndex>(node.parent_node().unmerged_leaves,
+                                 [](LeafIndex x) { return NodeIndex(x); });
 
+    out.insert(out.end(), unmerged.begin(), unmerged.end());
     return out;
   }
 
@@ -615,24 +611,20 @@ TreeKEMPublicKey::encap(LeafIndex from,
   auto dp = filtered_direct_path(NodeIndex(from));
 
   // Encrypt path secrets to the copath
-  auto path_nodes = std::vector<UpdatePathNode>{};
-  std::transform(
-    dp.begin(), dp.end(), std::back_inserter(path_nodes), [&](auto&& dpn) {
-      auto&& [n, res] = dpn;
-      remove_leaves(res, except);
+  auto path_nodes = stdx::transform<UpdatePathNode>(dp, [&](const auto& dpn) {
+    auto [n, res] = dpn;
+    remove_leaves(res, except);
 
-      auto path_secret = priv.path_secrets.at(n);
-      auto node_priv = opt::get(priv.private_key(n));
-      auto node = UpdatePathNode{ node_priv.public_key, {} };
+    auto path_secret = priv.path_secrets.at(n);
+    auto node_priv = opt::get(priv.private_key(n));
 
-      for (const auto nr : res) {
-        const auto& node_pub = opt::get(node_at(nr).node).public_key();
-        auto ct = node_pub.encrypt(suite, context, {}, path_secret);
-        node.encrypted_path_secret.push_back(ct);
-      }
-
-      return node;
+    auto ct = stdx::transform<HPKECiphertext>(res, [&](auto nr) {
+      const auto& node_pub = opt::get(node_at(nr).node).public_key();
+      return node_pub.encrypt(suite, context, {}, path_secret);
     });
+
+    return UpdatePathNode{ node_priv.public_key, std::move(ct) };
+  });
 
   // Update and re-sign the leaf_node
   auto ph = parent_hashes(from, dp, path_nodes);

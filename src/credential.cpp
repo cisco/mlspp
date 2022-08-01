@@ -32,18 +32,11 @@ find_signature(Signature::ID id)
   }
 }
 
-static std::vector<mls::X509Credential::CertData>
+static std::vector<X509Credential::CertData>
 bytes_to_x509_credential_data(const std::vector<bytes>& data_in)
 {
-  std::vector<mls::X509Credential::CertData> data_out;
-  data_out.resize(data_in.size());
-  std::transform(data_in.begin(),
-                 data_in.end(),
-                 data_out.begin(),
-                 [](const bytes& der) -> mls::X509Credential::CertData {
-                   return mls::X509Credential::CertData{ der };
-                 });
-  return data_out;
+  return stdx::transform<X509Credential::CertData>(
+    data_in, [](const bytes& der) { return X509Credential::CertData{ der }; });
 }
 
 X509Credential::X509Credential(const std::vector<bytes>& der_chain_in)
@@ -103,13 +96,8 @@ operator>>(tls::istream& str, X509Credential& obj)
   auto der_chain = std::vector<X509Credential::CertData>{};
   str >> der_chain;
 
-  std::vector<bytes> der_in;
-  der_in.resize(der_chain.size());
-
-  std::transform(der_chain.begin(),
-                 der_chain.end(),
-                 der_in.begin(),
-                 [](const auto& cert_data) { return cert_data.data; });
+  auto der_in = stdx::transform<bytes>(
+    der_chain, [](const auto& cert_data) { return cert_data.data; });
   obj = X509Credential(der_in);
 
   return str;
