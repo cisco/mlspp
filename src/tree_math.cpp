@@ -203,7 +203,8 @@ NodeIndex::copath(LeafCount n)
   d.pop_back();
 
   auto c = std::vector<NodeIndex>(d.size());
-  std::transform(d.begin(), d.end(), c.begin(), [](auto x) { return x.sibling(); });
+  std::transform(
+    d.begin(), d.end(), c.begin(), [](auto x) { return x.sibling(); });
 
   return c;
 }
