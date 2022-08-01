@@ -72,7 +72,7 @@ HashRatchet::next()
   next_secret = secret;
 
   cache[generation] = { key, nonce };
-  return { generation, cache[generation] };
+  return { generation, cache.at(generation) };
 }
 
 // Note: This construction deliberately does not preserve the forward-secrecy
@@ -83,7 +83,7 @@ KeyAndNonce
 HashRatchet::get(uint32_t generation)
 {
   if (cache.count(generation) > 0) {
-    auto out = cache[generation];
+    auto out = cache.at(generation);
     return out;
   }
 
@@ -118,12 +118,11 @@ SecretTree::SecretTree(CipherSuite suite_in,
                        LeafCount group_size_in,
                        bytes encryption_secret_in)
   : suite(suite_in)
-  , root(tree_math::root(group_size_in))
-  , group_size(group_size_in)
-  , secrets(NodeCount{ group_size }.val)
+  , group_size(LeafCount::full(group_size_in))
+  , root(tree_math::root(group_size))
   , secret_size(suite_in.secret_size())
 {
-  secrets[root.val] = std::move(encryption_secret_in);
+  secrets.emplace(std::make_pair(root, std::move(encryption_secret_in)));
 }
 
 bytes
@@ -137,7 +136,8 @@ SecretTree::get(LeafIndex sender)
   dirpath.push_back(root);
   uint32_t curr = 0;
   for (; curr < dirpath.size(); ++curr) {
-    if (!secrets[dirpath[curr].val].empty()) {
+    auto i = dirpath.at(curr);
+    if (secrets.count(i) > 0) {
       break;
     }
   }
@@ -148,23 +148,23 @@ SecretTree::get(LeafIndex sender)
 
   // Derive down
   for (; curr > 0; --curr) {
-    auto curr_node = dirpath[curr];
+    auto curr_node = dirpath.at(curr);
     auto left = tree_math::left(curr_node);
-    auto right = tree_math::right(curr_node, group_size);
+    auto right = tree_math::right(curr_node);
 
-    auto& secret = secrets[curr_node.val];
-    secrets[left.val] =
-      derive_tree_secret(suite, secret, "tree", left, 0, secret_size);
-    secrets[right.val] =
-      derive_tree_secret(suite, secret, "tree", right, 0, secret_size);
+    auto& secret = secrets.at(curr_node);
+    secrets.insert_or_assign(
+      left, derive_tree_secret(suite, secret, "tree", left, 0, secret_size));
+    secrets.insert_or_assign(
+      right, derive_tree_secret(suite, secret, "tree", right, 0, secret_size));
   }
 
   // Copy the leaf
-  auto out = secrets[node.val];
+  auto out = secrets.at(node);
 
   // Zeroize along the direct path
   for (auto i : dirpath) {
-    secrets[i.val] = {};
+    secrets.erase(i);
   }
 
   return out;

@@ -6,6 +6,8 @@
 #include "mls/tree_math.h"
 #include <tls/tls_syntax.h>
 
+#define ENABLE_TREE_DUMP 1
+
 namespace mls {
 
 enum struct NodeType : uint8_t
@@ -29,7 +31,6 @@ struct Node
 struct OptionalNode
 {
   std::optional<Node> node;
-  bytes hash;
 
   bool blank() const { return !node.has_value(); }
   bool leaf() const
@@ -53,15 +54,6 @@ struct OptionalNode
   {
     return var::get<ParentNode>(opt::get(node).node);
   }
-
-  // For leaf nodes
-  void set_tree_hash(CipherSuite suite, NodeIndex index);
-
-  // For parent nodes
-  void set_tree_hash(CipherSuite suite,
-                     NodeIndex index,
-                     const bytes& left,
-                     const bytes& right);
 
   TLS_SERIALIZABLE(node)
 };
@@ -108,7 +100,9 @@ struct TreeKEMPrivateKey
   bool consistent(const TreeKEMPrivateKey& other) const;
   bool consistent(const TreeKEMPublicKey& other) const;
 
+#if ENABLE_TREE_DUMP
   void dump() const;
+#endif
 
 private:
   void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
@@ -117,6 +111,7 @@ private:
 struct TreeKEMPublicKey
 {
   CipherSuite suite;
+  LeafCount size{ 0 };
   std::vector<OptionalNode> nodes;
 
   explicit TreeKEMPublicKey(CipherSuite suite);
@@ -134,7 +129,6 @@ struct TreeKEMPublicKey
   void merge(LeafIndex from, const UpdatePath& path);
   void set_hash_all();
   bytes root_hash() const;
-  LeafCount size() const;
 
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
@@ -155,34 +149,48 @@ struct TreeKEMPublicKey
 
   void truncate();
 
-  OptionalNode& node_at(NodeIndex n) { return nodes.at(n.val); }
-  const OptionalNode& node_at(NodeIndex n) const { return nodes.at(n.val); }
-  OptionalNode& node_at(LeafIndex n) { return nodes.at(NodeIndex(n).val); }
-  const OptionalNode& node_at(LeafIndex n) const
-  {
-    return nodes.at(NodeIndex(n).val);
-  }
+  OptionalNode& node_at(NodeIndex n);
+  const OptionalNode& node_at(NodeIndex n) const;
+  OptionalNode& node_at(LeafIndex n);
+  const OptionalNode& node_at(LeafIndex n) const;
 
   TLS_SERIALIZABLE(nodes)
 
+#if ENABLE_TREE_DUMP
   void dump() const;
+#endif
 
 private:
+  std::map<NodeIndex, bytes> hashes;
+
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
-  bytes get_hash(NodeIndex index);
+  const bytes& get_hash(NodeIndex index);
 
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(
     LeafIndex from,
     const std::vector<UpdatePathNode>& path_nodes) const;
 
+  OptionalNode blank_node;
+
   friend struct TreeKEMPrivateKey;
 };
+
+tls::ostream&
+operator<<(tls::ostream& str, const TreeKEMPublicKey& obj);
+tls::istream&
+operator>>(tls::istream& str, TreeKEMPublicKey& obj);
+
+struct LeafNodeHashInput;
+struct ParentNodeHashInput;
 
 } // namespace mls
 
 namespace tls {
+
+TLS_VARIANT_MAP(mls::NodeType, mls::LeafNodeHashInput, leaf)
+TLS_VARIANT_MAP(mls::NodeType, mls::ParentNodeHashInput, parent)
 
 TLS_VARIANT_MAP(mls::NodeType, mls::LeafNode, leaf)
 TLS_VARIANT_MAP(mls::NodeType, mls::ParentNode, parent)

@@ -58,33 +58,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
   REQUIRE(leaf_node.public_key() == leaf_priv.public_key);
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "Optional node hashes")
-{
-  const auto [init_priv, sig_priv, leaf] = new_leaf_node();
-  silence_unused(sig_priv);
-
-  auto node_index = NodeIndex{ 7 };
-  auto child_hash = bytes{ 0, 1, 2, 3, 4 };
-
-  auto parent = ParentNode{ init_priv.public_key, {}, {} };
-  auto opt_parent = OptionalNode{ Node{ parent }, {} };
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS_AS(opt_parent.set_tree_hash(suite, node_index),
-                    var::bad_variant_access);
-
-  opt_parent.set_tree_hash(suite, node_index, child_hash, child_hash);
-  REQUIRE_FALSE(opt_parent.hash.empty());
-
-  auto opt_leaf = OptionalNode{ Node{ leaf }, {} };
-  // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS_AS(
-    opt_leaf.set_tree_hash(suite, node_index, child_hash, child_hash),
-    var::bad_variant_access);
-
-  opt_leaf.set_tree_hash(suite, node_index);
-  REQUIRE_FALSE(opt_leaf.hash.empty());
-}
-
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 {
   const auto size = LeafCount{ 5 };
@@ -149,16 +122,16 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 }
 
 //        _
-//    _
-//  X   _
-// X X _ X X
+//    _       X
+//  X   _   X   _
+// X X _ X X _ _ _
+// 0123456789abcde
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 {
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
-  const auto root = tree_math::root(size);
   const auto root_resolution =
-    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 8 } };
+    std::vector<NodeIndex>{ NodeIndex{ 1 }, NodeIndex{ 6 }, NodeIndex{ 11 } };
 
   // Construct a full tree using add_leaf and merge
   auto pub = TreeKEMPublicKey{ suite };
@@ -169,7 +142,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     silence_unused(init_priv);
 
     auto index = LeafIndex(i);
-    auto curr_size = LeafCount(i + 1);
+    auto root = tree_math::root(LeafCount(i + 1));
+    auto curr_size = LeafCount(1U << tree_math::level(root));
 
     auto add_index = pub.add_leaf(leaf_before);
     REQUIRE(add_index == index);
@@ -211,7 +185,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   // Remove a node and verify that the resolution comes out right
   pub.blank_path(removed);
   REQUIRE_FALSE(pub.leaf_node(removed));
-  REQUIRE(root_resolution == pub.resolve(root));
+  REQUIRE(root_resolution == pub.resolve(tree_math::root(size)));
 }
 
 TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
@@ -263,7 +237,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     // New joiner initializes their private key
     auto joiner_priv = TreeKEMPrivateKey::joiner(
-      suite, pubs[i].size(), joiner, init_priv, overlap, path_secret);
+      suite, pubs[i].size, joiner, init_priv, overlap, path_secret);
     privs.push_back(joiner_priv);
     pubs.push_back(pubs[i]);
     REQUIRE(privs[i + 1].consistent(privs[i]));
