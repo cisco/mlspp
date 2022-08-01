@@ -797,15 +797,15 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 }
 
 // struct {
-//     HPKEPublicKey public_key;
-//     opaque parent_hash<0..255>;
-//     HPKEPublicKey original_child_resolution<0..2^32-1>;
+//     HPKEPublicKey encryption_key;
+//     opaque parent_hash<V>;
+//     opaque original_sibling_tree_hash<V>;
 // } ParentHashInput;
 struct ParentHashInput
 {
   const HPKEPublicKey& public_key;
   const bytes& parent_hash;
-  std::vector<HPKEPublicKey> original_child_resolution;
+  const bytes& original_child_resolution;
 
   TLS_SERIALIZABLE(public_key, parent_hash, original_child_resolution)
 };
@@ -814,18 +814,15 @@ bytes
 TreeKEMPublicKey::parent_hash(const ParentNode& parent,
                               NodeIndex copath_child) const
 {
-  auto res = resolve(copath_child);
-  remove_leaves(res, parent.unmerged_leaves);
+  if (hashes.count(copath_child) == 0) {
+    throw InvalidParameterError("Child hash not set");
+  }
 
   auto hash_input = ParentHashInput{
     parent.public_key,
     parent.parent_hash,
-    std::vector<HPKEPublicKey>(res.size()),
+    hashes.at(copath_child),
   };
-  for (size_t i = 0; i < res.size(); i++) {
-    const auto& node = opt::get(node_at(res[i]).node);
-    hash_input.original_child_resolution[i] = node.public_key();
-  }
 
   return suite.digest().hash(tls::marshal(hash_input));
 }
