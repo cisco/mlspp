@@ -493,22 +493,29 @@ TreeKEMPublicKey::has_parent_hash(NodeIndex child, const bytes& target_ph) const
 bool
 TreeKEMPublicKey::parent_hash_valid() const
 {
+  auto cache = TreeHashCache{};
+
   auto width = NodeCount(size);
-  for (auto i = NodeIndex{ 1 }; i.val < width.val; i.val += 2) {
-    if (node_at(i).blank()) {
-      continue;
-    }
+  auto height = NodeIndex::root(size).level();
+  for (auto level = uint32_t(1); level <= height; level++) {
+    auto stride = uint32_t(2) << level;
+    auto start = NodeIndex{ stride - 1 };
 
-    const auto& parent = node_at(i).parent_node();
-    auto l = i.left();
-    auto r = i.right();
+    for (auto p = start; p.val < width.val; p.val += stride) {
+      if (node_at(p).blank()) {
+        continue;
+      }
 
-    auto lh = parent_hash(parent, r);
-    auto rh = parent_hash(parent, l);
+      auto l = p.left();
+      auto r = p.right();
 
-    if (!has_parent_hash(l, lh) && !has_parent_hash(r, rh)) {
-      dump();
-      return false;
+      auto lh = original_parent_hash(cache, p, r);
+      auto rh = original_parent_hash(cache, p, l);
+
+      if (!has_parent_hash(l, lh) && !has_parent_hash(r, rh)) {
+        dump();
+        return false;
+      }
     }
   }
   return true;
@@ -867,6 +874,81 @@ TreeKEMPublicKey::parent_hashes(
   }
 
   return ph;
+}
+
+const bytes&
+TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
+                                     NodeIndex index,
+                                     std::vector<LeafIndex> parent_except) const
+{
+  // Scope the unmerged leaves list down to this subtree
+  auto except = std::vector<LeafIndex>{};
+  std::copy_if(parent_except.begin(),
+               parent_except.end(),
+               std::back_inserter(except),
+               [&](auto i) { return NodeIndex(i).is_below(index); });
+
+  auto have_local_changes = !except.empty();
+
+  // If there are no local changes, then we can use the cached tree hash
+  if (!have_local_changes) {
+    return hashes.at(index);
+  }
+
+  // If this method has been called before with the same number of excluded
+  // leaves (which implies the same set), then use the cached value.
+  auto cache_key = std::make_pair(index, except.size());
+  if (auto it = cache.find(cache_key); it != cache.end()) {
+    return it->second;
+  }
+
+  // If there is no entry in either cache, recompute the value
+  auto hash = bytes{};
+  if (index.is_leaf()) {
+    // A leaf node with local changes is by definition excluded from the parent
+    // hash.  So we return the hash of an empty leaf.
+    auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt };
+    hash = suite.digest().hash(tls::marshal(TreeHashInput{ leaf_hash_input }));
+  } else {
+    // If there is no cached value, recalculate the child hashes with the
+    // specified `except` list, removing the `except` list from `unmerged_leaves`.
+    auto parent_hash_input = ParentNodeHashInput{
+      std::nullopt,
+      original_tree_hash(cache, index.left(), except),
+      original_tree_hash(cache, index.right(), except),
+    };
+
+    if (!node_at(index).blank()) {
+      parent_hash_input.parent_node = node_at(index).parent_node();
+      auto& unmerged_leaves = opt::get(parent_hash_input.parent_node).unmerged_leaves;
+      auto end = std::remove_if(
+        unmerged_leaves.begin(), unmerged_leaves.end(), [&](auto leaf) {
+          return std::count(except.begin(), except.end(), leaf) != 0;
+        });
+      unmerged_leaves.erase(end, unmerged_leaves.end());
+    }
+
+    hash = suite.digest().hash(tls::marshal(TreeHashInput{ parent_hash_input }));
+  }
+
+  cache.insert_or_assign(cache_key, hash);
+  return cache.at(cache_key);
+}
+
+bytes
+TreeKEMPublicKey::original_parent_hash(TreeHashCache& cache,
+                                       NodeIndex parent,
+                                       NodeIndex sibling) const
+{
+  const auto& parent_node = node_at(parent).parent_node();
+  const auto& unmerged = parent_node.unmerged_leaves;
+  const auto& sibling_hash = original_tree_hash(cache, sibling, unmerged);
+
+  return suite.digest().hash(tls::marshal(ParentHashInput{
+    parent_node.public_key,
+    parent_node.parent_hash,
+    sibling_hash,
+  }));
 }
 
 bool
