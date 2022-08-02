@@ -877,6 +877,7 @@ TreeKEMPublicKey::parent_hashes(
 }
 
 const bytes&
+// NOLINTNEXTLINE(misc-no-recursion)
 TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
                                      NodeIndex index,
                                      std::vector<LeafIndex> parent_except) const
@@ -911,7 +912,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
     hash = suite.digest().hash(tls::marshal(TreeHashInput{ leaf_hash_input }));
   } else {
     // If there is no cached value, recalculate the child hashes with the
-    // specified `except` list, removing the `except` list from `unmerged_leaves`.
+    // specified `except` list, removing the `except` list from
+    // `unmerged_leaves`.
     auto parent_hash_input = ParentNodeHashInput{
       std::nullopt,
       original_tree_hash(cache, index.left(), except),
@@ -920,7 +922,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
 
     if (!node_at(index).blank()) {
       parent_hash_input.parent_node = node_at(index).parent_node();
-      auto& unmerged_leaves = opt::get(parent_hash_input.parent_node).unmerged_leaves;
+      auto& unmerged_leaves =
+        opt::get(parent_hash_input.parent_node).unmerged_leaves;
       auto end = std::remove_if(
         unmerged_leaves.begin(), unmerged_leaves.end(), [&](auto leaf) {
           return std::count(except.begin(), except.end(), leaf) != 0;
@@ -928,7 +931,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
       unmerged_leaves.erase(end, unmerged_leaves.end());
     }
 
-    hash = suite.digest().hash(tls::marshal(TreeHashInput{ parent_hash_input }));
+    hash =
+      suite.digest().hash(tls::marshal(TreeHashInput{ parent_hash_input }));
   }
 
   cache.insert_or_assign(cache_key, hash);
