@@ -82,7 +82,7 @@ GroupInfo::sign(const TreeKEMPublicKey& tree,
   }
 
   signer = signer_index;
-  signature = priv.sign(tree.suite, to_be_signed());
+  signature = priv.sign(tree.suite, sign_label::group_info, to_be_signed());
 }
 
 bool
@@ -94,7 +94,8 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
   }
 
   const auto& leaf = opt::get(maybe_leaf);
-  return leaf.signature_key.verify(tree.suite, to_be_signed(), signature);
+  return leaf.signature_key.verify(
+    tree.suite, sign_label::group_info, to_be_signed(), signature);
 }
 
 // Welcome
@@ -354,7 +355,8 @@ MLSAuthenticatedContent::sign(WireFormat wire_format,
   auto content_auth =
     MLSAuthenticatedContent{ wire_format, std::move(content) };
   auto tbs = content_auth.to_be_signed(context);
-  content_auth.auth.signature = sig_priv.sign(suite, tbs);
+  content_auth.auth.signature =
+    sig_priv.sign(suite, sign_label::mls_content, tbs);
   return content_auth;
 }
 
@@ -370,7 +372,7 @@ MLSAuthenticatedContent::verify(
   }
 
   auto tbs = to_be_signed(context);
-  return sig_pub.verify(suite, tbs, auth.signature);
+  return sig_pub.verify(suite, sign_label::mls_content, tbs, auth.signature);
 }
 
 struct ConfirmedTranscriptHashInput

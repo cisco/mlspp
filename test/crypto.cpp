@@ -66,10 +66,11 @@ TEST_CASE("Basic Signature")
     REQUIRE(b.public_key == b.public_key);
     REQUIRE(a.public_key != b.public_key);
 
+    auto label = from_ascii("label");
     auto message = from_hex("01020304");
-    auto signature = a.sign(suite, message);
+    auto signature = a.sign(suite, label, message);
 
-    REQUIRE(a.public_key.verify(suite, message, signature));
+    REQUIRE(a.public_key.verify(suite, label, message, signature));
   }
 }
 

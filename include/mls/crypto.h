@@ -164,11 +164,19 @@ private:
 };
 
 // Signature Keys
+namespace sign_label {
+extern const bytes mls_content;
+extern const bytes leaf_node;
+extern const bytes key_package;
+extern const bytes group_info;
+} // namespace sign_label
+
 struct SignaturePublicKey
 {
   bytes data;
 
   bool verify(const CipherSuite& suite,
+              const bytes& label,
               const bytes& message,
               const bytes& signature) const;
 
@@ -184,7 +192,9 @@ struct SignaturePrivateKey
   bytes data;
   SignaturePublicKey public_key;
 
-  bytes sign(const CipherSuite& suite, const bytes& message) const;
+  bytes sign(const CipherSuite& suite,
+             const bytes& label,
+             const bytes& message) const;
 
   TLS_SERIALIZABLE(data, public_key)
 
