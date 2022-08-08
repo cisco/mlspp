@@ -612,6 +612,8 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Encrypt path secrets to the copath
   auto path_nodes = stdx::transform<UpdatePathNode>(dp, [&](const auto& dpn) {
+    // We need the copy here so that we can modify the resolution.
+    // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
     auto [n, res] = dpn;
     remove_leaves(res, except);
 
