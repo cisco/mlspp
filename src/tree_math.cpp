@@ -57,9 +57,25 @@ LeafIndex::LeafIndex(NodeIndex x)
   val = x.val >> 1; // NOLINT(hicpp-signed-bitwise)
 }
 
-NodeIndex::NodeIndex(LeafIndex x)
-  : UInt32(2 * x.val)
+NodeIndex
+LeafIndex::ancestor(LeafIndex other) const
 {
+  auto ln = NodeIndex(*this);
+  auto rn = NodeIndex(other);
+  if (ln == rn) {
+    return ln;
+  }
+
+  uint8_t k = 0;
+  while (ln != rn) {
+    ln.val = ln.val >> 1U;
+    rn.val = rn.val >> 1U;
+    k += 1;
+  }
+
+  uint32_t prefix = ln.val << k;
+  uint32_t stop = (1U << uint8_t(k - 1));
+  return NodeIndex{ prefix + (stop - 1) };
 }
 
 tls::ostream&
@@ -77,24 +93,13 @@ operator>>(tls::istream& str, LeafIndex& obj)
   return str;
 }
 
-namespace tree_math {
-
-uint32_t
-level(NodeIndex x)
+NodeIndex::NodeIndex(LeafIndex x)
+  : UInt32(2 * x.val)
 {
-  if ((x.val & one) == 0) {
-    return 0;
-  }
-
-  uint32_t k = 0;
-  while (((x.val >> k) & one) == 1) {
-    k += 1;
-  }
-  return k;
 }
 
 NodeIndex
-root(LeafCount n)
+NodeIndex::root(LeafCount n)
 {
   if (n.val == 0) {
     throw std::runtime_error("Root for zero-size tree is undefined");
@@ -104,41 +109,57 @@ root(LeafCount n)
   return NodeIndex{ (one << log2(w.val)) - 1 };
 }
 
-NodeIndex
-left(NodeIndex x)
+bool
+NodeIndex::is_leaf() const
 {
-  if (level(x) == 0) {
-    return x;
+  return val % 2 == 0;
+}
+
+bool
+NodeIndex::is_below(NodeIndex other) const
+{
+  auto lx = level();
+  auto ly = other.level();
+  return lx <= ly && (val >> (ly + 1) == other.val >> (ly + 1));
+}
+
+NodeIndex
+NodeIndex::left() const
+{
+  if (is_leaf()) {
+    return *this;
   }
 
-  return NodeIndex{ x.val ^ (one << (level(x) - 1)) };
+  // The clang analyzer doesn't realize that is_leaf() assures that level >= 1
+  // NOLINTNEXTLINE(clang-analyzer-core.UndefinedBinaryOperatorResult)
+  return NodeIndex{ val ^ (one << (level() - 1)) };
 }
 
 NodeIndex
-right(NodeIndex x)
+NodeIndex::right() const
 {
-  if (level(x) == 0) {
-    return x;
+  if (is_leaf()) {
+    return *this;
   }
 
-  return NodeIndex{ x.val ^ (uint32_t(0x03) << (level(x) - 1)) };
+  return NodeIndex{ val ^ (uint32_t(0x03) << (level() - 1)) };
 }
 
 NodeIndex
-parent(NodeIndex x)
+NodeIndex::parent() const
 {
-  auto k = level(x);
-  return NodeIndex{ (x.val | (one << k)) & ~(one << (k + 1)) };
+  auto k = level();
+  return NodeIndex{ (val | (one << k)) & ~(one << (k + 1)) };
 }
 
 NodeIndex
-sibling(NodeIndex x)
+NodeIndex::sibling() const
 {
-  auto p = parent(x);
-  auto l = left(p);
-  auto r = right(p);
+  auto p = parent();
+  auto l = p.left();
+  auto r = p.right();
 
-  if (x.val == l.val) {
+  if (val == l.val) {
     return r;
   }
 
@@ -146,22 +167,23 @@ sibling(NodeIndex x)
 }
 
 std::vector<NodeIndex>
-dirpath(NodeIndex x, LeafCount n)
+NodeIndex::dirpath(LeafCount n)
 {
-  std::vector<NodeIndex> d;
+  auto d = std::vector<NodeIndex>{};
 
   auto r = root(n);
-  if (x == r) {
+  if (*this == r) {
     return d;
   }
 
-  auto p = parent(x);
+  auto p = parent();
   while (p.val != r.val) {
     d.push_back(p);
-    p = parent(p);
+    p = p.parent();
   }
 
-  if (x.val != r.val) {
+  // Include the root except in a one-member tree
+  if (val != r.val) {
     d.push_back(p);
   }
 
@@ -169,58 +191,36 @@ dirpath(NodeIndex x, LeafCount n)
 }
 
 std::vector<NodeIndex>
-copath(NodeIndex x, LeafCount n)
+NodeIndex::copath(LeafCount n)
 {
-  auto d = dirpath(x, n);
+  auto d = dirpath(n);
   if (d.empty()) {
     return {};
   }
 
-  std::vector<NodeIndex> path;
-  path.push_back(x);
-  // exclude root
-  for (size_t i = 0; i < d.size() - 1; ++i) {
-    path.push_back(d[i]);
-  }
+  // Prepend leaf; omit root
+  d.insert(d.begin(), *this);
+  d.pop_back();
 
-  std::vector<NodeIndex> c(path.size());
-  for (size_t i = 0; i < path.size(); ++i) {
-    c[i] = sibling(path[i]);
-  }
+  auto c = std::vector<NodeIndex>(d.size());
+  std::transform(
+    d.begin(), d.end(), c.begin(), [](auto x) { return x.sibling(); });
 
   return c;
 }
 
-bool
-in_path(NodeIndex x, NodeIndex y)
+uint32_t
+NodeIndex::level() const
 {
-  auto lx = level(x);
-  auto ly = level(y);
-  return lx <= ly && (x.val >> (ly + 1) == y.val >> (ly + 1));
-}
-
-// Common ancestor of two leaves
-NodeIndex
-ancestor(LeafIndex l, LeafIndex r)
-{
-  auto ln = NodeIndex(l);
-  auto rn = NodeIndex(r);
-  if (ln == rn) {
-    return ln;
+  if ((val & one) == 0) {
+    return 0;
   }
 
-  uint8_t k = 0;
-  while (ln != rn) {
-    ln.val = ln.val >> 1U;
-    rn.val = rn.val >> 1U;
+  uint32_t k = 0;
+  while (((val >> k) & one) == 1) {
     k += 1;
   }
-
-  uint32_t prefix = ln.val << k;
-  uint32_t stop = (1U << uint8_t(k - 1));
-  // NOLINTNEXTLINE(modernize-return-braced-init-list)
-  return NodeIndex(prefix + (stop - 1));
+  return k;
 }
 
-} // namespace tree_math
 } // namespace mls

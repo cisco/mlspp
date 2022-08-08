@@ -119,7 +119,7 @@ SecretTree::SecretTree(CipherSuite suite_in,
                        bytes encryption_secret_in)
   : suite(suite_in)
   , group_size(LeafCount::full(group_size_in))
-  , root(tree_math::root(group_size))
+  , root(NodeIndex::root(group_size))
   , secret_size(suite_in.secret_size())
 {
   secrets.emplace(std::make_pair(root, std::move(encryption_secret_in)));
@@ -131,7 +131,7 @@ SecretTree::get(LeafIndex sender)
   auto node = NodeIndex(sender);
 
   // Find an ancestor that is populated
-  auto dirpath = tree_math::dirpath(node, group_size);
+  auto dirpath = node.dirpath(group_size);
   dirpath.insert(dirpath.begin(), node);
   dirpath.push_back(root);
   uint32_t curr = 0;
@@ -149,8 +149,8 @@ SecretTree::get(LeafIndex sender)
   // Derive down
   for (; curr > 0; --curr) {
     auto curr_node = dirpath.at(curr);
-    auto left = tree_math::left(curr_node);
-    auto right = tree_math::right(curr_node);
+    auto left = curr_node.left();
+    auto right = curr_node.right();
 
     auto& secret = secrets.at(curr_node);
     secrets.insert_or_assign(

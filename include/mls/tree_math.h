@@ -73,6 +73,8 @@ struct LeafIndex : public UInt32
   explicit LeafIndex(const NodeIndex x);
   bool operator<(const LeafIndex other) const { return val < other.val; }
   bool operator<(const LeafCount other) const { return val < other.val; }
+
+  NodeIndex ancestor(LeafIndex other) const;
 };
 
 // Leaf indices serialize as node indices, and are validated on deserialize
@@ -86,41 +88,22 @@ struct NodeIndex : public UInt32
   using UInt32::UInt32;
   explicit NodeIndex(const LeafIndex x);
   bool operator<(const NodeIndex other) const { return val < other.val; }
+  bool operator<(const LeafCount other) const { return val < other.val; }
+
+  static NodeIndex root(LeafCount n);
+
+  bool is_leaf() const;
+  bool is_below(NodeIndex other) const;
+
+  NodeIndex left() const;
+  NodeIndex right() const;
+  NodeIndex parent() const;
+  NodeIndex sibling() const;
+
+  std::vector<NodeIndex> dirpath(LeafCount n);
+  std::vector<NodeIndex> copath(LeafCount n);
+
+  uint32_t level() const;
 };
 
-// Internal namespace to keep these generic names clean
-namespace tree_math {
-
-uint32_t
-level(NodeIndex x);
-
-// Node relationships
-NodeIndex
-root(LeafCount n);
-
-NodeIndex
-left(NodeIndex x);
-
-NodeIndex
-right(NodeIndex x);
-
-NodeIndex
-parent(NodeIndex x);
-
-NodeIndex
-sibling(NodeIndex x);
-
-std::vector<NodeIndex>
-dirpath(NodeIndex x, LeafCount n);
-
-std::vector<NodeIndex>
-copath(NodeIndex x, LeafCount n);
-
-bool
-in_path(NodeIndex x, NodeIndex y);
-
-NodeIndex
-ancestor(LeafIndex l, LeafIndex r);
-
-} // namespace tree_math
 } // namespace mls

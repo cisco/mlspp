@@ -166,15 +166,24 @@ TreeMathTestVector::create(uint32_t n_leaves)
 
   // Root is special
   for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
-    tv.root[n.val - 1] = tree_math::root(n);
+    tv.root[n.val - 1] = NodeIndex::root(n);
   }
 
   // Left, right, parent, sibling are relative
   for (NodeIndex x{ 0 }; x.val < tv.n_nodes.val; x.val++) {
-    tv.left[x.val] = null_if_same(x, tree_math::left(x));
-    tv.right[x.val] = null_if_same(x, tree_math::right(x));
-    tv.parent[x.val] = null_if_same(x, tree_math::parent(x));
-    tv.sibling[x.val] = null_if_same(x, tree_math::sibling(x));
+    tv.left[x.val] = null_if_same(x, x.left());
+    tv.right[x.val] = null_if_same(x, x.right());
+    tv.parent[x.val] = null_if_same(x, x.parent());
+    tv.sibling[x.val] = null_if_same(x, x.sibling());
+  }
+
+  // Ancestor takes two leaf nodes
+  tv.ancestor.resize(tv.n_leaves.val);
+  for (LeafIndex x{ 0 }; x.val < tv.n_leaves.val; x.val++) {
+    tv.ancestor[x.val].resize(tv.n_leaves.val);
+    for (LeafIndex y{ 0 }; y.val < tv.n_leaves.val; y.val++) {
+      tv.ancestor[x.val][y.val] = x.ancestor(y);
+    }
   }
 
   return tv;
@@ -187,16 +196,20 @@ TreeMathTestVector::verify() const
 
   auto ss = std::stringstream();
   for (LeafCount n{ 1 }; n.val <= n_leaves.val; n.val++) {
-    VERIFY_EQUAL("root", root[n.val - 1], tree_math::root(n));
+    VERIFY_EQUAL("root", root[n.val - 1], NodeIndex::root(n));
   }
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
-    VERIFY_EQUAL("left", left[x.val], null_if_same(x, tree_math::left(x)));
-    VERIFY_EQUAL("right", right[x.val], null_if_same(x, tree_math::right(x)));
-    VERIFY_EQUAL(
-      "parent", parent[x.val], null_if_same(x, tree_math::parent(x)));
-    VERIFY_EQUAL(
-      "sibling", sibling[x.val], null_if_same(x, tree_math::sibling(x)));
+    VERIFY_EQUAL("left", left[x.val], null_if_same(x, x.left()));
+    VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
+    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
+    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
+  }
+
+  for (LeafIndex x{ 0 }; x.val < n_leaves.val; x.val++) {
+    for (LeafIndex y{ 0 }; y.val < n_leaves.val; y.val++) {
+      VERIFY_EQUAL("ancestor", ancestor[x.val][y.val], x.ancestor(y));
+    }
   }
 
   return std::nullopt;
@@ -768,7 +781,7 @@ TreeKEMTestVector::verify() const
   }
 
   auto my_index = opt::get(maybe_index);
-  auto ancestor = tree_math::ancestor(my_index, add_sender);
+  auto ancestor = my_index.ancestor(add_sender);
 
   // Establish a TreeKEMPrivate Key
   auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");

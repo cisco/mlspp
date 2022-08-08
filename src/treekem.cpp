@@ -103,14 +103,14 @@ TreeKEMPrivateKey::implant(NodeIndex start,
                            const bytes& path_secret)
 {
   auto n = start;
-  auto r = tree_math::root(size);
+  auto r = NodeIndex::root(size);
   auto secret = path_secret;
 
   while (n != r) {
     path_secrets[n] = secret;
     private_key_cache.erase(n);
 
-    n = tree_math::parent(n);
+    n = n.parent();
     secret = suite.derive_secret(secret, "path");
   }
 
@@ -163,7 +163,7 @@ TreeKEMPrivateKey::set_leaf_secret(const bytes& secret)
 std::tuple<NodeIndex, bytes, bool>
 TreeKEMPrivateKey::shared_path_secret(LeafIndex to) const
 {
-  auto n = tree_math::ancestor(index, to);
+  auto n = index.ancestor(to);
   auto i = path_secrets.find(n);
   if (i == path_secrets.end()) {
     return std::make_tuple(n, bytes{}, false);
@@ -208,7 +208,7 @@ TreeKEMPublicKey::dump() const
     }
 
     std::cout << "  | ";
-    for (uint32_t j = 0; j < tree_math::level(i); j++) {
+    for (uint32_t j = 0; j < i.level(); j++) {
       std::cout << "  ";
     }
 
@@ -237,7 +237,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   // Identify which node in the path secret we will be decrypting
   auto ni = NodeIndex(index);
   auto size = pub.size;
-  auto dp = tree_math::dirpath(NodeIndex(from), size);
+  auto dp = NodeIndex(from).dirpath(size);
   if (dp.size() != path.nodes.size()) {
     throw ProtocolError("Malformed direct path");
   }
@@ -247,9 +247,9 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   NodeIndex overlap_node;
   NodeIndex copath_node;
   for (dpi = 0; dpi < dp.size(); dpi++) {
-    if (tree_math::in_path(ni, dp[dpi])) {
+    if (ni.is_below(dp[dpi])) {
       overlap_node = dp[dpi];
-      copath_node = tree_math::sibling(last);
+      copath_node = last.sibling();
       break;
     }
 
@@ -390,7 +390,7 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
   node_at(ni).node = Node{ leaf };
 
   // Update the unmerged list
-  for (auto& n : tree_math::dirpath(ni, size)) {
+  for (auto& n : ni.dirpath(size)) {
     if (!node_at(n).node) {
       continue;
     }
@@ -420,7 +420,7 @@ TreeKEMPublicKey::blank_path(LeafIndex index)
 
   auto ni = NodeIndex(index);
   node_at(ni).node.reset();
-  for (auto n : tree_math::dirpath(ni, size)) {
+  for (auto n : ni.dirpath(size)) {
     node_at(n).node.reset();
   }
 
@@ -433,7 +433,7 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
   node_at(from).node = Node{ path.leaf_node };
 
   auto ni = NodeIndex(from);
-  auto dp = tree_math::dirpath(ni, size);
+  auto dp = ni.dirpath(size);
   if (dp.size() != path.nodes.size()) {
     throw ProtocolError("Malformed direct path");
   }
@@ -458,14 +458,14 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
 void
 TreeKEMPublicKey::set_hash_all()
 {
-  auto r = tree_math::root(size);
+  auto r = NodeIndex::root(size);
   get_hash(r);
 }
 
 bytes
 TreeKEMPublicKey::root_hash() const
 {
-  auto r = tree_math::root(size);
+  auto r = NodeIndex::root(size);
   if (hashes.count(r) == 0) {
     throw InvalidParameterError("Root hash not set");
   }
@@ -483,8 +483,8 @@ TreeKEMPublicKey::parent_hash_valid() const
     }
 
     const auto& parent = node_at(i).parent_node();
-    auto l = tree_math::left(i);
-    auto r = tree_math::right(i);
+    auto l = i.left();
+    auto r = i.right();
 
     auto lh = parent_hash(parent, r);
     auto rh = parent_hash(parent, l);
@@ -496,8 +496,8 @@ TreeKEMPublicKey::parent_hash_valid() const
     }
 
     // Otherwise, the right child must be present and match
-    while (node_at(r).blank() && tree_math::level(r) > 0) {
-      r = tree_math::left(r);
+    while (node_at(r).blank() && r.level() > 0) {
+      r = r.left();
     }
 
     auto rn = node_at(r).node;
@@ -511,7 +511,7 @@ TreeKEMPublicKey::parent_hash_valid() const
 std::vector<NodeIndex>
 TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
 {
-  auto at_leaf = (tree_math::level(index) == 0);
+  auto at_leaf = (index.level() == 0);
   if (!node_at(index).blank()) {
     const auto& node = node_at(index);
     if (node.leaf()) {
@@ -532,8 +532,8 @@ TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
     return {};
   }
 
-  auto l = resolve(tree_math::left(index));
-  auto r = resolve(tree_math::right(index));
+  auto l = resolve(index.left());
+  auto r = resolve(index.right());
   l.insert(l.end(), r.begin(), r.end());
   return l;
 }
@@ -589,12 +589,12 @@ TreeKEMPublicKey::encap(LeafIndex from,
   // Encrypt path secrets to the copath
   auto last = NodeIndex(from);
   auto path_nodes = std::vector<UpdatePathNode>{};
-  for (auto n : tree_math::dirpath(NodeIndex(from), size)) {
+  for (auto n : NodeIndex(from).dirpath(size)) {
     auto path_secret = priv.path_secrets.at(n);
     auto node_priv = opt::get(priv.private_key(n));
     auto node = UpdatePathNode{ node_priv.public_key, {} };
 
-    auto copath = tree_math::sibling(last);
+    auto copath = last.sibling();
     auto res = resolve(copath);
     remove_leaves(res, except);
     for (auto nr : res) {
@@ -706,7 +706,7 @@ TreeKEMPublicKey::clear_hash_all()
 void
 TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 {
-  auto dp = tree_math::dirpath(NodeIndex(index), size);
+  auto dp = NodeIndex(index).dirpath(size);
   hashes.erase(NodeIndex(index));
   for (auto n : dp) {
     hashes.erase(n);
@@ -744,7 +744,7 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
 
   auto hash_input = bytes{};
   const auto& node = node_at(index);
-  if (tree_math::level(index) == 0) {
+  if (index.level() == 0) {
     auto input = LeafNodeHashInput{ LeafIndex(index), {} };
     if (!node.blank()) {
       input.leaf_node = node.leaf_node();
@@ -754,8 +754,8 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   } else {
     auto input = ParentNodeHashInput{
       {},
-      get_hash(tree_math::left(index)),
-      get_hash(tree_math::right(index)),
+      get_hash(index.left()),
+      get_hash(index.right()),
     };
 
     if (!node.blank()) {
@@ -812,13 +812,13 @@ TreeKEMPublicKey::parent_hashes(
   // The list of nodes for whom parent hashes are computed, namely: Direct path
   // excluding root, including leaf
   auto from_node = NodeIndex(from);
-  auto dp = tree_math::dirpath(from_node, size);
+  auto dp = from_node.dirpath(size);
   if (!dp.empty()) {
     // pop_back() on an empty list is undefined behavior
     dp.pop_back();
   }
 
-  if (from_node != tree_math::root(size)) {
+  if (from_node != NodeIndex::root(size)) {
     // Handle the special case of a one-leaf tree
     dp.insert(dp.begin(), from_node);
   }
@@ -832,7 +832,7 @@ TreeKEMPublicKey::parent_hashes(
   auto ph = std::vector<bytes>(dp.size());
   for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
     auto n = dp[i];
-    auto s = tree_math::sibling(n);
+    auto s = n.sibling();
 
     auto parent_node = ParentNode{ path_nodes[i].public_key, last_hash, {} };
     last_hash = parent_hash(parent_node, s);
