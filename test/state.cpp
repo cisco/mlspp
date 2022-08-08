@@ -640,7 +640,8 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
 {
   static const auto get_creds = [](const auto& kps) {
-    return stdx::transform<Credential>(kps, [](const auto& leaf) { return leaf.credential; });
+    return stdx::transform<Credential>(
+      kps, [](const auto& leaf) { return leaf.credential; });
   };
 
   // remove member at position 1
