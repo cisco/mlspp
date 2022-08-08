@@ -155,11 +155,20 @@ NodeIndex::parent() const
 NodeIndex
 NodeIndex::sibling() const
 {
-  auto p = parent();
-  auto l = p.left();
-  auto r = p.right();
+  return sibling(parent());
+}
 
-  if (val == l.val) {
+NodeIndex
+NodeIndex::sibling(NodeIndex ancestor) const
+{
+  if (!is_below(ancestor)) {
+    throw InvalidParameterError("Node is not below claimed ancestor");
+  }
+
+  auto l = ancestor.left();
+  auto r = ancestor.right();
+
+  if (is_below(l)) {
     return r;
   }
 

@@ -100,6 +100,10 @@ struct NodeIndex : public UInt32
   NodeIndex parent() const;
   NodeIndex sibling() const;
 
+  // Returns the sibling of this node "relative to this ancestor" -- the child
+  // of `ancestor` that is not in the direct path of this node.
+  NodeIndex sibling(NodeIndex ancestor) const;
+
   std::vector<NodeIndex> dirpath(LeafCount n);
   std::vector<NodeIndex> copath(LeafCount n);
 

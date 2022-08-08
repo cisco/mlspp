@@ -787,8 +787,7 @@ TreeKEMTestVector::verify() const
   auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");
   auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
   auto priv =
-    TreeKEMPrivateKey::joiner(cipher_suite,
-                              ratchet_tree_before.size,
+    TreeKEMPrivateKey::joiner(ratchet_tree_before,
                               my_index,
                               leaf_priv,
                               ancestor,

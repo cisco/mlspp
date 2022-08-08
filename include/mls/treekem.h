@@ -71,12 +71,10 @@ struct TreeKEMPrivateKey
   static TreeKEMPrivateKey solo(CipherSuite suite,
                                 LeafIndex index,
                                 const HPKEPrivateKey& leaf_priv);
-  static TreeKEMPrivateKey create(CipherSuite suite,
-                                  LeafCount size,
-                                  LeafIndex index,
+  static TreeKEMPrivateKey create(const TreeKEMPublicKey& pub,
+                                  LeafIndex from,
                                   const bytes& leaf_secret);
-  static TreeKEMPrivateKey joiner(CipherSuite suite,
-                                  LeafCount size,
+  static TreeKEMPrivateKey joiner(const TreeKEMPublicKey& pub,
                                   LeafIndex index,
                                   HPKEPrivateKey leaf_priv,
                                   NodeIndex intersect,
@@ -105,7 +103,9 @@ struct TreeKEMPrivateKey
 #endif
 
 private:
-  void implant(NodeIndex start, LeafCount size, const bytes& path_secret);
+  void implant(const TreeKEMPublicKey& pub,
+               NodeIndex start,
+               const bytes& path_secret);
 };
 
 struct TreeKEMPublicKey
@@ -138,6 +138,10 @@ struct TreeKEMPublicKey
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
+  using FilteredDirectPath =
+    std::vector<std::tuple<NodeIndex, std::vector<NodeIndex>>>;
+  FilteredDirectPath filtered_direct_path(NodeIndex index) const;
+
   std::tuple<TreeKEMPrivateKey, UpdatePath> encap(
     LeafIndex from,
     const bytes& group_id,
@@ -167,9 +171,12 @@ private:
   void clear_hash_path(LeafIndex index);
   const bytes& get_hash(NodeIndex index);
 
+  bool has_parent_hash(NodeIndex child, const bytes& target_ph) const;
+
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(
     LeafIndex from,
+    const FilteredDirectPath& fdp,
     const std::vector<UpdatePathNode>& path_nodes) const;
 
   OptionalNode blank_node;
