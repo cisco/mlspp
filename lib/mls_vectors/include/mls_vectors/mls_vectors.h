@@ -22,6 +22,8 @@ struct TreeMathTestVector
   std::vector<OptionalNode> parent;
   std::vector<OptionalNode> sibling;
 
+  std::vector<std::vector<mls::NodeIndex>> ancestor;
+
   static TreeMathTestVector create(uint32_t n_leaves);
   std::optional<std::string> verify() const;
 };

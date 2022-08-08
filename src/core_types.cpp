@@ -211,7 +211,7 @@ LeafNode::sign(CipherSuite cipher_suite,
     throw InvalidParameterError("Credential not valid for signature key");
   }
 
-  signature = sig_priv.sign(cipher_suite, tbs);
+  signature = sig_priv.sign(cipher_suite, sign_label::leaf_node, tbs);
 }
 
 bool
@@ -228,7 +228,8 @@ LeafNode::verify(CipherSuite cipher_suite,
     }
   }
 
-  return signature_key.verify(cipher_suite, tbs, signature);
+  return signature_key.verify(
+    cipher_suite, sign_label::leaf_node, tbs, signature);
 }
 
 bool
@@ -407,7 +408,7 @@ void
 KeyPackage::sign(const SignaturePrivateKey& sig_priv)
 {
   auto tbs = to_be_signed();
-  signature = sig_priv.sign(cipher_suite, tbs);
+  signature = sig_priv.sign(cipher_suite, sign_label::key_package, tbs);
 }
 
 bool
@@ -434,7 +435,8 @@ KeyPackage::verify() const
     }
   }
 
-  return leaf_node.signature_key.verify(cipher_suite, tbs, signature);
+  return leaf_node.signature_key.verify(
+    cipher_suite, sign_label::key_package, tbs, signature);
 }
 
 bytes

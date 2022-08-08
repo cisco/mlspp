@@ -177,6 +177,15 @@ TreeMathTestVector::create(uint32_t n_leaves)
     tv.sibling[x.val] = null_if_same(x, x.sibling());
   }
 
+  // Ancestor takes two leaf nodes
+  tv.ancestor.resize(tv.n_leaves.val);
+  for (LeafIndex x{ 0 }; x.val < tv.n_leaves.val; x.val++) {
+    tv.ancestor[x.val].resize(tv.n_leaves.val);
+    for (LeafIndex y{ 0 }; y.val < tv.n_leaves.val; y.val++) {
+      tv.ancestor[x.val][y.val] = x.ancestor(y);
+    }
+  }
+
   return tv;
 }
 
@@ -195,6 +204,12 @@ TreeMathTestVector::verify() const
     VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
     VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
     VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
+  }
+
+  for (LeafIndex x{ 0 }; x.val < n_leaves.val; x.val++) {
+    for (LeafIndex y{ 0 }; y.val < n_leaves.val; y.val++) {
+      VERIFY_EQUAL("ancestor", ancestor[x.val][y.val], x.ancestor(y));
+    }
   }
 
   return std::nullopt;
