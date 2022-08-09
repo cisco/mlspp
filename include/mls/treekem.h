@@ -179,7 +179,7 @@ private:
     const FilteredDirectPath& fdp,
     const std::vector<UpdatePathNode>& path_nodes) const;
 
-  using TreeHashCache = std::map<std::tuple<NodeIndex, size_t>, bytes>;
+  using TreeHashCache = std::map<NodeIndex, std::pair<size_t, bytes>>;
   const bytes& original_tree_hash(TreeHashCache& cache,
                                   NodeIndex index,
                                   std::vector<LeafIndex> parent_except) const;

@@ -499,7 +499,7 @@ TreeKEMPublicKey::parent_hash_valid() const
   auto height = NodeIndex::root(size).level();
   for (auto level = uint32_t(1); level <= height; level++) {
     auto stride = uint32_t(2) << level;
-    auto start = NodeIndex{ stride - 1 };
+    auto start = NodeIndex{ (stride >> 1U) - 1 };
 
     for (auto p = start; p.val < width.val; p.val += stride) {
       if (node_at(p).blank()) {
@@ -898,9 +898,12 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
 
   // If this method has been called before with the same number of excluded
   // leaves (which implies the same set), then use the cached value.
-  auto cache_key = std::make_pair(index, except.size());
-  if (auto it = cache.find(cache_key); it != cache.end()) {
-    return it->second;
+  if (auto it = cache.find(index); it != cache.end()) {
+    const auto& [key, value] = *it;
+    const auto& [except_size, hash] = value;
+    if (except_size == except.size()) {
+      return hash;
+    }
   }
 
   // If there is no entry in either cache, recompute the value
@@ -935,8 +938,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
       suite.digest().hash(tls::marshal(TreeHashInput{ parent_hash_input }));
   }
 
-  cache.insert_or_assign(cache_key, hash);
-  return cache.at(cache_key);
+  cache.insert_or_assign(index, std::make_pair(except.size(), hash));
+  return cache.at(index).second;
 }
 
 bytes
