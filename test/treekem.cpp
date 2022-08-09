@@ -228,6 +228,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     REQUIRE(index == joiner);
 
     auto leaf_secret = random_bytes(32);
+    pubs[i].set_hash_all();
     auto [new_adder_priv, path_] = pubs[i].encap(
       adder, group_id, context, leaf_secret, sig_privs[i], {}, {});
     auto path = path_;
@@ -252,6 +253,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     // Other members update via decap()
     for (uint32_t j = 0; j < i; j++) {
       pubs[j].add_leaf(leaf);
+      pubs[j].set_hash_all();
       privs[j].decap(adder, pubs[j], context, path, {});
       pubs[j].merge(adder, path);
 

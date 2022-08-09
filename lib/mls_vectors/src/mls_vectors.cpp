@@ -703,6 +703,7 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   auto add_secret = random_bytes(suite.secret_size());
   auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node(suite);
   auto test_index = pub.add_leaf(test_leaf);
+  pub.set_hash_all();
   auto [add_priv, add_path] = pub.encap(tv.add_sender,
                                         tv.group_id,
                                         {},

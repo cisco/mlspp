@@ -179,6 +179,14 @@ private:
     const FilteredDirectPath& fdp,
     const std::vector<UpdatePathNode>& path_nodes) const;
 
+  using TreeHashCache = std::map<NodeIndex, std::pair<size_t, bytes>>;
+  const bytes& original_tree_hash(TreeHashCache& cache,
+                                  NodeIndex index,
+                                  std::vector<LeafIndex> parent_except) const;
+  bytes original_parent_hash(TreeHashCache& cache,
+                             NodeIndex parent,
+                             NodeIndex sibling) const;
+
   OptionalNode blank_node;
 
   friend struct TreeKEMPrivateKey;
