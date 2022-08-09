@@ -404,8 +404,7 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
     auto& parent = var::get<ParentNode>(opt::get(node_at(n).node).node);
 
     // Insert into unmerged leaves while maintaining order
-    const auto insert_point = std::upper_bound(
-      parent.unmerged_leaves.begin(), parent.unmerged_leaves.end(), index);
+    const auto insert_point = stdx::upper_bound(parent.unmerged_leaves, index);
     parent.unmerged_leaves.insert(insert_point, index);
   }
 
