@@ -235,6 +235,13 @@ contains(const Container& c, const Value& val)
   return std::find(c.begin(), c.end(), val) != c.end();
 }
 
+template<typename Container, typename Value>
+auto
+upper_bound(const Container& c, const Value& val)
+{
+  return std::upper_bound(c.begin(), c.end(), val);
+}
+
 } // namespace stdx
 
 } // namespace mls
