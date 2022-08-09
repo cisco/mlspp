@@ -64,48 +64,32 @@ bool
 Capabilities::extensions_supported(
   const std::vector<Extension::Type>& required) const
 {
-  return std::all_of(
-    required.begin(), required.end(), [&](Extension::Type type) {
-      // Clang and MSVC disagree about the type returned by std::find.  Clang
-      // thinks it's a pointer, so clang-tidy requires `const auto*`.  But MSVC
-      // thinks it's a std::_Array_const_iterator<uint16_t,2>, which needs
-      // `const auto`.
-      // NOLINTNEXTLINE(llvm-qualified-auto, readability-qualified-auto)
-      const auto default_pos =
-        std::find(default_extensions.begin(), default_extensions.end(), type);
-      if (default_pos != default_extensions.end()) {
-        return true;
-      }
+  return stdx::all_of(required, [&](Extension::Type type) {
+    if (stdx::contains(default_extensions, type)) {
+      return true;
+    }
 
-      return std::find(extensions.begin(), extensions.end(), type) !=
-             extensions.end();
-    });
+    return stdx::contains(extensions, type);
+  });
 }
 
 bool
 Capabilities::proposals_supported(
   const std::vector<Proposal::Type>& required) const
 {
-  return std::all_of(
-    required.begin(), required.end(), [&](Proposal::Type type) {
-      // See above for NOLINT reasoning
-      // NOLINTNEXTLINE(llvm-qualified-auto, readability-qualified-auto)
-      const auto default_pos =
-        std::find(default_proposals.begin(), default_proposals.end(), type);
-      if (default_pos != default_proposals.end()) {
-        return true;
-      }
+  return stdx::all_of(required, [&](Proposal::Type type) {
+    if (stdx::contains(default_proposals, type)) {
+      return true;
+    }
 
-      return std::find(proposals.begin(), proposals.end(), type) !=
-             proposals.end();
-    });
+    return stdx::contains(proposals, type);
+  });
 }
 
 bool
 Capabilities::credential_supported(const Credential& credential) const
 {
-  const auto cred_type = credential.type();
-  return std::count(credentials.begin(), credentials.end(), cred_type) > 0;
+  return stdx::contains(credentials, credential.type());
 }
 
 Lifetime
@@ -132,10 +116,8 @@ ExtensionList::add(uint16_t type, bytes data)
 bool
 ExtensionList::has(uint16_t type) const
 {
-  return std::any_of(
-    extensions.begin(), extensions.end(), [&](const Extension& ext) -> bool {
-      return ext.type == type;
-    });
+  return stdx::any_of(extensions,
+                      [&](const Extension& ext) { return ext.type == type; });
 }
 
 ///
@@ -248,11 +230,8 @@ bool
 LeafNode::verify_extension_support(const ExtensionList& ext_list) const
 {
   // Verify that extensions in the list are supported
-  auto ext_types = std::vector<Extension::Type>(ext_list.extensions.size());
-  std::transform(ext_list.extensions.begin(),
-                 ext_list.extensions.end(),
-                 ext_types.begin(),
-                 [](const auto& ext) { return ext.type; });
+  auto ext_types = stdx::transform<Extension::Type>(
+    ext_list.extensions, [](const auto& ext) { return ext.type; });
 
   if (!capabilities.extensions_supported(ext_types)) {
     return false;

@@ -18,9 +18,7 @@ const Extension::Type SFrameCapabilities::type =
 bool
 SFrameCapabilities::compatible(const SFrameParameters& params) const
 {
-  const auto begin = cipher_suites.begin();
-  const auto end = cipher_suites.end();
-  return std::find(begin, end, params.cipher_suite) != end;
+  return stdx::contains(cipher_suites, params.cipher_suite);
 }
 
 // GroupContext
@@ -636,9 +634,9 @@ unmarshal_ciphertext_content(const bytes& content_pt,
   var::visit([&r](auto& val) { r >> val; }, content.content);
   r >> auth;
 
-  auto padding = r.bytes();
-  auto nonzero = [](const auto& x) { return x != 0; };
-  if (std::any_of(padding.begin(), padding.end(), nonzero)) {
+  const auto padding = r.bytes();
+  const auto nonzero = [](const auto& x) { return x != 0; };
+  if (stdx::any_of(padding, nonzero)) {
     throw ProtocolError("Malformed MLSCiphertextContent padding");
   }
 }

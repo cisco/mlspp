@@ -936,12 +936,10 @@ std::vector<State::CachedProposal>
 State::must_resolve(const std::vector<ProposalOrRef>& ids,
                     std::optional<LeafIndex> sender_index) const
 {
-  auto proposals = std::vector<CachedProposal>(ids.size());
-  auto must_resolve = [&](auto& id) {
+  auto must_resolve = [&](const auto& id) {
     return opt::get(resolve(id, sender_index));
   };
-  std::transform(ids.begin(), ids.end(), proposals.begin(), must_resolve);
-  return proposals;
+  return stdx::transform<CachedProposal>(ids, must_resolve);
 }
 
 std::vector<LeafIndex>

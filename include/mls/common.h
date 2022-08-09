@@ -189,4 +189,52 @@ silence_unused(const T& val)
   (void)val;
 }
 
+namespace stdx {
+
+// XXX(RLB) This method takes any container in, but always puts the resuls in
+// std::vector.  The output could be made generic with a Rust-like syntax,
+// defining a PendingTransform object that caches the inputs, with a template
+// `collect()` method that puts them in an output container.  Which makes the
+// calling syntax as follows:
+//
+//   auto out = stdx::transform(in, f).collect<Container>();
+//
+// (You always need the explicit specialization, even if assigning it to an
+// explicitly typed variable, because C++ won't infer return types.)
+//
+// Given that the above syntax is pretty chatty, and we never need anything
+// other than vectors here anyway, I have left this as-is.
+template<typename Value, typename Container, typename UnaryOperation>
+std::vector<Value>
+transform(const Container& c, const UnaryOperation& op)
+{
+  auto out = std::vector<Value>{};
+  auto ins = std::inserter(out, out.begin());
+  std::transform(c.begin(), c.end(), ins, op);
+  return out;
+}
+
+template<typename Container, typename UnaryPredicate>
+bool
+any_of(const Container& c, const UnaryPredicate& pred)
+{
+  return std::any_of(c.begin(), c.end(), pred);
+}
+
+template<typename Container, typename UnaryPredicate>
+bool
+all_of(const Container& c, const UnaryPredicate& pred)
+{
+  return std::all_of(c.begin(), c.end(), pred);
+}
+
+template<typename Container, typename Value>
+bool
+contains(const Container& c, const Value& val)
+{
+  return std::find(c.begin(), c.end(), val) != c.end();
+}
+
+} // namespace stdx
+
 } // namespace mls
