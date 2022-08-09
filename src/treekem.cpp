@@ -402,7 +402,11 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
     }
 
     auto& parent = var::get<ParentNode>(opt::get(node_at(n).node).node);
-    parent.unmerged_leaves.push_back(index);
+
+    // Insert into unmerged leaves while maintaining order
+    const auto insert_point = std::upper_bound(
+      parent.unmerged_leaves.begin(), parent.unmerged_leaves.end(), index);
+    parent.unmerged_leaves.insert(insert_point, index);
   }
 
   clear_hash_path(index);
