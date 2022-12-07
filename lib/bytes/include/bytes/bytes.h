@@ -3,6 +3,7 @@
 #include <string>
 #include <tls/tls_syntax.h>
 #include <vector>
+#include <memory>
 
 namespace bytes_ns {
 
