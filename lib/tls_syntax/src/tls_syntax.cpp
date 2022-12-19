@@ -62,7 +62,7 @@ istream::next()
     throw ReadError("Attempt to read from empty buffer");
   }
 
-  uint8_t value = _buffer.back();
+  const uint8_t value = _buffer.back();
   _buffer.pop_back();
   return value;
 }
