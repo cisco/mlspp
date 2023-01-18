@@ -2,6 +2,9 @@
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#if defined(WITH_OPENSSL3)
+#include <openssl/core_names.h>
+#endif
 
 #include "openssl_common.h"
 
@@ -24,6 +27,26 @@ openssl_digest_type(Digest::ID digest)
       throw std::runtime_error("Unsupported ciphersuite");
   }
 }
+
+#if defined(WITH_OPENSSL3)
+static std::string
+openssl_digest_name(Digest::ID digest)
+{
+  switch (digest) {
+    case Digest::ID::SHA256:
+      return OSSL_DIGEST_NAME_SHA2_256;
+
+    case Digest::ID::SHA384:
+      return OSSL_DIGEST_NAME_SHA2_384;
+
+    case Digest::ID::SHA512:
+      return OSSL_DIGEST_NAME_SHA2_512;
+
+    default:
+      throw std::runtime_error("Unsupported digest algorithm");
+  }
+}
+#endif
 
 template<>
 const Digest&
@@ -91,8 +114,22 @@ Digest::hmac(const bytes& key, const bytes& data) const
 bytes
 Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
 {
+#if defined(WITH_OPENSSL3)
+  auto mac =
+    make_typed_unique(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr));
+  auto ctx = make_typed_unique(EVP_MAC_CTX_new(mac.get()));
+  OSSL_PARAM params[2] = {
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_ALG_PARAM_DIGEST, openssl_digest_name(id).data(), 0),
+    OSSL_PARAM_construct_end()
+  };
+#else
   const auto* type = openssl_digest_type(id);
   auto ctx = make_typed_unique(HMAC_CTX_new());
+#endif
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
 
   // Some FIPS-enabled libraries are overly conservative in their interpretation
   // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
@@ -102,9 +139,21 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   // https://doi.org/10.6028/NIST.SP.800-131Ar2
   static const auto fips_min_hmac_key_len = 14;
   auto key_size = static_cast<int>(key.size());
+#if defined(WITH_OPENSSL3)
+  if (EVP_default_properties_is_fips_enabled(nullptr) &&
+      key_size < fips_min_hmac_key_len) {
+    // Currently OpenSSL's EVP_PKEY_new_mac_key API cannot deal with an empty
+    // key, see: https://github.com/openssl/openssl/issues/13089 As such, we
+    // have to use EVP_MAC API to do the HMAC operations. I am not sure if it's
+    // possible to do the following (or the equivalent) with EVP_MAC APIs:
+    //   EVP_MD_CTX_set_flags(context, EVP_MD_CTX_FLAG_NON_FIPS_ALLOW)
+    throw std::runtime_error("key size violates FIPS constraint");
+  }
+#else
   if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
     HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
   }
+#endif
 
   // Guard against sending nullptr to HMAC_Init_ex
   const auto* key_data = key.data();
@@ -113,17 +162,30 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
     key_data = &non_null_zero_length_key;
   }
 
+#if defined(WITH_OPENSSL3)
+  if (!EVP_MAC_init(ctx.get(), key_data, key_size, params)) {
+#else
   if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
+#endif
     throw openssl_error();
   }
 
+#if defined(WITH_OPENSSL3)
+  if (1 != EVP_MAC_update(ctx.get(), data.data(), data.size())) {
+#else
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
+#endif
     throw openssl_error();
   }
 
   auto md = bytes(hash_size);
+#if defined(WITH_OPENSSL3)
+  size_t size = 0;
+  if (1 != EVP_MAC_final(ctx.get(), md.data(), &size, hash_size)) {
+#else
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
+#endif
     throw openssl_error();
   }
 

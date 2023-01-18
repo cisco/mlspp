@@ -3,7 +3,19 @@ set(CURRENT_LIB_NAME hpke)
 ###
 ### Dependencies
 ###
-find_package(OpenSSL 1.1 REQUIRED)
+find_package(OpenSSL REQUIRED)
+if ( OPENSSL_FOUND )
+    if (${OPENSSL_VERSION} VERSION_GREATER 1.1.1)
+        add_compile_definitions(WITH_OPENSSL3)
+    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
+        message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
+    endif()
+    message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
+    message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
+    message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
+else()
+    message(FATAL_ERROR "No OpenSSL library found")
+endif()
 
 ###
 ### Library Config

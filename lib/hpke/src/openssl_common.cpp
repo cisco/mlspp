@@ -6,6 +6,9 @@
 #include <openssl/hmac.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#if defined(WITH_OPENSSL3)
+#include <openssl/param_build.h>
+#endif
 
 namespace hpke {
 
@@ -30,12 +33,14 @@ typed_delete(EVP_MD_CTX* ptr)
   EVP_MD_CTX_free(ptr);
 }
 
+#if !defined(WITH_OPENSSL3)
 template<>
 void
 typed_delete(HMAC_CTX* ptr)
 {
   HMAC_CTX_free(ptr);
 }
+#endif
 
 template<>
 void
@@ -58,12 +63,51 @@ typed_delete(EC_POINT* ptr)
   EC_POINT_free(ptr);
 }
 
+#if !defined(WITH_OPENSSL3)
 template<>
 void
 typed_delete(EC_KEY* ptr)
 {
   EC_KEY_free(ptr);
 }
+#endif
+
+#if defined(WITH_OPENSSL3)
+template<>
+void
+typed_delete(EVP_MAC* ptr)
+{
+  EVP_MAC_free(ptr);
+}
+
+template<>
+void
+typed_delete(EVP_MAC_CTX* ptr)
+{
+  EVP_MAC_CTX_free(ptr);
+}
+
+template<>
+void
+typed_delete(EC_GROUP* ptr)
+{
+  EC_GROUP_free(ptr);
+}
+
+template<>
+void
+typed_delete(OSSL_PARAM_BLD* ptr)
+{
+  OSSL_PARAM_BLD_free(ptr);
+}
+
+template<>
+void
+typed_delete(OSSL_PARAM* ptr)
+{
+  OSSL_PARAM_free(ptr);
+}
+#endif
 
 template<>
 void
