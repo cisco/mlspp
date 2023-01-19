@@ -73,8 +73,8 @@ LeafIndex::ancestor(LeafIndex other) const
     k += 1;
   }
 
-  uint32_t prefix = ln.val << k;
-  uint32_t stop = (1U << uint8_t(k - 1));
+  const uint32_t prefix = ln.val << k;
+  const uint32_t stop = (1U << uint8_t(k - 1));
   return NodeIndex{ prefix + (stop - 1) };
 }
 

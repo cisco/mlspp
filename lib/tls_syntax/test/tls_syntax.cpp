@@ -130,7 +130,7 @@ template<typename T>
 void
 istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 {
-  tls::istream r(enc);
+  tls::istream r(enc); // NOLINT(misc-const-correctness)
   r >> data;
   REQUIRE(data == val);
   REQUIRE(r.empty());

@@ -134,9 +134,8 @@ struct Certificate::ParsedCertificate
         continue;
       }
 
-      std::string parsed_value = asn1_string_to_std_string(asn_str);
-
-      int nid = OBJ_obj2nid(oid);
+      const int nid = OBJ_obj2nid(oid);
+      const std::string parsed_value = asn1_string_to_std_string(asn_str);
       parsed_name[nid] = parsed_value;
     }
 
