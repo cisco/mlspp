@@ -6,6 +6,12 @@ using namespace bytes_ns;
 using namespace bytes_ns::operators;
 using namespace std::literals::string_literals;
 
+// On Linux, the operators need to be imported to `namespace doctest` in order
+// to be visible within the doctest assertion macros.
+namespace doctest {
+using namespace bytes_ns::operators;
+} // namespace doctest
+
 // To check that memory is safely zeroized on destroy, we have to deliberately
 // do a use-after-free.  This will be caught by the sanitizers, so we only do it
 // when sanitizers are not enabled.
