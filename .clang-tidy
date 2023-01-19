@@ -15,6 +15,7 @@ Checks:            '*,
                     -google-runtime-references,
                     -hicpp-no-assembler,
                     -hicpp-special-member-functions,-warnings-as-errors,
+                    -llvm-include-order
                     -llvmlibc-callee-namespace,
                     -llvmlibc-implementation-in-namespace,
                     -llvmlibc-restrict-system-libc-headers,
