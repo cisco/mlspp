@@ -3,7 +3,6 @@
 #include <tls/tls_syntax.h>
 
 using namespace bytes_ns;
-using namespace bytes_ns::operators;
 
 // An enum to test enum encoding, and as a type for variants
 enum struct IntType : uint16_t

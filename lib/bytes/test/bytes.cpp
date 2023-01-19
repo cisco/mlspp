@@ -1,9 +1,8 @@
-#include <doctest/doctest.h>
 #include <bytes/bytes.h>
+#include <doctest/doctest.h>
 #include <sstream>
 
 using namespace bytes_ns;
-using namespace bytes_ns::operators;
 using namespace std::literals::string_literals;
 
 // To check that memory is safely zeroized on destroy, we have to deliberately

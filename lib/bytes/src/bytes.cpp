@@ -113,8 +113,6 @@ from_hex(const std::string& hex)
   return out;
 }
 
-namespace operators {
-
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
@@ -139,5 +137,4 @@ operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs)
   return rhs != lhs;
 }
 
-} // namespace operators
 } // namespace bytes_ns

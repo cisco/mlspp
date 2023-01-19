@@ -20,9 +20,6 @@ namespace opt = tls::opt;
 
 namespace mls {
 
-// Expose bytes operators for code within this namespace
-using namespace bytes_ns::operators;
-
 // Make variant equality work in the same way as optional equality, with
 // automatic unwrapping.  In other words
 //

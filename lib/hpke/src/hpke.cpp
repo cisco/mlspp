@@ -12,8 +12,6 @@
 
 namespace hpke {
 
-using namespace bytes_ns::operators;
-
 ///
 /// Helper functions and constants
 ///
