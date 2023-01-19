@@ -41,36 +41,27 @@ make_aead(AEAD::ID cipher_in)
 }
 
 template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::AES_128_GCM> =
-  make_aead(AEAD::ID::AES_128_GCM);
-
-template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::AES_256_GCM> =
-  make_aead(AEAD::ID::AES_256_GCM);
-
-template<>
-const AEADCipher AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305> =
-  make_aead(AEAD::ID::CHACHA20_POLY1305);
-
-template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::AES_128_GCM>()
 {
-  return AEADCipher::instance<AEAD::ID::AES_128_GCM>;
+  static const auto instance = make_aead(AEAD::ID::AES_128_GCM);
+  return instance;
 }
 
 template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::AES_256_GCM>()
 {
-  return AEADCipher::instance<AEAD::ID::AES_256_GCM>;
+  static const auto instance = make_aead(AEAD::ID::AES_256_GCM);
+  return instance;
 }
 
 template<>
 const AEADCipher&
 AEADCipher::get<AEAD::ID::CHACHA20_POLY1305>()
 {
-  return AEADCipher::instance<AEAD::ID::CHACHA20_POLY1305>;
+  static const auto instance = make_aead(AEAD::ID::CHACHA20_POLY1305);
+  return instance;
 }
 
 static size_t
