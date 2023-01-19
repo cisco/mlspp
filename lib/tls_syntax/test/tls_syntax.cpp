@@ -99,7 +99,7 @@ template<typename T>
 void
 ostream_test(T val, const std::vector<uint8_t>& enc)
 {
-  tls::ostream w;
+  tls::ostream w; // NOLINT(misc-const-correctness)
   w << val;
   REQUIRE(w.bytes() == enc);
   REQUIRE(w.size() == enc.size());
