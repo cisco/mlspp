@@ -23,13 +23,14 @@ FIPS_mode()
 static int
 FIPS_mode_set(int enable)
 {
-  if (enable && fips_prov == nullptr) {
+  auto retval = 0;
+  if (enable != 0 && fips_prov == nullptr) {
     fips_prov = OSSL_PROVIDER_load(nullptr, "fips");
-    return fips_prov != nullptr;
-  } else if (!enable && fips_prov != nullptr) {
-    return OSSL_PROVIDER_unload(fips_prov);
+    retval = (fips_prov != nullptr) ? 1 : 0;
+  } else if (enable == 0 && fips_prov != nullptr) {
+    retval = OSSL_PROVIDER_unload(fips_prov);
   }
-  return 0;
+  return retval;
 }
 #endif
 

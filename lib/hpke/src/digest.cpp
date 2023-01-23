@@ -119,9 +119,11 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
     make_typed_unique(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr));
   auto ctx = make_typed_unique(EVP_MAC_CTX_new(mac.get()));
   auto digest_name = openssl_digest_name(id);
-  OSSL_PARAM params[2] = { OSSL_PARAM_construct_utf8_string(
-                             OSSL_ALG_PARAM_DIGEST, digest_name.data(), 0),
-                           OSSL_PARAM_construct_end() };
+  std::array<OSSL_PARAM, 2> params = {
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_ALG_PARAM_DIGEST, digest_name.data(), 0),
+    OSSL_PARAM_construct_end()
+  };
 #else
   const auto* type = openssl_digest_type(id);
   auto ctx = make_typed_unique(HMAC_CTX_new());
@@ -155,7 +157,7 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   }
 
 #if defined(WITH_OPENSSL3)
-  if (!EVP_MAC_init(ctx.get(), key_data, key_size, params)) {
+  if (1 != EVP_MAC_init(ctx.get(), key_data, key_size, params.data())) {
 #else
   if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
 #endif

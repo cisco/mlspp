@@ -1,3 +1,4 @@
+#include "fips.h"
 #include <doctest/doctest.h>
 #include <mls/crypto.h>
 
@@ -12,6 +13,10 @@ TEST_CASE("Basic HPKE")
   auto original = random_bytes(100);
 
   for (auto suite_id : all_supported_suites) {
+    if (fips() && !is_fips_approved(suite_id)) {
+      continue;
+    }
+
     auto suite = CipherSuite{ suite_id };
     auto s = bytes{ 0, 1, 2, 3 };
 

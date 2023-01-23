@@ -1,3 +1,4 @@
+#include "fips.h"
 #include <doctest/doctest.h>
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
@@ -22,6 +23,10 @@ TEST_CASE("Tree Math")
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
+    if (fips() && !is_fips_approved(suite.cipher_suite())) {
+      continue;
+    }
+
     const auto tv = EncryptionTestVector::create(suite, 15, 10);
     REQUIRE(tv.verify() == std::nullopt);
   }
@@ -46,6 +51,10 @@ TEST_CASE("Transcript")
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
+    if (fips() && !is_fips_approved(suite.cipher_suite())) {
+      continue;
+    }
+
     const auto tv = TreeKEMTestVector::create(suite, 10);
     REQUIRE(tv.verify() == std::nullopt);
   }
