@@ -122,7 +122,7 @@ SecretTree::SecretTree(CipherSuite suite_in,
   , root(NodeIndex::root(group_size))
   , secret_size(suite_in.secret_size())
 {
-  secrets.emplace(std::make_pair(root, std::move(encryption_secret_in)));
+  secrets.emplace(root, std::move(encryption_secret_in));
 }
 
 bytes
@@ -233,15 +233,13 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
 
   auto handshake_secret = derive_tree_secret(
     suite, leaf_secret, "handshake", sender_node, 0, secret_size);
-  chains.emplace(
-    std::make_pair(Key{ RatchetType::handshake, sender },
-                   HashRatchet{ suite, sender_node, handshake_secret }));
+  chains.emplace(Key{ RatchetType::handshake, sender },
+                 HashRatchet{ suite, sender_node, handshake_secret });
 
   auto application_secret = derive_tree_secret(
     suite, leaf_secret, "application", sender_node, 0, secret_size);
-  chains.emplace(
-    std::make_pair(Key{ RatchetType::application, sender },
-                   HashRatchet{ suite, sender_node, application_secret }));
+  chains.emplace(Key{ RatchetType::application, sender },
+                 HashRatchet{ suite, sender_node, application_secret });
 
   return chains[key];
 }

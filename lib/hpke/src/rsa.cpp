@@ -50,7 +50,7 @@ bytes
 RSASignature::serialize(const Signature::PublicKey& pk) const
 {
   const auto& rpk = dynamic_cast<const PublicKey&>(pk);
-  int len = i2d_PublicKey(rpk.pkey.get(), nullptr);
+  const int len = i2d_PublicKey(rpk.pkey.get(), nullptr);
   auto raw = bytes(len);
   auto* data_ptr = raw.data();
   if (len != i2d_PublicKey(rpk.pkey.get(), &data_ptr)) {
@@ -75,7 +75,7 @@ bytes
 RSASignature::serialize_private(const Signature::PrivateKey& sk) const
 {
   const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
-  int len = i2d_PrivateKey(rsk.pkey.get(), nullptr);
+  const int len = i2d_PrivateKey(rsk.pkey.get(), nullptr);
   auto raw = bytes(len);
   auto* data_ptr = raw.data();
   if (len != i2d_PrivateKey(rsk.pkey.get(), &data_ptr)) {

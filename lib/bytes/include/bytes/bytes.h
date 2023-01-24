@@ -94,6 +94,11 @@ struct bytes
   // Sorting operators (to allow usage as map keys)
   bool operator<(const bytes& rhs) const;
 
+  // Other, external operators
+  friend std::ostream& operator<<(std::ostream& out, const bytes& data);
+  friend bool operator==(const std::vector<uint8_t>& lhs, const bytes& rhs);
+  friend bool operator!=(const std::vector<uint8_t>& lhs, const bytes& rhs);
+
   // TLS syntax serialization
   TLS_SERIALIZABLE(_data);
 
@@ -109,20 +114,5 @@ to_hex(const bytes& data);
 
 bytes
 from_hex(const std::string& hex);
-
-// Operators on bytes are defined in a separate namespace because operator
-// resolution requires them to be in the caller namespace.
-namespace operators {
-
-std::ostream&
-operator<<(std::ostream& out, const bytes_ns::bytes& data);
-
-bool
-operator==(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs);
-
-bool
-operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs);
-
-} // namespace operators
 
 } // namespace bytes_ns

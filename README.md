@@ -6,7 +6,6 @@ Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-proto
 protocol in C++.  Depends on C++17, STL for data structures, and
 OpenSSL for crypto.
 
-
 Quickstart
 ----------
 

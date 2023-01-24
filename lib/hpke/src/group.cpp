@@ -11,8 +11,6 @@
 
 namespace hpke {
 
-using namespace bytes_ns::operators;
-
 static inline size_t
 group_dh_size(Group::ID group_id);
 
