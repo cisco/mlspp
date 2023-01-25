@@ -277,7 +277,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   }
 
   size_t resi = 0;
-  NodeIndex res_overlap_node;
+  const NodeIndex res_overlap_node;
   for (resi = 0; resi < res.size(); resi++) {
     if (have_private_key(res[resi])) {
       break;

@@ -22,7 +22,7 @@ bytes::operator!=(const bytes& other) const
 bool
 bytes::operator==(const std::vector<uint8_t>& other) const
 {
-  size_t size = other.size();
+  const size_t size = other.size();
   if (_data.size() != size) {
     return false;
   }
@@ -106,20 +106,18 @@ from_hex(const std::string& hex)
   auto len = hex.length() / 2;
   auto out = bytes(len);
   for (size_t i = 0; i < len; i += 1) {
-    std::string byte = hex.substr(2 * i, 2);
+    const std::string byte = hex.substr(2 * i, 2);
     out.at(i) = static_cast<uint8_t>(strtol(byte.c_str(), nullptr, 16));
   }
 
   return out;
 }
 
-namespace operators {
-
 std::ostream&
 operator<<(std::ostream& out, const bytes& data)
 {
   // Adjust this threshold to make output more compact
-  size_t threshold = 0xffff;
+  const size_t threshold = 0xffff;
   if (data.size() < threshold) {
     return out << to_hex(data);
   }
@@ -139,5 +137,4 @@ operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs)
   return rhs != lhs;
 }
 
-} // namespace operators
 } // namespace bytes_ns

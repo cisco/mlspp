@@ -3,7 +3,6 @@
 #include <sstream>
 
 using namespace bytes_ns;
-using namespace bytes_ns::operators;
 using namespace std::literals::string_literals;
 
 // To check that memory is safely zeroized on destroy, we have to deliberately
@@ -28,19 +27,16 @@ TEST_CASE("Zeroization")
 }
 #endif
 
-TEST_CASE("From ASCII")
-{
-  const auto str = "hello"s;
-  const auto ascii = bytes{ 0x68, 0x65, 0x6c, 0x6c, 0x6f };
-  REQUIRE(from_ascii(str) == ascii);
-}
-
-TEST_CASE("To/from hex")
+TEST_CASE("To/from hex/ASCII")
 {
   const auto hex = "00010203f0f1f2f3"s;
   const auto bin = bytes{ 0x00, 0x01, 0x02, 0x03, 0xf0, 0xf1, 0xf2, 0xf3 };
   REQUIRE(to_hex(bin) == hex);
   REQUIRE(from_hex(hex) == bin);
+
+  const auto str = "hello"s;
+  const auto ascii = bytes{ 0x68, 0x65, 0x6c, 0x6c, 0x6f };
+  REQUIRE(from_ascii(str) == ascii);
 }
 
 TEST_CASE("Operators")

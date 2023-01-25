@@ -35,7 +35,7 @@ operator<<(std::ostream& str, const std::optional<T>& obj)
 }
 
 static std::ostream&
-operator<<(std::ostream& str, const bytes& obj)
+operator<<(std::ostream& str, const std::vector<uint8_t>& obj)
 {
   return str << to_hex(obj);
 }

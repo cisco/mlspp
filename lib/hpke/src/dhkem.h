@@ -52,9 +52,6 @@ private:
   friend DHKEM make_dhkem(KEM::ID kem_id_in,
                           const Group& group_in,
                           const KDF& kdf_in);
-
-  template<KEM::ID id>
-  static const DHKEM instance;
 };
 
 } // namespace hpke

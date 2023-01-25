@@ -272,7 +272,7 @@ TEST_CASE("Session with X509 Credential")
              "29b54cb90455bbbce07dae4fe4096e5c493615fe967f29ef1997022100dcbc71"
              "d9865c93f3952abc7e671e625b8479214c1c9b62a7cc6a51a84a3610f4");
 
-  std::vector<bytes> der_chain{ leaf_der, issuing_der };
+  const std::vector<bytes> der_chain{ leaf_der, issuing_der };
   const mls::CipherSuite suite{
     mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256
   };

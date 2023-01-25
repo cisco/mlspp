@@ -3,7 +3,6 @@
 #include <tls/tls_syntax.h>
 
 using namespace bytes_ns;
-using namespace bytes_ns::operators;
 
 // An enum to test enum encoding, and as a type for variants
 enum struct IntType : uint16_t
@@ -100,7 +99,7 @@ template<typename T>
 void
 ostream_test(T val, const std::vector<uint8_t>& enc)
 {
-  tls::ostream w;
+  tls::ostream w; // NOLINT(misc-const-correctness)
   w << val;
   REQUIRE(w.bytes() == enc);
   REQUIRE(w.size() == enc.size());
@@ -130,7 +129,7 @@ template<typename T>
 void
 istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 {
-  tls::istream r(enc);
+  tls::istream r(enc); // NOLINT(misc-const-correctness)
   r >> data;
   REQUIRE(data == val);
   REQUIRE(r.empty());

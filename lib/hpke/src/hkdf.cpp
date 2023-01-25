@@ -7,8 +7,6 @@
 
 namespace hpke {
 
-using namespace bytes_ns::operators;
-
 template<>
 const HKDF&
 HKDF::get<Digest::ID::SHA256>()

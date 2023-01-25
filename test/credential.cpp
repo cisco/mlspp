@@ -38,7 +38,7 @@ TEST_CASE("X509 Credential Depth 2")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<bytes> der_in{ leaf_der, issuing_der };
+  const std::vector<bytes> der_in{ leaf_der, issuing_der };
 
   auto cred = Credential::x509(der_in);
   auto x509 = cred.get<X509Credential>();
@@ -68,7 +68,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
              "a1a8c9a1eb85eaf36326ce66aab57bfe62713d2387e00f6af91fe86dffa6fefda"
              "89868e0c280163e33876260a5e8524c39ee592427cad3e99a5539ceae903");
 
-  std::vector<bytes> der_in{ leaf_der, issuing_der };
+  const std::vector<bytes> der_in{ leaf_der, issuing_der };
 
   auto original = Credential::x509(der_in);
   const auto& x509_original = original.get<X509Credential>();
@@ -94,7 +94,7 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
     "032b65700341002cc5b3f1a8954ccc872ecddf5779fb007c08ebc869227dec09cfba8fd977"
     "ea49a182a2e51b67d4440d42248f6951f4c765e9e72e301225c953e89b2747129a0c");
 
-  std::vector<bytes> der_in{ { leaf_der } };
+  const std::vector<bytes> der_in{ { leaf_der } };
 
   auto original = Credential::x509(der_in);
   auto x509_original = original.get<X509Credential>();
