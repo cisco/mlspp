@@ -1,5 +1,6 @@
 #include <bytes/bytes.h>
 #include <doctest/doctest.h>
+#include <memory>
 #include <sstream>
 
 using namespace bytes_ns;

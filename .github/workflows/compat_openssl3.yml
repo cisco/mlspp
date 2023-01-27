@@ -1,0 +1,43 @@
+name: Build for older MacOS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  MACOSX_DEPLOYMENT_TARGET: 10.11
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    env:
+        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+        OSSL3_VCPKG_DIR: ${{ github.workspace }}/alternatives/openssl_3
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: dependencies
+      run: |
+        brew install llvm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: build the library
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.OSSL3_VCPKG_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp

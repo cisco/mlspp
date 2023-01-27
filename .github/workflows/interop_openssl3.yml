@@ -1,0 +1,42 @@
+name: Build the interop harness (OpenSSL 3)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+        OSSL3_VCPKG_DIR: ${{ github.workspace }}/cmd/interop/alternatives/openssl_3
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: Build the library
+      run: |
+        cmake -B build -DVCPKG_MANIFEST_DIR="${{ env.OSSL3_VCPKG_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build build
+
+    - name: Build interop harness
+      run: |
+         cd cmd/interop
+         cmake -B build -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OSSL3_VCPKG_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+         cmake --build build

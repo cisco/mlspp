@@ -5,6 +5,34 @@
 #include <doctest/doctest.h>
 #include <openssl/crypto.h>
 
+#if defined(WITH_OPENSSL3)
+#include <openssl/evp.h>
+#include <openssl/provider.h>
+
+static OSSL_PROVIDER* fips_prov = nullptr;
+
+static int
+FIPS_mode()
+{
+  if (OSSL_PROVIDER_available(nullptr, "fips") == 1) {
+    return 1;
+  }
+  return EVP_default_properties_is_fips_enabled(nullptr);
+}
+
+static int
+FIPS_mode_set(int enable)
+{
+  if (enable && fips_prov == nullptr) {
+    fips_prov = OSSL_PROVIDER_load(nullptr, "fips");
+    return fips_prov != nullptr;
+  } else if (!enable && fips_prov != nullptr) {
+    return OSSL_PROVIDER_unload(fips_prov);
+  }
+  return 0;
+}
+#endif
+
 void
 ensure_fips_if_required()
 {
