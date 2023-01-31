@@ -1,4 +1,4 @@
-name: Build for older MacOS
+name: Build for older MacOS (OpenSSL 3)
 
 on:
   push:
