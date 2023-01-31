@@ -1,6 +1,10 @@
 #include "fips.h"
+#if defined(WITH_OPENSSL3)
 #include <openssl/evp.h>
 #include <openssl/provider.h>
+#else
+#include <openssl/crypto.h>
+#endif
 #include <set>
 
 using namespace mls;
@@ -8,8 +12,12 @@ using namespace mls;
 bool
 fips()
 {
+#if defined(WITH_OPENSSL3)
   return OSSL_PROVIDER_available(nullptr, "fips") == 1 ||
          EVP_default_properties_is_fips_enabled(nullptr) == 1;
+#else
+  return FIPS_mode() == 1;
+#endif
 }
 
 bool

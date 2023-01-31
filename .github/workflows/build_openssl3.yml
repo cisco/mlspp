@@ -48,10 +48,6 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Cleanup
-      run: |
-        rm -rf "${{ env.CMAKE_BUILD_DIR }}"
-
     - name: Restore cache
       uses: actions/cache@v2
       with:

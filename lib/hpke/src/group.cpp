@@ -179,12 +179,12 @@ struct ECKeyGroup : public EVPGroup
       throw openssl_error();
     }
 
-    size_t pt_size = EC_POINT_point2oct(group.get(),
-                                        pt.get(),
-                                        POINT_CONVERSION_UNCOMPRESSED,
-                                        nullptr,
-                                        0,
-                                        nullptr);
+    const auto pt_size = EC_POINT_point2oct(group.get(),
+                                            pt.get(),
+                                            POINT_CONVERSION_UNCOMPRESSED,
+                                            nullptr,
+                                            0,
+                                            nullptr);
     if (0 == pt_size) {
       throw openssl_error();
     }
