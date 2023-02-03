@@ -30,6 +30,19 @@ from_json(const json& j, TreeMathTestVector& v)
   j.get_to(v.cases);
 }
 
+// EncryptionTestVector
+void
+to_json(json& j, const EncryptionTestVector& v)
+{
+  j = json(v.cases);
+}
+
+void
+from_json(const json& j, EncryptionTestVector& v)
+{
+  j.get_to(v.cases);
+}
+
 
 } // namespace mls_vectors
 

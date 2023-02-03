@@ -105,12 +105,17 @@ TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
 
-// TreeMathTestVector requires special handling because it is an array at the
+// Some test vectors require special handling because it is an array at the
 // top level, not an object.
 void
 to_json(json& j, const mls_vectors::TreeMathTestVector& v);
 void
 from_json(const json& j, mls_vectors::TreeMathTestVector& v);
+
+void
+to_json(json& j, const mls_vectors::EncryptionTestVector& v);
+void
+from_json(const json& j, mls_vectors::EncryptionTestVector& v);
 
 } // namespace nlohmann
 
@@ -133,23 +138,20 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
                                    key,
                                    nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
+                                   generation,
                                    key,
                                    nonce,
+                                   plaintext,
                                    ciphertext)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
-                                   generations,
-                                   handshake_content_auth,
-                                   application_content_auth,
                                    handshake,
                                    application)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::TestCase,
                                    cipher_suite,
-                                   tree,
+                                   n_leaves,
                                    encryption_secret,
                                    sender_data_secret,
-                                   padding_size,
                                    sender_data_info,
-                                   authenticated_data,
                                    leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,

@@ -88,7 +88,7 @@ struct NodeIndex : public UInt32
   using UInt32::UInt32;
   explicit NodeIndex(const LeafIndex x);
   bool operator<(const NodeIndex other) const { return val < other.val; }
-  bool operator<(const LeafCount other) const { return val < other.val; }
+  bool operator<(const NodeCount other) const { return val < other.val; }
 
   static NodeIndex root(LeafCount n);
 

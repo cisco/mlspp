@@ -603,13 +603,11 @@ struct MLSCiphertext
 
   static MLSCiphertext protect(MLSAuthenticatedContent content_auth,
                                CipherSuite suite,
-                               const LeafIndex& index,
                                GroupKeySource& keys,
                                const bytes& sender_data_secret,
                                size_t padding_size);
   std::optional<MLSAuthenticatedContent> unprotect(
     CipherSuite suite,
-    const TreeKEMPublicKey& tree,
     GroupKeySource& keys,
     const bytes& sender_data_secret) const;
 

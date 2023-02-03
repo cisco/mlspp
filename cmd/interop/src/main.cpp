@@ -28,7 +28,7 @@ make_test_vector(uint64_t type)
       return mls_vectors::TreeMathTestVector::create({ n });
 
     case TestVectorType::ENCRYPTION:
-      return mls_vectors::EncryptionTestVector::create(suite, n, n);
+      return mls_vectors::EncryptionTestVector::create({ { suite, n, { n } } });
 
     case TestVectorType::KEY_SCHEDULE:
       return mls_vectors::KeyScheduleTestVector::create(suite, n, n);

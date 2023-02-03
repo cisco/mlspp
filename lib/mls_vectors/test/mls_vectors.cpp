@@ -22,7 +22,7 @@ TEST_CASE("Tree Math")
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    const auto tv = EncryptionTestVector::create(suite, 15, 10);
+    const auto tv = EncryptionTestVector::create({ { suite, 15, { 10 } } });
     REQUIRE(tv.verify() == std::nullopt);
   }
 }

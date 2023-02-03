@@ -11,7 +11,6 @@ namespace mls {
 struct HashRatchet
 {
   CipherSuite suite;
-  NodeIndex node;
   bytes next_secret;
   uint32_t next_generation;
   std::map<uint32_t, KeyAndNonce> cache;
@@ -27,7 +26,7 @@ struct HashRatchet
   HashRatchet& operator=(const HashRatchet& other) = default;
   HashRatchet& operator=(HashRatchet&& other) = default;
 
-  HashRatchet(CipherSuite suite_in, NodeIndex node_in, bytes base_secret_in);
+  HashRatchet(CipherSuite suite_in, bytes base_secret_in);
 
   std::tuple<uint32_t, KeyAndNonce> next();
   KeyAndNonce get(uint32_t generation);
@@ -41,7 +40,11 @@ struct SecretTree
              LeafCount group_size_in,
              bytes encryption_secret_in);
 
+  bool has_leaf(LeafIndex sender) { return sender < group_size; }
+
   bytes get(LeafIndex sender);
+
+  void dump(const std::string& label) const;
 
 private:
   CipherSuite suite;
@@ -65,6 +68,8 @@ struct GroupKeySource
   GroupKeySource(CipherSuite suite_in,
                  LeafCount group_size,
                  bytes encryption_secret);
+
+  bool has_leaf(LeafIndex sender) { return secret_tree.has_leaf(sender); }
 
   std::tuple<uint32_t, ReuseGuard, KeyAndNonce> next(ContentType content_type,
                                                      LeafIndex sender);

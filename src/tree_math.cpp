@@ -38,8 +38,11 @@ LeafCount::LeafCount(const NodeCount w)
 LeafCount
 LeafCount::full(const LeafCount n)
 {
-  auto k = log2(n.val);
-  return LeafCount{ 1U << (k + 1) };
+  auto w = 1U;
+  while (w < n.val) {
+    w <<= 1;
+  }
+  return LeafCount{ w };
 }
 
 NodeCount::NodeCount(const LeafCount n)

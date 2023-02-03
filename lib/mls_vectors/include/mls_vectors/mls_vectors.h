@@ -40,43 +40,59 @@ struct TreeMathTestVector
 
 struct EncryptionTestVector
 {
+  struct TestConfig
+  {
+    mls::CipherSuite suite;
+    uint32_t n_leaves;
+    std::vector<uint32_t> generations;
+  };
+
   struct SenderDataInfo
   {
     bytes ciphertext;
     bytes key;
     bytes nonce;
+
+    SenderDataInfo() = default;
+    SenderDataInfo(mls::CipherSuite suite, const bytes& sender_data_secret);
+    std::optional<std::string> verify(mls::CipherSuite suite,
+                                      const bytes& sender_data_secret) const;
   };
 
   struct RatchetStep
   {
+    uint32_t generation;
     bytes key;
     bytes nonce;
+    bytes plaintext;
     bytes ciphertext;
   };
 
   struct LeafInfo
   {
-    uint32_t generations;
-    bytes handshake_content_auth;
-    bytes application_content_auth;
     std::vector<RatchetStep> handshake;
     std::vector<RatchetStep> application;
   };
 
-  mls::CipherSuite cipher_suite;
+  struct TestCase
+  {
+    mls::CipherSuite cipher_suite;
+    mls::LeafCount n_leaves;
 
-  bytes tree;
-  bytes encryption_secret;
-  bytes sender_data_secret;
-  size_t padding_size = 0;
-  SenderDataInfo sender_data_info;
-  bytes authenticated_data;
+    bytes encryption_secret;
+    bytes sender_data_secret;
 
-  std::vector<LeafInfo> leaves;
+    SenderDataInfo sender_data_info;
+    std::vector<LeafInfo> leaves;
 
-  static EncryptionTestVector create(mls::CipherSuite suite,
-                                     uint32_t n_leaves,
-                                     uint32_t n_generations);
+    TestCase() = default;
+    TestCase(const TestConfig& config);
+    std::optional<std::string> verify() const;
+  };
+
+  std::vector<TestCase> cases;
+
+  static EncryptionTestVector create(const std::vector<TestConfig>& configs);
   std::optional<std::string> verify() const;
 };
 

@@ -1,6 +1,8 @@
 #include <mls/key_schedule.h>
 #include <mls/log.h>
 
+#include <iostream>
+
 using mls::log::Log;
 static const auto log_mod = "key_schedule"s;
 
@@ -22,32 +24,19 @@ static bytes
 derive_tree_secret(CipherSuite suite,
                    const bytes& secret,
                    const std::string& label,
-                   NodeIndex node,
                    uint32_t generation,
                    size_t length)
 {
-  auto ctx = tls::marshal(TreeContext{ node, generation });
-  auto derived = suite.expand_with_label(secret, label, ctx, length);
-
-  Log::crypto(log_mod, "=== DeriveTreeSecret ===");
-  Log::crypto(log_mod, "  secret       ", to_hex(secret));
-  Log::crypto(log_mod, "  label        ", label);
-  Log::crypto(log_mod, "  node         ", node.val);
-  Log::crypto(log_mod, "  generation   ", generation);
-  Log::crypto(log_mod, "  tree_context ", to_hex(ctx));
-
-  return derived;
+  return suite.expand_with_label(
+    secret, label, tls::marshal(generation), length);
 }
 
 ///
 /// HashRatchet
 ///
 
-HashRatchet::HashRatchet(CipherSuite suite_in,
-                         NodeIndex node_in,
-                         bytes base_secret_in)
+HashRatchet::HashRatchet(CipherSuite suite_in, bytes base_secret_in)
   : suite(suite_in)
-  , node(node_in)
   , next_secret(std::move(base_secret_in))
   , next_generation(0)
   , key_size(suite.hpke().aead.key_size)
@@ -59,14 +48,17 @@ HashRatchet::HashRatchet(CipherSuite suite_in,
 std::tuple<uint32_t, KeyAndNonce>
 HashRatchet::next()
 {
-  auto key = derive_tree_secret(
-    suite, next_secret, "key", node, next_generation, key_size);
-  auto nonce = derive_tree_secret(
-    suite, next_secret, "nonce", node, next_generation, nonce_size);
-  auto secret = derive_tree_secret(
-    suite, next_secret, "secret", node, next_generation, secret_size);
-
   auto generation = next_generation;
+  auto key =
+    derive_tree_secret(suite, next_secret, "key", generation, key_size);
+  auto nonce =
+    derive_tree_secret(suite, next_secret, "nonce", generation, nonce_size);
+  auto secret =
+    derive_tree_secret(suite, next_secret, "secret", generation, secret_size);
+
+  std::cout << "step: " << next_secret << std::endl;
+  std::cout << " " << generation << " => " << key << " " << nonce << std::endl;
+  std::cout << "      " << secret << std::endl;
 
   next_generation += 1;
   next_secret = secret;
@@ -91,13 +83,11 @@ HashRatchet::get(uint32_t generation)
     throw ProtocolError("Request for expired key");
   }
 
-  while (next_generation < generation) {
+  while (next_generation <= generation) {
     next();
   }
 
-  auto [gen, key_nonce] = next();
-  silence_unused(gen);
-  return key_nonce;
+  return cache.at(generation);
 }
 
 void
@@ -125,9 +115,28 @@ SecretTree::SecretTree(CipherSuite suite_in,
   secrets.emplace(root, std::move(encryption_secret_in));
 }
 
+void
+SecretTree::dump(const std::string& label) const
+{
+  std::cout << "~~~ " << label << " ~~~" << std::endl;
+  for (NodeIndex i{ 0 }; i < NodeCount(group_size); i.val++) {
+    std::cout << "  " << i.val << " ";
+    if (secrets.count(i) > 0) {
+      std::cout << secrets.at(i);
+    } else {
+      std::cout << "-";
+    }
+    std::cout << std::endl;
+  }
+}
+
 bytes
 SecretTree::get(LeafIndex sender)
 {
+  dump("before");
+
+  static const auto context_left = from_ascii("left");
+  static const auto context_right = from_ascii("right");
   auto node = NodeIndex(sender);
 
   // Find an ancestor that is populated
@@ -153,10 +162,18 @@ SecretTree::get(LeafIndex sender)
     auto right = curr_node.right();
 
     auto& secret = secrets.at(curr_node);
-    secrets.insert_or_assign(
-      left, derive_tree_secret(suite, secret, "tree", left, 0, secret_size));
-    secrets.insert_or_assign(
-      right, derive_tree_secret(suite, secret, "tree", right, 0, secret_size));
+
+    const auto left_secret =
+      suite.expand_with_label(secret, "tree", from_ascii("left"), secret_size);
+    const auto right_secret =
+      suite.expand_with_label(secret, "tree", from_ascii("right"), secret_size);
+
+    std::cout << "parent = " << secret << std::endl
+              << "  => L = " << left_secret << std::endl
+              << "  => R = " << right_secret << std::endl;
+
+    secrets.insert_or_assign(left, left_secret);
+    secrets.insert_or_assign(right, right_secret);
   }
 
   // Copy the leaf
@@ -166,6 +183,8 @@ SecretTree::get(LeafIndex sender)
   for (auto i : dirpath) {
     secrets.erase(i);
   }
+
+  dump("after");
 
   return out;
 }
@@ -231,15 +250,22 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
   auto secret_size = suite.secret_size();
   auto leaf_secret = secret_tree.get(sender);
 
-  auto handshake_secret = derive_tree_secret(
-    suite, leaf_secret, "handshake", sender_node, 0, secret_size);
-  chains.emplace(Key{ RatchetType::handshake, sender },
-                 HashRatchet{ suite, sender_node, handshake_secret });
+  auto handshake_secret =
+    suite.expand_with_label(leaf_secret, "handshake", {}, secret_size);
 
-  auto application_secret = derive_tree_secret(
-    suite, leaf_secret, "application", sender_node, 0, secret_size);
+  std::cout << "hs:   " << leaf_secret << " ~> " << handshake_secret
+            << std::endl;
+
+  auto application_secret =
+    suite.expand_with_label(leaf_secret, "application", {}, secret_size);
+
+  std::cout << "app:  " << leaf_secret << " ~> " << application_secret
+            << std::endl;
+
+  chains.emplace(Key{ RatchetType::handshake, sender },
+                 HashRatchet{ suite, handshake_secret });
   chains.emplace(Key{ RatchetType::application, sender },
-                 HashRatchet{ suite, sender_node, application_secret });
+                 HashRatchet{ suite, application_secret });
 
   return chains[key];
 }
