@@ -14,17 +14,22 @@ struct TreeMathTestVector
 {
   using OptionalNode = std::optional<mls::NodeIndex>;
 
-  mls::LeafCount n_leaves;
-  mls::NodeCount n_nodes;
-  std::vector<mls::NodeIndex> root;
-  std::vector<OptionalNode> left;
-  std::vector<OptionalNode> right;
-  std::vector<OptionalNode> parent;
-  std::vector<OptionalNode> sibling;
+  struct TestCase {
+    mls::LeafCount n_leaves;
+    mls::NodeCount n_nodes;
+    mls::NodeIndex root;
+    std::vector<OptionalNode> left;
+    std::vector<OptionalNode> right;
+    std::vector<OptionalNode> parent;
+    std::vector<OptionalNode> sibling;
 
-  std::vector<std::vector<mls::NodeIndex>> ancestor;
+    TestCase(uint32_t n_leaves);
+    std::optional<std::string> verify() const;
+  };
 
-  static TreeMathTestVector create(uint32_t n_leaves);
+  std::vector<TestCase> cases;
+
+  static TreeMathTestVector create(std::vector<uint32_t> n_leaves);
   std::optional<std::string> verify() const;
 };
 

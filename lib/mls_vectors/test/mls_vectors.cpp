@@ -15,7 +15,7 @@ static const std::vector<mls::CipherSuite> supported_suites{
 
 TEST_CASE("Tree Math")
 {
-  const auto tv = TreeMathTestVector::create(256);
+  const auto tv = TreeMathTestVector::create({ 1, 4, 16, 256 });
   REQUIRE(tv.verify() == std::nullopt);
 }
 
