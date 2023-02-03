@@ -1,11 +1,10 @@
 #include "json_details.h"
 
-///
-/// Bytes
-///
+using namespace mls_vectors;
 
 namespace nlohmann {
 
+// Bytes
 void
 to_json(json& j, const bytes& v)
 {
@@ -17,6 +16,20 @@ from_json(const json& j, bytes& v)
 {
   v = from_hex(j.get<std::string>());
 }
+
+// TreeMathTestVector
+void
+to_json(json& j, const TreeMathTestVector& v)
+{
+  j = json(v.cases);
+}
+
+void
+from_json(const json& j, TreeMathTestVector& v)
+{
+  j.get_to(v.cases);
+}
+
 
 } // namespace mls_vectors
 

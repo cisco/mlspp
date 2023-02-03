@@ -352,7 +352,7 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
   json j;
   switch (request->test_vector_type()) {
     case TestVectorType::TREE_MATH: {
-      j = mls_vectors::TreeMathTestVector::create(request->n_leaves());
+      j = mls_vectors::TreeMathTestVector::create({ request->n_leaves() });
       break;
     }
 

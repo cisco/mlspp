@@ -23,6 +23,7 @@ struct TreeMathTestVector
     std::vector<OptionalNode> parent;
     std::vector<OptionalNode> sibling;
 
+    TestCase() = default;
     TestCase(uint32_t n_leaves);
     std::optional<std::string> verify() const;
   };

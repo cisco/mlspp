@@ -8,9 +8,9 @@ protocol interactions.
 
 ```
 > make
-> ./build/mlspp_client -gen <type>         # Generate test vectors of a specified type
-> ./build/mlspp_client -ver <type> <file>  # Verify test vectors of a specified type
-> ./build/mlspp_client -live <port>        # Run a gRPC server for live testing
+> ./build/mlspp_client -gen <type>  # Generate test vectors of a specified type (to stdout)
+> ./build/mlspp_client -ver <type>  # Verify test vectors of a specified type (from stdin)
+> ./build/mlspp_client -live <port> # Run a gRPC server for live testing
 ```
 
 The test vector formats and the gRPC interface are specified in the [MLS interop

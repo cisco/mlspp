@@ -105,6 +105,13 @@ TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
 
+// TreeMathTestVector requires special handling because it is an array at the
+// top level, not an object.
+void
+to_json(json& j, const mls_vectors::TreeMathTestVector& v);
+void
+from_json(const json& j, mls_vectors::TreeMathTestVector& v);
+
 } // namespace nlohmann
 
 ///
@@ -112,7 +119,7 @@ TLS_SERIALIZER(mls::KeyPackage)
 ///
 namespace mls_vectors {
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector::TestCase,
                                    n_leaves,
                                    n_nodes,
                                    root,
