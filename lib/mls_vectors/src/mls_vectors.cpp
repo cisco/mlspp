@@ -141,7 +141,8 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
 std::optional<mls::NodeIndex>
-TreeMathTestVector::TestCase::null_if_invalid(NodeIndex input, NodeIndex answer) const
+TreeMathTestVector::TestCase::null_if_invalid(NodeIndex input,
+                                              NodeIndex answer) const
 {
   // For some invalid cases (e.g., leaf.left()), we currently return the node
   // itself instead of null
