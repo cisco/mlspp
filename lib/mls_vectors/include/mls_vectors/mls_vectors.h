@@ -23,6 +23,8 @@ struct TreeMathTestVector
     std::vector<OptionalNode> parent;
     std::vector<OptionalNode> sibling;
 
+    std::optional<mls::NodeIndex> null_if_invalid(mls::NodeIndex input, mls::NodeIndex answer) const;
+
     TestCase() = default;
     TestCase(uint32_t n_leaves);
     std::optional<std::string> verify() const;

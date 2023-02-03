@@ -20,6 +20,7 @@ using namespace mls_vectors;
 static json
 make_test_vector(uint64_t type)
 {
+  // TODO read parameters from the command line
   auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
   auto n = uint32_t(5);
   switch (type) {

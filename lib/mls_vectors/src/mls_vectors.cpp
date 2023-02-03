@@ -140,10 +140,18 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
-static std::optional<mls::NodeIndex>
-null_if_same(NodeIndex input, NodeIndex answer)
+std::optional<mls::NodeIndex>
+TreeMathTestVector::TestCase::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
+  // For some invalid cases (e.g., leaf.left()), we currently return the node
+  // itself instead of null
   if (input == answer) {
+    return std::nullopt;
+  }
+
+  // NodeIndex::parent is irrespective of tree size, so we might step out of the
+  // tree under consideration.
+  if (answer.val >= n_nodes.val) {
     return std::nullopt;
   }
 
@@ -160,10 +168,10 @@ TreeMathTestVector::TestCase::TestCase(uint32_t n_leaves_in)
   , sibling(n_nodes.val)
 {
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
-    left[x.val] = null_if_same(x, x.left());
-    right[x.val] = null_if_same(x, x.right());
-    parent[x.val] = null_if_same(x, x.parent());
-    sibling[x.val] = null_if_same(x, x.sibling());
+    left[x.val] = null_if_invalid(x, x.left());
+    right[x.val] = null_if_invalid(x, x.right());
+    parent[x.val] = null_if_invalid(x, x.parent());
+    sibling[x.val] = null_if_invalid(x, x.sibling());
   }
 }
 
@@ -186,10 +194,10 @@ TreeMathTestVector::TestCase::verify() const
   VERIFY_EQUAL("root", root, NodeIndex::root(n_leaves));
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
-    VERIFY_EQUAL("left", left[x.val], null_if_same(x, x.left()));
-    VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
-    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
-    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
+    VERIFY_EQUAL("left", null_if_invalid(x, x.left()), left[x.val]);
+    VERIFY_EQUAL("right", null_if_invalid(x, x.right()), right[x.val]);
+    VERIFY_EQUAL("parent", null_if_invalid(x, x.parent()), parent[x.val]);
+    VERIFY_EQUAL("sibling", null_if_invalid(x, x.sibling()), sibling[x.val]);
   }
 
   return std::nullopt;
