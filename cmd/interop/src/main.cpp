@@ -17,6 +17,9 @@ using nlohmann::json;
 using namespace mls_client;
 using namespace mls_vectors;
 
+// XXX(RLB): This function currently produces only one example of each type, as
+// a top-level object, not a top-level array.  We should produce a more
+// comprehensive matrix.
 static json
 make_test_vector(uint64_t type)
 {
@@ -25,10 +28,10 @@ make_test_vector(uint64_t type)
   auto n = uint32_t(5);
   switch (type) {
     case TestVectorType::TREE_MATH:
-      return mls_vectors::TreeMathTestVector::create({ n });
+      return mls_vectors::TreeMathTestVector{ n };
 
     case TestVectorType::ENCRYPTION:
-      return mls_vectors::EncryptionTestVector::create({ { suite, n, { n } } });
+      return mls_vectors::EncryptionTestVector{ suite, n, { n } };
 
     case TestVectorType::KEY_SCHEDULE:
       return mls_vectors::KeyScheduleTestVector::create(suite, n, n);
@@ -59,15 +62,29 @@ generate_test_vector(uint64_t type)
   std::cout << j.dump(2) << std::endl;
 }
 
+template<typename T>
+static std::optional<std::string>
+verify_test_vector(const json& j) {
+  const auto cases = j.get<std::vector<T>>();
+  for (const auto& tc : cases) {
+    auto result = tc.verify();
+    if (result) {
+      return result;
+    }
+  }
+
+  return std::nullopt;
+}
+
 static std::optional<std::string>
 verify_test_vector(uint64_t type) {
   auto j = json::parse(std::cin);
   switch (type) {
     case TestVectorType::TREE_MATH:
-      return j.get<TreeMathTestVector>().verify();
+      return verify_test_vector<TreeMathTestVector>(j);
 
     case TestVectorType::ENCRYPTION:
-      return j.get<EncryptionTestVector>().verify();
+      return verify_test_vector<EncryptionTestVector>(j);
 
     case TestVectorType::KEY_SCHEDULE:
       return j.get<KeyScheduleTestVector>().verify();

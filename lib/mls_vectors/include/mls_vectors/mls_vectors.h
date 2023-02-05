@@ -14,33 +14,25 @@ struct TreeMathTestVector
 {
   using OptionalNode = std::optional<mls::NodeIndex>;
 
-  struct TestCase
-  {
-    mls::LeafCount n_leaves;
-    mls::NodeCount n_nodes;
-    mls::NodeIndex root;
-    std::vector<OptionalNode> left;
-    std::vector<OptionalNode> right;
-    std::vector<OptionalNode> parent;
-    std::vector<OptionalNode> sibling;
+  mls::LeafCount n_leaves;
+  mls::NodeCount n_nodes;
+  mls::NodeIndex root;
+  std::vector<OptionalNode> left;
+  std::vector<OptionalNode> right;
+  std::vector<OptionalNode> parent;
+  std::vector<OptionalNode> sibling;
 
-    std::optional<mls::NodeIndex> null_if_invalid(mls::NodeIndex input,
-                                                  mls::NodeIndex answer) const;
+  std::optional<mls::NodeIndex> null_if_invalid(mls::NodeIndex input,
+                                                mls::NodeIndex answer) const;
 
-    TestCase() = default;
-    TestCase(uint32_t n_leaves);
-    std::optional<std::string> verify() const;
-  };
-
-  std::vector<TestCase> cases;
-
-  static TreeMathTestVector create(std::vector<uint32_t> n_leaves);
+  TreeMathTestVector() = default;
+  TreeMathTestVector(uint32_t n_leaves);
   std::optional<std::string> verify() const;
 };
 
 struct EncryptionTestVector
 {
-  struct TestConfig
+  struct Config
   {
     mls::CipherSuite suite;
     uint32_t n_leaves;
@@ -74,25 +66,19 @@ struct EncryptionTestVector
     std::vector<RatchetStep> application;
   };
 
-  struct TestCase
-  {
-    mls::CipherSuite cipher_suite;
-    mls::LeafCount n_leaves;
+  mls::CipherSuite cipher_suite;
+  mls::LeafCount n_leaves;
 
-    bytes encryption_secret;
-    bytes sender_data_secret;
+  bytes encryption_secret;
+  bytes sender_data_secret;
 
-    SenderDataInfo sender_data_info;
-    std::vector<LeafInfo> leaves;
+  SenderDataInfo sender_data_info;
+  std::vector<LeafInfo> leaves;
 
-    TestCase() = default;
-    TestCase(const TestConfig& config);
-    std::optional<std::string> verify() const;
-  };
-
-  std::vector<TestCase> cases;
-
-  static EncryptionTestVector create(const std::vector<TestConfig>& configs);
+  EncryptionTestVector() = default;
+  EncryptionTestVector(mls::CipherSuite suite,
+    uint32_t n_leaves,
+    const std::vector<uint32_t>& generations);
   std::optional<std::string> verify() const;
 };
 

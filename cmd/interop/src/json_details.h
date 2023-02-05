@@ -105,18 +105,6 @@ TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
 
-// Some test vectors require special handling because it is an array at the
-// top level, not an object.
-void
-to_json(json& j, const mls_vectors::TreeMathTestVector& v);
-void
-from_json(const json& j, mls_vectors::TreeMathTestVector& v);
-
-void
-to_json(json& j, const mls_vectors::EncryptionTestVector& v);
-void
-from_json(const json& j, mls_vectors::EncryptionTestVector& v);
-
 } // namespace nlohmann
 
 ///
@@ -124,7 +112,7 @@ from_json(const json& j, mls_vectors::EncryptionTestVector& v);
 ///
 namespace mls_vectors {
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector::TestCase,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
                                    n_leaves,
                                    n_nodes,
                                    root,
@@ -146,7 +134,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    handshake,
                                    application)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::TestCase,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    cipher_suite,
                                    n_leaves,
                                    encryption_secret,

@@ -352,14 +352,13 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
   json j;
   switch (request->test_vector_type()) {
     case TestVectorType::TREE_MATH: {
-      j = mls_vectors::TreeMathTestVector::create({ request->n_leaves() });
+      j = mls_vectors::TreeMathTestVector{ request->n_leaves() };
       break;
     }
 
     case TestVectorType::ENCRYPTION: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::EncryptionTestVector::create(
-          { { suite, request->n_leaves(), { request->n_generations() } } });
+      j = mls_vectors::EncryptionTestVector{ suite, request->n_leaves(), { request->n_generations() } };
       break;
     }
 

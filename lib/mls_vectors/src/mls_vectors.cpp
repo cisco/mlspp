@@ -145,7 +145,7 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
 std::optional<mls::NodeIndex>
-TreeMathTestVector::TestCase::null_if_invalid(NodeIndex input,
+TreeMathTestVector::null_if_invalid(NodeIndex input,
                                               NodeIndex answer) const
 {
   // For some invalid cases (e.g., leaf.left()), we currently return the node
@@ -163,7 +163,7 @@ TreeMathTestVector::TestCase::null_if_invalid(NodeIndex input,
   return answer;
 }
 
-TreeMathTestVector::TestCase::TestCase(uint32_t n_leaves_in)
+TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
   : n_leaves(n_leaves_in)
   , n_nodes(n_leaves)
   , root(NodeIndex::root(n_leaves))
@@ -181,7 +181,7 @@ TreeMathTestVector::TestCase::TestCase(uint32_t n_leaves_in)
 }
 
 std::optional<std::string>
-TreeMathTestVector::TestCase::verify() const
+TreeMathTestVector::verify() const
 {
   VERIFY_EQUAL("n_nodes", n_nodes, NodeCount(n_leaves));
   VERIFY_EQUAL("root", root, NodeIndex::root(n_leaves));
@@ -191,31 +191,6 @@ TreeMathTestVector::TestCase::verify() const
     VERIFY_EQUAL("right", null_if_invalid(x, x.right()), right[x.val]);
     VERIFY_EQUAL("parent", null_if_invalid(x, x.parent()), parent[x.val]);
     VERIFY_EQUAL("sibling", null_if_invalid(x, x.sibling()), sibling[x.val]);
-  }
-
-  return std::nullopt;
-}
-
-TreeMathTestVector
-TreeMathTestVector::create(std::vector<uint32_t> n_leaves)
-{
-  auto tv = TreeMathTestVector{};
-
-  for (const auto n : n_leaves) {
-    tv.cases.emplace_back(n);
-  }
-
-  return tv;
-}
-
-std::optional<std::string>
-TreeMathTestVector::verify() const
-{
-  for (const auto& tc : cases) {
-    const auto result = tc.verify();
-    if (result) {
-      return result;
-    }
   }
 
   return std::nullopt;
@@ -248,9 +223,11 @@ EncryptionTestVector::SenderDataInfo::verify(
   return std::nullopt;
 }
 
-EncryptionTestVector::TestCase::TestCase(const TestConfig& config)
-  : cipher_suite(config.suite)
-  , n_leaves(config.n_leaves)
+EncryptionTestVector::EncryptionTestVector(mls::CipherSuite suite,
+    uint32_t n_leaves_in,
+    const std::vector<uint32_t>& generations)
+  : cipher_suite(suite)
+  , n_leaves(n_leaves_in)
 {
   encryption_secret = random_bytes(cipher_suite.secret_size());
   sender_data_secret = random_bytes(cipher_suite.secret_size());
@@ -293,10 +270,10 @@ EncryptionTestVector::TestCase::TestCase(const TestConfig& config)
                                     sig_priv,
                                     group_context);
 
-    leaves[i].handshake.resize(config.generations.size());
-    leaves[i].application.resize(config.generations.size());
-    for (uint32_t j = 0; j < config.generations.size(); j++) {
-      auto generation = config.generations[j];
+    leaves[i].handshake.resize(generations.size());
+    leaves[i].application.resize(generations.size());
+    for (uint32_t j = 0; j < generations.size(); j++) {
+      auto generation = generations[j];
       auto hs_ct = MLSCiphertext::protect(
         hs_content_auth, cipher_suite, src, sender_data_secret, padding_size);
       auto hs_key_nonce =
@@ -323,7 +300,7 @@ EncryptionTestVector::TestCase::TestCase(const TestConfig& config)
 }
 
 std::optional<std::string>
-EncryptionTestVector::TestCase::verify() const
+EncryptionTestVector::verify() const
 {
   auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
     cipher_suite, sender_data_secret, sender_data_info.ciphertext);
@@ -376,33 +353,6 @@ EncryptionTestVector::TestCase::verify() const
       ok", app_pt); VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
       src.erase(ContentType::proposal, leaf, generation);
       */
-    }
-  }
-
-  return std::nullopt;
-}
-
-EncryptionTestVector
-EncryptionTestVector::create(const std::vector<TestConfig>& configs)
-{
-  auto tv = EncryptionTestVector{};
-
-  for (const auto& config : configs) {
-    tv.cases.emplace_back(config);
-  }
-
-  return tv;
-}
-
-std::optional<std::string>
-EncryptionTestVector::verify() const
-{
-  int i = 0;
-  for (const auto& tc : cases) {
-    std::cout << "case: " << i++ << std::endl;
-    const auto result = tc.verify();
-    if (result) {
-      return result;
     }
   }
 

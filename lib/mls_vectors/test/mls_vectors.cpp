@@ -15,14 +15,14 @@ static const std::vector<mls::CipherSuite> supported_suites{
 
 TEST_CASE("Tree Math")
 {
-  const auto tv = TreeMathTestVector::create({ 1, 4, 16, 256 });
+  const auto tv = TreeMathTestVector{ 15 };
   REQUIRE(tv.verify() == std::nullopt);
 }
 
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {
-    const auto tv = EncryptionTestVector::create({ { suite, 15, { 10 } } });
+    const auto tv = EncryptionTestVector{ suite, 15, { 10 } };
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
