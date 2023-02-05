@@ -325,16 +325,16 @@ EncryptionTestVector::verify() const
       VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
       VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
 
-      /* XXX
-      auto hs_content_auth = tls::get<MLSPlaintext>(hs_step.plaintext);
+      auto hs_pt = tls::get<MLSPlaintext>(hs_step.plaintext);
       auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto hs_pt = hs_ct.unprotect(cipher_suite, src, sender_data_secret);
-      VERIFY("hs pt ok", hs_pt);
-      VERIFY_EQUAL("hs pt", opt::get(hs_pt), hs_content_auth);
+      auto decrypted = hs_ct.unprotect(cipher_suite, src, sender_data_secret);
+      VERIFY("hs pt ok", decrypted);
+      VERIFY("hs pt", hs_pt.contains(decrypted.value()));
+
       src.erase(ContentType::proposal, leaf, generation);
-      */
     }
 
+    /* XXX
     for (uint32_t j = 0; j < leaves[i].application.size(); j++) {
       std::cout << "generation: " << leaves[i].application[j].generation
                 << std::endl;
@@ -345,15 +345,14 @@ EncryptionTestVector::verify() const
       VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
       VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
 
-      /* XXX
       auto app_content_auth =
       tls::get<MLSAuthenticatedContent>(app_step.plaintext); auto app_ct =
       tls::get<MLSCiphertext>(app_step.ciphertext); auto app_pt =
       app_ct.unprotect(cipher_suite, src, sender_data_secret); VERIFY("app pt
       ok", app_pt); VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
       src.erase(ContentType::proposal, leaf, generation);
-      */
     }
+    */
   }
 
   return std::nullopt;

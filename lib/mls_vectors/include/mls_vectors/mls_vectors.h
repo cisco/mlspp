@@ -32,13 +32,6 @@ struct TreeMathTestVector
 
 struct EncryptionTestVector
 {
-  struct Config
-  {
-    mls::CipherSuite suite;
-    uint32_t n_leaves;
-    std::vector<uint32_t> generations;
-  };
-
   struct SenderDataInfo
   {
     bytes ciphertext;

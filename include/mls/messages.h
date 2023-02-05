@@ -580,6 +580,8 @@ struct MLSPlaintext
     const std::optional<bytes>& membership_key,
     const std::optional<GroupContext>& context) const;
 
+  bool contains(const MLSAuthenticatedContent& content_auth) const;
+
   friend tls::ostream& operator<<(tls::ostream& str, const MLSPlaintext& obj);
   friend tls::istream& operator>>(tls::istream& str, MLSPlaintext& obj);
 

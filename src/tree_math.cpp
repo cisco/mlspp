@@ -81,21 +81,6 @@ LeafIndex::ancestor(LeafIndex other) const
   return NodeIndex{ prefix + (stop - 1) };
 }
 
-tls::ostream&
-operator<<(tls::ostream& str, const LeafIndex& obj)
-{
-  return str << NodeIndex(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& str, LeafIndex& obj)
-{
-  auto index = NodeIndex(0);
-  str >> index;
-  obj = LeafIndex(index);
-  return str;
-}
-
 NodeIndex::NodeIndex(LeafIndex x)
   : UInt32(2 * x.val)
 {

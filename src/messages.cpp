@@ -549,6 +549,12 @@ MLSPlaintext::unprotect(CipherSuite suite,
   };
 }
 
+bool
+MLSPlaintext::contains(const MLSAuthenticatedContent& content_auth) const
+{
+  return content == content_auth.content && auth == content_auth.auth;
+}
+
 MLSPlaintext::MLSPlaintext(MLSAuthenticatedContent content_auth)
   : content(std::move(content_auth.content))
   , auth(std::move(content_auth.auth))
