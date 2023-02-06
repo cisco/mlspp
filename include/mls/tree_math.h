@@ -77,18 +77,12 @@ struct LeafIndex : public UInt32
   NodeIndex ancestor(LeafIndex other) const;
 };
 
-// Leaf indices serialize as node indices, and are validated on deserialize
-tls::ostream&
-operator<<(tls::ostream& str, const LeafIndex& obj);
-tls::istream&
-operator>>(tls::istream& str, LeafIndex& obj);
-
 struct NodeIndex : public UInt32
 {
   using UInt32::UInt32;
   explicit NodeIndex(const LeafIndex x);
   bool operator<(const NodeIndex other) const { return val < other.val; }
-  bool operator<(const LeafCount other) const { return val < other.val; }
+  bool operator<(const NodeCount other) const { return val < other.val; }
 
   static NodeIndex root(LeafCount n);
 

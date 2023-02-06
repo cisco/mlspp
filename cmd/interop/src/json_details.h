@@ -126,23 +126,18 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
                                    key,
                                    nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
+                                   generation,
                                    key,
-                                   nonce,
-                                   ciphertext)
+                                   nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
-                                   generations,
-                                   handshake_content_auth,
-                                   application_content_auth,
                                    handshake,
                                    application)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
                                    cipher_suite,
-                                   tree,
+                                   n_leaves,
                                    encryption_secret,
                                    sender_data_secret,
-                                   padding_size,
                                    sender_data_info,
-                                   authenticated_data,
                                    leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,

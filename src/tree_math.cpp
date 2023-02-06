@@ -38,8 +38,11 @@ LeafCount::LeafCount(const NodeCount w)
 LeafCount
 LeafCount::full(const LeafCount n)
 {
-  auto k = log2(n.val);
-  return LeafCount{ 1U << (k + 1) };
+  auto w = uint32_t(1);
+  while (w < n.val) {
+    w <<= 1U;
+  }
+  return LeafCount{ w };
 }
 
 NodeCount::NodeCount(const LeafCount n)
@@ -76,21 +79,6 @@ LeafIndex::ancestor(LeafIndex other) const
   const uint32_t prefix = ln.val << k;
   const uint32_t stop = (1U << uint8_t(k - 1));
   return NodeIndex{ prefix + (stop - 1) };
-}
-
-tls::ostream&
-operator<<(tls::ostream& str, const LeafIndex& obj)
-{
-  return str << NodeIndex(obj);
-}
-
-tls::istream&
-operator>>(tls::istream& str, LeafIndex& obj)
-{
-  auto index = NodeIndex(0);
-  str >> index;
-  obj = LeafIndex(index);
-  return str;
 }
 
 NodeIndex::NodeIndex(LeafIndex x)

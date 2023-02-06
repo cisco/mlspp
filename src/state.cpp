@@ -277,7 +277,6 @@ State::protect(MLSAuthenticatedContent&& content_auth, size_t padding_size)
     case WireFormat::mls_ciphertext:
       return MLSCiphertext::protect(std::move(content_auth),
                                     _suite,
-                                    _index,
                                     _keys,
                                     _key_schedule.sender_data_secret,
                                     padding_size);
@@ -302,7 +301,7 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
 
     [&](const MLSCiphertext& ct) -> MLSAuthenticatedContent {
       auto maybe_content_auth =
-        ct.unprotect(_suite, _tree, _keys, _key_schedule.sender_data_secret);
+        ct.unprotect(_suite, _keys, _key_schedule.sender_data_secret);
       if (!maybe_content_auth) {
         throw ProtocolError("MLSCiphertext decryption failure");
       }

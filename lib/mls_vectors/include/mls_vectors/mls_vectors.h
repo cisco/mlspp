@@ -16,15 +16,17 @@ struct TreeMathTestVector
 
   mls::LeafCount n_leaves;
   mls::NodeCount n_nodes;
-  std::vector<mls::NodeIndex> root;
+  mls::NodeIndex root;
   std::vector<OptionalNode> left;
   std::vector<OptionalNode> right;
   std::vector<OptionalNode> parent;
   std::vector<OptionalNode> sibling;
 
-  std::vector<std::vector<mls::NodeIndex>> ancestor;
+  std::optional<mls::NodeIndex> null_if_invalid(mls::NodeIndex input,
+                                                mls::NodeIndex answer) const;
 
-  static TreeMathTestVector create(uint32_t n_leaves);
+  TreeMathTestVector() = default;
+  TreeMathTestVector(uint32_t n_leaves);
   std::optional<std::string> verify() const;
 };
 
@@ -35,38 +37,39 @@ struct EncryptionTestVector
     bytes ciphertext;
     bytes key;
     bytes nonce;
+
+    SenderDataInfo() = default;
+    SenderDataInfo(mls::CipherSuite suite, const bytes& sender_data_secret);
+    std::optional<std::string> verify(mls::CipherSuite suite,
+                                      const bytes& sender_data_secret) const;
   };
 
   struct RatchetStep
   {
+    uint32_t generation;
     bytes key;
     bytes nonce;
-    bytes ciphertext;
   };
 
   struct LeafInfo
   {
-    uint32_t generations;
-    bytes handshake_content_auth;
-    bytes application_content_auth;
     std::vector<RatchetStep> handshake;
     std::vector<RatchetStep> application;
   };
 
   mls::CipherSuite cipher_suite;
+  mls::LeafCount n_leaves;
 
-  bytes tree;
   bytes encryption_secret;
   bytes sender_data_secret;
-  size_t padding_size = 0;
-  SenderDataInfo sender_data_info;
-  bytes authenticated_data;
 
+  SenderDataInfo sender_data_info;
   std::vector<LeafInfo> leaves;
 
-  static EncryptionTestVector create(mls::CipherSuite suite,
-                                     uint32_t n_leaves,
-                                     uint32_t n_generations);
+  EncryptionTestVector() = default;
+  EncryptionTestVector(mls::CipherSuite suite,
+                       uint32_t n_leaves,
+                       const std::vector<uint32_t>& generations);
   std::optional<std::string> verify() const;
 };
 

@@ -549,6 +549,12 @@ MLSPlaintext::unprotect(CipherSuite suite,
   };
 }
 
+bool
+MLSPlaintext::contains(const MLSAuthenticatedContent& content_auth) const
+{
+  return content == content_auth.content && auth == content_auth.auth;
+}
+
 MLSPlaintext::MLSPlaintext(MLSAuthenticatedContent content_auth)
   : content(std::move(content_auth.content))
   , auth(std::move(content_auth.auth))
@@ -672,12 +678,13 @@ struct MLSSenderDataAAD
 MLSCiphertext
 MLSCiphertext::protect(MLSAuthenticatedContent content_auth,
                        CipherSuite suite,
-                       const LeafIndex& index,
                        GroupKeySource& keys,
                        const bytes& sender_data_secret,
                        size_t padding_size)
 {
   // Pull keys from the secret tree
+  auto index =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
   auto content_type = content_auth.content.content_type();
   auto [generation, reuse_guard, content_keys] = keys.next(content_type, index);
 
@@ -725,7 +732,6 @@ MLSCiphertext::protect(MLSAuthenticatedContent content_auth,
 
 std::optional<MLSAuthenticatedContent>
 MLSCiphertext::unprotect(CipherSuite suite,
-                         const TreeKEMPublicKey& tree,
                          GroupKeySource& keys,
                          const bytes& sender_data_secret) const
 {
@@ -747,7 +753,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
   }
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
-  if (!tree.has_leaf(sender_data.sender)) {
+  if (!keys.has_leaf(sender_data.sender)) {
     return std::nullopt;
   }
 

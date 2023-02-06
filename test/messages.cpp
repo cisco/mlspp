@@ -128,14 +128,9 @@ TEST_CASE_FIXTURE(MLSMessageTest, "MLSCiphertext Protect/Unprotect")
   auto content_auth_original = MLSAuthenticatedContent::sign(
     WireFormat::mls_ciphertext, std::move(content), suite, sig_priv, context);
 
-  auto ct = MLSCiphertext::protect(content_auth_original,
-                                   suite,
-                                   index,
-                                   keys,
-                                   sender_data_secret,
-                                   padding_size);
-  auto content_auth_unprotected =
-    ct.unprotect(suite, tree, keys, sender_data_secret);
+  auto ct = MLSCiphertext::protect(
+    content_auth_original, suite, keys, sender_data_secret, padding_size);
+  auto content_auth_unprotected = ct.unprotect(suite, keys, sender_data_secret);
   REQUIRE(content_auth_unprotected == content_auth_original);
 }
 

@@ -3,6 +3,8 @@
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
+#include <iostream> // XXX
+
 namespace mls_vectors {
 
 using namespace mls;
@@ -46,11 +48,13 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
   return str << to_hex(tls::marshal(obj));
 }
 
+#if 0 // XXX
 static std::ostream&
 operator<<(std::ostream& str, const MLSAuthenticatedContent& obj)
 {
   return str << to_hex(tls::marshal(obj));
 }
+#endif
 
 static std::ostream&
 operator<<(std::ostream& str, const TreeKEMPublicKey& /* obj */)
@@ -140,199 +144,122 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
-static std::optional<mls::NodeIndex>
-null_if_same(NodeIndex input, NodeIndex answer)
+std::optional<mls::NodeIndex>
+TreeMathTestVector::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
+  // For some invalid cases (e.g., leaf.left()), we currently return the node
+  // itself instead of null
   if (input == answer) {
+    return std::nullopt;
+  }
+
+  // NodeIndex::parent is irrespective of tree size, so we might step out of the
+  // tree under consideration.
+  if (answer.val >= n_nodes.val) {
     return std::nullopt;
   }
 
   return answer;
 }
 
-TreeMathTestVector
-TreeMathTestVector::create(uint32_t n_leaves)
+TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
+  : n_leaves(n_leaves_in)
+  , n_nodes(n_leaves)
+  , root(NodeIndex::root(n_leaves))
+  , left(n_nodes.val)
+  , right(n_nodes.val)
+  , parent(n_nodes.val)
+  , sibling(n_nodes.val)
 {
-  auto tv = TreeMathTestVector{};
-  tv.n_leaves = LeafCount{ n_leaves };
-  tv.n_nodes = NodeCount(tv.n_leaves);
-  tv.root.resize(n_leaves);
-
-  tv.n_nodes = NodeCount(tv.n_leaves);
-  tv.left.resize(tv.n_nodes.val);
-  tv.right.resize(tv.n_nodes.val);
-  tv.parent.resize(tv.n_nodes.val);
-  tv.sibling.resize(tv.n_nodes.val);
-
-  // Root is special
-  for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
-    tv.root[n.val - 1] = NodeIndex::root(n);
+  for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
+    left[x.val] = null_if_invalid(x, x.left());
+    right[x.val] = null_if_invalid(x, x.right());
+    parent[x.val] = null_if_invalid(x, x.parent());
+    sibling[x.val] = null_if_invalid(x, x.sibling());
   }
-
-  // Left, right, parent, sibling are relative
-  for (NodeIndex x{ 0 }; x.val < tv.n_nodes.val; x.val++) {
-    tv.left[x.val] = null_if_same(x, x.left());
-    tv.right[x.val] = null_if_same(x, x.right());
-    tv.parent[x.val] = null_if_same(x, x.parent());
-    tv.sibling[x.val] = null_if_same(x, x.sibling());
-  }
-
-  // Ancestor takes two leaf nodes
-  tv.ancestor.resize(tv.n_leaves.val);
-  for (LeafIndex x{ 0 }; x.val < tv.n_leaves.val; x.val++) {
-    tv.ancestor[x.val].resize(tv.n_leaves.val);
-    for (LeafIndex y{ 0 }; y.val < tv.n_leaves.val; y.val++) {
-      tv.ancestor[x.val][y.val] = x.ancestor(y);
-    }
-  }
-
-  return tv;
 }
 
 std::optional<std::string>
 TreeMathTestVector::verify() const
 {
   VERIFY_EQUAL("n_nodes", n_nodes, NodeCount(n_leaves));
-
-  auto ss = std::stringstream();
-  for (LeafCount n{ 1 }; n.val <= n_leaves.val; n.val++) {
-    VERIFY_EQUAL("root", root[n.val - 1], NodeIndex::root(n));
-  }
+  VERIFY_EQUAL("root", root, NodeIndex::root(n_leaves));
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
-    VERIFY_EQUAL("left", left[x.val], null_if_same(x, x.left()));
-    VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
-    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
-    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
-  }
-
-  for (LeafIndex x{ 0 }; x.val < n_leaves.val; x.val++) {
-    for (LeafIndex y{ 0 }; y.val < n_leaves.val; y.val++) {
-      VERIFY_EQUAL("ancestor", ancestor[x.val][y.val], x.ancestor(y));
-    }
+    VERIFY_EQUAL("left", null_if_invalid(x, x.left()), left[x.val]);
+    VERIFY_EQUAL("right", null_if_invalid(x, x.right()), right[x.val]);
+    VERIFY_EQUAL("parent", null_if_invalid(x, x.parent()), parent[x.val]);
+    VERIFY_EQUAL("sibling", null_if_invalid(x, x.sibling()), sibling[x.val]);
   }
 
   return std::nullopt;
 }
+
 ///
 /// EncryptionTestVector
 ///
 
-EncryptionTestVector
-EncryptionTestVector::create(CipherSuite suite,
-                             uint32_t n_leaves,
-                             uint32_t n_generations)
+EncryptionTestVector::SenderDataInfo::SenderDataInfo(
+  mls::CipherSuite suite,
+  const bytes& sender_data_secret)
 {
-  auto tv = EncryptionTestVector{};
-  tv.cipher_suite = suite;
-  tv.encryption_secret = random_bytes(suite.secret_size());
-  tv.sender_data_secret = random_bytes(suite.secret_size());
-  tv.padding_size = 10;
+  ciphertext = random_bytes(suite.secret_size());
+  auto key_and_nonce =
+    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
+  key = key_and_nonce.key;
+  nonce = key_and_nonce.nonce;
+}
 
-  auto ciphertext = random_bytes(suite.secret_size());
-  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
-    suite, tv.sender_data_secret, ciphertext);
-  tv.sender_data_info = {
-    ciphertext,
-    sender_data_key_nonce.key,
-    sender_data_key_nonce.nonce,
-  };
+std::optional<std::string>
+EncryptionTestVector::SenderDataInfo::verify(
+  mls::CipherSuite suite,
+  const bytes& sender_data_secret) const
+{
+  auto key_and_nonce =
+    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
+  VERIFY_EQUAL("sender data key", key, key_and_nonce.key);
+  VERIFY_EQUAL("sender data nonce", nonce, key_and_nonce.nonce);
+  return std::nullopt;
+}
 
-  auto sig_privs = std::vector<SignaturePrivateKey>{};
-  auto tree = TreeKEMPublicKey(suite);
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    auto leaf_priv = HPKEPrivateKey::generate(suite);
-    auto sig_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic({});
-    auto leaf = LeafNode(suite,
-                         leaf_priv.public_key,
-                         sig_priv.public_key,
-                         cred,
-                         Capabilities::create_default(),
-                         Lifetime::create_default(),
-                         {},
-                         sig_priv);
+EncryptionTestVector::EncryptionTestVector(
+  mls::CipherSuite suite,
+  uint32_t n_leaves_in,
+  const std::vector<uint32_t>& generations)
+  : cipher_suite(suite)
+  , n_leaves(n_leaves_in)
+{
+  encryption_secret = random_bytes(cipher_suite.secret_size());
+  sender_data_secret = random_bytes(cipher_suite.secret_size());
 
-    sig_privs.emplace_back(std::move(sig_priv));
-    tree.add_leaf(leaf);
-  }
-  tree.set_hash_all();
-  tv.tree = tls::marshal(tree);
+  sender_data_info = SenderDataInfo(cipher_suite, sender_data_secret);
 
-  auto src = GroupKeySource(suite, tree.size, tv.encryption_secret);
-
-  auto group_id = bytes{ 0, 1, 2, 3 };
-  auto epoch = epoch_t(0x0001020304050607);
-  auto group_context =
-    GroupContext{ suite, group_id, epoch, {}, tree.root_hash(), {} };
-  auto proposal = Proposal{ GroupContextExtensions{} };
-  auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
-  auto authenticated_data = random_bytes(suite.secret_size());
-
-  tv.leaves.resize(n_leaves);
+  auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+  leaves.resize(n_leaves.val);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    tv.leaves[i].generations = n_generations;
-    tv.leaves[i].handshake.resize(n_generations);
-    tv.leaves[i].application.resize(n_generations);
+  for (uint32_t i = 0; i < n_leaves.val; i++) {
+    auto leaf = LeafIndex{ i };
 
-    auto N = LeafIndex{ i };
-    auto sender = Sender{ MemberSender{ N } };
+    leaves[i].handshake.resize(generations.size());
+    leaves[i].application.resize(generations.size());
+    for (uint32_t j = 0; j < generations.size(); j++) {
+      auto generation = generations[j];
 
-    auto hs_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, proposal };
-    auto hs_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(hs_content),
-                                    suite,
-                                    sig_privs[i],
-                                    group_context);
-    tv.leaves[i].handshake_content_auth = tls::marshal(hs_content_auth);
-
-    auto app_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, app_data };
-    auto app_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(app_content),
-                                    suite,
-                                    sig_privs[i],
-                                    group_context);
-    tv.leaves[i].application_content_auth = tls::marshal(app_content_auth);
-
-    for (uint32_t j = 0; j < n_generations; ++j) {
-      // Handshake
-      auto hs_ct = MLSCiphertext::protect(
-        hs_content_auth, suite, N, src, tv.sender_data_secret, tv.padding_size);
       auto hs_key_nonce =
-        src.get(ContentType::proposal, N, j, zero_reuse_guard);
-      src.erase(ContentType::proposal, N, j);
+        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
+      leaves[i].handshake[j] = { generation,
+                                 hs_key_nonce.key,
+                                 hs_key_nonce.nonce };
+      src.erase(ContentType::proposal, leaf, generation);
 
-      tv.leaves[i].handshake[j] = {
-        std::move(hs_key_nonce.key),
-        std::move(hs_key_nonce.nonce),
-        tls::marshal(hs_ct),
-      };
-
-      // Application
-      auto app_ct = MLSCiphertext::protect(app_content_auth,
-                                           suite,
-                                           N,
-                                           src,
-                                           tv.sender_data_secret,
-                                           tv.padding_size);
       auto app_key_nonce =
-        src.get(ContentType::application, N, j, zero_reuse_guard);
-      src.erase(ContentType::application, N, j);
-
-      tv.leaves[i].application[j] = {
-        std::move(app_key_nonce.key),
-        std::move(app_key_nonce.nonce),
-        tls::marshal(app_ct),
-      };
+        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
+      leaves[i].application[j] = { generation,
+                                   app_key_nonce.key,
+                                   app_key_nonce.nonce };
+      src.erase(ContentType::application, leaf, generation);
     }
   }
-
-  return tv;
 }
 
 std::optional<std::string>
@@ -345,49 +272,23 @@ EncryptionTestVector::verify() const
   VERIFY_EQUAL(
     "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
 
-  auto ratchet_tree = tls::get<TreeKEMPublicKey>(tree);
-  ratchet_tree.suite = cipher_suite;
-  ratchet_tree.set_hash_all();
-  auto n_leaves = ratchet_tree.size;
-
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < leaves.size(); i++) {
-    auto N = LeafIndex{ i };
+  for (uint32_t i = 0; i < n_leaves.val; i++) {
+    auto leaf = LeafIndex{ i };
 
-    auto hs_content_auth =
-      tls::get<MLSAuthenticatedContent>(leaves[i].handshake_content_auth);
-    auto app_content_auth =
-      tls::get<MLSAuthenticatedContent>(leaves[i].application_content_auth);
+    for (const auto& step : leaves[i].handshake) {
+      auto key_nonce =
+        src.get(ContentType::proposal, leaf, step.generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
+      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
+    }
 
-    for (uint32_t j = 0; j < leaves[i].generations; ++j) {
-      // Handshake
-      const auto& hs_step = leaves[i].handshake[j];
-      auto hs_key_nonce =
-        src.get(ContentType::proposal, N, j, zero_reuse_guard);
-      VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
-      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
-
-      auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto hs_pt =
-        hs_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
-      VERIFY("hs pt ok", hs_pt);
-      VERIFY_EQUAL("hs pt", opt::get(hs_pt), hs_content_auth);
-      src.erase(ContentType::proposal, N, j);
-
-      // Application
-      const auto& app_step = leaves[i].application[j];
-      auto app_key_nonce =
-        src.get(ContentType::application, N, j, zero_reuse_guard);
-      VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
-      VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
-
-      auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
-      auto app_pt =
-        app_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
-      VERIFY("app pt ok", app_pt);
-      VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
-      src.erase(ContentType::application, N, j);
+    for (const auto& step : leaves[i].application) {
+      auto key_nonce = src.get(
+        ContentType::application, leaf, step.generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
+      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
     }
   }
 
@@ -935,7 +836,7 @@ MessagesTestVector::create()
   // MLSMessage(MLSCiphertext)
   auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
   auto mls_ciphertext = MLSMessage{ MLSCiphertext::protect(
-    content_auth_app, suite, index, keys, opaque, 10) };
+    content_auth_app, suite, keys, opaque, 10) };
 
   return MessagesTestVector{
     tls::marshal(key_package),
