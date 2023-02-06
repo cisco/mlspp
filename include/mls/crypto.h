@@ -33,10 +33,10 @@ struct KeyAndNonce
   bytes nonce;
 };
 
-// opaque HashReference[16];
+// opaque HashReference<V>;
 // HashReference KeyPackageRef;
 // HashReference ProposalRef;
-using HashReference = std::array<uint8_t, 16>;
+using HashReference = bytes;
 using KeyPackageRef = HashReference;
 using ProposalRef = HashReference;
 
@@ -75,15 +75,22 @@ struct CipherSuite
   bytes derive_secret(const bytes& secret, const std::string& label) const;
 
   template<typename T>
-  HashReference ref(const T& val) const
+  bytes ref(const T& value) const
   {
-    auto ref = HashReference{};
-    auto marshaled = tls::marshal(val);
-    auto extracted = hpke().kdf.extract({}, marshaled);
-    auto expanded =
-      hpke().kdf.expand(extracted, reference_label<T>(), ref.size());
-    std::copy(expanded.begin(), expanded.end(), ref.begin());
-    return ref;
+    return raw_ref(reference_label<T>(), tls::marshal(value));
+  }
+
+  bytes raw_ref(const bytes& label, const bytes& value) const
+  {
+    // RefHash(label, value) = Hash(RefHashInput)
+    //
+    // struct {
+    //   opaque label<V>;
+    //   opaque value<V>;
+    // } RefHashInput;
+    auto w = tls::ostream();
+    w << label << value;
+    return digest().hash(w.bytes());
   }
 
   TLS_SERIALIZABLE(id)

@@ -32,7 +32,8 @@ struct TreeMathTestVector
 
 struct CryptoBasicsTestVector
 {
-  struct RefHash {
+  struct RefHash
+  {
     std::string label;
     bytes value;
     bytes out;
@@ -42,7 +43,8 @@ struct CryptoBasicsTestVector
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
-  struct ExpandWithLabel {
+  struct ExpandWithLabel
+  {
     bytes secret;
     std::string label;
     bytes context;
@@ -54,7 +56,8 @@ struct CryptoBasicsTestVector
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
-  struct DeriveSecret {
+  struct DeriveSecret
+  {
     bytes secret;
     std::string label;
     bytes out;
@@ -64,7 +67,8 @@ struct CryptoBasicsTestVector
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
-  struct SignWithLabel {
+  struct SignWithLabel
+  {
     mls::SignaturePrivateKey priv;
     mls::SignaturePublicKey pub;
     bytes content;
@@ -76,7 +80,8 @@ struct CryptoBasicsTestVector
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
-  struct EncryptWithLabel {
+  struct EncryptWithLabel
+  {
     mls::HPKEPrivateKey priv;
     mls::HPKEPublicKey pub;
     std::string label;
