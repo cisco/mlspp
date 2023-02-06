@@ -1,9 +1,11 @@
 #include <doctest/doctest.h>
 #include <mls/crypto.h>
+#include <mls_vectors/mls_vectors.h>
 
 #include <string>
 
 using namespace mls;
+using namespace mls_vectors;
 
 TEST_CASE("Basic HPKE")
 {
@@ -86,5 +88,13 @@ TEST_CASE("Signature Key Serializion")
 
     auto gX2 = tls::get<SignaturePublicKey>(tls::marshal(gX));
     REQUIRE(gX2 == gX);
+  }
+}
+
+TEST_CASE("Crypto Interop")
+{
+  for (auto suite : all_supported_suites) {
+    auto tv = CryptoBasicsTestVector{ suite };
+    REQUIRE(tv.verify() == std::nullopt);
   }
 }

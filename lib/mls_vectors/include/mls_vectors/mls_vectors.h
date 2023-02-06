@@ -30,6 +30,79 @@ struct TreeMathTestVector
   std::optional<std::string> verify() const;
 };
 
+struct CryptoBasicsTestVector
+{
+  struct RefHash {
+    std::string label;
+    bytes value;
+    bytes out;
+
+    RefHash() = default;
+    RefHash(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
+  struct ExpandWithLabel {
+    bytes secret;
+    std::string label;
+    bytes context;
+    uint16_t length;
+    bytes out;
+
+    ExpandWithLabel() = default;
+    ExpandWithLabel(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
+  struct DeriveSecret {
+    bytes secret;
+    std::string label;
+    bytes out;
+
+    DeriveSecret() = default;
+    DeriveSecret(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
+  struct SignWithLabel {
+    mls::SignaturePrivateKey priv;
+    mls::SignaturePublicKey pub;
+    bytes content;
+    std::string label;
+    bytes signature;
+
+    SignWithLabel() = default;
+    SignWithLabel(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
+  struct EncryptWithLabel {
+    mls::HPKEPrivateKey priv;
+    mls::HPKEPublicKey pub;
+    std::string label;
+    bytes context;
+    bytes plaintext;
+    bytes kem_output;
+    bytes ciphertext;
+
+    EncryptWithLabel() = default;
+    EncryptWithLabel(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
+  mls::CipherSuite cipher_suite;
+
+  RefHash ref_hash;
+  ExpandWithLabel expand_with_label;
+  DeriveSecret derive_secret;
+  SignWithLabel sign_with_label;
+  EncryptWithLabel encrypt_with_label;
+
+  CryptoBasicsTestVector() = default;
+  CryptoBasicsTestVector(mls::CipherSuite suite);
+  std::optional<std::string> verify() const;
+};
+
 struct EncryptionTestVector
 {
   struct SenderDataInfo

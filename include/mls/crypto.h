@@ -189,6 +189,8 @@ struct SignaturePrivateKey
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
 
+  SignaturePrivateKey() = default;
+
   bytes data;
   SignaturePublicKey public_key;
 

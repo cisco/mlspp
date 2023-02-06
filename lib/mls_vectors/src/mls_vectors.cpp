@@ -196,6 +196,108 @@ TreeMathTestVector::verify() const
 }
 
 ///
+/// TreeMathTestVector
+///
+
+CryptoBasicsTestVector::RefHash::RefHash(CipherSuite  /* suite */)
+{
+  // TODO
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::RefHash::verify(CipherSuite  /* suite */) const
+{
+  return std::nullopt; // TODO
+}
+
+CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(CipherSuite  /* suite */)
+{
+  // TODO
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::ExpandWithLabel::verify(CipherSuite  /* suite */) const
+{
+  return std::nullopt; // TODO
+}
+
+CryptoBasicsTestVector::DeriveSecret::DeriveSecret(CipherSuite  /* suite */)
+{
+  // TODO
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite  /* suite */) const
+{
+  return std::nullopt; // TODO
+}
+
+CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
+  : priv(SignaturePrivateKey::generate(suite))
+{
+  // TODO
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite /* suite */) const
+{
+  return std::nullopt; // TODO
+}
+
+CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
+  : priv(HPKEPrivateKey::generate(suite))
+{
+  // TODO
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite /* suite */) const
+{
+  return std::nullopt; // TODO
+}
+
+
+CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
+  : cipher_suite(suite)
+  , ref_hash(suite)
+  , expand_with_label(suite)
+  , derive_secret(suite)
+  , sign_with_label(suite)
+  , encrypt_with_label(suite)
+{}
+
+std::optional<std::string>
+CryptoBasicsTestVector::verify() const
+{
+  auto result = ref_hash.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = expand_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = sign_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = encrypt_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+///
 /// EncryptionTestVector
 ///
 
