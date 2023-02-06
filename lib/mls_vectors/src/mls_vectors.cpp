@@ -251,16 +251,19 @@ CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
   , content(random_bytes(suite.secret_size()))
   , label("SignWithLabel")
   , signature(priv.sign(suite, from_ascii(label), content))
-{}
+{
+}
 
 std::optional<std::string>
 CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
 {
   auto ascii_label = from_ascii(label);
-  VERIFY("verify with label", pub.verify(suite, ascii_label, content, signature));
+  VERIFY("verify with label",
+         pub.verify(suite, ascii_label, content, signature));
 
   auto new_signature = priv.sign(suite, ascii_label, content);
-  VERIFY("sign with label", pub.verify(suite, ascii_label, content, new_signature));
+  VERIFY("sign with label",
+         pub.verify(suite, ascii_label, content, new_signature));
 
   return std::nullopt;
 }
