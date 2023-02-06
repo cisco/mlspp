@@ -145,8 +145,7 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
 std::optional<mls::NodeIndex>
-TreeMathTestVector::null_if_invalid(NodeIndex input,
-                                              NodeIndex answer) const
+TreeMathTestVector::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
   // For some invalid cases (e.g., leaf.left()), we currently return the node
   // itself instead of null
@@ -223,9 +222,10 @@ EncryptionTestVector::SenderDataInfo::verify(
   return std::nullopt;
 }
 
-EncryptionTestVector::EncryptionTestVector(mls::CipherSuite suite,
-    uint32_t n_leaves_in,
-    const std::vector<uint32_t>& generations)
+EncryptionTestVector::EncryptionTestVector(
+  mls::CipherSuite suite,
+  uint32_t n_leaves_in,
+  const std::vector<uint32_t>& generations)
   : cipher_suite(suite)
   , n_leaves(n_leaves_in)
 {

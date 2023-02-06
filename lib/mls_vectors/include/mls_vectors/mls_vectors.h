@@ -68,8 +68,8 @@ struct EncryptionTestVector
 
   EncryptionTestVector() = default;
   EncryptionTestVector(mls::CipherSuite suite,
-    uint32_t n_leaves,
-    const std::vector<uint32_t>& generations);
+                       uint32_t n_leaves,
+                       const std::vector<uint32_t>& generations);
   std::optional<std::string> verify() const;
 };
 
