@@ -64,7 +64,8 @@ generate_test_vector(uint64_t type)
 
 template<typename T>
 static std::optional<std::string>
-verify_test_vector(const json& j) {
+verify_test_vector(const json& j)
+{
   const auto cases = j.get<std::vector<T>>();
   for (const auto& tc : cases) {
     auto result = tc.verify();
@@ -77,7 +78,8 @@ verify_test_vector(const json& j) {
 }
 
 static std::optional<std::string>
-verify_test_vector(uint64_t type) {
+verify_test_vector(uint64_t type)
+{
   auto j = json::parse(std::cin);
   switch (type) {
     case TestVectorType::TREE_MATH:
@@ -110,7 +112,9 @@ DEFINE_uint64(port, 50001, "Listen for gRPC on this port");
 #define NO_U64 0xffffffffffffffff
 DEFINE_uint64(gen, NO_U64, "Generate test vectors of a given type");
 DEFINE_uint64(ver, NO_U64, "Verify test vectors of a given type");
-DEFINE_uint64(live, NO_U64, "Run a gRPC live-testing server on the specified port");
+DEFINE_uint64(live,
+              NO_U64,
+              "Run a gRPC live-testing server on the specified port");
 
 int
 main(int argc, char* argv[])
@@ -153,7 +157,7 @@ main(int argc, char* argv[])
     }
     std::cout << std::endl;
 
-    return error? 1 : 0;
+    return error ? 1 : 0;
   }
 
   // Live testing

@@ -285,8 +285,8 @@ EncryptionTestVector::verify() const
     }
 
     for (const auto& step : leaves[i].application) {
-      auto key_nonce =
-        src.get(ContentType::application, leaf, step.generation, zero_reuse_guard);
+      auto key_nonce = src.get(
+        ContentType::application, leaf, step.generation, zero_reuse_guard);
       VERIFY_EQUAL("hs key", key_nonce.key, step.key);
       VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
     }

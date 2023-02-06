@@ -358,7 +358,9 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::ENCRYPTION: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::EncryptionTestVector{ suite, request->n_leaves(), { request->n_generations() } };
+      j = mls_vectors::EncryptionTestVector{ suite,
+                                             request->n_leaves(),
+                                             { request->n_generations() } };
       break;
     }
 
