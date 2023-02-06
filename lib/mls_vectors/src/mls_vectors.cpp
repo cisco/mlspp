@@ -217,7 +217,7 @@ CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(CipherSuite suite)
   : secret(random_bytes(suite.secret_size()))
   , label("ExpandWithLabel")
   , context(random_bytes(suite.secret_size()))
-  , length(suite.key_size())
+  , length(static_cast<uint16_t>(suite.key_size()))
   , out(suite.expand_with_label(secret, label, context, length))
 {
 }
