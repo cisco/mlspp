@@ -108,44 +108,38 @@ struct CryptoBasicsTestVector
   std::optional<std::string> verify() const;
 };
 
-struct EncryptionTestVector
+struct SecretTreeTestVector
 {
-  struct SenderDataInfo
+  struct SenderData
   {
+    bytes sender_data_secret;
     bytes ciphertext;
     bytes key;
     bytes nonce;
 
-    SenderDataInfo() = default;
-    SenderDataInfo(mls::CipherSuite suite, const bytes& sender_data_secret);
-    std::optional<std::string> verify(mls::CipherSuite suite,
-                                      const bytes& sender_data_secret) const;
+    SenderData() = default;
+    SenderData(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
   struct RatchetStep
   {
     uint32_t generation;
-    bytes key;
-    bytes nonce;
-  };
-
-  struct LeafInfo
-  {
-    std::vector<RatchetStep> handshake;
-    std::vector<RatchetStep> application;
+    bytes handshake_key;
+    bytes handshake_nonce;
+    bytes application_key;
+    bytes application_nonce;
   };
 
   mls::CipherSuite cipher_suite;
-  mls::LeafCount n_leaves;
+
+  SenderData sender_data;
 
   bytes encryption_secret;
-  bytes sender_data_secret;
+  std::vector<std::vector<RatchetStep>> leaves;
 
-  SenderDataInfo sender_data_info;
-  std::vector<LeafInfo> leaves;
-
-  EncryptionTestVector() = default;
-  EncryptionTestVector(mls::CipherSuite suite,
+  SecretTreeTestVector() = default;
+  SecretTreeTestVector(mls::CipherSuite suite,
                        uint32_t n_leaves,
                        const std::vector<uint32_t>& generations);
   std::optional<std::string> verify() const;

@@ -337,14 +337,13 @@ CryptoBasicsTestVector::verify() const
 }
 
 ///
-/// EncryptionTestVector
+/// SecretTreeTestVector
 ///
 
-EncryptionTestVector::SenderDataInfo::SenderDataInfo(
-  mls::CipherSuite suite,
-  const bytes& sender_data_secret)
+SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite)
+  : sender_data_secret(random_bytes(suite.secret_size()))
+  , ciphertext(random_bytes(suite.secret_size()))
 {
-  ciphertext = random_bytes(suite.secret_size());
   auto key_and_nonce =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
   key = key_and_nonce.key;
@@ -352,9 +351,7 @@ EncryptionTestVector::SenderDataInfo::SenderDataInfo(
 }
 
 std::optional<std::string>
-EncryptionTestVector::SenderDataInfo::verify(
-  mls::CipherSuite suite,
-  const bytes& sender_data_secret) const
+SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
 {
   auto key_and_nonce =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
@@ -363,73 +360,63 @@ EncryptionTestVector::SenderDataInfo::verify(
   return std::nullopt;
 }
 
-EncryptionTestVector::EncryptionTestVector(
+SecretTreeTestVector::SecretTreeTestVector(
   mls::CipherSuite suite,
-  uint32_t n_leaves_in,
+  uint32_t n_leaves,
   const std::vector<uint32_t>& generations)
   : cipher_suite(suite)
-  , n_leaves(n_leaves_in)
+  , sender_data(suite)
+  , encryption_secret(random_bytes(suite.secret_size()))
 {
-  encryption_secret = random_bytes(cipher_suite.secret_size());
-  sender_data_secret = random_bytes(cipher_suite.secret_size());
-
-  sender_data_info = SenderDataInfo(cipher_suite, sender_data_secret);
-
-  auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
-  leaves.resize(n_leaves.val);
+  auto src =
+    GroupKeySource(cipher_suite, LeafCount{ n_leaves }, encryption_secret);
+  leaves.resize(n_leaves);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < n_leaves.val; i++) {
+  for (uint32_t i = 0; i < n_leaves; i++) {
     auto leaf = LeafIndex{ i };
 
-    leaves[i].handshake.resize(generations.size());
-    leaves[i].application.resize(generations.size());
-    for (uint32_t j = 0; j < generations.size(); j++) {
-      auto generation = generations[j];
-
-      auto hs_key_nonce =
+    for (const auto generation : generations) {
+      auto hs =
         src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
-      leaves[i].handshake[j] = { generation,
-                                 hs_key_nonce.key,
-                                 hs_key_nonce.nonce };
-      src.erase(ContentType::proposal, leaf, generation);
-
-      auto app_key_nonce =
+      auto app =
         src.get(ContentType::application, leaf, generation, zero_reuse_guard);
-      leaves[i].application[j] = { generation,
-                                   app_key_nonce.key,
-                                   app_key_nonce.nonce };
+
+      leaves.at(i).push_back(
+        RatchetStep{ generation, hs.key, hs.nonce, app.key, app.nonce });
+
+      src.erase(ContentType::proposal, leaf, generation);
       src.erase(ContentType::application, leaf, generation);
     }
   }
 }
 
 std::optional<std::string>
-EncryptionTestVector::verify() const
+SecretTreeTestVector::verify() const
 {
-  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
-    cipher_suite, sender_data_secret, sender_data_info.ciphertext);
-  VERIFY_EQUAL(
-    "sender data key", sender_data_key_nonce.key, sender_data_info.key);
-  VERIFY_EQUAL(
-    "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
+  auto sender_data_error = sender_data.verify(cipher_suite);
+  if (sender_data_error) {
+    return sender_data_error;
+  }
 
-  auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+  auto n_leaves = static_cast<uint32_t>(leaves.size());
+  auto src =
+    GroupKeySource(cipher_suite, LeafCount{ n_leaves }, encryption_secret);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < n_leaves.val; i++) {
+  for (uint32_t i = 0; i < n_leaves; i++) {
     auto leaf = LeafIndex{ i };
 
-    for (const auto& step : leaves[i].handshake) {
-      auto key_nonce =
-        src.get(ContentType::proposal, leaf, step.generation, zero_reuse_guard);
-      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
-      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
-    }
+    for (const auto& step : leaves[i]) {
+      auto generation = step.generation;
 
-    for (const auto& step : leaves[i].application) {
-      auto key_nonce = src.get(
-        ContentType::application, leaf, step.generation, zero_reuse_guard);
-      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
-      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
+      auto hs =
+        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", hs.key, step.handshake_key);
+      VERIFY_EQUAL("hs nonce", hs.nonce, step.handshake_nonce);
+
+      auto app =
+        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
+      VERIFY_EQUAL("app key", app.key, step.application_key);
+      VERIFY_EQUAL("app nonce", app.nonce, step.application_nonce);
     }
   }
 
