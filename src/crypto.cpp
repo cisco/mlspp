@@ -213,7 +213,7 @@ CipherSuite::reference_label<MLSAuthenticatedContent>()
 #define MLS_1_0_PLUS(label) from_ascii("MLS 1.0 " label)
 
 namespace encrypt_label {
-const bytes encrypt_label = MLS_1_0_PLUS("UpdatePathNode");
+const bytes update_path_node = MLS_1_0_PLUS("UpdatePathNode");
 const bytes welcome = MLS_1_0_PLUS("Welcome");
 } // namespace encrypt_label
 
