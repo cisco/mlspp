@@ -1,8 +1,4 @@
 #include <mls/key_schedule.h>
-#include <mls/log.h>
-
-using mls::log::Log;
-static const auto log_mod = "key_schedule"s;
 
 namespace mls {
 
@@ -217,7 +213,6 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
     return chains[key];
   }
 
-  auto sender_node = NodeIndex{ sender };
   auto secret_size = suite.secret_size();
   auto leaf_secret = secret_tree.get(sender);
 

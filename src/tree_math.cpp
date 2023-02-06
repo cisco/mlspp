@@ -38,9 +38,9 @@ LeafCount::LeafCount(const NodeCount w)
 LeafCount
 LeafCount::full(const LeafCount n)
 {
-  auto w = 1U;
+  auto w = uint32_t(1);
   while (w < n.val) {
-    w <<= 1;
+    w <<= 1U;
   }
   return LeafCount{ w };
 }

@@ -277,22 +277,18 @@ EncryptionTestVector::verify() const
   for (uint32_t i = 0; i < n_leaves.val; i++) {
     auto leaf = LeafIndex{ i };
 
-    for (uint32_t j = 0; j < leaves[i].handshake.size(); j++) {
-      const auto& hs_step = leaves[i].handshake[j];
-      auto generation = hs_step.generation;
-      auto hs_key_nonce =
-        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
-      VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
-      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
+    for (const auto& step : leaves[i].handshake) {
+      auto key_nonce =
+        src.get(ContentType::proposal, leaf, step.generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
+      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
     }
 
-    for (uint32_t j = 0; j < leaves[i].application.size(); j++) {
-      const auto& app_step = leaves[i].application[j];
-      auto generation = app_step.generation;
-      auto app_key_nonce =
-        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
-      VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
-      VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
+    for (const auto& step : leaves[i].application) {
+      auto key_nonce =
+        src.get(ContentType::application, leaf, step.generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", key_nonce.key, step.key);
+      VERIFY_EQUAL("hs nonce", key_nonce.nonce, step.nonce);
     }
   }
 
