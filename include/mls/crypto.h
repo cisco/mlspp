@@ -33,10 +33,10 @@ struct KeyAndNonce
   bytes nonce;
 };
 
-// opaque HashReference[16];
+// opaque HashReference<V>;
 // HashReference KeyPackageRef;
 // HashReference ProposalRef;
-using HashReference = std::array<uint8_t, 16>;
+using HashReference = bytes;
 using KeyPackageRef = HashReference;
 using ProposalRef = HashReference;
 
@@ -75,15 +75,22 @@ struct CipherSuite
   bytes derive_secret(const bytes& secret, const std::string& label) const;
 
   template<typename T>
-  HashReference ref(const T& val) const
+  bytes ref(const T& value) const
   {
-    auto ref = HashReference{};
-    auto marshaled = tls::marshal(val);
-    auto extracted = hpke().kdf.extract({}, marshaled);
-    auto expanded =
-      hpke().kdf.expand(extracted, reference_label<T>(), ref.size());
-    std::copy(expanded.begin(), expanded.end(), ref.begin());
-    return ref;
+    return raw_ref(reference_label<T>(), tls::marshal(value));
+  }
+
+  bytes raw_ref(const bytes& label, const bytes& value) const
+  {
+    // RefHash(label, value) = Hash(RefHashInput)
+    //
+    // struct {
+    //   opaque label<V>;
+    //   opaque value<V>;
+    // } RefHashInput;
+    auto w = tls::ostream();
+    w << label << value;
+    return digest().hash(w.bytes());
   }
 
   TLS_SERIALIZABLE(id)
@@ -110,6 +117,11 @@ extern const std::array<CipherSuite::ID, 6> all_supported_suites;
 using hpke::random_bytes;
 
 // HPKE Keys
+namespace encrypt_label {
+extern const bytes update_path_node;
+extern const bytes welcome;
+} // namespace encrypt_label
+
 struct HPKECiphertext
 {
   bytes kem_output;
@@ -123,8 +135,8 @@ struct HPKEPublicKey
   bytes data;
 
   HPKECiphertext encrypt(CipherSuite suite,
-                         const bytes& info,
-                         const bytes& aad,
+                         const bytes& label,
+                         const bytes& context,
                          const bytes& pt) const;
 
   std::tuple<bytes, bytes> do_export(CipherSuite suite,
@@ -147,8 +159,8 @@ struct HPKEPrivateKey
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
-                const bytes& info,
-                const bytes& aad,
+                const bytes& label,
+                const bytes& context,
                 const HPKECiphertext& ct) const;
 
   bytes do_export(CipherSuite suite,
@@ -188,6 +200,8 @@ struct SignaturePrivateKey
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
+
+  SignaturePrivateKey() = default;
 
   bytes data;
   SignaturePublicKey public_key;

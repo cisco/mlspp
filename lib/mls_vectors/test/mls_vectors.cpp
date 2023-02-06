@@ -19,6 +19,14 @@ TEST_CASE("Tree Math")
   REQUIRE(tv.verify() == std::nullopt);
 }
 
+TEST_CASE("Crypto Basics")
+{
+  for (auto suite : supported_suites) {
+    const auto tv = CryptoBasicsTestVector{ suite };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("Encryption Keys")
 {
   for (auto suite : supported_suites) {

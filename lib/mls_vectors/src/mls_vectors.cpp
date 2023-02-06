@@ -196,6 +196,147 @@ TreeMathTestVector::verify() const
 }
 
 ///
+/// TreeMathTestVector
+///
+
+CryptoBasicsTestVector::RefHash::RefHash(CipherSuite suite)
+  : label("RefHash")
+  , value(random_bytes(suite.secret_size()))
+  , out(suite.raw_ref(from_ascii(label), value))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::RefHash::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("ref hash", out, suite.raw_ref(from_ascii(label), value));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("ExpandWithLabel")
+  , context(random_bytes(suite.secret_size()))
+  , length(static_cast<uint16_t>(suite.key_size()))
+  , out(suite.expand_with_label(secret, label, context, length))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::ExpandWithLabel::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("expand with label",
+               out,
+               suite.expand_with_label(secret, label, context, length));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::DeriveSecret::DeriveSecret(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("DeriveSecret")
+  , out(suite.derive_secret(secret, label))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("derive secret", out, suite.derive_secret(secret, label));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
+  : priv(SignaturePrivateKey::generate(suite))
+  , pub(priv.public_key)
+  , content(random_bytes(suite.secret_size()))
+  , label("SignWithLabel")
+  , signature(priv.sign(suite, from_ascii(label), content))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
+{
+  auto ascii_label = from_ascii(label);
+  VERIFY("verify with label",
+         pub.verify(suite, ascii_label, content, signature));
+
+  auto new_signature = priv.sign(suite, ascii_label, content);
+  VERIFY("sign with label",
+         pub.verify(suite, ascii_label, content, new_signature));
+
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
+  : priv(HPKEPrivateKey::generate(suite))
+  , pub(priv.public_key)
+  , label("EncryptWithLabel")
+  , context(random_bytes(suite.secret_size()))
+  , plaintext(random_bytes(suite.secret_size()))
+{
+  auto ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
+  kem_output = ct.kem_output;
+  ciphertext = ct.ciphertext;
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite suite) const
+{
+  auto ascii_label = from_ascii(label);
+  auto ct = HPKECiphertext{ kem_output, ciphertext };
+  auto pt = priv.decrypt(suite, ascii_label, context, ct);
+  VERIFY_EQUAL("decrypt with label", pt, plaintext);
+
+  auto new_ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
+  auto new_pt = priv.decrypt(suite, ascii_label, context, new_ct);
+  VERIFY_EQUAL("encrypt with label", new_pt, plaintext);
+
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
+  : cipher_suite(suite)
+  , ref_hash(suite)
+  , expand_with_label(suite)
+  , derive_secret(suite)
+  , sign_with_label(suite)
+  , encrypt_with_label(suite)
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::verify() const
+{
+  auto result = ref_hash.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = expand_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = sign_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = encrypt_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+///
 /// EncryptionTestVector
 ///
 
@@ -791,8 +932,7 @@ MessagesTestVector::create()
   auto external_init = ExternalInit{ opaque };
 
   // Commit
-  auto proposal_ref = ProposalRef{};
-  proposal_ref.fill(0xa0);
+  auto proposal_ref = ProposalRef{ 32, 0xa0 };
 
   auto commit = Commit{ {
                           { proposal_ref },

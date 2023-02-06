@@ -237,6 +237,8 @@ struct Welcome
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
+  GroupSecrets decrypt_secrets(int kp_index,
+                               const HPKEPrivateKey& init_priv) const;
   GroupInfo decrypt(const bytes& joiner_secret,
                     const std::vector<PSKWithSecret>& psks) const;
 

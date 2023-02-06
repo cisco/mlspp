@@ -96,7 +96,9 @@ struct tls_serializer
   };
 
 TLS_SERIALIZER(mls::HPKEPublicKey)
+TLS_SERIALIZER(mls::HPKEPrivateKey)
 TLS_SERIALIZER(mls::SignaturePublicKey)
+TLS_SERIALIZER(mls::SignaturePrivateKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
 TLS_SERIALIZER(mls::Credential)
 TLS_SERIALIZER(mls::MLSAuthenticatedContent)
@@ -120,6 +122,42 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
                                    right,
                                    parent,
                                    sibling)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::RefHash,
+                                   label,
+                                   value,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::ExpandWithLabel,
+                                   secret,
+                                   label,
+                                   context,
+                                   length,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::DeriveSecret,
+                                   secret,
+                                   label,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::SignWithLabel,
+                                   priv,
+                                   pub,
+                                   content,
+                                   label,
+                                   signature)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::EncryptWithLabel,
+                                   priv,
+                                   pub,
+                                   label,
+                                   context,
+                                   plaintext,
+                                   kem_output,
+                                   ciphertext)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector,
+                                   cipher_suite,
+                                   ref_hash,
+                                   expand_with_label,
+                                   derive_secret,
+                                   sign_with_label,
+                                   encrypt_with_label)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
                                    ciphertext,
