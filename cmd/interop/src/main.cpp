@@ -17,6 +17,8 @@ using nlohmann::json;
 using namespace mls_client;
 using namespace mls_vectors;
 
+static constexpr uint64_t CRYPTO_BASICS = 10;
+
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
 // comprehensive matrix.
@@ -44,6 +46,16 @@ make_test_vector(uint64_t type)
 
     case TestVectorType::MESSAGES:
       return MessagesTestVector::create();
+
+    case CRYPTO_BASICS: {
+      auto cases = std::vector<CryptoBasicsTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
 
     default:
       return nullptr;
@@ -99,6 +111,9 @@ verify_test_vector(uint64_t type)
 
     case TestVectorType::MESSAGES:
       return j.get<MessagesTestVector>().verify();
+
+    case CRYPTO_BASICS:
+      return verify_test_vector<CryptoBasicsTestVector>(j);
 
     default:
       return "Invalid test vector type";
