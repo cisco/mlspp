@@ -44,8 +44,6 @@ struct SecretTree
 
   bytes get(LeafIndex sender);
 
-  void dump(const std::string& label) const;
-
 private:
   CipherSuite suite;
   LeafCount group_size;

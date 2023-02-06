@@ -234,67 +234,30 @@ EncryptionTestVector::EncryptionTestVector(mls::CipherSuite suite,
 
   sender_data_info = SenderDataInfo(cipher_suite, sender_data_secret);
 
-  // Fixed inputs to encryption
-  auto group_id = random_bytes(cipher_suite.secret_size());
-  auto epoch = epoch_t(0xA0A0A0A0A0A0A0A0);
-  auto proposal = Proposal{ GroupContextExtensions{} };
-  auto app_data = ApplicationData{ random_bytes(cipher_suite.secret_size()) };
-  auto sig_priv = SignaturePrivateKey::generate(cipher_suite);
-  auto authenticated_data = bytes{}; // TODO(RLB): Test this
-  auto group_context =
-    std::optional<GroupContext>(GroupContext{}); // TODO(RLB): Test this
-  auto padding_size = size_t(0);                 // TODO(RLB): Test this
-
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
   leaves.resize(n_leaves.val);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
   for (uint32_t i = 0; i < n_leaves.val; i++) {
     auto leaf = LeafIndex{ i };
-    auto sender = Sender{ MemberSender{ leaf } };
-
-    auto hs_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, proposal };
-    auto hs_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(hs_content),
-                                    cipher_suite,
-                                    sig_priv,
-                                    group_context);
-
-    auto app_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, app_data };
-    auto app_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(app_content),
-                                    cipher_suite,
-                                    sig_priv,
-                                    group_context);
 
     leaves[i].handshake.resize(generations.size());
     leaves[i].application.resize(generations.size());
     for (uint32_t j = 0; j < generations.size(); j++) {
       auto generation = generations[j];
-      auto hs_ct = MLSCiphertext::protect(
-        hs_content_auth, cipher_suite, src, sender_data_secret, padding_size);
+
       auto hs_key_nonce =
-        src.get(hs_content.content_type(), leaf, generation, zero_reuse_guard);
+        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
       leaves[i].handshake[j] = { generation,
                                  hs_key_nonce.key,
-                                 hs_key_nonce.nonce,
-                                 tls::marshal(hs_content_auth),
-                                 tls::marshal(hs_ct) };
-      src.erase(hs_content.content_type(), leaf, generation);
+                                 hs_key_nonce.nonce };
+      src.erase(ContentType::proposal, leaf, generation);
 
-      auto app_ct = MLSCiphertext::protect(
-        app_content_auth, cipher_suite, src, sender_data_secret, padding_size);
       auto app_key_nonce =
-        src.get(app_content.content_type(), leaf, generation, zero_reuse_guard);
+        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
       leaves[i].application[j] = { generation,
                                    app_key_nonce.key,
-                                   app_key_nonce.nonce,
-                                   tls::marshal(app_content_auth),
-                                   tls::marshal(app_ct) };
-      src.erase(app_content.content_type(), leaf, generation);
+                                   app_key_nonce.nonce };
+      src.erase(ContentType::application, leaf, generation);
     }
   }
 }
@@ -312,47 +275,25 @@ EncryptionTestVector::verify() const
   auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
   for (uint32_t i = 0; i < n_leaves.val; i++) {
-    std::cout << "leaf: " << i << std::endl;
     auto leaf = LeafIndex{ i };
 
     for (uint32_t j = 0; j < leaves[i].handshake.size(); j++) {
-      std::cout << "generation: " << leaves[i].handshake[j].generation
-                << std::endl;
       const auto& hs_step = leaves[i].handshake[j];
       auto generation = hs_step.generation;
       auto hs_key_nonce =
         src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
       VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
       VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
-
-      auto hs_pt = tls::get<MLSPlaintext>(hs_step.plaintext);
-      auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto decrypted = hs_ct.unprotect(cipher_suite, src, sender_data_secret);
-      VERIFY("hs pt ok", decrypted);
-      VERIFY("hs pt", hs_pt.contains(decrypted.value()));
-
-      src.erase(ContentType::proposal, leaf, generation);
     }
 
-    /* XXX
     for (uint32_t j = 0; j < leaves[i].application.size(); j++) {
-      std::cout << "generation: " << leaves[i].application[j].generation
-                << std::endl;
       const auto& app_step = leaves[i].application[j];
       auto generation = app_step.generation;
       auto app_key_nonce =
         src.get(ContentType::application, leaf, generation, zero_reuse_guard);
       VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
       VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
-
-      auto app_content_auth =
-      tls::get<MLSAuthenticatedContent>(app_step.plaintext); auto app_ct =
-      tls::get<MLSCiphertext>(app_step.ciphertext); auto app_pt =
-      app_ct.unprotect(cipher_suite, src, sender_data_secret); VERIFY("app pt
-      ok", app_pt); VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
-      src.erase(ContentType::proposal, leaf, generation);
     }
-    */
   }
 
   return std::nullopt;

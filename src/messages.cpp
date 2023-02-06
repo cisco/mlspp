@@ -754,6 +754,7 @@ MLSCiphertext::unprotect(CipherSuite suite,
 
   auto sender_data = tls::get<MLSSenderData>(opt::get(sender_data_pt));
   if (!keys.has_leaf(sender_data.sender)) {
+    return std::nullopt;
   }
 
   // Decrypt the content

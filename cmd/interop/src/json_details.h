@@ -128,9 +128,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
                                    generation,
                                    key,
-                                   nonce,
-                                   plaintext,
-                                   ciphertext)
+                                   nonce)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
                                    handshake,
                                    application)

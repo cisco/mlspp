@@ -1,10 +1,11 @@
 #include "json_details.h"
 
-using namespace mls_vectors;
+///
+/// Bytes
+///
 
 namespace nlohmann {
 
-// Bytes
 void
 to_json(json& j, const bytes& v)
 {

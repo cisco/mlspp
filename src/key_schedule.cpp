@@ -1,8 +1,6 @@
 #include <mls/key_schedule.h>
 #include <mls/log.h>
 
-#include <iostream>
-
 using mls::log::Log;
 static const auto log_mod = "key_schedule"s;
 
@@ -55,10 +53,6 @@ HashRatchet::next()
     derive_tree_secret(suite, next_secret, "nonce", generation, nonce_size);
   auto secret =
     derive_tree_secret(suite, next_secret, "secret", generation, secret_size);
-
-  std::cout << "step: " << next_secret << std::endl;
-  std::cout << " " << generation << " => " << key << " " << nonce << std::endl;
-  std::cout << "      " << secret << std::endl;
 
   next_generation += 1;
   next_secret = secret;
@@ -115,26 +109,9 @@ SecretTree::SecretTree(CipherSuite suite_in,
   secrets.emplace(root, std::move(encryption_secret_in));
 }
 
-void
-SecretTree::dump(const std::string& label) const
-{
-  std::cout << "~~~ " << label << " ~~~" << std::endl;
-  for (NodeIndex i{ 0 }; i < NodeCount(group_size); i.val++) {
-    std::cout << "  " << i.val << " ";
-    if (secrets.count(i) > 0) {
-      std::cout << secrets.at(i);
-    } else {
-      std::cout << "-";
-    }
-    std::cout << std::endl;
-  }
-}
-
 bytes
 SecretTree::get(LeafIndex sender)
 {
-  dump("before");
-
   static const auto context_left = from_ascii("left");
   static const auto context_right = from_ascii("right");
   auto node = NodeIndex(sender);
@@ -164,13 +141,9 @@ SecretTree::get(LeafIndex sender)
     auto& secret = secrets.at(curr_node);
 
     const auto left_secret =
-      suite.expand_with_label(secret, "tree", from_ascii("left"), secret_size);
+      suite.expand_with_label(secret, "tree", context_left, secret_size);
     const auto right_secret =
-      suite.expand_with_label(secret, "tree", from_ascii("right"), secret_size);
-
-    std::cout << "parent = " << secret << std::endl
-              << "  => L = " << left_secret << std::endl
-              << "  => R = " << right_secret << std::endl;
+      suite.expand_with_label(secret, "tree", context_right, secret_size);
 
     secrets.insert_or_assign(left, left_secret);
     secrets.insert_or_assign(right, right_secret);
@@ -183,8 +156,6 @@ SecretTree::get(LeafIndex sender)
   for (auto i : dirpath) {
     secrets.erase(i);
   }
-
-  dump("after");
 
   return out;
 }
@@ -252,15 +223,8 @@ GroupKeySource::chain(RatchetType type, LeafIndex sender)
 
   auto handshake_secret =
     suite.expand_with_label(leaf_secret, "handshake", {}, secret_size);
-
-  std::cout << "hs:   " << leaf_secret << " ~> " << handshake_secret
-            << std::endl;
-
   auto application_secret =
     suite.expand_with_label(leaf_secret, "application", {}, secret_size);
-
-  std::cout << "app:  " << leaf_secret << " ~> " << application_secret
-            << std::endl;
 
   chains.emplace(Key{ RatchetType::handshake, sender },
                  HashRatchet{ suite, handshake_secret });

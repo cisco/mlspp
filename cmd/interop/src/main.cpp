@@ -28,22 +28,22 @@ make_test_vector(uint64_t type)
   auto n = uint32_t(5);
   switch (type) {
     case TestVectorType::TREE_MATH:
-      return mls_vectors::TreeMathTestVector{ n };
+      return TreeMathTestVector{ n };
 
     case TestVectorType::ENCRYPTION:
-      return mls_vectors::EncryptionTestVector{ suite, n, { n } };
+      return EncryptionTestVector{ suite, n, { n } };
 
     case TestVectorType::KEY_SCHEDULE:
-      return mls_vectors::KeyScheduleTestVector::create(suite, n, n);
+      return KeyScheduleTestVector::create(suite, n, n);
 
     case TestVectorType::TRANSCRIPT:
-      return mls_vectors::TranscriptTestVector::create(suite);
+      return TranscriptTestVector::create(suite);
 
     case TestVectorType::TREEKEM:
-      return mls_vectors::TreeKEMTestVector::create(suite, n);
+      return TreeKEMTestVector::create(suite, n);
 
     case TestVectorType::MESSAGES:
-      return mls_vectors::MessagesTestVector::create();
+      return MessagesTestVector::create();
 
     default:
       return nullptr;

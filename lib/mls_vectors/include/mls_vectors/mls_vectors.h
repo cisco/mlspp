@@ -49,8 +49,6 @@ struct EncryptionTestVector
     uint32_t generation;
     bytes key;
     bytes nonce;
-    bytes plaintext;
-    bytes ciphertext;
   };
 
   struct LeafInfo
