@@ -117,6 +117,11 @@ extern const std::array<CipherSuite::ID, 6> all_supported_suites;
 using hpke::random_bytes;
 
 // HPKE Keys
+namespace encrypt_label {
+extern const bytes update_path_node;
+extern const bytes welcome;
+} // namespace encrypt_label
+
 struct HPKECiphertext
 {
   bytes kem_output;
@@ -130,8 +135,8 @@ struct HPKEPublicKey
   bytes data;
 
   HPKECiphertext encrypt(CipherSuite suite,
-                         const bytes& info,
-                         const bytes& aad,
+                         const bytes& label,
+                         const bytes& context,
                          const bytes& pt) const;
 
   std::tuple<bytes, bytes> do_export(CipherSuite suite,
@@ -154,8 +159,8 @@ struct HPKEPrivateKey
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
-                const bytes& info,
-                const bytes& aad,
+                const bytes& label,
+                const bytes& context,
                 const HPKECiphertext& ct) const;
 
   bytes do_export(CipherSuite suite,

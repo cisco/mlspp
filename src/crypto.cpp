@@ -207,15 +207,33 @@ CipherSuite::reference_label<MLSAuthenticatedContent>()
 ///
 /// HPKEPublicKey and HPKEPrivateKey
 ///
+
+// This function produces a non-literal type, so it can't be constexpr.
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define MLS_1_0_PLUS(label) from_ascii("MLS 1.0 " label)
+
+namespace encrypt_label {
+const bytes encrypt_label = MLS_1_0_PLUS("UpdatePathNode");
+const bytes welcome = MLS_1_0_PLUS("Welcome");
+} // namespace encrypt_label
+
+struct EncryptContext
+{
+  const bytes& label;
+  const bytes& content;
+  TLS_SERIALIZABLE(label, content)
+};
+
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
-                       const bytes& info,
-                       const bytes& aad,
+                       const bytes& label,
+                       const bytes& context,
                        const bytes& pt) const
 {
+  auto encrypt_context = tls::marshal(EncryptContext{ label, context });
   auto pkR = suite.hpke().kem.deserialize(data);
-  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
-  auto ct = ctx.seal(aad, pt);
+  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, encrypt_context);
+  auto ct = ctx.seal({}, pt);
   return HPKECiphertext{ enc, ct };
 }
 
@@ -263,13 +281,14 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 HPKEPrivateKey::decrypt(CipherSuite suite,
-                        const bytes& info,
-                        const bytes& aad,
+                        const bytes& label,
+                        const bytes& context,
                         const HPKECiphertext& ct) const
 {
+  auto encrypt_context = tls::marshal(EncryptContext{ label, context });
   auto skR = suite.hpke().kem.deserialize_private(data);
-  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, info);
-  auto pt = ctx.open(aad, ct.ciphertext);
+  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, encrypt_context);
+  auto pt = ctx.open({}, ct.ciphertext);
   if (!pt) {
     throw InvalidParameterError("HPKE decryption failure");
   }
@@ -299,16 +318,11 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
-
-// This function produces a non-literal type, so it can't be constexpr.
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define SIGN_LABEL(label) from_ascii("MLS 1.0 " label)
-
 namespace sign_label {
-const bytes mls_content = SIGN_LABEL("MLSContentTBS");
-const bytes leaf_node = SIGN_LABEL("LeafNodeTBS");
-const bytes key_package = SIGN_LABEL("KeyPackageTBS");
-const bytes group_info = SIGN_LABEL("GroupInfoTBS");
+const bytes mls_content = MLS_1_0_PLUS("MLSContentTBS");
+const bytes leaf_node = MLS_1_0_PLUS("LeafNodeTBS");
+const bytes key_package = MLS_1_0_PLUS("KeyPackageTBS");
+const bytes group_info = MLS_1_0_PLUS("GroupInfoTBS");
 } // namespace sign_label
 
 struct SignContent

@@ -141,8 +141,20 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
   }
 
   auto gs_data = tls::marshal(gs);
-  auto enc_gs = kp.init_key.encrypt(kp.cipher_suite, {}, {}, gs_data);
+  auto enc_gs = kp.init_key.encrypt(
+    kp.cipher_suite, encrypt_label::welcome, encrypted_group_info, gs_data);
   secrets.push_back({ kp.ref(), enc_gs });
+}
+
+GroupSecrets
+Welcome::decrypt_secrets(int kp_index, const HPKEPrivateKey& init_priv) const
+{
+  auto secrets_data =
+    init_priv.decrypt(cipher_suite,
+                      encrypt_label::welcome,
+                      encrypted_group_info,
+                      secrets.at(kp_index).encrypted_group_secrets);
+  return tls::get<GroupSecrets>(secrets_data);
 }
 
 GroupInfo
