@@ -615,26 +615,62 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
 std::optional<std::string>
 MessageProtectionTestVector::verify()
 {
-  // Verify proposal protection as PublicMessage
+  // Initialize fields that don't get set from JSON
+  group_context = GroupContext{
+    cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
+  };
+
+  keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+
+  // Sanity check the key pairs
+  VERIFY_EQUAL("sig kp", signature_priv.public_key, signature_pub);
+
+  // Verify proposal unprotect as PublicMessage
   auto proposal_pub_unprotected = unprotect(proposal_pub);
   VERIFY("proposal pub unprotect auth", proposal_pub_unprotected);
   VERIFY_EQUAL("proposal pub unprotect",
                opt::get(proposal_pub_unprotected).content,
                proposal);
 
+  // Verify proposal unprotect as PrivateMessage
+  auto proposal_priv_unprotected = unprotect(proposal_priv);
+  VERIFY("proposal priv unprotect auth", proposal_priv_unprotected);
+  VERIFY_EQUAL("proposal priv unprotect",
+               opt::get(proposal_priv_unprotected).content,
+               proposal);
+
+  // Verify commit unprotect as PublicMessage
+  auto commit_pub_unprotected = unprotect(commit_pub);
+  VERIFY("commit pub unprotect auth", commit_pub_unprotected);
+  VERIFY_EQUAL(
+    "commit pub unprotect", opt::get(commit_pub_unprotected).content, commit);
+
+  // Verify commit unprotect as PrivateMessage
+  auto commit_priv_unprotected = unprotect(commit_priv);
+  VERIFY("commit priv unprotect auth", commit_priv_unprotected);
+  VERIFY_EQUAL(
+    "commit priv unprotect", opt::get(commit_priv_unprotected).content, commit);
+
+  // Verify application data unprotect as PrivateMessage
+  auto app_unprotected = unprotect(application_priv);
+  VERIFY("app priv unprotect auth", app_unprotected);
+  VERIFY_EQUAL(
+    "app priv unprotect", opt::get(app_unprotected).content, application);
+
+  // Verify protect/unprotect round-trips
+  // XXX(RLB): Note that because (a) unprotect() deletes keys from the ratchet
+  // and (b) we are using the same ratchet to send and receive, we need to do
+  // these round-trip tests after all the unprotect tests are done.  Otherwise
+  // the protect() calls here will re-use generations used the test vector, and
+  // then unprotect() will delete the keys, then when you go to decrypt the test
+  // vector object, you'll get "expired key".  It might be good to have better
+  // safeguards around such reuse.
   auto proposal_pub_protected = protect_pub(proposal);
   auto proposal_pub_protected_unprotected = unprotect(proposal_pub_protected);
   VERIFY("proposal pub protect/unprotect auth",
          proposal_pub_protected_unprotected);
   VERIFY_EQUAL("proposal pub protect/unprotect",
                opt::get(proposal_pub_protected_unprotected).content,
-               proposal);
-
-  // Verify proposal protection as PrivateMessage
-  auto proposal_priv_unprotected = unprotect(proposal_priv);
-  VERIFY("proposal priv unprotect auth", proposal_priv_unprotected);
-  VERIFY_EQUAL("proposal priv unprotect",
-               opt::get(proposal_priv_unprotected).content,
                proposal);
 
   auto proposal_priv_protected = protect_priv(proposal);
@@ -645,24 +681,12 @@ MessageProtectionTestVector::verify()
                opt::get(proposal_priv_protected_unprotected).content,
                proposal);
 
-  // Verify commit protection as PublicMessage
-  auto commit_pub_unprotected = unprotect(commit_pub);
-  VERIFY("commit pub unprotect auth", commit_pub_unprotected);
-  VERIFY_EQUAL(
-    "commit pub unprotect", opt::get(commit_pub_unprotected).content, commit);
-
   auto commit_pub_protected = protect_pub(commit);
   auto commit_pub_protected_unprotected = unprotect(commit_pub_protected);
   VERIFY("commit pub protect/unprotect auth", commit_pub_protected_unprotected);
   VERIFY_EQUAL("commit pub protect/unprotect",
                opt::get(commit_pub_protected_unprotected).content,
                commit);
-
-  // Verify commit protection as PrivateMessage
-  auto commit_priv_unprotected = unprotect(commit_priv);
-  VERIFY("commit priv unprotect auth", commit_priv_unprotected);
-  VERIFY_EQUAL(
-    "commit priv unprotect", opt::get(commit_priv_unprotected).content, commit);
 
   auto commit_priv_protected = protect_priv(commit);
   auto commit_priv_protected_unprotected = unprotect(commit_priv_protected);
@@ -671,12 +695,6 @@ MessageProtectionTestVector::verify()
   VERIFY_EQUAL("commit priv protect/unprotect",
                opt::get(commit_priv_protected_unprotected).content,
                commit);
-
-  // Verify application data protection as PrivateMessage
-  auto app_unprotected = unprotect(application_priv);
-  VERIFY("app priv unprotect auth", app_unprotected);
-  VERIFY_EQUAL(
-    "app priv unprotect", opt::get(app_unprotected).content, application);
 
   auto app_protected = protect_priv(application);
   auto app_protected_unprotected = unprotect(app_protected);

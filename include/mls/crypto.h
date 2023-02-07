@@ -210,6 +210,10 @@ struct SignaturePrivateKey
              const bytes& label,
              const bytes& message) const;
 
+  // friend tls::ostream& operator<<(tls::ostream& str, const
+  // SignaturePrivateKey& obj); friend tls::istream& operator>>(tls::istream&
+  // str, SignaturePrivateKey& obj);
+
   TLS_SERIALIZABLE(data, public_key)
 
 private:
