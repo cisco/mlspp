@@ -209,7 +209,7 @@ struct TranscriptTestVector
   bytes confirmation_key;
 
   mls::SignaturePublicKey signature_key;
-  mls::MLSAuthenticatedContent commit;
+  mls::AuthenticatedContent commit;
 
   bytes group_context;
   bytes confirmed_transcript_hash_after;

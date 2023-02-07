@@ -50,7 +50,7 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
 
 #if 0 // XXX
 static std::ostream&
-operator<<(std::ostream& str, const MLSAuthenticatedContent& obj)
+operator<<(std::ostream& str, const AuthenticatedContent& obj)
 {
   return str << to_hex(tls::marshal(obj));
 }
@@ -597,14 +597,15 @@ TranscriptTestVector::create(CipherSuite suite)
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content =
-    MLSContent{ group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} };
+  auto commit_content = GroupContent{
+    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
+  };
   auto commit_content_auth =
-    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                  std::move(commit_content),
-                                  suite,
-                                  sig_priv,
-                                  group_context);
+    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                               std::move(commit_content),
+                               suite,
+                               sig_priv,
+                               group_context);
 
   transcript.update_confirmed(commit_content_auth);
 
@@ -933,15 +934,15 @@ MessagesTestVector::create()
                           },
                         } };
 
-  // MLSAuthenticatedContent with Application / Proposal / Commit
-  auto content_auth_app = MLSAuthenticatedContent::sign(
+  // AuthenticatedContent with Application / Proposal / Commit
+  auto content_auth_app = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal = MLSAuthenticatedContent::sign(
+  auto content_auth_proposal = AuthenticatedContent::sign(
     WireFormat::mls_plaintext,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
@@ -949,20 +950,20 @@ MessagesTestVector::create()
     group_context);
 
   auto content_auth_commit =
-    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                  { group_id, epoch, sender, {}, commit },
-                                  suite,
-                                  sig_priv,
-                                  group_context);
+    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                               { group_id, epoch, sender, {}, commit },
+                               suite,
+                               sig_priv,
+                               group_context);
   content_auth_commit.set_confirmation_tag(opaque);
 
-  // MLSMessage(MLSPlaintext)
-  auto mls_plaintext = MLSMessage{ MLSPlaintext::protect(
+  // MLSMessage(PublicMessage)
+  auto mls_plaintext = MLSMessage{ PublicMessage::protect(
     content_auth_proposal, suite, opaque, group_context) };
 
-  // MLSMessage(MLSCiphertext)
+  // MLSMessage(PrivateMessage)
   auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
-  auto mls_ciphertext = MLSMessage{ MLSCiphertext::protect(
+  auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
     content_auth_app, suite, keys, opaque, 10) };
 
   return MessagesTestVector{
@@ -1010,13 +1011,12 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
   VERIFY_TLS_RTT(
-    "MLSAuthenticatedContent/App", MLSAuthenticatedContent, content_auth_app);
-  VERIFY_TLS_RTT("MLSAuthenticatedContent/Proposal",
-                 MLSAuthenticatedContent,
+    "AuthenticatedContent/App", AuthenticatedContent, content_auth_app);
+  VERIFY_TLS_RTT("AuthenticatedContent/Proposal",
+                 AuthenticatedContent,
                  content_auth_proposal);
-  VERIFY_TLS_RTT("MLSAuthenticatedContent/Commit",
-                 MLSAuthenticatedContent,
-                 content_auth_commit);
+  VERIFY_TLS_RTT(
+    "AuthenticatedContent/Commit", AuthenticatedContent, content_auth_commit);
 
   auto require_pt = [](const MLSMessage& msg) {
     return msg.wire_format() == WireFormat::mls_plaintext;
@@ -1026,9 +1026,9 @@ MessagesTestVector::verify() const
   };
 
   VERIFY_TLS_RTT_VAL(
-    "MLSMessage/MLSPlaintext", MLSMessage, mls_plaintext, require_pt);
+    "MLSMessage/PublicMessage", MLSMessage, mls_plaintext, require_pt);
   VERIFY_TLS_RTT_VAL(
-    "MLSMessage/MLSCiphertext", MLSMessage, mls_ciphertext, require_ct);
+    "MLSMessage/PrivateMessage", MLSMessage, mls_ciphertext, require_ct);
 
   return std::nullopt;
 }

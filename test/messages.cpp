@@ -51,12 +51,12 @@ public:
                            LeafCount{ 1 },
                            random_bytes(suite.secret_size()) };
 
-    application_content = MLSContent{
+    application_content = GroupContent{
       group_id,         epoch, { MemberSender{ index } }, authenticated_data,
       application_data,
     };
 
-    proposal_content = MLSContent{
+    proposal_content = GroupContent{
       group_id,
       epoch,
       { MemberSender{ index } },
@@ -91,14 +91,14 @@ protected:
   TreeKEMPublicKey tree{ suite };
   GroupKeySource keys;
 
-  MLSContent application_content;
-  MLSContent proposal_content;
+  GroupContent application_content;
+  GroupContent proposal_content;
 };
 
-TEST_CASE_FIXTURE(MLSMessageTest, "MLSAuthenticatedContent Sign/Verify")
+TEST_CASE_FIXTURE(MLSMessageTest, "AuthenticatedContent Sign/Verify")
 {
   // Verify that a sign / verify round-trip works
-  auto content_auth = MLSAuthenticatedContent::sign(
+  auto content_auth = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext, application_content, suite, sig_priv, context);
 
   REQUIRE(content_auth.verify(suite, sig_priv.public_key, context));
@@ -106,29 +106,29 @@ TEST_CASE_FIXTURE(MLSMessageTest, "MLSAuthenticatedContent Sign/Verify")
 
   // Verify that `mls_plaintext` is forbidden for ApplicationData
   // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS(MLSAuthenticatedContent::sign(
+  REQUIRE_THROWS(AuthenticatedContent::sign(
     WireFormat::mls_plaintext, application_content, suite, sig_priv, context));
 }
 
-TEST_CASE_FIXTURE(MLSMessageTest, "MLSPlaintext Protect/Unprotect")
+TEST_CASE_FIXTURE(MLSMessageTest, "PublicMessage Protect/Unprotect")
 {
   auto content = proposal_content;
-  auto content_auth_original = MLSAuthenticatedContent::sign(
+  auto content_auth_original = AuthenticatedContent::sign(
     WireFormat::mls_plaintext, std::move(content), suite, sig_priv, context);
 
-  auto pt = MLSPlaintext::protect(
+  auto pt = PublicMessage::protect(
     content_auth_original, suite, membership_key, context);
   auto content_auth_unprotected = pt.unprotect(suite, membership_key, context);
   REQUIRE(content_auth_unprotected == content_auth_original);
 }
 
-TEST_CASE_FIXTURE(MLSMessageTest, "MLSCiphertext Protect/Unprotect")
+TEST_CASE_FIXTURE(MLSMessageTest, "PrivateMessage Protect/Unprotect")
 {
   auto content = proposal_content;
-  auto content_auth_original = MLSAuthenticatedContent::sign(
+  auto content_auth_original = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext, std::move(content), suite, sig_priv, context);
 
-  auto ct = MLSCiphertext::protect(
+  auto ct = PrivateMessage::protect(
     content_auth_original, suite, keys, sender_data_secret, padding_size);
   auto content_auth_unprotected = ct.unprotect(suite, keys, sender_data_secret);
   REQUIRE(content_auth_unprotected == content_auth_original);

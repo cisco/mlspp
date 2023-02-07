@@ -195,10 +195,10 @@ CipherSuite::reference_label<KeyPackage>()
 //   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
 //
 // Even though the label says "Proposal", we actually hash the entire enclosing
-// MLSAuthenticatedContent object.
+// AuthenticatedContent object.
 template<>
 const bytes&
-CipherSuite::reference_label<MLSAuthenticatedContent>()
+CipherSuite::reference_label<AuthenticatedContent>()
 {
   static const auto label = from_ascii("MLS 1.0 Proposal Reference");
   return label;
@@ -319,7 +319,7 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 /// SignaturePublicKey and SignaturePrivateKey
 ///
 namespace sign_label {
-const bytes mls_content = MLS_1_0_PLUS("MLSContentTBS");
+const bytes mls_content = MLS_1_0_PLUS("GroupContentTBS");
 const bytes leaf_node = MLS_1_0_PLUS("LeafNodeTBS");
 const bytes key_package = MLS_1_0_PLUS("KeyPackageTBS");
 const bytes group_info = MLS_1_0_PLUS("GroupInfoTBS");

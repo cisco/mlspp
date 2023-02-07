@@ -577,7 +577,7 @@ MLSClientImpl::unprotect(CachedState& entry,
                          UnprotectResponse* response)
 {
   auto ct_data = string_to_bytes(request->ciphertext());
-  auto ct = tls::get<mls::MLSCiphertext>(ct_data);
+  auto ct = tls::get<mls::PrivateMessage>(ct_data);
   auto [aad, pt] = entry.state.unprotect(ct);
   mls::silence_unused(aad);
 
