@@ -236,7 +236,8 @@ private:
 
   mls::MLSMessage protect_pub(
     const mls::GroupContent::RawContent& raw_content) const;
-  mls::MLSMessage protect_priv(const mls::GroupContent::RawContent& raw_content);
+  mls::MLSMessage protect_priv(
+    const mls::GroupContent::RawContent& raw_content);
   std::optional<mls::GroupContent> unprotect(const mls::MLSMessage& message);
 };
 

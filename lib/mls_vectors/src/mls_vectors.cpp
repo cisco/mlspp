@@ -719,10 +719,10 @@ MessageProtectionTestVector::protect_pub(
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
   auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                                    content,
-                                                    cipher_suite,
-                                                    signature_priv,
-                                                    group_context);
+                                                 content,
+                                                 cipher_suite,
+                                                 signature_priv,
+                                                 group_context);
   if (content.content_type() == ContentType::commit) {
     auth_content.set_confirmation_tag(confirmation_tag);
   }
@@ -743,10 +743,10 @@ MessageProtectionTestVector::protect_priv(
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
   auto auth_content = AuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                                    content,
-                                                    cipher_suite,
-                                                    signature_priv,
-                                                    group_context);
+                                                 content,
+                                                 cipher_suite,
+                                                 signature_priv,
+                                                 group_context);
   if (content.content_type() == ContentType::commit) {
     auth_content.set_confirmation_tag(confirmation_tag);
   }
