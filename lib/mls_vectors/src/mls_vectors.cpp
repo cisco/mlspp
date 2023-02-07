@@ -710,15 +710,15 @@ MessageProtectionTestVector::verify()
 
 MLSMessage
 MessageProtectionTestVector::protect_pub(
-  const mls::MLSContent::RawContent& raw_content) const
+  const mls::GroupContent::RawContent& raw_content) const
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
   auto authenticated_data = bytes{};
 
   auto content =
-    MLSContent{ group_id, epoch, sender, authenticated_data, raw_content };
+    GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
                                                     content,
                                                     cipher_suite,
                                                     signature_priv,
@@ -727,22 +727,22 @@ MessageProtectionTestVector::protect_pub(
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
-  return MLSPlaintext::protect(
+  return PublicMessage::protect(
     auth_content, cipher_suite, membership_key, group_context);
 }
 
 MLSMessage
 MessageProtectionTestVector::protect_priv(
-  const mls::MLSContent::RawContent& raw_content)
+  const mls::GroupContent::RawContent& raw_content)
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
   auto authenticated_data = bytes{};
   auto padding_size = size_t(0);
 
   auto content =
-    MLSContent{ group_id, epoch, sender, authenticated_data, raw_content };
+    GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_ciphertext,
                                                     content,
                                                     cipher_suite,
                                                     signature_priv,
@@ -751,21 +751,21 @@ MessageProtectionTestVector::protect_priv(
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
-  return MLSCiphertext::protect(
+  return PrivateMessage::protect(
     auth_content, cipher_suite, keys, sender_data_secret, padding_size);
 }
 
-std::optional<MLSContent>
+std::optional<GroupContent>
 MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
   auto do_unprotect = overloaded{
-    [&](const MLSPlaintext& pt) {
+    [&](const PublicMessage& pt) {
       return pt.unprotect(cipher_suite, membership_key, group_context);
     },
-    [&](const MLSCiphertext& ct) {
+    [&](const PrivateMessage& ct) {
       return ct.unprotect(cipher_suite, keys, sender_data_secret);
     },
-    [](const auto& /* other */) -> std::optional<MLSAuthenticatedContent> {
+    [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
       return std::nullopt;
     }
   };
