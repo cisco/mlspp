@@ -2,6 +2,7 @@
 
 #include <bytes/bytes.h>
 #include <mls/crypto.h>
+#include <mls/key_schedule.h>
 #include <mls/messages.h>
 #include <mls/tree_math.h>
 #include <mls/treekem.h>
@@ -194,6 +195,49 @@ struct KeyScheduleTestVector
                                       uint32_t n_epochs,
                                       uint32_t n_psks);
   std::optional<std::string> verify() const;
+};
+
+struct MessageProtectionTestVector
+{
+  mls::CipherSuite cipher_suite;
+
+  bytes group_id;
+  mls::epoch_t epoch;
+  bytes tree_hash;
+  bytes confirmed_transcript_hash;
+  mls::LeafCount n_leaves;
+
+  mls::SignaturePrivateKey signature_priv;
+  mls::SignaturePublicKey signature_pub;
+
+  bytes encryption_secret;
+  bytes sender_data_secret;
+  bytes membership_key;
+  bytes confirmation_tag;
+
+  mls::Proposal proposal;
+  mls::MLSMessage proposal_pub;
+  mls::MLSMessage proposal_priv;
+
+  mls::Commit commit;
+  mls::MLSMessage commit_pub;
+  mls::MLSMessage commit_priv;
+
+  mls::ApplicationData application;
+  mls::MLSMessage application_priv;
+
+  MessageProtectionTestVector() = default;
+  MessageProtectionTestVector(mls::CipherSuite suite);
+  std::optional<std::string> verify();
+
+private:
+  mls::GroupContext group_context;
+  mls::GroupKeySource keys;
+
+  mls::MLSMessage protect_pub(
+    const mls::MLSContent::RawContent& raw_content) const;
+  mls::MLSMessage protect_priv(const mls::MLSContent::RawContent& raw_content);
+  std::optional<mls::MLSContent> unprotect(const mls::MLSMessage& message);
 };
 
 struct TranscriptTestVector

@@ -62,6 +62,8 @@ CipherSuite::signature_scheme() const
       return SignatureScheme::ed448;
     case ID::P521_AES256GCM_SHA512_P521:
       return SignatureScheme::ecdsa_secp521r1_sha512;
+    case ID::P384_AES256GCM_SHA384_P384:
+      return SignatureScheme::ecdsa_secp384r1_sha384;
     default:
       throw InvalidParameterError("Unsupported algorithm");
   }
@@ -118,6 +120,13 @@ CipherSuite::get() const
       Signature::get<Signature::ID::Ed448>(),
     };
 
+  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
+    HPKE(
+      KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA384>(),
+    Signature::get<Signature::ID::P384_SHA384>(),
+  };
+
   switch (id) {
     case ID::unknown:
       throw InvalidParameterError("Uninitialized ciphersuite");
@@ -139,6 +148,9 @@ CipherSuite::get() const
 
     case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
+
+    case ID::P384_AES256GCM_SHA384_P384:
+      return ciphers_P384_AES256GCM_SHA384_P384;
 
     default:
       throw InvalidParameterError("Unsupported ciphersuite");
@@ -172,13 +184,14 @@ CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
   return expand_with_label(secret, label, {}, secret_size());
 }
 
-const std::array<CipherSuite::ID, 6> all_supported_suites = {
+const std::array<CipherSuite::ID, 7> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,
   CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
   CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
   CipherSuite::ID::P521_AES256GCM_SHA512_P521,
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
+  CipherSuite::ID::P384_AES256GCM_SHA384_P384,
 };
 
 // MakeKeyPackageRef(value) = KDF.expand(
@@ -315,6 +328,14 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 {
 }
 
+void
+HPKEPrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.hpke().kem.deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.hpke().kem.serialize(*pub);
+}
+
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
@@ -386,6 +407,14 @@ SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
 {
+}
+
+void
+SignaturePrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.sig().deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.sig().serialize(*pub);
 }
 
 } // namespace mls

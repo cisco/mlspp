@@ -51,6 +51,7 @@ struct CipherSuite
     X448_AES256GCM_SHA512_Ed448 = 0x0004,
     P521_AES256GCM_SHA512_P521 = 0x0005,
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
+    P384_AES256GCM_SHA384_P384 = 0x0007,
   };
 
   CipherSuite();
@@ -111,7 +112,7 @@ private:
   static const bytes& reference_label();
 };
 
-extern const std::array<CipherSuite::ID, 6> all_supported_suites;
+extern const std::array<CipherSuite::ID, 7> all_supported_suites;
 
 // Utilities
 using hpke::random_bytes;
@@ -169,7 +170,9 @@ struct HPKEPrivateKey
                   const std::string& label,
                   size_t size) const;
 
-  TLS_SERIALIZABLE(data, public_key)
+  void set_public_key(CipherSuite suite);
+
+  TLS_SERIALIZABLE(data)
 
 private:
   HPKEPrivateKey(bytes priv_data, bytes pub_data);
@@ -210,7 +213,9 @@ struct SignaturePrivateKey
              const bytes& label,
              const bytes& message) const;
 
-  TLS_SERIALIZABLE(data, public_key)
+  void set_public_key(CipherSuite suite);
+
+  TLS_SERIALIZABLE(data)
 
 private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);

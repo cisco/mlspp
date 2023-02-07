@@ -141,3 +141,11 @@ TEST_CASE("Messages Interop")
   auto result = tv.verify();
   REQUIRE(result == std::nullopt);
 }
+
+TEST_CASE("Message Protection Interop")
+{
+  for (auto suite : all_supported_suites) {
+    auto tv = MessageProtectionTestVector{ suite };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
