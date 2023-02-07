@@ -18,6 +18,7 @@ using namespace mls_client;
 using namespace mls_vectors;
 
 static constexpr uint64_t CRYPTO_BASICS = 10;
+static constexpr uint64_t SECRET_TREE = 11;
 
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
@@ -31,9 +32,6 @@ make_test_vector(uint64_t type)
   switch (type) {
     case TestVectorType::TREE_MATH:
       return TreeMathTestVector{ n };
-
-    case TestVectorType::ENCRYPTION:
-      return EncryptionTestVector{ suite, n, { n } };
 
     case TestVectorType::KEY_SCHEDULE:
       return KeyScheduleTestVector::create(suite, n, n);
@@ -52,6 +50,17 @@ make_test_vector(uint64_t type)
 
       for (const auto& suite : mls::all_supported_suites) {
         cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
+
+    case SECRET_TREE: {
+      auto cases = std::vector<SecretTreeTestVector>();
+      auto generations = std::vector<uint32_t>{ 1, 15 };
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite, 15, generations);
       }
 
       return cases;
@@ -97,9 +106,6 @@ verify_test_vector(uint64_t type)
     case TestVectorType::TREE_MATH:
       return verify_test_vector<TreeMathTestVector>(j);
 
-    case TestVectorType::ENCRYPTION:
-      return verify_test_vector<EncryptionTestVector>(j);
-
     case TestVectorType::KEY_SCHEDULE:
       return j.get<KeyScheduleTestVector>().verify();
 
@@ -114,6 +120,9 @@ verify_test_vector(uint64_t type)
 
     case CRYPTO_BASICS:
       return verify_test_vector<CryptoBasicsTestVector>(j);
+
+    case SECRET_TREE:
+      return verify_test_vector<SecretTreeTestVector>(j);
 
     default:
       return "Invalid test vector type";

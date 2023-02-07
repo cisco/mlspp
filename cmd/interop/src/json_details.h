@@ -159,23 +159,21 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector,
                                    sign_with_label,
                                    encrypt_with_label)
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector::SenderData,
+                                   sender_data_secret,
                                    ciphertext,
                                    key,
                                    nonce)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector::RatchetStep,
                                    generation,
-                                   key,
-                                   nonce)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
-                                   handshake,
-                                   application)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
+                                   handshake_key,
+                                   handshake_nonce,
+                                   application_key,
+                                   application_nonce)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector,
                                    cipher_suite,
-                                   n_leaves,
                                    encryption_secret,
-                                   sender_data_secret,
-                                   sender_data_info,
+                                   sender_data,
                                    leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,

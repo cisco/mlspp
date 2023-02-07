@@ -27,10 +27,10 @@ TEST_CASE("Crypto Basics")
   }
 }
 
-TEST_CASE("Encryption Keys")
+TEST_CASE("Secret Tree")
 {
   for (auto suite : supported_suites) {
-    const auto tv = EncryptionTestVector{ suite, 15, { 10 } };
+    const auto tv = SecretTreeTestVector{ suite, 15, { 10 } };
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
