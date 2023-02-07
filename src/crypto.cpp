@@ -120,8 +120,7 @@ CipherSuite::get() const
       Signature::get<Signature::ID::Ed448>(),
     };
 
-  static const auto ciphers_P384_AES256GCM_SHA384_P384 =
-    CipherSuite::Ciphers{
+  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
     HPKE(
       KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
     Digest::get<Digest::ID::SHA384>(),
