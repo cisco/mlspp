@@ -169,7 +169,9 @@ struct HPKEPrivateKey
                   const std::string& label,
                   size_t size) const;
 
-  TLS_SERIALIZABLE(data, public_key)
+  void set_public_key(CipherSuite suite);
+
+  TLS_SERIALIZABLE(data)
 
 private:
   HPKEPrivateKey(bytes priv_data, bytes pub_data);
@@ -210,11 +212,9 @@ struct SignaturePrivateKey
              const bytes& label,
              const bytes& message) const;
 
-  // friend tls::ostream& operator<<(tls::ostream& str, const
-  // SignaturePrivateKey& obj); friend tls::istream& operator>>(tls::istream&
-  // str, SignaturePrivateKey& obj);
+  void set_public_key(CipherSuite suite);
 
-  TLS_SERIALIZABLE(data, public_key)
+  TLS_SERIALIZABLE(data)
 
 private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);

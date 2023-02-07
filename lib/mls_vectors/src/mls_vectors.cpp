@@ -622,6 +622,8 @@ MessageProtectionTestVector::verify()
 
   keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
 
+  signature_priv.set_public_key(cipher_suite);
+
   // Sanity check the key pairs
   VERIFY_EQUAL("sig kp", signature_priv.public_key, signature_pub);
 

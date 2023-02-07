@@ -315,6 +315,14 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 {
 }
 
+void
+HPKEPrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.hpke().kem.deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.hpke().kem.serialize(*pub);
+}
+
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
@@ -386,6 +394,14 @@ SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
 {
+}
+
+void
+SignaturePrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.sig().deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.sig().serialize(*pub);
 }
 
 } // namespace mls
