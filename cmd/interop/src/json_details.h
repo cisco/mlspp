@@ -100,9 +100,12 @@ TLS_SERIALIZER(mls::HPKEPrivateKey)
 TLS_SERIALIZER(mls::SignaturePublicKey)
 TLS_SERIALIZER(mls::SignaturePrivateKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
-TLS_SERIALIZER(mls::Credential)
 TLS_SERIALIZER(mls::MLSAuthenticatedContent)
-TLS_SERIALIZER(mls::MLSPlaintext)
+TLS_SERIALIZER(mls::Credential)
+TLS_SERIALIZER(mls::Proposal)
+TLS_SERIALIZER(mls::Commit)
+TLS_SERIALIZER(mls::ApplicationData)
+TLS_SERIALIZER(mls::MLSMessage)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
@@ -205,6 +208,28 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector,
                                    group_id,
                                    initial_init_secret,
                                    epochs)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessageProtectionTestVector,
+                                   cipher_suite,
+                                   group_id,
+                                   epoch,
+                                   tree_hash,
+                                   confirmed_transcript_hash,
+                                   n_leaves,
+                                   signature_priv,
+                                   signature_pub,
+                                   encryption_secret,
+                                   sender_data_secret,
+                                   membership_key,
+                                   confirmation_tag,
+                                   proposal,
+                                   proposal_pub,
+                                   proposal_priv,
+                                   commit,
+                                   commit_pub,
+                                   commit_priv,
+                                   application,
+                                   application_priv)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,

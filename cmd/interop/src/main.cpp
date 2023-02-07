@@ -19,6 +19,7 @@ using namespace mls_vectors;
 
 static constexpr uint64_t CRYPTO_BASICS = 10;
 static constexpr uint64_t SECRET_TREE = 11;
+static constexpr uint64_t MESSAGE_PROTECTION = 12;
 
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
@@ -66,6 +67,16 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
+    case MESSAGE_PROTECTION: {
+      auto cases = std::vector<MessageProtectionTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
+
     default:
       return nullptr;
   }
@@ -87,8 +98,8 @@ template<typename T>
 static std::optional<std::string>
 verify_test_vector(const json& j)
 {
-  const auto cases = j.get<std::vector<T>>();
-  for (const auto& tc : cases) {
+  auto cases = j.get<std::vector<T>>();
+  for (auto& tc : cases) {
     auto result = tc.verify();
     if (result) {
       return result;
@@ -123,6 +134,9 @@ verify_test_vector(uint64_t type)
 
     case SECRET_TREE:
       return verify_test_vector<SecretTreeTestVector>(j);
+
+    case MESSAGE_PROTECTION:
+      return verify_test_vector<MessageProtectionTestVector>(j);
 
     default:
       return "Invalid test vector type";

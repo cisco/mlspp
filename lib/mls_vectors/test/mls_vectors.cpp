@@ -43,6 +43,14 @@ TEST_CASE("Key Schedule")
   }
 }
 
+TEST_CASE("Message Protection")
+{
+  for (auto suite : supported_suites) {
+    auto tv = MessageProtectionTestVector{ suite };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("Transcript")
 {
   for (auto suite : supported_suites) {
