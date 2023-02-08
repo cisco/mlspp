@@ -263,7 +263,9 @@ CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(CipherSuite suite)
 std::optional<std::string>
 CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
 {
-  VERIFY_EQUAL("derive tree secret", out, suite.derive_tree_secret(secret, label, generation, length));
+  VERIFY_EQUAL("derive tree secret",
+               out,
+               suite.derive_tree_secret(secret, label, generation, length));
   return std::nullopt;
 }
 
@@ -279,12 +281,10 @@ CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
 std::optional<std::string>
 CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
 {
-  VERIFY("verify with label",
-         pub.verify(suite, label, content, signature));
+  VERIFY("verify with label", pub.verify(suite, label, content, signature));
 
   auto new_signature = priv.sign(suite, label, content);
-  VERIFY("sign with label",
-         pub.verify(suite, label, content, new_signature));
+  VERIFY("sign with label", pub.verify(suite, label, content, new_signature));
 
   return std::nullopt;
 }

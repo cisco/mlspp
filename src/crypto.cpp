@@ -185,14 +185,12 @@ CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
 }
 
 bytes
-CipherSuite::derive_tree_secret(
-                   const bytes& secret,
-                   const std::string& label,
-                   uint32_t generation,
-                   size_t length)
+CipherSuite::derive_tree_secret(const bytes& secret,
+                                const std::string& label,
+                                uint32_t generation,
+                                size_t length)
 {
-  return expand_with_label(
-    secret, label, tls::marshal(generation), length);
+  return expand_with_label(secret, label, tls::marshal(generation), length);
 }
 
 const std::array<CipherSuite::ID, 7> all_supported_suites = {
@@ -236,7 +234,9 @@ CipherSuite::reference_label<MLSAuthenticatedContent>()
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define MLS_1_0_PLUS(label) from_ascii("MLS 1.0 " label)
 
-static bytes mls_1_0_plus(const std::string& label) {
+static bytes
+mls_1_0_plus(const std::string& label)
+{
   auto plus = "MLS 1.0 "s + label;
   return from_ascii(plus);
 }

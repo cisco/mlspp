@@ -74,11 +74,10 @@ struct CipherSuite
                           const bytes& context,
                           size_t length) const;
   bytes derive_secret(const bytes& secret, const std::string& label) const;
-  bytes derive_tree_secret(
-                   const bytes& secret,
-                   const std::string& label,
-                   uint32_t generation,
-                   size_t length) const;
+  bytes derive_tree_secret(const bytes& secret,
+                           const std::string& label,
+                           uint32_t generation,
+                           size_t length) const;
 
   template<typename T>
   bytes ref(const T& value) const

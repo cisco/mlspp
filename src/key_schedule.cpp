@@ -32,8 +32,7 @@ std::tuple<uint32_t, KeyAndNonce>
 HashRatchet::next()
 {
   auto generation = next_generation;
-  auto key =
-    suite.derive_tree_secret(next_secret, "key", generation, key_size);
+  auto key = suite.derive_tree_secret(next_secret, "key", generation, key_size);
   auto nonce =
     suite.derive_tree_secret(next_secret, "nonce", generation, nonce_size);
   auto secret =

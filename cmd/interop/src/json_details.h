@@ -82,11 +82,10 @@ struct adl_serializer<mls::CipherSuite>
 template<typename T>
 struct asymmetric_key_serializer
 {
-  static void to_json(json& j, const T& v) {
-    j = bytes{ v.data };
-  }
+  static void to_json(json& j, const T& v) { j = bytes{ v.data }; }
 
-  static void from_json(const json& j, T& v) {
+  static void from_json(const json& j, T& v)
+  {
     v = T();
     v.data = j.get<bytes>();
   }
