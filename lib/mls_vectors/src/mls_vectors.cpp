@@ -639,6 +639,7 @@ MessageProtectionTestVector::verify()
     cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
   };
 
+  n_leaves = LeafCount{ 2 };
   keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
 
   signature_priv.set_public_key(cipher_suite);
