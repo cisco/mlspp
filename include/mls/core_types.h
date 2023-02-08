@@ -11,7 +11,7 @@ namespace mls {
 //   mls10(1),
 //   (255)
 // } ProtocolVersion;
-enum class ProtocolVersion : uint8_t
+enum class ProtocolVersion : uint16_t
 {
   mls10 = 0x01,
 };
