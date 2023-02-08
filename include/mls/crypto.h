@@ -78,7 +78,7 @@ struct CipherSuite
                    const bytes& secret,
                    const std::string& label,
                    uint32_t generation,
-                   size_t length);
+                   size_t length) const;
 
   template<typename T>
   bytes ref(const T& value) const
