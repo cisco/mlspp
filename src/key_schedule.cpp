@@ -14,17 +14,6 @@ struct TreeContext
   TLS_SERIALIZABLE(node, generation)
 };
 
-static bytes
-derive_tree_secret(CipherSuite suite,
-                   const bytes& secret,
-                   const std::string& label,
-                   uint32_t generation,
-                   size_t length)
-{
-  return suite.expand_with_label(
-    secret, label, tls::marshal(generation), length);
-}
-
 ///
 /// HashRatchet
 ///
@@ -44,11 +33,11 @@ HashRatchet::next()
 {
   auto generation = next_generation;
   auto key =
-    derive_tree_secret(suite, next_secret, "key", generation, key_size);
+    suite.derive_tree_secret(next_secret, "key", generation, key_size);
   auto nonce =
-    derive_tree_secret(suite, next_secret, "nonce", generation, nonce_size);
+    suite.derive_tree_secret(next_secret, "nonce", generation, nonce_size);
   auto secret =
-    derive_tree_secret(suite, next_secret, "secret", generation, secret_size);
+    suite.derive_tree_secret(next_secret, "secret", generation, secret_size);
 
   next_generation += 1;
   next_secret = secret;

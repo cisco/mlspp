@@ -251,6 +251,22 @@ CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
+CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("DeriveTreeSecret")
+  , generation(0xA0A0A0A0)
+  , length(static_cast<uint16_t>(suite.secret_size()))
+  , out(suite.derive_tree_secret(secret, label, generation, length))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("derive tree secret", out, suite.derive_tree_secret(secret, label, generation, length));
+  return std::nullopt;
+}
+
 CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
   : priv(SignaturePrivateKey::generate(suite))
   , pub(priv.public_key)
@@ -304,6 +320,7 @@ CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
   , ref_hash(suite)
   , expand_with_label(suite)
   , derive_secret(suite)
+  , derive_tree_secret(suite)
   , sign_with_label(suite)
   , encrypt_with_label(suite)
 {
@@ -323,6 +340,11 @@ CryptoBasicsTestVector::verify() const
   }
 
   result = derive_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_tree_secret.verify(cipher_suite);
   if (result) {
     return result;
   }

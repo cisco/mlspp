@@ -184,6 +184,17 @@ CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
   return expand_with_label(secret, label, {}, secret_size());
 }
 
+bytes
+CipherSuite::derive_tree_secret(
+                   const bytes& secret,
+                   const std::string& label,
+                   uint32_t generation,
+                   size_t length)
+{
+  return expand_with_label(
+    secret, label, tls::marshal(generation), length);
+}
+
 const std::array<CipherSuite::ID, 7> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,

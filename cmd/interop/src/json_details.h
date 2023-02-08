@@ -140,6 +140,12 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::DeriveSecret,
                                    secret,
                                    label,
                                    out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::DeriveTreeSecret,
+                                   secret,
+                                   label,
+                                   generation,
+                                   length,
+                                   out)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::SignWithLabel,
                                    priv,
                                    pub,
@@ -159,6 +165,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector,
                                    ref_hash,
                                    expand_with_label,
                                    derive_secret,
+                                   derive_tree_secret,
                                    sign_with_label,
                                    encrypt_with_label)
 
