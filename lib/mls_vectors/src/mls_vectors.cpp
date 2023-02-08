@@ -611,7 +611,6 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   , encryption_secret(random_bytes(suite.secret_size()))
   , sender_data_secret(random_bytes(suite.secret_size()))
   , membership_key(random_bytes(suite.secret_size()))
-  , confirmation_tag(random_bytes(suite.secret_size()))
   , proposal{ GroupContextExtensions{} }
   , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
   , application{ random_bytes(suite.secret_size()) }
@@ -732,7 +731,7 @@ MLSMessage
 MessageProtectionTestVector::protect_pub(
   const mls::MLSContent::RawContent& raw_content) const
 {
-  auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
 
   auto content =
@@ -744,6 +743,7 @@ MessageProtectionTestVector::protect_pub(
                                                     signature_priv,
                                                     group_context);
   if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
@@ -755,7 +755,7 @@ MLSMessage
 MessageProtectionTestVector::protect_priv(
   const mls::MLSContent::RawContent& raw_content)
 {
-  auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
   auto padding_size = size_t(0);
 
@@ -768,6 +768,7 @@ MessageProtectionTestVector::protect_priv(
                                                     signature_priv,
                                                     group_context);
   if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 

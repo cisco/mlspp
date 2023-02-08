@@ -227,7 +227,6 @@ struct MessageProtectionTestVector
   bytes encryption_secret;
   bytes sender_data_secret;
   bytes membership_key;
-  bytes confirmation_tag;
 
   mls::Proposal proposal;
   mls::MLSMessage proposal_pub;
