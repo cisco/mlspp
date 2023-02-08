@@ -256,20 +256,19 @@ CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
   , pub(priv.public_key)
   , content(random_bytes(suite.secret_size()))
   , label("SignWithLabel")
-  , signature(priv.sign(suite, from_ascii(label), content))
+  , signature(priv.sign(suite, label, content))
 {
 }
 
 std::optional<std::string>
 CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
 {
-  auto ascii_label = from_ascii(label);
   VERIFY("verify with label",
-         pub.verify(suite, ascii_label, content, signature));
+         pub.verify(suite, label, content, signature));
 
-  auto new_signature = priv.sign(suite, ascii_label, content);
+  auto new_signature = priv.sign(suite, label, content);
   VERIFY("sign with label",
-         pub.verify(suite, ascii_label, content, new_signature));
+         pub.verify(suite, label, content, new_signature));
 
   return std::nullopt;
 }
@@ -281,7 +280,7 @@ CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
   , context(random_bytes(suite.secret_size()))
   , plaintext(random_bytes(suite.secret_size()))
 {
-  auto ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
+  auto ct = pub.encrypt(suite, label, context, plaintext);
   kem_output = ct.kem_output;
   ciphertext = ct.ciphertext;
 }
@@ -289,13 +288,12 @@ CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
 std::optional<std::string>
 CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite suite) const
 {
-  auto ascii_label = from_ascii(label);
   auto ct = HPKECiphertext{ kem_output, ciphertext };
-  auto pt = priv.decrypt(suite, ascii_label, context, ct);
+  auto pt = priv.decrypt(suite, label, context, ct);
   VERIFY_EQUAL("decrypt with label", pt, plaintext);
 
-  auto new_ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
-  auto new_pt = priv.decrypt(suite, ascii_label, context, new_ct);
+  auto new_ct = pub.encrypt(suite, label, context, plaintext);
+  auto new_pt = priv.decrypt(suite, label, context, new_ct);
   VERIFY_EQUAL("encrypt with label", new_pt, plaintext);
 
   return std::nullopt;

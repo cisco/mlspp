@@ -119,8 +119,8 @@ using hpke::random_bytes;
 
 // HPKE Keys
 namespace encrypt_label {
-extern const bytes update_path_node;
-extern const bytes welcome;
+extern const std::string update_path_node;
+extern const std::string welcome;
 } // namespace encrypt_label
 
 struct HPKECiphertext
@@ -136,7 +136,7 @@ struct HPKEPublicKey
   bytes data;
 
   HPKECiphertext encrypt(CipherSuite suite,
-                         const bytes& label,
+                         const std::string& label,
                          const bytes& context,
                          const bytes& pt) const;
 
@@ -160,7 +160,7 @@ struct HPKEPrivateKey
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
-                const bytes& label,
+                const std::string& label,
                 const bytes& context,
                 const HPKECiphertext& ct) const;
 
@@ -180,10 +180,10 @@ private:
 
 // Signature Keys
 namespace sign_label {
-extern const bytes mls_content;
-extern const bytes leaf_node;
-extern const bytes key_package;
-extern const bytes group_info;
+extern const std::string mls_content;
+extern const std::string leaf_node;
+extern const std::string key_package;
+extern const std::string group_info;
 } // namespace sign_label
 
 struct SignaturePublicKey
@@ -191,7 +191,7 @@ struct SignaturePublicKey
   bytes data;
 
   bool verify(const CipherSuite& suite,
-              const bytes& label,
+              const std::string& label,
               const bytes& message,
               const bytes& signature) const;
 
@@ -210,7 +210,7 @@ struct SignaturePrivateKey
   SignaturePublicKey public_key;
 
   bytes sign(const CipherSuite& suite,
-             const bytes& label,
+             const std::string& label,
              const bytes& message) const;
 
   void set_public_key(CipherSuite suite);

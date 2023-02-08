@@ -9,8 +9,8 @@ using namespace mls_vectors;
 
 TEST_CASE("Basic HPKE")
 {
-  auto info = random_bytes(100);
-  auto aad = random_bytes(100);
+  auto label = "label";
+  auto context = random_bytes(100);
   auto original = random_bytes(100);
 
   for (auto suite_id : all_supported_suites) {
@@ -30,8 +30,8 @@ TEST_CASE("Basic HPKE")
     REQUIRE(gY == gY);
     REQUIRE(gX != gY);
 
-    auto encrypted = gX.encrypt(suite, info, aad, original);
-    auto decrypted = x.decrypt(suite, info, aad, encrypted);
+    auto encrypted = gX.encrypt(suite, label, context, original);
+    auto decrypted = x.decrypt(suite, label, context, encrypted);
 
     REQUIRE(original == decrypted);
   }
@@ -68,7 +68,7 @@ TEST_CASE("Basic Signature")
     REQUIRE(b.public_key == b.public_key);
     REQUIRE(a.public_key != b.public_key);
 
-    auto label = from_ascii("label");
+    auto label = "label";
     auto message = from_hex("01020304");
     auto signature = a.sign(suite, label, message);
 
