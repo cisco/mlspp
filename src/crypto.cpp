@@ -184,6 +184,15 @@ CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
   return expand_with_label(secret, label, {}, secret_size());
 }
 
+bytes
+CipherSuite::derive_tree_secret(const bytes& secret,
+                                const std::string& label,
+                                uint32_t generation,
+                                size_t length) const
+{
+  return expand_with_label(secret, label, tls::marshal(generation), length);
+}
+
 const std::array<CipherSuite::ID, 7> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,
@@ -225,9 +234,16 @@ CipherSuite::reference_label<AuthenticatedContent>()
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define MLS_1_0_PLUS(label) from_ascii("MLS 1.0 " label)
 
+static bytes
+mls_1_0_plus(const std::string& label)
+{
+  auto plus = "MLS 1.0 "s + label;
+  return from_ascii(plus);
+}
+
 namespace encrypt_label {
-const bytes update_path_node = MLS_1_0_PLUS("UpdatePathNode");
-const bytes welcome = MLS_1_0_PLUS("Welcome");
+const std::string update_path_node = "UpdatePathNode";
+const std::string welcome = "Welcome";
 } // namespace encrypt_label
 
 struct EncryptContext
@@ -239,11 +255,12 @@ struct EncryptContext
 
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
-                       const bytes& label,
+                       const std::string& label,
                        const bytes& context,
                        const bytes& pt) const
 {
-  auto encrypt_context = tls::marshal(EncryptContext{ label, context });
+  auto label_plus = mls_1_0_plus(label);
+  auto encrypt_context = tls::marshal(EncryptContext{ label_plus, context });
   auto pkR = suite.hpke().kem.deserialize(data);
   auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, encrypt_context);
   auto ct = ctx.seal({}, pt);
@@ -294,11 +311,12 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 HPKEPrivateKey::decrypt(CipherSuite suite,
-                        const bytes& label,
+                        const std::string& label,
                         const bytes& context,
                         const HPKECiphertext& ct) const
 {
-  auto encrypt_context = tls::marshal(EncryptContext{ label, context });
+  auto label_plus = mls_1_0_plus(label);
+  auto encrypt_context = tls::marshal(EncryptContext{ label_plus, context });
   auto skR = suite.hpke().kem.deserialize_private(data);
   auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, encrypt_context);
   auto pt = ctx.open({}, ct.ciphertext);
@@ -340,10 +358,10 @@ HPKEPrivateKey::set_public_key(CipherSuite suite)
 /// SignaturePublicKey and SignaturePrivateKey
 ///
 namespace sign_label {
-const bytes mls_content = MLS_1_0_PLUS("GroupContentTBS");
-const bytes leaf_node = MLS_1_0_PLUS("LeafNodeTBS");
-const bytes key_package = MLS_1_0_PLUS("KeyPackageTBS");
-const bytes group_info = MLS_1_0_PLUS("GroupInfoTBS");
+const std::string mls_content = "GroupContentTBS";
+const std::string leaf_node = "LeafNodeTBS";
+const std::string key_package = "KeyPackageTBS";
+const std::string group_info = "GroupInfoTBS";
 } // namespace sign_label
 
 struct SignContent
@@ -355,11 +373,12 @@ struct SignContent
 
 bool
 SignaturePublicKey::verify(const CipherSuite& suite,
-                           const bytes& label,
+                           const std::string& label,
                            const bytes& message,
                            const bytes& signature) const
 {
-  const auto content = tls::marshal(SignContent{ label, message });
+  auto label_plus = mls_1_0_plus(label);
+  const auto content = tls::marshal(SignContent{ label_plus, message });
   auto pub = suite.sig().deserialize(data);
   return suite.sig().verify(content, signature, *pub);
 }
@@ -395,10 +414,11 @@ SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 SignaturePrivateKey::sign(const CipherSuite& suite,
-                          const bytes& label,
+                          const std::string& label,
                           const bytes& message) const
 {
-  const auto content = tls::marshal(SignContent{ label, message });
+  auto label_plus = mls_1_0_plus(label);
+  const auto content = tls::marshal(SignContent{ label_plus, message });
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().sign(content, *priv);
 }

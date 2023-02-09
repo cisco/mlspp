@@ -278,6 +278,9 @@ operator>>(istream& str, std::vector<T>& vec)
   // Read the encoded data size
   auto size = uint64_t(0);
   varint::decode(str, size);
+  if (size > str._buffer.size()) {
+    throw ReadError("Vector is longer than remaining data");
+  }
 
   // Read the elements of the vector
   // NB: Remember that we store the vector in reverse order

@@ -251,25 +251,40 @@ CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
+CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("DeriveTreeSecret")
+  , generation(0xA0A0A0A0)
+  , length(static_cast<uint16_t>(suite.secret_size()))
+  , out(suite.derive_tree_secret(secret, label, generation, length))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("derive tree secret",
+               out,
+               suite.derive_tree_secret(secret, label, generation, length));
+  return std::nullopt;
+}
+
 CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
   : priv(SignaturePrivateKey::generate(suite))
   , pub(priv.public_key)
   , content(random_bytes(suite.secret_size()))
   , label("SignWithLabel")
-  , signature(priv.sign(suite, from_ascii(label), content))
+  , signature(priv.sign(suite, label, content))
 {
 }
 
 std::optional<std::string>
 CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
 {
-  auto ascii_label = from_ascii(label);
-  VERIFY("verify with label",
-         pub.verify(suite, ascii_label, content, signature));
+  VERIFY("verify with label", pub.verify(suite, label, content, signature));
 
-  auto new_signature = priv.sign(suite, ascii_label, content);
-  VERIFY("sign with label",
-         pub.verify(suite, ascii_label, content, new_signature));
+  auto new_signature = priv.sign(suite, label, content);
+  VERIFY("sign with label", pub.verify(suite, label, content, new_signature));
 
   return std::nullopt;
 }
@@ -281,7 +296,7 @@ CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
   , context(random_bytes(suite.secret_size()))
   , plaintext(random_bytes(suite.secret_size()))
 {
-  auto ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
+  auto ct = pub.encrypt(suite, label, context, plaintext);
   kem_output = ct.kem_output;
   ciphertext = ct.ciphertext;
 }
@@ -289,13 +304,12 @@ CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
 std::optional<std::string>
 CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite suite) const
 {
-  auto ascii_label = from_ascii(label);
   auto ct = HPKECiphertext{ kem_output, ciphertext };
-  auto pt = priv.decrypt(suite, ascii_label, context, ct);
+  auto pt = priv.decrypt(suite, label, context, ct);
   VERIFY_EQUAL("decrypt with label", pt, plaintext);
 
-  auto new_ct = pub.encrypt(suite, from_ascii(label), context, plaintext);
-  auto new_pt = priv.decrypt(suite, ascii_label, context, new_ct);
+  auto new_ct = pub.encrypt(suite, label, context, plaintext);
+  auto new_pt = priv.decrypt(suite, label, context, new_ct);
   VERIFY_EQUAL("encrypt with label", new_pt, plaintext);
 
   return std::nullopt;
@@ -306,6 +320,7 @@ CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
   , ref_hash(suite)
   , expand_with_label(suite)
   , derive_secret(suite)
+  , derive_tree_secret(suite)
   , sign_with_label(suite)
   , encrypt_with_label(suite)
 {
@@ -325,6 +340,11 @@ CryptoBasicsTestVector::verify() const
   }
 
   result = derive_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_tree_secret.verify(cipher_suite);
   if (result) {
     return result;
   }
@@ -591,7 +611,6 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   , encryption_secret(random_bytes(suite.secret_size()))
   , sender_data_secret(random_bytes(suite.secret_size()))
   , membership_key(random_bytes(suite.secret_size()))
-  , confirmation_tag(random_bytes(suite.secret_size()))
   , proposal{ GroupContextExtensions{} }
   , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
   , application{ random_bytes(suite.secret_size()) }
@@ -620,6 +639,7 @@ MessageProtectionTestVector::verify()
     cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
   };
 
+  n_leaves = LeafCount{ 2 };
   keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
 
   signature_priv.set_public_key(cipher_suite);
@@ -712,7 +732,7 @@ MLSMessage
 MessageProtectionTestVector::protect_pub(
   const mls::GroupContent::RawContent& raw_content) const
 {
-  auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
 
   auto content =
@@ -724,6 +744,7 @@ MessageProtectionTestVector::protect_pub(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
@@ -735,7 +756,7 @@ MLSMessage
 MessageProtectionTestVector::protect_priv(
   const mls::GroupContent::RawContent& raw_content)
 {
-  auto sender = Sender{ MemberSender{ LeafIndex{ 0 } } };
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
   auto padding_size = size_t(0);
 
@@ -748,6 +769,7 @@ MessageProtectionTestVector::protect_priv(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 

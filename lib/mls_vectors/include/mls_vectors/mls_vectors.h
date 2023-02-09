@@ -68,6 +68,19 @@ struct CryptoBasicsTestVector
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
+  struct DeriveTreeSecret
+  {
+    bytes secret;
+    std::string label;
+    uint32_t generation;
+    uint16_t length;
+    bytes out;
+
+    DeriveTreeSecret() = default;
+    DeriveTreeSecret(mls::CipherSuite suite);
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
+  };
+
   struct SignWithLabel
   {
     mls::SignaturePrivateKey priv;
@@ -101,6 +114,7 @@ struct CryptoBasicsTestVector
   RefHash ref_hash;
   ExpandWithLabel expand_with_label;
   DeriveSecret derive_secret;
+  DeriveTreeSecret derive_tree_secret;
   SignWithLabel sign_with_label;
   EncryptWithLabel encrypt_with_label;
 
@@ -213,7 +227,6 @@ struct MessageProtectionTestVector
   bytes encryption_secret;
   bytes sender_data_secret;
   bytes membership_key;
-  bytes confirmation_tag;
 
   mls::Proposal proposal;
   mls::MLSMessage proposal_pub;
