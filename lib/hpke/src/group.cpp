@@ -14,7 +14,7 @@ namespace hpke {
 static inline size_t
 group_dh_size(Group::ID group_id);
 
-static inline const EVP_MD *
+static inline const EVP_MD*
 group_sig_digest(Group::ID group_id)
 {
   switch (group_id) {
@@ -126,8 +126,8 @@ EVPGroup::sign(const bytes& data, const Group::PrivateKey& sk) const
   }
 
   const auto* digest = group_sig_digest(id);
-  if (1 != EVP_DigestSignInit(
-             ctx.get(), nullptr, digest, nullptr, rsk.pkey.get())) {
+  if (1 !=
+      EVP_DigestSignInit(ctx.get(), nullptr, digest, nullptr, rsk.pkey.get())) {
     throw openssl_error();
   }
 
