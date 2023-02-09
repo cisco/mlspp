@@ -309,7 +309,7 @@ CryptoBasicsTestVector::RefHash::verify(CipherSuite suite) const
 CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(
   CipherSuite suite,
   PseudoRandom::Generator&& prg)
-  : secret(random_bytes(suite.secret_size()))
+  : secret(prg.secret("secret"))
   , label("ExpandWithLabel")
   , context(prg.secret("context"))
   , length(prg.output_length())
@@ -843,7 +843,7 @@ MessageProtectionTestVector::protect_pub(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
-    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
@@ -868,7 +868,7 @@ MessageProtectionTestVector::protect_priv(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
-    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
