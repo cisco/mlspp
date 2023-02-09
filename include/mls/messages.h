@@ -237,6 +237,8 @@ struct Welcome
 
   void encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret);
   std::optional<int> find(const KeyPackage& kp) const;
+  GroupSecrets decrypt_secrets(int kp_index,
+                               const HPKEPrivateKey& init_priv) const;
   GroupInfo decrypt(const bytes& joiner_secret,
                     const std::vector<PSKWithSecret>& psks) const;
 
@@ -390,7 +392,7 @@ struct Commit
 //     uint32 sender;
 //     ContentType content_type;
 //
-//     select (MLSPlaintext.content_type) {
+//     select (PublicMessage.content_type) {
 //         case handshake:
 //             GroupOperation operation;
 //             opaque confirmation<0..255>;
@@ -400,7 +402,7 @@ struct Commit
 //     }
 //
 //     opaque signature<0..2^16-1>;
-// } MLSPlaintext;
+// } PublicMessage;
 struct ApplicationData
 {
   bytes data;
@@ -477,7 +479,7 @@ struct Sender
 ///
 struct GroupKeySource;
 
-struct MLSContent
+struct GroupContent
 {
   using RawContent = var::variant<ApplicationData, Proposal, Commit>;
 
@@ -487,17 +489,17 @@ struct MLSContent
   bytes authenticated_data;
   RawContent content;
 
-  MLSContent() = default;
-  MLSContent(bytes group_id_in,
-             epoch_t epoch_in,
-             Sender sender_in,
-             bytes authenticated_data_in,
-             RawContent content_in);
-  MLSContent(bytes group_id_in,
-             epoch_t epoch_in,
-             Sender sender_in,
-             bytes authenticated_data_in,
-             ContentType content_type);
+  GroupContent() = default;
+  GroupContent(bytes group_id_in,
+               epoch_t epoch_in,
+               Sender sender_in,
+               bytes authenticated_data_in,
+               RawContent content_in);
+  GroupContent(bytes group_id_in,
+               epoch_t epoch_in,
+               Sender sender_in,
+               bytes authenticated_data_in,
+               ContentType content_type);
 
   ContentType content_type() const;
 
@@ -509,33 +511,32 @@ struct MLSContent
              tls::variant<ContentType>)
 };
 
-struct MLSContentAuthData
+struct GroupContentAuthData
 {
   ContentType content_type = ContentType::invalid;
   bytes signature;
   std::optional<bytes> confirmation_tag;
 
   friend tls::ostream& operator<<(tls::ostream& str,
-                                  const MLSContentAuthData& obj);
-  friend tls::istream& operator>>(tls::istream& str, MLSContentAuthData& obj);
-  friend bool operator==(const MLSContentAuthData& lhs,
-                         const MLSContentAuthData& rhs);
+                                  const GroupContentAuthData& obj);
+  friend tls::istream& operator>>(tls::istream& str, GroupContentAuthData& obj);
+  friend bool operator==(const GroupContentAuthData& lhs,
+                         const GroupContentAuthData& rhs);
 };
 
-struct MLSAuthenticatedContent
+struct AuthenticatedContent
 {
   WireFormat wire_format;
-  MLSContent content;
-  MLSContentAuthData auth;
+  GroupContent content;
+  GroupContentAuthData auth;
 
-  MLSAuthenticatedContent() = default;
+  AuthenticatedContent() = default;
 
-  static MLSAuthenticatedContent sign(
-    WireFormat wire_format,
-    MLSContent content,
-    CipherSuite suite,
-    const SignaturePrivateKey& sig_priv,
-    const std::optional<GroupContext>& context);
+  static AuthenticatedContent sign(WireFormat wire_format,
+                                   GroupContent content,
+                                   CipherSuite suite,
+                                   const SignaturePrivateKey& sig_priv,
+                                   const std::optional<GroupContext>& context);
   bool verify(CipherSuite suite,
               const SignaturePublicKey& sig_pub,
               const std::optional<GroupContext>& context) const;
@@ -547,69 +548,68 @@ struct MLSAuthenticatedContent
   bool check_confirmation_tag(const bytes& confirmation_tag) const;
 
   friend tls::ostream& operator<<(tls::ostream& str,
-                                  const MLSAuthenticatedContent& obj);
-  friend tls::istream& operator>>(tls::istream& str,
-                                  MLSAuthenticatedContent& obj);
-  friend bool operator==(const MLSAuthenticatedContent& lhs,
-                         const MLSAuthenticatedContent& rhs);
+                                  const AuthenticatedContent& obj);
+  friend tls::istream& operator>>(tls::istream& str, AuthenticatedContent& obj);
+  friend bool operator==(const AuthenticatedContent& lhs,
+                         const AuthenticatedContent& rhs);
 
 private:
-  MLSAuthenticatedContent(WireFormat wire_format_in, MLSContent content_in);
-  MLSAuthenticatedContent(WireFormat wire_format_in,
-                          MLSContent content_in,
-                          MLSContentAuthData auth_in);
+  AuthenticatedContent(WireFormat wire_format_in, GroupContent content_in);
+  AuthenticatedContent(WireFormat wire_format_in,
+                       GroupContent content_in,
+                       GroupContentAuthData auth_in);
 
   bytes to_be_signed(const std::optional<GroupContext>& context) const;
 
-  friend struct MLSPlaintext;
-  friend struct MLSCiphertext;
+  friend struct PublicMessage;
+  friend struct PrivateMessage;
 };
 
-struct MLSPlaintext
+struct PublicMessage
 {
-  MLSPlaintext() = default;
+  PublicMessage() = default;
 
   epoch_t get_epoch() const { return content.epoch; }
 
-  static MLSPlaintext protect(MLSAuthenticatedContent content_auth,
-                              CipherSuite suite,
-                              const std::optional<bytes>& membership_key,
-                              const std::optional<GroupContext>& context);
-  std::optional<MLSAuthenticatedContent> unprotect(
+  static PublicMessage protect(AuthenticatedContent content_auth,
+                               CipherSuite suite,
+                               const std::optional<bytes>& membership_key,
+                               const std::optional<GroupContext>& context);
+  std::optional<AuthenticatedContent> unprotect(
     CipherSuite suite,
     const std::optional<bytes>& membership_key,
     const std::optional<GroupContext>& context) const;
 
-  friend tls::ostream& operator<<(tls::ostream& str, const MLSPlaintext& obj);
-  friend tls::istream& operator>>(tls::istream& str, MLSPlaintext& obj);
+  bool contains(const AuthenticatedContent& content_auth) const;
+
+  friend tls::ostream& operator<<(tls::ostream& str, const PublicMessage& obj);
+  friend tls::istream& operator>>(tls::istream& str, PublicMessage& obj);
 
 private:
-  MLSContent content;
-  MLSContentAuthData auth;
+  GroupContent content;
+  GroupContentAuthData auth;
   std::optional<bytes> membership_tag;
 
-  MLSPlaintext(MLSAuthenticatedContent content_auth);
+  PublicMessage(AuthenticatedContent content_auth);
 
   bytes membership_mac(CipherSuite suite,
                        const bytes& membership_key,
                        const std::optional<GroupContext>& context) const;
 };
 
-struct MLSCiphertext
+struct PrivateMessage
 {
-  MLSCiphertext() = default;
+  PrivateMessage() = default;
 
   epoch_t get_epoch() const { return epoch; }
 
-  static MLSCiphertext protect(MLSAuthenticatedContent content_auth,
-                               CipherSuite suite,
-                               const LeafIndex& index,
-                               GroupKeySource& keys,
-                               const bytes& sender_data_secret,
-                               size_t padding_size);
-  std::optional<MLSAuthenticatedContent> unprotect(
+  static PrivateMessage protect(AuthenticatedContent content_auth,
+                                CipherSuite suite,
+                                GroupKeySource& keys,
+                                const bytes& sender_data_secret,
+                                size_t padding_size);
+  std::optional<AuthenticatedContent> unprotect(
     CipherSuite suite,
-    const TreeKEMPublicKey& tree,
     GroupKeySource& keys,
     const bytes& sender_data_secret) const;
 
@@ -628,23 +628,23 @@ private:
   bytes encrypted_sender_data;
   bytes ciphertext;
 
-  MLSCiphertext(MLSContent content,
-                bytes encrypted_sender_data_in,
-                bytes ciphertext_in);
+  PrivateMessage(GroupContent content,
+                 bytes encrypted_sender_data_in,
+                 bytes ciphertext_in);
 };
 
 struct MLSMessage
 {
   ProtocolVersion version = ProtocolVersion::mls10;
-  var::variant<MLSPlaintext, MLSCiphertext, Welcome, GroupInfo, KeyPackage>
+  var::variant<PublicMessage, PrivateMessage, Welcome, GroupInfo, KeyPackage>
     message;
 
   epoch_t epoch() const;
   WireFormat wire_format() const;
 
   MLSMessage() = default;
-  MLSMessage(MLSPlaintext mls_plaintext);
-  MLSMessage(MLSCiphertext mls_ciphertext);
+  MLSMessage(PublicMessage mls_plaintext);
+  MLSMessage(PrivateMessage mls_ciphertext);
   MLSMessage(Welcome welcome);
   MLSMessage(GroupInfo group_info);
   MLSMessage(KeyPackage key_package);
@@ -692,8 +692,8 @@ TLS_VARIANT_MAP(mls::SenderType,
                 new_member_proposal)
 TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberCommitSender, new_member_commit)
 
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSPlaintext, mls_plaintext)
-TLS_VARIANT_MAP(mls::WireFormat, mls::MLSCiphertext, mls_ciphertext)
+TLS_VARIANT_MAP(mls::WireFormat, mls::PublicMessage, mls_plaintext)
+TLS_VARIANT_MAP(mls::WireFormat, mls::PrivateMessage, mls_ciphertext)
 TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome)
 TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info)
 TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package)

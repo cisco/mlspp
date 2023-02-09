@@ -3,6 +3,8 @@
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
+#include <iostream> // XXX
+
 namespace mls_vectors {
 
 using namespace mls;
@@ -47,9 +49,17 @@ operator<<(std::ostream& str, const HPKEPublicKey& obj)
 }
 
 static std::ostream&
-operator<<(std::ostream& str, const MLSAuthenticatedContent& obj)
+operator<<(std::ostream& str, const GroupContent::RawContent& obj)
 {
-  return str << to_hex(tls::marshal(obj));
+  return var::visit(
+    overloaded{
+      [&](const Proposal&) -> std::ostream& { return str << "[Proposal]"; },
+      [&](const Commit&) -> std::ostream& { return str << "[Commit]"; },
+      [&](const ApplicationData&) -> std::ostream& {
+        return str << "[ApplicationData]";
+      },
+    },
+    obj);
 }
 
 static std::ostream&
@@ -140,254 +150,299 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
-static std::optional<mls::NodeIndex>
-null_if_same(NodeIndex input, NodeIndex answer)
+std::optional<mls::NodeIndex>
+TreeMathTestVector::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
+  // For some invalid cases (e.g., leaf.left()), we currently return the node
+  // itself instead of null
   if (input == answer) {
+    return std::nullopt;
+  }
+
+  // NodeIndex::parent is irrespective of tree size, so we might step out of the
+  // tree under consideration.
+  if (answer.val >= n_nodes.val) {
     return std::nullopt;
   }
 
   return answer;
 }
 
-TreeMathTestVector
-TreeMathTestVector::create(uint32_t n_leaves)
+TreeMathTestVector::TreeMathTestVector(uint32_t n_leaves_in)
+  : n_leaves(n_leaves_in)
+  , n_nodes(n_leaves)
+  , root(NodeIndex::root(n_leaves))
+  , left(n_nodes.val)
+  , right(n_nodes.val)
+  , parent(n_nodes.val)
+  , sibling(n_nodes.val)
 {
-  auto tv = TreeMathTestVector{};
-  tv.n_leaves = LeafCount{ n_leaves };
-  tv.n_nodes = NodeCount(tv.n_leaves);
-  tv.root.resize(n_leaves);
-
-  tv.n_nodes = NodeCount(tv.n_leaves);
-  tv.left.resize(tv.n_nodes.val);
-  tv.right.resize(tv.n_nodes.val);
-  tv.parent.resize(tv.n_nodes.val);
-  tv.sibling.resize(tv.n_nodes.val);
-
-  // Root is special
-  for (LeafCount n{ 1 }; n.val <= n_leaves; n.val++) {
-    tv.root[n.val - 1] = NodeIndex::root(n);
+  for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
+    left[x.val] = null_if_invalid(x, x.left());
+    right[x.val] = null_if_invalid(x, x.right());
+    parent[x.val] = null_if_invalid(x, x.parent());
+    sibling[x.val] = null_if_invalid(x, x.sibling());
   }
-
-  // Left, right, parent, sibling are relative
-  for (NodeIndex x{ 0 }; x.val < tv.n_nodes.val; x.val++) {
-    tv.left[x.val] = null_if_same(x, x.left());
-    tv.right[x.val] = null_if_same(x, x.right());
-    tv.parent[x.val] = null_if_same(x, x.parent());
-    tv.sibling[x.val] = null_if_same(x, x.sibling());
-  }
-
-  // Ancestor takes two leaf nodes
-  tv.ancestor.resize(tv.n_leaves.val);
-  for (LeafIndex x{ 0 }; x.val < tv.n_leaves.val; x.val++) {
-    tv.ancestor[x.val].resize(tv.n_leaves.val);
-    for (LeafIndex y{ 0 }; y.val < tv.n_leaves.val; y.val++) {
-      tv.ancestor[x.val][y.val] = x.ancestor(y);
-    }
-  }
-
-  return tv;
 }
 
 std::optional<std::string>
 TreeMathTestVector::verify() const
 {
   VERIFY_EQUAL("n_nodes", n_nodes, NodeCount(n_leaves));
-
-  auto ss = std::stringstream();
-  for (LeafCount n{ 1 }; n.val <= n_leaves.val; n.val++) {
-    VERIFY_EQUAL("root", root[n.val - 1], NodeIndex::root(n));
-  }
+  VERIFY_EQUAL("root", root, NodeIndex::root(n_leaves));
 
   for (NodeIndex x{ 0 }; x.val < n_nodes.val; x.val++) {
-    VERIFY_EQUAL("left", left[x.val], null_if_same(x, x.left()));
-    VERIFY_EQUAL("right", right[x.val], null_if_same(x, x.right()));
-    VERIFY_EQUAL("parent", parent[x.val], null_if_same(x, x.parent()));
-    VERIFY_EQUAL("sibling", sibling[x.val], null_if_same(x, x.sibling()));
-  }
-
-  for (LeafIndex x{ 0 }; x.val < n_leaves.val; x.val++) {
-    for (LeafIndex y{ 0 }; y.val < n_leaves.val; y.val++) {
-      VERIFY_EQUAL("ancestor", ancestor[x.val][y.val], x.ancestor(y));
-    }
+    VERIFY_EQUAL("left", null_if_invalid(x, x.left()), left[x.val]);
+    VERIFY_EQUAL("right", null_if_invalid(x, x.right()), right[x.val]);
+    VERIFY_EQUAL("parent", null_if_invalid(x, x.parent()), parent[x.val]);
+    VERIFY_EQUAL("sibling", null_if_invalid(x, x.sibling()), sibling[x.val]);
   }
 
   return std::nullopt;
 }
+
 ///
-/// EncryptionTestVector
+/// TreeMathTestVector
 ///
 
-EncryptionTestVector
-EncryptionTestVector::create(CipherSuite suite,
-                             uint32_t n_leaves,
-                             uint32_t n_generations)
+CryptoBasicsTestVector::RefHash::RefHash(CipherSuite suite)
+  : label("RefHash")
+  , value(random_bytes(suite.secret_size()))
+  , out(suite.raw_ref(from_ascii(label), value))
 {
-  auto tv = EncryptionTestVector{};
-  tv.cipher_suite = suite;
-  tv.encryption_secret = random_bytes(suite.secret_size());
-  tv.sender_data_secret = random_bytes(suite.secret_size());
-  tv.padding_size = 10;
-
-  auto ciphertext = random_bytes(suite.secret_size());
-  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
-    suite, tv.sender_data_secret, ciphertext);
-  tv.sender_data_info = {
-    ciphertext,
-    sender_data_key_nonce.key,
-    sender_data_key_nonce.nonce,
-  };
-
-  auto sig_privs = std::vector<SignaturePrivateKey>{};
-  auto tree = TreeKEMPublicKey(suite);
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    auto leaf_priv = HPKEPrivateKey::generate(suite);
-    auto sig_priv = SignaturePrivateKey::generate(suite);
-    auto cred = Credential::basic({});
-    auto leaf = LeafNode(suite,
-                         leaf_priv.public_key,
-                         sig_priv.public_key,
-                         cred,
-                         Capabilities::create_default(),
-                         Lifetime::create_default(),
-                         {},
-                         sig_priv);
-
-    sig_privs.emplace_back(std::move(sig_priv));
-    tree.add_leaf(leaf);
-  }
-  tree.set_hash_all();
-  tv.tree = tls::marshal(tree);
-
-  auto src = GroupKeySource(suite, tree.size, tv.encryption_secret);
-
-  auto group_id = bytes{ 0, 1, 2, 3 };
-  auto epoch = epoch_t(0x0001020304050607);
-  auto group_context =
-    GroupContext{ suite, group_id, epoch, {}, tree.root_hash(), {} };
-  auto proposal = Proposal{ GroupContextExtensions{} };
-  auto app_data = ApplicationData{ random_bytes(suite.secret_size()) };
-  auto authenticated_data = random_bytes(suite.secret_size());
-
-  tv.leaves.resize(n_leaves);
-  auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    tv.leaves[i].generations = n_generations;
-    tv.leaves[i].handshake.resize(n_generations);
-    tv.leaves[i].application.resize(n_generations);
-
-    auto N = LeafIndex{ i };
-    auto sender = Sender{ MemberSender{ N } };
-
-    auto hs_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, proposal };
-    auto hs_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(hs_content),
-                                    suite,
-                                    sig_privs[i],
-                                    group_context);
-    tv.leaves[i].handshake_content_auth = tls::marshal(hs_content_auth);
-
-    auto app_content =
-      MLSContent{ group_id, epoch, sender, authenticated_data, app_data };
-    auto app_content_auth =
-      MLSAuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                    std::move(app_content),
-                                    suite,
-                                    sig_privs[i],
-                                    group_context);
-    tv.leaves[i].application_content_auth = tls::marshal(app_content_auth);
-
-    for (uint32_t j = 0; j < n_generations; ++j) {
-      // Handshake
-      auto hs_ct = MLSCiphertext::protect(
-        hs_content_auth, suite, N, src, tv.sender_data_secret, tv.padding_size);
-      auto hs_key_nonce =
-        src.get(ContentType::proposal, N, j, zero_reuse_guard);
-      src.erase(ContentType::proposal, N, j);
-
-      tv.leaves[i].handshake[j] = {
-        std::move(hs_key_nonce.key),
-        std::move(hs_key_nonce.nonce),
-        tls::marshal(hs_ct),
-      };
-
-      // Application
-      auto app_ct = MLSCiphertext::protect(app_content_auth,
-                                           suite,
-                                           N,
-                                           src,
-                                           tv.sender_data_secret,
-                                           tv.padding_size);
-      auto app_key_nonce =
-        src.get(ContentType::application, N, j, zero_reuse_guard);
-      src.erase(ContentType::application, N, j);
-
-      tv.leaves[i].application[j] = {
-        std::move(app_key_nonce.key),
-        std::move(app_key_nonce.nonce),
-        tls::marshal(app_ct),
-      };
-    }
-  }
-
-  return tv;
 }
 
 std::optional<std::string>
-EncryptionTestVector::verify() const
+CryptoBasicsTestVector::RefHash::verify(CipherSuite suite) const
 {
-  auto sender_data_key_nonce = KeyScheduleEpoch::sender_data_keys(
-    cipher_suite, sender_data_secret, sender_data_info.ciphertext);
-  VERIFY_EQUAL(
-    "sender data key", sender_data_key_nonce.key, sender_data_info.key);
-  VERIFY_EQUAL(
-    "sender data nonce", sender_data_key_nonce.nonce, sender_data_info.nonce);
+  VERIFY_EQUAL("ref hash", out, suite.raw_ref(from_ascii(label), value));
+  return std::nullopt;
+}
 
-  auto ratchet_tree = tls::get<TreeKEMPublicKey>(tree);
-  ratchet_tree.suite = cipher_suite;
-  ratchet_tree.set_hash_all();
-  auto n_leaves = ratchet_tree.size;
+CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("ExpandWithLabel")
+  , context(random_bytes(suite.secret_size()))
+  , length(static_cast<uint16_t>(suite.key_size()))
+  , out(suite.expand_with_label(secret, label, context, length))
+{
+}
 
-  auto src = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+std::optional<std::string>
+CryptoBasicsTestVector::ExpandWithLabel::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("expand with label",
+               out,
+               suite.expand_with_label(secret, label, context, length));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::DeriveSecret::DeriveSecret(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("DeriveSecret")
+  , out(suite.derive_secret(secret, label))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("derive secret", out, suite.derive_secret(secret, label));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(CipherSuite suite)
+  : secret(random_bytes(suite.secret_size()))
+  , label("DeriveTreeSecret")
+  , generation(0xA0A0A0A0)
+  , length(static_cast<uint16_t>(suite.secret_size()))
+  , out(suite.derive_tree_secret(secret, label, generation, length))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
+{
+  VERIFY_EQUAL("derive tree secret",
+               out,
+               suite.derive_tree_secret(secret, label, generation, length));
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
+  : priv(SignaturePrivateKey::generate(suite))
+  , pub(priv.public_key)
+  , content(random_bytes(suite.secret_size()))
+  , label("SignWithLabel")
+  , signature(priv.sign(suite, label, content))
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
+{
+  VERIFY("verify with label", pub.verify(suite, label, content, signature));
+
+  auto new_signature = priv.sign(suite, label, content);
+  VERIFY("sign with label", pub.verify(suite, label, content, new_signature));
+
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
+  : priv(HPKEPrivateKey::generate(suite))
+  , pub(priv.public_key)
+  , label("EncryptWithLabel")
+  , context(random_bytes(suite.secret_size()))
+  , plaintext(random_bytes(suite.secret_size()))
+{
+  auto ct = pub.encrypt(suite, label, context, plaintext);
+  kem_output = ct.kem_output;
+  ciphertext = ct.ciphertext;
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite suite) const
+{
+  auto ct = HPKECiphertext{ kem_output, ciphertext };
+  auto pt = priv.decrypt(suite, label, context, ct);
+  VERIFY_EQUAL("decrypt with label", pt, plaintext);
+
+  auto new_ct = pub.encrypt(suite, label, context, plaintext);
+  auto new_pt = priv.decrypt(suite, label, context, new_ct);
+  VERIFY_EQUAL("encrypt with label", new_pt, plaintext);
+
+  return std::nullopt;
+}
+
+CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
+  : cipher_suite(suite)
+  , ref_hash(suite)
+  , expand_with_label(suite)
+  , derive_secret(suite)
+  , derive_tree_secret(suite)
+  , sign_with_label(suite)
+  , encrypt_with_label(suite)
+{
+}
+
+std::optional<std::string>
+CryptoBasicsTestVector::verify() const
+{
+  auto result = ref_hash.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = expand_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = derive_tree_secret.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = sign_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  result = encrypt_with_label.verify(cipher_suite);
+  if (result) {
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+///
+/// SecretTreeTestVector
+///
+
+SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite)
+  : sender_data_secret(random_bytes(suite.secret_size()))
+  , ciphertext(random_bytes(suite.secret_size()))
+{
+  auto key_and_nonce =
+    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
+  key = key_and_nonce.key;
+  nonce = key_and_nonce.nonce;
+}
+
+std::optional<std::string>
+SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
+{
+  auto key_and_nonce =
+    KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
+  VERIFY_EQUAL("sender data key", key, key_and_nonce.key);
+  VERIFY_EQUAL("sender data nonce", nonce, key_and_nonce.nonce);
+  return std::nullopt;
+}
+
+SecretTreeTestVector::SecretTreeTestVector(
+  mls::CipherSuite suite,
+  uint32_t n_leaves,
+  const std::vector<uint32_t>& generations)
+  : cipher_suite(suite)
+  , sender_data(suite)
+  , encryption_secret(random_bytes(suite.secret_size()))
+{
+  auto src =
+    GroupKeySource(cipher_suite, LeafCount{ n_leaves }, encryption_secret);
+  leaves.resize(n_leaves);
   auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
-  for (uint32_t i = 0; i < leaves.size(); i++) {
-    auto N = LeafIndex{ i };
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    auto leaf = LeafIndex{ i };
 
-    auto hs_content_auth =
-      tls::get<MLSAuthenticatedContent>(leaves[i].handshake_content_auth);
-    auto app_content_auth =
-      tls::get<MLSAuthenticatedContent>(leaves[i].application_content_auth);
+    for (const auto generation : generations) {
+      auto hs =
+        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
+      auto app =
+        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
 
-    for (uint32_t j = 0; j < leaves[i].generations; ++j) {
-      // Handshake
-      const auto& hs_step = leaves[i].handshake[j];
-      auto hs_key_nonce =
-        src.get(ContentType::proposal, N, j, zero_reuse_guard);
-      VERIFY_EQUAL("hs key", hs_key_nonce.key, hs_step.key);
-      VERIFY_EQUAL("hs nonce", hs_key_nonce.nonce, hs_step.nonce);
+      leaves.at(i).push_back(
+        RatchetStep{ generation, hs.key, hs.nonce, app.key, app.nonce });
 
-      auto hs_ct = tls::get<MLSCiphertext>(hs_step.ciphertext);
-      auto hs_pt =
-        hs_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
-      VERIFY("hs pt ok", hs_pt);
-      VERIFY_EQUAL("hs pt", opt::get(hs_pt), hs_content_auth);
-      src.erase(ContentType::proposal, N, j);
+      src.erase(ContentType::proposal, leaf, generation);
+      src.erase(ContentType::application, leaf, generation);
+    }
+  }
+}
 
-      // Application
-      const auto& app_step = leaves[i].application[j];
-      auto app_key_nonce =
-        src.get(ContentType::application, N, j, zero_reuse_guard);
-      VERIFY_EQUAL("app key", app_key_nonce.key, app_step.key);
-      VERIFY_EQUAL("app nonce", app_key_nonce.nonce, app_step.nonce);
+std::optional<std::string>
+SecretTreeTestVector::verify() const
+{
+  auto sender_data_error = sender_data.verify(cipher_suite);
+  if (sender_data_error) {
+    return sender_data_error;
+  }
 
-      auto app_ct = tls::get<MLSCiphertext>(app_step.ciphertext);
-      auto app_pt =
-        app_ct.unprotect(cipher_suite, ratchet_tree, src, sender_data_secret);
-      VERIFY("app pt ok", app_pt);
-      VERIFY_EQUAL("app pt", opt::get(app_pt), app_content_auth);
-      src.erase(ContentType::application, N, j);
+  auto n_leaves = static_cast<uint32_t>(leaves.size());
+  auto src =
+    GroupKeySource(cipher_suite, LeafCount{ n_leaves }, encryption_secret);
+  auto zero_reuse_guard = ReuseGuard{ 0, 0, 0, 0 };
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    auto leaf = LeafIndex{ i };
+
+    for (const auto& step : leaves[i]) {
+      auto generation = step.generation;
+
+      auto hs =
+        src.get(ContentType::proposal, leaf, generation, zero_reuse_guard);
+      VERIFY_EQUAL("hs key", hs.key, step.handshake_key);
+      VERIFY_EQUAL("hs nonce", hs.nonce, step.handshake_nonce);
+
+      auto app =
+        src.get(ContentType::application, leaf, generation, zero_reuse_guard);
+      VERIFY_EQUAL("app key", app.key, step.application_key);
+      VERIFY_EQUAL("app nonce", app.nonce, step.application_nonce);
     }
   }
 
@@ -541,6 +596,216 @@ KeyScheduleTestVector::verify() const
 }
 
 ///
+/// MessageProtectionTestVector
+///
+
+MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
+  : cipher_suite(suite)
+  , group_id(random_bytes(suite.secret_size()))
+  , epoch(0xA0A0A0A0A0A0A0A0)
+  , tree_hash(random_bytes(suite.secret_size()))
+  , confirmed_transcript_hash(random_bytes(suite.secret_size()))
+  , n_leaves(2)
+  , signature_priv(SignaturePrivateKey::generate(suite))
+  , signature_pub(signature_priv.public_key)
+  , encryption_secret(random_bytes(suite.secret_size()))
+  , sender_data_secret(random_bytes(suite.secret_size()))
+  , membership_key(random_bytes(suite.secret_size()))
+  , proposal{ GroupContextExtensions{} }
+  , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
+  , application{ random_bytes(suite.secret_size()) }
+  , group_context{ cipher_suite,
+                   group_id,
+                   epoch,
+                   tree_hash,
+                   confirmed_transcript_hash,
+                   {} }
+  , keys(cipher_suite, n_leaves, encryption_secret)
+{
+  proposal_pub = protect_pub(proposal);
+  proposal_priv = protect_priv(proposal);
+
+  commit_pub = protect_pub(commit);
+  commit_priv = protect_priv(commit);
+
+  application_priv = protect_priv(application);
+}
+
+std::optional<std::string>
+MessageProtectionTestVector::verify()
+{
+  // Initialize fields that don't get set from JSON
+  group_context = GroupContext{
+    cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
+  };
+
+  n_leaves = LeafCount{ 2 };
+  keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
+
+  signature_priv.set_public_key(cipher_suite);
+
+  // Sanity check the key pairs
+  VERIFY_EQUAL("sig kp", signature_priv.public_key, signature_pub);
+
+  // Verify proposal unprotect as PublicMessage
+  auto proposal_pub_unprotected = unprotect(proposal_pub);
+  VERIFY("proposal pub unprotect auth", proposal_pub_unprotected);
+  VERIFY_EQUAL("proposal pub unprotect",
+               opt::get(proposal_pub_unprotected).content,
+               proposal);
+
+  // Verify proposal unprotect as PrivateMessage
+  auto proposal_priv_unprotected = unprotect(proposal_priv);
+  VERIFY("proposal priv unprotect auth", proposal_priv_unprotected);
+  VERIFY_EQUAL("proposal priv unprotect",
+               opt::get(proposal_priv_unprotected).content,
+               proposal);
+
+  // Verify commit unprotect as PublicMessage
+  auto commit_pub_unprotected = unprotect(commit_pub);
+  VERIFY("commit pub unprotect auth", commit_pub_unprotected);
+  VERIFY_EQUAL(
+    "commit pub unprotect", opt::get(commit_pub_unprotected).content, commit);
+
+  // Verify commit unprotect as PrivateMessage
+  auto commit_priv_unprotected = unprotect(commit_priv);
+  VERIFY("commit priv unprotect auth", commit_priv_unprotected);
+  VERIFY_EQUAL(
+    "commit priv unprotect", opt::get(commit_priv_unprotected).content, commit);
+
+  // Verify application data unprotect as PrivateMessage
+  auto app_unprotected = unprotect(application_priv);
+  VERIFY("app priv unprotect auth", app_unprotected);
+  VERIFY_EQUAL(
+    "app priv unprotect", opt::get(app_unprotected).content, application);
+
+  // Verify protect/unprotect round-trips
+  // XXX(RLB): Note that because (a) unprotect() deletes keys from the ratchet
+  // and (b) we are using the same ratchet to send and receive, we need to do
+  // these round-trip tests after all the unprotect tests are done.  Otherwise
+  // the protect() calls here will re-use generations used the test vector, and
+  // then unprotect() will delete the keys, then when you go to decrypt the test
+  // vector object, you'll get "expired key".  It might be good to have better
+  // safeguards around such reuse.
+  auto proposal_pub_protected = protect_pub(proposal);
+  auto proposal_pub_protected_unprotected = unprotect(proposal_pub_protected);
+  VERIFY("proposal pub protect/unprotect auth",
+         proposal_pub_protected_unprotected);
+  VERIFY_EQUAL("proposal pub protect/unprotect",
+               opt::get(proposal_pub_protected_unprotected).content,
+               proposal);
+
+  auto proposal_priv_protected = protect_priv(proposal);
+  auto proposal_priv_protected_unprotected = unprotect(proposal_priv_protected);
+  VERIFY("proposal priv protect/unprotect auth",
+         proposal_priv_protected_unprotected);
+  VERIFY_EQUAL("proposal priv protect/unprotect",
+               opt::get(proposal_priv_protected_unprotected).content,
+               proposal);
+
+  auto commit_pub_protected = protect_pub(commit);
+  auto commit_pub_protected_unprotected = unprotect(commit_pub_protected);
+  VERIFY("commit pub protect/unprotect auth", commit_pub_protected_unprotected);
+  VERIFY_EQUAL("commit pub protect/unprotect",
+               opt::get(commit_pub_protected_unprotected).content,
+               commit);
+
+  auto commit_priv_protected = protect_priv(commit);
+  auto commit_priv_protected_unprotected = unprotect(commit_priv_protected);
+  VERIFY("commit priv protect/unprotect auth",
+         commit_priv_protected_unprotected);
+  VERIFY_EQUAL("commit priv protect/unprotect",
+               opt::get(commit_priv_protected_unprotected).content,
+               commit);
+
+  auto app_protected = protect_priv(application);
+  auto app_protected_unprotected = unprotect(app_protected);
+  VERIFY("app priv protect/unprotect auth", app_protected_unprotected);
+  VERIFY_EQUAL("app priv protect/unprotect",
+               opt::get(app_protected_unprotected).content,
+               application);
+
+  return std::nullopt;
+}
+
+MLSMessage
+MessageProtectionTestVector::protect_pub(
+  const mls::GroupContent::RawContent& raw_content) const
+{
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
+  auto authenticated_data = bytes{};
+
+  auto content =
+    GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
+
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                                 content,
+                                                 cipher_suite,
+                                                 signature_priv,
+                                                 group_context);
+  if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auth_content.set_confirmation_tag(confirmation_tag);
+  }
+
+  return PublicMessage::protect(
+    auth_content, cipher_suite, membership_key, group_context);
+}
+
+MLSMessage
+MessageProtectionTestVector::protect_priv(
+  const mls::GroupContent::RawContent& raw_content)
+{
+  auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
+  auto authenticated_data = bytes{};
+  auto padding_size = size_t(0);
+
+  auto content =
+    GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
+
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_ciphertext,
+                                                 content,
+                                                 cipher_suite,
+                                                 signature_priv,
+                                                 group_context);
+  if (content.content_type() == ContentType::commit) {
+    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auth_content.set_confirmation_tag(confirmation_tag);
+  }
+
+  return PrivateMessage::protect(
+    auth_content, cipher_suite, keys, sender_data_secret, padding_size);
+}
+
+std::optional<GroupContent>
+MessageProtectionTestVector::unprotect(const MLSMessage& message)
+{
+  auto do_unprotect = overloaded{
+    [&](const PublicMessage& pt) {
+      return pt.unprotect(cipher_suite, membership_key, group_context);
+    },
+    [&](const PrivateMessage& ct) {
+      return ct.unprotect(cipher_suite, keys, sender_data_secret);
+    },
+    [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
+      return std::nullopt;
+    }
+  };
+
+  auto maybe_auth_content = var::visit(do_unprotect, message.message);
+  if (!maybe_auth_content) {
+    return std::nullopt;
+  }
+
+  auto auth_content = opt::get(maybe_auth_content);
+  if (!auth_content.verify(cipher_suite, signature_pub, group_context)) {
+    return std::nullopt;
+  }
+
+  return auth_content.content;
+}
+
+///
 /// TranscriptTestVector
 ///
 TranscriptTestVector
@@ -568,14 +833,15 @@ TranscriptTestVector::create(CipherSuite suite)
   auto sig_priv = SignaturePrivateKey::generate(suite);
   auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content =
-    MLSContent{ group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} };
+  auto commit_content = GroupContent{
+    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
+  };
   auto commit_content_auth =
-    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                  std::move(commit_content),
-                                  suite,
-                                  sig_priv,
-                                  group_context);
+    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                               std::move(commit_content),
+                               suite,
+                               sig_priv,
+                               group_context);
 
   transcript.update_confirmed(commit_content_auth);
 
@@ -890,8 +1156,7 @@ MessagesTestVector::create()
   auto external_init = ExternalInit{ opaque };
 
   // Commit
-  auto proposal_ref = ProposalRef{};
-  proposal_ref.fill(0xa0);
+  auto proposal_ref = ProposalRef{ 32, 0xa0 };
 
   auto commit = Commit{ {
                           { proposal_ref },
@@ -905,15 +1170,15 @@ MessagesTestVector::create()
                           },
                         } };
 
-  // MLSAuthenticatedContent with Application / Proposal / Commit
-  auto content_auth_app = MLSAuthenticatedContent::sign(
+  // AuthenticatedContent with Application / Proposal / Commit
+  auto content_auth_app = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal = MLSAuthenticatedContent::sign(
+  auto content_auth_proposal = AuthenticatedContent::sign(
     WireFormat::mls_plaintext,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
@@ -921,21 +1186,21 @@ MessagesTestVector::create()
     group_context);
 
   auto content_auth_commit =
-    MLSAuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                  { group_id, epoch, sender, {}, commit },
-                                  suite,
-                                  sig_priv,
-                                  group_context);
+    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                               { group_id, epoch, sender, {}, commit },
+                               suite,
+                               sig_priv,
+                               group_context);
   content_auth_commit.set_confirmation_tag(opaque);
 
-  // MLSMessage(MLSPlaintext)
-  auto mls_plaintext = MLSMessage{ MLSPlaintext::protect(
+  // MLSMessage(PublicMessage)
+  auto mls_plaintext = MLSMessage{ PublicMessage::protect(
     content_auth_proposal, suite, opaque, group_context) };
 
-  // MLSMessage(MLSCiphertext)
+  // MLSMessage(PrivateMessage)
   auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
-  auto mls_ciphertext = MLSMessage{ MLSCiphertext::protect(
-    content_auth_app, suite, index, keys, opaque, 10) };
+  auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
+    content_auth_app, suite, keys, opaque, 10) };
 
   return MessagesTestVector{
     tls::marshal(key_package),
@@ -982,13 +1247,12 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
   VERIFY_TLS_RTT(
-    "MLSAuthenticatedContent/App", MLSAuthenticatedContent, content_auth_app);
-  VERIFY_TLS_RTT("MLSAuthenticatedContent/Proposal",
-                 MLSAuthenticatedContent,
+    "AuthenticatedContent/App", AuthenticatedContent, content_auth_app);
+  VERIFY_TLS_RTT("AuthenticatedContent/Proposal",
+                 AuthenticatedContent,
                  content_auth_proposal);
-  VERIFY_TLS_RTT("MLSAuthenticatedContent/Commit",
-                 MLSAuthenticatedContent,
-                 content_auth_commit);
+  VERIFY_TLS_RTT(
+    "AuthenticatedContent/Commit", AuthenticatedContent, content_auth_commit);
 
   auto require_pt = [](const MLSMessage& msg) {
     return msg.wire_format() == WireFormat::mls_plaintext;
@@ -998,9 +1262,9 @@ MessagesTestVector::verify() const
   };
 
   VERIFY_TLS_RTT_VAL(
-    "MLSMessage/MLSPlaintext", MLSMessage, mls_plaintext, require_pt);
+    "MLSMessage/PublicMessage", MLSMessage, mls_plaintext, require_pt);
   VERIFY_TLS_RTT_VAL(
-    "MLSMessage/MLSCiphertext", MLSMessage, mls_ciphertext, require_ct);
+    "MLSMessage/PrivateMessage", MLSMessage, mls_ciphertext, require_ct);
 
   return std::nullopt;
 }

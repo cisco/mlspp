@@ -33,10 +33,10 @@ struct KeyAndNonce
   bytes nonce;
 };
 
-// opaque HashReference[16];
+// opaque HashReference<V>;
 // HashReference KeyPackageRef;
 // HashReference ProposalRef;
-using HashReference = std::array<uint8_t, 16>;
+using HashReference = bytes;
 using KeyPackageRef = HashReference;
 using ProposalRef = HashReference;
 
@@ -51,6 +51,7 @@ struct CipherSuite
     X448_AES256GCM_SHA512_Ed448 = 0x0004,
     P521_AES256GCM_SHA512_P521 = 0x0005,
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
+    P384_AES256GCM_SHA384_P384 = 0x0007,
   };
 
   CipherSuite();
@@ -73,17 +74,28 @@ struct CipherSuite
                           const bytes& context,
                           size_t length) const;
   bytes derive_secret(const bytes& secret, const std::string& label) const;
+  bytes derive_tree_secret(const bytes& secret,
+                           const std::string& label,
+                           uint32_t generation,
+                           size_t length) const;
 
   template<typename T>
-  HashReference ref(const T& val) const
+  bytes ref(const T& value) const
   {
-    auto ref = HashReference{};
-    auto marshaled = tls::marshal(val);
-    auto extracted = hpke().kdf.extract({}, marshaled);
-    auto expanded =
-      hpke().kdf.expand(extracted, reference_label<T>(), ref.size());
-    std::copy(expanded.begin(), expanded.end(), ref.begin());
-    return ref;
+    return raw_ref(reference_label<T>(), tls::marshal(value));
+  }
+
+  bytes raw_ref(const bytes& label, const bytes& value) const
+  {
+    // RefHash(label, value) = Hash(RefHashInput)
+    //
+    // struct {
+    //   opaque label<V>;
+    //   opaque value<V>;
+    // } RefHashInput;
+    auto w = tls::ostream();
+    w << label << value;
+    return digest().hash(w.bytes());
   }
 
   TLS_SERIALIZABLE(id)
@@ -104,12 +116,17 @@ private:
   static const bytes& reference_label();
 };
 
-extern const std::array<CipherSuite::ID, 6> all_supported_suites;
+extern const std::array<CipherSuite::ID, 7> all_supported_suites;
 
 // Utilities
 using hpke::random_bytes;
 
 // HPKE Keys
+namespace encrypt_label {
+extern const std::string update_path_node;
+extern const std::string welcome;
+} // namespace encrypt_label
+
 struct HPKECiphertext
 {
   bytes kem_output;
@@ -123,8 +140,8 @@ struct HPKEPublicKey
   bytes data;
 
   HPKECiphertext encrypt(CipherSuite suite,
-                         const bytes& info,
-                         const bytes& aad,
+                         const std::string& label,
+                         const bytes& context,
                          const bytes& pt) const;
 
   std::tuple<bytes, bytes> do_export(CipherSuite suite,
@@ -147,8 +164,8 @@ struct HPKEPrivateKey
   HPKEPublicKey public_key;
 
   bytes decrypt(CipherSuite suite,
-                const bytes& info,
-                const bytes& aad,
+                const std::string& label,
+                const bytes& context,
                 const HPKECiphertext& ct) const;
 
   bytes do_export(CipherSuite suite,
@@ -157,7 +174,9 @@ struct HPKEPrivateKey
                   const std::string& label,
                   size_t size) const;
 
-  TLS_SERIALIZABLE(data, public_key)
+  void set_public_key(CipherSuite suite);
+
+  TLS_SERIALIZABLE(data)
 
 private:
   HPKEPrivateKey(bytes priv_data, bytes pub_data);
@@ -165,10 +184,10 @@ private:
 
 // Signature Keys
 namespace sign_label {
-extern const bytes mls_content;
-extern const bytes leaf_node;
-extern const bytes key_package;
-extern const bytes group_info;
+extern const std::string mls_content;
+extern const std::string leaf_node;
+extern const std::string key_package;
+extern const std::string group_info;
 } // namespace sign_label
 
 struct SignaturePublicKey
@@ -176,7 +195,7 @@ struct SignaturePublicKey
   bytes data;
 
   bool verify(const CipherSuite& suite,
-              const bytes& label,
+              const std::string& label,
               const bytes& message,
               const bytes& signature) const;
 
@@ -189,14 +208,18 @@ struct SignaturePrivateKey
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
 
+  SignaturePrivateKey() = default;
+
   bytes data;
   SignaturePublicKey public_key;
 
   bytes sign(const CipherSuite& suite,
-             const bytes& label,
+             const std::string& label,
              const bytes& message) const;
 
-  TLS_SERIALIZABLE(data, public_key)
+  void set_public_key(CipherSuite suite);
+
+  TLS_SERIALIZABLE(data)
 
 private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);

@@ -11,7 +11,6 @@ namespace mls {
 struct HashRatchet
 {
   CipherSuite suite;
-  NodeIndex node;
   bytes next_secret;
   uint32_t next_generation;
   std::map<uint32_t, KeyAndNonce> cache;
@@ -27,7 +26,7 @@ struct HashRatchet
   HashRatchet& operator=(const HashRatchet& other) = default;
   HashRatchet& operator=(HashRatchet&& other) = default;
 
-  HashRatchet(CipherSuite suite_in, NodeIndex node_in, bytes base_secret_in);
+  HashRatchet(CipherSuite suite_in, bytes base_secret_in);
 
   std::tuple<uint32_t, KeyAndNonce> next();
   KeyAndNonce get(uint32_t generation);
@@ -40,6 +39,8 @@ struct SecretTree
   SecretTree(CipherSuite suite_in,
              LeafCount group_size_in,
              bytes encryption_secret_in);
+
+  bool has_leaf(LeafIndex sender) { return sender < group_size; }
 
   bytes get(LeafIndex sender);
 
@@ -65,6 +66,8 @@ struct GroupKeySource
   GroupKeySource(CipherSuite suite_in,
                  LeafCount group_size,
                  bytes encryption_secret);
+
+  bool has_leaf(LeafIndex sender) { return secret_tree.has_leaf(sender); }
 
   std::tuple<uint32_t, ReuseGuard, KeyAndNonce> next(ContentType content_type,
                                                      LeafIndex sender);
@@ -176,10 +179,10 @@ struct TranscriptHash
                  bytes confirmed_in,
                  const bytes& confirmation_tag);
 
-  void update(const MLSAuthenticatedContent& content_auth);
-  void update_confirmed(const MLSAuthenticatedContent& content_auth);
+  void update(const AuthenticatedContent& content_auth);
+  void update_confirmed(const AuthenticatedContent& content_auth);
   void update_interim(const bytes& confirmation_tag);
-  void update_interim(const MLSAuthenticatedContent& content_auth);
+  void update_interim(const AuthenticatedContent& content_auth);
 };
 
 bool

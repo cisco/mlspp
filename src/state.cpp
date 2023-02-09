@@ -122,9 +122,7 @@ State::State(const HPKEPrivateKey& init_priv,
   }
 
   // Decrypt the GroupSecrets
-  auto secrets_ct = welcome.secrets[kpi].encrypted_group_secrets;
-  auto secrets_data = init_priv.decrypt(kp.cipher_suite, {}, {}, secrets_ct);
-  auto secrets = tls::get<GroupSecrets>(secrets_data);
+  auto secrets = welcome.decrypt_secrets(kpi, init_priv);
   if (!secrets.psks.psks.empty()) {
     throw NotImplementedError(/* PSKs are not supported */);
   }
@@ -219,15 +217,15 @@ State::new_member_add(const bytes& group_id,
 {
   const auto suite = new_member.cipher_suite;
   auto proposal = Proposal{ Add{ new_member } };
-  auto content = MLSContent{ group_id,
-                             epoch,
-                             { NewMemberProposalSender{} },
-                             { /* no authenticated data */ },
-                             { std::move(proposal) } };
-  auto content_auth = MLSAuthenticatedContent::sign(
+  auto content = GroupContent{ group_id,
+                               epoch,
+                               { NewMemberProposalSender{} },
+                               { /* no authenticated data */ },
+                               { std::move(proposal) } };
+  auto content_auth = AuthenticatedContent::sign(
     WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
 
-  return MLSPlaintext::protect(std::move(content_auth), suite, {}, {});
+  return PublicMessage::protect(std::move(content_auth), suite, {}, {});
 }
 
 ///
@@ -245,53 +243,52 @@ State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 }
 
 template<typename Inner>
-MLSAuthenticatedContent
+AuthenticatedContent
 State::sign(const Sender& sender,
             Inner&& inner_content,
             const bytes& authenticated_data,
             bool encrypt) const
 {
-  auto content = MLSContent{
+  auto content = GroupContent{
     _group_id, _epoch, sender, authenticated_data, { inner_content }
   };
 
   auto wire_format =
     (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
 
-  auto content_auth = MLSAuthenticatedContent::sign(
+  auto content_auth = AuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
 
   return content_auth;
 }
 
 MLSMessage
-State::protect(MLSAuthenticatedContent&& content_auth, size_t padding_size)
+State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 {
   switch (content_auth.wire_format) {
     case WireFormat::mls_plaintext:
-      return MLSPlaintext::protect(std::move(content_auth),
-                                   _suite,
-                                   _key_schedule.membership_key,
-                                   group_context());
+      return PublicMessage::protect(std::move(content_auth),
+                                    _suite,
+                                    _key_schedule.membership_key,
+                                    group_context());
 
     case WireFormat::mls_ciphertext:
-      return MLSCiphertext::protect(std::move(content_auth),
-                                    _suite,
-                                    _index,
-                                    _keys,
-                                    _key_schedule.sender_data_secret,
-                                    padding_size);
+      return PrivateMessage::protect(std::move(content_auth),
+                                     _suite,
+                                     _keys,
+                                     _key_schedule.sender_data_secret,
+                                     padding_size);
 
     default:
-      throw InvalidParameterError("Malformed MLSAuthenticatedContent");
+      throw InvalidParameterError("Malformed AuthenticatedContent");
   }
 }
 
-MLSAuthenticatedContent
+AuthenticatedContent
 State::unprotect_to_content_auth(const MLSMessage& msg)
 {
   const auto unprotect = overloaded{
-    [&](const MLSPlaintext& pt) -> MLSAuthenticatedContent {
+    [&](const PublicMessage& pt) -> AuthenticatedContent {
       auto maybe_content_auth =
         pt.unprotect(_suite, _key_schedule.membership_key, group_context());
       if (!maybe_content_auth) {
@@ -300,16 +297,16 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
       return opt::get(maybe_content_auth);
     },
 
-    [&](const MLSCiphertext& ct) -> MLSAuthenticatedContent {
+    [&](const PrivateMessage& ct) -> AuthenticatedContent {
       auto maybe_content_auth =
-        ct.unprotect(_suite, _tree, _keys, _key_schedule.sender_data_secret);
+        ct.unprotect(_suite, _keys, _key_schedule.sender_data_secret);
       if (!maybe_content_auth) {
-        throw ProtocolError("MLSCiphertext decryption failure");
+        throw ProtocolError("PrivateMessage decryption failure");
       }
       return opt::get(maybe_content_auth);
     },
 
-    [](const auto& /* unused */) -> MLSAuthenticatedContent {
+    [](const auto& /* unused */) -> AuthenticatedContent {
       throw ProtocolError("Invalid wire format");
     },
   };
@@ -620,7 +617,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-  // Validate the MLSContent
+  // Validate the GroupContent
   const auto& content = content_auth.content;
   if (content.group_id != _group_id) {
     throw InvalidParameterError("GroupID mismatch");
@@ -895,7 +892,7 @@ State::extensions_supported(const ExtensionList& exts) const
 }
 
 void
-State::cache_proposal(MLSAuthenticatedContent content_auth)
+State::cache_proposal(AuthenticatedContent content_auth)
 {
   auto sender_location = std::optional<LeafIndex>();
   if (content_auth.content.sender.sender_type() == SenderType::member) {
@@ -1053,7 +1050,7 @@ State::unprotect(const MLSMessage& ct)
   }
 
   if (content_auth.wire_format != WireFormat::mls_ciphertext) {
-    throw ProtocolError("Application data not sent as MLSCiphertext");
+    throw ProtocolError("Application data not sent as PrivateMessage");
   }
 
   return {
@@ -1109,7 +1106,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
 /// Message encryption and decryption
 ///
 bool
-State::verify_internal(const MLSAuthenticatedContent& content_auth) const
+State::verify_internal(const AuthenticatedContent& content_auth) const
 {
   const auto& sender =
     var::get<MemberSender>(content_auth.content.sender.sender).sender;
@@ -1123,7 +1120,7 @@ State::verify_internal(const MLSAuthenticatedContent& content_auth) const
 }
 
 bool
-State::verify_external(const MLSAuthenticatedContent& content_auth) const
+State::verify_external(const AuthenticatedContent& content_auth) const
 {
   const auto& ext_sender =
     var::get<ExternalSenderIndex>(content_auth.content.sender.sender);
@@ -1135,7 +1132,7 @@ State::verify_external(const MLSAuthenticatedContent& content_auth) const
 
 bool
 State::verify_new_member_proposal(
-  const MLSAuthenticatedContent& content_auth) const
+  const AuthenticatedContent& content_auth) const
 {
   const auto& proposal = var::get<Proposal>(content_auth.content.content);
   const auto& add = var::get<Add>(proposal.content);
@@ -1144,8 +1141,7 @@ State::verify_new_member_proposal(
 }
 
 bool
-State::verify_new_member_commit(
-  const MLSAuthenticatedContent& content_auth) const
+State::verify_new_member_commit(const AuthenticatedContent& content_auth) const
 {
   const auto& commit = var::get<Commit>(content_auth.content.content);
   const auto& path = opt::get(commit.path);
@@ -1154,7 +1150,7 @@ State::verify_new_member_commit(
 }
 
 bool
-State::verify(const MLSAuthenticatedContent& content_auth) const
+State::verify(const AuthenticatedContent& content_auth) const
 {
   switch (content_auth.content.sender.sender_type()) {
     case SenderType::member:

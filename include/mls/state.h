@@ -187,18 +187,17 @@ protected:
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
-  MLSAuthenticatedContent sign(const Sender& sender,
-                               Inner&& content,
-                               const bytes& authenticated_data,
-                               bool encrypt) const;
+  AuthenticatedContent sign(const Sender& sender,
+                            Inner&& content,
+                            const bytes& authenticated_data,
+                            bool encrypt) const;
 
-  MLSMessage protect(MLSAuthenticatedContent&& content_auth,
-                     size_t padding_size);
+  MLSMessage protect(AuthenticatedContent&& content_auth, size_t padding_size);
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
 
-  MLSAuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
+  AuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   void check_add_leaf_node(const LeafNode& leaf,
@@ -221,7 +220,7 @@ protected:
   bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract a proposal from the cache
-  void cache_proposal(MLSAuthenticatedContent content_auth);
+  void cache_proposal(AuthenticatedContent content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
     std::optional<LeafIndex> sender_index) const;
@@ -239,13 +238,12 @@ protected:
                             const std::optional<bytes>& force_init_secret);
 
   // Signature verification over a handshake message
-  bool verify_internal(const MLSAuthenticatedContent& content_auth) const;
-  bool verify_external(const MLSAuthenticatedContent& content_auth) const;
+  bool verify_internal(const AuthenticatedContent& content_auth) const;
+  bool verify_external(const AuthenticatedContent& content_auth) const;
   bool verify_new_member_proposal(
-    const MLSAuthenticatedContent& content_auth) const;
-  bool verify_new_member_commit(
-    const MLSAuthenticatedContent& content_auth) const;
-  bool verify(const MLSAuthenticatedContent& content_auth) const;
+    const AuthenticatedContent& content_auth) const;
+  bool verify_new_member_commit(const AuthenticatedContent& content_auth) const;
+  bool verify(const AuthenticatedContent& content_auth) const;
 
   // Convert a Roster entry into LeafIndex
   LeafIndex leaf_for_roster_entry(RosterIndex index) const;

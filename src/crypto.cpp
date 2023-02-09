@@ -1,6 +1,5 @@
 #include <mls/core_types.h>
 #include <mls/crypto.h>
-#include <mls/log.h>
 #include <mls/messages.h>
 
 #include <string>
@@ -11,9 +10,6 @@ using hpke::HPKE;      // NOLINT(misc-unused-using-decls)
 using hpke::KDF;       // NOLINT(misc-unused-using-decls)
 using hpke::KEM;       // NOLINT(misc-unused-using-decls)
 using hpke::Signature; // NOLINT(misc-unused-using-decls)
-
-using mls::log::Log;
-static const auto log_mod = "crypto"s;
 
 namespace mls {
 
@@ -66,6 +62,8 @@ CipherSuite::signature_scheme() const
       return SignatureScheme::ed448;
     case ID::P521_AES256GCM_SHA512_P521:
       return SignatureScheme::ecdsa_secp521r1_sha512;
+    case ID::P384_AES256GCM_SHA384_P384:
+      return SignatureScheme::ecdsa_secp384r1_sha384;
     default:
       throw InvalidParameterError("Unsupported algorithm");
   }
@@ -122,6 +120,13 @@ CipherSuite::get() const
       Signature::get<Signature::ID::Ed448>(),
     };
 
+  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
+    HPKE(
+      KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA384>(),
+    Signature::get<Signature::ID::P384_SHA384>(),
+  };
+
   switch (id) {
     case ID::unknown:
       throw InvalidParameterError("Uninitialized ciphersuite");
@@ -144,6 +149,9 @@ CipherSuite::get() const
     case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
 
+    case ID::P384_AES256GCM_SHA384_P384:
+      return ciphers_P384_AES256GCM_SHA384_P384;
+
     default:
       throw InvalidParameterError("Unsupported ciphersuite");
   }
@@ -164,33 +172,35 @@ CipherSuite::expand_with_label(const bytes& secret,
                                const bytes& context,
                                size_t length) const
 {
-  auto mls_label = from_ascii(std::string("mls10 ") + label);
+  auto mls_label = from_ascii(std::string("MLS 1.0 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
-  auto derived = get().hpke.kdf.expand(secret, label_bytes, length);
-
-  Log::crypto(log_mod, "=== ExpandWithLabel ===");
-  Log::crypto(log_mod, "  secret ", to_hex(secret));
-  Log::crypto(log_mod, "  label  ", to_hex(label_bytes));
-  Log::crypto(log_mod, "  length ", length);
-
-  return derived;
+  return get().hpke.kdf.expand(secret, label_bytes, length);
 }
 
 bytes
 CipherSuite::derive_secret(const bytes& secret, const std::string& label) const
 {
-  Log::crypto(log_mod, "=== DeriveSecret ===");
   return expand_with_label(secret, label, {}, secret_size());
 }
 
-const std::array<CipherSuite::ID, 6> all_supported_suites = {
+bytes
+CipherSuite::derive_tree_secret(const bytes& secret,
+                                const std::string& label,
+                                uint32_t generation,
+                                size_t length) const
+{
+  return expand_with_label(secret, label, tls::marshal(generation), length);
+}
+
+const std::array<CipherSuite::ID, 7> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,
   CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
   CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
   CipherSuite::ID::P521_AES256GCM_SHA512_P521,
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
+  CipherSuite::ID::P384_AES256GCM_SHA384_P384,
 };
 
 // MakeKeyPackageRef(value) = KDF.expand(
@@ -207,10 +217,10 @@ CipherSuite::reference_label<KeyPackage>()
 //   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
 //
 // Even though the label says "Proposal", we actually hash the entire enclosing
-// MLSAuthenticatedContent object.
+// AuthenticatedContent object.
 template<>
 const bytes&
-CipherSuite::reference_label<MLSAuthenticatedContent>()
+CipherSuite::reference_label<AuthenticatedContent>()
 {
   static const auto label = from_ascii("MLS 1.0 Proposal Reference");
   return label;
@@ -219,15 +229,41 @@ CipherSuite::reference_label<MLSAuthenticatedContent>()
 ///
 /// HPKEPublicKey and HPKEPrivateKey
 ///
+
+// This function produces a non-literal type, so it can't be constexpr.
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define MLS_1_0_PLUS(label) from_ascii("MLS 1.0 " label)
+
+static bytes
+mls_1_0_plus(const std::string& label)
+{
+  auto plus = "MLS 1.0 "s + label;
+  return from_ascii(plus);
+}
+
+namespace encrypt_label {
+const std::string update_path_node = "UpdatePathNode";
+const std::string welcome = "Welcome";
+} // namespace encrypt_label
+
+struct EncryptContext
+{
+  const bytes& label;
+  const bytes& content;
+  TLS_SERIALIZABLE(label, content)
+};
+
 HPKECiphertext
 HPKEPublicKey::encrypt(CipherSuite suite,
-                       const bytes& info,
-                       const bytes& aad,
+                       const std::string& label,
+                       const bytes& context,
                        const bytes& pt) const
 {
+  auto label_plus = mls_1_0_plus(label);
+  auto encrypt_context = tls::marshal(EncryptContext{ label_plus, context });
   auto pkR = suite.hpke().kem.deserialize(data);
-  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, info);
-  auto ct = ctx.seal(aad, pt);
+  auto [enc, ctx] = suite.hpke().setup_base_s(*pkR, encrypt_context);
+  auto ct = ctx.seal({}, pt);
   return HPKECiphertext{ enc, ct };
 }
 
@@ -275,13 +311,15 @@ HPKEPrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 HPKEPrivateKey::decrypt(CipherSuite suite,
-                        const bytes& info,
-                        const bytes& aad,
+                        const std::string& label,
+                        const bytes& context,
                         const HPKECiphertext& ct) const
 {
+  auto label_plus = mls_1_0_plus(label);
+  auto encrypt_context = tls::marshal(EncryptContext{ label_plus, context });
   auto skR = suite.hpke().kem.deserialize_private(data);
-  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, info);
-  auto pt = ctx.open(aad, ct.ciphertext);
+  auto ctx = suite.hpke().setup_base_r(ct.kem_output, *skR, encrypt_context);
+  auto pt = ctx.open({}, ct.ciphertext);
   if (!pt) {
     throw InvalidParameterError("HPKE decryption failure");
   }
@@ -308,19 +346,22 @@ HPKEPrivateKey::HPKEPrivateKey(bytes priv_data, bytes pub_data)
 {
 }
 
+void
+HPKEPrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.hpke().kem.deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.hpke().kem.serialize(*pub);
+}
+
 ///
 /// SignaturePublicKey and SignaturePrivateKey
 ///
-
-// This function produces a non-literal type, so it can't be constexpr.
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define SIGN_LABEL(label) from_ascii("MLS 1.0 " label)
-
 namespace sign_label {
-const bytes mls_content = SIGN_LABEL("MLSContentTBS");
-const bytes leaf_node = SIGN_LABEL("LeafNodeTBS");
-const bytes key_package = SIGN_LABEL("KeyPackageTBS");
-const bytes group_info = SIGN_LABEL("GroupInfoTBS");
+const std::string mls_content = "GroupContentTBS";
+const std::string leaf_node = "LeafNodeTBS";
+const std::string key_package = "KeyPackageTBS";
+const std::string group_info = "GroupInfoTBS";
 } // namespace sign_label
 
 struct SignContent
@@ -332,11 +373,12 @@ struct SignContent
 
 bool
 SignaturePublicKey::verify(const CipherSuite& suite,
-                           const bytes& label,
+                           const std::string& label,
                            const bytes& message,
                            const bytes& signature) const
 {
-  const auto content = tls::marshal(SignContent{ label, message });
+  auto label_plus = mls_1_0_plus(label);
+  const auto content = tls::marshal(SignContent{ label_plus, message });
   auto pub = suite.sig().deserialize(data);
   return suite.sig().verify(content, signature, *pub);
 }
@@ -372,10 +414,11 @@ SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 
 bytes
 SignaturePrivateKey::sign(const CipherSuite& suite,
-                          const bytes& label,
+                          const std::string& label,
                           const bytes& message) const
 {
-  const auto content = tls::marshal(SignContent{ label, message });
+  auto label_plus = mls_1_0_plus(label);
+  const auto content = tls::marshal(SignContent{ label_plus, message });
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().sign(content, *priv);
 }
@@ -384,6 +427,14 @@ SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
 {
+}
+
+void
+SignaturePrivateKey::set_public_key(CipherSuite suite)
+{
+  const auto priv = suite.sig().deserialize_private(data);
+  auto pub = priv->public_key();
+  public_key.data = suite.sig().serialize(*pub);
 }
 
 } // namespace mls

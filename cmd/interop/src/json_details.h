@@ -77,7 +77,32 @@ struct adl_serializer<mls::CipherSuite>
   }
 };
 
-// TLS-serializable things
+// Public keys and private keys serialize directly as the content of their
+// `data` member, without a length prefix.
+template<typename T>
+struct asymmetric_key_serializer
+{
+  static void to_json(json& j, const T& v) { j = bytes{ v.data }; }
+
+  static void from_json(const json& j, T& v)
+  {
+    v = T();
+    v.data = j.get<bytes>();
+  }
+};
+
+#define ASYMM_KEY_SERIALIZER(T)                                                \
+  template<>                                                                   \
+  struct adl_serializer<T> : asymmetric_key_serializer<T>                      \
+  {                                                                            \
+  };
+
+ASYMM_KEY_SERIALIZER(mls::HPKEPublicKey)
+ASYMM_KEY_SERIALIZER(mls::HPKEPrivateKey)
+ASYMM_KEY_SERIALIZER(mls::SignaturePublicKey)
+ASYMM_KEY_SERIALIZER(mls::SignaturePrivateKey)
+
+// Other TLS-serializable things
 template<typename T>
 struct tls_serializer
 {
@@ -95,12 +120,13 @@ struct tls_serializer
   {                                                                            \
   };
 
-TLS_SERIALIZER(mls::HPKEPublicKey)
-TLS_SERIALIZER(mls::SignaturePublicKey)
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
+TLS_SERIALIZER(mls::AuthenticatedContent)
 TLS_SERIALIZER(mls::Credential)
-TLS_SERIALIZER(mls::MLSAuthenticatedContent)
-TLS_SERIALIZER(mls::MLSPlaintext)
+TLS_SERIALIZER(mls::Proposal)
+TLS_SERIALIZER(mls::Commit)
+TLS_SERIALIZER(mls::ApplicationData)
+TLS_SERIALIZER(mls::MLSMessage)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
@@ -121,28 +147,64 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeMathTestVector,
                                    parent,
                                    sibling)
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::SenderDataInfo,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::RefHash,
+                                   label,
+                                   value,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::ExpandWithLabel,
+                                   secret,
+                                   label,
+                                   context,
+                                   length,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::DeriveSecret,
+                                   secret,
+                                   label,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::DeriveTreeSecret,
+                                   secret,
+                                   label,
+                                   generation,
+                                   length,
+                                   out)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::SignWithLabel,
+                                   priv,
+                                   pub,
+                                   content,
+                                   label,
+                                   signature)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector::EncryptWithLabel,
+                                   priv,
+                                   pub,
+                                   label,
+                                   context,
+                                   plaintext,
+                                   kem_output,
+                                   ciphertext)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CryptoBasicsTestVector,
+                                   cipher_suite,
+                                   ref_hash,
+                                   expand_with_label,
+                                   derive_secret,
+                                   derive_tree_secret,
+                                   sign_with_label,
+                                   encrypt_with_label)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector::SenderData,
+                                   sender_data_secret,
                                    ciphertext,
                                    key,
                                    nonce)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::RatchetStep,
-                                   key,
-                                   nonce,
-                                   ciphertext)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector::LeafInfo,
-                                   generations,
-                                   handshake_content_auth,
-                                   application_content_auth,
-                                   handshake,
-                                   application)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EncryptionTestVector,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector::RatchetStep,
+                                   generation,
+                                   handshake_key,
+                                   handshake_nonce,
+                                   application_key,
+                                   application_nonce)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector,
                                    cipher_suite,
-                                   tree,
                                    encryption_secret,
-                                   sender_data_secret,
-                                   padding_size,
-                                   sender_data_info,
-                                   authenticated_data,
+                                   sender_data,
                                    leaves)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,
@@ -174,6 +236,26 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector,
                                    group_id,
                                    initial_init_secret,
                                    epochs)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessageProtectionTestVector,
+                                   cipher_suite,
+                                   group_id,
+                                   epoch,
+                                   tree_hash,
+                                   confirmed_transcript_hash,
+                                   signature_priv,
+                                   signature_pub,
+                                   encryption_secret,
+                                   sender_data_secret,
+                                   membership_key,
+                                   proposal,
+                                   proposal_pub,
+                                   proposal_priv,
+                                   commit,
+                                   commit_pub,
+                                   commit_priv,
+                                   application,
+                                   application_priv)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,

@@ -6,14 +6,10 @@
 using namespace mls;
 using namespace mls_vectors;
 
-TEST_CASE("Encryption Keys Interop")
+TEST_CASE("Secret Tree Interop")
 {
   for (auto suite : all_supported_suites) {
-    if (fips() && !is_fips_approved(suite)) {
-      continue;
-    }
-
-    const auto tv = EncryptionTestVector::create(suite, 15, 10);
+    const auto tv = SecretTreeTestVector{ suite, 15, { 1, 10 } };
     REQUIRE(tv.verify() == std::nullopt);
   }
 }

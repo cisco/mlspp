@@ -290,8 +290,10 @@ TreeKEMPrivateKey::decap(LeafIndex from,
 
   // Decrypt and implant
   auto priv = opt::get(private_key(res[resi]));
-  auto path_secret = priv.decrypt(
-    suite, context, {}, path.nodes[dpi].encrypted_path_secret[resi]);
+  auto path_secret = priv.decrypt(suite,
+                                  encrypt_label::update_path_node,
+                                  context,
+                                  path.nodes[dpi].encrypted_path_secret[resi]);
   implant(pub, overlap_node, path_secret);
 }
 
@@ -632,7 +634,8 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
     auto ct = stdx::transform<HPKECiphertext>(res, [&](auto nr) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
-      return node_pub.encrypt(suite, context, {}, path_secret);
+      return node_pub.encrypt(
+        suite, encrypt_label::update_path_node, context, path_secret);
     });
 
     return UpdatePathNode{ node_priv.public_key, std::move(ct) };
