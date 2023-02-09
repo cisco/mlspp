@@ -188,7 +188,7 @@ bytes
 CipherSuite::derive_tree_secret(const bytes& secret,
                                 const std::string& label,
                                 uint32_t generation,
-                                size_t length)
+                                size_t length) const
 {
   return expand_with_label(secret, label, tls::marshal(generation), length);
 }

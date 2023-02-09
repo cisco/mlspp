@@ -9,7 +9,7 @@ using namespace mls_vectors;
 
 TEST_CASE("Basic HPKE")
 {
-  auto label = "label";
+  const auto label = "label"s;
   auto context = random_bytes(100);
   auto original = random_bytes(100);
 
@@ -68,7 +68,7 @@ TEST_CASE("Basic Signature")
     REQUIRE(b.public_key == b.public_key);
     REQUIRE(a.public_key != b.public_key);
 
-    auto label = "label";
+    const auto label = "label"s;
     auto message = from_hex("01020304");
     auto signature = a.sign(suite, label, message);
 

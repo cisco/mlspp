@@ -78,7 +78,7 @@ struct CryptoBasicsTestVector
 
     DeriveTreeSecret() = default;
     DeriveTreeSecret(mls::CipherSuite suite);
-    std::optional<std::string> verify(mls::CipherSuite sutie) const;
+    std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
   struct SignWithLabel
