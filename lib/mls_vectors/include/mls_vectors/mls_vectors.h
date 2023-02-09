@@ -337,11 +337,11 @@ struct TreeKEMTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 
   void initialize_trees();
-  std::tuple<bytes, mls::SignaturePrivateKey, mls::LeafNode> new_leaf_node(const std::string& label)
-    const;
+  std::tuple<bytes, mls::SignaturePrivateKey, mls::LeafNode> new_leaf_node(
+    const std::string& label) const;
 };
 
-struct MessagesTestVector
+struct MessagesTestVector : PseudoRandom
 {
   bytes key_package;
   bytes ratchet_tree;
@@ -354,7 +354,7 @@ struct MessagesTestVector
   bytes update_proposal;
   bytes remove_proposal;
   bytes pre_shared_key_proposal;
-  bytes re_init_proposal;
+  bytes reinit_proposal;
   bytes external_init_proposal;
 
   bytes commit;
@@ -365,7 +365,7 @@ struct MessagesTestVector
   bytes mls_plaintext;
   bytes mls_ciphertext;
 
-  static MessagesTestVector create();
+  MessagesTestVector();
   std::optional<std::string> verify() const;
 };
 

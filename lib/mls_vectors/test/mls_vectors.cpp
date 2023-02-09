@@ -69,6 +69,6 @@ TEST_CASE("TreeKEM")
 
 TEST_CASE("Messages")
 {
-  auto tv = MessagesTestVector::create();
+  auto tv = MessagesTestVector();
   REQUIRE(tv.verify() == std::nullopt);
 }

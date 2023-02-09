@@ -1058,13 +1058,8 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
   auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node("add_leaf");
   auto test_index = pub.add_leaf(test_leaf);
   pub.set_hash_all();
-  auto [add_priv, add_path] = pub.encap(add_sender,
-                                        group_id,
-                                        {},
-                                        add_secret,
-                                        sig_privs[add_sender.val],
-                                        {},
-                                        {});
+  auto [add_priv, add_path] = pub.encap(
+    add_sender, group_id, {}, add_secret, sig_privs[add_sender.val], {}, {});
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
   silence_unused(add_path);
@@ -1084,12 +1079,12 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
   update_group_context = prg.secret("update_context");
   auto update_secret = prg.secret("update_secret");
   auto [update_priv, update_path_val] = pub.encap(update_sender,
-                                              group_id,
-                                              update_group_context,
-                                              update_secret,
-                                              sig_privs[update_sender.val],
-                                              {},
-                                              {});
+                                                  group_id,
+                                                  update_group_context,
+                                                  update_secret,
+                                                  sig_privs[update_sender.val],
+                                                  {},
+                                                  {});
   pub.merge(update_sender, update_path_val);
   pub.set_hash_all();
 
@@ -1168,28 +1163,35 @@ TreeKEMTestVector::verify() const
 /// MessagesTestVector
 ///
 
-MessagesTestVector
-MessagesTestVector::create()
+MessagesTestVector::MessagesTestVector()
+  : PseudoRandom(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519, "messages")
 {
-  auto epoch = epoch_t(0xA0A1A2A3A4A5A6A7);
-  auto index = LeafIndex{ 0xB0 };
-  auto user_id = bytes(16, 0xD1);
-  auto group_id = bytes(16, 0xD2);
-  auto opaque = bytes(32, 0xD3);
-  auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
-  auto mac = bytes(32, 0xD5);
   auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
-  auto group_context =
-    GroupContext{ suite, group_id, epoch, opaque, opaque, {} };
+  auto epoch = epoch_t(prg.uint64("epoch"));
+  auto index = LeafIndex{ prg.uint32("index") };
+  auto user_id = prg.secret("user_id");
+  auto group_id = prg.secret("group_id");
+  // auto opaque = bytes(32, 0xD3);
+  // auto mac = bytes(32, 0xD5);
+
+  auto app_id_ext = ApplicationIDExtension{ prg.secret("app_id") };
+  auto ext_list = ExtensionList{};
+  ext_list.add(app_id_ext);
+
+  auto group_context = GroupContext{ suite,
+                                     group_id,
+                                     epoch,
+                                     prg.secret("tree_hash"),
+                                     prg.secret("confirmed_trasncript_hash"),
+                                     ext_list };
 
   auto version = ProtocolVersion::mls10;
-  auto hpke_priv = HPKEPrivateKey::generate(suite);
+  auto hpke_priv = prg.hpke_key("hpke_priv");
   auto hpke_pub = hpke_priv.public_key;
-  auto hpke_ct = HPKECiphertext{ opaque, opaque };
-  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto hpke_ct =
+    HPKECiphertext{ prg.secret("kem_output"), prg.secret("ciphertext") };
+  auto sig_priv = prg.signature_key("signature_priv");
   auto sig_pub = sig_priv.public_key;
-
-  auto psk_nonce = random_bytes(suite.secret_size());
 
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id);
@@ -1199,20 +1201,15 @@ MessagesTestVector::create()
                              cred,
                              Capabilities::create_default(),
                              Lifetime::create_default(),
-                             {},
+                             ext_list,
                              sig_priv };
   auto key_package = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
   auto leaf_node_update =
-    leaf_node.for_update(suite, opaque, hpke_pub, {}, sig_priv);
-  auto leaf_node_commit =
-    leaf_node.for_commit(suite, opaque, hpke_pub, opaque, {}, sig_priv);
+    leaf_node.for_update(suite, group_id, hpke_pub, {}, sig_priv);
+  auto leaf_node_commit = leaf_node.for_commit(
+    suite, group_id, hpke_pub, prg.secret("parent_hash"), {}, sig_priv);
 
   auto sender = Sender{ MemberSender{ index } };
-
-  auto app_id_ext = ApplicationIDExtension{ opaque };
-
-  auto ext_list = ExtensionList{};
-  ext_list.add(app_id_ext);
 
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);
@@ -1220,17 +1217,18 @@ MessagesTestVector::create()
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{
-    { suite, group_id, epoch, opaque, opaque, ext_list }, ext_list, mac
-  };
-  auto group_secrets = GroupSecrets{ opaque,
-                                     { { opaque } },
+  auto group_info = GroupInfo{ group_context, ext_list, prg.secret("confirmation_tag") };
+  auto joiner_secret = prg.secret("joiner_secret");
+  auto path_secret = prg.secret("path_secret");
+  auto psk_id = ExternalPSK{ prg.secret("psk_id") };
+  auto psk_nonce = prg.secret("psk_nonce");
+  auto group_secrets = GroupSecrets{ joiner_secret,
+                                     { { path_secret } },
                                      PreSharedKeys{ {
                                        { psk_id, psk_nonce },
-                                       { psk_id, psk_nonce },
                                      } } };
-  auto welcome = Welcome{ suite, opaque, {}, group_info };
-  welcome.encrypt(key_package, opaque);
+  auto welcome = Welcome{ suite, joiner_secret, {}, group_info };
+  welcome.encrypt(key_package, path_secret);
 
   // Proposals
   auto add = Add{ key_package };
@@ -1238,7 +1236,7 @@ MessagesTestVector::create()
   auto remove = Remove{ index };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
-  auto external_init = ExternalInit{ opaque };
+  auto external_init = ExternalInit{ prg.secret("external_init") };
 
   // Commit
   auto proposal_ref = ProposalRef{ 32, 0xa0 };
@@ -1276,40 +1274,40 @@ MessagesTestVector::create()
                                suite,
                                sig_priv,
                                group_context);
-  content_auth_commit.set_confirmation_tag(opaque);
+  content_auth_commit.set_confirmation_tag(prg.secret("confirmation_tag"));
 
   // MLSMessage(PublicMessage)
-  auto mls_plaintext = MLSMessage{ PublicMessage::protect(
-    content_auth_proposal, suite, opaque, group_context) };
+  auto mls_plaintext = MLSMessage{
+    PublicMessage::protect(
+      content_auth_proposal, suite, prg.secret("membership_key"), group_context)
+  };
 
   // MLSMessage(PrivateMessage)
-  auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
+  auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
   auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
-    content_auth_app, suite, keys, opaque, 10) };
+    content_auth_app, suite, keys, prg.secret("sender_data_secret"), 10) };
 
-  return MessagesTestVector{
-    tls::marshal(key_package),
-    tls::marshal(ratchet_tree),
+  this->key_package = tls::marshal(key_package);
+  this->ratchet_tree = tls::marshal(ratchet_tree);
 
-    tls::marshal(group_info),
-    tls::marshal(group_secrets),
-    tls::marshal(welcome),
+  this->group_info = tls::marshal(group_info);
+  this->group_secrets = tls::marshal(group_secrets);
+  this->welcome = tls::marshal(welcome);
 
-    tls::marshal(add),
-    tls::marshal(update),
-    tls::marshal(remove),
-    tls::marshal(pre_shared_key),
-    tls::marshal(reinit),
-    tls::marshal(external_init),
+  this->add_proposal = tls::marshal(add);
+  this->update_proposal = tls::marshal(update);
+  this->remove_proposal = tls::marshal(remove);
+  this->pre_shared_key_proposal = tls::marshal(pre_shared_key);
+  this->reinit_proposal = tls::marshal(reinit);
+  this->external_init_proposal = tls::marshal(external_init);
 
-    tls::marshal(commit),
+  this->commit = tls::marshal(commit);
 
-    tls::marshal(content_auth_app),
-    tls::marshal(content_auth_proposal),
-    tls::marshal(content_auth_commit),
-    tls::marshal(mls_plaintext),
-    tls::marshal(mls_ciphertext),
-  };
+  this->content_auth_app = tls::marshal(content_auth_app);
+  this->content_auth_proposal = tls::marshal(content_auth_proposal);
+  this->content_auth_commit = tls::marshal(content_auth_commit);
+  this->mls_plaintext = tls::marshal(mls_plaintext);
+  this->mls_ciphertext = tls::marshal(mls_ciphertext);
 }
 
 std::optional<std::string>
@@ -1326,7 +1324,7 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Update", Update, update_proposal);
   VERIFY_TLS_RTT("Remove", Remove, remove_proposal);
   VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal);
-  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal);
+  VERIFY_TLS_RTT("ReInit", ReInit, reinit_proposal);
   VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal);
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
