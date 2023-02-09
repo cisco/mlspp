@@ -248,9 +248,10 @@ private:
   mls::GroupKeySource keys;
 
   mls::MLSMessage protect_pub(
-    const mls::MLSContent::RawContent& raw_content) const;
-  mls::MLSMessage protect_priv(const mls::MLSContent::RawContent& raw_content);
-  std::optional<mls::MLSContent> unprotect(const mls::MLSMessage& message);
+    const mls::GroupContent::RawContent& raw_content) const;
+  mls::MLSMessage protect_priv(
+    const mls::GroupContent::RawContent& raw_content);
+  std::optional<mls::GroupContent> unprotect(const mls::MLSMessage& message);
 };
 
 struct TranscriptTestVector
@@ -266,7 +267,7 @@ struct TranscriptTestVector
   bytes confirmation_key;
 
   mls::SignaturePublicKey signature_key;
-  mls::MLSAuthenticatedContent commit;
+  mls::AuthenticatedContent commit;
 
   bytes group_context;
   bytes confirmed_transcript_hash_after;

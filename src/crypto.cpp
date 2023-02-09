@@ -217,10 +217,10 @@ CipherSuite::reference_label<KeyPackage>()
 //   KDF.extract("", value), "MLS 1.0 Proposal Reference", 16)
 //
 // Even though the label says "Proposal", we actually hash the entire enclosing
-// MLSAuthenticatedContent object.
+// AuthenticatedContent object.
 template<>
 const bytes&
-CipherSuite::reference_label<MLSAuthenticatedContent>()
+CipherSuite::reference_label<AuthenticatedContent>()
 {
   static const auto label = from_ascii("MLS 1.0 Proposal Reference");
   return label;

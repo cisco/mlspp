@@ -250,8 +250,8 @@ GroupKeySource::erase(ContentType type, LeafIndex sender, uint32_t generation)
 //     uint64 epoch;
 //     ContentType content_type;
 //     opaque authenticated_data<0..2^32-1>;
-// } MLSCiphertextContentAAD;
-struct MLSCiphertextContentAAD
+// } ContentAAD;
+struct ContentAAD
 {
   const bytes& group_id;
   const epoch_t epoch;
@@ -475,13 +475,13 @@ operator==(const KeyScheduleEpoch& lhs, const KeyScheduleEpoch& rhs)
 
 // struct {
 //     WireFormat wire_format;
-//     MLSContent content; // with content.content_type == commit
+//     GroupContent content; // with content.content_type == commit
 //     opaque signature<V>;
 // } ConfirmedTranscriptHashInput;
 struct ConfirmedTranscriptHashInput
 {
   WireFormat wire_format;
-  const MLSContent& content;
+  const GroupContent& content;
   const bytes& signature;
 
   TLS_SERIALIZABLE(wire_format, content, signature)
@@ -512,14 +512,14 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in,
 }
 
 void
-TranscriptHash::update(const MLSAuthenticatedContent& content_auth)
+TranscriptHash::update(const AuthenticatedContent& content_auth)
 {
   update_confirmed(content_auth);
   update_interim(content_auth);
 }
 
 void
-TranscriptHash::update_confirmed(const MLSAuthenticatedContent& content_auth)
+TranscriptHash::update_confirmed(const AuthenticatedContent& content_auth)
 {
   const auto transcript =
     interim + content_auth.confirmed_transcript_hash_input();
@@ -534,7 +534,7 @@ TranscriptHash::update_interim(const bytes& confirmation_tag)
 }
 
 void
-TranscriptHash::update_interim(const MLSAuthenticatedContent& content_auth)
+TranscriptHash::update_interim(const AuthenticatedContent& content_auth)
 {
   const auto transcript =
     confirmed + content_auth.interim_transcript_hash_input();

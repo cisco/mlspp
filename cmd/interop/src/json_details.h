@@ -121,7 +121,7 @@ struct tls_serializer
   };
 
 TLS_SERIALIZER(mls::TreeKEMPublicKey)
-TLS_SERIALIZER(mls::MLSAuthenticatedContent)
+TLS_SERIALIZER(mls::AuthenticatedContent)
 TLS_SERIALIZER(mls::Credential)
 TLS_SERIALIZER(mls::Proposal)
 TLS_SERIALIZER(mls::Commit)
