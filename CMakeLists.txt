@@ -73,7 +73,7 @@ endif()
 # External libraries
 find_package(OpenSSL REQUIRED)
 if ( OPENSSL_FOUND )
-    if (${OPENSSL_VERSION} VERSION_GREATER 1.1.1)
+    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
         add_compile_definitions(WITH_OPENSSL3)
     elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
         message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")

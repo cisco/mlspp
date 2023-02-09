@@ -8,30 +8,6 @@
 #if defined(WITH_OPENSSL3)
 #include <openssl/evp.h>
 #include <openssl/provider.h>
-
-static OSSL_PROVIDER* fips_prov = nullptr;
-
-static int
-FIPS_mode()
-{
-  if (OSSL_PROVIDER_available(nullptr, "fips") == 1) {
-    return 1;
-  }
-  return EVP_default_properties_is_fips_enabled(nullptr);
-}
-
-static int
-FIPS_mode_set(int enable)
-{
-  auto retval = 0;
-  if (enable != 0 && fips_prov == nullptr) {
-    fips_prov = OSSL_PROVIDER_load(nullptr, "fips");
-    retval = (fips_prov != nullptr) ? 1 : 0;
-  } else if (enable == 0 && fips_prov != nullptr) {
-    retval = OSSL_PROVIDER_unload(fips_prov);
-  }
-  return retval;
-}
 #endif
 
 void
@@ -39,15 +15,26 @@ ensure_fips_if_required()
 {
   // NOLINTNEXTLINE (concurrency-mt-unsafe)
   const auto* require = std::getenv("REQUIRE_FIPS");
+#if defined(WITH_OPENSSL3)
+  if (require != nullptr && OSSL_PROVIDER_available(nullptr, "fips") == 0) {
+    REQUIRE(OSSL_PROVIDER_load(nullptr, "fips") != nullptr);
+  }
+#else
   if (require != nullptr && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
+#endif
 }
 
 bool
 fips()
 {
+#if defined(WITH_OPENSSL3)
+  return OSSL_PROVIDER_available(nullptr, "fips") == 1 ||
+         EVP_default_properties_is_fips_enabled(nullptr) == 1;
+#else
   return FIPS_mode() != 0;
+#endif
 }
 
 bool
