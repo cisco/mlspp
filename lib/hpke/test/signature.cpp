@@ -85,6 +85,111 @@ TEST_CASE("Signature Known-Answer")
   }
 }
 
+TEST_CASE("Signature Verify Known-Answer")
+{
+  ensure_fips_if_required();
+
+  struct KnownAnswerTest
+  {
+    Signature::ID id;
+    bytes pub_serialized;
+    bytes data;
+    bytes signature;
+  };
+
+  const std::vector<KnownAnswerTest> cases{
+    {
+      Signature::ID::P256_SHA256,
+      from_hex(
+        "0490253da1fc5ffef719906c8f7d89371a7bb005fdd1325be3d2f1fd5e20615027e5da"
+        "0143ce767f74f6a9b47078e37b6c021c830feae0166a03ab19051cfa43f5"),
+      from_hex(
+        "d0ea25121ae5f417f66b29ed46d6d9c8d166ee2c3d7209ccda6c01332e2aa7f9bac260"
+        "dbcbaa54122aa05c7fd4ec82abde8e6322b1bbe34fb5a3cb438d7beccf37cd327c80bc"
+        "7f4ad345ebfab406cbb2b532ac91e2875e337014805a839a53f3c9e2a2325298961336"
+        "7ba1166578037e2c0ca8b9d9b9071dda6bc9b14689bdba"),
+      from_hex("304402200d5b20abc4beee561c1d64d9145e4da8a186ffd28cdaf06ca65247d"
+               "86f94b88c02203b6a5e140d2d13ebec80636bfb1e32d17fe3d7f2983a53104e"
+               "101e766830453a"),
+    },
+    {
+      Signature::ID::P384_SHA384,
+      from_hex(
+        "04d5a2abcb844865a479af773f9db66f5b8994710e2617e8b3c7ab4555f023f8e71a42"
+        "291416cdf9ea288874c5cc9f38a49b6e7cc96a3a65f60a42a05e233af26c94e0cc23c8"
+        "ee60177f1e1e3b52514a8de018addcc97245c2bef6bdd9ea7149da"),
+      from_hex(
+        "4be880bc0ccc92f79ed58b2c78268e28610719fb654b7d8b8aceae09e9e9ec3115de63"
+        "3d5dbeb36762a67d48b0fd1c74cd499058557638372bb5d76f88a5ea00194f9c0b1578"
+        "a9b5833d8d001ce847d4a55212601d514d6134f581f4c9a1f7bc5564ceaf28169c7fff"
+        "70fbc67087da868826913dab1f1dcfdf045d027e7460b7"),
+      from_hex(
+        "3064023036da67b80ca54e25cffd8c7992d406118de661c9ff40ed0468938b04d71009"
+        "7a3f5a947d2cb5420a5af6ca9b7a8684cb023042950fa4859def74cee5066f974b7a49"
+        "cd43899468831970b736b7bbb95338d1dd0c9e9034c9801f414982580fe9e590"),
+    },
+    {
+      Signature::ID::P521_SHA512,
+      from_hex(
+        "0400a659dcddfafe88ebbba8c04155870e0315794c7bd5a0c53ed9b57bcfaa36d79743"
+        "5b40a74d62ba4104d62e166538e6f88d832aa047b6ed3cd119a477000f3362df01855f"
+        "4e61ed4be7e81ed5f566ef6455a4fb588db6e6e44f57dc4271ac3d22cdba16d361db47"
+        "8fa4fb233fd71179633e722615c33cfbd1d556cc29a839121c37b982"),
+      from_hex(
+        "6abe2712353e03ef03571a9679a3f1e889937d5ffc0df431fab44a408ce8cc37449f94"
+        "28aae783a2ce200bb7ed546a1a92ea3555b45552844d15d6d86b662778e33124304691"
+        "16615523990495dd3352b374792d591384123c3c7ca81ad42b9f6e856426a82dddd284"
+        "d2f447df243067af6fe7f73cc4a368cb7cd53240af21d6"),
+      from_hex(
+        "3081880242015a033045a1bf86b3e1017826dd226604d78d129dcfca84f4020063beec"
+        "03e0b4bedbedacbf1b0d1285ddbd0c7107078ac200be9876577025ffdd898e97f648f7"
+        "80024201afcf701a73ab224ea5a0b6399fc231da0e7f1a8649df17ef2d5171fc4dc278"
+        "6923727c2edc4f0ad9e98825750596be312d0109d47888ab6481c688a287b0aac6b0"),
+    },
+    {
+      Signature::ID::Ed25519,
+      from_hex(
+        "923654bbdbacc72ab6c568208719c7cb866c3f89c366914ae90d604ef360c5c8"),
+      from_hex(
+        "dab12589702ff146b4e83b808da4007ff4ea4a358af2f7baa6861f08fb11ed71e338b2"
+        "fa01c7a68f86daaed5c1f00683bd5a2e511f773ac3e664222692297d7b469fcae561e6"
+        "1a8127bef87978449ec640883c0ba17d4f1741ed4ec94443b0fa0db1a139ad219ff7a4"
+        "ac34ced9c7d74e4bf608a1d8f792c0bf28eedbf2536af7"),
+      from_hex(
+        "460396e559547d5faa532503b9a15bdd4d9b7415f3e71327adb1dd1cc21eb905dd9654"
+        "136772745f5cc9d9ffdf6bed05b9b17491a2ae8309e847bc1c7f4d6e0c"),
+    },
+    {
+      Signature::ID::Ed448,
+      from_hex("7d60a1da10701ca4579de441643a545e334fddf18f6159ad2e8d2d914877a82"
+               "ea95f0b1bdac911dfb2499d3ccf814ebe69b09f9914c6aca000"),
+      from_hex(
+        "074f95d4f746a270af113b5650da98dcb247ef9839e480e99961a2cc998058e2b98be3"
+        "f949ceb7b000973127c0f79e54644f3b750763c2e904ac2179aa0a7e03da4e6d848f50"
+        "8323ff81e4a6d20b4eb89fed06a9117383daa50e13d25e6e1c740691021379005d140a"
+        "8e2157744cf7717f95a503d8e3740a081efa27146974c6"),
+      from_hex("902aa0a168a9e7a547a1736fb52b491f857fe8984b9a5a5b2ae50b3c2c3b232"
+               "894ae055013b256218cea79c4b4055719de3a6fbb2b0be0470062bc9e76f89e"
+               "4ffc4c08cbd8ce50de80bae8029b78ced07cce09bc75c9b2eedcf402ed0e74c"
+               "8078326f8ab69960d8062d2294ad1ff63901b00"),
+    },
+  };
+
+  for (const auto& tc : cases) {
+    const auto& sig = select_signature(tc.id);
+    auto pub = sig.deserialize(tc.pub_serialized);
+    auto valid = sig.verify(tc.data, tc.signature, *pub);
+    CHECK(valid);
+  }
+}
+
+// Samples generated via WebCrypto with the following:
+//
+// const data = new Uint8Array(128);
+// crypto.getRandomValues(data);
+//
+// const keyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve:
+// "P-256" }, true, ["sign", "verify"]); const
 TEST_CASE("Signature Round-Trip")
 {
   ensure_fips_if_required();

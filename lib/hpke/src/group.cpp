@@ -14,6 +14,32 @@ namespace hpke {
 static inline size_t
 group_dh_size(Group::ID group_id);
 
+static inline const EVP_MD*
+group_sig_digest(Group::ID group_id)
+{
+  switch (group_id) {
+    case Group::ID::P256:
+      return EVP_sha256();
+    case Group::ID::P384:
+      return EVP_sha384();
+    case Group::ID::P521:
+      return EVP_sha512();
+
+    // EdDSA does its own hashing internally
+    case Group::ID::Ed25519:
+    case Group::ID::Ed448:
+      return nullptr;
+
+    // Groups not used for signature
+    case Group::ID::X25519:
+    case Group::ID::X448:
+      throw std::runtime_error("Signature not supported for group");
+
+    default:
+      throw std::runtime_error("Unknown group");
+  }
+}
+
 ///
 /// General implementation with OpenSSL EVP_PKEY
 ///
@@ -99,8 +125,9 @@ EVPGroup::sign(const bytes& data, const Group::PrivateKey& sk) const
     throw openssl_error();
   }
 
-  if (1 != EVP_DigestSignInit(
-             ctx.get(), nullptr, nullptr, nullptr, rsk.pkey.get())) {
+  const auto* digest = group_sig_digest(id);
+  if (1 !=
+      EVP_DigestSignInit(ctx.get(), nullptr, digest, nullptr, rsk.pkey.get())) {
     throw openssl_error();
   }
 
@@ -127,8 +154,9 @@ EVPGroup::verify(const bytes& data,
     throw openssl_error();
   }
 
+  const auto* digest = group_sig_digest(id);
   if (1 != EVP_DigestVerifyInit(
-             ctx.get(), nullptr, nullptr, nullptr, rpk.pkey.get())) {
+             ctx.get(), nullptr, digest, nullptr, rpk.pkey.get())) {
     throw openssl_error();
   }
 
