@@ -59,6 +59,14 @@ TEST_CASE("Transcript")
   }
 }
 
+TEST_CASE("Welcome")
+{
+  for (auto suite : supported_suites) {
+    const auto tv = WelcomeTestVector{ suite };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
