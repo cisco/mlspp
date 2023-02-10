@@ -1220,10 +1220,10 @@ MessagesTestVector::MessagesTestVector()
   auto psk_id = ExternalPSK{ prg.secret("psk_id") };
   auto psk_nonce = prg.secret("psk_nonce");
   auto group_secrets_obj = GroupSecrets{ joiner_secret,
-                                     { { path_secret } },
-                                     PreSharedKeys{ {
-                                       { psk_id, psk_nonce },
-                                     } } };
+                                         { { path_secret } },
+                                         PreSharedKeys{ {
+                                           { psk_id, psk_nonce },
+                                         } } };
   auto welcome_obj = Welcome{ suite, joiner_secret, {}, group_info_obj };
   welcome_obj.encrypt(key_package_obj, path_secret);
 
@@ -1239,16 +1239,16 @@ MessagesTestVector::MessagesTestVector()
   auto proposal_ref = ProposalRef{ 32, 0xa0 };
 
   auto commit_obj = Commit{ {
-                          { proposal_ref },
-                          { Proposal{ add } },
-                        },
-                        UpdatePath{
-                          leaf_node_commit,
-                          {
-                            { hpke_pub, { hpke_ct, hpke_ct } },
-                            { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
-                          },
-                        } };
+                              { proposal_ref },
+                              { Proposal{ add } },
+                            },
+                            UpdatePath{
+                              leaf_node_commit,
+                              {
+                                { hpke_pub, { hpke_ct, hpke_ct } },
+                                { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
+                              },
+                            } };
 
   // AuthenticatedContent with Application / Proposal / Commit
   auto content_auth_app_obj = AuthenticatedContent::sign(
@@ -1274,10 +1274,11 @@ MessagesTestVector::MessagesTestVector()
   content_auth_commit_obj.set_confirmation_tag(prg.secret("confirmation_tag"));
 
   // MLSMessage(PublicMessage)
-  auto mls_plaintext_obj = MLSMessage{
-    PublicMessage::protect(
-      content_auth_proposal_obj, suite, prg.secret("membership_key"), group_context)
-  };
+  auto mls_plaintext_obj =
+    MLSMessage{ PublicMessage::protect(content_auth_proposal_obj,
+                                       suite,
+                                       prg.secret("membership_key"),
+                                       group_context) };
 
   // MLSMessage(PrivateMessage)
   auto keys = GroupKeySource(
