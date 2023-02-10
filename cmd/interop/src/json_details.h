@@ -299,22 +299,21 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    tree_hash_after)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
-                                   key_package,
+                                   mls_welcome,
+                                   mls_group_info,
+                                   mls_key_package,
                                    ratchet_tree,
-                                   group_info,
                                    group_secrets,
-                                   welcome,
                                    add_proposal,
                                    update_proposal,
                                    remove_proposal,
                                    pre_shared_key_proposal,
-                                   reinit_proposal,
+                                   re_init_proposal,
                                    external_init_proposal,
+                                   group_context_extensions_proposal,
                                    commit,
-                                   content_auth_app,
-                                   content_auth_proposal,
-                                   content_auth_commit,
-                                   mls_plaintext,
-                                   mls_ciphertext)
+                                   public_message_proposal,
+                                   public_message_commit,
+                                   private_message)
 
 } // namespace mls_vectors

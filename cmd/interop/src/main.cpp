@@ -46,7 +46,9 @@ make_test_vector(uint64_t type)
       return TreeKEMTestVector{ suite, n };
 
     case TestVectorType::MESSAGES:
-      return MessagesTestVector();
+      return std::vector<MessagesTestVector>{
+        MessagesTestVector(),
+      };
 
     case CRYPTO_BASICS: {
       auto cases = std::vector<CryptoBasicsTestVector>();
@@ -149,7 +151,7 @@ verify_test_vector(uint64_t type)
       return j.get<TreeKEMTestVector>().verify();
 
     case TestVectorType::MESSAGES:
-      return j.get<MessagesTestVector>().verify();
+      return verify_test_vector<MessagesTestVector>(j);
 
     case CRYPTO_BASICS:
       return verify_test_vector<CryptoBasicsTestVector>(j);

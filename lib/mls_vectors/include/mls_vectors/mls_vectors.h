@@ -373,27 +373,26 @@ struct TreeKEMTestVector : PseudoRandom
 
 struct MessagesTestVector : PseudoRandom
 {
-  bytes key_package;
-  bytes ratchet_tree;
+  bytes mls_welcome;
+  bytes mls_group_info;
+  bytes mls_key_package;
 
-  bytes group_info;
+  bytes ratchet_tree;
   bytes group_secrets;
-  bytes welcome;
 
   bytes add_proposal;
   bytes update_proposal;
   bytes remove_proposal;
   bytes pre_shared_key_proposal;
-  bytes reinit_proposal;
+  bytes re_init_proposal;
   bytes external_init_proposal;
+  bytes group_context_extensions_proposal;
 
   bytes commit;
 
-  bytes content_auth_app;
-  bytes content_auth_proposal;
-  bytes content_auth_commit;
-  bytes mls_plaintext;
-  bytes mls_ciphertext;
+  bytes public_message_proposal;
+  bytes public_message_commit;
+  bytes private_message;
 
   MessagesTestVector();
   std::optional<std::string> verify() const;

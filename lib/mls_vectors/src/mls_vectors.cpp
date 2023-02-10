@@ -1354,103 +1354,98 @@ MessagesTestVector::MessagesTestVector()
                             } };
 
   // AuthenticatedContent with Application / Proposal / Commit
-  auto content_auth_app_obj = AuthenticatedContent::sign(
+
+  // PublicMessage
+  auto membership_key = prg.secret("membership_key");
+
+  auto content_auth_proposal = AuthenticatedContent::sign(
+    WireFormat::mls_plaintext,
+    { group_id, epoch, sender, {}, Proposal{ remove } },
+    suite,
+    sig_priv,
+    group_context);
+  auto public_message_proposal_obj = PublicMessage::protect(content_auth_proposal,
+                                       suite,
+                                       membership_key,
+                                       group_context);
+
+  auto content_auth_commit =
+    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                               { group_id, epoch, sender, {}, commit_obj },
+                               suite,
+                               sig_priv,
+                               group_context);
+  content_auth_commit.set_confirmation_tag(prg.secret("confirmation_tag"));
+  auto public_message_commit_obj = PublicMessage::protect(content_auth_commit,
+                                       suite,
+                                       membership_key,
+                                       group_context);
+
+  // PrivateMessage
+  auto content_auth_application_obj = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal_obj = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext,
-    { group_id, epoch, sender, {}, Proposal{ remove } },
-    suite,
-    sig_priv,
-    group_context);
-
-  auto content_auth_commit_obj =
-    AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                               { group_id, epoch, sender, {}, commit_obj },
-                               suite,
-                               sig_priv,
-                               group_context);
-  content_auth_commit_obj.set_confirmation_tag(prg.secret("confirmation_tag"));
-
-  // MLSMessage(PublicMessage)
-  auto mls_plaintext_obj =
-    MLSMessage{ PublicMessage::protect(content_auth_proposal_obj,
-                                       suite,
-                                       prg.secret("membership_key"),
-                                       group_context) };
-
-  // MLSMessage(PrivateMessage)
   auto keys = GroupKeySource(
     suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
-  auto mls_ciphertext_obj = MLSMessage{ PrivateMessage::protect(
-    content_auth_app_obj, suite, keys, prg.secret("sender_data_secret"), 10) };
+  auto private_message_obj = PrivateMessage::protect(
+    content_auth_application_obj, suite, keys, prg.secret("sender_data_secret"), 10);
 
   // Serialize out all the objects
-  key_package = tls::marshal(key_package_obj);
-  ratchet_tree = tls::marshal(ratchet_tree_obj);
+  mls_welcome = tls::marshal(MLSMessage{ welcome_obj });
+  mls_group_info = tls::marshal(MLSMessage{ group_info_obj });
+  mls_key_package = tls::marshal(MLSMessage{ key_package_obj });
 
-  group_info = tls::marshal(group_info_obj);
+  ratchet_tree = tls::marshal(ratchet_tree_obj);
   group_secrets = tls::marshal(group_secrets_obj);
-  welcome = tls::marshal(welcome_obj);
 
   add_proposal = tls::marshal(add);
   update_proposal = tls::marshal(update);
   remove_proposal = tls::marshal(remove);
   pre_shared_key_proposal = tls::marshal(pre_shared_key);
-  reinit_proposal = tls::marshal(reinit);
+  re_init_proposal = tls::marshal(reinit);
   external_init_proposal = tls::marshal(external_init);
 
   commit = tls::marshal(commit_obj);
 
-  content_auth_app = tls::marshal(content_auth_app_obj);
-  content_auth_proposal = tls::marshal(content_auth_proposal_obj);
-  content_auth_commit = tls::marshal(content_auth_commit_obj);
-  mls_plaintext = tls::marshal(mls_plaintext_obj);
-  mls_ciphertext = tls::marshal(mls_ciphertext_obj);
+  public_message_proposal = tls::marshal(MLSMessage{ public_message_proposal_obj });
+  public_message_commit = tls::marshal(MLSMessage{ public_message_commit_obj });
+  private_message = tls::marshal(MLSMessage{ private_message_obj });
 }
 
 std::optional<std::string>
 MessagesTestVector::verify() const
 {
-  VERIFY_TLS_RTT("KeyPackage", KeyPackage, key_package);
-  VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree);
+  // TODO(RLB) Verify signatures
+  // TODO(RLB) Verify content types in PublicMessage objects
+  auto require_format = [](WireFormat format) {
+    return [format](const MLSMessage& msg) {
+      return msg.wire_format() == format;
+    };
+  };
 
-  VERIFY_TLS_RTT("GroupInfo", GroupInfo, group_info);
+  VERIFY_TLS_RTT_VAL("Welcome", MLSMessage, mls_welcome, require_format(WireFormat::mls_welcome));
+  VERIFY_TLS_RTT_VAL("GroupInfo", MLSMessage, mls_group_info, require_format(WireFormat::mls_group_info));
+  VERIFY_TLS_RTT_VAL("KeyPackage", MLSMessage, mls_key_package, require_format(WireFormat::mls_key_package));
+
+  VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree);
   VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets);
-  VERIFY_TLS_RTT("Welcome", Welcome, welcome);
 
   VERIFY_TLS_RTT("Add", Add, add_proposal);
   VERIFY_TLS_RTT("Update", Update, update_proposal);
   VERIFY_TLS_RTT("Remove", Remove, remove_proposal);
   VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal);
-  VERIFY_TLS_RTT("ReInit", ReInit, reinit_proposal);
+  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal);
   VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal);
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  VERIFY_TLS_RTT(
-    "AuthenticatedContent/App", AuthenticatedContent, content_auth_app);
-  VERIFY_TLS_RTT("AuthenticatedContent/Proposal",
-                 AuthenticatedContent,
-                 content_auth_proposal);
-  VERIFY_TLS_RTT(
-    "AuthenticatedContent/Commit", AuthenticatedContent, content_auth_commit);
-
-  auto require_pt = [](const MLSMessage& msg) {
-    return msg.wire_format() == WireFormat::mls_plaintext;
-  };
-  auto require_ct = [](const MLSMessage& msg) {
-    return msg.wire_format() == WireFormat::mls_ciphertext;
-  };
-
-  VERIFY_TLS_RTT_VAL(
-    "MLSMessage/PublicMessage", MLSMessage, mls_plaintext, require_pt);
-  VERIFY_TLS_RTT_VAL(
-    "MLSMessage/PrivateMessage", MLSMessage, mls_ciphertext, require_ct);
+  VERIFY_TLS_RTT_VAL("Public(Proposal)", MLSMessage, public_message_proposal, require_format(WireFormat::mls_plaintext));
+  VERIFY_TLS_RTT_VAL("Public(Commit)", MLSMessage, public_message_commit, require_format(WireFormat::mls_plaintext));
+  VERIFY_TLS_RTT_VAL("PrivateMessage", MLSMessage, private_message, require_format(WireFormat::mls_ciphertext));
 
   return std::nullopt;
 }
