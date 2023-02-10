@@ -285,7 +285,8 @@ private:
 
 struct PSKSecretTestVector : PseudoRandom
 {
-  struct PSK {
+  struct PSK
+  {
     bytes psk_id;
     bytes psk_nonce;
     bytes psk;

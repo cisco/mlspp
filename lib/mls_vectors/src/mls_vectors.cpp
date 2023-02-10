@@ -882,12 +882,12 @@ static std::vector<PSKWithSecret>
 to_psk_w_secret(const std::vector<PSKSecretTestVector::PSK>& psks)
 {
   auto pskws = std::vector<PSKWithSecret>(psks.size());
-  std::transform(std::begin(psks), std::end(psks), std::begin(pskws),
-      [](const auto& psk) {
-        auto ext_id = ExternalPSK{ psk.psk_id };
-        auto id = PreSharedKeyID{ ext_id, psk.psk_nonce };
-        return PSKWithSecret{ id, psk.psk };
-      });
+  std::transform(
+    std::begin(psks), std::end(psks), std::begin(pskws), [](const auto& psk) {
+      auto ext_id = ExternalPSK{ psk.psk_id };
+      auto id = PreSharedKeyID{ ext_id, psk.psk_nonce };
+      return PSKWithSecret{ id, psk.psk };
+    });
 
   return pskws;
 }
@@ -907,19 +907,19 @@ PSKSecretTestVector::PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks)
     psk.psk = prg.secret("psk" + ix);
   }
 
-  psk_secret = KeyScheduleEpoch::make_psk_secret(cipher_suite, to_psk_w_secret(psks));
+  psk_secret =
+    KeyScheduleEpoch::make_psk_secret(cipher_suite, to_psk_w_secret(psks));
 }
 
 std::optional<std::string>
 PSKSecretTestVector::verify() const
 {
-  auto actual = KeyScheduleEpoch::make_psk_secret(cipher_suite, to_psk_w_secret(psks));
+  auto actual =
+    KeyScheduleEpoch::make_psk_secret(cipher_suite, to_psk_w_secret(psks));
   VERIFY_EQUAL("psk secret", actual, psk_secret);
 
   return std::nullopt;
 }
-
-
 
 ///
 /// TranscriptTestVector

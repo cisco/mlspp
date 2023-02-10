@@ -411,7 +411,8 @@ KeyScheduleEpoch::resumption_psk_w_secret(ResumptionPSKUsage usage,
 }
 
 bytes
-KeyScheduleEpoch::make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
+KeyScheduleEpoch::make_psk_secret(CipherSuite suite,
+                                  const std::vector<PSKWithSecret>& psks)
 {
   auto psk_secret = suite.zero();
   auto count = uint16_t(psks.size());

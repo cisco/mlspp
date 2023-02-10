@@ -155,7 +155,7 @@ public:
                                         epoch_t epoch);
 
   static bytes make_psk_secret(CipherSuite suite,
-                          const std::vector<PSKWithSecret>& psks);
+                               const std::vector<PSKWithSecret>& psks);
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& joiner_secret,
                               const std::vector<PSKWithSecret>& psks);
