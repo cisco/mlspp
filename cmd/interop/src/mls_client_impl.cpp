@@ -363,8 +363,7 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::KEY_SCHEDULE: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::KeyScheduleTestVector{ suite,
-                                              request->n_epochs() };
+      j = mls_vectors::KeyScheduleTestVector{ suite, request->n_epochs() };
       break;
     }
 

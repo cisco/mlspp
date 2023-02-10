@@ -580,34 +580,32 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
     auto exporter_length = cipher_suite.secret_size();
     auto exported = epoch.do_export(exporter_label, {}, exporter_length);
 
-    epochs.push_back({
-      group_context.tree_hash,
-      commit_secret,
-      group_context.confirmed_transcript_hash,
+    epochs.push_back({ group_context.tree_hash,
+                       commit_secret,
+                       group_context.confirmed_transcript_hash,
 
-      ctx,
+                       ctx,
 
-      epoch.joiner_secret,
-      welcome_secret,
-      epoch.init_secret,
+                       epoch.joiner_secret,
+                       welcome_secret,
+                       epoch.init_secret,
 
-      epoch.sender_data_secret,
-      epoch.encryption_secret,
-      epoch.exporter_secret,
-      epoch.epoch_authenticator,
-      epoch.external_secret,
-      epoch.confirmation_key,
-      epoch.membership_key,
-      epoch.resumption_psk,
+                       epoch.sender_data_secret,
+                       epoch.encryption_secret,
+                       epoch.exporter_secret,
+                       epoch.epoch_authenticator,
+                       epoch.external_secret,
+                       epoch.confirmation_key,
+                       epoch.membership_key,
+                       epoch.resumption_psk,
 
-      epoch.external_priv.public_key,
+                       epoch.external_priv.public_key,
 
-      {
-        exporter_label,
-        exporter_length,
-        exported,
-      }
-    });
+                       {
+                         exporter_label,
+                         exporter_length,
+                         exported,
+                       } });
 
     group_context.epoch += 1;
   }
@@ -647,14 +645,14 @@ KeyScheduleTestVector::verify() const
     VERIFY_EQUAL(
       "confirmation key", epoch.confirmation_key, tve.confirmation_key);
     VERIFY_EQUAL("membership key", epoch.membership_key, tve.membership_key);
-    VERIFY_EQUAL(
-      "resumption psk", epoch.resumption_psk, tve.resumption_psk);
+    VERIFY_EQUAL("resumption psk", epoch.resumption_psk, tve.resumption_psk);
     VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
 
-    auto exported = epoch.do_export(tve.exporter.exporter_label, {}, tve.exporter.exporter_length);
+    auto exported = epoch.do_export(
+      tve.exporter.exporter_label, {}, tve.exporter.exporter_length);
     VERIFY_EQUAL("exported", exported, tve.exporter.exported);
 
     group_context.epoch += 1;
@@ -731,8 +729,9 @@ MessageProtectionTestVector::verify()
   // Verify application data unprotect as PrivateMessage
   auto app_unprotected = unprotect(application_priv);
   VERIFY("app priv unprotect auth", app_unprotected);
-  VERIFY_EQUAL(
-    "app priv unprotect", opt::get(app_unprotected).content, ApplicationData{ application });
+  VERIFY_EQUAL("app priv unprotect",
+               opt::get(app_unprotected).content,
+               ApplicationData{ application });
 
   // Verify protect/unprotect round-trips
   // XXX(RLB): Note that because (a) unprotect() deletes keys from the ratchet

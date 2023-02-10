@@ -195,7 +195,8 @@ struct SecretTreeTestVector : PseudoRandom
 
 struct KeyScheduleTestVector : PseudoRandom
 {
-  struct Export {
+  struct Export
+  {
     std::string exporter_label;
     size_t exporter_length;
     bytes exported;
@@ -236,8 +237,7 @@ struct KeyScheduleTestVector : PseudoRandom
   std::vector<Epoch> epochs;
 
   KeyScheduleTestVector() = default;
-  KeyScheduleTestVector(mls::CipherSuite suite,
-                        uint32_t n_epochs);
+  KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
