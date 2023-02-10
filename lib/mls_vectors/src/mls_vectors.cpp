@@ -145,6 +145,87 @@ verify_round_trip(const std::string& label, const bytes& expected, const F& val)
 }
 
 ///
+/// PseudoRandom
+///
+
+PseudoRandom::Generator::Generator(CipherSuite suite_in,
+                                   const std::string& label)
+  : suite(suite_in)
+  , seed(suite.hpke().kdf.extract({}, from_ascii(label)))
+{
+}
+
+PseudoRandom::Generator::Generator(CipherSuite suite_in, bytes&& seed_in)
+  : suite(suite_in)
+  , seed(seed_in)
+{
+}
+
+PseudoRandom::Generator
+PseudoRandom::Generator::sub(const std::string& label) const
+{
+  return { suite, suite.derive_secret(seed, label) };
+}
+
+bytes
+PseudoRandom::Generator::secret(const std::string& label) const
+{
+  return suite.derive_secret(seed, label);
+}
+
+bytes
+PseudoRandom::Generator::generate(const std::string& label, size_t size) const
+{
+  return suite.expand_with_label(seed, label, {}, size);
+}
+
+uint16_t
+PseudoRandom::Generator::uint16(const std::string& label) const
+{
+  auto data = generate(label, 2);
+  return tls::get<uint16_t>(data);
+}
+
+uint32_t
+PseudoRandom::Generator::uint32(const std::string& label) const
+{
+  auto data = generate(label, 4);
+  return tls::get<uint16_t>(data);
+}
+
+uint64_t
+PseudoRandom::Generator::uint64(const std::string& label) const
+{
+  auto data = generate(label, 8);
+  return tls::get<uint16_t>(data);
+}
+
+SignaturePrivateKey
+PseudoRandom::Generator::signature_key(const std::string& label) const
+{
+  auto data = generate(label, suite.secret_size());
+  return SignaturePrivateKey::derive(suite, data);
+}
+
+HPKEPrivateKey
+PseudoRandom::Generator::hpke_key(const std::string& label) const
+{
+  auto data = generate(label, suite.secret_size());
+  return HPKEPrivateKey::derive(suite, data);
+}
+
+size_t
+PseudoRandom::Generator::output_length() const
+{
+  return suite.secret_size();
+}
+
+PseudoRandom::PseudoRandom(CipherSuite suite, const std::string& label)
+  : prg(suite, label)
+{
+}
+
+///
 /// TreeMathTestVector
 ///
 
@@ -205,9 +286,10 @@ TreeMathTestVector::verify() const
 /// TreeMathTestVector
 ///
 
-CryptoBasicsTestVector::RefHash::RefHash(CipherSuite suite)
+CryptoBasicsTestVector::RefHash::RefHash(CipherSuite suite,
+                                         PseudoRandom::Generator&& prg)
   : label("RefHash")
-  , value(random_bytes(suite.secret_size()))
+  , value(prg.secret("value"))
   , out(suite.raw_ref(from_ascii(label), value))
 {
 }
@@ -219,11 +301,13 @@ CryptoBasicsTestVector::RefHash::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
-CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(CipherSuite suite)
-  : secret(random_bytes(suite.secret_size()))
+CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(
+  CipherSuite suite,
+  PseudoRandom::Generator&& prg)
+  : secret(prg.secret("secret"))
   , label("ExpandWithLabel")
-  , context(random_bytes(suite.secret_size()))
-  , length(static_cast<uint16_t>(suite.key_size()))
+  , context(prg.secret("context"))
+  , length(static_cast<uint16_t>(prg.output_length()))
   , out(suite.expand_with_label(secret, label, context, length))
 {
 }
@@ -237,8 +321,10 @@ CryptoBasicsTestVector::ExpandWithLabel::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
-CryptoBasicsTestVector::DeriveSecret::DeriveSecret(CipherSuite suite)
-  : secret(random_bytes(suite.secret_size()))
+CryptoBasicsTestVector::DeriveSecret::DeriveSecret(
+  CipherSuite suite,
+  PseudoRandom::Generator&& prg)
+  : secret(prg.secret("secret"))
   , label("DeriveSecret")
   , out(suite.derive_secret(secret, label))
 {
@@ -251,11 +337,13 @@ CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
-CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(CipherSuite suite)
-  : secret(random_bytes(suite.secret_size()))
+CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(
+  CipherSuite suite,
+  PseudoRandom::Generator&& prg)
+  : secret(prg.secret("secret"))
   , label("DeriveTreeSecret")
-  , generation(0xA0A0A0A0)
-  , length(static_cast<uint16_t>(suite.secret_size()))
+  , generation(prg.uint32("generation"))
+  , length(static_cast<uint16_t>(prg.output_length()))
   , out(suite.derive_tree_secret(secret, label, generation, length))
 {
 }
@@ -269,10 +357,12 @@ CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
-CryptoBasicsTestVector::SignWithLabel::SignWithLabel(CipherSuite suite)
-  : priv(SignaturePrivateKey::generate(suite))
+CryptoBasicsTestVector::SignWithLabel::SignWithLabel(
+  CipherSuite suite,
+  PseudoRandom::Generator&& prg)
+  : priv(prg.signature_key("priv"))
   , pub(priv.public_key)
-  , content(random_bytes(suite.secret_size()))
+  , content(prg.secret("content"))
   , label("SignWithLabel")
   , signature(priv.sign(suite, label, content))
 {
@@ -289,12 +379,14 @@ CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
   return std::nullopt;
 }
 
-CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(CipherSuite suite)
-  : priv(HPKEPrivateKey::generate(suite))
+CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(
+  CipherSuite suite,
+  PseudoRandom::Generator&& prg)
+  : priv(prg.hpke_key("priv"))
   , pub(priv.public_key)
   , label("EncryptWithLabel")
-  , context(random_bytes(suite.secret_size()))
-  , plaintext(random_bytes(suite.secret_size()))
+  , context(prg.secret("context"))
+  , plaintext(prg.secret("plaintext"))
 {
   auto ct = pub.encrypt(suite, label, context, plaintext);
   kem_output = ct.kem_output;
@@ -316,13 +408,14 @@ CryptoBasicsTestVector::EncryptWithLabel::verify(CipherSuite suite) const
 }
 
 CryptoBasicsTestVector::CryptoBasicsTestVector(CipherSuite suite)
-  : cipher_suite(suite)
-  , ref_hash(suite)
-  , expand_with_label(suite)
-  , derive_secret(suite)
-  , derive_tree_secret(suite)
-  , sign_with_label(suite)
-  , encrypt_with_label(suite)
+  : PseudoRandom(suite, "crypto-basics")
+  , cipher_suite(suite)
+  , ref_hash(suite, prg.sub("ref_hash"))
+  , expand_with_label(suite, prg.sub("expand_with_label"))
+  , derive_secret(suite, prg.sub("derive_secret"))
+  , derive_tree_secret(suite, prg.sub("derive_tree_secret"))
+  , sign_with_label(suite, prg.sub("sign_with_label"))
+  , encrypt_with_label(suite, prg.sub("encrypt_with_label"))
 {
 }
 
@@ -366,9 +459,10 @@ CryptoBasicsTestVector::verify() const
 /// SecretTreeTestVector
 ///
 
-SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite)
-  : sender_data_secret(random_bytes(suite.secret_size()))
-  , ciphertext(random_bytes(suite.secret_size()))
+SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite,
+                                             PseudoRandom::Generator&& prg)
+  : sender_data_secret(prg.secret("sender_data_secret"))
+  , ciphertext(prg.secret("ciphertext"))
 {
   auto key_and_nonce =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
@@ -390,9 +484,10 @@ SecretTreeTestVector::SecretTreeTestVector(
   mls::CipherSuite suite,
   uint32_t n_leaves,
   const std::vector<uint32_t>& generations)
-  : cipher_suite(suite)
-  , sender_data(suite)
-  , encryption_secret(random_bytes(suite.secret_size()))
+  : PseudoRandom(suite, "secret-tree")
+  , cipher_suite(suite)
+  , sender_data(suite, prg.sub("sender_data"))
+  , encryption_secret(prg.secret("encryption_secret"))
 {
   auto src =
     GroupKeySource(cipher_suite, LeafCount{ n_leaves }, encryption_secret);
@@ -453,31 +548,33 @@ SecretTreeTestVector::verify() const
 /// KeyScheduleTestVector
 ///
 
-KeyScheduleTestVector
-KeyScheduleTestVector::create(CipherSuite suite,
-                              uint32_t n_epochs,
-                              uint32_t n_psks)
+KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
+                                             uint32_t n_epochs,
+                                             uint32_t n_psks)
+  : PseudoRandom(suite, "key-schedule")
+  , cipher_suite(suite)
+  , group_id(prg.secret("group_id"))
+  , initial_init_secret(prg.secret("group_id"))
 {
-  auto tv = KeyScheduleTestVector{};
-  tv.cipher_suite = suite;
-  tv.group_id = from_hex("00010203");
+  auto group_context = GroupContext{ suite, group_id, 0, {}, {}, {} };
+  auto epoch = KeyScheduleEpoch(
+    cipher_suite, initial_init_secret, tls::marshal(group_context));
 
-  auto group_context = GroupContext{ suite, tv.group_id, 0, {}, {}, {} };
-  auto epoch = KeyScheduleEpoch(suite, {}, random_bytes(suite.secret_size()));
-  tv.initial_init_secret = epoch.init_secret;
+  for (uint64_t i = 0; i < n_epochs; i++) {
+    auto epoch_prg = prg.sub(to_hex(tls::marshal(i)));
 
-  for (size_t i = 0; i < n_epochs; i++) {
-    group_context.tree_hash = random_bytes(suite.digest().hash_size);
+    group_context.tree_hash = epoch_prg.secret("tree_hash");
     group_context.confirmed_transcript_hash =
-      random_bytes(suite.digest().hash_size);
+      epoch_prg.secret("confirmed_transcript_hash");
     auto ctx = tls::marshal(group_context);
 
     auto psks = std::vector<PSKWithSecret>{};
     auto external_psks = std::vector<ExternalPSKInfo>{};
-    for (size_t j = 0; j < n_psks; j++) {
-      auto id = random_bytes(suite.secret_size());
-      auto nonce = random_bytes(suite.secret_size());
-      auto secret = random_bytes(suite.secret_size());
+    for (uint32_t j = 0; j < n_psks; j++) {
+      auto jx = to_hex(tls::marshal(j));
+      auto id = epoch_prg.secret("psk_id " + jx);
+      auto nonce = epoch_prg.secret("psk_nonce " + jx);
+      auto secret = epoch_prg.secret("psk_secret " + jx);
 
       psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
       external_psks.push_back({ id, nonce, secret });
@@ -486,19 +583,19 @@ KeyScheduleTestVector::create(CipherSuite suite,
     auto psk_nonce = bytes{};
     if (i > 0) {
       auto psk = epoch.resumption_psk(
-        ResumptionPSKUsage::branch, tv.group_id, epoch_t(i - 1));
+        ResumptionPSKUsage::branch, group_id, epoch_t(i - 1));
       psk_nonce = psk.id.psk_nonce;
       psks.push_back(psk);
     }
 
-    auto commit_secret = random_bytes(suite.secret_size());
+    auto commit_secret = epoch_prg.secret("commit_secret");
     // TODO(RLB) Add Test case for externally-driven epoch change
     epoch = epoch.next(commit_secret, psks, std::nullopt, ctx);
 
     auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(suite, epoch.joiner_secret, psks);
+      KeyScheduleEpoch::welcome_secret(cipher_suite, epoch.joiner_secret, psks);
 
-    tv.epochs.push_back({
+    epochs.push_back({
       group_context.tree_hash,
       commit_secret,
       group_context.confirmed_transcript_hash,
@@ -526,18 +623,14 @@ KeyScheduleTestVector::create(CipherSuite suite,
 
     group_context.epoch += 1;
   }
-
-  return tv;
 }
 
 std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
   auto group_context = GroupContext{ cipher_suite, group_id, 0, {}, {}, {} };
-  auto epoch = KeyScheduleEpoch(cipher_suite, {}, {});
-
-  // Manually correct the init secret
-  epoch.init_secret = initial_init_secret;
+  auto epoch = KeyScheduleEpoch(
+    cipher_suite, initial_init_secret, tls::marshal(group_context));
 
   auto epoch_n = epoch_t(0);
   for (const auto& tve : epochs) {
@@ -600,20 +693,21 @@ KeyScheduleTestVector::verify() const
 ///
 
 MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
-  : cipher_suite(suite)
-  , group_id(random_bytes(suite.secret_size()))
-  , epoch(0xA0A0A0A0A0A0A0A0)
-  , tree_hash(random_bytes(suite.secret_size()))
-  , confirmed_transcript_hash(random_bytes(suite.secret_size()))
+  : PseudoRandom(suite, "message-protection")
+  , cipher_suite(suite)
+  , group_id(prg.secret("group_id"))
+  , epoch(prg.uint64("epoch"))
+  , tree_hash(prg.secret("tree_hash"))
+  , confirmed_transcript_hash(prg.secret("confirmed_transcript_hash"))
   , n_leaves(2)
-  , signature_priv(SignaturePrivateKey::generate(suite))
+  , signature_priv(prg.signature_key("signature_priv"))
   , signature_pub(signature_priv.public_key)
-  , encryption_secret(random_bytes(suite.secret_size()))
-  , sender_data_secret(random_bytes(suite.secret_size()))
-  , membership_key(random_bytes(suite.secret_size()))
+  , encryption_secret(prg.secret("encryption_secret"))
+  , sender_data_secret(prg.secret("sender_data_secret"))
+  , membership_key(prg.secret("membership_key"))
   , proposal{ GroupContextExtensions{} }
   , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
-  , application{ random_bytes(suite.secret_size()) }
+  , application{ prg.secret("application") }
   , group_context{ cipher_suite,
                    group_id,
                    epoch,
@@ -744,7 +838,7 @@ MessageProtectionTestVector::protect_pub(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
-    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
@@ -769,7 +863,7 @@ MessageProtectionTestVector::protect_priv(
                                                  signature_priv,
                                                  group_context);
   if (content.content_type() == ContentType::commit) {
-    auto confirmation_tag = random_bytes(cipher_suite.secret_size());
+    auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
@@ -808,65 +902,53 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
 ///
 /// TranscriptTestVector
 ///
-TranscriptTestVector
-TranscriptTestVector::create(CipherSuite suite)
+TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
+  : PseudoRandom(suite, "transcript")
+  , cipher_suite(suite)
+  , group_id(prg.secret("group_id"))
+  , epoch(prg.uint64("epoch"))
+  , tree_hash_before(prg.secret("tree_hash_before"))
+  , confirmed_transcript_hash_before(
+      prg.secret("confirmed_transcript_hash_before"))
+  , interim_transcript_hash_before(prg.secret("interim_transcript_hash_before"))
 {
-  auto group_id = bytes{ 0, 1, 2, 3 };
-  auto epoch = epoch_t(0);
-  auto tree_hash_before = random_bytes(suite.digest().hash_size);
-  auto confirmed_transcript_hash_before =
-    random_bytes(suite.digest().hash_size);
-  auto interim_transcript_hash_before = random_bytes(suite.digest().hash_size);
-
   auto transcript = TranscriptHash(suite);
   transcript.interim = interim_transcript_hash_before;
 
-  auto group_context = GroupContext{
+  auto group_context_obj = GroupContext{
     suite, group_id, epoch, tree_hash_before, confirmed_transcript_hash_before,
     {}
   };
-  auto ctx = tls::marshal(group_context);
+  group_context = tls::marshal(group_context_obj);
 
-  auto init_secret = random_bytes(suite.secret_size());
-  auto ks_epoch = KeyScheduleEpoch(suite, init_secret, ctx);
+  auto init_secret = prg.secret("init_secret");
+  auto ks_epoch = KeyScheduleEpoch(suite, init_secret, group_context);
 
-  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto sig_priv = prg.signature_key("sig_priv");
   auto leaf_index = LeafIndex{ 0 };
 
   auto commit_content = GroupContent{
     group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
   };
-  auto commit_content_auth =
-    AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                               std::move(commit_content),
-                               suite,
-                               sig_priv,
-                               group_context);
+  commit = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                      std::move(commit_content),
+                                      suite,
+                                      sig_priv,
+                                      group_context_obj);
 
-  transcript.update_confirmed(commit_content_auth);
+  transcript.update_confirmed(commit);
 
   const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  commit_content_auth.set_confirmation_tag(confirmation_tag);
+  commit.set_confirmation_tag(confirmation_tag);
 
-  transcript.update_interim(commit_content_auth);
+  transcript.update_interim(commit);
 
-  return {
-    suite,
+  // Store remaining data
+  confirmation_key = ks_epoch.confirmation_key;
+  signature_key = sig_priv.public_key;
 
-    group_id,
-    epoch,
-    tree_hash_before,
-    confirmed_transcript_hash_before,
-    interim_transcript_hash_before,
-
-    ks_epoch.confirmation_key,
-    sig_priv.public_key,
-    commit_content_auth,
-
-    ctx,
-    transcript.confirmed,
-    transcript.interim,
-  };
+  confirmed_transcript_hash_after = transcript.confirmed;
+  interim_transcript_hash_after = transcript.interim;
 }
 
 std::optional<std::string>
@@ -908,15 +990,17 @@ TranscriptTestVector::verify() const
 /// TreeKEMTestVector
 ///
 
-static std::tuple<bytes, SignaturePrivateKey, LeafNode>
-new_leaf_node(CipherSuite suite)
+std::tuple<bytes, SignaturePrivateKey, LeafNode>
+TreeKEMTestVector::new_leaf_node(const std::string& label) const
 {
-  auto init_secret = random_bytes(suite.secret_size());
-  auto leaf_node_secret = suite.derive_secret(init_secret, "node");
-  auto leaf_priv = HPKEPrivateKey::derive(suite, leaf_node_secret);
-  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto sub_prg = prg.sub(label);
+
+  auto init_secret = sub_prg.secret("init_secret");
+  auto leaf_node_secret = cipher_suite.derive_secret(init_secret, "node");
+  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
+  auto sig_priv = sub_prg.signature_key("sig_priv");
   auto cred = Credential::basic({ 0, 1, 2, 3 });
-  auto leaf = LeafNode(suite,
+  auto leaf = LeafNode(cipher_suite,
                        leaf_priv.public_key,
                        sig_priv.public_key,
                        cred,
@@ -927,36 +1011,35 @@ new_leaf_node(CipherSuite suite)
   return std::make_tuple(init_secret, sig_priv, leaf);
 }
 
-TreeKEMTestVector
-TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
+TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
+  : PseudoRandom(suite, "treekem")
+  , cipher_suite(suite)
+  , group_id(prg.secret("group_id"))
+  , add_sender(0)
+  , update_sender(0)
 {
-  auto tv = TreeKEMTestVector{};
-  tv.cipher_suite = suite;
-  tv.group_id = bytes{ 0, 1, 2, 3 };
-
   // Make a plan
-  tv.add_sender = LeafIndex{ 0 };
-  tv.update_sender = LeafIndex{ 0 };
   auto my_index = std::optional<LeafIndex>();
   if (n_leaves > 4) {
     // Make things more interesting if we have space
     my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
-    tv.add_sender.val = static_cast<uint32_t>(n_leaves / 2) - 2;
-    tv.update_sender.val = static_cast<uint32_t>(n_leaves) - 2;
+    add_sender.val = static_cast<uint32_t>(n_leaves / 2) - 2;
+    update_sender.val = static_cast<uint32_t>(n_leaves) - 2;
   }
 
   // Construct a full ratchet tree with the required number of leaves
   auto sig_privs = std::vector<SignaturePrivateKey>{};
   auto pub = TreeKEMPublicKey{ suite };
-  for (size_t i = 0; i < n_leaves; i++) {
-    auto [init_secret, sig_priv, leaf] = new_leaf_node(suite);
+  for (uint32_t i = 0; i < n_leaves; i++) {
+    auto ix = to_hex(tls::marshal(i));
+    auto [init_secret, sig_priv, leaf] = new_leaf_node(ix);
     silence_unused(init_secret);
     sig_privs.push_back(sig_priv);
 
-    auto leaf_secret = random_bytes(suite.secret_size());
+    auto leaf_secret = prg.secret("leaf_secret_" + ix);
     auto added = pub.add_leaf(leaf);
     auto [new_adder_priv, path] =
-      pub.encap(added, tv.group_id, {}, leaf_secret, sig_priv, {}, {});
+      pub.encap(added, group_id, {}, leaf_secret, sig_priv, {}, {});
     silence_unused(new_adder_priv);
     pub.merge(added, path);
   }
@@ -966,17 +1049,12 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
   }
 
   // Add the test participant
-  auto add_secret = random_bytes(suite.secret_size());
-  auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node(suite);
+  auto add_secret = prg.secret("add_secret");
+  auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node("add_leaf");
   auto test_index = pub.add_leaf(test_leaf);
   pub.set_hash_all();
-  auto [add_priv, add_path] = pub.encap(tv.add_sender,
-                                        tv.group_id,
-                                        {},
-                                        add_secret,
-                                        sig_privs[tv.add_sender.val],
-                                        {},
-                                        {});
+  auto [add_priv, add_path] = pub.encap(
+    add_sender, group_id, {}, add_secret, sig_privs[add_sender.val], {}, {});
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
   silence_unused(add_path);
@@ -985,33 +1063,30 @@ TreeKEMTestVector::create(CipherSuite suite, size_t n_leaves)
 
   pub.set_hash_all();
 
-  tv.ratchet_tree_before = pub;
-  tv.tree_hash_before = pub.root_hash();
-  tv.my_leaf_secret = test_init_secret;
-  tv.my_leaf_node = test_leaf;
-  tv.my_path_secret = path_secret;
-  tv.root_secret_after_add = add_priv.update_secret;
+  ratchet_tree_before = pub;
+  tree_hash_before = pub.root_hash();
+  my_leaf_secret = test_init_secret;
+  my_leaf_node = test_leaf;
+  my_path_secret = path_secret;
+  root_secret_after_add = add_priv.update_secret;
 
   // Do a second update that the test participant should be able to process
-  auto update_secret = random_bytes(suite.secret_size());
-  auto update_context = random_bytes(suite.secret_size());
-  auto [update_priv, update_path] = pub.encap(tv.update_sender,
-                                              tv.group_id,
-                                              update_context,
-                                              update_secret,
-                                              sig_privs[tv.update_sender.val],
-                                              {},
-                                              {});
-  pub.merge(tv.update_sender, update_path);
+  update_group_context = prg.secret("update_context");
+  auto update_secret = prg.secret("update_secret");
+  auto [update_priv, update_path_val] = pub.encap(update_sender,
+                                                  group_id,
+                                                  update_group_context,
+                                                  update_secret,
+                                                  sig_privs[update_sender.val],
+                                                  {},
+                                                  {});
+  pub.merge(update_sender, update_path_val);
   pub.set_hash_all();
 
-  tv.update_path = update_path;
-  tv.update_group_context = update_context;
-  tv.root_secret_after_update = update_priv.update_secret;
-  tv.ratchet_tree_after = pub;
-  tv.tree_hash_after = { pub.root_hash() };
-
-  return tv;
+  update_path = update_path_val;
+  root_secret_after_update = update_priv.update_secret;
+  ratchet_tree_after = pub;
+  tree_hash_after = { pub.root_hash() };
 }
 
 void
@@ -1083,28 +1158,35 @@ TreeKEMTestVector::verify() const
 /// MessagesTestVector
 ///
 
-MessagesTestVector
-MessagesTestVector::create()
+MessagesTestVector::MessagesTestVector()
+  : PseudoRandom(CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519, "messages")
 {
-  auto epoch = epoch_t(0xA0A1A2A3A4A5A6A7);
-  auto index = LeafIndex{ 0xB0 };
-  auto user_id = bytes(16, 0xD1);
-  auto group_id = bytes(16, 0xD2);
-  auto opaque = bytes(32, 0xD3);
-  auto psk_id = ExternalPSK{ bytes(32, 0xD4) };
-  auto mac = bytes(32, 0xD5);
   auto suite = CipherSuite{ CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 };
-  auto group_context =
-    GroupContext{ suite, group_id, epoch, opaque, opaque, {} };
+  auto epoch = epoch_t(prg.uint64("epoch"));
+  auto index = LeafIndex{ prg.uint32("index") };
+  auto user_id = prg.secret("user_id");
+  auto group_id = prg.secret("group_id");
+  // auto opaque = bytes(32, 0xD3);
+  // auto mac = bytes(32, 0xD5);
+
+  auto app_id_ext = ApplicationIDExtension{ prg.secret("app_id") };
+  auto ext_list = ExtensionList{};
+  ext_list.add(app_id_ext);
+
+  auto group_context = GroupContext{ suite,
+                                     group_id,
+                                     epoch,
+                                     prg.secret("tree_hash"),
+                                     prg.secret("confirmed_trasncript_hash"),
+                                     ext_list };
 
   auto version = ProtocolVersion::mls10;
-  auto hpke_priv = HPKEPrivateKey::generate(suite);
+  auto hpke_priv = prg.hpke_key("hpke_priv");
   auto hpke_pub = hpke_priv.public_key;
-  auto hpke_ct = HPKECiphertext{ opaque, opaque };
-  auto sig_priv = SignaturePrivateKey::generate(suite);
+  auto hpke_ct =
+    HPKECiphertext{ prg.secret("kem_output"), prg.secret("ciphertext") };
+  auto sig_priv = prg.signature_key("signature_priv");
   auto sig_pub = sig_priv.public_key;
-
-  auto psk_nonce = random_bytes(suite.secret_size());
 
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id);
@@ -1114,117 +1196,118 @@ MessagesTestVector::create()
                              cred,
                              Capabilities::create_default(),
                              Lifetime::create_default(),
-                             {},
+                             ext_list,
                              sig_priv };
-  auto key_package = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
+  auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
+
   auto leaf_node_update =
-    leaf_node.for_update(suite, opaque, hpke_pub, {}, sig_priv);
-  auto leaf_node_commit =
-    leaf_node.for_commit(suite, opaque, hpke_pub, opaque, {}, sig_priv);
+    leaf_node.for_update(suite, group_id, hpke_pub, {}, sig_priv);
+  auto leaf_node_commit = leaf_node.for_commit(
+    suite, group_id, hpke_pub, prg.secret("parent_hash"), {}, sig_priv);
 
   auto sender = Sender{ MemberSender{ index } };
-
-  auto app_id_ext = ApplicationIDExtension{ opaque };
-
-  auto ext_list = ExtensionList{};
-  ext_list.add(app_id_ext);
 
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);
   tree.add_leaf(leaf_node);
-  auto ratchet_tree = RatchetTreeExtension{ tree };
+  auto ratchet_tree_obj = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{
-    { suite, group_id, epoch, opaque, opaque, ext_list }, ext_list, mac
-  };
-  auto group_secrets = GroupSecrets{ opaque,
-                                     { { opaque } },
-                                     PreSharedKeys{ {
-                                       { psk_id, psk_nonce },
-                                       { psk_id, psk_nonce },
-                                     } } };
-  auto welcome = Welcome{ suite, opaque, {}, group_info };
-  welcome.encrypt(key_package, opaque);
+  auto group_info_obj =
+    GroupInfo{ group_context, ext_list, prg.secret("confirmation_tag") };
+  auto joiner_secret = prg.secret("joiner_secret");
+  auto path_secret = prg.secret("path_secret");
+  auto psk_id = ExternalPSK{ prg.secret("psk_id") };
+  auto psk_nonce = prg.secret("psk_nonce");
+  auto group_secrets_obj = GroupSecrets{ joiner_secret,
+                                         { { path_secret } },
+                                         PreSharedKeys{ {
+                                           { psk_id, psk_nonce },
+                                         } } };
+  auto welcome_obj = Welcome{ suite, joiner_secret, {}, group_info_obj };
+  welcome_obj.encrypt(key_package_obj, path_secret);
 
   // Proposals
-  auto add = Add{ key_package };
+  auto add = Add{ key_package_obj };
   auto update = Update{ leaf_node_update };
   auto remove = Remove{ index };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
   auto reinit = ReInit{ group_id, version, suite, {} };
-  auto external_init = ExternalInit{ opaque };
+  auto external_init = ExternalInit{ prg.secret("external_init") };
 
   // Commit
   auto proposal_ref = ProposalRef{ 32, 0xa0 };
 
-  auto commit = Commit{ {
-                          { proposal_ref },
-                          { Proposal{ add } },
-                        },
-                        UpdatePath{
-                          leaf_node_commit,
-                          {
-                            { hpke_pub, { hpke_ct, hpke_ct } },
-                            { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
-                          },
-                        } };
+  auto commit_obj = Commit{ {
+                              { proposal_ref },
+                              { Proposal{ add } },
+                            },
+                            UpdatePath{
+                              leaf_node_commit,
+                              {
+                                { hpke_pub, { hpke_ct, hpke_ct } },
+                                { hpke_pub, { hpke_ct, hpke_ct, hpke_ct } },
+                              },
+                            } };
 
   // AuthenticatedContent with Application / Proposal / Commit
-  auto content_auth_app = AuthenticatedContent::sign(
+  auto content_auth_app_obj = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal = AuthenticatedContent::sign(
+  auto content_auth_proposal_obj = AuthenticatedContent::sign(
     WireFormat::mls_plaintext,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_commit =
+  auto content_auth_commit_obj =
     AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                               { group_id, epoch, sender, {}, commit },
+                               { group_id, epoch, sender, {}, commit_obj },
                                suite,
                                sig_priv,
                                group_context);
-  content_auth_commit.set_confirmation_tag(opaque);
+  content_auth_commit_obj.set_confirmation_tag(prg.secret("confirmation_tag"));
 
   // MLSMessage(PublicMessage)
-  auto mls_plaintext = MLSMessage{ PublicMessage::protect(
-    content_auth_proposal, suite, opaque, group_context) };
+  auto mls_plaintext_obj =
+    MLSMessage{ PublicMessage::protect(content_auth_proposal_obj,
+                                       suite,
+                                       prg.secret("membership_key"),
+                                       group_context) };
 
   // MLSMessage(PrivateMessage)
-  auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, opaque);
-  auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
-    content_auth_app, suite, keys, opaque, 10) };
+  auto keys = GroupKeySource(
+    suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
+  auto mls_ciphertext_obj = MLSMessage{ PrivateMessage::protect(
+    content_auth_app_obj, suite, keys, prg.secret("sender_data_secret"), 10) };
 
-  return MessagesTestVector{
-    tls::marshal(key_package),
-    tls::marshal(ratchet_tree),
+  // Serialize out all the objects
+  key_package = tls::marshal(key_package_obj);
+  ratchet_tree = tls::marshal(ratchet_tree_obj);
 
-    tls::marshal(group_info),
-    tls::marshal(group_secrets),
-    tls::marshal(welcome),
+  group_info = tls::marshal(group_info_obj);
+  group_secrets = tls::marshal(group_secrets_obj);
+  welcome = tls::marshal(welcome_obj);
 
-    tls::marshal(add),
-    tls::marshal(update),
-    tls::marshal(remove),
-    tls::marshal(pre_shared_key),
-    tls::marshal(reinit),
-    tls::marshal(external_init),
+  add_proposal = tls::marshal(add);
+  update_proposal = tls::marshal(update);
+  remove_proposal = tls::marshal(remove);
+  pre_shared_key_proposal = tls::marshal(pre_shared_key);
+  reinit_proposal = tls::marshal(reinit);
+  external_init_proposal = tls::marshal(external_init);
 
-    tls::marshal(commit),
+  commit = tls::marshal(commit_obj);
 
-    tls::marshal(content_auth_app),
-    tls::marshal(content_auth_proposal),
-    tls::marshal(content_auth_commit),
-    tls::marshal(mls_plaintext),
-    tls::marshal(mls_ciphertext),
-  };
+  content_auth_app = tls::marshal(content_auth_app_obj);
+  content_auth_proposal = tls::marshal(content_auth_proposal_obj);
+  content_auth_commit = tls::marshal(content_auth_commit_obj);
+  mls_plaintext = tls::marshal(mls_plaintext_obj);
+  mls_ciphertext = tls::marshal(mls_ciphertext_obj);
 }
 
 std::optional<std::string>
@@ -1241,7 +1324,7 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT("Update", Update, update_proposal);
   VERIFY_TLS_RTT("Remove", Remove, remove_proposal);
   VERIFY_TLS_RTT("PreSharedKey", PreSharedKey, pre_shared_key_proposal);
-  VERIFY_TLS_RTT("ReInit", ReInit, re_init_proposal);
+  VERIFY_TLS_RTT("ReInit", ReInit, reinit_proposal);
   VERIFY_TLS_RTT("ExternalInit", ExternalInit, external_init_proposal);
 
   VERIFY_TLS_RTT("Commit", Commit, commit);

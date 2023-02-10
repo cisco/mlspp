@@ -35,16 +35,16 @@ make_test_vector(uint64_t type)
       return TreeMathTestVector{ n };
 
     case TestVectorType::KEY_SCHEDULE:
-      return KeyScheduleTestVector::create(suite, n, n);
+      return KeyScheduleTestVector{ suite, n, n };
 
     case TestVectorType::TRANSCRIPT:
-      return TranscriptTestVector::create(suite);
+      return TranscriptTestVector{ suite };
 
     case TestVectorType::TREEKEM:
-      return TreeKEMTestVector::create(suite, n);
+      return TreeKEMTestVector{ suite, n };
 
     case TestVectorType::MESSAGES:
-      return MessagesTestVector::create();
+      return MessagesTestVector();
 
     case CRYPTO_BASICS: {
       auto cases = std::vector<CryptoBasicsTestVector>();
