@@ -558,8 +558,8 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
   , initial_init_secret(prg.secret("group_id"))
 {
   auto group_context = GroupContext{ suite, group_id, 0, {}, {}, {} };
-  auto epoch = KeyScheduleEpoch(
-    cipher_suite, initial_init_secret, tls::marshal(group_context));
+  auto epoch = KeyScheduleEpoch(cipher_suite);
+  epoch.init_secret = initial_init_secret;
 
   for (uint64_t i = 0; i < n_epochs; i++) {
     auto epoch_prg = prg.sub(to_hex(tls::marshal(i)));
