@@ -120,7 +120,7 @@ public:
   // Ordered list of credentials from non-blank leaves
   std::vector<LeafNode> roster() const;
 
-  bytes authentication_secret() const;
+  bytes epoch_authenticator() const;
 
   ///
   /// Application encryption and decryption

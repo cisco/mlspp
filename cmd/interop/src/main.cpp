@@ -35,7 +35,7 @@ make_test_vector(uint64_t type)
       return TreeMathTestVector{ n };
 
     case TestVectorType::KEY_SCHEDULE:
-      return KeyScheduleTestVector{ suite, n, n };
+      return KeyScheduleTestVector{ suite, n };
 
     case TestVectorType::TRANSCRIPT:
       return TranscriptTestVector{ suite };
@@ -118,7 +118,7 @@ verify_test_vector(uint64_t type)
       return verify_test_vector<TreeMathTestVector>(j);
 
     case TestVectorType::KEY_SCHEDULE:
-      return j.get<KeyScheduleTestVector>().verify();
+      return verify_test_vector<KeyScheduleTestVector>(j);
 
     case TestVectorType::TRANSCRIPT:
       return j.get<TranscriptTestVector>().verify();

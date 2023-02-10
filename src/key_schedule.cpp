@@ -325,11 +325,11 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
   , encryption_secret(suite.derive_secret(epoch_secret, "encryption"))
   , exporter_secret(suite.derive_secret(epoch_secret, "exporter"))
-  , authentication_secret(suite.derive_secret(epoch_secret, "authentication"))
+  , epoch_authenticator(suite.derive_secret(epoch_secret, "authentication"))
   , external_secret(suite.derive_secret(epoch_secret, "external"))
   , confirmation_key(suite.derive_secret(epoch_secret, "confirm"))
   , membership_key(suite.derive_secret(epoch_secret, "membership"))
-  , resumption_secret(suite.derive_secret(epoch_secret, "resumption"))
+  , resumption_psk(suite.derive_secret(epoch_secret, "resumption"))
   , init_secret(suite.derive_secret(epoch_secret, "init"))
   , external_priv(HPKEPrivateKey::derive(suite, external_secret))
 {
@@ -418,13 +418,13 @@ KeyScheduleEpoch::do_export(const std::string& label,
 }
 
 PSKWithSecret
-KeyScheduleEpoch::resumption_psk(ResumptionPSKUsage usage,
-                                 const bytes& group_id,
-                                 epoch_t epoch)
+KeyScheduleEpoch::resumption_psk_w_secret(ResumptionPSKUsage usage,
+                                          const bytes& group_id,
+                                          epoch_t epoch)
 {
   auto nonce = random_bytes(suite.secret_size());
   auto psk = ResumptionPSK{ usage, group_id, epoch };
-  return { { psk, nonce }, resumption_secret };
+  return { { psk, nonce }, resumption_psk };
 }
 
 bytes

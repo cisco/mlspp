@@ -385,9 +385,9 @@ Session::roster() const
 }
 
 bytes
-Session::authentication_secret() const
+Session::epoch_authenticator() const
 {
-  return inner->history.front().authentication_secret();
+  return inner->history.front().epoch_authenticator();
 }
 
 bytes

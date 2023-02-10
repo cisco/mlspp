@@ -195,11 +195,10 @@ struct SecretTreeTestVector : PseudoRandom
 
 struct KeyScheduleTestVector : PseudoRandom
 {
-  struct ExternalPSKInfo
-  {
-    bytes id;
-    bytes nonce;
-    bytes secret;
+  struct Export {
+    std::string exporter_label;
+    size_t exporter_length;
+    bytes exported;
   };
 
   struct Epoch
@@ -208,13 +207,10 @@ struct KeyScheduleTestVector : PseudoRandom
     bytes tree_hash;
     bytes commit_secret;
     bytes confirmed_transcript_hash;
-    std::vector<ExternalPSKInfo> external_psks;
-    bytes psk_nonce;
 
     // Computed values
     bytes group_context;
 
-    bytes psk_secret;
     bytes joiner_secret;
     bytes welcome_secret;
     bytes init_secret;
@@ -222,13 +218,14 @@ struct KeyScheduleTestVector : PseudoRandom
     bytes sender_data_secret;
     bytes encryption_secret;
     bytes exporter_secret;
-    bytes authentication_secret;
+    bytes epoch_authenticator;
     bytes external_secret;
     bytes confirmation_key;
     bytes membership_key;
-    bytes resumption_secret;
+    bytes resumption_psk;
 
     mls::HPKEPublicKey external_pub;
+    Export exporter;
   };
 
   mls::CipherSuite cipher_suite;
@@ -240,8 +237,7 @@ struct KeyScheduleTestVector : PseudoRandom
 
   KeyScheduleTestVector() = default;
   KeyScheduleTestVector(mls::CipherSuite suite,
-                        uint32_t n_epochs,
-                        uint32_t n_psks);
+                        uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
@@ -253,7 +249,6 @@ struct MessageProtectionTestVector : PseudoRandom
   mls::epoch_t epoch;
   bytes tree_hash;
   bytes confirmed_transcript_hash;
-  mls::LeafCount n_leaves;
 
   mls::SignaturePrivateKey signature_priv;
   mls::SignaturePublicKey signature_pub;
@@ -270,7 +265,7 @@ struct MessageProtectionTestVector : PseudoRandom
   mls::MLSMessage commit_pub;
   mls::MLSMessage commit_priv;
 
-  mls::ApplicationData application;
+  bytes application;
   mls::MLSMessage application_priv;
 
   MessageProtectionTestVector() = default;
@@ -278,8 +273,8 @@ struct MessageProtectionTestVector : PseudoRandom
   std::optional<std::string> verify();
 
 private:
-  mls::GroupContext group_context;
-  mls::GroupKeySource keys;
+  mls::GroupKeySource group_keys() const;
+  mls::GroupContext group_context() const;
 
   mls::MLSMessage protect_pub(
     const mls::GroupContent::RawContent& raw_content) const;

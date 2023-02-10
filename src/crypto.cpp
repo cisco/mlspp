@@ -358,7 +358,7 @@ HPKEPrivateKey::set_public_key(CipherSuite suite)
 /// SignaturePublicKey and SignaturePrivateKey
 ///
 namespace sign_label {
-const std::string mls_content = "GroupContentTBS";
+const std::string mls_content = "FramedContentTBS";
 const std::string leaf_node = "LeafNodeTBS";
 const std::string key_package = "KeyPackageTBS";
 const std::string group_info = "GroupInfoTBS";
