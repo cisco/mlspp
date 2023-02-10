@@ -220,11 +220,6 @@ PseudoRandom::Generator::output_length() const
   return suite.secret_size();
 }
 
-PseudoRandom::PseudoRandom()
-  : prg(CipherSuite::ID::unknown, "uninitialized")
-{
-}
-
 PseudoRandom::PseudoRandom(CipherSuite suite, const std::string& label)
   : prg(suite, label)
 {

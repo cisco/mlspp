@@ -15,6 +15,7 @@ struct PseudoRandom
 {
   struct Generator
   {
+    Generator() = default;
     Generator(mls::CipherSuite suite_in, const std::string& label);
     Generator sub(const std::string& label) const;
 
@@ -37,7 +38,7 @@ struct PseudoRandom
     Generator(mls::CipherSuite suite_in, bytes&& seed_in);
   };
 
-  PseudoRandom();
+  PseudoRandom() = default;
   PseudoRandom(mls::CipherSuite suite, const std::string& label);
 
   Generator prg;
