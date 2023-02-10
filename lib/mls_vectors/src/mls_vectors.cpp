@@ -164,7 +164,7 @@ PseudoRandom::Generator::Generator(CipherSuite suite_in, bytes&& seed_in)
 PseudoRandom::Generator
 PseudoRandom::Generator::sub(const std::string& label) const
 {
-  return PseudoRandom::Generator(suite, suite.derive_secret(seed, label));
+  return { suite, suite.derive_secret(seed, label) };
 }
 
 bytes
@@ -307,7 +307,7 @@ CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(
   : secret(prg.secret("secret"))
   , label("ExpandWithLabel")
   , context(prg.secret("context"))
-  , length(prg.output_length())
+  , length(static_cast<uint16_t>(prg.output_length()))
   , out(suite.expand_with_label(secret, label, context, length))
 {
 }
@@ -343,7 +343,7 @@ CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(
   : secret(prg.secret("secret"))
   , label("DeriveTreeSecret")
   , generation(prg.uint32("generation"))
-  , length(prg.output_length())
+  , length(static_cast<uint16_t>(prg.output_length()))
   , out(suite.derive_tree_secret(secret, label, generation, length))
 {
 }
@@ -1198,7 +1198,8 @@ MessagesTestVector::MessagesTestVector()
                              Lifetime::create_default(),
                              ext_list,
                              sig_priv };
-  auto key_package = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
+  auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
+
   auto leaf_node_update =
     leaf_node.for_update(suite, group_id, hpke_pub, {}, sig_priv);
   auto leaf_node_commit = leaf_node.for_commit(
@@ -1209,25 +1210,25 @@ MessagesTestVector::MessagesTestVector()
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);
   tree.add_leaf(leaf_node);
-  auto ratchet_tree = RatchetTreeExtension{ tree };
+  auto ratchet_tree_obj = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info =
+  auto group_info_obj =
     GroupInfo{ group_context, ext_list, prg.secret("confirmation_tag") };
   auto joiner_secret = prg.secret("joiner_secret");
   auto path_secret = prg.secret("path_secret");
   auto psk_id = ExternalPSK{ prg.secret("psk_id") };
   auto psk_nonce = prg.secret("psk_nonce");
-  auto group_secrets = GroupSecrets{ joiner_secret,
+  auto group_secrets_obj = GroupSecrets{ joiner_secret,
                                      { { path_secret } },
                                      PreSharedKeys{ {
                                        { psk_id, psk_nonce },
                                      } } };
-  auto welcome = Welcome{ suite, joiner_secret, {}, group_info };
-  welcome.encrypt(key_package, path_secret);
+  auto welcome_obj = Welcome{ suite, joiner_secret, {}, group_info_obj };
+  welcome_obj.encrypt(key_package_obj, path_secret);
 
   // Proposals
-  auto add = Add{ key_package };
+  auto add = Add{ key_package_obj };
   auto update = Update{ leaf_node_update };
   auto remove = Remove{ index };
   auto pre_shared_key = PreSharedKey{ psk_id, psk_nonce };
@@ -1237,7 +1238,7 @@ MessagesTestVector::MessagesTestVector()
   // Commit
   auto proposal_ref = ProposalRef{ 32, 0xa0 };
 
-  auto commit = Commit{ {
+  auto commit_obj = Commit{ {
                           { proposal_ref },
                           { Proposal{ add } },
                         },
@@ -1250,61 +1251,62 @@ MessagesTestVector::MessagesTestVector()
                         } };
 
   // AuthenticatedContent with Application / Proposal / Commit
-  auto content_auth_app = AuthenticatedContent::sign(
+  auto content_auth_app_obj = AuthenticatedContent::sign(
     WireFormat::mls_ciphertext,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_proposal = AuthenticatedContent::sign(
+  auto content_auth_proposal_obj = AuthenticatedContent::sign(
     WireFormat::mls_plaintext,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
     sig_priv,
     group_context);
 
-  auto content_auth_commit =
+  auto content_auth_commit_obj =
     AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                               { group_id, epoch, sender, {}, commit },
+                               { group_id, epoch, sender, {}, commit_obj },
                                suite,
                                sig_priv,
                                group_context);
-  content_auth_commit.set_confirmation_tag(prg.secret("confirmation_tag"));
+  content_auth_commit_obj.set_confirmation_tag(prg.secret("confirmation_tag"));
 
   // MLSMessage(PublicMessage)
-  auto mls_plaintext = MLSMessage{
+  auto mls_plaintext_obj = MLSMessage{
     PublicMessage::protect(
-      content_auth_proposal, suite, prg.secret("membership_key"), group_context)
+      content_auth_proposal_obj, suite, prg.secret("membership_key"), group_context)
   };
 
   // MLSMessage(PrivateMessage)
   auto keys = GroupKeySource(
     suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
-  auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
-    content_auth_app, suite, keys, prg.secret("sender_data_secret"), 10) };
+  auto mls_ciphertext_obj = MLSMessage{ PrivateMessage::protect(
+    content_auth_app_obj, suite, keys, prg.secret("sender_data_secret"), 10) };
 
-  this->key_package = tls::marshal(key_package);
-  this->ratchet_tree = tls::marshal(ratchet_tree);
+  // Serialize out all the objects
+  key_package = tls::marshal(key_package_obj);
+  ratchet_tree = tls::marshal(ratchet_tree_obj);
 
-  this->group_info = tls::marshal(group_info);
-  this->group_secrets = tls::marshal(group_secrets);
-  this->welcome = tls::marshal(welcome);
+  group_info = tls::marshal(group_info_obj);
+  group_secrets = tls::marshal(group_secrets_obj);
+  welcome = tls::marshal(welcome_obj);
 
-  this->add_proposal = tls::marshal(add);
-  this->update_proposal = tls::marshal(update);
-  this->remove_proposal = tls::marshal(remove);
-  this->pre_shared_key_proposal = tls::marshal(pre_shared_key);
-  this->reinit_proposal = tls::marshal(reinit);
-  this->external_init_proposal = tls::marshal(external_init);
+  add_proposal = tls::marshal(add);
+  update_proposal = tls::marshal(update);
+  remove_proposal = tls::marshal(remove);
+  pre_shared_key_proposal = tls::marshal(pre_shared_key);
+  reinit_proposal = tls::marshal(reinit);
+  external_init_proposal = tls::marshal(external_init);
 
-  this->commit = tls::marshal(commit);
+  commit = tls::marshal(commit_obj);
 
-  this->content_auth_app = tls::marshal(content_auth_app);
-  this->content_auth_proposal = tls::marshal(content_auth_proposal);
-  this->content_auth_commit = tls::marshal(content_auth_commit);
-  this->mls_plaintext = tls::marshal(mls_plaintext);
-  this->mls_ciphertext = tls::marshal(mls_ciphertext);
+  content_auth_app = tls::marshal(content_auth_app_obj);
+  content_auth_proposal = tls::marshal(content_auth_proposal_obj);
+  content_auth_commit = tls::marshal(content_auth_commit_obj);
+  mls_plaintext = tls::marshal(mls_plaintext_obj);
+  mls_ciphertext = tls::marshal(mls_ciphertext_obj);
 }
 
 std::optional<std::string>
