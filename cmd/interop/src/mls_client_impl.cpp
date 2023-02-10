@@ -366,25 +366,26 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::KEY_SCHEDULE: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::KeyScheduleTestVector::create(
-        suite, request->n_epochs(), n_psks);
+      j = mls_vectors::KeyScheduleTestVector{ suite,
+                                              request->n_epochs(),
+                                              n_psks };
       break;
     }
 
     case TestVectorType::TRANSCRIPT: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TranscriptTestVector::create(suite);
+      j = mls_vectors::TranscriptTestVector{ suite };
       break;
     }
 
     case TestVectorType::TREEKEM: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TreeKEMTestVector::create(suite, request->n_leaves());
+      j = mls_vectors::TreeKEMTestVector{ suite, request->n_leaves() };
       break;
     }
 
     case TestVectorType::MESSAGES: {
-      j = mls_vectors::MessagesTestVector::create();
+      j = mls_vectors::MessagesTestVector();
       break;
     }
 

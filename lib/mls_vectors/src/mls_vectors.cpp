@@ -168,54 +168,54 @@ PseudoRandom::Generator::sub(const std::string& label) const
 }
 
 bytes
-PseudoRandom::Generator::secret(const std::string& label)
+PseudoRandom::Generator::secret(const std::string& label) const
 {
   return suite.derive_secret(seed, label);
 }
 
 bytes
-PseudoRandom::Generator::generate(const std::string& label, size_t size)
+PseudoRandom::Generator::generate(const std::string& label, size_t size) const
 {
   return suite.expand_with_label(seed, label, {}, size);
 }
 
 uint16_t
-PseudoRandom::Generator::uint16(const std::string& label)
+PseudoRandom::Generator::uint16(const std::string& label) const
 {
   auto data = generate(label, 2);
   return tls::get<uint16_t>(data);
 }
 
 uint32_t
-PseudoRandom::Generator::uint32(const std::string& label)
+PseudoRandom::Generator::uint32(const std::string& label) const
 {
   auto data = generate(label, 4);
   return tls::get<uint16_t>(data);
 }
 
 uint64_t
-PseudoRandom::Generator::uint64(const std::string& label)
+PseudoRandom::Generator::uint64(const std::string& label) const
 {
   auto data = generate(label, 8);
   return tls::get<uint16_t>(data);
 }
 
 SignaturePrivateKey
-PseudoRandom::Generator::signature_key(const std::string& label)
+PseudoRandom::Generator::signature_key(const std::string& label) const
 {
   auto data = generate(label, suite.secret_size());
   return SignaturePrivateKey::derive(suite, data);
 }
 
 HPKEPrivateKey
-PseudoRandom::Generator::hpke_key(const std::string& label)
+PseudoRandom::Generator::hpke_key(const std::string& label) const
 {
   auto data = generate(label, suite.secret_size());
   return HPKEPrivateKey::derive(suite, data);
 }
 
 size_t
-PseudoRandom::Generator::output_length()
+PseudoRandom::Generator::output_length() const
 {
   return suite.secret_size();
 }
@@ -1217,7 +1217,8 @@ MessagesTestVector::MessagesTestVector()
   auto ratchet_tree = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
-  auto group_info = GroupInfo{ group_context, ext_list, prg.secret("confirmation_tag") };
+  auto group_info =
+    GroupInfo{ group_context, ext_list, prg.secret("confirmation_tag") };
   auto joiner_secret = prg.secret("joiner_secret");
   auto path_secret = prg.secret("path_secret");
   auto psk_id = ExternalPSK{ prg.secret("psk_id") };
@@ -1283,7 +1284,8 @@ MessagesTestVector::MessagesTestVector()
   };
 
   // MLSMessage(PrivateMessage)
-  auto keys = GroupKeySource(suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
+  auto keys = GroupKeySource(
+    suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
   auto mls_ciphertext = MLSMessage{ PrivateMessage::protect(
     content_auth_app, suite, keys, prg.secret("sender_data_secret"), 10) };
 

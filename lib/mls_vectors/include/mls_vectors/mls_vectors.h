@@ -18,21 +18,21 @@ struct PseudoRandom
     Generator(mls::CipherSuite suite_in, const std::string& label);
     Generator sub(const std::string& label) const;
 
-    bytes secret(const std::string& label);
-    bytes generate(const std::string& label, size_t size);
+    bytes secret(const std::string& label) const;
+    bytes generate(const std::string& label, size_t size) const;
 
-    uint16_t uint16(const std::string& label);
-    uint32_t uint32(const std::string& label);
-    uint64_t uint64(const std::string& label);
+    uint16_t uint16(const std::string& label) const;
+    uint32_t uint32(const std::string& label) const;
+    uint64_t uint64(const std::string& label) const;
 
-    mls::SignaturePrivateKey signature_key(const std::string& label);
-    mls::HPKEPrivateKey hpke_key(const std::string& label);
+    mls::SignaturePrivateKey signature_key(const std::string& label) const;
+    mls::HPKEPrivateKey hpke_key(const std::string& label) const;
 
-    size_t output_length();
+    size_t output_length() const;
 
   private:
-    const mls::CipherSuite suite;
-    const bytes seed;
+    mls::CipherSuite suite;
+    bytes seed;
 
     Generator(mls::CipherSuite suite_in, bytes&& seed_in);
   };
@@ -306,6 +306,7 @@ struct TranscriptTestVector : PseudoRandom
   bytes confirmed_transcript_hash_after;
   bytes interim_transcript_hash_after;
 
+  TranscriptTestVector() = default;
   TranscriptTestVector(mls::CipherSuite suite);
   std::optional<std::string> verify() const;
 };
