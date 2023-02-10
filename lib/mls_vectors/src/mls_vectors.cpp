@@ -785,7 +785,7 @@ MessageProtectionTestVector::verify()
 GroupKeySource
 MessageProtectionTestVector::group_keys() const
 {
-  return GroupKeySource(cipher_suite, LeafCount{ 2 }, encryption_secret);
+  return { cipher_suite, LeafCount{ 2 }, encryption_secret };
 }
 
 GroupContext
