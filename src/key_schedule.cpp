@@ -275,23 +275,6 @@ struct PSKLabel
 };
 
 static bytes
-make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
-{
-  auto psk_secret = suite.zero();
-  auto count = uint16_t(psks.size());
-  auto index = uint16_t(0);
-  for (const auto& psk : psks) {
-    auto psk_extracted = suite.hpke().kdf.extract(suite.zero(), psk.secret);
-    auto psk_label = tls::marshal(PSKLabel{ psk.id, index, count });
-    auto psk_input = suite.expand_with_label(
-      psk_extracted, "derived psk", psk_label, suite.secret_size());
-    psk_secret = suite.hpke().kdf.extract(psk_input, psk_secret);
-    index += 1;
-  }
-  return psk_secret;
-}
-
-static bytes
 make_joiner_secret(CipherSuite suite,
                    const bytes& context,
                    const bytes& init_secret,
@@ -425,6 +408,23 @@ KeyScheduleEpoch::resumption_psk_w_secret(ResumptionPSKUsage usage,
   auto nonce = random_bytes(suite.secret_size());
   auto psk = ResumptionPSK{ usage, group_id, epoch };
   return { { psk, nonce }, resumption_psk };
+}
+
+bytes
+KeyScheduleEpoch::make_psk_secret(CipherSuite suite, const std::vector<PSKWithSecret>& psks)
+{
+  auto psk_secret = suite.zero();
+  auto count = uint16_t(psks.size());
+  auto index = uint16_t(0);
+  for (const auto& psk : psks) {
+    auto psk_extracted = suite.hpke().kdf.extract(suite.zero(), psk.secret);
+    auto psk_label = tls::marshal(PSKLabel{ psk.id, index, count });
+    auto psk_input = suite.expand_with_label(
+      psk_extracted, "derived psk", psk_label, suite.secret_size());
+    psk_secret = suite.hpke().kdf.extract(psk_input, psk_secret);
+    index += 1;
+  }
+  return psk_secret;
 }
 
 bytes

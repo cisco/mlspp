@@ -250,6 +250,15 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessageProtectionTestVector,
                                    application,
                                    application_priv)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector::PSK,
+                                   psk_id,
+                                   psk_nonce,
+                                   psk)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector,
+                                   cipher_suite,
+                                   psks,
+                                   psk_secret)
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
                                    group_id,

@@ -283,6 +283,23 @@ private:
   std::optional<mls::GroupContent> unprotect(const mls::MLSMessage& message);
 };
 
+struct PSKSecretTestVector : PseudoRandom
+{
+  struct PSK {
+    bytes psk_id;
+    bytes psk_nonce;
+    bytes psk;
+  };
+
+  mls::CipherSuite cipher_suite;
+  std::vector<PSK> psks;
+  bytes psk_secret;
+
+  PSKSecretTestVector() = default;
+  PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks);
+  std::optional<std::string> verify() const;
+};
+
 struct TranscriptTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
