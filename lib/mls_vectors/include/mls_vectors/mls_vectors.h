@@ -307,6 +307,21 @@ struct TranscriptTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 };
 
+struct WelcomeTestVector : PseudoRandom
+{
+  mls::CipherSuite cipher_suite;
+
+  mls::HPKEPrivateKey init_priv;
+  mls::SignaturePublicKey signer_pub;
+
+  mls::KeyPackage key_package;
+  mls::Welcome welcome;
+
+  WelcomeTestVector() = default;
+  WelcomeTestVector(mls::CipherSuite suite);
+  std::optional<std::string> verify() const;
+};
+
 struct TreeKEMTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
