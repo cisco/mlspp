@@ -21,6 +21,7 @@ static constexpr uint64_t CRYPTO_BASICS = 10;
 static constexpr uint64_t SECRET_TREE = 11;
 static constexpr uint64_t MESSAGE_PROTECTION = 12;
 static constexpr uint64_t PSK_SECRET = 13;
+static constexpr uint64_t WELCOME = 14;
 
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
@@ -83,6 +84,13 @@ make_test_vector(uint64_t type)
 
       for (const auto& suite : mls::all_supported_suites) {
         cases.emplace_back(suite, 5);
+    }
+        
+    case WELCOME: {
+      auto cases = std::vector<WelcomeTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
       }
 
       return cases;
@@ -151,6 +159,9 @@ verify_test_vector(uint64_t type)
 
     case PSK_SECRET:
       return verify_test_vector<PSKSecretTestVector>(j);
+
+    case WELCOME:
+      return verify_test_vector<WelcomeTestVector>(j);
 
     default:
       return "Invalid test vector type";

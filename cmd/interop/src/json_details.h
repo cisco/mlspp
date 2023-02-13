@@ -130,6 +130,7 @@ TLS_SERIALIZER(mls::MLSMessage)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
+TLS_SERIALIZER(mls::Welcome)
 
 } // namespace nlohmann
 
@@ -272,6 +273,13 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    group_context,
                                    confirmed_transcript_hash_after,
                                    interim_transcript_hash_after)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
+                                   cipher_suite,
+                                   init_priv,
+                                   signer_pub,
+                                   key_package,
+                                   welcome)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    cipher_suite,

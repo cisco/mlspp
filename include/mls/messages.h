@@ -176,6 +176,10 @@ struct GroupInfo
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
+  // These methods exist only to simplify unit testing
+  void sign(LeafIndex signer_index, const SignaturePrivateKey& priv);
+  bool verify(const SignaturePublicKey& pub) const;
+
   TLS_SERIALIZABLE(group_context,
                    extensions,
                    confirmation_tag,
