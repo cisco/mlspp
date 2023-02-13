@@ -117,8 +117,7 @@ GroupInfo::verify(const SignaturePublicKey& pub) const
 // Welcome
 
 Welcome::Welcome()
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::ID::unknown)
+  : cipher_suite(CipherSuite::ID::unknown)
 {
 }
 
@@ -126,8 +125,7 @@ Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
                  const std::vector<PSKWithSecret>& psks,
                  const GroupInfo& group_info)
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(suite)
+  : cipher_suite(suite)
   , _joiner_secret(joiner_secret)
 {
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
