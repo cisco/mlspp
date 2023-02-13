@@ -20,6 +20,7 @@ using namespace mls_vectors;
 static constexpr uint64_t CRYPTO_BASICS = 10;
 static constexpr uint64_t SECRET_TREE = 11;
 static constexpr uint64_t MESSAGE_PROTECTION = 12;
+static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
 
 // XXX(RLB): This function currently produces only one example of each type, as
@@ -73,6 +74,16 @@ make_test_vector(uint64_t type)
 
       for (const auto& suite : mls::all_supported_suites) {
         cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
+
+    case PSK_SECRET: {
+      auto cases = std::vector<PSKSecretTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite, 5);
       }
 
       return cases;
@@ -148,6 +159,9 @@ verify_test_vector(uint64_t type)
 
     case MESSAGE_PROTECTION:
       return verify_test_vector<MessageProtectionTestVector>(j);
+
+    case PSK_SECRET:
+      return verify_test_vector<PSKSecretTestVector>(j);
 
     case WELCOME:
       return verify_test_vector<WelcomeTestVector>(j);

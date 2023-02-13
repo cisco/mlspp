@@ -51,6 +51,14 @@ TEST_CASE("Message Protection")
   }
 }
 
+TEST_CASE("PSK Secret")
+{
+  for (auto suite : supported_suites) {
+    const auto tv = PSKSecretTestVector{ suite, 5 };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("Transcript")
 {
   for (auto suite : supported_suites) {
