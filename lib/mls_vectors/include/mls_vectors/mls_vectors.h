@@ -332,8 +332,8 @@ struct WelcomeTestVector : PseudoRandom
   mls::HPKEPrivateKey init_priv;
   mls::SignaturePublicKey signer_pub;
 
-  mls::KeyPackage key_package;
-  mls::Welcome welcome;
+  mls::MLSMessage key_package;
+  mls::MLSMessage welcome;
 
   WelcomeTestVector() = default;
   WelcomeTestVector(mls::CipherSuite suite);
