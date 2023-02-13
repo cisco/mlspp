@@ -1221,9 +1221,9 @@ State::roster() const
 }
 
 bytes
-State::authentication_secret() const
+State::epoch_authenticator() const
 {
-  return _key_schedule.authentication_secret;
+  return _key_schedule.epoch_authenticator;
 }
 
 LeafIndex

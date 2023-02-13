@@ -103,11 +103,11 @@ public:
   bytes sender_data_secret;
   bytes encryption_secret;
   bytes exporter_secret;
-  bytes authentication_secret;
+  bytes epoch_authenticator;
   bytes external_secret;
   bytes confirmation_key;
   bytes membership_key;
-  bytes resumption_secret;
+  bytes resumption_psk;
   bytes init_secret;
 
   HPKEPrivateKey external_priv;
@@ -150,9 +150,9 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  PSKWithSecret resumption_psk(ResumptionPSKUsage usage,
-                               const bytes& group_id,
-                               epoch_t epoch);
+  PSKWithSecret resumption_psk_w_secret(ResumptionPSKUsage usage,
+                                        const bytes& group_id,
+                                        epoch_t epoch);
 
   static bytes welcome_secret(CipherSuite suite,
                               const bytes& joiner_secret,

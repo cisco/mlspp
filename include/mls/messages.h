@@ -411,7 +411,7 @@ struct ApplicationData
 
 struct GroupContext;
 
-enum struct WireFormat : uint8_t
+enum struct WireFormat : uint16_t
 {
   reserved = 0,
   mls_plaintext = 1,

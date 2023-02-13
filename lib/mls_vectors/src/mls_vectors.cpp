@@ -42,11 +42,13 @@ operator<<(std::ostream& str, const std::vector<uint8_t>& obj)
   return str << to_hex(obj);
 }
 
+#if 0
 static std::ostream&
 operator<<(std::ostream& str, const HPKEPublicKey& obj)
 {
   return str << to_hex(tls::marshal(obj));
 }
+#endif
 
 static std::ostream&
 operator<<(std::ostream& str, const GroupContent::RawContent& obj)
@@ -549,16 +551,15 @@ SecretTreeTestVector::verify() const
 ///
 
 KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
-                                             uint32_t n_epochs,
-                                             uint32_t n_psks)
+                                             uint32_t n_epochs)
   : PseudoRandom(suite, "key-schedule")
   , cipher_suite(suite)
   , group_id(prg.secret("group_id"))
   , initial_init_secret(prg.secret("group_id"))
 {
   auto group_context = GroupContext{ suite, group_id, 0, {}, {}, {} };
-  auto epoch = KeyScheduleEpoch(
-    cipher_suite, initial_init_secret, tls::marshal(group_context));
+  auto epoch = KeyScheduleEpoch(cipher_suite);
+  epoch.init_secret = initial_init_secret;
 
   for (uint64_t i = 0; i < n_epochs; i++) {
     auto epoch_prg = prg.sub(to_hex(tls::marshal(i)));
@@ -568,58 +569,43 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
       epoch_prg.secret("confirmed_transcript_hash");
     auto ctx = tls::marshal(group_context);
 
-    auto psks = std::vector<PSKWithSecret>{};
-    auto external_psks = std::vector<ExternalPSKInfo>{};
-    for (uint32_t j = 0; j < n_psks; j++) {
-      auto jx = to_hex(tls::marshal(j));
-      auto id = epoch_prg.secret("psk_id " + jx);
-      auto nonce = epoch_prg.secret("psk_nonce " + jx);
-      auto secret = epoch_prg.secret("psk_secret " + jx);
-
-      psks.push_back({ PreSharedKeyID{ ExternalPSK{ id }, nonce }, secret });
-      external_psks.push_back({ id, nonce, secret });
-    }
-
-    auto psk_nonce = bytes{};
-    if (i > 0) {
-      auto psk = epoch.resumption_psk(
-        ResumptionPSKUsage::branch, group_id, epoch_t(i - 1));
-      psk_nonce = psk.id.psk_nonce;
-      psks.push_back(psk);
-    }
-
     auto commit_secret = epoch_prg.secret("commit_secret");
     // TODO(RLB) Add Test case for externally-driven epoch change
-    epoch = epoch.next(commit_secret, psks, std::nullopt, ctx);
+    epoch = epoch.next(commit_secret, {}, std::nullopt, ctx);
 
     auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(cipher_suite, epoch.joiner_secret, psks);
+      KeyScheduleEpoch::welcome_secret(cipher_suite, epoch.joiner_secret, {});
 
-    epochs.push_back({
-      group_context.tree_hash,
-      commit_secret,
-      group_context.confirmed_transcript_hash,
-      external_psks,
-      psk_nonce,
+    auto exporter_label = to_hex(epoch_prg.secret("exporter_label"));
+    auto exporter_length = cipher_suite.secret_size();
+    auto exported = epoch.do_export(exporter_label, {}, exporter_length);
 
-      ctx,
+    epochs.push_back({ group_context.tree_hash,
+                       commit_secret,
+                       group_context.confirmed_transcript_hash,
 
-      epoch.psk_secret,
-      epoch.joiner_secret,
-      welcome_secret,
-      epoch.init_secret,
+                       ctx,
 
-      epoch.sender_data_secret,
-      epoch.encryption_secret,
-      epoch.exporter_secret,
-      epoch.authentication_secret,
-      epoch.external_secret,
-      epoch.confirmation_key,
-      epoch.membership_key,
-      epoch.resumption_secret,
+                       epoch.joiner_secret,
+                       welcome_secret,
+                       epoch.init_secret,
 
-      epoch.external_priv.public_key,
-    });
+                       epoch.sender_data_secret,
+                       epoch.encryption_secret,
+                       epoch.exporter_secret,
+                       epoch.epoch_authenticator,
+                       epoch.external_secret,
+                       epoch.confirmation_key,
+                       epoch.membership_key,
+                       epoch.resumption_psk,
+
+                       epoch.external_priv.public_key,
+
+                       {
+                         exporter_label,
+                         exporter_length,
+                         exported,
+                       } });
 
     group_context.epoch += 1;
   }
@@ -629,38 +615,22 @@ std::optional<std::string>
 KeyScheduleTestVector::verify() const
 {
   auto group_context = GroupContext{ cipher_suite, group_id, 0, {}, {}, {} };
-  auto epoch = KeyScheduleEpoch(
-    cipher_suite, initial_init_secret, tls::marshal(group_context));
+  auto epoch = KeyScheduleEpoch(cipher_suite);
+  epoch.init_secret = initial_init_secret;
 
-  auto epoch_n = epoch_t(0);
   for (const auto& tve : epochs) {
-    // Ratchet forward the key schedule
     group_context.tree_hash = tve.tree_hash;
     group_context.confirmed_transcript_hash = tve.confirmed_transcript_hash;
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("group context", ctx, tve.group_context);
 
-    auto psks = std::vector<PSKWithSecret>{};
-    for (const auto& psk : tve.external_psks) {
-      psks.push_back(
-        { PreSharedKeyID{ ExternalPSK{ psk.id }, psk.nonce }, psk.secret });
-    }
-
-    if (epoch_n > 0) {
-      auto psk =
-        epoch.resumption_psk(ResumptionPSKUsage::branch, group_id, epoch_n - 1);
-      psk.id.psk_nonce = tve.psk_nonce;
-      psks.push_back(psk);
-    }
-
-    epoch_n += 1;
-    epoch = epoch.next(tve.commit_secret, psks, std::nullopt, ctx);
+    epoch = epoch.next(tve.commit_secret, {}, std::nullopt, ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
     auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, psks);
+      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, {});
     VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
     VERIFY_EQUAL(
@@ -668,19 +638,22 @@ KeyScheduleTestVector::verify() const
     VERIFY_EQUAL(
       "encryption secret", epoch.encryption_secret, tve.encryption_secret);
     VERIFY_EQUAL("exporter secret", epoch.exporter_secret, tve.exporter_secret);
-    VERIFY_EQUAL("authentication secret",
-                 epoch.authentication_secret,
-                 tve.authentication_secret);
+    VERIFY_EQUAL("epoch authenticator",
+                 epoch.epoch_authenticator,
+                 tve.epoch_authenticator);
     VERIFY_EQUAL("external secret", epoch.external_secret, tve.external_secret);
     VERIFY_EQUAL(
       "confirmation key", epoch.confirmation_key, tve.confirmation_key);
     VERIFY_EQUAL("membership key", epoch.membership_key, tve.membership_key);
-    VERIFY_EQUAL(
-      "resumption secret", epoch.resumption_secret, tve.resumption_secret);
+    VERIFY_EQUAL("resumption psk", epoch.resumption_psk, tve.resumption_psk);
     VERIFY_EQUAL("init secret", epoch.init_secret, tve.init_secret);
 
     VERIFY_EQUAL(
       "external pub", epoch.external_priv.public_key, tve.external_pub);
+
+    auto exported = epoch.do_export(
+      tve.exporter.exporter_label, {}, tve.exporter.exporter_length);
+    VERIFY_EQUAL("exported", exported, tve.exporter.exported);
 
     group_context.epoch += 1;
   }
@@ -699,7 +672,6 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   , epoch(prg.uint64("epoch"))
   , tree_hash(prg.secret("tree_hash"))
   , confirmed_transcript_hash(prg.secret("confirmed_transcript_hash"))
-  , n_leaves(2)
   , signature_priv(prg.signature_key("signature_priv"))
   , signature_pub(signature_priv.public_key)
   , encryption_secret(prg.secret("encryption_secret"))
@@ -708,13 +680,6 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   , proposal{ GroupContextExtensions{} }
   , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
   , application{ prg.secret("application") }
-  , group_context{ cipher_suite,
-                   group_id,
-                   epoch,
-                   tree_hash,
-                   confirmed_transcript_hash,
-                   {} }
-  , keys(cipher_suite, n_leaves, encryption_secret)
 {
   proposal_pub = protect_pub(proposal);
   proposal_priv = protect_priv(proposal);
@@ -722,20 +687,14 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   commit_pub = protect_pub(commit);
   commit_priv = protect_priv(commit);
 
-  application_priv = protect_priv(application);
+  application_priv = protect_priv(ApplicationData{ application });
 }
 
 std::optional<std::string>
 MessageProtectionTestVector::verify()
 {
   // Initialize fields that don't get set from JSON
-  group_context = GroupContext{
-    cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
-  };
-
-  n_leaves = LeafCount{ 2 };
-  keys = GroupKeySource(cipher_suite, n_leaves, encryption_secret);
-
+  prg = PseudoRandom::Generator(cipher_suite, "message-protection");
   signature_priv.set_public_key(cipher_suite);
 
   // Sanity check the key pairs
@@ -770,8 +729,9 @@ MessageProtectionTestVector::verify()
   // Verify application data unprotect as PrivateMessage
   auto app_unprotected = unprotect(application_priv);
   VERIFY("app priv unprotect auth", app_unprotected);
-  VERIFY_EQUAL(
-    "app priv unprotect", opt::get(app_unprotected).content, application);
+  VERIFY_EQUAL("app priv unprotect",
+               opt::get(app_unprotected).content,
+               ApplicationData{ application });
 
   // Verify protect/unprotect round-trips
   // XXX(RLB): Note that because (a) unprotect() deletes keys from the ratchet
@@ -812,14 +772,28 @@ MessageProtectionTestVector::verify()
                opt::get(commit_priv_protected_unprotected).content,
                commit);
 
-  auto app_protected = protect_priv(application);
+  auto app_protected = protect_priv(ApplicationData{ application });
   auto app_protected_unprotected = unprotect(app_protected);
   VERIFY("app priv protect/unprotect auth", app_protected_unprotected);
   VERIFY_EQUAL("app priv protect/unprotect",
                opt::get(app_protected_unprotected).content,
-               application);
+               ApplicationData{ application });
 
   return std::nullopt;
+}
+
+GroupKeySource
+MessageProtectionTestVector::group_keys() const
+{
+  return { cipher_suite, LeafCount{ 2 }, encryption_secret };
+}
+
+GroupContext
+MessageProtectionTestVector::group_context() const
+{
+  return GroupContext{
+    cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
+  };
 }
 
 MLSMessage
@@ -836,14 +810,14 @@ MessageProtectionTestVector::protect_pub(
                                                  content,
                                                  cipher_suite,
                                                  signature_priv,
-                                                 group_context);
+                                                 group_context());
   if (content.content_type() == ContentType::commit) {
     auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
   return PublicMessage::protect(
-    auth_content, cipher_suite, membership_key, group_context);
+    auth_content, cipher_suite, membership_key, group_context());
 }
 
 MLSMessage
@@ -861,12 +835,13 @@ MessageProtectionTestVector::protect_priv(
                                                  content,
                                                  cipher_suite,
                                                  signature_priv,
-                                                 group_context);
+                                                 group_context());
   if (content.content_type() == ContentType::commit) {
     auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
   }
 
+  auto keys = group_keys();
   return PrivateMessage::protect(
     auth_content, cipher_suite, keys, sender_data_secret, padding_size);
 }
@@ -876,9 +851,10 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
   auto do_unprotect = overloaded{
     [&](const PublicMessage& pt) {
-      return pt.unprotect(cipher_suite, membership_key, group_context);
+      return pt.unprotect(cipher_suite, membership_key, group_context());
     },
     [&](const PrivateMessage& ct) {
+      auto keys = group_keys();
       return ct.unprotect(cipher_suite, keys, sender_data_secret);
     },
     [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
@@ -892,7 +868,7 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
   }
 
   auto auth_content = opt::get(maybe_auth_content);
-  if (!auth_content.verify(cipher_suite, signature_pub, group_context)) {
+  if (!auth_content.verify(cipher_suite, signature_pub, group_context())) {
     return std::nullopt;
   }
 

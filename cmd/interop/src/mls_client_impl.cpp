@@ -269,7 +269,7 @@ MLSClientImpl::CachedState::unmarshal(const std::string& wire)
 uint32_t
 MLSClientImpl::store_state(mls::State&& state, bool encrypt_handshake)
 {
-  auto state_id = tls::get<uint32_t>(state.authentication_secret());
+  auto state_id = tls::get<uint32_t>(state.epoch_authenticator());
   state_id += state.index().val;
 
   auto entry = CachedState{ std::move(state), encrypt_handshake, {}, {} };
@@ -346,9 +346,6 @@ Status
 MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
                                     GenerateTestVectorResponse* reply)
 {
-  // XXX(RLB): Should this value be set by the test runner?
-  static const uint32_t n_psks = 3;
-
   json j;
   switch (request->test_vector_type()) {
     case TestVectorType::TREE_MATH: {
@@ -366,9 +363,7 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::KEY_SCHEDULE: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::KeyScheduleTestVector{ suite,
-                                              request->n_epochs(),
-                                              n_psks };
+      j = mls_vectors::KeyScheduleTestVector{ suite, request->n_epochs() };
       break;
     }
 
@@ -542,7 +537,7 @@ MLSClientImpl::state_auth(CachedState& entry,
                           const StateAuthRequest* /* request */,
                           StateAuthResponse* response)
 {
-  auto secret = entry.state.authentication_secret();
+  auto secret = entry.state.epoch_authenticator();
   response->set_state_auth_secret(bytes_to_string(secret));
   return Status::OK;
 }

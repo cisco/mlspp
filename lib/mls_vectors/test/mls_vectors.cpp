@@ -38,7 +38,7 @@ TEST_CASE("Secret Tree")
 TEST_CASE("Key Schedule")
 {
   for (auto suite : supported_suites) {
-    const auto tv = KeyScheduleTestVector{ suite, 15, 3 };
+    const auto tv = KeyScheduleTestVector{ suite, 15 };
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
