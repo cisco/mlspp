@@ -224,7 +224,6 @@ struct EncryptedGroupSecrets
 // } Welcome;
 struct Welcome
 {
-  ProtocolVersion version;
   CipherSuite cipher_suite;
   std::vector<EncryptedGroupSecrets> secrets;
   bytes encrypted_group_info;
@@ -242,7 +241,7 @@ struct Welcome
   GroupInfo decrypt(const bytes& joiner_secret,
                     const std::vector<PSKWithSecret>& psks) const;
 
-  TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
+  TLS_SERIALIZABLE(cipher_suite, secrets, encrypted_group_info)
 
 private:
   bytes _joiner_secret;
