@@ -85,6 +85,8 @@ make_test_vector(uint64_t type)
       for (const auto& suite : mls::all_supported_suites) {
         cases.emplace_back(suite, 5);
       }
+
+      return cases;
     }
 
     case WELCOME: {
