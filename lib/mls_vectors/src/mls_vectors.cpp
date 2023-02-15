@@ -930,6 +930,38 @@ PSKSecretTestVector::verify() const
 }
 
 ///
+/// TreeHashTestVector
+///
+std::optional<std::string>
+TreeHashTestVector::verify()
+{
+  // Finish setting up the tree
+  tree.suite = cipher_suite;
+  tree.set_hash_all();
+
+  // Verify that each leaf node is properly signed
+  for (LeafIndex i{ 0 }; i < tree.size(); i.val++) {
+    auto maybe_leaf = tree.leaf_node(index)
+    if (!tree.has_leaf(i)) {
+      continue;
+    }
+
+    VERIFY("leaf sig valid", opt::get(maybe_leaf).verify());
+  }
+
+  // Verify the tree hashes
+  VERIFY_EQUAL("root tree hash", tree.root_hash());
+  VERIFY("parent hash valid", tree.parent_hash_valid());
+
+  // Verify the resolutions
+  auto width = NodeCount{ tree.size() };
+  for (NodeIndex i{ 0 }; i < width; i.val++) {
+    VERIFY_EQUAL("resolution", tree.resolve(i), resolutions[i.val]);
+  }
+}
+
+
+///
 /// TranscriptTestVector
 ///
 TranscriptTestVector::TranscriptTestVector(CipherSuite suite)

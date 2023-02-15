@@ -301,6 +301,17 @@ struct PSKSecretTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 };
 
+struct TreeHashTestVector : PseudoRandom
+{
+  mls::CipherSuite cipher_suite;
+
+  mls::TreeKEMPublicKey tree;
+  std::vector<bytes> tree_hashes;
+
+  TreeHashTestVector() = default;
+  std::optional<std::string> verify();
+};
+
 struct TranscriptTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
