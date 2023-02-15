@@ -1364,10 +1364,8 @@ MessagesTestVector::MessagesTestVector()
     suite,
     sig_priv,
     group_context);
-  auto public_message_proposal_obj = PublicMessage::protect(content_auth_proposal,
-                                       suite,
-                                       membership_key,
-                                       group_context);
+  auto public_message_proposal_obj = PublicMessage::protect(
+    content_auth_proposal, suite, membership_key, group_context);
 
   auto content_auth_commit =
     AuthenticatedContent::sign(WireFormat::mls_plaintext,
@@ -1376,10 +1374,8 @@ MessagesTestVector::MessagesTestVector()
                                sig_priv,
                                group_context);
   content_auth_commit.set_confirmation_tag(prg.secret("confirmation_tag"));
-  auto public_message_commit_obj = PublicMessage::protect(content_auth_commit,
-                                       suite,
-                                       membership_key,
-                                       group_context);
+  auto public_message_commit_obj = PublicMessage::protect(
+    content_auth_commit, suite, membership_key, group_context);
 
   // PrivateMessage
   auto content_auth_application_obj = AuthenticatedContent::sign(
@@ -1391,8 +1387,12 @@ MessagesTestVector::MessagesTestVector()
 
   auto keys = GroupKeySource(
     suite, LeafCount{ index.val + 1 }, prg.secret("encryption_secret"));
-  auto private_message_obj = PrivateMessage::protect(
-    content_auth_application_obj, suite, keys, prg.secret("sender_data_secret"), 10);
+  auto private_message_obj =
+    PrivateMessage::protect(content_auth_application_obj,
+                            suite,
+                            keys,
+                            prg.secret("sender_data_secret"),
+                            10);
 
   // Serialize out all the objects
   mls_welcome = tls::marshal(MLSMessage{ welcome_obj });
@@ -1411,7 +1411,8 @@ MessagesTestVector::MessagesTestVector()
 
   commit = tls::marshal(commit_obj);
 
-  public_message_proposal = tls::marshal(MLSMessage{ public_message_proposal_obj });
+  public_message_proposal =
+    tls::marshal(MLSMessage{ public_message_proposal_obj });
   public_message_commit = tls::marshal(MLSMessage{ public_message_commit_obj });
   private_message = tls::marshal(MLSMessage{ private_message_obj });
 }
@@ -1422,14 +1423,22 @@ MessagesTestVector::verify() const
   // TODO(RLB) Verify signatures
   // TODO(RLB) Verify content types in PublicMessage objects
   auto require_format = [](WireFormat format) {
-    return [format](const MLSMessage& msg) {
-      return msg.wire_format() == format;
-    };
+    return
+      [format](const MLSMessage& msg) { return msg.wire_format() == format; };
   };
 
-  VERIFY_TLS_RTT_VAL("Welcome", MLSMessage, mls_welcome, require_format(WireFormat::mls_welcome));
-  VERIFY_TLS_RTT_VAL("GroupInfo", MLSMessage, mls_group_info, require_format(WireFormat::mls_group_info));
-  VERIFY_TLS_RTT_VAL("KeyPackage", MLSMessage, mls_key_package, require_format(WireFormat::mls_key_package));
+  VERIFY_TLS_RTT_VAL("Welcome",
+                     MLSMessage,
+                     mls_welcome,
+                     require_format(WireFormat::mls_welcome));
+  VERIFY_TLS_RTT_VAL("GroupInfo",
+                     MLSMessage,
+                     mls_group_info,
+                     require_format(WireFormat::mls_group_info));
+  VERIFY_TLS_RTT_VAL("KeyPackage",
+                     MLSMessage,
+                     mls_key_package,
+                     require_format(WireFormat::mls_key_package));
 
   VERIFY_TLS_RTT("RatchetTree", RatchetTreeExtension, ratchet_tree);
   VERIFY_TLS_RTT("GroupSecrets", GroupSecrets, group_secrets);
@@ -1443,9 +1452,18 @@ MessagesTestVector::verify() const
 
   VERIFY_TLS_RTT("Commit", Commit, commit);
 
-  VERIFY_TLS_RTT_VAL("Public(Proposal)", MLSMessage, public_message_proposal, require_format(WireFormat::mls_plaintext));
-  VERIFY_TLS_RTT_VAL("Public(Commit)", MLSMessage, public_message_commit, require_format(WireFormat::mls_plaintext));
-  VERIFY_TLS_RTT_VAL("PrivateMessage", MLSMessage, private_message, require_format(WireFormat::mls_ciphertext));
+  VERIFY_TLS_RTT_VAL("Public(Proposal)",
+                     MLSMessage,
+                     public_message_proposal,
+                     require_format(WireFormat::mls_plaintext));
+  VERIFY_TLS_RTT_VAL("Public(Commit)",
+                     MLSMessage,
+                     public_message_commit,
+                     require_format(WireFormat::mls_plaintext));
+  VERIFY_TLS_RTT_VAL("PrivateMessage",
+                     MLSMessage,
+                     private_message,
+                     require_format(WireFormat::mls_ciphertext));
 
   return std::nullopt;
 }
