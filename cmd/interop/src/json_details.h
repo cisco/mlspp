@@ -260,6 +260,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector,
                                    psks,
                                    psk_secret)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeHashTestVector,
+                                   cipher_suite,
+                                   tree,
+                                   tree_hashes)
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
                                    group_id,

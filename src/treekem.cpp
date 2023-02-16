@@ -748,7 +748,8 @@ TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 
 struct LeafNodeHashInput
 {
-  LeafIndex leaf_index;
+  // LeafIndex leaf_index;
+  NodeIndex leaf_index; // XXX HACK
   std::optional<LeafNode> leaf_node;
   TLS_SERIALIZABLE(leaf_index, leaf_node)
 };
@@ -778,7 +779,8 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   auto hash_input = bytes{};
   const auto& node = node_at(index);
   if (index.level() == 0) {
-    auto input = LeafNodeHashInput{ LeafIndex(index), {} };
+    // auto input = LeafNodeHashInput{ LeafIndex(index), {} };
+    auto input = LeafNodeHashInput{ index, {} }; // XXX HACK
     if (!node.blank()) {
       input.leaf_node = node.leaf_node();
     }
@@ -911,7 +913,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
   if (index.is_leaf()) {
     // A leaf node with local changes is by definition excluded from the parent
     // hash.  So we return the hash of an empty leaf.
-    auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt };
+    // auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt };
+    auto leaf_hash_input = LeafNodeHashInput{ index, std::nullopt }; // XXX HACK
     hash = suite.digest().hash(tls::marshal(TreeHashInput{ leaf_hash_input }));
   } else {
     // If there is no cached value, recalculate the child hashes with the

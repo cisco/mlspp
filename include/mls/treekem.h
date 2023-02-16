@@ -128,6 +128,7 @@ struct TreeKEMPublicKey
 
   void merge(LeafIndex from, const UpdatePath& path);
   void set_hash_all();
+  const bytes& get_hash(NodeIndex index);
   bytes root_hash() const;
 
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
@@ -169,7 +170,6 @@ private:
 
   void clear_hash_all();
   void clear_hash_path(LeafIndex index);
-  const bytes& get_hash(NodeIndex index);
 
   bool has_parent_hash(NodeIndex child, const bytes& target_ph) const;
 

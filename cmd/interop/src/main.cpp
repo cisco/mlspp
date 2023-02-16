@@ -22,6 +22,7 @@ static constexpr uint64_t SECRET_TREE = 11;
 static constexpr uint64_t MESSAGE_PROTECTION = 12;
 static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
+static constexpr uint64_t TREE_HASHES = 15;
 
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
@@ -167,6 +168,9 @@ verify_test_vector(uint64_t type)
 
     case WELCOME:
       return verify_test_vector<WelcomeTestVector>(j);
+
+    case TREE_HASHES:
+      return verify_test_vector<TreeHashTestVector>(j);
 
     default:
       return "Invalid test vector type";
