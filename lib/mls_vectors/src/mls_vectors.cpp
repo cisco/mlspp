@@ -13,6 +13,14 @@ using namespace mls;
 /// Assertions for verifying test vectors
 ///
 
+template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
+std::ostream&
+operator<<(std::ostream& str, const T& obj)
+{
+  auto u = static_cast<std::underlying_type_t<T>>(obj);
+  return str << u;
+}
+
 static std::ostream&
 operator<<(std::ostream& str, const NodeIndex& obj)
 {
@@ -1039,9 +1047,10 @@ WelcomeTestVector::WelcomeTestVector(CipherSuite suite)
     {},
     sig_priv,
   };
-  key_package = KeyPackage{
+  auto key_package_obj = KeyPackage{
     cipher_suite, init_priv.public_key, leaf_node, {}, sig_priv,
   };
+  key_package = key_package_obj;
 
   auto group_context = GroupContext{
     cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
@@ -1059,22 +1068,31 @@ WelcomeTestVector::WelcomeTestVector(CipherSuite suite)
   };
   group_info.sign(signer_index, signer_priv);
 
-  welcome = Welcome(cipher_suite, joiner_secret, {}, group_info);
-  welcome.encrypt(key_package, std::nullopt);
+  auto welcome_obj = Welcome(cipher_suite, joiner_secret, {}, group_info);
+  welcome_obj.encrypt(key_package_obj, std::nullopt);
+  welcome = welcome_obj;
 }
 
 std::optional<std::string>
 WelcomeTestVector::verify() const
 {
-  VERIFY_EQUAL("kp suite", key_package.cipher_suite, cipher_suite);
-  VERIFY_EQUAL("welcome suite", welcome.cipher_suite, cipher_suite);
+  VERIFY_EQUAL(
+    "kp format", key_package.wire_format(), WireFormat::mls_key_package);
+  VERIFY_EQUAL(
+    "welcome format", welcome.wire_format(), WireFormat::mls_welcome);
 
-  auto maybe_kpi = welcome.find(key_package);
+  const auto& key_package_obj = var::get<KeyPackage>(key_package.message);
+  const auto& welcome_obj = var::get<Welcome>(welcome.message);
+
+  VERIFY_EQUAL("kp suite", key_package_obj.cipher_suite, cipher_suite);
+  VERIFY_EQUAL("welcome suite", welcome_obj.cipher_suite, cipher_suite);
+
+  auto maybe_kpi = welcome_obj.find(key_package_obj);
   VERIFY("found key package", maybe_kpi);
 
   auto kpi = opt::get(maybe_kpi);
-  auto group_secrets = welcome.decrypt_secrets(kpi, init_priv);
-  auto group_info = welcome.decrypt(group_secrets.joiner_secret, {});
+  auto group_secrets = welcome_obj.decrypt_secrets(kpi, init_priv);
+  auto group_info = welcome_obj.decrypt(group_secrets.joiner_secret, {});
 
   // Verify signature on GroupInfo
   VERIFY("group info verify", group_info.verify(signer_pub));
