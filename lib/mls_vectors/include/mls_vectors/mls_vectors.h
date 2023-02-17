@@ -351,35 +351,123 @@ struct WelcomeTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 };
 
+enum struct TreeStructure
+{
+  // Full trees on N leaves, created by member k adding member k+1
+  full_tree_2,
+  full_tree_3,
+  full_tree_4,
+  full_tree_5,
+  full_tree_6,
+  full_tree_7,
+  full_tree_8,
+  full_tree_32,
+  full_tree_33,
+  full_tree_34,
+
+  //               W
+  //         ______|_____
+  //        /             \
+  //       U               Y
+  //     __|__           __|__
+  //    /     \         /     \
+  //   T       _       X       Z
+  //  / \     / \     / \     / \
+  // A   B   C   _   E   F   G   H
+  //
+  // * Start with full tree on 8 members
+  // * 0 commits removeing 2 and 3, and adding a new member
+  internal_blanks_no_skipping,
+
+  //               W
+  //         ______|_____
+  //        /             \
+  //       _               Y
+  //     __|__           __|__
+  //    /     \         /     \
+  //   _       _       X       Z
+  //  / \     / \     / \     / \
+  // A   _   _   _   E   F   G   H
+  //
+  // * Start with full tree on 8 members
+  // * 0 commitsremoveing 1, 2, and 3
+  internal_blanks_with_skipping,
+
+  //               W[H]
+  //         ______|_____
+  //        /             \
+  //       U               Y[H]
+  //     __|__           __|__
+  //    /     \         /     \
+  //   T       V       X       _
+  //  / \     / \     / \     / \
+  // A   B   C   D   E   F   G   H
+  //
+  // * Start with full tree on 7 members
+  // * 0 commits adding a member in a partial Commit (no path)
+  unmerged_leaves_no_skipping,
+
+  //               W [F]
+  //         ______|_____
+  //        /             \
+  //       U               Y [F]
+  //     __|__           __|__
+  //    /     \         /     \
+  //   T       _       _       _
+  //  / \     / \     / \     / \
+  // A   B   C   D   E   F   G   _
+  //
+  // == Fig. 20 / {{parent-hash-tree}}
+  // * 0 creates group
+  // * 0 adds 1, ..., 6 in a partial Commit
+  // * O commits removing 5
+  // * 4 commits without any proposals
+  // * 0 commits adding a new member in a partial Commit
+  unmerged_leaves_with_skipping,
+};
+
+extern std::array<TreeStructure, 14> all_tree_structures;
+extern std::array<TreeStructure, 11> treekem_test_tree_structures;
+
 struct TreeKEMTestVector : PseudoRandom
 {
+  struct PathSecret
+  {
+    mls::NodeIndex node;
+    bytes path_secret;
+  };
+
+  struct LeafPrivateInfo
+  {
+    mls::LeafIndex index;
+    mls::HPKEPrivateKey encryption_priv;
+    mls::SignaturePrivateKey signature_priv;
+    std::vector<PathSecret> path_secrets;
+  };
+
+  struct UpdatePathInfo
+  {
+    mls::LeafIndex sender;
+    mls::UpdatePath update_path;
+    std::vector<std::optional<bytes>> path_secrets;
+    bytes commit_secret;
+    bytes tree_hash_after;
+  };
+
   mls::CipherSuite cipher_suite;
+
   bytes group_id;
+  mls::epoch_t epoch;
+  bytes confirmed_transcript_hash;
 
-  mls::TreeKEMPublicKey ratchet_tree_before;
+  mls::TreeKEMPublicKey ratchet_tree;
 
-  mls::LeafIndex add_sender;
-  bytes my_leaf_secret;
-  mls::LeafNode my_leaf_node;
-  bytes my_path_secret;
-
-  mls::LeafIndex update_sender;
-  mls::UpdatePath update_path;
-  bytes update_group_context;
-
-  bytes tree_hash_before;
-  bytes root_secret_after_add;
-  bytes root_secret_after_update;
-  mls::TreeKEMPublicKey ratchet_tree_after;
-  bytes tree_hash_after;
+  std::vector<LeafPrivateInfo> leaves_private;
+  std::vector<UpdatePathInfo> update_paths;
 
   TreeKEMTestVector() = default;
-  TreeKEMTestVector(mls::CipherSuite suite, size_t n_leaves);
-  std::optional<std::string> verify() const;
-
-  void initialize_trees();
-  std::tuple<bytes, mls::SignaturePrivateKey, mls::LeafNode> new_leaf_node(
-    const std::string& label) const;
+  TreeKEMTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  std::optional<std::string> verify();
 };
 
 struct MessagesTestVector : PseudoRandom

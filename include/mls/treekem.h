@@ -102,7 +102,7 @@ struct TreeKEMPrivateKey
   void dump() const;
 #endif
 
-private:
+  // TODO(RLB) Make this private but exposed to test vectors
   void implant(const TreeKEMPublicKey& pub,
                NodeIndex start,
                const bytes& path_secret);

@@ -75,6 +75,16 @@ TEST_CASE("Welcome")
   }
 }
 
+TEST_CASE("TreeKEM2")
+{
+  for (auto suite : supported_suites) {
+    for (auto structure : treekem_test_tree_structures) {
+      auto tv = TreeKEMTestVector2{ suite, structure };
+      REQUIRE(tv.verify() == std::nullopt);
+    }
+  }
+}
+
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {

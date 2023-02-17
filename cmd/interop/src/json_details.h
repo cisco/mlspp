@@ -286,6 +286,29 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
                                    key_package,
                                    welcome)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::PathSecret,
+                                   node,
+                                   path_secret)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::LeafPrivateInfo,
+                                   index,
+                                   encryption_priv,
+                                   signature_priv,
+                                   path_secrets)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::UpdatePathInfo,
+                                   sender,
+                                   update_path,
+                                   path_secrets,
+                                   commit_secret,
+                                   tree_hash_after)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2,
+                                   cipher_suite,
+                                   group_id,
+                                   epoch,
+                                   confirmed_transcript_hash,
+                                   ratchet_tree,
+                                   leaves_private,
+                                   update_paths)
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    cipher_suite,
                                    group_id,

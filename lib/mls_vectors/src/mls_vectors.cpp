@@ -87,8 +87,8 @@ operator<<(std::ostream& str, const T& obj)
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VERIFY(label, test)                                                    \
-  if (!(test)) {                                                               \
-    return std::string(label);                                                 \
+  if (auto err = verify_bool(label, test)) {                                   \
+    return err;                                                                \
   }
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
@@ -108,6 +108,17 @@ operator<<(std::ostream& str, const T& obj)
   if (auto err = verify_round_trip<Type>(label, expected, val)) {              \
     return err;                                                                \
   }
+
+template<typename T>
+static std::optional<std::string>
+verify_bool(const std::string& label, const T& test)
+{
+  if (test) {
+    return std::nullopt;
+  }
+
+  return label;
+}
 
 template<typename T, typename U>
 static std::optional<std::string>
@@ -1170,169 +1181,462 @@ WelcomeTestVector::verify() const
 }
 
 ///
-/// TreeKEMTestVector
+/// TreeTestCase
 ///
 
-std::tuple<bytes, SignaturePrivateKey, LeafNode>
-TreeKEMTestVector::new_leaf_node(const std::string& label) const
+std::array<TreeStructure, 14> all_tree_structures{
+  TreeStructure::full_tree_2,
+  TreeStructure::full_tree_3,
+  TreeStructure::full_tree_4,
+  TreeStructure::full_tree_5,
+  TreeStructure::full_tree_6,
+  TreeStructure::full_tree_7,
+  TreeStructure::full_tree_8,
+  TreeStructure::full_tree_32,
+  TreeStructure::full_tree_33,
+  TreeStructure::full_tree_34,
+  TreeStructure::internal_blanks_no_skipping,
+  TreeStructure::internal_blanks_with_skipping,
+  TreeStructure::unmerged_leaves_no_skipping,
+  TreeStructure::unmerged_leaves_with_skipping,
+};
+
+std::array<TreeStructure, 11> treekem_test_tree_structures{
+  // All cases except the big ones
+  TreeStructure::full_tree_2,
+  TreeStructure::full_tree_3,
+  TreeStructure::full_tree_4,
+  TreeStructure::full_tree_5,
+  TreeStructure::full_tree_6,
+  TreeStructure::full_tree_7,
+  TreeStructure::full_tree_8,
+  TreeStructure::internal_blanks_no_skipping,
+  TreeStructure::internal_blanks_with_skipping,
+  TreeStructure::unmerged_leaves_no_skipping,
+  TreeStructure::unmerged_leaves_with_skipping,
+};
+
+struct TreeTestCase
 {
-  auto sub_prg = prg.sub(label);
+  CipherSuite suite;
+  PseudoRandom::Generator prg;
 
-  auto init_secret = sub_prg.secret("init_secret");
-  auto leaf_node_secret = cipher_suite.derive_secret(init_secret, "node");
-  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
-  auto sig_priv = sub_prg.signature_key("sig_priv");
-  auto cred = Credential::basic({ 0, 1, 2, 3 });
-  auto leaf = LeafNode(cipher_suite,
-                       leaf_priv.public_key,
-                       sig_priv.public_key,
-                       cred,
-                       Capabilities::create_default(),
-                       Lifetime::create_default(),
-                       {},
-                       sig_priv);
-  return std::make_tuple(init_secret, sig_priv, leaf);
-}
+  bytes group_id;
+  bytes context;
+  uint32_t leaf_counter = 0;
+  uint32_t path_counter = 0;
 
-TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
+  struct PrivateState
+  {
+    SignaturePrivateKey sig_priv;
+    TreeKEMPrivateKey priv;
+    std::vector<LeafIndex> senders;
+  };
+
+  std::map<LeafIndex, PrivateState> privs;
+  TreeKEMPublicKey pub;
+
+  TreeTestCase(CipherSuite suite_in, PseudoRandom::Generator&& prg_in)
+    : suite(suite_in)
+    , prg(prg_in)
+    , pub(suite)
+  {
+    auto [where, enc_priv, sig_priv] = add_leaf();
+    auto tree_priv = TreeKEMPrivateKey::solo(suite, where, enc_priv);
+    auto priv_state = PrivateState{ sig_priv, tree_priv, { LeafIndex{ 0 } } };
+    privs.insert_or_assign(where, priv_state);
+  }
+
+  std::tuple<LeafIndex, HPKEPrivateKey, SignaturePrivateKey> add_leaf()
+  {
+    leaf_counter += 1;
+    auto ix = to_hex(tls::marshal(leaf_counter));
+    auto enc_priv = prg.hpke_key("encryption_key" + ix);
+    auto sig_priv = prg.signature_key("signature_key" + ix);
+    auto identity = prg.secret("identity" + ix);
+
+    auto credential = Credential::basic(identity);
+    auto leaf_node = LeafNode{ suite,
+                               enc_priv.public_key,
+                               sig_priv.public_key,
+                               credential,
+                               Capabilities::create_default(),
+                               Lifetime::create_default(),
+                               {},
+                               sig_priv };
+    auto where = pub.add_leaf(leaf_node);
+    pub.set_hash_all();
+    return { where, enc_priv, sig_priv };
+  }
+
+  void commit(LeafIndex from,
+              const std::vector<LeafIndex>& remove,
+              bool add,
+              std::optional<bytes> maybe_context)
+  {
+    // Remove members from the tree
+    for (auto i : remove) {
+      pub.blank_path(i);
+      privs.erase(i);
+    }
+    pub.set_hash_all();
+
+    auto joiner = std::vector<LeafIndex>{};
+    auto maybe_enc_priv = std::optional<HPKEPrivateKey>{};
+    auto maybe_sig_priv = std::optional<SignaturePrivateKey>{};
+    if (add) {
+      auto [where, enc_priv, sig_priv] = add_leaf();
+      joiner.push_back(where);
+      maybe_enc_priv = enc_priv;
+      maybe_sig_priv = sig_priv;
+    }
+
+    auto path_secret = std::optional<bytes>{};
+    if (maybe_context) {
+      // Create an UpdatePath
+      path_counter += 1;
+      auto ix = to_hex(tls::marshal(path_counter));
+      auto leaf_secret = prg.secret("leaf_secret" + ix);
+      auto priv = privs.at(from);
+
+      auto context = opt::get(maybe_context);
+      auto pub_before = pub;
+      auto [sender_priv, path] = pub.encap(
+        from, group_id, context, leaf_secret, priv.sig_priv, joiner, {});
+
+      // Process the UpdatePath at all the members
+      for (auto& [leaf, priv_state] : privs) {
+        if (leaf == from) {
+          priv_state =
+            PrivateState{ priv_state.sig_priv, sender_priv, { from } };
+          continue;
+        }
+
+        priv_state.priv.decap(from, pub_before, context, path, joiner);
+        priv_state.senders.push_back(from);
+      }
+
+      // Look up the path secret for the joiner
+      if (!joiner.empty()) {
+        auto index = joiner.front();
+        auto [overlap, shared_path_secret, ok] =
+          sender_priv.shared_path_secret(index);
+        silence_unused(overlap);
+        silence_unused(ok);
+
+        path_secret = shared_path_secret;
+      }
+    }
+
+    // Add a private entry for the joiner if we added someone
+    if (!joiner.empty()) {
+      auto index = joiner.front();
+      auto ancestor = index.ancestor(from);
+      auto enc_priv = opt::get(maybe_enc_priv);
+      auto sig_priv = opt::get(maybe_sig_priv);
+      auto tree_priv =
+        TreeKEMPrivateKey::joiner(pub, index, enc_priv, ancestor, path_secret);
+      privs.insert_or_assign(index,
+                             PrivateState{ sig_priv, tree_priv, { from } });
+    }
+  }
+
+  static TreeTestCase full(CipherSuite suite,
+                           const PseudoRandom::Generator& prg,
+                           LeafCount leaves,
+                           std::string label)
+  {
+    auto tc = TreeTestCase{ suite, prg.sub(label) };
+
+    for (LeafIndex i{ 0 }; i.val < leaves.val - 1; i.val++) {
+      tc.commit(
+        i, {}, true, tc.prg.secret("context" + to_hex(tls::marshal(i))));
+    }
+
+    return tc;
+  }
+
+  static TreeTestCase with_structure(CipherSuite suite,
+                                     const PseudoRandom::Generator& prg,
+                                     TreeStructure tree_structure)
+  {
+    switch (tree_structure) {
+      case TreeStructure::full_tree_2:
+        return full(suite, prg, LeafCount{ 2 }, "full_tree_2");
+
+      case TreeStructure::full_tree_3:
+        return full(suite, prg, LeafCount{ 3 }, "full_tree_3");
+
+      case TreeStructure::full_tree_4:
+        return full(suite, prg, LeafCount{ 4 }, "full_tree_4");
+
+      case TreeStructure::full_tree_5:
+        return full(suite, prg, LeafCount{ 5 }, "full_tree_5");
+
+      case TreeStructure::full_tree_6:
+        return full(suite, prg, LeafCount{ 6 }, "full_tree_6");
+
+      case TreeStructure::full_tree_7:
+        return full(suite, prg, LeafCount{ 7 }, "full_tree_7");
+
+      case TreeStructure::full_tree_8:
+        return full(suite, prg, LeafCount{ 8 }, "full_tree_8");
+
+      case TreeStructure::full_tree_32:
+        return full(suite, prg, LeafCount{ 32 }, "full_tree_32");
+
+      case TreeStructure::full_tree_33:
+        return full(suite, prg, LeafCount{ 33 }, "full_tree_33");
+
+      case TreeStructure::full_tree_34:
+        return full(suite, prg, LeafCount{ 34 }, "full_tree_34");
+
+      case TreeStructure::internal_blanks_no_skipping: {
+        auto tc = TreeTestCase::full(
+          suite, prg, LeafCount{ 8 }, "internal_blanks_no_skipping");
+        auto context = tc.prg.secret("context");
+        tc.commit(
+          LeafIndex{ 0 }, { LeafIndex{ 2 }, LeafIndex{ 3 } }, true, context);
+        return tc;
+      }
+
+      case TreeStructure::internal_blanks_with_skipping: {
+        auto tc = TreeTestCase::full(
+          suite, prg, LeafCount{ 8 }, "internal_blanks_with_skipping");
+        auto context = tc.prg.secret("context");
+        tc.commit(LeafIndex{ 0 },
+                  { LeafIndex{ 1 }, LeafIndex{ 2 }, LeafIndex{ 3 } },
+                  false,
+                  context);
+        return tc;
+      }
+
+      case TreeStructure::unmerged_leaves_no_skipping: {
+        auto tc = TreeTestCase::full(
+          suite, prg, LeafCount{ 7 }, "unmerged_leaves_no_skipping");
+        auto context = tc.prg.secret("context");
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        return tc;
+      }
+
+      case TreeStructure::unmerged_leaves_with_skipping: {
+        auto tc = TreeTestCase::full(
+          suite, prg, LeafCount{ 1 }, "unmerged_leaves_with_skipping");
+
+        // 0 adds 1..6
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+
+        // 0 reemoves 5
+        tc.commit(LeafIndex{ 0 },
+                  { LeafIndex{ 5 } },
+                  false,
+                  tc.prg.secret("context_remove5"));
+
+        // 4 commits without any proupposals
+        tc.commit(LeafIndex{ 4 }, {}, false, tc.prg.secret("context_update4"));
+
+        // 0 adds a new member
+        tc.commit(LeafIndex{ 0 }, {}, true, std::nullopt);
+
+        return tc;
+      }
+
+      default:
+        throw InvalidParameterError("Unsupported tree structure");
+    }
+  }
+};
+
+///
+/// TreeKEMTestVector2
+///
+
+TreeKEMTestVector2::TreeKEMTestVector2(mls::CipherSuite suite,
+                                       TreeStructure tree_structure)
   : PseudoRandom(suite, "treekem")
   , cipher_suite(suite)
-  , group_id(prg.secret("group_id"))
-  , add_sender(0)
-  , update_sender(0)
 {
-  // Make a plan
-  auto my_index = std::optional<LeafIndex>();
-  if (n_leaves > 4) {
-    // Make things more interesting if we have space
-    my_index = LeafIndex{ static_cast<uint32_t>(n_leaves / 2) };
-    add_sender.val = static_cast<uint32_t>(n_leaves / 2) - 2;
-    update_sender.val = static_cast<uint32_t>(n_leaves) - 2;
+  auto tc = TreeTestCase::with_structure(cipher_suite, prg, tree_structure);
+
+  group_id = tc.group_id;
+  epoch = prg.uint64("epoch");
+  confirmed_transcript_hash = prg.secret("confirmed_transcript_hash");
+
+  ratchet_tree = tc.pub;
+
+  // Serialize out the private states
+  for (LeafIndex index{ 0 }; index < ratchet_tree.size; index.val++) {
+    if (tc.privs.count(index) == 0) {
+      continue;
+    }
+
+    auto priv_state = tc.privs.at(index);
+    auto enc_priv = priv_state.priv.private_key_cache.at(NodeIndex(index));
+    auto path_secrets = std::vector<PathSecret>{};
+    for (const auto& [node, path_secret] : priv_state.priv.path_secrets) {
+      if (node == NodeIndex(index)) {
+        // No need to serialize a secret for the leaf node
+        continue;
+      }
+
+      path_secrets.push_back(PathSecret{ node, path_secret });
+    }
+
+    leaves_private.push_back(LeafPrivateInfo{
+      index,
+      enc_priv,
+      priv_state.sig_priv,
+      path_secrets,
+    });
   }
 
-  // Construct a full ratchet tree with the required number of leaves
-  auto sig_privs = std::vector<SignaturePrivateKey>{};
-  auto pub = TreeKEMPublicKey{ suite };
-  for (uint32_t i = 0; i < n_leaves; i++) {
-    auto ix = to_hex(tls::marshal(i));
-    auto [init_secret, sig_priv, leaf] = new_leaf_node(ix);
-    silence_unused(init_secret);
-    sig_privs.push_back(sig_priv);
+  // Create test update paths
+  auto group_context = GroupContext{ cipher_suite,
+                                     group_id,
+                                     epoch,
+                                     tc.pub.root_hash(),
+                                     confirmed_transcript_hash,
+                                     {} };
+  auto ctx = tls::marshal(group_context);
+  for (LeafIndex sender{ 0 }; sender < ratchet_tree.size; sender.val++) {
+    if (!tc.pub.has_leaf(sender)) {
+      continue;
+    }
 
-    auto leaf_secret = prg.secret("leaf_secret_" + ix);
-    auto added = pub.add_leaf(leaf);
-    auto [new_adder_priv, path] =
-      pub.encap(added, group_id, {}, leaf_secret, sig_priv, {}, {});
-    silence_unused(new_adder_priv);
-    pub.merge(added, path);
+    auto leaf_secret = prg.secret("update_path" + to_hex(tls::marshal(sender)));
+    const auto& sig_priv = tc.privs.at(sender).sig_priv;
+
+    auto pub = tc.pub;
+    auto [new_sender_priv, path] =
+      pub.encap(sender, group_id, ctx, leaf_secret, sig_priv, {}, {});
+
+    auto path_secrets = std::vector<std::optional<bytes>>{};
+    for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
+      if (to == sender || !pub.has_leaf(to)) {
+        path_secrets.push_back(std::nullopt);
+        continue;
+      }
+
+      auto [overlap, path_secret, ok] = new_sender_priv.shared_path_secret(to);
+      silence_unused(overlap);
+      silence_unused(ok);
+
+      path_secrets.push_back(path_secret);
+    }
+
+    update_paths.push_back(UpdatePathInfo{
+      sender,
+      path,
+      path_secrets,
+      new_sender_priv.update_secret,
+      pub.root_hash(),
+    });
   }
-
-  if (my_index) {
-    pub.blank_path(opt::get(my_index));
-  }
-
-  // Add the test participant
-  auto add_secret = prg.secret("add_secret");
-  auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node("add_leaf");
-  auto test_index = pub.add_leaf(test_leaf);
-  pub.set_hash_all();
-  auto [add_priv, add_path] = pub.encap(
-    add_sender, group_id, {}, add_secret, sig_privs[add_sender.val], {}, {});
-  auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
-  silence_unused(test_sig_priv);
-  silence_unused(add_path);
-  silence_unused(overlap);
-  silence_unused(ok);
-
-  pub.set_hash_all();
-
-  ratchet_tree_before = pub;
-  tree_hash_before = pub.root_hash();
-  my_leaf_secret = test_init_secret;
-  my_leaf_node = test_leaf;
-  my_path_secret = path_secret;
-  root_secret_after_add = add_priv.update_secret;
-
-  // Do a second update that the test participant should be able to process
-  update_group_context = prg.secret("update_context");
-  auto update_secret = prg.secret("update_secret");
-  auto [update_priv, update_path_val] = pub.encap(update_sender,
-                                                  group_id,
-                                                  update_group_context,
-                                                  update_secret,
-                                                  sig_privs[update_sender.val],
-                                                  {},
-                                                  {});
-  pub.merge(update_sender, update_path_val);
-  pub.set_hash_all();
-
-  update_path = update_path_val;
-  root_secret_after_update = update_priv.update_secret;
-  ratchet_tree_after = pub;
-  tree_hash_after = { pub.root_hash() };
-}
-
-void
-TreeKEMTestVector::initialize_trees()
-{
-  ratchet_tree_before.suite = cipher_suite;
-  ratchet_tree_before.set_hash_all();
-
-  ratchet_tree_after.suite = cipher_suite;
-  ratchet_tree_after.set_hash_all();
 }
 
 std::optional<std::string>
-TreeKEMTestVector::verify() const
+TreeKEMTestVector2::verify()
 {
-  // Verify that the trees provided are valid
-  VERIFY_EQUAL(
-    "tree hash before", ratchet_tree_before.root_hash(), tree_hash_before);
-  VERIFY("tree before parent hash valid",
-         ratchet_tree_before.parent_hash_valid());
+  // Finish initializing the ratchet tree
+  ratchet_tree.suite = cipher_suite;
+  ratchet_tree.set_hash_all();
 
-  VERIFY("update path parent hash valid",
-         ratchet_tree_before.parent_hash_valid(update_sender, update_path));
+  // Validate public state
+  VERIFY("parent hash valid", ratchet_tree.parent_hash_valid());
 
-  VERIFY_EQUAL(
-    "tree hash after", ratchet_tree_after.root_hash(), tree_hash_after);
-  VERIFY("tree after parent hash valid",
-         ratchet_tree_after.parent_hash_valid());
+  for (LeafIndex i{ 0 }; i < ratchet_tree.size; i.val++) {
+    auto maybe_leaf = ratchet_tree.leaf_node(i);
+    if (!maybe_leaf) {
+      continue;
+    }
 
-  // Find ourselves in the tree
-  auto maybe_index = ratchet_tree_before.find(my_leaf_node);
-  if (!maybe_index) {
-    return "Error: key package not found in ratchet tree";
+    auto leaf = opt::get(maybe_leaf);
+    VERIFY("leaf sig", leaf.verify(cipher_suite, group_id));
   }
 
-  auto my_index = opt::get(maybe_index);
-  auto ancestor = my_index.ancestor(add_sender);
+  // Import private keys
+  std::map<LeafIndex, TreeKEMPrivateKey> tree_privs;
+  std::map<LeafIndex, SignaturePrivateKey> sig_privs;
+  for (const auto& info : leaves_private) {
+    auto enc_priv = info.encryption_priv;
+    auto sig_priv = info.signature_priv;
+    enc_priv.set_public_key(cipher_suite);
+    sig_priv.set_public_key(cipher_suite);
 
-  // Establish a TreeKEMPrivate Key
-  auto leaf_node_secret = cipher_suite.derive_secret(my_leaf_secret, "node");
-  auto leaf_priv = HPKEPrivateKey::derive(cipher_suite, leaf_node_secret);
-  auto priv =
-    TreeKEMPrivateKey::joiner(ratchet_tree_before,
-                              my_index,
-                              leaf_priv,
-                              ancestor,
-                              static_cast<const bytes&>(my_path_secret));
-  VERIFY("private key consistent with tree before",
-         priv.consistent(ratchet_tree_before));
-  VERIFY_EQUAL(
-    "root secret after add", priv.update_secret, root_secret_after_add);
+    auto priv = TreeKEMPrivateKey{};
+    priv.suite = cipher_suite;
+    priv.index = info.index;
+    priv.private_key_cache.insert_or_assign(NodeIndex(info.index), enc_priv);
 
-  // Process the UpdatePath
-  priv.decap(
-    update_sender, ratchet_tree_before, update_group_context, update_path, {});
+    for (const auto& entry : info.path_secrets) {
+      priv.path_secrets.insert_or_assign(entry.node, entry.path_secret);
+    }
 
-  auto my_tree_after = ratchet_tree_before;
-  my_tree_after.merge(update_sender, update_path);
+    VERIFY("priv consistent", priv.consistent(ratchet_tree));
 
-  // Verify that we ended up in the right place
-  VERIFY_EQUAL(
-    "root secret after update", priv.update_secret, root_secret_after_update);
-  VERIFY_EQUAL("tree after", my_tree_after, ratchet_tree_after);
+    tree_privs.insert_or_assign(info.index, priv);
+    sig_privs.insert_or_assign(info.index, sig_priv);
+  }
+
+  auto group_context = GroupContext{ cipher_suite,
+                                     group_id,
+                                     epoch,
+                                     ratchet_tree.root_hash(),
+                                     confirmed_transcript_hash,
+                                     {} };
+  auto ctx = tls::marshal(group_context);
+  for (const auto& info : update_paths) {
+    // Test decap of the existing group secrets
+    const auto& from = info.sender;
+    const auto& path = info.update_path;
+    VERIFY("path parent hash valid",
+           ratchet_tree.parent_hash_valid(from, path));
+
+    for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
+      if (to == from || !ratchet_tree.has_leaf(to)) {
+        continue;
+      }
+
+      auto priv = tree_privs.at(to);
+      priv.decap(from, ratchet_tree, ctx, path, {});
+      VERIFY_EQUAL("commit secret", priv.update_secret, info.commit_secret);
+
+      auto [overlap, path_secret, ok] = priv.shared_path_secret(from);
+      silence_unused(overlap);
+      silence_unused(ok);
+      VERIFY_EQUAL("path secret", path_secret, info.path_secrets[to.val]);
+
+      auto pub = ratchet_tree;
+      pub.merge(from, path);
+      pub.set_hash_all();
+      VERIFY_EQUAL("tree hash after", pub.root_hash(), info.tree_hash_after);
+    }
+
+    // Test encap/decap
+    auto pub = ratchet_tree;
+    auto leaf_secret = random_bytes(cipher_suite.secret_size());
+    const auto& sig_priv = sig_privs.at(from);
+    auto [new_sender_priv, new_path] =
+      pub.encap(from, group_id, ctx, leaf_secret, sig_priv, {}, {});
+    VERIFY("new path parent hash valid",
+           ratchet_tree.parent_hash_valid(from, path));
+
+    for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
+      if (to == from || !ratchet_tree.has_leaf(to)) {
+        continue;
+      }
+
+      auto priv = tree_privs.at(to);
+      priv.decap(from, ratchet_tree, ctx, new_path, {});
+      VERIFY_EQUAL(
+        "commit secret", priv.update_secret, new_sender_priv.update_secret);
+    }
+  }
 
   return std::nullopt;
 }

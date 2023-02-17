@@ -657,6 +657,8 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   // Update the public key itself
   merge(from, path);
+  set_hash_all();
+
   return std::make_tuple(priv, path);
 }
 
