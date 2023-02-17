@@ -262,8 +262,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector,
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeHashTestVector,
                                    cipher_suite,
+                                   group_id,
                                    tree,
-                                   tree_hashes)
+                                   tree_hashes,
+                                   resolutions)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
@@ -286,21 +288,21 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
                                    key_package,
                                    welcome)
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::PathSecret,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::PathSecret,
                                    node,
                                    path_secret)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::LeafPrivateInfo,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::LeafPrivateInfo,
                                    index,
                                    encryption_priv,
                                    signature_priv,
                                    path_secrets)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2::UpdatePathInfo,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::UpdatePathInfo,
                                    sender,
                                    update_path,
                                    path_secrets,
                                    commit_secret,
                                    tree_hash_after)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    cipher_suite,
                                    group_id,
                                    epoch,
@@ -308,23 +310,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector2,
                                    ratchet_tree,
                                    leaves_private,
                                    update_paths)
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
-                                   cipher_suite,
-                                   group_id,
-                                   ratchet_tree_before,
-                                   add_sender,
-                                   my_leaf_secret,
-                                   my_leaf_node,
-                                   my_path_secret,
-                                   update_sender,
-                                   update_path,
-                                   update_group_context,
-                                   tree_hash_before,
-                                   root_secret_after_add,
-                                   root_secret_after_update,
-                                   ratchet_tree_after,
-                                   tree_hash_after)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
                                    mls_welcome,

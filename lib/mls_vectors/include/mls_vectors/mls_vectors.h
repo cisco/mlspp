@@ -301,17 +301,6 @@ struct PSKSecretTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 };
 
-struct TreeHashTestVector : PseudoRandom
-{
-  mls::CipherSuite cipher_suite;
-
-  mls::TreeKEMPublicKey tree;
-  std::vector<bytes> tree_hashes;
-
-  TreeHashTestVector() = default;
-  std::optional<std::string> verify();
-};
-
 struct TranscriptTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
@@ -428,6 +417,20 @@ enum struct TreeStructure
 
 extern std::array<TreeStructure, 14> all_tree_structures;
 extern std::array<TreeStructure, 11> treekem_test_tree_structures;
+
+struct TreeHashTestVector : PseudoRandom
+{
+  mls::CipherSuite cipher_suite;
+  bytes group_id;
+
+  mls::TreeKEMPublicKey tree;
+  std::vector<bytes> tree_hashes;
+  std::vector<std::vector<mls::NodeIndex>> resolutions;
+
+  TreeHashTestVector() = default;
+  TreeHashTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  std::optional<std::string> verify();
+};
 
 struct TreeKEMTestVector : PseudoRandom
 {

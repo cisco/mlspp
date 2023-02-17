@@ -23,7 +23,6 @@ static constexpr uint64_t MESSAGE_PROTECTION = 12;
 static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
 static constexpr uint64_t TREE_HASHES = 15;
-static constexpr uint64_t TREEKEM2 = 16;
 
 // XXX(RLB): This function currently produces only one example of each type, as
 // a top-level object, not a top-level array.  We should produce a more
@@ -44,8 +43,17 @@ make_test_vector(uint64_t type)
     case TestVectorType::TRANSCRIPT:
       return TranscriptTestVector{ suite };
 
-    case TestVectorType::TREEKEM:
-      return TreeKEMTestVector{ suite, n };
+    case TestVectorType::TREEKEM: {
+      auto cases = std::vector<TreeKEMTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        for (const auto& tree_structure : treekem_test_tree_structures) {
+          cases.emplace_back(suite, tree_structure);
+        }
+      }
+
+      return cases;
+    }
 
     case TestVectorType::MESSAGES:
       return std::vector<MessagesTestVector>{
@@ -103,18 +111,6 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case TREEKEM2: {
-      auto cases = std::vector<TreeKEMTestVector2>();
-
-      for (const auto& suite : mls::all_supported_suites) {
-        for (const auto& tree_structure : treekem_test_tree_structures) {
-          cases.emplace_back(suite, tree_structure);
-        }
-      }
-
-      return cases;
-    }
-
     default:
       return nullptr;
   }
@@ -162,7 +158,7 @@ verify_test_vector(uint64_t type)
       return j.get<TranscriptTestVector>().verify();
 
     case TestVectorType::TREEKEM:
-      return j.get<TreeKEMTestVector>().verify();
+      return verify_test_vector<TreeKEMTestVector>(j);
 
     case TestVectorType::MESSAGES:
       return verify_test_vector<MessagesTestVector>(j);
@@ -184,9 +180,6 @@ verify_test_vector(uint64_t type)
 
     case TREE_HASHES:
       return verify_test_vector<TreeHashTestVector>(j);
-
-    case TREEKEM2:
-      return verify_test_vector<TreeKEMTestVector2>(j);
 
     default:
       return "Invalid test vector type";

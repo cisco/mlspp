@@ -915,7 +915,8 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
   if (index.is_leaf()) {
     // A leaf node with local changes is by definition excluded from the parent
     // hash.  So we return the hash of an empty leaf.
-    // auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt };
+    // auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt
+    // };
     auto leaf_hash_input = LeafNodeHashInput{ index, std::nullopt }; // XXX HACK
     hash = suite.digest().hash(tls::marshal(TreeHashInput{ leaf_hash_input }));
   } else {

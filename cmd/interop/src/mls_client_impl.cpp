@@ -321,7 +321,6 @@ MLSClientImpl::verify_test_vector(const VerifyTestVectorRequest* request)
 
     case TestVectorType::TREEKEM: {
       auto tv = tv_json.get<mls_vectors::TreeKEMTestVector>();
-      tv.initialize_trees();
       error = tv.verify();
       break;
     }
@@ -375,7 +374,9 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::TREEKEM: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TreeKEMTestVector{ suite, request->n_leaves() };
+      j = mls_vectors::TreeKEMTestVector{
+        suite, mls_vectors::TreeStructure::full_tree_8
+      };
       break;
     }
 
