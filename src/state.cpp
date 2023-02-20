@@ -499,6 +499,26 @@ State::commit(const bytes& leaf_secret,
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   if (path_required) {
+    auto leaf_node_opts = LeafNodeOptions{};
+    if (opts) {
+      leaf_node_opts = opt::get(opts).leaf_node_opts;
+    }
+
+    /*
+    auto [new_priv, path] = next._tree.encap(next._index,
+                                             next._group_id,
+                                             ctx,
+                                             leaf_secret,
+                                             _identity_priv,
+                                             joiner_locations,
+                                             leaf_node_opts);
+    */
+    auto new_priv = next._tree.update(next._index,
+                                      leaf_secret,
+                                      next._group_id,
+                                      _identity_priv,
+                                      leaf_node_opts);
+
     auto ctx = tls::marshal(GroupContext{
       next._suite,
       next._group_id,
@@ -507,19 +527,8 @@ State::commit(const bytes& leaf_secret,
       next._transcript_hash.confirmed,
       next._extensions,
     });
+    auto path = next._tree.encap(new_priv, ctx, joiner_locations);
 
-    auto leaf_node_opts = LeafNodeOptions{};
-    if (opts) {
-      leaf_node_opts = opt::get(opts).leaf_node_opts;
-    }
-
-    auto [new_priv, path] = next._tree.encap(next._index,
-                                             next._group_id,
-                                             ctx,
-                                             leaf_secret,
-                                             _identity_priv,
-                                             joiner_locations,
-                                             leaf_node_opts);
     next._tree_priv = new_priv;
     commit.path = path;
     commit_secret = new_priv.update_secret;
@@ -741,6 +750,8 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     next.check_update_leaf_node(
       sender_location, path.leaf_node, LeafNodeSource::commit);
 
+    next._tree.merge(sender_location, path);
+
     auto ctx = tls::marshal(GroupContext{
       next._suite,
       next._group_id,
@@ -751,7 +762,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     });
     next._tree_priv.decap(
       sender_location, next._tree, ctx, path, joiner_locations);
-    next._tree.merge(sender_location, path);
+
     commit_secret = next._tree_priv.update_secret;
   }
 

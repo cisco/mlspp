@@ -1159,9 +1159,9 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
 
     auto leaf_secret = prg.secret("leaf_secret_" + ix);
     auto added = pub.add_leaf(leaf);
-    auto [new_adder_priv, path] =
-      pub.encap(added, group_id, {}, leaf_secret, sig_priv, {}, {});
-    silence_unused(new_adder_priv);
+
+    auto new_adder_priv = pub.update(added, leaf_secret, group_id, sig_priv, {});
+    auto path = pub.encap(new_adder_priv, {}, {});
     pub.merge(added, path);
   }
 
@@ -1174,11 +1174,10 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
   auto [test_init_secret, test_sig_priv, test_leaf] = new_leaf_node("add_leaf");
   auto test_index = pub.add_leaf(test_leaf);
   pub.set_hash_all();
-  auto [add_priv, add_path] = pub.encap(
-    add_sender, group_id, {}, add_secret, sig_privs[add_sender.val], {}, {});
+  auto add_priv = pub.update(add_sender, add_secret, group_id, sig_privs[add_sender.val], {});
+
   auto [overlap, path_secret, ok] = add_priv.shared_path_secret(test_index);
   silence_unused(test_sig_priv);
-  silence_unused(add_path);
   silence_unused(overlap);
   silence_unused(ok);
 
@@ -1194,13 +1193,8 @@ TreeKEMTestVector::TreeKEMTestVector(CipherSuite suite, size_t n_leaves)
   // Do a second update that the test participant should be able to process
   update_group_context = prg.secret("update_context");
   auto update_secret = prg.secret("update_secret");
-  auto [update_priv, update_path_val] = pub.encap(update_sender,
-                                                  group_id,
-                                                  update_group_context,
-                                                  update_secret,
-                                                  sig_privs[update_sender.val],
-                                                  {},
-                                                  {});
+  auto update_priv = pub.update(update_sender, update_secret, group_id, sig_privs[update_sender.val], {});
+  auto update_path_val = pub.encap(update_priv, update_group_context, {});
   pub.merge(update_sender, update_path_val);
   pub.set_hash_all();
 
