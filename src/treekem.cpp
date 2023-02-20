@@ -650,7 +650,7 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   auto leaf_pub = opt::get(priv.private_key(NodeIndex(from))).public_key;
   auto new_leaf = leaf_node.leaf_node().for_commit(
-    suite, group_id, leaf_pub, ph0, opts, sig_priv);
+    suite, group_id, from, leaf_pub, ph0, opts, sig_priv);
 
   // Package everything into an UpdatePath
   auto path = UpdatePath{ std::move(new_leaf), std::move(path_nodes) };
@@ -723,13 +723,13 @@ TreeKEMPublicKey::node_at(NodeIndex n) const
 OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n)
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 const OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n) const
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 void
@@ -750,8 +750,7 @@ TreeKEMPublicKey::clear_hash_path(LeafIndex index)
 
 struct LeafNodeHashInput
 {
-  // LeafIndex leaf_index;
-  NodeIndex leaf_index; // XXX HACK
+  LeafIndex leaf_index;
   std::optional<LeafNode> leaf_node;
   TLS_SERIALIZABLE(leaf_index, leaf_node)
 };
@@ -781,8 +780,7 @@ TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
   auto hash_input = bytes{};
   const auto& node = node_at(index);
   if (index.level() == 0) {
-    // auto input = LeafNodeHashInput{ LeafIndex(index), {} };
-    auto input = LeafNodeHashInput{ index, {} }; // XXX HACK
+    auto input = LeafNodeHashInput{ LeafIndex(index), {} };
     if (!node.blank()) {
       input.leaf_node = node.leaf_node();
     }
@@ -915,9 +913,7 @@ TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
   if (index.is_leaf()) {
     // A leaf node with local changes is by definition excluded from the parent
     // hash.  So we return the hash of an empty leaf.
-    // auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt
-    // };
-    auto leaf_hash_input = LeafNodeHashInput{ index, std::nullopt }; // XXX HACK
+    auto leaf_hash_input = LeafNodeHashInput{ LeafIndex(index), std::nullopt };
     hash = suite.digest().hash(tls::marshal(TreeHashInput{ leaf_hash_input }));
   } else {
     // If there is no cached value, recalculate the child hashes with the

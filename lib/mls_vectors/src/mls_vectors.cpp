@@ -1420,7 +1420,7 @@ TreeHashTestVector::verify()
     }
 
     auto leaf = opt::get(maybe_leaf);
-    auto leaf_valid = leaf.verify(cipher_suite, group_id);
+    auto leaf_valid = leaf.verify(cipher_suite, {{ group_id, i }});
     VERIFY("leaf sig valid", leaf_valid);
   }
 
@@ -1431,24 +1431,13 @@ TreeHashTestVector::verify()
     VERIFY_EQUAL("resolution", tree.resolve(i), resolutions.at(i.val));
   }
 
-#if 0
-  auto root = NodeIndex::root(tree.size);
-  auto root_hash = tree_hashes.at(root.val);
-  VERIFY_EQUAL("root tree hash", tree.root_hash(), root_hash);
-#endif
-
   // Verify parent hashes
-#if 0
   VERIFY("parent hash valid", tree.parent_hash_valid());
-#endif
 
-  // TODO Verify the resolutions
-#if 0
-  auto width = NodeCount{ tree.size };
+  // Verify the resolutions
   for (NodeIndex i{ 0 }; i < width; i.val++) {
     VERIFY_EQUAL("resolution", tree.resolve(i), resolutions[i.val]);
   }
-#endif
 
   return std::nullopt;
 }
@@ -1557,7 +1546,7 @@ TreeKEMTestVector::verify()
     }
 
     auto leaf = opt::get(maybe_leaf);
-    VERIFY("leaf sig", leaf.verify(cipher_suite, group_id));
+    VERIFY("leaf sig", leaf.verify(cipher_suite, {{ group_id, i }}));
   }
 
   // Import private keys
@@ -1689,9 +1678,9 @@ MessagesTestVector::MessagesTestVector()
   auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
 
   auto leaf_node_update =
-    leaf_node.for_update(suite, group_id, hpke_pub, {}, sig_priv);
+    leaf_node.for_update(suite, group_id, index, hpke_pub, {}, sig_priv);
   auto leaf_node_commit = leaf_node.for_commit(
-    suite, group_id, hpke_pub, prg.secret("parent_hash"), {}, sig_priv);
+    suite, group_id, index, hpke_pub, prg.secret("parent_hash"), {}, sig_priv);
 
   auto sender = Sender{ MemberSender{ index } };
 

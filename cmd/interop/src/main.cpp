@@ -111,6 +111,18 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
+    case TREE_HASHES: {
+      auto cases = std::vector<TreeHashTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        for (const auto& tree_structure : all_tree_structures) {
+          cases.emplace_back(suite, tree_structure);
+        }
+      }
+
+      return cases;
+    }
+
     default:
       return nullptr;
   }
