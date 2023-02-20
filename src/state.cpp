@@ -347,8 +347,8 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
   auto leaf = opt::get(_tree.leaf_node(_index));
 
   auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
-  auto new_leaf =
-    leaf.for_update(_suite, _group_id, _index, public_key, opts, _identity_priv);
+  auto new_leaf = leaf.for_update(
+    _suite, _group_id, _index, public_key, opts, _identity_priv);
 
   auto update = Update{ new_leaf };
   _cached_update = CachedUpdate{ leaf_secret, update };

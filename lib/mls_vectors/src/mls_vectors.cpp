@@ -1419,7 +1419,7 @@ TreeHashTestVector::verify()
     }
 
     auto leaf = opt::get(maybe_leaf);
-    auto leaf_valid = leaf.verify(cipher_suite, {{ group_id, i }});
+    auto leaf_valid = leaf.verify(cipher_suite, { { group_id, i } });
     VERIFY("leaf sig valid", leaf_valid);
   }
 
@@ -1545,7 +1545,7 @@ TreeKEMTestVector::verify()
     }
 
     auto leaf = opt::get(maybe_leaf);
-    VERIFY("leaf sig", leaf.verify(cipher_suite, {{ group_id, i }}));
+    VERIFY("leaf sig", leaf.verify(cipher_suite, { { group_id, i } }));
   }
 
   // Import private keys

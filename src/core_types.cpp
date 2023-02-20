@@ -152,7 +152,7 @@ LeafNode::for_update(CipherSuite cipher_suite,
   auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = Empty{};
-  clone.sign(cipher_suite, sig_priv, {{ group_id, leaf_index }});
+  clone.sign(cipher_suite, sig_priv, { { group_id, leaf_index } });
 
   return clone;
 }
@@ -169,7 +169,7 @@ LeafNode::for_commit(CipherSuite cipher_suite,
   auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = ParentHash{ parent_hash };
-  clone.sign(cipher_suite, sig_priv, {{ group_id, leaf_index }});
+  clone.sign(cipher_suite, sig_priv, { { group_id, leaf_index } });
 
   return clone;
 }
