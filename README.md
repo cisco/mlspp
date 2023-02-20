@@ -29,4 +29,3 @@ Conventions
   * Snake case for variables, functions, members (`derive_epoch_keys`)
   * Private member variables start with underscore (`_`)
   * In general, prefer descriptive names
-
