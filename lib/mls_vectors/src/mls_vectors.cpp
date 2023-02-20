@@ -1156,7 +1156,6 @@ struct TreeTestCase
   PseudoRandom::Generator prg;
 
   bytes group_id;
-  bytes context;
   uint32_t leaf_counter = 0;
   uint32_t path_counter = 0;
 
@@ -1278,7 +1277,7 @@ struct TreeTestCase
   static TreeTestCase full(CipherSuite suite,
                            const PseudoRandom::Generator& prg,
                            LeafCount leaves,
-                           std::string label)
+                           const std::string& label)
   {
     auto tc = TreeTestCase{ suite, prg.sub(label) };
 
@@ -1508,7 +1507,7 @@ TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
     auto path_secrets = std::vector<std::optional<bytes>>{};
     for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
       if (to == sender || !pub.has_leaf(to)) {
-        path_secrets.push_back(std::nullopt);
+        path_secrets.emplace_back(std::nullopt);
         continue;
       }
 
@@ -1516,7 +1515,7 @@ TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
       silence_unused(overlap);
       silence_unused(ok);
 
-      path_secrets.push_back(path_secret);
+      path_secrets.emplace_back(path_secret);
     }
 
     update_paths.push_back(UpdatePathInfo{

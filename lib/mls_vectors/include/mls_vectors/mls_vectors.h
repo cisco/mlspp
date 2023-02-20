@@ -340,6 +340,10 @@ struct WelcomeTestVector : PseudoRandom
   std::optional<std::string> verify() const;
 };
 
+// XXX(RLB): The |structure| of the example trees below is to avoid compile
+// errors from gcc's -Werror=comment when there is a '\' character at the end of
+// a line.  Inspired by a similar bug in Chromium:
+//   https://codereview.chromium.org/874663003/patch/1/10001
 enum struct TreeStructure
 {
   // Full trees on N leaves, created by member k adding member k+1
@@ -354,57 +358,57 @@ enum struct TreeStructure
   full_tree_33,
   full_tree_34,
 
-  //               W
-  //         ______|_____
-  //        /             \
-  //       U               Y
-  //     __|__           __|__
-  //    /     \         /     \
-  //   T       _       X       Z
-  //  / \     / \     / \     / \
-  // A   B   C   _   E   F   G   H
+  // |               W               |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y       |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       _       X       Z   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   _   E   F   G   H |
   //
   // * Start with full tree on 8 members
   // * 0 commits removeing 2 and 3, and adding a new member
   internal_blanks_no_skipping,
 
-  //               W
-  //         ______|_____
-  //        /             \
-  //       _               Y
-  //     __|__           __|__
-  //    /     \         /     \
-  //   _       _       X       Z
-  //  / \     / \     / \     / \
-  // A   _   _   _   E   F   G   H
+  // |               W               |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       _               Y       |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   _       _       X       Z   |
+  // |  / \     / \     / \     / \  |
+  // | A   _   _   _   E   F   G   H |
   //
   // * Start with full tree on 8 members
   // * 0 commitsremoveing 1, 2, and 3
   internal_blanks_with_skipping,
 
-  //               W[H]
-  //         ______|_____
-  //        /             \
-  //       U               Y[H]
-  //     __|__           __|__
-  //    /     \         /     \
-  //   T       V       X       _
-  //  / \     / \     / \     / \
-  // A   B   C   D   E   F   G   H
+  // |               W[H]            |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y[H]    |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       V       X       _   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   D   E   F   G   H |
   //
   // * Start with full tree on 7 members
   // * 0 commits adding a member in a partial Commit (no path)
   unmerged_leaves_no_skipping,
 
-  //               W [F]
-  //         ______|_____
-  //        /             \
-  //       U               Y [F]
-  //     __|__           __|__
-  //    /     \         /     \
-  //   T       _       _       _
-  //  / \     / \     / \     / \
-  // A   B   C   D   E   F   G   _
+  // |               W [F]           |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y [F]   |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       _       _       _   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   D   E   F   G   _ |
   //
   // == Fig. 20 / {{parent-hash-tree}}
   // * 0 creates group
