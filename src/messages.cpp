@@ -94,15 +94,30 @@ GroupInfo::verify(const TreeKEMPublicKey& tree) const
   }
 
   const auto& leaf = opt::get(maybe_leaf);
-  return leaf.signature_key.verify(
-    tree.suite, sign_label::group_info, to_be_signed(), signature);
+  return verify(leaf.signature_key);
+}
+
+void
+GroupInfo::sign(LeafIndex signer_index, const SignaturePrivateKey& priv)
+{
+  signer = signer_index;
+  signature = priv.sign(
+    group_context.cipher_suite, sign_label::group_info, to_be_signed());
+}
+
+bool
+GroupInfo::verify(const SignaturePublicKey& pub) const
+{
+  return pub.verify(group_context.cipher_suite,
+                    sign_label::group_info,
+                    to_be_signed(),
+                    signature);
 }
 
 // Welcome
 
 Welcome::Welcome()
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(CipherSuite::ID::unknown)
+  : cipher_suite(CipherSuite::ID::unknown)
 {
 }
 
@@ -110,8 +125,7 @@ Welcome::Welcome(CipherSuite suite,
                  const bytes& joiner_secret,
                  const std::vector<PSKWithSecret>& psks,
                  const GroupInfo& group_info)
-  : version(ProtocolVersion::mls10)
-  , cipher_suite(suite)
+  : cipher_suite(suite)
   , _joiner_secret(joiner_secret)
 {
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);

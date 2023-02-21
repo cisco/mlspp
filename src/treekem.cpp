@@ -650,13 +650,15 @@ TreeKEMPublicKey::encap(LeafIndex from,
 
   auto leaf_pub = opt::get(priv.private_key(NodeIndex(from))).public_key;
   auto new_leaf = leaf_node.leaf_node().for_commit(
-    suite, group_id, leaf_pub, ph0, opts, sig_priv);
+    suite, group_id, from, leaf_pub, ph0, opts, sig_priv);
 
   // Package everything into an UpdatePath
   auto path = UpdatePath{ std::move(new_leaf), std::move(path_nodes) };
 
   // Update the public key itself
   merge(from, path);
+  set_hash_all();
+
   return std::make_tuple(priv, path);
 }
 
@@ -721,13 +723,13 @@ TreeKEMPublicKey::node_at(NodeIndex n) const
 OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n)
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 const OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n) const
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 void

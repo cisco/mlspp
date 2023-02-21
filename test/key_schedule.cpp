@@ -13,10 +13,18 @@ TEST_CASE("Secret Tree Interop")
   }
 }
 
+TEST_CASE("PSK Secret Interop")
+{
+  for (auto suite : all_supported_suites) {
+    const auto tv = PSKSecretTestVector{ suite, 5 };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("Key Schedule Interop")
 {
   for (auto suite : all_supported_suites) {
-    auto tv = KeyScheduleTestVector::create(suite, 15, 3);
+    auto tv = KeyScheduleTestVector{ suite, 15 };
     REQUIRE(tv.verify() == std::nullopt);
   }
 }

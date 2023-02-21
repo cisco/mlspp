@@ -25,7 +25,7 @@ jobs:
      
     - name: dependencies
       run: |
-        brew install llvm
+        brew install llvm pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 

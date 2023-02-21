@@ -269,7 +269,7 @@ MLSClientImpl::CachedState::unmarshal(const std::string& wire)
 uint32_t
 MLSClientImpl::store_state(mls::State&& state, bool encrypt_handshake)
 {
-  auto state_id = tls::get<uint32_t>(state.authentication_secret());
+  auto state_id = tls::get<uint32_t>(state.epoch_authenticator());
   state_id += state.index().val;
 
   auto entry = CachedState{ std::move(state), encrypt_handshake, {}, {} };
@@ -321,7 +321,6 @@ MLSClientImpl::verify_test_vector(const VerifyTestVectorRequest* request)
 
     case TestVectorType::TREEKEM: {
       auto tv = tv_json.get<mls_vectors::TreeKEMTestVector>();
-      tv.initialize_trees();
       error = tv.verify();
       break;
     }
@@ -346,9 +345,6 @@ Status
 MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
                                     GenerateTestVectorResponse* reply)
 {
-  // XXX(RLB): Should this value be set by the test runner?
-  static const uint32_t n_psks = 3;
-
   json j;
   switch (request->test_vector_type()) {
     case TestVectorType::TREE_MATH: {
@@ -366,25 +362,26 @@ MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
 
     case TestVectorType::KEY_SCHEDULE: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::KeyScheduleTestVector::create(
-        suite, request->n_epochs(), n_psks);
+      j = mls_vectors::KeyScheduleTestVector{ suite, request->n_epochs() };
       break;
     }
 
     case TestVectorType::TRANSCRIPT: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TranscriptTestVector::create(suite);
+      j = mls_vectors::TranscriptTestVector{ suite };
       break;
     }
 
     case TestVectorType::TREEKEM: {
       auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TreeKEMTestVector::create(suite, request->n_leaves());
+      j = mls_vectors::TreeKEMTestVector{
+        suite, mls_vectors::TreeStructure::full_tree_8
+      };
       break;
     }
 
     case TestVectorType::MESSAGES: {
-      j = mls_vectors::MessagesTestVector::create();
+      j = mls_vectors::MessagesTestVector();
       break;
     }
 
@@ -541,7 +538,7 @@ MLSClientImpl::state_auth(CachedState& entry,
                           const StateAuthRequest* /* request */,
                           StateAuthResponse* response)
 {
-  auto secret = entry.state.authentication_secret();
+  auto secret = entry.state.epoch_authenticator();
   response->set_state_auth_secret(bytes_to_string(secret));
   return Status::OK;
 }

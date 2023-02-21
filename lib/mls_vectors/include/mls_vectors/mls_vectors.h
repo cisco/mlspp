@@ -11,6 +11,39 @@
 
 namespace mls_vectors {
 
+struct PseudoRandom
+{
+  struct Generator
+  {
+    Generator() = default;
+    Generator(mls::CipherSuite suite_in, const std::string& label);
+    Generator sub(const std::string& label) const;
+
+    bytes secret(const std::string& label) const;
+    bytes generate(const std::string& label, size_t size) const;
+
+    uint16_t uint16(const std::string& label) const;
+    uint32_t uint32(const std::string& label) const;
+    uint64_t uint64(const std::string& label) const;
+
+    mls::SignaturePrivateKey signature_key(const std::string& label) const;
+    mls::HPKEPrivateKey hpke_key(const std::string& label) const;
+
+    size_t output_length() const;
+
+  private:
+    mls::CipherSuite suite;
+    bytes seed;
+
+    Generator(mls::CipherSuite suite_in, bytes&& seed_in);
+  };
+
+  PseudoRandom() = default;
+  PseudoRandom(mls::CipherSuite suite, const std::string& label);
+
+  Generator prg;
+};
+
 struct TreeMathTestVector
 {
   using OptionalNode = std::optional<mls::NodeIndex>;
@@ -31,7 +64,7 @@ struct TreeMathTestVector
   std::optional<std::string> verify() const;
 };
 
-struct CryptoBasicsTestVector
+struct CryptoBasicsTestVector : PseudoRandom
 {
   struct RefHash
   {
@@ -40,7 +73,7 @@ struct CryptoBasicsTestVector
     bytes out;
 
     RefHash() = default;
-    RefHash(mls::CipherSuite suite);
+    RefHash(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -53,7 +86,7 @@ struct CryptoBasicsTestVector
     bytes out;
 
     ExpandWithLabel() = default;
-    ExpandWithLabel(mls::CipherSuite suite);
+    ExpandWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -64,7 +97,7 @@ struct CryptoBasicsTestVector
     bytes out;
 
     DeriveSecret() = default;
-    DeriveSecret(mls::CipherSuite suite);
+    DeriveSecret(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -77,7 +110,7 @@ struct CryptoBasicsTestVector
     bytes out;
 
     DeriveTreeSecret() = default;
-    DeriveTreeSecret(mls::CipherSuite suite);
+    DeriveTreeSecret(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -90,7 +123,7 @@ struct CryptoBasicsTestVector
     bytes signature;
 
     SignWithLabel() = default;
-    SignWithLabel(mls::CipherSuite suite);
+    SignWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -105,7 +138,7 @@ struct CryptoBasicsTestVector
     bytes ciphertext;
 
     EncryptWithLabel() = default;
-    EncryptWithLabel(mls::CipherSuite suite);
+    EncryptWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -123,7 +156,7 @@ struct CryptoBasicsTestVector
   std::optional<std::string> verify() const;
 };
 
-struct SecretTreeTestVector
+struct SecretTreeTestVector : PseudoRandom
 {
   struct SenderData
   {
@@ -133,7 +166,7 @@ struct SecretTreeTestVector
     bytes nonce;
 
     SenderData() = default;
-    SenderData(mls::CipherSuite suite);
+    SenderData(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
     std::optional<std::string> verify(mls::CipherSuite suite) const;
   };
 
@@ -160,12 +193,13 @@ struct SecretTreeTestVector
   std::optional<std::string> verify() const;
 };
 
-struct KeyScheduleTestVector
+struct KeyScheduleTestVector : PseudoRandom
 {
-  struct ExternalPSKInfo
+  struct Export
   {
-    bytes id;
-    bytes nonce;
+    std::string label;
+    bytes context;
+    size_t length;
     bytes secret;
   };
 
@@ -174,14 +208,12 @@ struct KeyScheduleTestVector
     // Chosen by the generator
     bytes tree_hash;
     bytes commit_secret;
+    bytes psk_secret;
     bytes confirmed_transcript_hash;
-    std::vector<ExternalPSKInfo> external_psks;
-    bytes psk_nonce;
 
     // Computed values
     bytes group_context;
 
-    bytes psk_secret;
     bytes joiner_secret;
     bytes welcome_secret;
     bytes init_secret;
@@ -189,13 +221,14 @@ struct KeyScheduleTestVector
     bytes sender_data_secret;
     bytes encryption_secret;
     bytes exporter_secret;
-    bytes authentication_secret;
+    bytes epoch_authenticator;
     bytes external_secret;
     bytes confirmation_key;
     bytes membership_key;
-    bytes resumption_secret;
+    bytes resumption_psk;
 
     mls::HPKEPublicKey external_pub;
+    Export exporter;
   };
 
   mls::CipherSuite cipher_suite;
@@ -205,13 +238,12 @@ struct KeyScheduleTestVector
 
   std::vector<Epoch> epochs;
 
-  static KeyScheduleTestVector create(mls::CipherSuite suite,
-                                      uint32_t n_epochs,
-                                      uint32_t n_psks);
+  KeyScheduleTestVector() = default;
+  KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
-struct MessageProtectionTestVector
+struct MessageProtectionTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
 
@@ -219,7 +251,6 @@ struct MessageProtectionTestVector
   mls::epoch_t epoch;
   bytes tree_hash;
   bytes confirmed_transcript_hash;
-  mls::LeafCount n_leaves;
 
   mls::SignaturePrivateKey signature_priv;
   mls::SignaturePublicKey signature_pub;
@@ -236,7 +267,7 @@ struct MessageProtectionTestVector
   mls::MLSMessage commit_pub;
   mls::MLSMessage commit_priv;
 
-  mls::ApplicationData application;
+  bytes application;
   mls::MLSMessage application_priv;
 
   MessageProtectionTestVector() = default;
@@ -244,8 +275,8 @@ struct MessageProtectionTestVector
   std::optional<std::string> verify();
 
 private:
-  mls::GroupContext group_context;
-  mls::GroupKeySource keys;
+  mls::GroupKeySource group_keys() const;
+  mls::GroupContext group_context() const;
 
   mls::MLSMessage protect_pub(
     const mls::GroupContent::RawContent& raw_content) const;
@@ -254,7 +285,25 @@ private:
   std::optional<mls::GroupContent> unprotect(const mls::MLSMessage& message);
 };
 
-struct TranscriptTestVector
+struct PSKSecretTestVector : PseudoRandom
+{
+  struct PSK
+  {
+    bytes psk_id;
+    bytes psk_nonce;
+    bytes psk;
+  };
+
+  mls::CipherSuite cipher_suite;
+  std::vector<PSK> psks;
+  bytes psk_secret;
+
+  PSKSecretTestVector() = default;
+  PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks);
+  std::optional<std::string> verify() const;
+};
+
+struct TranscriptTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
 
@@ -273,45 +322,171 @@ struct TranscriptTestVector
   bytes confirmed_transcript_hash_after;
   bytes interim_transcript_hash_after;
 
-  static TranscriptTestVector create(mls::CipherSuite suite);
+  TranscriptTestVector() = default;
+  TranscriptTestVector(mls::CipherSuite suite);
   std::optional<std::string> verify() const;
 };
 
-struct TreeKEMTestVector
+struct WelcomeTestVector : PseudoRandom
+{
+  mls::CipherSuite cipher_suite;
+
+  mls::HPKEPrivateKey init_priv;
+  mls::SignaturePublicKey signer_pub;
+
+  mls::MLSMessage key_package;
+  mls::MLSMessage welcome;
+
+  WelcomeTestVector() = default;
+  WelcomeTestVector(mls::CipherSuite suite);
+  std::optional<std::string> verify() const;
+};
+
+// XXX(RLB): The |structure| of the example trees below is to avoid compile
+// errors from gcc's -Werror=comment when there is a '\' character at the end of
+// a line.  Inspired by a similar bug in Chromium:
+//   https://codereview.chromium.org/874663003/patch/1/10001
+enum struct TreeStructure
+{
+  // Full trees on N leaves, created by member k adding member k+1
+  full_tree_2,
+  full_tree_3,
+  full_tree_4,
+  full_tree_5,
+  full_tree_6,
+  full_tree_7,
+  full_tree_8,
+  full_tree_32,
+  full_tree_33,
+  full_tree_34,
+
+  // |               W               |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y       |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       _       X       Z   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   _   E   F   G   H |
+  //
+  // * Start with full tree on 8 members
+  // * 0 commits removeing 2 and 3, and adding a new member
+  internal_blanks_no_skipping,
+
+  // |               W               |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       _               Y       |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   _       _       X       Z   |
+  // |  / \     / \     / \     / \  |
+  // | A   _   _   _   E   F   G   H |
+  //
+  // * Start with full tree on 8 members
+  // * 0 commitsremoveing 1, 2, and 3
+  internal_blanks_with_skipping,
+
+  // |               W[H]            |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y[H]    |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       V       X       _   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   D   E   F   G   H |
+  //
+  // * Start with full tree on 7 members
+  // * 0 commits adding a member in a partial Commit (no path)
+  unmerged_leaves_no_skipping,
+
+  // |               W [F]           |
+  // |         ______|______         |
+  // |        /             \        |
+  // |       U               Y [F]   |
+  // |     __|__           __|__     |
+  // |    /     \         /     \    |
+  // |   T       _       _       _   |
+  // |  / \     / \     / \     / \  |
+  // | A   B   C   D   E   F   G   _ |
+  //
+  // == Fig. 20 / {{parent-hash-tree}}
+  // * 0 creates group
+  // * 0 adds 1, ..., 6 in a partial Commit
+  // * O commits removing 5
+  // * 4 commits without any proposals
+  // * 0 commits adding a new member in a partial Commit
+  unmerged_leaves_with_skipping,
+};
+
+extern std::array<TreeStructure, 14> all_tree_structures;
+extern std::array<TreeStructure, 11> treekem_test_tree_structures;
+
+struct TreeHashTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
   bytes group_id;
 
-  mls::TreeKEMPublicKey ratchet_tree_before;
+  mls::TreeKEMPublicKey tree;
+  std::vector<bytes> tree_hashes;
+  std::vector<std::vector<mls::NodeIndex>> resolutions;
 
-  mls::LeafIndex add_sender;
-  bytes my_leaf_secret;
-  mls::LeafNode my_leaf_node;
-  bytes my_path_secret;
-
-  mls::LeafIndex update_sender;
-  mls::UpdatePath update_path;
-  bytes update_group_context;
-
-  bytes tree_hash_before;
-  bytes root_secret_after_add;
-  bytes root_secret_after_update;
-  mls::TreeKEMPublicKey ratchet_tree_after;
-  bytes tree_hash_after;
-
-  static TreeKEMTestVector create(mls::CipherSuite suite, size_t n_leaves);
-  void initialize_trees();
-  std::optional<std::string> verify() const;
+  TreeHashTestVector() = default;
+  TreeHashTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  std::optional<std::string> verify();
 };
 
-struct MessagesTestVector
+struct TreeKEMTestVector : PseudoRandom
 {
-  bytes key_package;
-  bytes ratchet_tree;
+  struct PathSecret
+  {
+    mls::NodeIndex node;
+    bytes path_secret;
+  };
 
-  bytes group_info;
+  struct LeafPrivateInfo
+  {
+    mls::LeafIndex index;
+    mls::HPKEPrivateKey encryption_priv;
+    mls::SignaturePrivateKey signature_priv;
+    std::vector<PathSecret> path_secrets;
+  };
+
+  struct UpdatePathInfo
+  {
+    mls::LeafIndex sender;
+    mls::UpdatePath update_path;
+    std::vector<std::optional<bytes>> path_secrets;
+    bytes commit_secret;
+    bytes tree_hash_after;
+  };
+
+  mls::CipherSuite cipher_suite;
+
+  bytes group_id;
+  mls::epoch_t epoch;
+  bytes confirmed_transcript_hash;
+
+  mls::TreeKEMPublicKey ratchet_tree;
+
+  std::vector<LeafPrivateInfo> leaves_private;
+  std::vector<UpdatePathInfo> update_paths;
+
+  TreeKEMTestVector() = default;
+  TreeKEMTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  std::optional<std::string> verify();
+};
+
+struct MessagesTestVector : PseudoRandom
+{
+  bytes mls_welcome;
+  bytes mls_group_info;
+  bytes mls_key_package;
+
+  bytes ratchet_tree;
   bytes group_secrets;
-  bytes welcome;
 
   bytes add_proposal;
   bytes update_proposal;
@@ -319,16 +494,15 @@ struct MessagesTestVector
   bytes pre_shared_key_proposal;
   bytes re_init_proposal;
   bytes external_init_proposal;
+  bytes group_context_extensions_proposal;
 
   bytes commit;
 
-  bytes content_auth_app;
-  bytes content_auth_proposal;
-  bytes content_auth_commit;
-  bytes mls_plaintext;
-  bytes mls_ciphertext;
+  bytes public_message_proposal;
+  bytes public_message_commit;
+  bytes private_message;
 
-  static MessagesTestVector create();
+  MessagesTestVector();
   std::optional<std::string> verify() const;
 };
 

@@ -299,6 +299,6 @@ TEST_CASE("Session with X509 Credential")
 
   auto bob_session = bob_pending_join.complete(welcome);
 
-  REQUIRE(alice_session.authentication_secret() ==
-          bob_session.authentication_secret());
+  REQUIRE(alice_session.epoch_authenticator() ==
+          bob_session.epoch_authenticator());
 }

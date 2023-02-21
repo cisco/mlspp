@@ -77,7 +77,7 @@ public:
                   size_t size) const;
   GroupInfo group_info() const;
   std::vector<LeafNode> roster() const;
-  bytes authentication_secret() const;
+  bytes epoch_authenticator() const;
 
   // Application message protection
   bytes protect(const bytes& plaintext);

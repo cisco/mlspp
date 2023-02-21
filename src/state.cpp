@@ -171,7 +171,7 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _key_schedule = KeyScheduleEpoch(
+  _key_schedule = KeyScheduleEpoch::joiner(
     _suite, secrets.joiner_secret, { /* no PSKs */ }, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);
 
@@ -347,8 +347,8 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
   auto leaf = opt::get(_tree.leaf_node(_index));
 
   auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
-  auto new_leaf =
-    leaf.for_update(_suite, _group_id, public_key, opts, _identity_priv);
+  auto new_leaf = leaf.for_update(
+    _suite, _group_id, _index, public_key, opts, _identity_priv);
 
   auto update = Update{ new_leaf };
   _cached_update = CachedUpdate{ leaf_secret, update };
@@ -1221,9 +1221,9 @@ State::roster() const
 }
 
 bytes
-State::authentication_secret() const
+State::epoch_authenticator() const
 {
-  return _key_schedule.authentication_secret;
+  return _key_schedule.epoch_authenticator;
 }
 
 LeafIndex

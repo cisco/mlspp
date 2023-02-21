@@ -130,6 +130,7 @@ TLS_SERIALIZER(mls::MLSMessage)
 TLS_SERIALIZER(mls::LeafNode)
 TLS_SERIALIZER(mls::UpdatePath)
 TLS_SERIALIZER(mls::KeyPackage)
+TLS_SERIALIZER(mls::Welcome)
 
 } // namespace nlohmann
 
@@ -207,17 +208,16 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector,
                                    sender_data,
                                    leaves)
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::ExternalPSKInfo,
-                                   id,
-                                   nonce,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Export,
+                                   label,
+                                   context,
+                                   length,
                                    secret)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    tree_hash,
                                    commit_secret,
-                                   confirmed_transcript_hash,
-                                   external_psks,
-                                   psk_nonce,
                                    psk_secret,
+                                   confirmed_transcript_hash,
                                    group_context,
                                    joiner_secret,
                                    welcome_secret,
@@ -225,12 +225,13 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    sender_data_secret,
                                    encryption_secret,
                                    exporter_secret,
-                                   authentication_secret,
+                                   epoch_authenticator,
                                    external_secret,
                                    confirmation_key,
                                    membership_key,
-                                   resumption_secret,
-                                   external_pub)
+                                   resumption_psk,
+                                   external_pub,
+                                   exporter)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector,
                                    cipher_suite,
                                    group_id,
@@ -257,6 +258,22 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessageProtectionTestVector,
                                    application,
                                    application_priv)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector::PSK,
+                                   psk_id,
+                                   psk_nonce,
+                                   psk)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PSKSecretTestVector,
+                                   cipher_suite,
+                                   psks,
+                                   psk_secret)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeHashTestVector,
+                                   cipher_suite,
+                                   group_id,
+                                   tree,
+                                   tree_hashes,
+                                   resolutions)
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
                                    group_id,
@@ -271,40 +288,52 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    confirmed_transcript_hash_after,
                                    interim_transcript_hash_after)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
+                                   cipher_suite,
+                                   init_priv,
+                                   signer_pub,
+                                   key_package,
+                                   welcome)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::PathSecret,
+                                   node,
+                                   path_secret)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::LeafPrivateInfo,
+                                   index,
+                                   encryption_priv,
+                                   signature_priv,
+                                   path_secrets)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::UpdatePathInfo,
+                                   sender,
+                                   update_path,
+                                   path_secrets,
+                                   commit_secret,
+                                   tree_hash_after)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector,
                                    cipher_suite,
                                    group_id,
-                                   ratchet_tree_before,
-                                   add_sender,
-                                   my_leaf_secret,
-                                   my_leaf_node,
-                                   my_path_secret,
-                                   update_sender,
-                                   update_path,
-                                   update_group_context,
-                                   tree_hash_before,
-                                   root_secret_after_add,
-                                   root_secret_after_update,
-                                   ratchet_tree_after,
-                                   tree_hash_after)
+                                   epoch,
+                                   confirmed_transcript_hash,
+                                   ratchet_tree,
+                                   leaves_private,
+                                   update_paths)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
-                                   key_package,
+                                   mls_welcome,
+                                   mls_group_info,
+                                   mls_key_package,
                                    ratchet_tree,
-                                   group_info,
                                    group_secrets,
-                                   welcome,
                                    add_proposal,
                                    update_proposal,
                                    remove_proposal,
                                    pre_shared_key_proposal,
                                    re_init_proposal,
                                    external_init_proposal,
+                                   group_context_extensions_proposal,
                                    commit,
-                                   content_auth_app,
-                                   content_auth_proposal,
-                                   content_auth_commit,
-                                   mls_plaintext,
-                                   mls_ciphertext)
+                                   public_message_proposal,
+                                   public_message_commit,
+                                   private_message)
 
 } // namespace mls_vectors

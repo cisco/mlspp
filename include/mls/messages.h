@@ -176,6 +176,10 @@ struct GroupInfo
             const SignaturePrivateKey& priv);
   bool verify(const TreeKEMPublicKey& tree) const;
 
+  // These methods exist only to simplify unit testing
+  void sign(LeafIndex signer_index, const SignaturePrivateKey& priv);
+  bool verify(const SignaturePublicKey& pub) const;
+
   TLS_SERIALIZABLE(group_context,
                    extensions,
                    confirmation_tag,
@@ -224,7 +228,6 @@ struct EncryptedGroupSecrets
 // } Welcome;
 struct Welcome
 {
-  ProtocolVersion version;
   CipherSuite cipher_suite;
   std::vector<EncryptedGroupSecrets> secrets;
   bytes encrypted_group_info;
@@ -242,7 +245,7 @@ struct Welcome
   GroupInfo decrypt(const bytes& joiner_secret,
                     const std::vector<PSKWithSecret>& psks) const;
 
-  TLS_SERIALIZABLE(version, cipher_suite, secrets, encrypted_group_info)
+  TLS_SERIALIZABLE(cipher_suite, secrets, encrypted_group_info)
 
 private:
   bytes _joiner_secret;
@@ -411,7 +414,7 @@ struct ApplicationData
 
 struct GroupContext;
 
-enum struct WireFormat : uint8_t
+enum struct WireFormat : uint16_t
 {
   reserved = 0,
   mls_plaintext = 1,

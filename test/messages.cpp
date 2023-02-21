@@ -136,8 +136,7 @@ TEST_CASE_FIXTURE(MLSMessageTest, "PrivateMessage Protect/Unprotect")
 
 TEST_CASE("Messages Interop")
 {
-  auto tv = MessagesTestVector::create();
-
+  auto tv = MessagesTestVector();
   auto result = tv.verify();
   REQUIRE(result == std::nullopt);
 }
