@@ -641,7 +641,7 @@ TreeKEMPublicKey::update(LeafIndex from,
 
   auto leaf_pub = opt::get(priv.private_key(NodeIndex(from))).public_key;
   auto new_leaf = leaf_node.leaf_node().for_commit(
-    suite, group_id, leaf_pub, ph0, opts, sig_priv);
+    suite, group_id, from, leaf_pub, ph0, opts, sig_priv);
 
   // Merge the changes into the tree
   merge(from, UpdatePath{ std::move(new_leaf), std::move(path_nodes) });
@@ -743,13 +743,13 @@ TreeKEMPublicKey::node_at(NodeIndex n) const
 OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n)
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 const OptionalNode&
 TreeKEMPublicKey::node_at(LeafIndex n) const
 {
-  return nodes.at(NodeIndex(n).val);
+  return node_at(NodeIndex(n));
 }
 
 void
