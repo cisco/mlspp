@@ -436,6 +436,30 @@ struct TreeHashTestVector : PseudoRandom
   std::optional<std::string> verify();
 };
 
+struct TreeOperationsTestVector : PseudoRandom
+{
+  enum struct Scenario
+  {
+    add_right_edge,
+    add_internal,
+    update,
+    remove_right_edge,
+    remove_internal,
+  };
+
+  static const std::vector<Scenario> all_scenarios;
+
+  mls::TreeKEMPublicKey tree_before;
+  mls::Proposal proposal;
+  mls::LeafIndex proposal_sender;
+
+  mls::TreeKEMPublicKey tree_after;
+
+  TreeOperationsTestVector() = default;
+  TreeOperationsTestVector(mls::CipherSuite suite, Scenario scenario);
+  std::optional<std::string> verify() const;
+};
+
 struct TreeKEMTestVector : PseudoRandom
 {
   struct PathSecret
