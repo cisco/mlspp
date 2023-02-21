@@ -1007,11 +1007,14 @@ TranscriptTestVector::verify() const
   transcript.interim = interim_transcript_hash_before;
 
   transcript.update(auth_content);
-  VERIFY_EQUAL("confirmed",  transcript.confirmed, confirmed_transcript_hash_after);
-  VERIFY_EQUAL("interim",  transcript.interim, interim_transcript_hash_after);
+  VERIFY_EQUAL(
+    "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
+  VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
 
-  auto confirmation_tag = cipher_suite.digest().hmac(confirmation_key, transcript.confirmed);
-  VERIFY_EQUAL("confirmation tag", confirmation_tag, auth_content.auth.confirmation_tag);
+  auto confirmation_tag =
+    cipher_suite.digest().hmac(confirmation_key, transcript.confirmed);
+  VERIFY_EQUAL(
+    "confirmation tag", confirmation_tag, auth_content.auth.confirmation_tag);
 
   return std::nullopt;
 }

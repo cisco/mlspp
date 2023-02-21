@@ -32,7 +32,7 @@ make_test_vector(uint64_t type)
     case TestVectorType::TREE_MATH:
       return TreeMathTestVector{ n };
 
-    case TestVectorType::KEY_SCHEDULE:{
+    case TestVectorType::KEY_SCHEDULE: {
       auto cases = std::vector<KeyScheduleTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
@@ -42,7 +42,7 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case TestVectorType::TRANSCRIPT:{
+    case TestVectorType::TRANSCRIPT: {
       auto cases = std::vector<TranscriptTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
