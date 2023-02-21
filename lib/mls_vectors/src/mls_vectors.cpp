@@ -584,19 +584,24 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
       epoch_prg.secret("confirmed_transcript_hash");
     auto ctx = tls::marshal(group_context);
 
-    auto commit_secret = epoch_prg.secret("commit_secret");
     // TODO(RLB) Add Test case for externally-driven epoch change
-    epoch = epoch.next(commit_secret, {}, std::nullopt, ctx);
+    auto commit_secret = epoch_prg.secret("commit_secret");
+    auto psk_secret = epoch_prg.secret("psk_secret");
+    epoch = epoch.next_raw(commit_secret, psk_secret, std::nullopt, ctx);
 
-    auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(cipher_suite, epoch.joiner_secret, {});
+    auto welcome_secret = KeyScheduleEpoch::welcome_secret_raw(
+      cipher_suite, epoch.joiner_secret, psk_secret);
 
-    auto exporter_label = to_hex(epoch_prg.secret("exporter_label"));
+    auto exporter_prg = epoch_prg.sub("exporter");
+    auto exporter_label = to_hex(exporter_prg.secret("label"));
+    auto exporter_context = exporter_prg.secret("context");
     auto exporter_length = cipher_suite.secret_size();
-    auto exported = epoch.do_export(exporter_label, {}, exporter_length);
+    auto exported =
+      epoch.do_export(exporter_label, exporter_context, exporter_length);
 
     epochs.push_back({ group_context.tree_hash,
                        commit_secret,
+                       psk_secret,
                        group_context.confirmed_transcript_hash,
 
                        ctx,
@@ -618,6 +623,7 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
 
                        {
                          exporter_label,
+                         exporter_context,
                          exporter_length,
                          exported,
                        } });
@@ -639,13 +645,14 @@ KeyScheduleTestVector::verify() const
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("group context", ctx, tve.group_context);
 
-    epoch = epoch.next(tve.commit_secret, {}, std::nullopt, ctx);
+    epoch =
+      epoch.next_raw(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
 
-    auto welcome_secret =
-      KeyScheduleEpoch::welcome_secret(cipher_suite, tve.joiner_secret, {});
+    auto welcome_secret = KeyScheduleEpoch::welcome_secret_raw(
+      cipher_suite, tve.joiner_secret, tve.psk_secret);
     VERIFY_EQUAL("welcome secret", welcome_secret, tve.welcome_secret);
 
     VERIFY_EQUAL(
@@ -667,8 +674,8 @@ KeyScheduleTestVector::verify() const
       "external pub", epoch.external_priv.public_key, tve.external_pub);
 
     auto exported = epoch.do_export(
-      tve.exporter.exporter_label, {}, tve.exporter.exporter_length);
-    VERIFY_EQUAL("exported", exported, tve.exporter.exported);
+      tve.exporter.label, tve.exporter.context, tve.exporter.length);
+    VERIFY_EQUAL("exported", exported, tve.exporter.secret);
 
     group_context.epoch += 1;
   }
@@ -1063,7 +1070,7 @@ WelcomeTestVector::WelcomeTestVector(CipherSuite suite)
     cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
   };
 
-  auto key_schedule = KeyScheduleEpoch(
+  auto key_schedule = KeyScheduleEpoch::joiner(
     cipher_suite, joiner_secret, {}, tls::marshal(group_context));
   auto confirmation_tag =
     key_schedule.confirmation_tag(confirmed_transcript_hash);
@@ -1106,7 +1113,7 @@ WelcomeTestVector::verify() const
 
   // Verify confirmation tag
   const auto& group_context = group_info.group_context;
-  auto key_schedule = KeyScheduleEpoch(
+  auto key_schedule = KeyScheduleEpoch::joiner(
     cipher_suite, group_secrets.joiner_secret, {}, tls::marshal(group_context));
   auto confirmation_tag =
     key_schedule.confirmation_tag(group_context.confirmed_transcript_hash);

@@ -97,7 +97,6 @@ private:
 
 public:
   bytes joiner_secret;
-  bytes psk_secret;
   bytes epoch_secret;
 
   bytes sender_data_secret;
@@ -115,10 +114,10 @@ public:
   KeyScheduleEpoch() = default;
 
   // Full initializer, used by invited joiner
-  KeyScheduleEpoch(CipherSuite suite_in,
-                   const bytes& joiner_secret,
-                   const std::vector<PSKWithSecret>& psks,
-                   const bytes& context);
+  static KeyScheduleEpoch joiner(CipherSuite suite_in,
+                                 const bytes& joiner_secret,
+                                 const std::vector<PSKWithSecret>& psks,
+                                 const bytes& context);
 
   // Ciphersuite-only initializer, used by external joiner
   KeyScheduleEpoch(CipherSuite suite_in);
@@ -126,13 +125,6 @@ public:
   // Initial epoch
   KeyScheduleEpoch(CipherSuite suite_in,
                    const bytes& init_secret,
-                   const bytes& context);
-
-  // Subsequent epochs
-  KeyScheduleEpoch(CipherSuite suite_in,
-                   const bytes& init_secret,
-                   const bytes& commit_secret,
-                   const std::vector<PSKWithSecret>& psks,
                    const bytes& context);
 
   static std::tuple<bytes, bytes> external_init(
@@ -162,6 +154,26 @@ public:
   static KeyAndNonce sender_data_keys(CipherSuite suite,
                                       const bytes& sender_data_secret,
                                       const bytes& ciphertext);
+
+  // TODO(RLB) make these methods private, but accessible to test vectors
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& init_secret,
+                   const bytes& commit_secret,
+                   const bytes& psk_secret,
+                   const bytes& context);
+  KeyScheduleEpoch next_raw(const bytes& commit_secret,
+                            const bytes& psk_secret,
+                            const std::optional<bytes>& force_init_secret,
+                            const bytes& context) const;
+  static bytes welcome_secret_raw(CipherSuite suite,
+                                  const bytes& joiner_secret,
+                                  const bytes& psk_secret);
+
+private:
+  KeyScheduleEpoch(CipherSuite suite_in,
+                   const bytes& joiner_secret,
+                   const bytes& psk_secret,
+                   const bytes& context);
 };
 
 bool

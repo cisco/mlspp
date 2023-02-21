@@ -37,8 +37,15 @@ make_test_vector(uint64_t type)
     case TestVectorType::TREE_MATH:
       return TreeMathTestVector{ n };
 
-    case TestVectorType::KEY_SCHEDULE:
-      return KeyScheduleTestVector{ suite, n };
+    case TestVectorType::KEY_SCHEDULE: {
+      auto cases = std::vector<KeyScheduleTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite, n);
+      }
+
+      return cases;
+    }
 
     case TestVectorType::TRANSCRIPT:
       return TranscriptTestVector{ suite };

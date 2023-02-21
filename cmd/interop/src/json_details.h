@@ -208,9 +208,15 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecretTreeTestVector,
                                    sender_data,
                                    leaves)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Export,
+                                   label,
+                                   context,
+                                   length,
+                                   secret)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    tree_hash,
                                    commit_secret,
+                                   psk_secret,
                                    confirmed_transcript_hash,
                                    group_context,
                                    joiner_secret,
@@ -224,7 +230,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector::Epoch,
                                    confirmation_key,
                                    membership_key,
                                    resumption_psk,
-                                   external_pub)
+                                   external_pub,
+                                   exporter)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(KeyScheduleTestVector,
                                    cipher_suite,
                                    group_id,

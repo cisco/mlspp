@@ -171,7 +171,7 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _key_schedule = KeyScheduleEpoch(
+  _key_schedule = KeyScheduleEpoch::joiner(
     _suite, secrets.joiner_secret, { /* no PSKs */ }, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);
 
