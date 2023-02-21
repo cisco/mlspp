@@ -199,12 +199,14 @@ struct LeafNode
 
   LeafNode for_update(CipherSuite cipher_suite,
                       const bytes& group_id,
+                      LeafIndex leaf_index,
                       HPKEPublicKey encryption_key,
                       const LeafNodeOptions& opts,
                       const SignaturePrivateKey& sig_priv_in) const;
 
   LeafNode for_commit(CipherSuite cipher_suite,
                       const bytes& group_id,
+                      LeafIndex leaf_index,
                       HPKEPublicKey encryption_key,
                       const bytes& parent_hash,
                       const LeafNodeOptions& opts,
@@ -212,11 +214,18 @@ struct LeafNode
 
   LeafNodeSource source() const;
 
+  struct MemberBinding
+  {
+    const bytes& group_id;
+    LeafIndex leaf_index;
+    TLS_SERIALIZABLE(group_id, leaf_index);
+  };
+
   void sign(CipherSuite cipher_suite,
             const SignaturePrivateKey& sig_priv,
-            const std::optional<bytes>& group_id);
+            const std::optional<MemberBinding>& binding);
   bool verify(CipherSuite cipher_suite,
-              const std::optional<bytes>& group_id) const;
+              const std::optional<MemberBinding>& binding) const;
 
   bool verify_expiry(uint64_t now) const;
   bool verify_extension_support(const ExtensionList& ext_list) const;
@@ -239,7 +248,7 @@ struct LeafNode
 private:
   LeafNode clone_with_options(HPKEPublicKey encryption_key,
                               const LeafNodeOptions& opts) const;
-  bytes to_be_signed(const std::optional<bytes>& group_id) const;
+  bytes to_be_signed(const std::optional<MemberBinding>& binding) const;
 };
 
 // Concrete extension types

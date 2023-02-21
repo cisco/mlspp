@@ -144,6 +144,7 @@ LeafNode::LeafNode(CipherSuite cipher_suite,
 LeafNode
 LeafNode::for_update(CipherSuite cipher_suite,
                      const bytes& group_id,
+                     LeafIndex leaf_index,
                      HPKEPublicKey encryption_key_in,
                      const LeafNodeOptions& opts,
                      const SignaturePrivateKey& sig_priv) const
@@ -151,7 +152,7 @@ LeafNode::for_update(CipherSuite cipher_suite,
   auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = Empty{};
-  clone.sign(cipher_suite, sig_priv, group_id);
+  clone.sign(cipher_suite, sig_priv, { { group_id, leaf_index } });
 
   return clone;
 }
@@ -159,6 +160,7 @@ LeafNode::for_update(CipherSuite cipher_suite,
 LeafNode
 LeafNode::for_commit(CipherSuite cipher_suite,
                      const bytes& group_id,
+                     LeafIndex leaf_index,
                      HPKEPublicKey encryption_key_in,
                      const bytes& parent_hash,
                      const LeafNodeOptions& opts,
@@ -167,7 +169,7 @@ LeafNode::for_commit(CipherSuite cipher_suite,
   auto clone = clone_with_options(std::move(encryption_key_in), opts);
 
   clone.content = ParentHash{ parent_hash };
-  clone.sign(cipher_suite, sig_priv, group_id);
+  clone.sign(cipher_suite, sig_priv, { { group_id, leaf_index } });
 
   return clone;
 }
@@ -181,9 +183,9 @@ LeafNode::source() const
 void
 LeafNode::sign(CipherSuite cipher_suite,
                const SignaturePrivateKey& sig_priv,
-               const std::optional<bytes>& group_id)
+               const std::optional<MemberBinding>& binding)
 {
-  const auto tbs = to_be_signed(group_id);
+  const auto tbs = to_be_signed(binding);
 
   if (sig_priv.public_key != signature_key) {
     throw InvalidParameterError("Signature key mismatch");
@@ -198,9 +200,9 @@ LeafNode::sign(CipherSuite cipher_suite,
 
 bool
 LeafNode::verify(CipherSuite cipher_suite,
-                 const std::optional<bytes>& group_id) const
+                 const std::optional<MemberBinding>& binding) const
 {
-  const auto tbs = to_be_signed(group_id);
+  const auto tbs = to_be_signed(binding);
 
   if (CredentialType::x509 == credential.type()) {
     const auto& cred = credential.get<X509Credential>();
@@ -326,7 +328,7 @@ struct LeafNodeTBS
 };
 
 bytes
-LeafNode::to_be_signed(const std::optional<bytes>& group_id) const
+LeafNode::to_be_signed(const std::optional<MemberBinding>& binding) const
 {
   tls::ostream w;
 
@@ -341,7 +343,7 @@ LeafNode::to_be_signed(const std::optional<bytes>& group_id) const
 
     case LeafNodeSource::update:
     case LeafNodeSource::commit:
-      w << opt::get(group_id);
+      w << opt::get(binding);
   }
 
   return w.bytes();
