@@ -288,6 +288,12 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
                                    key_package,
                                    welcome)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeOperationsTestVector,
+                                   tree_before,
+                                   proposal,
+                                   proposal_sender,
+                                   tree_after)
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeKEMTestVector::PathSecret,
                                    node,
                                    path_secret)

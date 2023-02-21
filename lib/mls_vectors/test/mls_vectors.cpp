@@ -1,5 +1,4 @@
 #include <doctest/doctest.h>
-#include <iostream> // XXX
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 
@@ -91,13 +90,6 @@ TEST_CASE("Tree Operations")
   auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
   for (auto scenario : TreeOperationsTestVector::all_scenarios) {
     auto tv = TreeOperationsTestVector{ suite, scenario };
-
-    std::cout << "~~~ before ~~~ " << std::endl;
-    tv.tree_before.dump();
-    std::cout << "~~~ after ~~~ " << std::endl;
-    tv.tree_after.dump();
-    std::cout << std::endl << std::endl;
-
     REQUIRE(tv.verify() == std::nullopt);
   }
 }

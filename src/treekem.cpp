@@ -376,9 +376,9 @@ TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
 LeafIndex
 TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
 {
-  // Find the leftmost free leaf
+  // Find the leftmost blank leaf node
   auto index = LeafIndex(0);
-  while (index.val < size.val && node_at(NodeIndex(index)).node) {
+  while (index.val < size.val && !node_at(index).blank()) {
     index.val++;
   }
 
@@ -395,7 +395,7 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
   }
 
   // Set the leaf
-  node_at(ni).node = Node{ leaf };
+  node_at(index).node = Node{ leaf };
 
   // Update the unmerged list
   for (auto& n : ni.dirpath(size)) {
@@ -994,14 +994,39 @@ operator<<(tls::ostream& str, const TreeKEMPublicKey& obj)
 tls::istream&
 operator>>(tls::istream& str, TreeKEMPublicKey& obj)
 {
+  // Read the node list
   str >> obj.nodes;
   if (obj.nodes.empty()) {
     return str;
   }
 
+  // Adjust the size value to fit the non-blank nodes
   obj.size.val = 1;
   while (NodeCount(obj.size).val < obj.nodes.size()) {
     obj.size.val *= 2;
+  }
+
+  // Add blank nodes to the end
+  obj.nodes.resize(NodeCount(obj.size).val);
+
+  // Verify the basic structure of the tree is sane
+  for (size_t i = 0; i < obj.nodes.size(); i++) {
+    if (obj.nodes[i].blank()) {
+      continue;
+    }
+
+    const auto& node = opt::get(obj.nodes[i].node).node;
+    auto at_leaf = (i % 2 == 0);
+    auto holds_leaf = var::holds_alternative<LeafNode>(node);
+    auto holds_parent = var::holds_alternative<ParentNode>(node);
+
+    if (at_leaf && !holds_leaf) {
+      throw InvalidParameterError("Parent node in leaf node position");
+    }
+
+    if (!at_leaf && !holds_parent) {
+      throw InvalidParameterError("Leaf node in parent node position");
+    }
   }
 
   return str;
