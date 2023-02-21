@@ -606,10 +606,10 @@ TreeKEMPublicKey::leaf_node(LeafIndex index) const
 
 TreeKEMPrivateKey
 TreeKEMPublicKey::update(LeafIndex from,
-                        const bytes& leaf_secret,
-                        const bytes& group_id,
-                        const SignaturePrivateKey& sig_priv,
-                        const LeafNodeOptions& opts)
+                         const bytes& leaf_secret,
+                         const bytes& group_id,
+                         const SignaturePrivateKey& sig_priv,
+                         const LeafNodeOptions& opts)
 {
   // Grab information about the sender
   const auto& leaf_node = node_at(from);

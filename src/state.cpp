@@ -513,11 +513,8 @@ State::commit(const bytes& leaf_secret,
                                              joiner_locations,
                                              leaf_node_opts);
     */
-    auto new_priv = next._tree.update(next._index,
-                                      leaf_secret,
-                                      next._group_id,
-                                      _identity_priv,
-                                      leaf_node_opts);
+    auto new_priv = next._tree.update(
+      next._index, leaf_secret, next._group_id, _identity_priv, leaf_node_opts);
 
     auto ctx = tls::marshal(GroupContext{
       next._suite,
