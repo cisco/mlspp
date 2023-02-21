@@ -296,13 +296,21 @@ make_epoch_secret(CipherSuite suite,
     member_secret, "epoch", context, suite.secret_size());
 }
 
+KeyScheduleEpoch
+KeyScheduleEpoch::joiner(CipherSuite suite_in,
+                         const bytes& joiner_secret,
+                         const std::vector<PSKWithSecret>& psks,
+                         const bytes& context)
+{
+  return { suite_in, joiner_secret, make_psk_secret(suite_in, psks), context };
+}
+
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& joiner_secret,
-                                   const std::vector<PSKWithSecret>& psks,
+                                   const bytes& psk_secret,
                                    const bytes& context)
   : suite(suite_in)
   , joiner_secret(joiner_secret)
-  , psk_secret(make_psk_secret(suite_in, psks))
   , epoch_secret(
       make_epoch_secret(suite_in, joiner_secret, psk_secret, context))
   , sender_data_secret(suite.derive_secret(epoch_secret, "sender data"))
@@ -337,12 +345,12 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& commit_secret,
-                                   const std::vector<PSKWithSecret>& psks,
+                                   const bytes& psk_secret,
                                    const bytes& context)
   : KeyScheduleEpoch(
       suite_in,
       make_joiner_secret(suite_in, context, init_secret, commit_secret),
-      psks,
+      psk_secret,
       context)
 {
 }
@@ -370,12 +378,22 @@ KeyScheduleEpoch::next(const bytes& commit_secret,
                        const std::optional<bytes>& force_init_secret,
                        const bytes& context) const
 {
+  return next_raw(
+    commit_secret, make_psk_secret(suite, psks), force_init_secret, context);
+}
+
+KeyScheduleEpoch
+KeyScheduleEpoch::next_raw(const bytes& commit_secret,
+                           const bytes& psk_secret,
+                           const std::optional<bytes>& force_init_secret,
+                           const bytes& context) const
+{
   auto actual_init_secret = init_secret;
   if (force_init_secret) {
     actual_init_secret = opt::get(force_init_secret);
   }
 
-  return { suite, actual_init_secret, commit_secret, psks, context };
+  return { suite, actual_init_secret, commit_secret, psk_secret, context };
 }
 
 GroupKeySource
@@ -434,6 +452,14 @@ KeyScheduleEpoch::welcome_secret(CipherSuite suite,
                                  const std::vector<PSKWithSecret>& psks)
 {
   auto psk_secret = make_psk_secret(suite, psks);
+  return welcome_secret_raw(suite, joiner_secret, psk_secret);
+}
+
+bytes
+KeyScheduleEpoch::welcome_secret_raw(CipherSuite suite,
+                                     const bytes& joiner_secret,
+                                     const bytes& psk_secret)
+{
   auto extract = suite.hpke().kdf.extract(joiner_secret, psk_secret);
   return suite.derive_secret(extract, "welcome");
 }

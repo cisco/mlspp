@@ -197,9 +197,10 @@ struct KeyScheduleTestVector : PseudoRandom
 {
   struct Export
   {
-    std::string exporter_label;
-    size_t exporter_length;
-    bytes exported;
+    std::string label;
+    bytes context;
+    size_t length;
+    bytes secret;
   };
 
   struct Epoch
@@ -207,6 +208,7 @@ struct KeyScheduleTestVector : PseudoRandom
     // Chosen by the generator
     bytes tree_hash;
     bytes commit_secret;
+    bytes psk_secret;
     bytes confirmed_transcript_hash;
 
     // Computed values
