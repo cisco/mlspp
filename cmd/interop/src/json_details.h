@@ -269,15 +269,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeHashTestVector,
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
-                                   group_id,
-                                   epoch,
-                                   tree_hash_before,
-                                   confirmed_transcript_hash_before,
                                    interim_transcript_hash_before,
                                    confirmation_key,
-                                   signature_key,
-                                   commit,
-                                   group_context,
+                                   message,
                                    confirmed_transcript_hash_after,
                                    interim_transcript_hash_after)
 

@@ -942,21 +942,21 @@ PSKSecretTestVector::verify() const
 TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   : PseudoRandom(suite, "transcript")
   , cipher_suite(suite)
-  , group_id(prg.secret("group_id"))
-  , epoch(prg.uint64("epoch"))
-  , tree_hash_before(prg.secret("tree_hash_before"))
-  , confirmed_transcript_hash_before(
-      prg.secret("confirmed_transcript_hash_before"))
   , interim_transcript_hash_before(prg.secret("interim_transcript_hash_before"))
 {
   auto transcript = TranscriptHash(suite);
   transcript.interim = interim_transcript_hash_before;
 
-  auto group_context_obj = GroupContext{
-    suite, group_id, epoch, tree_hash_before, confirmed_transcript_hash_before,
-    {}
-  };
-  group_context = tls::marshal(group_context_obj);
+  auto group_id = prg.secret("group_id");
+  auto epoch = prg.uint64("epoch");
+  auto group_context_obj =
+    GroupContext{ suite,
+                  group_id,
+                  epoch,
+                  prg.secret("tree_hash_before"),
+                  prg.secret("confirmed_transcript_hash_before"),
+                  {} };
+  auto group_context = tls::marshal(group_context_obj);
 
   auto init_secret = prg.secret("init_secret");
   auto ks_epoch = KeyScheduleEpoch(suite, init_secret, group_context);
@@ -967,22 +967,24 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   auto commit_content = GroupContent{
     group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
   };
-  commit = AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                      std::move(commit_content),
-                                      suite,
-                                      sig_priv,
-                                      group_context_obj);
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                                 std::move(commit_content),
+                                                 suite,
+                                                 sig_priv,
+                                                 group_context_obj);
 
-  transcript.update_confirmed(commit);
+  transcript.update_confirmed(auth_content);
 
   const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  commit.set_confirmation_tag(confirmation_tag);
+  auth_content.set_confirmation_tag(confirmation_tag);
 
-  transcript.update_interim(commit);
+  transcript.update_interim(auth_content);
 
-  // Store remaining data
+  // Store the required data
   confirmation_key = ks_epoch.confirmation_key;
-  signature_key = sig_priv.public_key;
+
+  message = PublicMessage::protect(
+    auth_content, suite, ks_epoch.membership_key, group_context_obj);
 
   confirmed_transcript_hash_after = transcript.confirmed;
   interim_transcript_hash_after = transcript.interim;
@@ -991,34 +993,18 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
 std::optional<std::string>
 TranscriptTestVector::verify() const
 {
-  auto group_context_obj = GroupContext{ cipher_suite,
-                                         group_id,
-                                         epoch,
-                                         tree_hash_before,
-                                         confirmed_transcript_hash_before,
-                                         {} };
-  auto ctx = tls::marshal(group_context_obj);
-  VERIFY_EQUAL("group context", ctx, group_context);
+  auto public_message = var::get<PublicMessage>(message.message);
+  auto auth_content = public_message.authenticated_content();
 
-  // Verify the transcript
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
-  transcript.update(commit);
-  VERIFY_EQUAL(
-    "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
-  VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
 
-  // Verify that the commit signature is valid
-  auto commit_valid =
-    commit.verify(cipher_suite, signature_key, group_context_obj);
-  VERIFY("commit signature valid", commit_valid);
+  transcript.update(auth_content);
+  VERIFY_EQUAL("confirmed",  transcript.confirmed, confirmed_transcript_hash_after);
+  VERIFY_EQUAL("interim",  transcript.interim, interim_transcript_hash_after);
 
-  // Verify the confirmation tag
-  auto ks_epoch = KeyScheduleEpoch(cipher_suite, {}, ctx);
-  ks_epoch.confirmation_key = confirmation_key;
-
-  auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  VERIFY("confirmation", commit.check_confirmation_tag(confirmation_tag));
+  auto confirmation_tag = cipher_suite.digest().hmac(confirmation_key, transcript.confirmed);
+  VERIFY_EQUAL("confirmation tag", confirmation_tag, auth_content.auth.confirmation_tag);
 
   return std::nullopt;
 }

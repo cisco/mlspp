@@ -585,6 +585,9 @@ struct PublicMessage
 
   bool contains(const AuthenticatedContent& content_auth) const;
 
+  // TODO(RLB) Make this private and expose only to tests
+  AuthenticatedContent authenticated_content() const;
+
   friend tls::ostream& operator<<(tls::ostream& str, const PublicMessage& obj);
   friend tls::istream& operator>>(tls::istream& str, PublicMessage& obj);
 

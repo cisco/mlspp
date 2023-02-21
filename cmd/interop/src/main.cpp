@@ -24,24 +24,33 @@ static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
 static constexpr uint64_t TREE_HASHES = 15;
 
-// XXX(RLB): This function currently produces only one example of each type, as
-// a top-level object, not a top-level array.  We should produce a more
-// comprehensive matrix.
 static json
 make_test_vector(uint64_t type)
 {
-  // TODO read parameters from the command line
-  auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
   auto n = uint32_t(5);
   switch (type) {
     case TestVectorType::TREE_MATH:
       return TreeMathTestVector{ n };
 
-    case TestVectorType::KEY_SCHEDULE:
-      return KeyScheduleTestVector{ suite, n };
+    case TestVectorType::KEY_SCHEDULE:{
+      auto cases = std::vector<KeyScheduleTestVector>();
 
-    case TestVectorType::TRANSCRIPT:
-      return TranscriptTestVector{ suite };
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite, n);
+      }
+
+      return cases;
+    }
+
+    case TestVectorType::TRANSCRIPT:{
+      auto cases = std::vector<TranscriptTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
 
     case TestVectorType::TREEKEM: {
       auto cases = std::vector<TreeKEMTestVector>();
@@ -167,7 +176,7 @@ verify_test_vector(uint64_t type)
       return verify_test_vector<KeyScheduleTestVector>(j);
 
     case TestVectorType::TRANSCRIPT:
-      return j.get<TranscriptTestVector>().verify();
+      return verify_test_vector<TranscriptTestVector>(j);
 
     case TestVectorType::TREEKEM:
       return verify_test_vector<TreeKEMTestVector>(j);
