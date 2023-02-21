@@ -31,6 +31,11 @@ struct MessageOpts
   size_t padding_size = 0;
 };
 
+struct PSKStore
+{
+  virtual bytes get_psk_secret(const PreSharedKeyID& id) const = 0;
+};
+
 class State
 {
 public:
