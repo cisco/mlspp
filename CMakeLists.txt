@@ -70,14 +70,27 @@ endif()
 ### Dependencies
 ###
 
+# External libraries
+find_package(OpenSSL REQUIRED)
+if ( OPENSSL_FOUND )
+    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
+        add_compile_definitions(WITH_OPENSSL3)
+    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
+        message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
+    endif()
+    message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
+    message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
+    message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
+else()
+    message(FATAL_ERROR "No OpenSSL library found")
+endif()
+
 # Internal libraries
 add_subdirectory(lib)
 
 # Third-Party libraries in tree
 add_subdirectory(third_party)
 
-# External libraries
-find_package(OpenSSL 1.1 REQUIRED)
 
 ###
 ### Library Config

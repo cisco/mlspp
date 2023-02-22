@@ -8,6 +8,10 @@
 #include "openssl/ec.h"
 #include "openssl/evp.h"
 #include "openssl/obj_mac.h"
+#if defined(WITH_OPENSSL3)
+#include "openssl/core_names.h"
+#include "openssl/param_build.h"
+#endif
 
 namespace hpke {
 
@@ -178,6 +182,131 @@ struct ECKeyGroup : public EVPGroup
   {
   }
 
+#if defined(WITH_OPENSSL3)
+  typed_unique_ptr<EVP_PKEY> keypair_evp_key(
+    const typed_unique_ptr<BIGNUM>& priv) const
+  {
+    const auto* name = OBJ_nid2sn(curve_nid);
+    if (name == nullptr) {
+      throw std::runtime_error("Unsupported algorithm");
+    }
+
+    auto group = make_typed_unique(
+      EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid));
+    if (group == nullptr) {
+      throw openssl_error();
+    }
+
+    auto pt = make_typed_unique(EC_POINT_new(group.get()));
+    if (pt == nullptr) {
+      throw openssl_error();
+    }
+
+    if (1 != EC_POINT_mul(
+               group.get(), pt.get(), priv.get(), nullptr, nullptr, nullptr)) {
+      throw openssl_error();
+    }
+
+    const auto pt_size = EC_POINT_point2oct(group.get(),
+                                            pt.get(),
+                                            POINT_CONVERSION_UNCOMPRESSED,
+                                            nullptr,
+                                            0,
+                                            nullptr);
+    if (0 == pt_size) {
+      throw openssl_error();
+    }
+
+    bytes pub(pt_size);
+    if (EC_POINT_point2oct(group.get(),
+                           pt.get(),
+                           POINT_CONVERSION_UNCOMPRESSED,
+                           pub.data(),
+                           pt_size,
+                           nullptr) != pt_size) {
+      throw openssl_error();
+    }
+
+    auto builder = make_typed_unique(OSSL_PARAM_BLD_new());
+    if (builder == nullptr ||
+        1 != OSSL_PARAM_BLD_push_utf8_string(
+               builder.get(), OSSL_PKEY_PARAM_GROUP_NAME, name, 0) ||
+        1 != OSSL_PARAM_BLD_push_BN(
+               builder.get(), OSSL_PKEY_PARAM_PRIV_KEY, priv.get()) ||
+        1 !=
+          OSSL_PARAM_BLD_push_octet_string(
+            builder.get(), OSSL_PKEY_PARAM_PUB_KEY, pub.data(), pub.size())) {
+      throw openssl_error();
+    }
+
+    auto params = make_typed_unique(OSSL_PARAM_BLD_to_param(builder.get()));
+    auto ctx =
+      make_typed_unique(EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr));
+    auto key = make_typed_unique(EVP_PKEY_new());
+    auto* key_ptr = key.get();
+    if (params == nullptr || ctx == nullptr || key == nullptr ||
+        EVP_PKEY_fromdata_init(ctx.get()) <= 0 ||
+        EVP_PKEY_fromdata(
+          ctx.get(), &key_ptr, EVP_PKEY_KEYPAIR, params.get()) <= 0) {
+      throw openssl_error();
+    }
+    ctx.reset();
+
+    ctx = make_typed_unique(
+      EVP_PKEY_CTX_new_from_pkey(nullptr, key.get(), nullptr));
+    if (EVP_PKEY_check(ctx.get()) <= 0) {
+      throw openssl_error();
+    }
+
+    return key;
+  }
+
+  typed_unique_ptr<EVP_PKEY> public_evp_key(const bytes& pub) const
+  {
+    const auto* name = OBJ_nid2sn(curve_nid);
+    if (name == nullptr) {
+      throw std::runtime_error("Unsupported algorithm");
+    }
+
+    auto group = make_typed_unique(
+      EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid));
+    if (group == nullptr) {
+      throw openssl_error();
+    }
+
+    auto builder = make_typed_unique(OSSL_PARAM_BLD_new());
+    if (builder == nullptr ||
+        1 != OSSL_PARAM_BLD_push_utf8_string(
+               builder.get(), OSSL_PKEY_PARAM_GROUP_NAME, name, 0) ||
+        1 !=
+          OSSL_PARAM_BLD_push_octet_string(
+            builder.get(), OSSL_PKEY_PARAM_PUB_KEY, pub.data(), pub.size())) {
+      throw openssl_error();
+    }
+
+    auto params = make_typed_unique(OSSL_PARAM_BLD_to_param(builder.get()));
+    auto ctx =
+      make_typed_unique(EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr));
+    auto key = make_typed_unique(EVP_PKEY_new());
+    auto* key_ptr = key.get();
+    if (params == nullptr || ctx == nullptr || key == nullptr ||
+        EVP_PKEY_fromdata_init(ctx.get()) <= 0 ||
+        EVP_PKEY_fromdata(
+          ctx.get(), &key_ptr, EVP_PKEY_KEYPAIR, params.get()) <= 0) {
+      throw openssl_error();
+    }
+    ctx.reset();
+
+    ctx = make_typed_unique(
+      EVP_PKEY_CTX_new_from_pkey(nullptr, key.get(), nullptr));
+    if (EVP_PKEY_public_check(ctx.get()) <= 0) {
+      throw openssl_error();
+    }
+
+    return key;
+  }
+#endif
+
   std::unique_ptr<Group::PrivateKey> derive_key_pair(
     const bytes& suite_id,
     const bytes& ikm) const override
@@ -188,8 +317,13 @@ struct ECKeyGroup : public EVPGroup
 
     auto dkp_prk = kdf.labeled_extract(suite_id, {}, label_dkp_prk, ikm);
 
+#if defined(WITH_OPENSSL3)
+    auto* group = EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid);
+    auto group_ptr = make_typed_unique(group);
+#else
     auto eckey = make_typed_unique(new_ec_key());
     const auto* group = EC_KEY_get0_group(eckey.get());
+#endif
 
     auto order = make_typed_unique(BN_new());
     if (1 != EC_GROUP_get_order(group, order.get(), nullptr)) {
@@ -197,9 +331,7 @@ struct ECKeyGroup : public EVPGroup
     }
 
     auto sk = make_typed_unique(BN_new());
-    if (1 != BN_zero(sk.get())) {
-      throw openssl_error();
-    }
+    BN_zero(sk.get());
 
     auto counter = int(0);
     while (BN_is_zero(sk.get()) != 0 || BN_cmp(sk.get(), order.get()) != -1) {
@@ -216,6 +348,10 @@ struct ECKeyGroup : public EVPGroup
       }
     }
 
+#if defined(WITH_OPENSSL3)
+    auto key = keypair_evp_key(sk);
+    return std::make_unique<EVPGroup::PrivateKey>(key.release());
+#else
     auto pt = make_typed_unique(EC_POINT_new(group));
     EC_POINT_mul(group, pt.get(), sk.get(), nullptr, nullptr, nullptr);
 
@@ -223,11 +359,71 @@ struct ECKeyGroup : public EVPGroup
     EC_KEY_set_public_key(eckey.get(), pt.get());
 
     return std::make_unique<PrivateKey>(to_pkey(eckey.release()));
+#endif
   }
 
   bytes serialize(const Group::PublicKey& pk) const override
   {
     const auto& rpk = dynamic_cast<const PublicKey&>(pk);
+#if defined(WITH_OPENSSL3)
+    OSSL_PARAM* param = nullptr;
+    if (1 != EVP_PKEY_todata(rpk.pkey.get(), EVP_PKEY_PUBLIC_KEY, &param)) {
+      throw openssl_error();
+    }
+    auto param_ptr = make_typed_unique(param);
+
+    const OSSL_PARAM* pk_param =
+      OSSL_PARAM_locate_const(param_ptr.get(), OSSL_PKEY_PARAM_PUB_KEY);
+    if (pk_param == nullptr) {
+      return bytes({}, 0);
+    }
+
+    size_t len = 0;
+    if (1 != OSSL_PARAM_get_octet_string(pk_param, nullptr, 0, &len)) {
+      return bytes({}, 0);
+    }
+
+    bytes buf(len);
+    void* data_ptr = buf.data();
+    if (1 != OSSL_PARAM_get_octet_string(pk_param, &data_ptr, len, nullptr)) {
+      return bytes({}, 0);
+    }
+
+    // Prior to OpenSSL 3.0.8, we will always get compressed point from
+    // OSSL_PKEY_PARAM_PUB_KEY, so we will have to do the following conversion.
+    // From OpenSSL 3.0.8, we can obtain the uncompressed point value by setting
+    // OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT appropriately.
+    auto group = make_typed_unique(
+      EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid));
+    if (group == nullptr) {
+      return bytes({}, 0);
+    }
+    auto point = make_typed_unique(EC_POINT_new(group.get()));
+    const auto* oct_ptr = static_cast<const unsigned char*>(data_ptr);
+    if (1 !=
+        EC_POINT_oct2point(group.get(), point.get(), oct_ptr, len, nullptr)) {
+      return bytes({}, 0);
+    }
+    len = EC_POINT_point2oct(group.get(),
+                             point.get(),
+                             POINT_CONVERSION_UNCOMPRESSED,
+                             nullptr,
+                             0,
+                             nullptr);
+    if (0 == len) {
+      return bytes({}, 0);
+    }
+    bytes out(len);
+    auto* data = out.data();
+    if (EC_POINT_point2oct(group.get(),
+                           point.get(),
+                           POINT_CONVERSION_UNCOMPRESSED,
+                           data,
+                           len,
+                           nullptr) != len) {
+      return bytes({}, 0);
+    }
+#else
     auto* pub = EVP_PKEY_get0_EC_KEY(rpk.pkey.get());
 
     auto len = i2o_ECPublicKey(pub, nullptr);
@@ -240,12 +436,19 @@ struct ECKeyGroup : public EVPGroup
     if (i2o_ECPublicKey(pub, &data) == 0) {
       throw openssl_error();
     }
-
+#endif
     return out;
   }
 
   std::unique_ptr<Group::PublicKey> deserialize(const bytes& enc) const override
   {
+#if defined(WITH_OPENSSL3)
+    auto key = public_evp_key(enc);
+    if (key == nullptr) {
+      throw std::runtime_error("Unable to deserialize the public key");
+    }
+    return std::make_unique<EVPGroup::PublicKey>(key.release());
+#else
     auto eckey = make_typed_unique(new_ec_key());
     auto* eckey_ptr = eckey.get();
     const auto* data_ptr = enc.data();
@@ -258,13 +461,34 @@ struct ECKeyGroup : public EVPGroup
     }
 
     return std::make_unique<EVPGroup::PublicKey>(to_pkey(eckey.release()));
+#endif
   }
 
   bytes serialize_private(const Group::PrivateKey& sk) const override
   {
     const auto& rsk = dynamic_cast<const PrivateKey&>(sk);
+#if defined(WITH_OPENSSL3)
+    OSSL_PARAM* param = nullptr;
+    if (1 != EVP_PKEY_todata(rsk.pkey.get(), EVP_PKEY_KEYPAIR, &param)) {
+      throw openssl_error();
+    }
+    auto param_ptr = make_typed_unique(param);
+
+    const OSSL_PARAM* sk_param =
+      OSSL_PARAM_locate_const(param_ptr.get(), OSSL_PKEY_PARAM_PRIV_KEY);
+    if (sk_param == nullptr) {
+      return bytes({}, 0);
+    }
+
+    BIGNUM* d = nullptr;
+    if (1 != OSSL_PARAM_get_BN(sk_param, &d)) {
+      return bytes({}, 0);
+    }
+    auto d_ptr = make_typed_unique(d);
+#else
     auto* eckey = EVP_PKEY_get0_EC_KEY(rsk.pkey.get());
     const auto* d = EC_KEY_get0_private_key(eckey);
+#endif
 
     auto out = bytes(BN_num_bytes(d));
     if (BN_bn2bin(d, out.data()) != int(out.size())) {
@@ -279,6 +503,15 @@ struct ECKeyGroup : public EVPGroup
   std::unique_ptr<Group::PrivateKey> deserialize_private(
     const bytes& skm) const override
   {
+#if defined(WITH_OPENSSL3)
+    auto priv = make_typed_unique(
+      BN_bin2bn(skm.data(), static_cast<int>(skm.size()), nullptr));
+    if (priv == nullptr) {
+      throw std::runtime_error("Unable to deserialize the private key");
+    }
+    auto key = keypair_evp_key(priv);
+    return std::make_unique<EVPGroup::PrivateKey>(key.release());
+#else
     auto eckey = make_typed_unique(new_ec_key());
     const auto* group = EC_KEY_get0_group(eckey.get());
     const auto d = make_typed_unique(
@@ -290,12 +523,17 @@ struct ECKeyGroup : public EVPGroup
     EC_KEY_set_public_key(eckey.get(), pt.get());
 
     return std::make_unique<EVPGroup::PrivateKey>(to_pkey(eckey.release()));
+#endif
   }
 
 private:
   int curve_nid;
 
-  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(curve_nid); }
+#if !defined(WITH_OPENSSL3)
+  EC_KEY* new_ec_key() const
+  {
+    return EC_KEY_new_by_curve_name(curve_nid);
+  }
 
   static EVP_PKEY* to_pkey(EC_KEY* eckey)
   {
@@ -304,6 +542,7 @@ private:
     EVP_PKEY_assign_EC_KEY(pkey, eckey);
     return pkey;
   }
+#endif
 
   static inline int group_to_nid(Group::ID group_id)
   {

@@ -5,20 +5,36 @@
 #include <doctest/doctest.h>
 #include <openssl/crypto.h>
 
+#if defined(WITH_OPENSSL3)
+#include <openssl/evp.h>
+#include <openssl/provider.h>
+#endif
+
 void
 ensure_fips_if_required()
 {
   // NOLINTNEXTLINE (concurrency-mt-unsafe)
   const auto* require = std::getenv("REQUIRE_FIPS");
+#if defined(WITH_OPENSSL3)
+  if (require != nullptr && OSSL_PROVIDER_available(nullptr, "fips") == 0) {
+    REQUIRE(OSSL_PROVIDER_load(nullptr, "fips") != nullptr);
+  }
+#else
   if (require != nullptr && FIPS_mode() == 0) {
     REQUIRE(FIPS_mode_set(1) == 1);
   }
+#endif
 }
 
 bool
 fips()
 {
+#if defined(WITH_OPENSSL3)
+  return OSSL_PROVIDER_available(nullptr, "fips") == 1 ||
+         EVP_default_properties_is_fips_enabled(nullptr) == 1;
+#else
   return FIPS_mode() != 0;
+#endif
 }
 
 bool

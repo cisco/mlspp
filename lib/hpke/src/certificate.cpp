@@ -198,8 +198,8 @@ struct Certificate::ParsedCertificate
     , sub_alt_names(parse_san(x509.get()))
     , is_ca(X509_check_ca(x509.get()) != 0)
     , hash(compute_digest(x509.get()))
-    , not_before(asn1_time_to_chrono(X509_get_notBefore(x509.get())))
-    , not_after(asn1_time_to_chrono(X509_get_notAfter(x509.get())))
+    , not_before(asn1_time_to_chrono(X509_get0_notBefore(x509.get())))
+    , not_after(asn1_time_to_chrono(X509_get0_notAfter(x509.get())))
   {
   }
 

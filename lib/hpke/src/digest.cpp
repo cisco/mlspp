@@ -2,6 +2,9 @@
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#if defined(WITH_OPENSSL3)
+#include <openssl/core_names.h>
+#endif
 
 #include "openssl_common.h"
 
@@ -24,6 +27,26 @@ openssl_digest_type(Digest::ID digest)
       throw std::runtime_error("Unsupported ciphersuite");
   }
 }
+
+#if defined(WITH_OPENSSL3)
+static std::string
+openssl_digest_name(Digest::ID digest)
+{
+  switch (digest) {
+    case Digest::ID::SHA256:
+      return OSSL_DIGEST_NAME_SHA2_256;
+
+    case Digest::ID::SHA384:
+      return OSSL_DIGEST_NAME_SHA2_384;
+
+    case Digest::ID::SHA512:
+      return OSSL_DIGEST_NAME_SHA2_512;
+
+    default:
+      throw std::runtime_error("Unsupported digest algorithm");
+  }
+}
+#endif
 
 template<>
 const Digest&
@@ -91,8 +114,23 @@ Digest::hmac(const bytes& key, const bytes& data) const
 bytes
 Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
 {
+#if defined(WITH_OPENSSL3)
+  auto digest_name = openssl_digest_name(id);
+  std::array<OSSL_PARAM, 2> params = {
+    OSSL_PARAM_construct_utf8_string(
+      OSSL_ALG_PARAM_DIGEST, digest_name.data(), 0),
+    OSSL_PARAM_construct_end()
+  };
+  const auto mac =
+    make_typed_unique(EVP_MAC_fetch(nullptr, OSSL_MAC_NAME_HMAC, nullptr));
+  const auto ctx = make_typed_unique(EVP_MAC_CTX_new(mac.get()));
+#else
   const auto* type = openssl_digest_type(id);
   auto ctx = make_typed_unique(HMAC_CTX_new());
+#endif
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
 
   // Some FIPS-enabled libraries are overly conservative in their interpretation
   // of NIST SP 800-131A, which requires HMAC keys to be at least 112 bits long.
@@ -100,11 +138,16 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   // enforcement for purposes of HKDF.
   //
   // https://doi.org/10.6028/NIST.SP.800-131Ar2
-  static const auto fips_min_hmac_key_len = 14;
   auto key_size = static_cast<int>(key.size());
+  // OpenSSL 3 does not support the flag EVP_MD_CTX_FLAG_NON_FIPS_ALLOW anymore.
+  // However, OpenSSL 3 in FIPS mode doesn't seem to check the HMAC key size
+  // constraint.
+#if !defined(WITH_OPENSSL3)
+  static const auto fips_min_hmac_key_len = 14;
   if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
     HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
   }
+#endif
 
   // Guard against sending nullptr to HMAC_Init_ex
   const auto* key_data = key.data();
@@ -113,19 +156,30 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
     key_data = &non_null_zero_length_key;
   }
 
+  auto md = bytes(hash_size);
+#if defined(WITH_OPENSSL3)
+  if (1 != EVP_MAC_init(ctx.get(), key_data, key_size, params.data())) {
+    throw openssl_error();
+  }
+  if (1 != EVP_MAC_update(ctx.get(), data.data(), data.size())) {
+    throw openssl_error();
+  }
+  size_t size = 0;
+  if (1 != EVP_MAC_final(ctx.get(), md.data(), &size, hash_size)) {
+    throw openssl_error();
+  }
+#else
   if (1 != HMAC_Init_ex(ctx.get(), key_data, key_size, type, nullptr)) {
     throw openssl_error();
   }
-
   if (1 != HMAC_Update(ctx.get(), data.data(), data.size())) {
     throw openssl_error();
   }
-
-  auto md = bytes(hash_size);
   unsigned int size = 0;
   if (1 != HMAC_Final(ctx.get(), md.data(), &size)) {
     throw openssl_error();
   }
+#endif
 
   return md;
 }

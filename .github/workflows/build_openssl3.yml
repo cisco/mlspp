@@ -1,0 +1,68 @@
+name: Build and Test (OpenSSL 3)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '30 3 * * 1'
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives\\openssl_3"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+            - os: macos-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+
+    env:
+      CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+      CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: dependencies (macos)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Restore cache
+      uses: actions/cache@v2
+      with:
+        path: |
+            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
+        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+
+    - name: Configure to use clang-tidy and sanitizers
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+
+    - name: Build
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Unit tests
+      run: |
+         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
