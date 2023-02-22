@@ -971,13 +971,13 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   auto sig_priv = prg.signature_key("sig_priv");
   auto leaf_index = LeafIndex{ 0 };
 
-  authenticated_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                                 GroupContent{
-    group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
-  },
-                                                 suite,
-                                                 sig_priv,
-                                                 group_context_obj);
+  authenticated_content = AuthenticatedContent::sign(
+    WireFormat::mls_plaintext,
+    GroupContent{
+      group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} },
+    suite,
+    sig_priv,
+    group_context_obj);
 
   transcript.update_confirmed(authenticated_content);
 
@@ -1005,8 +1005,9 @@ TranscriptTestVector::verify() const
 
   auto confirmation_tag =
     cipher_suite.digest().hmac(confirmation_key, transcript.confirmed);
-  VERIFY_EQUAL(
-    "confirmation tag", confirmation_tag, authenticated_content.auth.confirmation_tag);
+  VERIFY_EQUAL("confirmation tag",
+               confirmation_tag,
+               authenticated_content.auth.confirmation_tag);
 
   return std::nullopt;
 }
