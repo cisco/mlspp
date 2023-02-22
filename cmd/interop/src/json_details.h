@@ -336,4 +336,19 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
                                    public_message_commit,
                                    private_message)
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::Epoch,
+                                   proposals,
+                                   commit,
+                                   epoch_authenticator)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector,
+                                   cipher_suite,
+                                   key_package,
+                                   signature_priv,
+                                   encryption_priv,
+                                   init_priv,
+                                   welcome,
+                                   initial_epoch_authenticator,
+                                   epochs)
+
+
 } // namespace mls_vectors

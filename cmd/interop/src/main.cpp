@@ -24,6 +24,7 @@ static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
 static constexpr uint64_t TREE_HASHES = 15;
 static constexpr uint64_t TREE_OPERATIONS = 16;
+static constexpr uint64_t PASSIVE_CLIENT = 17;
 
 static json
 make_test_vector(uint64_t type)
@@ -216,6 +217,9 @@ verify_test_vector(uint64_t type)
 
     case TREE_HASHES:
       return verify_test_vector<TreeHashTestVector>(j);
+
+    case PASSIVE_CLIENT:
+      return verify_test_vector<PassiveClientTestVector>(j);
 
     default:
       return "Invalid test vector type";
