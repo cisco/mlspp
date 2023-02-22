@@ -278,7 +278,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TranscriptTestVector,
                                    cipher_suite,
                                    interim_transcript_hash_before,
                                    confirmation_key,
-                                   message,
+                                   authenticated_content,
                                    confirmed_transcript_hash_after,
                                    interim_transcript_hash_after)
 

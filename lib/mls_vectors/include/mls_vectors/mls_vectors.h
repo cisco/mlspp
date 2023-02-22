@@ -310,7 +310,7 @@ struct TranscriptTestVector : PseudoRandom
   bytes confirmation_key;
   bytes interim_transcript_hash_before;
 
-  mls::MLSMessage message;
+  mls::AuthenticatedContent authenticated_content;
 
   bytes confirmed_transcript_hash_after;
   bytes interim_transcript_hash_after;

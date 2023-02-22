@@ -971,28 +971,23 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   auto sig_priv = prg.signature_key("sig_priv");
   auto leaf_index = LeafIndex{ 0 };
 
-  auto commit_content = GroupContent{
+  authenticated_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+                                                 GroupContent{
     group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{}
-  };
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
-                                                 std::move(commit_content),
+  },
                                                  suite,
                                                  sig_priv,
                                                  group_context_obj);
 
-  transcript.update_confirmed(auth_content);
+  transcript.update_confirmed(authenticated_content);
 
   const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  auth_content.set_confirmation_tag(confirmation_tag);
+  authenticated_content.set_confirmation_tag(confirmation_tag);
 
-  transcript.update_interim(auth_content);
+  transcript.update_interim(authenticated_content);
 
   // Store the required data
   confirmation_key = ks_epoch.confirmation_key;
-
-  message = PublicMessage::protect(
-    auth_content, suite, ks_epoch.membership_key, group_context_obj);
-
   confirmed_transcript_hash_after = transcript.confirmed;
   interim_transcript_hash_after = transcript.interim;
 }
@@ -1000,13 +995,10 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
 std::optional<std::string>
 TranscriptTestVector::verify() const
 {
-  auto public_message = var::get<PublicMessage>(message.message);
-  auto auth_content = public_message.authenticated_content();
-
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
 
-  transcript.update(auth_content);
+  transcript.update(authenticated_content);
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
@@ -1014,7 +1006,7 @@ TranscriptTestVector::verify() const
   auto confirmation_tag =
     cipher_suite.digest().hmac(confirmation_key, transcript.confirmed);
   VERIFY_EQUAL(
-    "confirmation tag", confirmation_tag, auth_content.auth.confirmation_tag);
+    "confirmation tag", confirmation_tag, authenticated_content.auth.confirmation_tag);
 
   return std::nullopt;
 }
