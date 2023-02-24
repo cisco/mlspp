@@ -504,15 +504,6 @@ State::commit(const bytes& leaf_secret,
       leaf_node_opts = opt::get(opts).leaf_node_opts;
     }
 
-    /*
-    auto [new_priv, path] = next._tree.encap(next._index,
-                                             next._group_id,
-                                             ctx,
-                                             leaf_secret,
-                                             _identity_priv,
-                                             joiner_locations,
-                                             leaf_node_opts);
-    */
     auto new_priv = next._tree.update(
       next._index, leaf_secret, next._group_id, _identity_priv, leaf_node_opts);
 
