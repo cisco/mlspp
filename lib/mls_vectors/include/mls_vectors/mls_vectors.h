@@ -307,18 +307,11 @@ struct TranscriptTestVector : PseudoRandom
 {
   mls::CipherSuite cipher_suite;
 
-  bytes group_id;
-  mls::epoch_t epoch;
-  bytes tree_hash_before;
-  bytes confirmed_transcript_hash_before;
+  bytes confirmation_key;
   bytes interim_transcript_hash_before;
 
-  bytes confirmation_key;
+  mls::AuthenticatedContent authenticated_content;
 
-  mls::SignaturePublicKey signature_key;
-  mls::AuthenticatedContent commit;
-
-  bytes group_context;
   bytes confirmed_transcript_hash_after;
   bytes interim_transcript_hash_after;
 

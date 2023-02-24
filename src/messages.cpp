@@ -578,6 +578,16 @@ PublicMessage::contains(const AuthenticatedContent& content_auth) const
   return content == content_auth.content && auth == content_auth.auth;
 }
 
+AuthenticatedContent
+PublicMessage::authenticated_content() const
+{
+  auto auth_content = AuthenticatedContent{};
+  auth_content.wire_format = WireFormat::mls_plaintext;
+  auth_content.content = content;
+  auth_content.auth = auth;
+  return auth_content;
+}
+
 PublicMessage::PublicMessage(AuthenticatedContent content_auth)
   : content(std::move(content_auth.content))
   , auth(std::move(content_auth.auth))
