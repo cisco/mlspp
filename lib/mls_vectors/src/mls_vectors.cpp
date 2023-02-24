@@ -1965,8 +1965,13 @@ MessagesTestVector::verify() const
 }
 
 std::optional<std::string>
-PassiveClientTestVector::verify() const
+PassiveClientTestVector::verify()
 {
+  // Import everything
+  signature_priv.set_public_key(cipher_suite);
+  encryption_priv.set_public_key(cipher_suite);
+  init_priv.set_public_key(cipher_suite);
+
   const auto& key_package_raw = var::get<KeyPackage>(key_package.message);
   const auto& welcome_raw = var::get<Welcome>(welcome.message);
 

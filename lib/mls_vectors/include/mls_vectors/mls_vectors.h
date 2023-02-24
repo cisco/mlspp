@@ -545,7 +545,7 @@ struct PassiveClientTestVector : PseudoRandom
   std::vector<Epoch> epochs;
 
   PassiveClientTestVector() = default;
-  std::optional<std::string> verify() const;
+  std::optional<std::string> verify();
 };
 
 } // namespace mls_vectors
