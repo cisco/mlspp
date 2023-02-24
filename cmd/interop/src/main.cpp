@@ -23,6 +23,7 @@ static constexpr uint64_t MESSAGE_PROTECTION = 12;
 static constexpr uint64_t PSK_SECRET = 13;
 static constexpr uint64_t WELCOME = 14;
 static constexpr uint64_t TREE_HASHES = 15;
+static constexpr uint64_t TREE_OPERATIONS = 16;
 
 static json
 make_test_vector(uint64_t type)
@@ -132,6 +133,17 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
+    case TREE_OPERATIONS: {
+      auto cases = std::vector<TreeOperationsTestVector>();
+
+      auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
+      for (auto scenario : TreeOperationsTestVector::all_scenarios) {
+        cases.emplace_back(suite, scenario);
+      }
+
+      return cases;
+    }
+
     default:
       return nullptr;
   }
@@ -198,6 +210,9 @@ verify_test_vector(uint64_t type)
 
     case WELCOME:
       return verify_test_vector<WelcomeTestVector>(j);
+
+    case TREE_OPERATIONS:
+      return verify_test_vector<TreeOperationsTestVector>(j);
 
     case TREE_HASHES:
       return verify_test_vector<TreeHashTestVector>(j);

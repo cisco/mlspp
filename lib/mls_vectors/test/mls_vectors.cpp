@@ -85,6 +85,15 @@ TEST_CASE("Tree Hashes")
   }
 }
 
+TEST_CASE("Tree Operations")
+{
+  auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
+  for (auto scenario : TreeOperationsTestVector::all_scenarios) {
+    auto tv = TreeOperationsTestVector{ suite, scenario };
+    REQUIRE(tv.verify() == std::nullopt);
+  }
+}
+
 TEST_CASE("TreeKEM")
 {
   for (auto suite : supported_suites) {
