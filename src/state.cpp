@@ -678,8 +678,6 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   const auto& commit = var::get<Commit>(content.content);
   const auto proposals = must_resolve(commit.proposals, sender);
 
-  // XXX(RLB) This will fail for external commits, but we need to refactor for
-  // that anyway.
   if (!external_commit && !valid(proposals, opt::get(sender))) {
     throw ProtocolError("Invalid proposal list");
   }
@@ -731,9 +729,6 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
       throw ProtocolError("Commit path has invalid parent hash");
     }
 
-    next.check_update_leaf_node(
-      sender_location, path.leaf_node, LeafNodeSource::commit, external_commit);
-
     next._tree.merge(sender_location, path);
 
     auto ctx = tls::marshal(GroupContext{
@@ -766,78 +761,15 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   return next;
 }
 
-// A LeafNode in an Add KeyPackage must not have the same leaf_node.public_key
-// or signature_key as any KeyPackage for a current member.  The joiner must
-// support all credential types in use by other members, and vice versa.
-void
-State::check_add_leaf_node(const LeafNode& leaf,
-                           std::optional<LeafIndex> except) const
-{
-  for (LeafIndex i{ 0 }; i < _tree.size; i.val++) {
-    if (i == except) {
-      continue;
-    }
-
-    const auto maybe_tree_leaf = _tree.leaf_node(i);
-    if (!maybe_tree_leaf) {
-      continue;
-    }
-
-    const auto& tree_leaf = opt::get(maybe_tree_leaf);
-    const auto hpke_key_eq = tree_leaf.encryption_key == leaf.encryption_key;
-    const auto sig_key_eq = tree_leaf.signature_key == leaf.signature_key;
-    if (hpke_key_eq || sig_key_eq) {
-      throw ProtocolError("Duplicate parameters in new KeyPackage");
-    }
-
-    if (!leaf.capabilities.credential_supported(tree_leaf.credential)) {
-      throw ProtocolError("Member credential not supported by joiner");
-    }
-
-    if (!tree_leaf.capabilities.credential_supported(leaf.credential)) {
-      throw ProtocolError("Joiner credential not supported by group member");
-    }
-  }
-}
-
-// A KeyPackage in an Update must meet the same uniqueness criteria as for an
-// Add, except with regard to the KeyPackage it replaces.
-void
-State::check_update_leaf_node(LeafIndex target,
-                              const LeafNode& leaf,
-                              LeafNodeSource required_source,
-                              bool external_commit) const
-{
-  check_add_leaf_node(leaf, target);
-
-  if (leaf.source() != required_source) {
-    throw ProtocolError("LeafNode in Update has incorrect LeafNodeSource");
-  }
-
-  const auto maybe_tree_leaf = _tree.leaf_node(target);
-  if (!maybe_tree_leaf) {
-    return;
-  }
-
-  const auto& tree_leaf = opt::get(maybe_tree_leaf);
-  if (!external_commit && tree_leaf.encryption_key == leaf.encryption_key) {
-    throw ProtocolError("Update without a fresh encryption key");
-  }
-}
-
 LeafIndex
 State::apply(const Add& add)
 {
-  check_add_leaf_node(add.key_package.leaf_node, std::nullopt);
   return _tree.add_leaf(add.key_package.leaf_node);
 }
 
 void
 State::apply(LeafIndex target, const Update& update)
 {
-  std::cout << "apply update" << std::endl;
-  check_update_leaf_node(
-    target, update.leaf_node, LeafNodeSource::update, false);
   _tree.update_leaf(target, update.leaf_node);
 }
 
@@ -1113,10 +1045,6 @@ State::valid(const LeafNode& leaf_node,
   auto unique_encryption_key = true;
   auto mutual_credential_support = true;
   for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
-    if (i == index) {
-      continue;
-    }
-
     const auto maybe_leaf = _tree.leaf_node(i);
     if (!maybe_leaf) {
       continue;
@@ -1124,8 +1052,10 @@ State::valid(const LeafNode& leaf_node,
 
     const auto& leaf = opt::get(maybe_leaf);
 
+    // Signature keys are allowed to repeat within a leaf
     unique_signature_key =
-      unique_signature_key && (signature_key != leaf.signature_key);
+      unique_signature_key &&
+      ((i == index) || (signature_key != leaf.signature_key));
     unique_encryption_key =
       unique_encryption_key && (encryption_key != leaf.encryption_key);
     mutual_credential_support =
@@ -1361,11 +1291,42 @@ State::valid(const std::vector<CachedProposal>& proposals,
 
   // After processing the commit the ratchet tree is invalid, in particular, if
   // it contains any leaf node that is invalid according to Section 7.3.
-  // XXX(RLB): N/A, too hard to detect
+  //
+  // NB(RLB): Leaf nodes are already checked in the individual proposal check at
+  // the top.  So the focus here is key uniqueness. We check this by checking
+  // uniqueness of encryption keys across the Adds and Updates in this list of
+  // proposals.  The keys have already been checked to be distinct from any keys
+  // already in the tree.
+  auto enc_keys = std::vector<HPKEPublicKey>{};
+  const auto has_dup_enc_key = stdx::any_of(proposals, [&](const auto& cached) {
+    const auto get_enc_key =
+      overloaded{ [](const Add& add) -> std::optional<HPKEPublicKey> {
+                   return add.key_package.leaf_node.encryption_key;
+                 },
+                  [](const Update& update) -> std::optional<HPKEPublicKey> {
+                    return update.leaf_node.encryption_key;
+                  },
+
+                  [](const auto& /* default */)
+                    -> std::optional<HPKEPublicKey> { return std::nullopt; } };
+    auto maybe_enc_key = var::visit(get_enc_key, cached.proposal.content);
+    if (!maybe_enc_key) {
+      return false;
+    }
+
+    const auto& enc_key = opt::get(maybe_enc_key);
+    if (stdx::contains(enc_keys, enc_key)) {
+      return true;
+    }
+
+    enc_keys.push_back(enc_key);
+    return false;
+  });
 
   return !(has_invalid_proposal || has_self_update || has_self_remove ||
            has_dup_update_remove || has_dup_signature_key || has_dup_psk_id ||
-           has_multiple_gce || has_reinit || has_external_init);
+           has_multiple_gce || has_reinit || has_external_init ||
+           has_dup_enc_key);
 }
 
 bool

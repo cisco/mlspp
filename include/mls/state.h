@@ -203,12 +203,6 @@ protected:
   AuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
-  void check_add_leaf_node(const LeafNode& leaf,
-                           std::optional<LeafIndex> except) const;
-  void check_update_leaf_node(LeafIndex target,
-                              const LeafNode& leaf,
-                              LeafNodeSource required_source,
-                              bool external_commit) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
   void apply(LeafIndex target,
