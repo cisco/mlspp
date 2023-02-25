@@ -151,9 +151,11 @@ TreeKEMPrivateKey::private_key(NodeIndex n)
 }
 
 void
-TreeKEMPrivateKey::set_leaf_secret(const bytes& secret)
+TreeKEMPrivateKey::set_leaf_priv(HPKEPrivateKey priv)
 {
-  path_secrets[NodeIndex(index)] = secret;
+  auto n = NodeIndex(index);
+  path_secrets.erase(n);
+  private_key_cache.insert_or_assign(n, std::move(priv));
 }
 
 std::tuple<NodeIndex, bytes, bool>
@@ -185,14 +187,10 @@ TreeKEMPrivateKey::dump() const
 
   std::cout << "  Secrets: " << std::endl;
   for (const auto& [n, secret] : path_secrets) {
+    auto sk = opt::get(private_key(n));
     auto ssm = to_hex(secret).substr(0, 8);
-    std::cout << "    " << n.val << " => " << ssm << std::endl;
-  }
-
-  std::cout << "  Public Keys: " << std::endl;
-  for (const auto& [n, sk] : private_key_cache) {
     auto pkm = to_hex(sk.public_key.data).substr(0, 8);
-    std::cout << "    " << n.val << " => " << pkm << std::endl;
+    std::cout << "    " << n.val << " => " << ssm << " = " << pkm << std::endl;
   }
 }
 

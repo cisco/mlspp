@@ -59,6 +59,7 @@ public:
   // whether to include PSKs or evict our prior appearance.
   static std::tuple<MLSMessage, State> external_join(
     const bytes& leaf_secret,
+    HPKEPrivateKey enc_priv,
     SignaturePrivateKey sig_priv,
     const KeyPackage& kp,
     const GroupInfo& group_info,
@@ -76,14 +77,14 @@ public:
   ///
 
   Proposal add_proposal(const KeyPackage& key_package) const;
-  Proposal update_proposal(const bytes& leaf_secret,
+  Proposal update_proposal(HPKEPrivateKey leaf_priv,
                            const LeafNodeOptions& opts);
   Proposal remove_proposal(RosterIndex index) const;
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
-  MLSMessage update(const bytes& leaf_secret,
+  MLSMessage update(HPKEPrivateKey leaf_priv,
                     const LeafNodeOptions& opts,
                     const MessageOpts& msg_opts);
   MLSMessage remove(RosterIndex index, const MessageOpts& msg_opts);
@@ -163,13 +164,15 @@ protected:
 
   struct CachedUpdate
   {
-    bytes update_secret;
+    HPKEPrivateKey update_priv;
     Update proposal;
   };
   std::optional<CachedUpdate> _cached_update;
 
   // Assemble a preliminary, unjoined group state
-  State(SignaturePrivateKey sig_priv,
+  State(HPKEPrivateKey enc_priv,
+        SignaturePrivateKey sig_priv,
+        const KeyPackage& key_package,
         const GroupInfo& group_info,
         const std::optional<TreeKEMPublicKey>& tree);
 
@@ -204,10 +207,13 @@ protected:
                            std::optional<LeafIndex> except) const;
   void check_update_leaf_node(LeafIndex target,
                               const LeafNode& leaf,
-                              LeafNodeSource required_source) const;
+                              LeafNodeSource required_source,
+                              bool external_commit) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
+  void apply(LeafIndex target,
+             const Update& update,
+             const HPKEPrivateKey& leaf_priv);
   LeafIndex apply(const Remove& remove);
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
@@ -228,7 +234,9 @@ protected:
     std::optional<LeafIndex> sender_index) const;
 
   // Check properties of proposals
-  bool valid(const LeafNode& leaf_node, LeafNodeSource required_source, std::optional<LeafIndex> index) const;
+  bool valid(const LeafNode& leaf_node,
+             LeafNodeSource required_source,
+             std::optional<LeafIndex> index) const;
   bool valid(const KeyPackage& key_package) const;
   bool valid(const Add& add) const;
   bool valid(LeafIndex sender, const Update& update) const;
@@ -238,7 +246,8 @@ protected:
   bool valid(const ExternalInit& external_init) const;
   bool valid(const GroupContextExtensions& gce) const;
   bool valid(std::optional<LeafIndex> sender, const Proposal& proposal) const;
-  bool valid(const std::vector<CachedProposal>& proposals, LeafIndex commit_sender) const;
+  bool valid(const std::vector<CachedProposal>& proposals,
+             LeafIndex commit_sender) const;
   bool valid_reinit(const std::vector<CachedProposal>& proposals) const;
   bool valid_external(const std::vector<CachedProposal>& proposals) const;
   bool path_required(const std::vector<CachedProposal>& proposals) const;

@@ -1,4 +1,7 @@
 #include <mls/state.h>
+#include <set>
+
+#include <iostream> // XXX
 
 namespace mls {
 
@@ -73,7 +76,9 @@ State::import_tree(const bytes& tree_hash,
   return tree;
 }
 
-State::State(SignaturePrivateKey sig_priv,
+State::State(HPKEPrivateKey /* enc_priv */,
+             SignaturePrivateKey sig_priv,
+             const KeyPackage& /* key_package */,
              const GroupInfo& group_info,
              const std::optional<TreeKEMPublicKey>& tree)
   : _suite(group_info.group_context.cipher_suite)
@@ -90,12 +95,7 @@ State::State(SignaturePrivateKey sig_priv,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
-  // The following are not set:
-  //    _index
-  //    _tree_priv
-  //
-  // This ctor should only be used within external_commit, in which case these
-  // fields are populated by the subsequent commit()
+  // XXX revert
 }
 
 // Initialize a group from a Welcome
@@ -185,6 +185,7 @@ State::State(const HPKEPrivateKey& init_priv,
 
 std::tuple<MLSMessage, State>
 State::external_join(const bytes& leaf_secret,
+                     HPKEPrivateKey enc_priv,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& key_package,
                      const GroupInfo& group_info,
@@ -202,7 +203,8 @@ State::external_join(const bytes& leaf_secret,
   const auto& external_pub = opt::get(maybe_external_pub).external_pub;
 
   // Create an initial state that contains the joiner and use it to ommit
-  auto initial_state = State(std::move(sig_priv), group_info, tree);
+  auto initial_state = State(
+    std::move(enc_priv), std::move(sig_priv), key_package, group_info, tree);
   auto [commit_msg, welcome, state] =
     initial_state.commit(leaf_secret, {}, msg_opts, key_package, external_pub);
   silence_unused(welcome);
@@ -338,7 +340,7 @@ State::add_proposal(const KeyPackage& key_package) const
 }
 
 Proposal
-State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
+State::update_proposal(HPKEPrivateKey leaf_priv, const LeafNodeOptions& opts)
 {
   if (_cached_update) {
     return { opt::get(_cached_update).proposal };
@@ -346,12 +348,11 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
 
   auto leaf = opt::get(_tree.leaf_node(_index));
 
-  auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   auto new_leaf = leaf.for_update(
-    _suite, _group_id, _index, public_key, opts, _identity_priv);
+    _suite, _group_id, _index, leaf_priv.public_key, opts, _identity_priv);
 
   auto update = Update{ new_leaf };
-  _cached_update = CachedUpdate{ leaf_secret, update };
+  _cached_update = CachedUpdate{ std::move(leaf_priv), update };
   return { update };
 }
 
@@ -388,11 +389,11 @@ State::add(const KeyPackage& key_package, const MessageOpts& msg_opts)
 }
 
 MLSMessage
-State::update(const bytes& leaf_secret,
+State::update(HPKEPrivateKey leaf_priv,
               const LeafNodeOptions& opts,
               const MessageOpts& msg_opts)
 {
-  return protect_full(update_proposal(leaf_secret, opts), msg_opts);
+  return protect_full(update_proposal(leaf_priv, opts), msg_opts);
 }
 
 MLSMessage
@@ -474,6 +475,7 @@ State::commit(const bytes& leaf_secret,
 
   // Apply proposals
   State next = successor();
+
   const auto proposals = must_resolve(commit.proposals, _index);
   if (!external_commit && !valid(proposals, _index)) {
     throw ProtocolError("Invalid proposal list");
@@ -483,6 +485,10 @@ State::commit(const bytes& leaf_secret,
   }
 
   const auto joiner_locations = next.apply(proposals);
+
+  if (external_commit) {
+    next._index = next._tree.add_leaf(opt::get(joiner_key_package).leaf_node);
+  }
 
   // If this is an external commit, indicate it in the sender field
   auto sender = Sender{ MemberSender{ _index } };
@@ -494,7 +500,7 @@ State::commit(const bytes& leaf_secret,
   auto commit_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
-  if (path_required(proposals))) {
+  if (path_required(proposals)) {
     auto leaf_node_opts = LeafNodeOptions{};
     if (opts) {
       leaf_node_opts = opt::get(opts).leaf_node_opts;
@@ -700,7 +706,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   } else {
     // Add the joiner
     const auto& path = opt::get(commit.path);
-    sender_location = _tree.add_leaf(path.leaf_node);
+    sender_location = next._tree.add_leaf(path.leaf_node);
 
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
@@ -726,7 +732,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     }
 
     next.check_update_leaf_node(
-      sender_location, path.leaf_node, LeafNodeSource::commit);
+      sender_location, path.leaf_node, LeafNodeSource::commit, external_commit);
 
     next._tree.merge(sender_location, path);
 
@@ -799,7 +805,8 @@ State::check_add_leaf_node(const LeafNode& leaf,
 void
 State::check_update_leaf_node(LeafIndex target,
                               const LeafNode& leaf,
-                              LeafNodeSource required_source) const
+                              LeafNodeSource required_source,
+                              bool external_commit) const
 {
   check_add_leaf_node(leaf, target);
 
@@ -813,8 +820,8 @@ State::check_update_leaf_node(LeafIndex target,
   }
 
   const auto& tree_leaf = opt::get(maybe_tree_leaf);
-  if (tree_leaf.encryption_key == leaf.encryption_key) {
-    throw ProtocolError("Update without a fresh init key");
+  if (!external_commit && tree_leaf.encryption_key == leaf.encryption_key) {
+    throw ProtocolError("Update without a fresh encryption key");
   }
 }
 
@@ -828,15 +835,19 @@ State::apply(const Add& add)
 void
 State::apply(LeafIndex target, const Update& update)
 {
-  check_update_leaf_node(target, update.leaf_node, LeafNodeSource::update);
+  std::cout << "apply update" << std::endl;
+  check_update_leaf_node(
+    target, update.leaf_node, LeafNodeSource::update, false);
   _tree.update_leaf(target, update.leaf_node);
 }
 
 void
-State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
+State::apply(LeafIndex target,
+             const Update& update,
+             const HPKEPrivateKey& leaf_priv)
 {
   _tree.update_leaf(target, update.leaf_node);
-  _tree_priv.set_leaf_secret(leaf_secret);
+  _tree_priv.set_leaf_priv(leaf_priv);
 }
 
 LeafIndex
@@ -972,7 +983,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
           throw ProtocolError("Self-update does not match cached data");
         }
 
-        apply(target, update, cached_update.update_secret);
+        apply(target, update, cached_update.update_priv);
         locations.push_back(target);
         break;
       }
@@ -1053,7 +1064,9 @@ State::unprotect(const MLSMessage& ct)
 ///
 
 bool
-State::valid(const LeafNode& leaf_node, LeafNodeSource required_source, std::optional<LeafIndex> index) const
+State::valid(const LeafNode& leaf_node,
+             LeafNodeSource required_source,
+             std::optional<LeafIndex> index) const
 {
   // Verify that the credential in the LeafNode is valid as described in Section
   // 5.3.1.
@@ -1081,7 +1094,8 @@ State::valid(const LeafNode& leaf_node, LeafNodeSource required_source, std::opt
   // GroupContext has a required_capabilities extension, then the required
   // extensions, proposals, and credential types MUST be listed in the
   // LeafNode's capabilities field.
-  const auto supports_group_extensions = leaf_node.verify_extension_support(_extensions);
+  const auto supports_group_extensions =
+    leaf_node.verify_extension_support(_extensions);
 
   // TODO(RLB) Verify the lifetime field
 
@@ -1120,8 +1134,7 @@ State::valid(const LeafNode& leaf_node, LeafNodeSource required_source, std::opt
       leaf_node.capabilities.credential_supported(leaf.credential);
   }
 
-  return (signature_valid && supports_group_extensions &&
-          correct_source &&
+  return (signature_valid && supports_group_extensions && correct_source &&
           mutual_credential_support && unique_signature_key &&
           unique_encryption_key);
 }
@@ -1213,15 +1226,12 @@ State::valid(const GroupContextExtensions& gce) const
 }
 
 bool
-State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const {
+State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const
+{
   const auto specifically_valid = overloaded{
-    [&](const Update& update) {
-      return valid(opt::get(sender), update);
-    },
+    [&](const Update& update) { return valid(opt::get(sender), update); },
 
-    [&](const auto& proposal) {
-      return valid(proposal);
-    },
+    [&](const auto& proposal) { return valid(proposal); },
   };
   return var::visit(specifically_valid, proposal.content);
 }
@@ -1229,7 +1239,8 @@ State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const {
 // XXX(RLB) We handle the normal case separately from the ReInit case, because I
 // expect that we will end up with a different API for the ReInit case.
 bool
-State::valid(const std::vector<CachedProposal>& proposals, LeafIndex commit_sender) const
+State::valid(const std::vector<CachedProposal>& proposals,
+             LeafIndex commit_sender) const
 {
   // It contains an individual proposal that is invalid as specified in Section
   // 12.1.

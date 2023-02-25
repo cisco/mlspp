@@ -318,6 +318,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
 
   // Initialize the second participant as an external joiner
   auto [commit, second0] = State::external_join(fresh_secret(),
+                                                init_privs[1],
                                                 identity_privs[1],
                                                 key_packages[1],
                                                 group_info,
@@ -344,8 +345,13 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
   auto tree = first0.tree();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(
-    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree, {});
+  auto [commit, second0] = State::external_join(fresh_secret(),
+                                                init_privs[1],
+                                                identity_privs[1],
+                                                key_packages[1],
+                                                group_info,
+                                                tree,
+                                                {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
@@ -602,7 +608,8 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
     auto& updater = states.at(i);
     auto& committer = states.at(committer_index);
 
-    auto update = updater.update(fresh_secret(), {}, {});
+    auto update_priv = HPKEPrivateKey::generate(suite);
+    auto update = updater.update(std::move(update_priv), {}, {});
 
     committer.handle(update);
     auto [commit, welcome, new_state] =

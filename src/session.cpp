@@ -263,8 +263,10 @@ bytes
 Session::update()
 {
   auto leaf_secret = inner->fresh_secret();
+
+  auto leaf_priv = HPKEPrivateKey::generate(cipher_suite());
   auto proposal = inner->history.front().update(
-    leaf_secret, {}, { inner->encrypt_handshake, {}, 0 });
+    std::move(leaf_priv), {}, { inner->encrypt_handshake, {}, 0 });
   return tls::marshal(proposal);
 }
 

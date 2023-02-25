@@ -80,7 +80,7 @@ struct TreeKEMPrivateKey
                                   NodeIndex intersect,
                                   const std::optional<bytes>& path_secret);
 
-  void set_leaf_secret(const bytes& secret);
+  void set_leaf_priv(HPKEPrivateKey priv);
   std::tuple<NodeIndex, bytes, bool> shared_path_secret(LeafIndex to) const;
 
   bool have_private_key(NodeIndex n) const;
