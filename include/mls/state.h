@@ -50,7 +50,7 @@ public:
   State(const HPKEPrivateKey& init_priv,
         HPKEPrivateKey leaf_priv,
         SignaturePrivateKey sig_priv,
-        const KeyPackage& kp,
+        const KeyPackage& key_package,
         const Welcome& welcome,
         const std::optional<TreeKEMPublicKey>& tree);
 
@@ -212,8 +212,7 @@ protected:
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                Proposal::Type required_type);
-  std::tuple<bool, bool, std::vector<LeafIndex>> apply(
-    const std::vector<CachedProposal>& proposals);
+  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals);
 
   // Verify that a specific key package or all members support a given set of
   // extensions
@@ -227,6 +226,22 @@ protected:
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
     std::optional<LeafIndex> sender_index) const;
+
+  // Check properties of proposals
+  bool valid(const LeafNode& leaf_node, LeafNodeSource required_source, std::optional<LeafIndex> index) const;
+  bool valid(const KeyPackage& key_package) const;
+  bool valid(const Add& add) const;
+  bool valid(LeafIndex sender, const Update& update) const;
+  bool valid(const Remove& remove) const;
+  bool valid(const PreSharedKey& psk) const;
+  bool valid(const ReInit& reinit) const;
+  bool valid(const ExternalInit& external_init) const;
+  bool valid(const GroupContextExtensions& gce) const;
+  bool valid(std::optional<LeafIndex> sender, const Proposal& proposal) const;
+  bool valid(const std::vector<CachedProposal>& proposals, LeafIndex commit_sender) const;
+  bool valid_reinit(const std::vector<CachedProposal>& proposals) const;
+  bool valid_external(const std::vector<CachedProposal>& proposals) const;
+  bool path_required(const std::vector<CachedProposal>& proposals) const;
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);
