@@ -76,9 +76,7 @@ State::import_tree(const bytes& tree_hash,
   return tree;
 }
 
-State::State(HPKEPrivateKey /* enc_priv */,
-             SignaturePrivateKey sig_priv,
-             const KeyPackage& /* key_package */,
+State::State(SignaturePrivateKey sig_priv,
              const GroupInfo& group_info,
              const std::optional<TreeKEMPublicKey>& tree)
   : _suite(group_info.group_context.cipher_suite)
@@ -95,7 +93,12 @@ State::State(HPKEPrivateKey /* enc_priv */,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
-  // XXX revert
+  // The following are not set:
+  //    _index
+  //    _tree_priv
+  //
+  // This ctor should only be used within external_commit, in which case these
+  // fields are populated by the subsequent commit()
 }
 
 // Initialize a group from a Welcome
@@ -185,7 +188,6 @@ State::State(const HPKEPrivateKey& init_priv,
 
 std::tuple<MLSMessage, State>
 State::external_join(const bytes& leaf_secret,
-                     HPKEPrivateKey enc_priv,
                      SignaturePrivateKey sig_priv,
                      const KeyPackage& key_package,
                      const GroupInfo& group_info,
@@ -203,8 +205,7 @@ State::external_join(const bytes& leaf_secret,
   const auto& external_pub = opt::get(maybe_external_pub).external_pub;
 
   // Create an initial state that contains the joiner and use it to ommit
-  auto initial_state = State(
-    std::move(enc_priv), std::move(sig_priv), key_package, group_info, tree);
+  auto initial_state = State(std::move(sig_priv), group_info, tree);
   auto [commit_msg, welcome, state] =
     initial_state.commit(leaf_secret, {}, msg_opts, key_package, external_pub);
   silence_unused(welcome);

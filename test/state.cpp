@@ -318,7 +318,6 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
 
   // Initialize the second participant as an external joiner
   auto [commit, second0] = State::external_join(fresh_secret(),
-                                                init_privs[1],
                                                 identity_privs[1],
                                                 key_packages[1],
                                                 group_info,
@@ -346,7 +345,6 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
 
   // Initialize the second participant as an external joiner
   auto [commit, second0] = State::external_join(fresh_secret(),
-                                                init_privs[1],
                                                 identity_privs[1],
                                                 key_packages[1],
                                                 group_info,

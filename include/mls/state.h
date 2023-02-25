@@ -59,7 +59,6 @@ public:
   // whether to include PSKs or evict our prior appearance.
   static std::tuple<MLSMessage, State> external_join(
     const bytes& leaf_secret,
-    HPKEPrivateKey enc_priv,
     SignaturePrivateKey sig_priv,
     const KeyPackage& kp,
     const GroupInfo& group_info,
@@ -170,9 +169,7 @@ protected:
   std::optional<CachedUpdate> _cached_update;
 
   // Assemble a preliminary, unjoined group state
-  State(HPKEPrivateKey enc_priv,
-        SignaturePrivateKey sig_priv,
-        const KeyPackage& key_package,
+  State(SignaturePrivateKey sig_priv,
         const GroupInfo& group_info,
         const std::optional<TreeKEMPublicKey>& tree);
 

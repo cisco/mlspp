@@ -241,6 +241,13 @@ contains(const Container& c, const Value& val)
 
 template<typename Container, typename UnaryPredicate>
 auto
+find_if(Container& c, const UnaryPredicate& pred)
+{
+  return std::find_if(c.begin(), c.end(), pred);
+}
+
+template<typename Container, typename UnaryPredicate>
+auto
 find_if(const Container& c, const UnaryPredicate& pred)
 {
   return std::find_if(c.begin(), c.end(), pred);
