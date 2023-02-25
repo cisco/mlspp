@@ -344,12 +344,8 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
   auto tree = first0.tree();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(fresh_secret(),
-                                                identity_privs[1],
-                                                key_packages[1],
-                                                group_info,
-                                                tree,
-                                                {});
+  auto [commit, second0] = State::external_join(
+    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree, {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));

@@ -60,7 +60,7 @@ public:
   static std::tuple<MLSMessage, State> external_join(
     const bytes& leaf_secret,
     SignaturePrivateKey sig_priv,
-    const KeyPackage& kp,
+    const KeyPackage& key_package,
     const GroupInfo& group_info,
     const std::optional<TreeKEMPublicKey>& tree,
     const MessageOpts& msg_opts);
@@ -232,16 +232,16 @@ protected:
   bool valid(const Add& add) const;
   bool valid(LeafIndex sender, const Update& update) const;
   bool valid(const Remove& remove) const;
-  bool valid(const PreSharedKey& psk) const;
-  bool valid(const ReInit& reinit) const;
+  static bool valid(const PreSharedKey& psk);
+  static bool valid(const ReInit& reinit);
   bool valid(const ExternalInit& external_init) const;
   bool valid(const GroupContextExtensions& gce) const;
   bool valid(std::optional<LeafIndex> sender, const Proposal& proposal) const;
   bool valid(const std::vector<CachedProposal>& proposals,
              LeafIndex commit_sender) const;
-  bool valid_reinit(const std::vector<CachedProposal>& proposals) const;
-  bool valid_external(const std::vector<CachedProposal>& proposals) const;
-  bool path_required(const std::vector<CachedProposal>& proposals) const;
+  static bool valid_reinit(const std::vector<CachedProposal>& proposals);
+  static bool valid_external(const std::vector<CachedProposal>& proposals);
+  static bool path_required(const std::vector<CachedProposal>& proposals);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);

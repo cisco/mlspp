@@ -105,7 +105,7 @@ State::State(SignaturePrivateKey sig_priv,
 State::State(const HPKEPrivateKey& init_priv,
              HPKEPrivateKey leaf_priv,
              SignaturePrivateKey sig_priv,
-             const KeyPackage& kp,
+             const KeyPackage& key_package,
              const Welcome& welcome,
              const std::optional<TreeKEMPublicKey>& tree)
   : _suite(welcome.cipher_suite)
@@ -114,13 +114,13 @@ State::State(const HPKEPrivateKey& init_priv,
   , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
 {
-  auto maybe_kpi = welcome.find(kp);
+  auto maybe_kpi = welcome.find(key_package);
   if (!maybe_kpi) {
     throw InvalidParameterError("Welcome not intended for key package");
   }
   auto kpi = opt::get(maybe_kpi);
 
-  if (kp.cipher_suite != welcome.cipher_suite) {
+  if (key_package.cipher_suite != welcome.cipher_suite) {
     throw InvalidParameterError("Ciphersuite mismatch");
   }
 
@@ -156,7 +156,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _extensions = group_info.group_context.extensions;
 
   // Construct TreeKEM private key from parts provided
-  auto maybe_index = _tree.find(kp.leaf_node);
+  auto maybe_index = _tree.find(key_package.leaf_node);
   if (!maybe_index) {
     throw InvalidParameterError("New joiner not in tree");
   }
@@ -394,7 +394,7 @@ State::update(HPKEPrivateKey leaf_priv,
               const LeafNodeOptions& opts,
               const MessageOpts& msg_opts)
 {
-  return protect_full(update_proposal(leaf_priv, opts), msg_opts);
+  return protect_full(update_proposal(std::move(leaf_priv), opts), msg_opts);
 }
 
 MLSMessage
@@ -1119,14 +1119,14 @@ State::valid(const Remove& remove) const
 }
 
 bool
-State::valid(const PreSharedKey& /* psk */) const
+State::valid(const PreSharedKey& /* psk */)
 {
   // No validation to be done
   return true;
 }
 
 bool
-State::valid(const ReInit& /* reinit */) const
+State::valid(const ReInit& /* reinit */)
 {
   // No validation to be done
   return true;
@@ -1167,9 +1167,11 @@ State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const
   return var::visit(specifically_valid, proposal.content);
 }
 
-// XXX(RLB) We handle the normal case separately from the ReInit case, because I
+// NB(RLB) We handle the normal case separately from the ReInit case, because I
 // expect that we will end up with a different API for the ReInit case.
 bool
+// NB(RLB): clang-tidy thinks this can be static, but it can't.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 State::valid(const std::vector<CachedProposal>& proposals,
              LeafIndex commit_sender) const
 {
@@ -1331,7 +1333,7 @@ State::valid(const std::vector<CachedProposal>& proposals,
 }
 
 bool
-State::valid_reinit(const std::vector<CachedProposal>& proposals) const
+State::valid_reinit(const std::vector<CachedProposal>& proposals)
 {
   // Check that the list contains a ReInit proposal
   const auto has_reinit = stdx::any_of(proposals, [](const auto& cached) {
@@ -1347,7 +1349,7 @@ State::valid_reinit(const std::vector<CachedProposal>& proposals) const
 }
 
 bool
-State::valid_external(const std::vector<CachedProposal>& proposals) const
+State::valid_external(const std::vector<CachedProposal>& proposals)
 {
   // Exactly one ExternalInit
   auto ext_init_count = stdx::count_if(proposals, [](const auto& cached) {
@@ -1386,7 +1388,7 @@ State::valid_external(const std::vector<CachedProposal>& proposals) const
 }
 
 bool
-State::path_required(const std::vector<CachedProposal>& proposals) const
+State::path_required(const std::vector<CachedProposal>& proposals)
 {
   static const auto path_required_types = std::set<Proposal::Type>{
     ProposalType::update,
