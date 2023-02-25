@@ -153,9 +153,6 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].epoch();
 
-    auto update = sessions[i].update();
-    broadcast(update);
-
     auto welcome_commit = sessions[i].commit();
     broadcast(std::get<1>(welcome_commit));
 
@@ -207,8 +204,6 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
   // 2. Have everyone update
   for (int i = 0; i < group_size - 1; i += 1) {
     auto initial_epoch = sessions[0].epoch();
-    auto update = sessions[i].update();
-    broadcast(update);
     auto welcome_commit = sessions[i].commit();
     broadcast(std::get<1>(welcome_commit));
     check(initial_epoch);

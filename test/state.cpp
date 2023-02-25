@@ -598,16 +598,22 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone via Empty Commit")
 TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
 {
   for (size_t i = 0; i < group_size; i += 1) {
-    auto new_leaf = fresh_secret();
-    auto update = states[i].update_proposal(new_leaf, {});
+    auto committer_index = (i + 1) % group_size;
+    auto& updater = states.at(i);
+    auto& committer = states.at(committer_index);
+
+    auto update = updater.update(fresh_secret(), {}, {});
+
+    committer.handle(update);
     auto [commit, welcome, new_state] =
-      states[i].commit(new_leaf, CommitOpts{ { update }, true, false, {} }, {});
+      committer.commit(fresh_secret(), {}, {});
     silence_unused(welcome);
 
     for (auto& state : states) {
-      if (state.index().val == i) {
+      if (state.index().val == committer_index) {
         state = new_state;
       } else {
+        state.handle(update);
         state = opt::get(state.handle(commit));
       }
     }

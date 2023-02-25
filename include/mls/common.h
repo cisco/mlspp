@@ -225,6 +225,13 @@ all_of(const Container& c, const UnaryPredicate& pred)
   return std::all_of(c.begin(), c.end(), pred);
 }
 
+template<typename Container, typename UnaryPredicate>
+auto
+count_if(const Container& c, const UnaryPredicate& pred)
+{
+  return std::count_if(c.begin(), c.end(), pred);
+}
+
 template<typename Container, typename Value>
 bool
 contains(const Container& c, const Value& val)
