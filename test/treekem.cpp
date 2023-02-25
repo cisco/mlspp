@@ -229,10 +229,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
     auto leaf_secret = random_bytes(32);
     pubs[i].set_hash_all();
-    auto [new_adder_priv, path_] = pubs[i].encap(
-      adder, group_id, context, leaf_secret, sig_privs[i], {}, {});
-    auto path = path_;
-    privs[i] = new_adder_priv;
+    privs[i] = pubs[i].update(adder, leaf_secret, group_id, sig_privs[i], {});
+    auto path = pubs[i].encap(privs[i], context, {});
     REQUIRE(pubs[i].parent_hash_valid(adder, path));
 
     auto [overlap, path_secret, ok_] = privs[i].shared_path_secret(joiner);

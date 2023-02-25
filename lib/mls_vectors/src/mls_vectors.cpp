@@ -1223,8 +1223,9 @@ struct TreeTestCase
 
       auto context = opt::get(maybe_context);
       auto pub_before = pub;
-      auto [sender_priv, path] = pub.encap(
-        from, group_id, context, leaf_secret, priv.sig_priv, joiner, {});
+      auto sender_priv =
+        pub.update(from, leaf_secret, group_id, priv.sig_priv, {});
+      auto path = pub.encap(sender_priv, context, joiner);
 
       // Process the UpdatePath at all the members
       for (auto& [leaf, priv_state] : privs) {
@@ -1621,8 +1622,9 @@ TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
     const auto& sig_priv = tc.privs.at(sender).sig_priv;
 
     auto pub = tc.pub;
-    auto [new_sender_priv, path] =
-      pub.encap(sender, group_id, ctx, leaf_secret, sig_priv, {}, {});
+    auto new_sender_priv =
+      pub.update(sender, leaf_secret, group_id, sig_priv, {});
+    auto path = pub.encap(new_sender_priv, ctx, {});
 
     auto path_secrets = std::vector<std::optional<bytes>>{};
     for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
@@ -1730,8 +1732,9 @@ TreeKEMTestVector::verify()
     auto pub = ratchet_tree;
     auto leaf_secret = random_bytes(cipher_suite.secret_size());
     const auto& sig_priv = sig_privs.at(from);
-    auto [new_sender_priv, new_path] =
-      pub.encap(from, group_id, ctx, leaf_secret, sig_priv, {}, {});
+    auto new_sender_priv =
+      pub.update(from, leaf_secret, group_id, sig_priv, {});
+    auto new_path = pub.encap(new_sender_priv, ctx, {});
     VERIFY("new path parent hash valid",
            ratchet_tree.parent_hash_valid(from, path));
 
