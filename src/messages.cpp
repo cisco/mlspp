@@ -128,6 +128,12 @@ Welcome::Welcome(CipherSuite suite,
   : cipher_suite(suite)
   , _joiner_secret(joiner_secret)
 {
+  // Cache the list of PSK IDs
+  for (const auto& psks : psks) {
+    _psks.psks.push_back(psks.id);
+  }
+
+  // Pre-encrypt the GroupInfo
   auto [key, nonce] = group_info_key_nonce(suite, joiner_secret, psks);
   auto group_info_data = tls::marshal(group_info);
   encrypted_group_info =
@@ -149,7 +155,7 @@ Welcome::find(const KeyPackage& kp) const
 void
 Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
-  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, {} };
+  auto gs = GroupSecrets{ _joiner_secret, std::nullopt, _psks };
   if (path_secret) {
     gs.path_secret = { opt::get(path_secret) };
   }

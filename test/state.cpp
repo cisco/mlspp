@@ -305,6 +305,37 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   verify_group_functionality(group);
 }
 
+TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
+{
+  const auto psk_id = from_ascii("external psk");
+  const auto psk_secret = from_ascii("super secret");
+  const auto psks = std::map<bytes, bytes>{{psk_id, psk_secret}};
+
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Install the PSK on the creator
+  first0.add_external_psk(psk_id, psk_secret);
+
+  // Create a Commit over Add and PSK proposals
+  auto add = first0.add_proposal(key_packages[1]);
+  auto psk = first0.pre_shared_key_proposal(psk_id);
+  auto [commit, welcome, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add, psk }, true, false, {} }, {});
+  silence_unused(commit);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
+                        key_packages[1], welcome,       std::nullopt, psks};
+  REQUIRE(first1 == second0);
+}
+
 TEST_CASE_FIXTURE(StateTest, "External Join")
 {
   // Initialize the creator's state
@@ -623,12 +654,37 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
   }
 }
 
+TEST_CASE_FIXTURE(RunningGroupTest, "Add a PSK from Everyone in a Group")
+{
+  for (uint32_t i = 0; i < group_size; i += 1) {
+    auto psk_id = tls::marshal(i);
+    auto psk_secret = suite.derive_secret(psk_id, "psk secret");
+    states[i].add_external_psk(psk_id, psk_secret);
+
+    auto psk = states[i].pre_shared_key_proposal(psk_id);
+    auto [commit, welcome, new_state] = states[i].commit(
+      fresh_secret(), CommitOpts{ { psk }, false, false, {} }, {});
+    silence_unused(welcome);
+
+    for (auto& state : states) {
+      if (state.index().val == i) {
+        state = new_state;
+      } else {
+        state.add_external_psk(psk_id, psk_secret);
+        state = opt::get(state.handle(commit));
+      }
+    }
+
+    check_consistency();
+  }
+}
+
 TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
 {
   for (uint32_t i = uint32_t(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(LeafIndex{ i + 1 });
     auto [commit, welcome, new_state] = states[i].commit(
-      fresh_secret(), CommitOpts{ { remove }, true, false, {} }, {});
+      fresh_secret(), CommitOpts{ { remove }, false, false, {} }, {});
     silence_unused(welcome);
 
     states.pop_back();

@@ -128,9 +128,6 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Decrypt the GroupSecrets
   auto secrets = welcome.decrypt_secrets(kpi, init_priv);
-  if (!secrets.psks.psks.empty()) {
-    throw NotImplementedError(/* PSKs are not supported */);
-  }
 
   // Look up PSKs
   auto psks =
@@ -193,7 +190,7 @@ State::State(const HPKEPrivateKey& init_priv,
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
   _key_schedule = KeyScheduleEpoch::joiner(
-    _suite, secrets.joiner_secret, { /* no PSKs */ }, group_ctx);
+    _suite, secrets.joiner_secret, psks, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);
 
   // Verify the confirmation
