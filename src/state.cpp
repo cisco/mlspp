@@ -107,12 +107,14 @@ State::State(const HPKEPrivateKey& init_priv,
              SignaturePrivateKey sig_priv,
              const KeyPackage& key_package,
              const Welcome& welcome,
-             const std::optional<TreeKEMPublicKey>& tree)
+             const std::optional<TreeKEMPublicKey>& tree,
+             std::map<bytes, bytes> external_psks)
   : _suite(welcome.cipher_suite)
   , _epoch(0)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
+  , _external_psks(std::move(external_psks))
 {
   auto maybe_kpi = welcome.find(key_package);
   if (!maybe_kpi) {
@@ -130,8 +132,24 @@ State::State(const HPKEPrivateKey& init_priv,
     throw NotImplementedError(/* PSKs are not supported */);
   }
 
+  // Look up PSKs
+  auto psks =
+    stdx::transform<PSKWithSecret>(secrets.psks.psks, [&](const auto& psk_id) {
+      if (!var::holds_alternative<ExternalPSK>(psk_id.content)) {
+        throw ProtocolError("Illegal resumption PSK");
+      }
+
+      const auto& ext_psk = var::get<ExternalPSK>(psk_id.content);
+      if (_external_psks.count(ext_psk.psk_id) == 0) {
+        throw ProtocolError("Unknown PSK");
+      }
+
+      const auto& secret = _external_psks.at(ext_psk.psk_id);
+      return PSKWithSecret{ psk_id, secret };
+    });
+
   // Decrypt the GroupInfo
-  auto group_info = welcome.decrypt(secrets.joiner_secret, { /* no PSKs */ });
+  auto group_info = welcome.decrypt(secrets.joiner_secret, psks);
   if (group_info.group_context.cipher_suite != _suite) {
     throw InvalidParameterError("GroupInfo and Welcome ciphersuites disagree");
   }
@@ -383,6 +401,20 @@ State::group_context_extensions_proposal(ExtensionList exts) const
   return { GroupContextExtensions{ std::move(exts) } };
 }
 
+Proposal
+State::pre_shared_key_proposal(const bytes& external_psk_id) const
+{
+  if (_external_psks.count(external_psk_id) == 0) {
+    throw InvalidParameterError("Unknown PSK");
+  }
+
+  auto psk_id = PreSharedKeyID{
+    { ExternalPSK{ external_psk_id } },
+    random_bytes(_suite.secret_size()),
+  };
+  return { PreSharedKey{ psk_id } };
+}
+
 MLSMessage
 State::add(const KeyPackage& key_package, const MessageOpts& msg_opts)
 {
@@ -414,6 +446,12 @@ State::group_context_extensions(ExtensionList exts, const MessageOpts& msg_opts)
 {
   return protect_full(group_context_extensions_proposal(std::move(exts)),
                       msg_opts);
+}
+
+MLSMessage
+State::pre_shared_key(const bytes& external_psk_id, const MessageOpts& msg_opts)
+{
+  return protect_full(pre_shared_key_proposal(external_psk_id), msg_opts);
 }
 
 std::tuple<MLSMessage, Welcome, State>
@@ -485,7 +523,7 @@ State::commit(const bytes& leaf_secret,
     throw ProtocolError("Invalid proposal list for external commit");
   }
 
-  const auto joiner_locations = next.apply(proposals);
+  const auto [joiner_locations, psks] = next.apply(proposals);
 
   if (external_commit) {
     next._index = next._tree.add_leaf(opt::get(joiner_key_package).leaf_node);
@@ -540,8 +578,7 @@ State::commit(const bytes& leaf_secret,
 
   next._transcript_hash.update_confirmed(commit_content_auth);
   next._epoch += 1;
-  next.update_epoch_secrets(
-    commit_secret, { /* no PSKs */ }, force_init_secret);
+  next.update_epoch_secrets(commit_secret, psks, force_init_secret);
 
   const auto confirmation_tag =
     next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
@@ -570,9 +607,8 @@ State::commit(const bytes& leaf_secret,
   }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
-  auto welcome = Welcome{
-    _suite, next._key_schedule.joiner_secret, { /* no PSKs */ }, group_info
-  };
+  auto welcome =
+    Welcome{ _suite, next._key_schedule.joiner_secret, psks, group_info };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
@@ -692,7 +728,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   }
 
   auto next = successor();
-  auto joiner_locations = next.apply(proposals);
+  auto [joiner_locations, psks] = next.apply(proposals);
 
   // If this is an external commit, add the joiner to the tree and note the
   // location where they were added.  Also, compute the "externally forced"
@@ -749,8 +785,7 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   // Update the transcripts and advance the key schedule
   next._transcript_hash.update(content_auth);
   next._epoch += 1;
-  next.update_epoch_secrets(
-    commit_secret, { /* no PSKs */ }, force_init_secret);
+  next.update_epoch_secrets(commit_secret, { psks }, force_init_secret);
 
   // Verify the confirmation MAC
   const auto confirmation_tag =
@@ -942,18 +977,34 @@ State::apply(const std::vector<CachedProposal>& proposals,
   return locations;
 }
 
-std::vector<LeafIndex>
+std::tuple<std::vector<LeafIndex>, std::vector<PSKWithSecret>>
 State::apply(const std::vector<CachedProposal>& proposals)
 {
-  auto update_locations = apply(proposals, ProposalType::update);
-  auto remove_locations = apply(proposals, ProposalType::remove);
+  apply(proposals, ProposalType::update);
+  apply(proposals, ProposalType::remove);
   auto joiner_locations = apply(proposals, ProposalType::add);
   apply(proposals, ProposalType::group_context_extensions);
+
+  // Extract the PSK proposals and look up the secrets
+  // TODO(RLB): Factor this out, and also factor the above methods into
+  // apply_update, apply_remove, etc.
+  auto psks = std::vector<PSKWithSecret>{};
+  for (const auto& cached : proposals) {
+    if (cached.proposal.proposal_type() != ProposalType::psk) {
+      continue;
+    }
+
+    const auto& proposal = var::get<PreSharedKey>(cached.proposal.content);
+    const auto& ext_psk = var::get<ExternalPSK>(proposal.psk.content);
+    const auto secret = _external_psks.at(ext_psk.psk_id);
+
+    psks.push_back({ proposal.psk, secret });
+  }
 
   _tree.truncate();
   _tree_priv.truncate(_tree.size);
   _tree.set_hash_all();
-  return joiner_locations;
+  return { joiner_locations, psks };
 }
 
 ///
@@ -1119,10 +1170,16 @@ State::valid(const Remove& remove) const
 }
 
 bool
-State::valid(const PreSharedKey& /* psk */)
+State::valid(const PreSharedKey& psk) const
 {
-  // No validation to be done
-  return true;
+  // Verify that it's an external PSK (we don't support any others)
+  if (!var::holds_alternative<ExternalPSK>(psk.psk.content)) {
+    return false;
+  }
+
+  // Verify that we have the appropriate PSK
+  const auto& ext_psk = var::get<ExternalPSK>(psk.psk.content);
+  return _external_psks.count(ext_psk.psk_id) > 0;
 }
 
 bool
@@ -1515,6 +1572,18 @@ State::verify(const AuthenticatedContent& content_auth) const
     default:
       throw ProtocolError("Invalid sender type");
   }
+}
+
+void
+State::add_external_psk(const bytes& id, const bytes& secret)
+{
+  _external_psks.insert_or_assign(id, secret);
+}
+
+void
+State::remove_external_psk(const bytes& id)
+{
+  _external_psks.erase(id);
 }
 
 bytes
