@@ -137,8 +137,13 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   auto first1 = first1_;
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome,       std::nullopt, {}};
+  auto second0 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        std::nullopt,
+                        {} };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -165,8 +170,13 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with New Member Add")
   auto first1 = first1_;
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome,       std::nullopt, {} };
+  auto second0 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        std::nullopt,
+                        {} };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -205,8 +215,13 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with External Proposal")
   auto first1 = first1_;
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome,       std::nullopt, {} };
+  auto second0 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        std::nullopt,
+                        {} };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -234,8 +249,13 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
   silence_unused(commit1);
 
   // Initialize the second participant from the Welcome
-  auto second1 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome1,      std::nullopt, {} };
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
   REQUIRE(first1 == second1);
   REQUIRE(first1.extensions() == first_exts);
 
@@ -283,7 +303,8 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
                         identity_privs[1],
                         key_packages[1],
                         welcome,
-                        std::nullopt, {}),
+                        std::nullopt,
+                        {}),
                   InvalidParameterError);
 
   auto incorrect_tree = TreeKEMPublicKey(suite);
@@ -294,11 +315,17 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
                         identity_privs[1],
                         key_packages[1],
                         welcome,
-                        incorrect_tree, {}),
+                        incorrect_tree,
+                        {}),
                   InvalidParameterError);
 
-  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome,       first1.tree(), {} };
+  auto second0 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        first1.tree(),
+                        {} };
   REQUIRE(first1 == second0);
 
   auto group = std::vector<State>{ first1, second0 };
@@ -309,7 +336,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
 {
   const auto psk_id = from_ascii("external psk");
   const auto psk_secret = from_ascii("super secret");
-  const auto psks = std::map<bytes, bytes>{{psk_id, psk_secret}};
+  const auto psks = std::map<bytes, bytes>{ { psk_id, psk_secret } };
 
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -325,14 +352,16 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
   // Create a Commit over Add and PSK proposals
   auto add = first0.add_proposal(key_packages[1]);
   auto psk = first0.pre_shared_key_proposal(psk_id);
-  auto [commit, welcome, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add, psk }, true, false, {} }, {});
+  auto [commit, welcome, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add, psk }, true, false, {} }, {});
   silence_unused(commit);
   auto first1 = first1_;
 
   // Initialize the second participant from the Welcome
-  auto second0 = State{ init_privs[1],   leaf_privs[1], identity_privs[1],
-                        key_packages[1], welcome,       std::nullopt, psks};
+  auto second0 = State{
+    init_privs[1], leaf_privs[1], identity_privs[1], key_packages[1], welcome,
+    std::nullopt,  psks
+  };
   REQUIRE(first1 == second0);
 }
 
@@ -511,11 +540,12 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
   // Initialize the new joiners from the welcome
   for (size_t i = 1; i < group_size; i += 1) {
     states.push_back({ init_privs[i],
-                        leaf_privs[i],
-                        identity_privs[i],
-                        key_packages[i],
-                        welcome,
-                        std::nullopt, {} });
+                       leaf_privs[i],
+                       identity_privs[i],
+                       key_packages[i],
+                       welcome,
+                       std::nullopt,
+                       {} });
   }
 
   verify_group_functionality(states);
@@ -547,11 +577,12 @@ TEST_CASE_FIXTURE(StateTest, "Full Size Group")
     }
 
     states.push_back({ init_privs[i],
-                        leaf_privs[i],
-                        identity_privs[i],
-                        key_packages[i],
-                        welcome,
-                        std::nullopt, {} });
+                       leaf_privs[i],
+                       identity_privs[i],
+                       key_packages[i],
+                       welcome,
+                       std::nullopt,
+                       {} });
 
     // Check that everyone ended up in the same place
     for (const auto& state : states) {
@@ -587,11 +618,12 @@ protected:
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {
       states.push_back({ init_privs[i],
-                          leaf_privs[i],
-                          identity_privs[i],
-                          key_packages[i],
-                          welcome,
-                          std::nullopt, {} });
+                         leaf_privs[i],
+                         identity_privs[i],
+                         key_packages[i],
+                         welcome,
+                         std::nullopt,
+                         {} });
     }
 
     check_consistency();
