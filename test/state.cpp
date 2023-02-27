@@ -732,6 +732,57 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   }
 }
 
+TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
+{
+  static const auto get_creds = [](const auto& kps) {
+    return stdx::transform<Credential>(
+      kps, [](const auto& leaf) { return leaf.credential; });
+  };
+
+  // remove member at position 1
+  auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
+  auto [commit_1, welcome_1, new_state_1_] = states[0].commit(
+    fresh_secret(), CommitOpts{ { remove_1 }, true, false, {} }, {});
+  auto new_state_1 = new_state_1_;
+  silence_unused(welcome_1);
+  silence_unused(commit_1);
+  // roster should be 0, 2, 3, 4
+  auto expected_creds = std::vector<Credential>{
+    key_packages[0].leaf_node.credential,
+    key_packages[2].leaf_node.credential,
+    key_packages[3].leaf_node.credential,
+    key_packages[4].leaf_node.credential,
+  };
+  REQUIRE(expected_creds == get_creds(new_state_1.roster()));
+
+  // remove member at position 2
+  auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
+  auto [commit_2, welcome_2, new_state_2_] = new_state_1.commit(
+    fresh_secret(), CommitOpts{ { remove_2 }, true, false, {} }, {});
+  auto new_state_2 = new_state_2_;
+  silence_unused(welcome_2);
+  // roster should be 0, 2, 4
+  expected_creds = std::vector<Credential>{
+    key_packages[0].leaf_node.credential,
+    key_packages[2].leaf_node.credential,
+    key_packages[4].leaf_node.credential,
+  };
+
+  REQUIRE(expected_creds == get_creds(new_state_2.roster()));
+
+  // handle remove by remaining clients and verify the roster
+  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
+    if (i == 3) {
+      // skip since we removed
+      continue;
+    }
+
+    states[i] = opt::get(states[i].handle(commit_1));
+    states[i] = opt::get(states[i].handle(commit_2));
+    REQUIRE(expected_creds == get_creds(states[i].roster()));
+  }
+}
+
 class RelatedGroupTest : public RunningGroupTest
 {
 protected:
@@ -800,53 +851,76 @@ TEST_CASE_FIXTURE(RelatedGroupTest, "Branch the group")
   }
 }
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
+TEST_CASE_FIXTURE(RelatedGroupTest, "Reinitialize the group")
 {
-  static const auto get_creds = [](const auto& kps) {
-    return stdx::transform<Credential>(
-      kps, [](const auto& leaf) { return leaf.credential; });
-  };
+  // Member 0 proposes reinitialization with a new group ID
+  auto new_group_id = from_ascii("reinitialized group");
+  auto reinit_proposal =
+    states[0].reinit(new_group_id, ProtocolVersion::mls10, suite, {}, {});
+  for (auto& state : states) {
+    state.handle(reinit_proposal);
+  }
 
-  // remove member at position 1
-  auto remove_1 = states[0].remove_proposal(RosterIndex{ 1 });
-  auto [commit_1, welcome_1, new_state_1_] = states[0].commit(
-    fresh_secret(), CommitOpts{ { remove_1 }, true, false, {} }, {});
-  auto new_state_1 = new_state_1_;
-  silence_unused(welcome_1);
-  silence_unused(commit_1);
-  // roster should be 0, 2, 3, 4
-  auto expected_creds = std::vector<Credential>{
-    key_packages[0].leaf_node.credential,
-    key_packages[2].leaf_node.credential,
-    key_packages[3].leaf_node.credential,
-    key_packages[4].leaf_node.credential,
-  };
-  REQUIRE(expected_creds == get_creds(new_state_1.roster()));
+  // Member 1 generates a ReInit Commit
+  auto leaf_secret = random_bytes(suite.secret_size());
+  auto [tombstone_1, reinit_commit] =
+    states[1].reinit_commit(leaf_secret, {}, {});
 
-  // remove member at position 2
-  auto remove_2 = new_state_1.remove_proposal(RosterIndex{ 2 });
-  auto [commit_2, welcome_2, new_state_2_] = new_state_1.commit(
-    fresh_secret(), CommitOpts{ { remove_2 }, true, false, {} }, {});
-  auto new_state_2 = new_state_2_;
-  silence_unused(welcome_2);
-  // roster should be 0, 2, 4
-  expected_creds = std::vector<Credential>{
-    key_packages[0].leaf_node.credential,
-    key_packages[2].leaf_node.credential,
-    key_packages[4].leaf_node.credential,
-  };
-
-  REQUIRE(expected_creds == get_creds(new_state_2.roster()));
-
-  // handle remove by remaining clients and verify the roster
-  for (int i = 2; i < static_cast<int>(group_size); i += 1) {
-    if (i == 3) {
-      // skip since we removed
+  // The other members process the ReInit Commit
+  auto tombstones = std::vector<State::Tombstone>{};
+  for (uint32_t i = 0; i < group_size; i++) {
+    if (i == 1) {
+      tombstones.push_back(tombstone_1);
       continue;
     }
 
-    states[i] = opt::get(states[i].handle(commit_1));
-    states[i] = opt::get(states[i].handle(commit_2));
-    REQUIRE(expected_creds == get_creds(states[i].roster()));
+    auto tombstone = states[i].handle_reinit_commit(reinit_commit);
+    tombstones.push_back(tombstone);
+  }
+
+  for (const auto& tombstone : tombstones) {
+    REQUIRE(tombstone == tombstones[0]);
+  }
+
+  // Member 2 generates a Welcome message
+  auto reinit_key_packages = std::vector<KeyPackage>{};
+  for (uint32_t i = 0; i < group_size; i++) {
+    if (i == 2) {
+      continue;
+    }
+
+    reinit_key_packages.push_back(new_key_packages[i]);
+  }
+
+  auto [new_state_2, welcome] =
+    tombstones[2].create_welcome(new_leaf_privs[2],
+                                 new_identity_privs[2],
+                                 new_key_packages[2].leaf_node,
+                                 reinit_key_packages,
+                                 random_bytes(suite.secret_size()),
+                                 {});
+  auto tree = new_state_2.tree();
+
+  // The other members process the Welcome
+  auto new_states = std::vector<State>{};
+  for (uint32_t i = 0; i < group_size; i++) {
+    if (i == 2) {
+      new_states.push_back(new_state_2);
+      continue;
+    }
+
+    auto new_state = tombstones[i].handle_welcome(new_init_privs[i],
+                                                  new_leaf_privs[i],
+                                                  new_identity_privs[i],
+                                                  new_key_packages[i],
+                                                  welcome,
+                                                  tree);
+    new_states.push_back(new_state);
+  }
+
+  // Verify that the new group works
+  verify_group_functionality(new_states);
+  for (const auto& state : new_states) {
+    REQUIRE(state == new_states[0]);
   }
 }

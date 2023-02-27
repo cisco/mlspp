@@ -83,6 +83,10 @@ public:
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
   Proposal pre_shared_key_proposal(const bytes& external_psk_id) const;
+  Proposal reinit_proposal(bytes group_id,
+                           ProtocolVersion version,
+                           CipherSuite cipher_suite,
+                           ExtensionList extensions) const;
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
   MLSMessage update(HPKEPrivateKey leaf_priv,
@@ -94,6 +98,11 @@ public:
                                       const MessageOpts& msg_opts);
   MLSMessage pre_shared_key(const bytes& external_psk_id,
                             const MessageOpts& msg_opts);
+  MLSMessage reinit(bytes group_id,
+                    ProtocolVersion version,
+                    CipherSuite cipher_suite,
+                    ExtensionList extensions,
+                    const MessageOpts& msg_opts);
 
   std::tuple<MLSMessage, Welcome, State> commit(
     const bytes& leaf_secret,
@@ -105,8 +114,7 @@ public:
   ///
   std::optional<State> handle(const MLSMessage& msg);
   std::optional<State> handle(const MLSMessage& msg,
-                              std::optional<State> cached);
-
+                              std::optional<State> cached_state);
   ///
   /// PSK management
   ///
@@ -159,6 +167,43 @@ public:
                       const KeyPackage& key_package,
                       const Welcome& welcome,
                       const std::optional<TreeKEMPublicKey>& tree) const;
+
+  // Reinitialization
+  struct Tombstone
+  {
+    std::tuple<State, Welcome> create_welcome(
+      HPKEPrivateKey enc_priv,
+      SignaturePrivateKey sig_priv,
+      const LeafNode& leaf_node,
+      const std::vector<KeyPackage>& key_packages,
+      const bytes& leaf_secret,
+      const CommitOpts& commit_opts) const;
+    State handle_welcome(const HPKEPrivateKey& init_priv,
+                         HPKEPrivateKey enc_priv,
+                         SignaturePrivateKey sig_priv,
+                         const KeyPackage& key_package,
+                         const Welcome& welcome,
+                         const std::optional<TreeKEMPublicKey>& tree) const;
+
+    TLS_SERIALIZABLE(prior_group_id, prior_epoch, resumption_psk, reinit);
+
+  private:
+    Tombstone(const State& state_in, const ReInit& reinit_in);
+
+    bytes prior_group_id;
+    epoch_t prior_epoch;
+    bytes resumption_psk;
+
+    ReInit reinit;
+
+    friend class State;
+  };
+
+  std::tuple<Tombstone, MLSMessage> reinit_commit(
+    const bytes& leaf_secret,
+    const std::optional<CommitOpts>& opts,
+    const MessageOpts& msg_opts);
+  Tombstone handle_reinit_commit(const MLSMessage& commit);
 
 protected:
   // Shared confirmed state
@@ -221,12 +266,43 @@ protected:
                                const std::optional<TreeKEMPublicKey>& external,
                                const ExtensionList& extensions);
 
+  // Form a commit, covering all the cases with slightly different validation
+  // rules:
+  // * Normal
+  // * External
+  // * Branch
+  // * Reinit
+  struct NormalCommitParams
+  {};
+
+  struct ExternalCommitParams
+  {
+    KeyPackage joiner_key_package;
+    bytes force_init_secret;
+  };
+
+  struct RestartCommitParams
+  {
+    ResumptionPSKUsage allowed_usage;
+  };
+
+  struct ReInitCommitParams
+  {};
+
+  using CommitParams = var::variant<NormalCommitParams,
+                                    ExternalCommitParams,
+                                    RestartCommitParams,
+                                    ReInitCommitParams>;
+
   std::tuple<MLSMessage, Welcome, State> commit(
     const bytes& leaf_secret,
     const std::optional<CommitOpts>& opts,
     const MessageOpts& msg_opts,
-    const std::optional<KeyPackage>& joiner_key_package,
-    const std::optional<HPKEPublicKey>& external_pub);
+    CommitParams params);
+
+  std::optional<State> handle(const MLSMessage& msg,
+                              std::optional<State> cached_state,
+                              std::optional<CommitParams> expected_params);
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
@@ -285,10 +361,21 @@ protected:
   bool valid(const ExternalInit& external_init) const;
   bool valid(const GroupContextExtensions& gce) const;
   bool valid(std::optional<LeafIndex> sender, const Proposal& proposal) const;
+
   bool valid(const std::vector<CachedProposal>& proposals,
-             LeafIndex commit_sender) const;
+             LeafIndex commit_sender,
+             const CommitParams& params) const;
+  bool valid_normal(const std::vector<CachedProposal>& proposals,
+                    LeafIndex commit_sender) const;
+  bool valid_external(const std::vector<CachedProposal>& proposals) const;
   static bool valid_reinit(const std::vector<CachedProposal>& proposals);
-  static bool valid_external(const std::vector<CachedProposal>& proposals);
+  static bool valid_restart(const std::vector<CachedProposal>& proposals,
+                            ResumptionPSKUsage allowed_usage);
+
+  CommitParams infer_commit_type(
+    const std::optional<LeafIndex>& sender,
+    const std::vector<CachedProposal>& proposals,
+    const std::optional<CommitParams>& expected_params) const;
   static bool path_required(const std::vector<CachedProposal>& proposals);
 
   // Compare the **shared** attributes of the states

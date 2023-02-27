@@ -212,6 +212,8 @@ State::external_join(const bytes& leaf_secret,
                      const std::optional<TreeKEMPublicKey>& tree,
                      const MessageOpts& msg_opts)
 {
+  // Create a preliminary state
+  auto initial_state = State(std::move(sig_priv), group_info, tree);
 
   // Look up the external public key for the group
   const auto maybe_external_pub =
@@ -222,10 +224,18 @@ State::external_join(const bytes& leaf_secret,
 
   const auto& external_pub = opt::get(maybe_external_pub).external_pub;
 
+  // Insert an ExternalInit proposal
+  auto [enc, force_init_secret] =
+    KeyScheduleEpoch::external_init(key_package.cipher_suite, external_pub);
+  auto ext_init_proposal = Proposal{ ExternalInit{ enc } };
+
   // Create an initial state that contains the joiner and use it to ommit
-  auto initial_state = State(std::move(sig_priv), group_info, tree);
+  auto opts = CommitOpts{};
+  opts.extra_proposals.push_back(ext_init_proposal);
+
+  auto params = ExternalCommitParams{ key_package, force_init_secret };
   auto [commit_msg, welcome, state] =
-    initial_state.commit(leaf_secret, {}, msg_opts, key_package, external_pub);
+    initial_state.commit(leaf_secret, opts, msg_opts, params);
   silence_unused(welcome);
   return { commit_msg, state };
 }
@@ -308,6 +318,10 @@ State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 AuthenticatedContent
 State::unprotect_to_content_auth(const MLSMessage& msg)
 {
+  if (msg.version != ProtocolVersion::mls10) {
+    throw InvalidParameterError("Unsupported version");
+  }
+
   const auto unprotect = overloaded{
     [&](const PublicMessage& pt) -> AuthenticatedContent {
       auto maybe_content_auth =
@@ -415,6 +429,16 @@ State::pre_shared_key_proposal(const bytes& external_psk_id) const
   return { PreSharedKey{ psk_id } };
 }
 
+Proposal
+State::reinit_proposal(bytes group_id,
+                       ProtocolVersion version,
+                       CipherSuite cipher_suite,
+                       ExtensionList extensions) const
+{
+  return { ReInit{
+    std::move(group_id), version, cipher_suite, std::move(extensions) } };
+}
+
 MLSMessage
 State::add(const KeyPackage& key_package, const MessageOpts& msg_opts)
 {
@@ -454,20 +478,30 @@ State::pre_shared_key(const bytes& external_psk_id, const MessageOpts& msg_opts)
   return protect_full(pre_shared_key_proposal(external_psk_id), msg_opts);
 }
 
+MLSMessage
+State::reinit(bytes group_id,
+              ProtocolVersion version,
+              CipherSuite cipher_suite,
+              ExtensionList extensions,
+              const MessageOpts& msg_opts)
+{
+  return protect_full(
+    reinit_proposal(group_id, version, cipher_suite, extensions), msg_opts);
+}
+
 std::tuple<MLSMessage, Welcome, State>
 State::commit(const bytes& leaf_secret,
               const std::optional<CommitOpts>& opts,
               const MessageOpts& msg_opts)
 {
-  return commit(leaf_secret, opts, msg_opts, std::nullopt, std::nullopt);
+  return commit(leaf_secret, opts, msg_opts, NormalCommitParams{});
 }
 
 std::tuple<MLSMessage, Welcome, State>
 State::commit(const bytes& leaf_secret,
               const std::optional<CommitOpts>& opts,
               const MessageOpts& msg_opts,
-              const std::optional<KeyPackage>& joiner_key_package,
-              const std::optional<HPKEPublicKey>& external_pub)
+              CommitParams params)
 {
   // Construct a commit from cached proposals
   // TODO(rlb) ignore some proposals:
@@ -499,34 +533,30 @@ State::commit(const bytes& leaf_secret,
   }
 
   // If this is an external commit, insert an ExternalInit proposal
-  auto external_commit = bool(joiner_key_package) && bool(external_pub);
-  if (bool(joiner_key_package) != bool(external_pub)) {
-    throw InvalidParameterError("Malformed external commit parameters");
+  auto external_commit = std::optional<ExternalCommitParams>{};
+  if (var::holds_alternative<ExternalCommitParams>(params)) {
+    external_commit = var::get<ExternalCommitParams>(params);
   }
 
   auto force_init_secret = std::optional<bytes>{};
   if (external_commit) {
-    auto [enc, exported] =
-      KeyScheduleEpoch::external_init(_suite, opt::get(external_pub));
-    force_init_secret = exported;
-    commit.proposals.push_back({ Proposal{ ExternalInit{ enc } } });
+    force_init_secret = opt::get(external_commit).force_init_secret;
   }
 
   // Apply proposals
   State next = successor();
 
   const auto proposals = must_resolve(commit.proposals, _index);
-  if (!external_commit && !valid(proposals, _index)) {
+  if (!valid(proposals, _index, params)) {
     throw ProtocolError("Invalid proposal list");
-  }
-  if (external_commit && !valid_external(proposals)) {
-    throw ProtocolError("Invalid proposal list for external commit");
   }
 
   const auto [joiner_locations, psks] = next.apply(proposals);
 
   if (external_commit) {
-    next._index = next._tree.add_leaf(opt::get(joiner_key_package).leaf_node);
+    const auto& leaf_node =
+      opt::get(external_commit).joiner_key_package.leaf_node;
+    next._index = next._tree.add_leaf(leaf_node);
   }
 
   // If this is an external commit, indicate it in the sender field
@@ -636,17 +666,20 @@ State::group_context() const
 std::optional<State>
 State::handle(const MLSMessage& msg)
 {
-  return handle(msg, std::nullopt);
+  return handle(msg, std::nullopt, std::nullopt);
 }
 
 std::optional<State>
 State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 {
-  // Check the version
-  if (msg.version != ProtocolVersion::mls10) {
-    throw InvalidParameterError("Unsupported version");
-  }
+  return handle(msg, cached_state, std::nullopt);
+}
 
+std::optional<State>
+State::handle(const MLSMessage& msg,
+              std::optional<State> cached_state,
+              std::optional<CommitParams> expected_params)
+{
   // Verify the signature on the message
   auto content_auth = unprotect_to_content_auth(msg);
   if (!verify(content_auth)) {
@@ -688,9 +721,6 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
       throw ProtocolError("Invalid commit sender type");
   }
 
-  auto external_commit =
-    content.sender.sender_type() == SenderType::new_member_commit;
-
   auto sender = std::optional<LeafIndex>();
   if (content.sender.sender_type() == SenderType::member) {
     sender = var::get<MemberSender>(content.sender.sender).sender;
@@ -715,18 +745,15 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   const auto& commit = var::get<Commit>(content.content);
   const auto proposals = must_resolve(commit.proposals, sender);
 
-  if (!external_commit && !valid(proposals, opt::get(sender))) {
-    throw ProtocolError("Invalid proposal list");
-  }
+  const auto params = infer_commit_type(sender, proposals, expected_params);
+  auto external_commit = var::holds_alternative<ExternalCommitParams>(params);
 
-  if (external_commit && !valid_external(proposals)) {
-    throw ProtocolError("Invalid proposal list for external commit");
-  }
-
+  // Check that a path is present when required
   if (path_required(proposals) && !commit.path) {
     throw ProtocolError("Path required but not present");
   }
 
+  // Apply the proposals
   auto next = successor();
   auto [joiner_locations, psks] = next.apply(proposals);
 
@@ -838,7 +865,8 @@ State::create_branch(bytes group_id,
     commit_opts.encrypt_handshake,
     commit_opts.leaf_node_opts,
   };
-  auto [_commit, welcome, state] = new_group.commit(leaf_secret, opts, {});
+  auto [_commit, welcome, state] = new_group.commit(
+    leaf_secret, opts, {}, RestartCommitParams{ ResumptionPSKUsage::branch });
   return { state, welcome };
 }
 
@@ -873,6 +901,135 @@ State::handle_branch(const HPKEPrivateKey& init_priv,
   }
 
   return branch_state;
+}
+
+State::Tombstone::Tombstone(const State& state_in, const ReInit& reinit_in)
+  : prior_group_id(state_in._group_id)
+  , prior_epoch(state_in._epoch)
+  , resumption_psk(state_in._key_schedule.resumption_psk)
+  , reinit(reinit_in)
+{
+}
+
+std::tuple<State, Welcome>
+State::Tombstone::create_welcome(HPKEPrivateKey enc_priv,
+                                 SignaturePrivateKey sig_priv,
+                                 const LeafNode& leaf_node,
+                                 const std::vector<KeyPackage>& key_packages,
+                                 const bytes& leaf_secret,
+                                 const CommitOpts& commit_opts) const
+{
+  // Create new empty group with the appropriate PSK
+  auto new_group =
+    State{ reinit.group_id,     reinit.cipher_suite, std::move(enc_priv),
+           std::move(sig_priv), leaf_node,           reinit.extensions };
+
+  new_group.add_resumption_psk(prior_group_id, prior_epoch, resumption_psk);
+
+  // Create Add proposals
+  auto proposals = stdx::transform<Proposal>(
+    key_packages, [&](const auto& kp) { return new_group.add_proposal(kp); });
+
+  // Create PSK proposal
+  proposals.push_back({ PreSharedKey{
+    { ResumptionPSK{ ResumptionPSKUsage::reinit, prior_group_id, prior_epoch },
+      random_bytes(reinit.cipher_suite.secret_size()) } } });
+
+  // Commit the Add and PSK proposals
+  auto opts = CommitOpts{
+    proposals,
+    commit_opts.inline_tree,
+    commit_opts.encrypt_handshake,
+    commit_opts.leaf_node_opts,
+  };
+  auto [_commit, welcome, state] = new_group.commit(
+    leaf_secret, opts, {}, RestartCommitParams{ ResumptionPSKUsage::reinit });
+  return { state, welcome };
+}
+
+State
+State::Tombstone::handle_welcome(
+  const HPKEPrivateKey& init_priv,
+  HPKEPrivateKey enc_priv,
+  SignaturePrivateKey sig_priv,
+  const KeyPackage& key_package,
+  const Welcome& welcome,
+  const std::optional<TreeKEMPublicKey>& tree) const
+{
+  auto resumption_psks =
+    std::map<EpochRef, bytes>{ { { prior_group_id, prior_epoch },
+                                 resumption_psk } };
+  auto new_state = State{
+    init_priv,
+    std::move(enc_priv),
+    std::move(sig_priv),
+    key_package,
+    welcome,
+    tree,
+    {},
+    resumption_psks,
+  };
+
+  if (new_state._suite != reinit.cipher_suite) {
+    throw ProtocolError("Attempt to reinit with the wrong ciphersuite");
+  }
+
+  if (new_state._epoch != 1) {
+    throw ProtocolError("ReInit not done at the beginning of the group");
+  }
+
+  return new_state;
+}
+
+std::tuple<State::Tombstone, MLSMessage>
+State::reinit_commit(const bytes& leaf_secret,
+                     const std::optional<CommitOpts>& opts,
+                     const MessageOpts& msg_opts)
+{
+  // Ensure that either the proposal cache or the inline proposals have a ReInit
+  // proposal, and no others.
+  auto reinit_proposal = Proposal{};
+  if (_pending_proposals.size() == 1) {
+    reinit_proposal = _pending_proposals.front().proposal;
+  } else if (opts && opt::get(opts).extra_proposals.size() == 1) {
+    reinit_proposal = opt::get(opts).extra_proposals.front();
+  } else {
+    throw ProtocolError("Illegal proposals for reinitialization");
+  }
+
+  auto reinit = var::get<ReInit>(reinit_proposal.content);
+
+  // Create the commit
+  const auto [commit_msg, welcome, new_state] =
+    commit(leaf_secret, opts, msg_opts, ReInitCommitParams{});
+  silence_unused(welcome);
+
+  // Create the Tombstone from the terminal state
+  return { { new_state, reinit }, commit_msg };
+}
+
+State::Tombstone
+State::handle_reinit_commit(const MLSMessage& commit_msg)
+{
+  auto new_state = opt::get(handle(commit_msg, std::nullopt, ReInitCommitParams{}));
+
+  // XXX(RLB): This is pretty brute force, replicating a bunch of logic in
+  // State::handle() so that we can find the ReInit commit.  There is probably a
+  // more elegant way to extract the reinit parameters.
+  //
+  // XXX(RLB): We also skip a bunch of checks that are done in State::handle(),
+  // on the theory that they will have already been done in the State::handle()
+  // call above.
+  auto content_auth = unprotect_to_content_auth(commit_msg);
+  const auto& commit = var::get<Commit>(content_auth.content.content);
+  const auto proposals = must_resolve(commit.proposals, std::nullopt);
+  if (!valid_reinit(proposals)) {
+    throw ProtocolError("Invalid proposals for reinit");
+  }
+
+  const auto& reinit_proposal = proposals.front();
+  const auto& reinit = var::get<ReInit>(reinit_proposal.proposal.content);
+  return Tombstone{ new_state, reinit };
 }
 
 ///
@@ -1288,31 +1445,26 @@ State::valid(const Remove& remove) const
 bool
 State::valid(const PreSharedKey& psk) const
 {
-  // TODO(RLB) Verify that the resumption PSK usage is allowed.  We should only
-  // have branch or reinit PSKs when actually branching or reinitializing,
-  // respectively.  But to do that, we need to propagate that context down to
-  // here through a few layers of the call stack.
+  // We forbid resumption PSKs here because this function is only called in the
+  // normal and external cases, both of which only allow external PSKs.
+  if (!var::holds_alternative<ExternalPSK>(psk.psk.content)) {
+    return false;
+  }
 
   // Verify that we have the appropriate PSK
-  const auto have_psk = overloaded{
-    [&](const ExternalPSK& ext_psk) {
-      return _external_psks.count(ext_psk.psk_id) > 0;
-    },
-
-    [&](const ResumptionPSK& res_psk) {
-      auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
-      return _resumption_psks.count(key) > 0;
-    },
-  };
-
-  return var::visit(have_psk, psk.psk.content);
+  const auto& ext_psk = var::get<ExternalPSK>(psk.psk.content);
+  return _external_psks.count(ext_psk.psk_id) > 0;
 }
 
 bool
-State::valid(const ReInit& /* reinit */)
+State::valid(const ReInit& reinit)
 {
-  // No validation to be done
-  return true;
+  // Check that the version and CipherSuite are ones we support
+  auto supported_version = (reinit.version == ProtocolVersion::mls10);
+  auto supported_suite =
+    stdx::contains(all_supported_suites, reinit.cipher_suite.cipher_suite());
+
+  return supported_version && supported_suite;
 }
 
 bool
@@ -1350,13 +1502,34 @@ State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const
   return var::visit(specifically_valid, proposal.content);
 }
 
-// NB(RLB) We handle the normal case separately from the ReInit case, because I
-// expect that we will end up with a different API for the ReInit case.
+bool
+State::valid(const std::vector<CachedProposal>& proposals,
+             LeafIndex commit_sender,
+             const CommitParams& params) const
+{
+  auto specifically = overloaded{
+    [&](const NormalCommitParams& /* unused */) {
+      return valid_normal(proposals, commit_sender);
+    },
+    [&](const ExternalCommitParams& /* unused */) {
+      return valid_external(proposals);
+    },
+    [&](const RestartCommitParams& params) {
+      return valid_restart(proposals, params.allowed_usage);
+    },
+    [&](const ReInitCommitParams& /* unused */) {
+      return valid_reinit(proposals);
+    },
+  };
+
+  return var::visit(specifically, params);
+}
+
 bool
 // NB(RLB): clang-tidy thinks this can be static, but it can't.
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-State::valid(const std::vector<CachedProposal>& proposals,
-             LeafIndex commit_sender) const
+State::valid_normal(const std::vector<CachedProposal>& proposals,
+                    LeafIndex commit_sender) const
 {
   // It contains an individual proposal that is invalid as specified in Section
   // 12.1.
@@ -1466,7 +1639,7 @@ State::valid(const std::vector<CachedProposal>& proposals,
   // It contains an ExternalInit proposal.
   const auto has_external_init =
     stdx::any_of(proposals, [](const auto& cached) {
-      return cached.proposal.proposal_type() == ProposalType::reinit;
+      return cached.proposal.proposal_type() == ProposalType::external_init;
     });
 
   // It contains a proposal with a non-default proposal type that is not
@@ -1532,7 +1705,37 @@ State::valid_reinit(const std::vector<CachedProposal>& proposals)
 }
 
 bool
-State::valid_external(const std::vector<CachedProposal>& proposals)
+State::valid_restart(const std::vector<CachedProposal>& proposals,
+                     ResumptionPSKUsage allowed_usage)
+{
+  // Check that the list has exactly one resumption PSK proposal with the
+  // allowed usage and any other PSKs are external
+  auto found_allowed = false;
+  const auto acceptable_psks = stdx::all_of(proposals, [&](const auto& cached) {
+    if (cached.proposal.proposal_type() != ProposalType::psk) {
+      return true;
+    }
+
+    const auto& psk = var::get<PreSharedKey>(cached.proposal.content);
+    if (var::holds_alternative<ExternalPSK>(psk.psk.content)) {
+      return true;
+    }
+
+    const auto& res_psk = var::get<ResumptionPSK>(psk.psk.content);
+    const auto allowed = res_psk.usage == allowed_usage;
+    if (found_allowed && allowed) {
+      return false;
+    }
+
+    found_allowed = found_allowed || allowed;
+    return true;
+  });
+
+  return acceptable_psks && found_allowed;
+}
+
+bool
+State::valid_external(const std::vector<CachedProposal>& proposals) const
 {
   // Exactly one ExternalInit
   auto ext_init_count = stdx::count_if(proposals, [](const auto& cached) {
@@ -1555,12 +1758,14 @@ State::valid_external(const std::vector<CachedProposal>& proposals)
 
   // Zero or more PreSharedKey proposals.
   // No other proposals.
-  auto no_disallowed = stdx::all_of(proposals, [](const auto& cached) {
+  auto no_disallowed = stdx::all_of(proposals, [&](const auto& cached) {
     switch (cached.proposal.proposal_type()) {
       case ProposalType::external_init:
       case ProposalType::remove:
-      case ProposalType::psk:
         return true;
+
+      case ProposalType::psk:
+        return valid(var::get<PreSharedKey>(cached.proposal.content));
 
       default:
         return false;
@@ -1568,6 +1773,49 @@ State::valid_external(const std::vector<CachedProposal>& proposals)
   });
 
   return one_ext_init && no_dup_remove && no_disallowed;
+}
+
+State::CommitParams
+State::infer_commit_type(const std::optional<LeafIndex>& sender,
+                         const std::vector<CachedProposal>& proposals,
+    const std::optional<CommitParams>& expected_params) const
+{
+  // If an expected type was provided, validate against it
+  if (expected_params) {
+    const auto& expected = opt::get(expected_params);
+
+    auto specifically = overloaded{
+      [&](const NormalCommitParams& /* unused */) {
+        return sender && valid_normal(proposals, opt::get(sender));
+      },
+      [&](const ExternalCommitParams& /* unused */) {
+        return !sender && valid_external(proposals);
+      },
+      [&](const RestartCommitParams& params) {
+        return sender && valid_restart(proposals, params.allowed_usage);
+      },
+      [&](const ReInitCommitParams& /* unused */) {
+        return sender && valid_reinit(proposals);
+      },
+    };
+
+    if (!var::visit(specifically, expected)) {
+      throw ProtocolError("Invalid proposal list");
+    }
+
+    return expected;
+  }
+
+  // Otherwise, check to see if this is a valid external or normal commit
+  if (!sender && valid_external(proposals)) {
+    return ExternalCommitParams{};
+  }
+
+  if (sender && valid_normal(proposals, opt::get(sender))) {
+    return NormalCommitParams{};
+  }
+
+  throw ProtocolError("Invalid proposal list");
 }
 
 bool
