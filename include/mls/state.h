@@ -41,7 +41,7 @@ public:
   // Initialize an empty group
   State(bytes group_id,
         CipherSuite suite,
-        const HPKEPrivateKey& init_priv,
+        HPKEPrivateKey enc_priv,
         SignaturePrivateKey sig_priv,
         const LeafNode& leaf_node,
         ExtensionList extensions);
@@ -143,6 +143,23 @@ public:
   // Assemble a group context for this state
   GroupContext group_context() const;
 
+  // Subgroup branching
+  std::tuple<State, Welcome> create_branch(
+    bytes group_id,
+    HPKEPrivateKey enc_priv,
+    SignaturePrivateKey sig_priv,
+    const LeafNode& leaf_node,
+    ExtensionList extensions,
+    const std::vector<KeyPackage>& key_packages,
+    const bytes& leaf_secret,
+    const CommitOpts& commit_opts) const;
+  State handle_branch(const HPKEPrivateKey& init_priv,
+                      HPKEPrivateKey enc_priv,
+                      SignaturePrivateKey sig_priv,
+                      const KeyPackage& key_package,
+                      const Welcome& welcome,
+                      const std::optional<TreeKEMPublicKey>& tree) const;
+
 protected:
   // Shared confirmed state
   // XXX(rlb@ipv.sx): Can these be made const?
@@ -165,6 +182,9 @@ protected:
   // Storage for PSKs
   std::map<bytes, bytes> _external_psks;
 
+  using EpochRef = std::tuple<bytes, epoch_t>;
+  std::map<EpochRef, bytes> _resumption_psks;
+
   // Cache of Proposals and update secrets
   struct CachedProposal
   {
@@ -185,6 +205,16 @@ protected:
   State(SignaturePrivateKey sig_priv,
         const GroupInfo& group_info,
         const std::optional<TreeKEMPublicKey>& tree);
+
+  // Assemble a group from a Welcome, allowing for resumption PSKs
+  State(const HPKEPrivateKey& init_priv,
+        HPKEPrivateKey leaf_priv,
+        SignaturePrivateKey sig_priv,
+        const KeyPackage& key_package,
+        const Welcome& welcome,
+        const std::optional<TreeKEMPublicKey>& tree,
+        std::map<bytes, bytes> external_psks,
+        std::map<EpochRef, bytes> resumption_psks);
 
   // Import a tree from an externally-provided tree or an extension
   TreeKEMPublicKey import_tree(const bytes& tree_hash,
@@ -229,7 +259,7 @@ protected:
   // extensions
   bool extensions_supported(const ExtensionList& exts) const;
 
-  // Extract a proposal from the cache
+  // Extract proposals and PSKs from cache
   void cache_proposal(AuthenticatedContent content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
@@ -237,6 +267,10 @@ protected:
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
     std::optional<LeafIndex> sender_index) const;
+
+  void add_resumption_psk(bytes group_id, epoch_t epoch, bytes secret);
+  std::vector<PSKWithSecret> resolve(
+    const std::vector<PreSharedKeyID>& psks) const;
 
   // Check properties of proposals
   bool valid(const LeafNode& leaf_node,

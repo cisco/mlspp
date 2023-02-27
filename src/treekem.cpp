@@ -63,10 +63,10 @@ Node::parent_hash() const
 TreeKEMPrivateKey
 TreeKEMPrivateKey::solo(CipherSuite suite,
                         LeafIndex index,
-                        const HPKEPrivateKey& leaf_priv)
+                        HPKEPrivateKey leaf_priv)
 {
   auto priv = TreeKEMPrivateKey{ suite, index, {}, {}, {} };
-  priv.private_key_cache.insert({ NodeIndex(index), leaf_priv });
+  priv.private_key_cache.insert({ NodeIndex(index), std::move(leaf_priv) });
   return priv;
 }
 
