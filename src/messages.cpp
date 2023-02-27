@@ -129,8 +129,8 @@ Welcome::Welcome(CipherSuite suite,
   , _joiner_secret(joiner_secret)
 {
   // Cache the list of PSK IDs
-  for (const auto& psks : psks) {
-    _psks.psks.push_back(psks.id);
+  for (const auto& psk : psks) {
+    _psks.psks.push_back(psk.id);
   }
 
   // Pre-encrypt the GroupInfo
