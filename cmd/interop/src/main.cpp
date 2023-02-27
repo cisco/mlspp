@@ -249,14 +249,14 @@ main(int argc, char* argv[])
 
   // Need some action to do
   if (!do_gen && !do_ver && !do_live) {
-    gflags::ShowUsageWithFlags(nullptr);
+    gflags::ShowUsageWithFlags(argv[0]);
     return 1;
   }
 
   // Can only do one action per run
   if ((do_gen && do_ver) || (do_ver && do_live) || (do_gen && do_live)) {
     std::cout << "Please choose exactly one action" << std::endl;
-    gflags::ShowUsageWithFlags(nullptr);
+    gflags::ShowUsageWithFlags(argv[0]);
     return 1;
   }
 
