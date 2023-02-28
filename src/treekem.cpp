@@ -1014,7 +1014,20 @@ TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
 tls::ostream&
 operator<<(tls::ostream& str, const TreeKEMPublicKey& obj)
 {
-  return str << obj.nodes;
+  LeafIndex cut = LeafIndex{ obj.size.val - 1 };
+  while (cut.val > 0 && obj.node_at(cut).blank()) {
+    cut.val -= 1;
+  }
+
+  if (obj.node_at(cut).blank()) {
+    // Empty tree
+    return str << std::vector<OptionalNode>{};
+  }
+
+  const auto begin = obj.nodes.begin();
+  const auto end = begin + NodeIndex(cut).val + 1;
+  const auto view = std::vector<OptionalNode>(begin, end);
+  return str << view;
 }
 
 tls::istream&
@@ -1024,6 +1037,15 @@ operator>>(tls::istream& str, TreeKEMPublicKey& obj)
   str >> obj.nodes;
   if (obj.nodes.empty()) {
     return str;
+  }
+
+  // Verify that the tree is well-formed and minimal
+  if (obj.nodes.size() % 2 == 0) {
+    throw ProtocolError("Malformed ratchet tree: even number of nodes");
+  }
+
+  if (obj.nodes.back().blank()) {
+    throw ProtocolError("Ratchet tree does not use minimal encoding");
   }
 
   // Adjust the size value to fit the non-blank nodes
