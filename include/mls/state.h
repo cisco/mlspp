@@ -84,9 +84,9 @@ public:
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
   Proposal pre_shared_key_proposal(const bytes& external_psk_id) const;
   static Proposal reinit_proposal(bytes group_id,
-                           ProtocolVersion version,
-                           CipherSuite cipher_suite,
-                           ExtensionList extensions);
+                                  ProtocolVersion version,
+                                  CipherSuite cipher_suite,
+                                  ExtensionList extensions);
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
   MLSMessage update(HPKEPrivateKey leaf_priv,
@@ -300,9 +300,10 @@ protected:
     const MessageOpts& msg_opts,
     CommitParams params);
 
-  std::optional<State> handle(const MLSMessage& msg,
-                              std::optional<State> cached_state,
-                              const std::optional<CommitParams>& expected_params);
+  std::optional<State> handle(
+    const MLSMessage& msg,
+    std::optional<State> cached_state,
+    const std::optional<CommitParams>& expected_params);
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>

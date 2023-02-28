@@ -486,7 +486,9 @@ State::reinit(bytes group_id,
               const MessageOpts& msg_opts)
 {
   return protect_full(
-    reinit_proposal(std::move(group_id), version, cipher_suite, std::move(extensions)), msg_opts);
+    reinit_proposal(
+      std::move(group_id), version, cipher_suite, std::move(extensions)),
+    msg_opts);
 }
 
 std::tuple<MLSMessage, Welcome, State>
@@ -1011,7 +1013,8 @@ State::reinit_commit(const bytes& leaf_secret,
 State::Tombstone
 State::handle_reinit_commit(const MLSMessage& commit_msg)
 {
-  auto new_state = opt::get(handle(commit_msg, std::nullopt, ReInitCommitParams{}));
+  auto new_state =
+    opt::get(handle(commit_msg, std::nullopt, ReInitCommitParams{}));
 
   // XXX(RLB): This is pretty brute force, replicating a bunch of logic in
   // State::handle() so that we can find the ReInit commit.  There is probably a
@@ -1777,9 +1780,10 @@ State::valid_external(const std::vector<CachedProposal>& proposals) const
 }
 
 State::CommitParams
-State::infer_commit_type(const std::optional<LeafIndex>& sender,
-                         const std::vector<CachedProposal>& proposals,
-    const std::optional<CommitParams>& expected_params) const
+State::infer_commit_type(
+  const std::optional<LeafIndex>& sender,
+  const std::vector<CachedProposal>& proposals,
+  const std::optional<CommitParams>& expected_params) const
 {
   // If an expected type was provided, validate against it
   if (expected_params) {
