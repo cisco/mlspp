@@ -207,61 +207,34 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 // Commit
-
-template<typename P>
-std::vector<std::reference_wrapper<const P>>
-filter_inline(const std::vector<ProposalOrRef>& prop_or_refs)
-{
-  auto selected = std::vector<std::reference_wrapper<const P>>{};
-  for (const auto& prop_or_ref : prop_or_refs) {
-    const auto* by_value = var::get_if<Proposal>(&prop_or_ref.content);
-    if (!by_value) {
-      continue;
-    }
-
-    const auto* correct_type = var::get_if<P>(&by_value->content);
-    if (!correct_type) {
-      continue;
-    }
-
-    selected.push_back(*correct_type);
-  }
-
-  return selected;
-}
-
 std::optional<bytes>
 Commit::valid_external() const
 {
-  // There MUST be a single Add proposal
-  if (filter_inline<Add>(proposals).size() != 1) {
+  // External Commits MUST contain a path field (and is therefore a "full"
+  // Commit). The joiner is added at the leftmost free leaf node (just as if
+  // they were added with an Add proposal), and the path is calculated relative
+  // to that leaf node.
+  //
+  // The Commit MUST NOT include any proposals by reference, since an external
+  // joiner cannot determine the validity of proposals sent within the group
+  const auto all_by_value = stdx::all_of(proposals, [](const auto& p) {
+    return var::holds_alternative<Proposal>(p.content);
+  });
+  if (!path || !all_by_value) {
     return std::nullopt;
   }
 
-  // There MUST NOT be any Update proposals
-  if (!filter_inline<Update>(proposals).empty()) {
+  const auto ext_init_ptr = stdx::find_if(proposals, [](const auto& p) {
+    const auto proposal = var::get<Proposal>(p.content);
+    return proposal.proposal_type() == ProposalType::external_init;
+  });
+  if (ext_init_ptr == proposals.end()) {
     return std::nullopt;
   }
 
-  // If a Remove proposal is present, then the `credential` and `endpoint_id` of
-  // the removed leaf MUST be the same as the corresponding values in the Add
-  // KeyPackage.
-  auto removes = filter_inline<Remove>(proposals);
-  if (removes.size() > 1) {
-    return std::nullopt;
-  }
-
-  if (removes.size() == 1) {
-    // TODO(RLB) Implement identity match once endpoint_id is implemented
-  }
-
-  // There MUST be a single ExternalInit proposal
-  auto ext_inits = filter_inline<ExternalInit>(proposals);
-  if (ext_inits.size() != 1) {
-    return std::nullopt;
-  }
-
-  return ext_inits[0].get().kem_output;
+  const auto& ext_init_proposal = var::get<Proposal>(ext_init_ptr->content);
+  const auto& ext_init = var::get<ExternalInit>(ext_init_proposal.content);
+  return ext_init.kem_output;
 }
 
 // PublicMessage

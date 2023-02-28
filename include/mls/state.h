@@ -50,7 +50,7 @@ public:
   State(const HPKEPrivateKey& init_priv,
         HPKEPrivateKey leaf_priv,
         SignaturePrivateKey sig_priv,
-        const KeyPackage& kp,
+        const KeyPackage& key_package,
         const Welcome& welcome,
         const std::optional<TreeKEMPublicKey>& tree);
 
@@ -60,7 +60,7 @@ public:
   static std::tuple<MLSMessage, State> external_join(
     const bytes& leaf_secret,
     SignaturePrivateKey sig_priv,
-    const KeyPackage& kp,
+    const KeyPackage& key_package,
     const GroupInfo& group_info,
     const std::optional<TreeKEMPublicKey>& tree,
     const MessageOpts& msg_opts);
@@ -76,14 +76,14 @@ public:
   ///
 
   Proposal add_proposal(const KeyPackage& key_package) const;
-  Proposal update_proposal(const bytes& leaf_secret,
+  Proposal update_proposal(HPKEPrivateKey leaf_priv,
                            const LeafNodeOptions& opts);
   Proposal remove_proposal(RosterIndex index) const;
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
-  MLSMessage update(const bytes& leaf_secret,
+  MLSMessage update(HPKEPrivateKey leaf_priv,
                     const LeafNodeOptions& opts,
                     const MessageOpts& msg_opts);
   MLSMessage remove(RosterIndex index, const MessageOpts& msg_opts);
@@ -163,7 +163,7 @@ protected:
 
   struct CachedUpdate
   {
-    bytes update_secret;
+    HPKEPrivateKey update_priv;
     Update proposal;
   };
   std::optional<CachedUpdate> _cached_update;
@@ -200,20 +200,16 @@ protected:
   AuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
-  void check_add_leaf_node(const LeafNode& leaf,
-                           std::optional<LeafIndex> except) const;
-  void check_update_leaf_node(LeafIndex target,
-                              const LeafNode& leaf,
-                              LeafNodeSource required_source) const;
   LeafIndex apply(const Add& add);
   void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target, const Update& update, const bytes& leaf_secret);
+  void apply(LeafIndex target,
+             const Update& update,
+             const HPKEPrivateKey& leaf_priv);
   LeafIndex apply(const Remove& remove);
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                Proposal::Type required_type);
-  std::tuple<bool, bool, std::vector<LeafIndex>> apply(
-    const std::vector<CachedProposal>& proposals);
+  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals);
 
   // Verify that a specific key package or all members support a given set of
   // extensions
@@ -227,6 +223,25 @@ protected:
   std::vector<CachedProposal> must_resolve(
     const std::vector<ProposalOrRef>& ids,
     std::optional<LeafIndex> sender_index) const;
+
+  // Check properties of proposals
+  bool valid(const LeafNode& leaf_node,
+             LeafNodeSource required_source,
+             std::optional<LeafIndex> index) const;
+  bool valid(const KeyPackage& key_package) const;
+  bool valid(const Add& add) const;
+  bool valid(LeafIndex sender, const Update& update) const;
+  bool valid(const Remove& remove) const;
+  static bool valid(const PreSharedKey& psk);
+  static bool valid(const ReInit& reinit);
+  bool valid(const ExternalInit& external_init) const;
+  bool valid(const GroupContextExtensions& gce) const;
+  bool valid(std::optional<LeafIndex> sender, const Proposal& proposal) const;
+  bool valid(const std::vector<CachedProposal>& proposals,
+             LeafIndex commit_sender) const;
+  static bool valid_reinit(const std::vector<CachedProposal>& proposals);
+  static bool valid_external(const std::vector<CachedProposal>& proposals);
+  static bool path_required(const std::vector<CachedProposal>& proposals);
 
   // Compare the **shared** attributes of the states
   friend bool operator==(const State& lhs, const State& rhs);

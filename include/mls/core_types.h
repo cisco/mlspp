@@ -216,7 +216,7 @@ struct LeafNode
 
   struct MemberBinding
   {
-    const bytes& group_id;
+    bytes group_id;
     LeafIndex leaf_index;
     TLS_SERIALIZABLE(group_id, leaf_index);
   };

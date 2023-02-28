@@ -166,6 +166,10 @@ NodeIndex::sibling(NodeIndex ancestor) const
 std::vector<NodeIndex>
 NodeIndex::dirpath(LeafCount n)
 {
+  if (val >= NodeCount(n).val) {
+    throw InvalidParameterError("Request for dirpath outside of tree");
+  }
+
   auto d = std::vector<NodeIndex>{};
 
   auto r = root(n);

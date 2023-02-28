@@ -225,11 +225,32 @@ all_of(const Container& c, const UnaryPredicate& pred)
   return std::all_of(c.begin(), c.end(), pred);
 }
 
+template<typename Container, typename UnaryPredicate>
+auto
+count_if(const Container& c, const UnaryPredicate& pred)
+{
+  return std::count_if(c.begin(), c.end(), pred);
+}
+
 template<typename Container, typename Value>
 bool
 contains(const Container& c, const Value& val)
 {
   return std::find(c.begin(), c.end(), val) != c.end();
+}
+
+template<typename Container, typename UnaryPredicate>
+auto
+find_if(Container& c, const UnaryPredicate& pred)
+{
+  return std::find_if(c.begin(), c.end(), pred);
+}
+
+template<typename Container, typename UnaryPredicate>
+auto
+find_if(const Container& c, const UnaryPredicate& pred)
+{
+  return std::find_if(c.begin(), c.end(), pred);
 }
 
 template<typename Container, typename Value>

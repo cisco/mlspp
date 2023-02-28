@@ -1,4 +1,7 @@
 #include <mls/state.h>
+#include <set>
+
+#include <iostream> // XXX
 
 namespace mls {
 
@@ -102,7 +105,7 @@ State::State(SignaturePrivateKey sig_priv,
 State::State(const HPKEPrivateKey& init_priv,
              HPKEPrivateKey leaf_priv,
              SignaturePrivateKey sig_priv,
-             const KeyPackage& kp,
+             const KeyPackage& key_package,
              const Welcome& welcome,
              const std::optional<TreeKEMPublicKey>& tree)
   : _suite(welcome.cipher_suite)
@@ -111,13 +114,13 @@ State::State(const HPKEPrivateKey& init_priv,
   , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
 {
-  auto maybe_kpi = welcome.find(kp);
+  auto maybe_kpi = welcome.find(key_package);
   if (!maybe_kpi) {
     throw InvalidParameterError("Welcome not intended for key package");
   }
   auto kpi = opt::get(maybe_kpi);
 
-  if (kp.cipher_suite != welcome.cipher_suite) {
+  if (key_package.cipher_suite != welcome.cipher_suite) {
     throw InvalidParameterError("Ciphersuite mismatch");
   }
 
@@ -153,7 +156,7 @@ State::State(const HPKEPrivateKey& init_priv,
   _extensions = group_info.group_context.extensions;
 
   // Construct TreeKEM private key from parts provided
-  auto maybe_index = _tree.find(kp.leaf_node);
+  auto maybe_index = _tree.find(key_package.leaf_node);
   if (!maybe_index) {
     throw InvalidParameterError("New joiner not in tree");
   }
@@ -186,13 +189,13 @@ State::State(const HPKEPrivateKey& init_priv,
 std::tuple<MLSMessage, State>
 State::external_join(const bytes& leaf_secret,
                      SignaturePrivateKey sig_priv,
-                     const KeyPackage& kp,
+                     const KeyPackage& key_package,
                      const GroupInfo& group_info,
                      const std::optional<TreeKEMPublicKey>& tree,
                      const MessageOpts& msg_opts)
 {
-  auto initial_state = State(std::move(sig_priv), group_info, tree);
 
+  // Look up the external public key for the group
   const auto maybe_external_pub =
     group_info.extensions.find<ExternalPubExtension>();
   if (!maybe_external_pub) {
@@ -201,10 +204,10 @@ State::external_join(const bytes& leaf_secret,
 
   const auto& external_pub = opt::get(maybe_external_pub).external_pub;
 
-  auto add = initial_state.add_proposal(kp);
-  auto opts = CommitOpts{ { add }, false, false, {} };
+  // Create an initial state that contains the joiner and use it to ommit
+  auto initial_state = State(std::move(sig_priv), group_info, tree);
   auto [commit_msg, welcome, state] =
-    initial_state.commit(leaf_secret, opts, msg_opts, kp, external_pub);
+    initial_state.commit(leaf_secret, {}, msg_opts, key_package, external_pub);
   silence_unused(welcome);
   return { commit_msg, state };
 }
@@ -338,7 +341,7 @@ State::add_proposal(const KeyPackage& key_package) const
 }
 
 Proposal
-State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
+State::update_proposal(HPKEPrivateKey leaf_priv, const LeafNodeOptions& opts)
 {
   if (_cached_update) {
     return { opt::get(_cached_update).proposal };
@@ -346,12 +349,11 @@ State::update_proposal(const bytes& leaf_secret, const LeafNodeOptions& opts)
 
   auto leaf = opt::get(_tree.leaf_node(_index));
 
-  auto public_key = HPKEPrivateKey::derive(_suite, leaf_secret).public_key;
   auto new_leaf = leaf.for_update(
-    _suite, _group_id, _index, public_key, opts, _identity_priv);
+    _suite, _group_id, _index, leaf_priv.public_key, opts, _identity_priv);
 
   auto update = Update{ new_leaf };
-  _cached_update = CachedUpdate{ leaf_secret, update };
+  _cached_update = CachedUpdate{ std::move(leaf_priv), update };
   return { update };
 }
 
@@ -388,11 +390,11 @@ State::add(const KeyPackage& key_package, const MessageOpts& msg_opts)
 }
 
 MLSMessage
-State::update(const bytes& leaf_secret,
+State::update(HPKEPrivateKey leaf_priv,
               const LeafNodeOptions& opts,
               const MessageOpts& msg_opts)
 {
-  return protect_full(update_proposal(leaf_secret, opts), msg_opts);
+  return protect_full(update_proposal(std::move(leaf_priv), opts), msg_opts);
 }
 
 MLSMessage
@@ -474,31 +476,32 @@ State::commit(const bytes& leaf_secret,
 
   // Apply proposals
   State next = successor();
-  auto proposals = must_resolve(commit.proposals, _index);
-  auto [has_updates, has_removes, joiner_locations] = next.apply(proposals);
 
-  // If this is an external commit, see where the new joiner ended up
+  const auto proposals = must_resolve(commit.proposals, _index);
+  if (!external_commit && !valid(proposals, _index)) {
+    throw ProtocolError("Invalid proposal list");
+  }
+  if (external_commit && !valid_external(proposals)) {
+    throw ProtocolError("Invalid proposal list for external commit");
+  }
+
+  const auto joiner_locations = next.apply(proposals);
+
+  if (external_commit) {
+    next._index = next._tree.add_leaf(opt::get(joiner_key_package).leaf_node);
+  }
+
+  // If this is an external commit, indicate it in the sender field
   auto sender = Sender{ MemberSender{ _index } };
   if (external_commit) {
-    const auto& kp = opt::get(joiner_key_package);
-    const auto it = std::find(joiners.begin(), joiners.end(), kp);
-    if (it == joiners.end()) {
-      throw InvalidParameterError("Joiner not added");
-    }
-
-    const auto pos = it - joiners.begin();
-    next._index = joiner_locations[pos];
     sender = Sender{ NewMemberCommitSender{} };
   }
 
   // KEM new entropy to the group and the new joiners
-  auto no_proposals = commit.proposals.empty();
-  auto path_required =
-    has_updates || has_removes || no_proposals || external_commit;
   auto commit_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
-  if (path_required) {
+  if (path_required(proposals)) {
     auto leaf_node_opts = LeafNodeOptions{};
     if (opts) {
       leaf_node_opts = opt::get(opts).leaf_node_opts;
@@ -627,9 +630,6 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   // Dispatch on content type
   switch (content.content_type()) {
     // Proposals get queued, do not result in a state transition
-    // TODO(RLB): We should validate that the proposal makes sense here, e.g.,
-    // that an Add KeyPackage is for the right CipherSuite or that a Remove
-    // target is actually in the group.
     case ContentType::proposal:
       cache_proposal(content_auth);
       return std::nullopt;
@@ -651,6 +651,9 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
     default:
       throw ProtocolError("Invalid commit sender type");
   }
+
+  auto external_commit =
+    content.sender.sender_type() == SenderType::new_member_commit;
 
   auto sender = std::optional<LeafIndex>();
   if (content.sender.sender_type() == SenderType::member) {
@@ -676,20 +679,34 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   const auto& commit = var::get<Commit>(content.content);
   const auto proposals = must_resolve(commit.proposals, sender);
 
-  auto next = successor();
-  auto [_has_updates, _has_removes, joiner_locations] = next.apply(proposals);
-  silence_unused(_has_updates);
-  silence_unused(_has_removes);
-
-  // If this is an external Commit, then its direct proposals must meet certain
-  // constraints, and we need to identify the sender's location in the new tree.
-  auto force_init_secret = std::optional<bytes>{};
-  auto sender_location = LeafIndex{ 0 };
-  if (sender) {
-    sender_location = opt::get(sender);
+  if (!external_commit && !valid(proposals, opt::get(sender))) {
+    throw ProtocolError("Invalid proposal list");
   }
 
-  if (content.sender.sender_type() == SenderType::new_member_commit) {
+  if (external_commit && !valid_external(proposals)) {
+    throw ProtocolError("Invalid proposal list for external commit");
+  }
+
+  if (path_required(proposals) && !commit.path) {
+    throw ProtocolError("Path required but not present");
+  }
+
+  auto next = successor();
+  auto joiner_locations = next.apply(proposals);
+
+  // If this is an external commit, add the joiner to the tree and note the
+  // location where they were added.  Also, compute the "externally forced"
+  // value that we will use for the init_secret (as opposed to the init_secret
+  // from the key schedule).
+  auto force_init_secret = std::optional<bytes>{};
+  auto sender_location = LeafIndex{ 0 };
+  if (!external_commit) {
+    sender_location = opt::get(sender);
+  } else {
+    // Add the joiner
+    const auto& path = opt::get(commit.path);
+    sender_location = next._tree.add_leaf(path.leaf_node);
+
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
     if (!kem_output) {
@@ -698,45 +715,20 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 
     force_init_secret =
       _key_schedule.receive_external_init(opt::get(kem_output));
-
-    // Figure out where the new joiner was added by identifying the Add by value
-    // in the proposals vector
-    auto add_index = size_t(0);
-    for (size_t i = 0; i < commit.proposals.size(); i++) {
-      if (proposals[i].proposal.proposal_type() != ProposalType::add) {
-        continue;
-      }
-
-      if (var::holds_alternative<ProposalRef>(commit.proposals[i].content)) {
-        add_index += 1;
-      } else {
-        sender_location = joiner_locations[add_index];
-        break;
-      }
-
-      if (i == commit.proposals.size() - 1) {
-        // If we make it to the end of the loop, we're missing a sender location
-        throw ProtocolError("Unable to locate external joiner");
-      }
-    }
   }
 
   // Decapsulate and apply the UpdatePath, if provided
-  // TODO(RLB) Verify that path is provided if required
   auto commit_secret = _suite.zero();
   if (commit.path) {
     const auto& path = opt::get(commit.path);
 
-    if (path.leaf_node.source() != LeafNodeSource::commit) {
-      throw ProtocolError("Commit path leaf node has invalid source");
+    if (!valid(path.leaf_node, LeafNodeSource::commit, sender_location)) {
+      throw ProtocolError("Commit path has invalid leaf node");
     }
 
     if (!next._tree.parent_hash_valid(sender_location, path)) {
       throw ProtocolError("Commit path has invalid parent hash");
     }
-
-    next.check_update_leaf_node(
-      sender_location, path.leaf_node, LeafNodeSource::commit);
 
     next._tree.merge(sender_location, path);
 
@@ -770,83 +762,25 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   return next;
 }
 
-// A LeafNode in an Add KeyPackage must not have the same leaf_node.public_key
-// or signature_key as any KeyPackage for a current member.  The joiner must
-// support all credential types in use by other members, and vice versa.
-void
-State::check_add_leaf_node(const LeafNode& leaf,
-                           std::optional<LeafIndex> except) const
-{
-  for (LeafIndex i{ 0 }; i < _tree.size; i.val++) {
-    if (i == except) {
-      continue;
-    }
-
-    const auto maybe_tree_leaf = _tree.leaf_node(i);
-    if (!maybe_tree_leaf) {
-      continue;
-    }
-
-    const auto& tree_leaf = opt::get(maybe_tree_leaf);
-    const auto hpke_key_eq = tree_leaf.encryption_key == leaf.encryption_key;
-    const auto sig_key_eq = tree_leaf.signature_key == leaf.signature_key;
-    if (hpke_key_eq || sig_key_eq) {
-      throw ProtocolError("Duplicate parameters in new KeyPackage");
-    }
-
-    if (!leaf.capabilities.credential_supported(tree_leaf.credential)) {
-      throw ProtocolError("Member credential not supported by joiner");
-    }
-
-    if (!tree_leaf.capabilities.credential_supported(leaf.credential)) {
-      throw ProtocolError("Joiner credential not supported by group member");
-    }
-  }
-}
-
-// A KeyPackage in an Update must meet the same uniqueness criteria as for an
-// Add, except with regard to the KeyPackage it replaces.
-void
-State::check_update_leaf_node(LeafIndex target,
-                              const LeafNode& leaf,
-                              LeafNodeSource required_source) const
-{
-  check_add_leaf_node(leaf, target);
-
-  if (leaf.source() != required_source) {
-    throw ProtocolError("LeafNode in Update has incorrect LeafNodeSource");
-  }
-
-  const auto maybe_tree_leaf = _tree.leaf_node(target);
-  if (!maybe_tree_leaf) {
-    return;
-  }
-
-  const auto& tree_leaf = opt::get(maybe_tree_leaf);
-  if (tree_leaf.encryption_key == leaf.encryption_key) {
-    throw ProtocolError("Update without a fresh init key");
-  }
-}
-
 LeafIndex
 State::apply(const Add& add)
 {
-  check_add_leaf_node(add.key_package.leaf_node, std::nullopt);
   return _tree.add_leaf(add.key_package.leaf_node);
 }
 
 void
 State::apply(LeafIndex target, const Update& update)
 {
-  check_update_leaf_node(target, update.leaf_node, LeafNodeSource::update);
   _tree.update_leaf(target, update.leaf_node);
 }
 
 void
-State::apply(LeafIndex target, const Update& update, const bytes& leaf_secret)
+State::apply(LeafIndex target,
+             const Update& update,
+             const HPKEPrivateKey& leaf_priv)
 {
   _tree.update_leaf(target, update.leaf_node);
-  _tree_priv.set_leaf_secret(leaf_secret);
+  _tree_priv.set_leaf_priv(leaf_priv);
 }
 
 LeafIndex
@@ -899,9 +833,14 @@ State::cache_proposal(AuthenticatedContent content_auth)
     sender_location = var::get<MemberSender>(sender).sender;
   }
 
+  const auto& proposal = var::get<Proposal>(content_auth.content.content);
+  if (!valid(sender_location, proposal)) {
+    throw ProtocolError("Invalid proposal");
+  }
+
   _pending_proposals.push_back({
     _suite.ref(content_auth),
-    var::get<Proposal>(content_auth.content.content),
+    proposal,
     sender_location,
   });
 }
@@ -977,7 +916,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
           throw ProtocolError("Self-update does not match cached data");
         }
 
-        apply(target, update, cached_update.update_secret);
+        apply(target, update, cached_update.update_priv);
         locations.push_back(target);
         break;
       }
@@ -1003,7 +942,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
   return locations;
 }
 
-std::tuple<bool, bool, std::vector<LeafIndex>>
+std::vector<LeafIndex>
 State::apply(const std::vector<CachedProposal>& proposals)
 {
   auto update_locations = apply(proposals, ProposalType::update);
@@ -1011,15 +950,10 @@ State::apply(const std::vector<CachedProposal>& proposals)
   auto joiner_locations = apply(proposals, ProposalType::add);
   apply(proposals, ProposalType::group_context_extensions);
 
-  // TODO(RLB) Check for unknown / unhandled proposal types.
-
-  auto has_updates = !update_locations.empty();
-  auto has_removes = !remove_locations.empty();
-
   _tree.truncate();
   _tree_priv.truncate(_tree.size);
   _tree.set_hash_all();
-  return std::make_tuple(has_updates, has_removes, joiner_locations);
+  return joiner_locations;
 }
 
 ///
@@ -1056,6 +990,420 @@ State::unprotect(const MLSMessage& ct)
     std::move(content_auth.content.authenticated_data),
     std::move(var::get<ApplicationData>(content_auth.content.content).data),
   };
+}
+
+///
+/// Properties of a proposal list
+///
+
+bool
+State::valid(const LeafNode& leaf_node,
+             LeafNodeSource required_source,
+             std::optional<LeafIndex> index) const
+{
+  // Verify that the credential in the LeafNode is valid as described in Section
+  // 5.3.1.
+  // XXX(RLB) N/A, no credential validation in the library right now
+
+  // Verify the leaf_node_source field:
+  const auto correct_source = (leaf_node.source() == required_source);
+
+  // Verify that the signature on the LeafNode is valid using signature_key.
+  auto binding = std::optional<LeafNode::MemberBinding>{};
+  switch (required_source) {
+    case LeafNodeSource::commit:
+    case LeafNodeSource::update:
+      binding = LeafNode::MemberBinding{ _group_id, opt::get(index) };
+      break;
+
+    default:
+      // Nothing to do
+      break;
+  }
+
+  const auto signature_valid = leaf_node.verify(_suite, binding);
+
+  // Verify that the LeafNode is compatible with the group's parameters. If the
+  // GroupContext has a required_capabilities extension, then the required
+  // extensions, proposals, and credential types MUST be listed in the
+  // LeafNode's capabilities field.
+  const auto supports_group_extensions =
+    leaf_node.verify_extension_support(_extensions);
+
+  // TODO(RLB) Verify the lifetime field
+
+  // Verify that the credential type is supported by all members of the group,
+  // as specified by the capabilities field of each member's LeafNode, and that
+  // the capabilities field of this LeafNode indicates support for all the
+  // credential types currently in use by other members.
+  //
+  // Verify that the following fields are unique among the members of the group:
+  // signature_key
+  // encryption_key
+  const auto& signature_key = leaf_node.signature_key;
+  const auto& encryption_key = leaf_node.encryption_key;
+  auto unique_signature_key = true;
+  auto unique_encryption_key = true;
+  auto mutual_credential_support = true;
+  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
+    const auto maybe_leaf = _tree.leaf_node(i);
+    if (!maybe_leaf) {
+      continue;
+    }
+
+    const auto& leaf = opt::get(maybe_leaf);
+
+    // Signature keys are allowed to repeat within a leaf
+    unique_signature_key =
+      unique_signature_key &&
+      ((i == index) || (signature_key != leaf.signature_key));
+    unique_encryption_key =
+      unique_encryption_key && (encryption_key != leaf.encryption_key);
+    mutual_credential_support =
+      mutual_credential_support &&
+      leaf.capabilities.credential_supported(leaf_node.credential) &&
+      leaf_node.capabilities.credential_supported(leaf.credential);
+  }
+
+  return (signature_valid && supports_group_extensions && correct_source &&
+          mutual_credential_support && unique_signature_key &&
+          unique_encryption_key);
+}
+
+bool
+State::valid(const KeyPackage& key_package) const
+{
+  // Verify that the ciphersuite and protocol version of the KeyPackage match
+  // those in the GroupContext.
+  const auto correct_ciphersuite = (key_package.cipher_suite == _suite);
+
+  // Verify that the signature on the KeyPackage is valid using the public key
+  // in leaf_node.credential.
+  const auto valid_signature = key_package.verify();
+
+  // Verify that the leaf_node of the KeyPackage is valid for a KeyPackage
+  // according to Section 7.3.
+  const auto leaf_node_valid =
+    valid(key_package.leaf_node, LeafNodeSource::key_package, std::nullopt);
+
+  // Verify that the value of leaf_node.encryption_key is different from the
+  // value of the init_key field.
+  const auto distinct_keys =
+    (key_package.init_key != key_package.leaf_node.encryption_key);
+
+  return (correct_ciphersuite && valid_signature && leaf_node_valid &&
+          distinct_keys);
+}
+
+bool
+State::valid(const Add& add) const
+{
+  return valid(add.key_package);
+}
+
+bool
+State::valid(LeafIndex sender, const Update& update) const
+{
+  const auto maybe_leaf = _tree.leaf_node(sender);
+  if (!maybe_leaf) {
+    return false;
+  }
+
+  return valid(update.leaf_node, LeafNodeSource::update, sender);
+}
+
+bool
+State::valid(const Remove& remove) const
+{
+  return remove.removed < _tree.size && _tree.leaf_node(remove.removed);
+}
+
+bool
+State::valid(const PreSharedKey& /* psk */)
+{
+  // No validation to be done
+  return true;
+}
+
+bool
+State::valid(const ReInit& /* reinit */)
+{
+  // No validation to be done
+  return true;
+}
+
+bool
+State::valid(const ExternalInit& external_init) const
+{
+  return external_init.kem_output.size() == _suite.hpke().kem.enc_size;
+}
+
+bool
+State::valid(const GroupContextExtensions& gce) const
+{
+  // Verify that each extension is supported by all members
+  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
+    const auto maybe_leaf = _tree.leaf_node(i);
+    if (!maybe_leaf) {
+      continue;
+    }
+
+    const auto& leaf = opt::get(maybe_leaf);
+    if (!leaf.verify_extension_support(gce.group_context_extensions)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool
+State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const
+{
+  const auto specifically_valid = overloaded{
+    [&](const Update& update) { return valid(opt::get(sender), update); },
+
+    [&](const auto& proposal) { return valid(proposal); },
+  };
+  return var::visit(specifically_valid, proposal.content);
+}
+
+// NB(RLB) We handle the normal case separately from the ReInit case, because I
+// expect that we will end up with a different API for the ReInit case.
+bool
+// NB(RLB): clang-tidy thinks this can be static, but it can't.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+State::valid(const std::vector<CachedProposal>& proposals,
+             LeafIndex commit_sender) const
+{
+  // It contains an individual proposal that is invalid as specified in Section
+  // 12.1.
+  const auto has_invalid_proposal =
+    stdx::any_of(proposals, [&](const auto& cached) {
+      return !valid(cached.sender, cached.proposal);
+    });
+
+  // It contains an Update proposal generated by the committer.
+  const auto has_self_update = stdx::any_of(proposals, [&](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::update &&
+           cached.sender == commit_sender;
+  });
+
+  // It contains a Remove proposal that removes the committer.
+  const auto has_self_remove = stdx::any_of(proposals, [&](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::remove &&
+           var::get<Remove>(cached.proposal.content).removed == commit_sender;
+  });
+
+  // It contains multiple Update and/or Remove proposals that apply to the same
+  // leaf. If the committer has received multiple such proposals they SHOULD
+  // prefer any Remove received, or the most recent Update if there are no
+  // Removes.
+  auto updated_or_removed = std::set<LeafIndex>{};
+  const auto has_dup_update_remove =
+    stdx::any_of(proposals, [&](const auto& cached) {
+      auto index = LeafIndex{ 0 };
+      switch (cached.proposal.proposal_type()) {
+        case ProposalType::update:
+          index = opt::get(cached.sender);
+          break;
+
+        case ProposalType::remove:
+          index = var::get<Remove>(cached.proposal.content).removed;
+          break;
+
+        default:
+          return false;
+      }
+
+      if (stdx::contains(updated_or_removed, index)) {
+        return true;
+      }
+
+      updated_or_removed.insert(index);
+      return false;
+    });
+
+  // It contains multiple Add proposals that contain KeyPackages that represent
+  // the same client according to the application (for example, identical
+  // signature keys).
+  auto signature_keys = std::vector<SignaturePublicKey>{};
+  const auto has_dup_signature_key =
+    stdx::any_of(proposals, [&](const auto& cached) {
+      if (cached.proposal.proposal_type() != ProposalType::add) {
+        return false;
+      }
+
+      auto key_package = var::get<Add>(cached.proposal.content).key_package;
+      auto signature_key = key_package.leaf_node.signature_key;
+      if (stdx::contains(signature_keys, signature_key)) {
+        return true;
+      }
+
+      signature_keys.push_back(signature_key);
+      return false;
+    });
+
+  // It contains an Add proposal with a KeyPackage that represents a client
+  // already in the group according to the application, unless there is a Remove
+  // proposal in the list removing the matching client from the group.
+  // TODO(RLB)
+
+  // It contains multiple PreSharedKey proposals that reference the same
+  // PreSharedKeyID.
+  auto psk_ids = std::vector<PreSharedKeyID>{};
+  const auto has_dup_psk_id = stdx::any_of(proposals, [&](const auto& cached) {
+    if (cached.proposal.proposal_type() != ProposalType::psk) {
+      return false;
+    }
+
+    auto psk_id = var::get<PreSharedKey>(cached.proposal.content).psk;
+    if (stdx::contains(psk_ids, psk_id)) {
+      return true;
+    }
+
+    psk_ids.push_back(psk_id);
+    return false;
+  });
+
+  // It contains multiple GroupContextExtensions proposals.
+  const auto gce_count = stdx::count_if(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() ==
+           ProposalType::group_context_extensions;
+  });
+  const auto has_multiple_gce = (gce_count > 1);
+
+  // It contains a ReInit proposal together with any other proposal. If the
+  // committer has received other proposals during the epoch, they SHOULD prefer
+  // them over the ReInit proposal, allowing the ReInit to be resent and applied
+  // in a subsequent epoch.
+  const auto has_reinit = stdx::any_of(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::reinit;
+  });
+
+  // It contains an ExternalInit proposal.
+  const auto has_external_init =
+    stdx::any_of(proposals, [](const auto& cached) {
+      return cached.proposal.proposal_type() == ProposalType::reinit;
+    });
+
+  // It contains a proposal with a non-default proposal type that is not
+  // supported by some members of the group that will process the Commit (i.e.,
+  // members being added or removed by the Commit do not need to support the
+  // proposal type).
+  // XXX(RLB): N/A, no non-default proposal types
+
+  // After processing the commit the ratchet tree is invalid, in particular, if
+  // it contains any leaf node that is invalid according to Section 7.3.
+  //
+  // NB(RLB): Leaf nodes are already checked in the individual proposal check at
+  // the top.  So the focus here is key uniqueness. We check this by checking
+  // uniqueness of encryption keys across the Adds and Updates in this list of
+  // proposals.  The keys have already been checked to be distinct from any keys
+  // already in the tree.
+  auto enc_keys = std::vector<HPKEPublicKey>{};
+  const auto has_dup_enc_key = stdx::any_of(proposals, [&](const auto& cached) {
+    const auto get_enc_key =
+      overloaded{ [](const Add& add) -> std::optional<HPKEPublicKey> {
+                   return add.key_package.leaf_node.encryption_key;
+                 },
+                  [](const Update& update) -> std::optional<HPKEPublicKey> {
+                    return update.leaf_node.encryption_key;
+                  },
+
+                  [](const auto& /* default */)
+                    -> std::optional<HPKEPublicKey> { return std::nullopt; } };
+    auto maybe_enc_key = var::visit(get_enc_key, cached.proposal.content);
+    if (!maybe_enc_key) {
+      return false;
+    }
+
+    const auto& enc_key = opt::get(maybe_enc_key);
+    if (stdx::contains(enc_keys, enc_key)) {
+      return true;
+    }
+
+    enc_keys.push_back(enc_key);
+    return false;
+  });
+
+  return !(has_invalid_proposal || has_self_update || has_self_remove ||
+           has_dup_update_remove || has_dup_signature_key || has_dup_psk_id ||
+           has_multiple_gce || has_reinit || has_external_init ||
+           has_dup_enc_key);
+}
+
+bool
+State::valid_reinit(const std::vector<CachedProposal>& proposals)
+{
+  // Check that the list contains a ReInit proposal
+  const auto has_reinit = stdx::any_of(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::reinit;
+  });
+
+  // Check whether the list contains any disallowed proposals
+  const auto has_disallowed = stdx::any_of(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() != ProposalType::reinit;
+  });
+
+  return has_reinit && !has_disallowed;
+}
+
+bool
+State::valid_external(const std::vector<CachedProposal>& proposals)
+{
+  // Exactly one ExternalInit
+  auto ext_init_count = stdx::count_if(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::external_init;
+  });
+  auto one_ext_init = (ext_init_count == 1);
+
+  // At most one Remove proposal, with which the joiner removes an old version
+  // of themselves. If a Remove proposal is present, then the LeafNode in the
+  // path field of the external commit MUST meet the same criteria as would the
+  // LeafNode in an Update for the removed leaf (see Section 12.1.2). In
+  // particular, the credential in the LeafNode MUST present a set of
+  // identifiers that is acceptable to the application for the removed
+  // participant.
+  // TODO(RLB) Verify that Remove is properly formed
+  auto remove_count = stdx::count_if(proposals, [](const auto& cached) {
+    return cached.proposal.proposal_type() == ProposalType::remove;
+  });
+  auto no_dup_remove = (remove_count <= 1);
+
+  // Zero or more PreSharedKey proposals.
+  // No other proposals.
+  auto no_disallowed = stdx::all_of(proposals, [](const auto& cached) {
+    switch (cached.proposal.proposal_type()) {
+      case ProposalType::external_init:
+      case ProposalType::remove:
+      case ProposalType::psk:
+        return true;
+
+      default:
+        return false;
+    }
+  });
+
+  return one_ext_init && no_dup_remove && no_disallowed;
+}
+
+bool
+State::path_required(const std::vector<CachedProposal>& proposals)
+{
+  static const auto path_required_types = std::set<Proposal::Type>{
+    ProposalType::update,
+    ProposalType::remove,
+    ProposalType::external_init,
+    ProposalType::group_context_extensions,
+  };
+
+  if (proposals.empty()) {
+    return true;
+  }
+
+  return stdx::any_of(proposals, [](const auto& cp) {
+    return path_required_types.count(cp.proposal.proposal_type()) != 0;
+  });
 }
 
 ///
