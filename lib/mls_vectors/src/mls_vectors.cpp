@@ -1980,7 +1980,8 @@ PassiveClientTestVector::verify()
                      signature_priv,
                      key_package_raw,
                      welcome_raw,
-                     std::nullopt);
+                     std::nullopt,
+                     {});
   VERIFY_EQUAL(
     "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
 

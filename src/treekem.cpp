@@ -198,7 +198,7 @@ TreeKEMPrivateKey::dump() const
   std::cout << "  Cached key pairs: " << std::endl;
   for (const auto& [n, sk] : private_key_cache) {
     auto pkm = to_hex(sk.public_key.data).substr(0, 8);
-    std::cout << "    " << n.val << " => " << ssm << " = " << pkm << std::endl;
+    std::cout << "    " << n.val << " => " << pkm << std::endl;
   }
 }
 
