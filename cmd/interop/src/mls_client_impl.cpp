@@ -477,7 +477,8 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
                           std::move(join->sig_priv),
                           join->key_package,
                           welcome,
-                          std::nullopt);
+                          std::nullopt,
+                          {});
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);

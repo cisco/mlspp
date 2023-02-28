@@ -52,7 +52,8 @@ public:
         SignaturePrivateKey sig_priv,
         const KeyPackage& key_package,
         const Welcome& welcome,
-        const std::optional<TreeKEMPublicKey>& tree);
+        const std::optional<TreeKEMPublicKey>& tree,
+        std::map<bytes, bytes> psks);
 
   // Join a group from outside
   // XXX(RLB) To be fully general, we would need a few more options here, e.g.,
@@ -81,6 +82,7 @@ public:
   Proposal remove_proposal(RosterIndex index) const;
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
+  Proposal pre_shared_key_proposal(const bytes& external_psk_id) const;
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
   MLSMessage update(HPKEPrivateKey leaf_priv,
@@ -90,6 +92,8 @@ public:
   MLSMessage remove(LeafIndex removed, const MessageOpts& msg_opts);
   MLSMessage group_context_extensions(ExtensionList exts,
                                       const MessageOpts& msg_opts);
+  MLSMessage pre_shared_key(const bytes& external_psk_id,
+                            const MessageOpts& msg_opts);
 
   std::tuple<MLSMessage, Welcome, State> commit(
     const bytes& leaf_secret,
@@ -102,6 +106,12 @@ public:
   std::optional<State> handle(const MLSMessage& msg);
   std::optional<State> handle(const MLSMessage& msg,
                               std::optional<State> cached);
+
+  ///
+  /// PSK management
+  ///
+  void add_external_psk(const bytes& id, const bytes& secret);
+  void remove_external_psk(const bytes& id);
 
   ///
   /// Accessors
@@ -151,6 +161,9 @@ protected:
   // Per-participant state
   LeafIndex _index;
   SignaturePrivateKey _identity_priv;
+
+  // Storage for PSKs
+  std::map<bytes, bytes> _external_psks;
 
   // Cache of Proposals and update secrets
   struct CachedProposal
@@ -209,7 +222,8 @@ protected:
   void apply(const GroupContextExtensions& gce);
   std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
                                Proposal::Type required_type);
-  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals);
+  std::tuple<std::vector<LeafIndex>, std::vector<PSKWithSecret>> apply(
+    const std::vector<CachedProposal>& proposals);
 
   // Verify that a specific key package or all members support a given set of
   // extensions
@@ -232,7 +246,7 @@ protected:
   bool valid(const Add& add) const;
   bool valid(LeafIndex sender, const Update& update) const;
   bool valid(const Remove& remove) const;
-  static bool valid(const PreSharedKey& psk);
+  bool valid(const PreSharedKey& psk) const;
   static bool valid(const ReInit& reinit);
   bool valid(const ExternalInit& external_init) const;
   bool valid(const GroupContextExtensions& gce) const;

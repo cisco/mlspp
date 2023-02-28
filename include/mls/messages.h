@@ -249,6 +249,7 @@ struct Welcome
 
 private:
   bytes _joiner_secret;
+  PreSharedKeys _psks;
   static KeyAndNonce group_info_key_nonce(
     CipherSuite suite,
     const bytes& joiner_secret,
