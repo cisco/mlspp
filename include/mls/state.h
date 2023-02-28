@@ -83,10 +83,10 @@ public:
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
   Proposal pre_shared_key_proposal(const bytes& external_psk_id) const;
-  Proposal reinit_proposal(bytes group_id,
+  static Proposal reinit_proposal(bytes group_id,
                            ProtocolVersion version,
                            CipherSuite cipher_suite,
-                           ExtensionList extensions) const;
+                           ExtensionList extensions);
 
   MLSMessage add(const KeyPackage& key_package, const MessageOpts& msg_opts);
   MLSMessage update(HPKEPrivateKey leaf_priv,
@@ -188,7 +188,7 @@ public:
     TLS_SERIALIZABLE(prior_group_id, prior_epoch, resumption_psk, reinit);
 
   private:
-    Tombstone(const State& state_in, const ReInit& reinit_in);
+    Tombstone(const State& state_in, ReInit reinit_in);
 
     bytes prior_group_id;
     epoch_t prior_epoch;
@@ -302,7 +302,7 @@ protected:
 
   std::optional<State> handle(const MLSMessage& msg,
                               std::optional<State> cached_state,
-                              std::optional<CommitParams> expected_params);
+                              const std::optional<CommitParams>& expected_params);
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>

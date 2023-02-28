@@ -433,7 +433,7 @@ Proposal
 State::reinit_proposal(bytes group_id,
                        ProtocolVersion version,
                        CipherSuite cipher_suite,
-                       ExtensionList extensions) const
+                       ExtensionList extensions)
 {
   return { ReInit{
     std::move(group_id), version, cipher_suite, std::move(extensions) } };
@@ -486,7 +486,7 @@ State::reinit(bytes group_id,
               const MessageOpts& msg_opts)
 {
   return protect_full(
-    reinit_proposal(group_id, version, cipher_suite, extensions), msg_opts);
+    reinit_proposal(std::move(group_id), version, cipher_suite, std::move(extensions)), msg_opts);
 }
 
 std::tuple<MLSMessage, Welcome, State>
@@ -672,13 +672,13 @@ State::handle(const MLSMessage& msg)
 std::optional<State>
 State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 {
-  return handle(msg, cached_state, std::nullopt);
+  return handle(msg, std::move(cached_state), std::nullopt);
 }
 
 std::optional<State>
 State::handle(const MLSMessage& msg,
               std::optional<State> cached_state,
-              std::optional<CommitParams> expected_params)
+              const std::optional<CommitParams>& expected_params)
 {
   // Verify the signature on the message
   auto content_auth = unprotect_to_content_auth(msg);
@@ -903,11 +903,11 @@ State::handle_branch(const HPKEPrivateKey& init_priv,
   return branch_state;
 }
 
-State::Tombstone::Tombstone(const State& state_in, const ReInit& reinit_in)
+State::Tombstone::Tombstone(const State& state_in, ReInit reinit_in)
   : prior_group_id(state_in._group_id)
   , prior_epoch(state_in._epoch)
   , resumption_psk(state_in._key_schedule.resumption_psk)
-  , reinit(reinit_in)
+  , reinit(std::move(reinit_in))
 {
 }
 
@@ -1735,6 +1735,7 @@ State::valid_restart(const std::vector<CachedProposal>& proposals,
 }
 
 bool
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 State::valid_external(const std::vector<CachedProposal>& proposals) const
 {
   // Exactly one ExternalInit
