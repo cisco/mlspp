@@ -233,7 +233,8 @@ verify_test_vector(uint64_t type)
     case TestVectorClass::messages:
       return verify_test_vector<MessagesTestVector>(j);
 
-    // TODO TestVectorClass::passive_client_scenarios
+    case TestVectorClass::passive_client_scenarios:
+      return verify_test_vector<PassiveClientTestVector>(j);
 
     default:
       return "Invalid test vector type";
