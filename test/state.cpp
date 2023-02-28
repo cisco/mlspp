@@ -732,6 +732,74 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   }
 }
 
+class RelatedGroupTest : public RunningGroupTest
+{
+protected:
+  std::vector<HPKEPrivateKey> new_init_privs;
+  std::vector<HPKEPrivateKey> new_leaf_privs;
+  std::vector<SignaturePrivateKey> new_identity_privs;
+  std::vector<KeyPackage> new_key_packages;
+
+  RelatedGroupTest()
+  {
+    for (size_t i = 0; i < group_size; i += 1) {
+      auto [init_priv, leaf_priv, identity_priv, key_package] = make_client();
+      new_init_privs.push_back(init_priv);
+      new_leaf_privs.push_back(leaf_priv);
+      new_identity_privs.push_back(identity_priv);
+      new_key_packages.push_back(key_package);
+    }
+  }
+};
+
+TEST_CASE_FIXTURE(RelatedGroupTest, "Branch the group")
+{
+  // Note the epoch authenticator before we branch
+  auto original_epoch_authenticator = states[0].epoch_authenticator();
+
+  // Member 0 generates a Branch welcome
+  auto new_states = std::vector<State>{};
+
+  auto branch_key_packages = std::vector<KeyPackage>(
+    new_key_packages.begin() + 1, new_key_packages.end());
+  auto [new_state_0, welcome] =
+    states[0].create_branch(from_ascii("branched group"),
+                            new_leaf_privs[0],
+                            new_identity_privs[0],
+                            new_key_packages[0].leaf_node,
+                            {},
+                            branch_key_packages,
+                            random_bytes(suite.secret_size()),
+                            {});
+
+  new_states.push_back(std::move(new_state_0));
+  auto tree = new_states[0].tree();
+
+  // The other members process the welcome
+  for (uint32_t i = 1; i < group_size; i++) {
+    auto new_state = states[i].handle_branch(new_init_privs[i],
+                                             new_leaf_privs[i],
+                                             new_identity_privs[i],
+                                             new_key_packages[i],
+                                             welcome,
+                                             tree);
+    new_states.push_back(new_state);
+  }
+
+  // Verify that the old group is unperturbed
+  verify_group_functionality(states);
+  for (const auto& state : states) {
+    REQUIRE(state.epoch_authenticator() == original_epoch_authenticator);
+  }
+
+  // Verify that the new group works
+  verify_group_functionality(new_states);
+  for (const auto& state : new_states) {
+    REQUIRE(state == new_states[0]);
+    REQUIRE(state.epoch_authenticator() != original_epoch_authenticator);
+  }
+}
+
 TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
 {
   static const auto get_creds = [](const auto& kps) {

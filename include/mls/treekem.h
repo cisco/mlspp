@@ -70,7 +70,7 @@ struct TreeKEMPrivateKey
 
   static TreeKEMPrivateKey solo(CipherSuite suite,
                                 LeafIndex index,
-                                const HPKEPrivateKey& leaf_priv);
+                                HPKEPrivateKey leaf_priv);
   static TreeKEMPrivateKey create(const TreeKEMPublicKey& pub,
                                   LeafIndex from,
                                   const bytes& leaf_secret);

@@ -1,8 +1,6 @@
 #include <mls/state.h>
 #include <set>
 
-#include <iostream> // XXX
-
 namespace mls {
 
 ///
@@ -11,7 +9,7 @@ namespace mls {
 
 State::State(bytes group_id,
              CipherSuite suite,
-             const HPKEPrivateKey& init_priv,
+             HPKEPrivateKey enc_priv,
              SignaturePrivateKey sig_priv,
              const LeafNode& leaf_node,
              ExtensionList extensions)
@@ -31,7 +29,7 @@ State::State(bytes group_id,
 
   _index = _tree.add_leaf(leaf_node);
   _tree.set_hash_all();
-  _tree_priv = TreeKEMPrivateKey::solo(suite, _index, init_priv);
+  _tree_priv = TreeKEMPrivateKey::solo(suite, _index, std::move(enc_priv));
   if (!_tree_priv.consistent(_tree)) {
     throw InvalidParameterError("LeafNode inconsistent with private key");
   }
@@ -109,12 +107,32 @@ State::State(const HPKEPrivateKey& init_priv,
              const Welcome& welcome,
              const std::optional<TreeKEMPublicKey>& tree,
              std::map<bytes, bytes> external_psks)
+  : State(init_priv,
+          std::move(leaf_priv),
+          std::move(sig_priv),
+          key_package,
+          welcome,
+          tree,
+          std::move(external_psks),
+          {})
+{
+}
+
+State::State(const HPKEPrivateKey& init_priv,
+             HPKEPrivateKey leaf_priv,
+             SignaturePrivateKey sig_priv,
+             const KeyPackage& key_package,
+             const Welcome& welcome,
+             const std::optional<TreeKEMPublicKey>& tree,
+             std::map<bytes, bytes> external_psks,
+             std::map<EpochRef, bytes> resumption_psks)
   : _suite(welcome.cipher_suite)
   , _epoch(0)
   , _tree(welcome.cipher_suite)
   , _transcript_hash(welcome.cipher_suite)
   , _identity_priv(std::move(sig_priv))
   , _external_psks(std::move(external_psks))
+  , _resumption_psks(std::move(resumption_psks))
 {
   auto maybe_kpi = welcome.find(key_package);
   if (!maybe_kpi) {
@@ -126,24 +144,9 @@ State::State(const HPKEPrivateKey& init_priv,
     throw InvalidParameterError("Ciphersuite mismatch");
   }
 
-  // Decrypt the GroupSecrets
+  // Decrypt the GroupSecrets and look up required PSKs
   auto secrets = welcome.decrypt_secrets(kpi, init_priv);
-
-  // Look up PSKs
-  auto psks =
-    stdx::transform<PSKWithSecret>(secrets.psks.psks, [&](const auto& psk_id) {
-      if (!var::holds_alternative<ExternalPSK>(psk_id.content)) {
-        throw ProtocolError("Illegal resumption PSK");
-      }
-
-      const auto& ext_psk = var::get<ExternalPSK>(psk_id.content);
-      if (_external_psks.count(ext_psk.psk_id) == 0) {
-        throw ProtocolError("Unknown PSK");
-      }
-
-      const auto& secret = _external_psks.at(ext_psk.psk_id);
-      return PSKWithSecret{ psk_id, secret };
-    });
+  auto psks = resolve(secrets.psks.psks);
 
   // Decrypt the GroupInfo
   auto group_info = welcome.decrypt(secrets.joiner_secret, psks);
@@ -794,6 +797,88 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
   return next;
 }
 
+///
+/// Subgroup branching
+///
+
+// Parameters:
+// * ctor inputs
+// * leaf_secret
+// * commit_opts
+std::tuple<State, Welcome>
+State::create_branch(bytes group_id,
+                     HPKEPrivateKey enc_priv,
+                     SignaturePrivateKey sig_priv,
+                     const LeafNode& leaf_node,
+                     ExtensionList extensions,
+                     const std::vector<KeyPackage>& key_packages,
+                     const bytes& leaf_secret,
+                     const CommitOpts& commit_opts) const
+{
+  // Create new empty group with the appropriate PSK
+  auto new_group =
+    State{ std::move(group_id), _suite,    std::move(enc_priv),
+           std::move(sig_priv), leaf_node, std::move(extensions) };
+
+  new_group.add_resumption_psk(_group_id, _epoch, _key_schedule.resumption_psk);
+
+  // Create Add proposals
+  auto proposals = stdx::transform<Proposal>(
+    key_packages, [&](const auto& kp) { return new_group.add_proposal(kp); });
+
+  // Create PSK proposal
+  proposals.push_back({ PreSharedKey{
+    { ResumptionPSK{ ResumptionPSKUsage::branch, _group_id, _epoch },
+      random_bytes(_suite.secret_size()) } } });
+
+  // Commit the Add and PSK proposals
+  auto opts = CommitOpts{
+    proposals,
+    commit_opts.inline_tree,
+    commit_opts.encrypt_handshake,
+    commit_opts.leaf_node_opts,
+  };
+  auto [_commit, welcome, state] = new_group.commit(leaf_secret, opts, {});
+  return { state, welcome };
+}
+
+State
+State::handle_branch(const HPKEPrivateKey& init_priv,
+                     HPKEPrivateKey enc_priv,
+                     SignaturePrivateKey sig_priv,
+                     const KeyPackage& key_package,
+                     const Welcome& welcome,
+                     const std::optional<TreeKEMPublicKey>& tree) const
+{
+  auto resumption_psks =
+    std::map<EpochRef, bytes>{ { { _group_id, _epoch },
+                                 _key_schedule.resumption_psk } };
+  auto branch_state = State{
+    init_priv,
+    std::move(enc_priv),
+    std::move(sig_priv),
+    key_package,
+    welcome,
+    tree,
+    {},
+    resumption_psks,
+  };
+
+  if (branch_state._suite != _suite) {
+    throw ProtocolError("Attempt to branch with a different ciphersuite");
+  }
+
+  if (branch_state._epoch != 1) {
+    throw ProtocolError("Branch not done at the beginning of the group");
+  }
+
+  return branch_state;
+}
+
+///
+/// Internals
+///
+
 LeafIndex
 State::apply(const Add& add)
 {
@@ -900,6 +985,7 @@ State::resolve(const ProposalOrRef& id,
 }
 
 std::vector<State::CachedProposal>
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 State::must_resolve(const std::vector<ProposalOrRef>& ids,
                     std::optional<LeafIndex> sender_index) const
 {
@@ -907,6 +993,41 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
     return opt::get(resolve(id, sender_index));
   };
   return stdx::transform<CachedProposal>(ids, must_resolve);
+}
+
+void
+State::add_resumption_psk(bytes group_id, epoch_t epoch, bytes secret)
+{
+  auto key = std::make_tuple(std::move(group_id), epoch);
+  _resumption_psks.insert_or_assign(std::move(key), std::move(secret));
+}
+
+std::vector<PSKWithSecret>
+State::resolve(const std::vector<PreSharedKeyID>& psks) const
+{
+  return stdx::transform<PSKWithSecret>(psks, [&](const auto& psk_id) {
+    auto get_secret = overloaded{
+      [&](const ExternalPSK& ext_psk) {
+        if (_external_psks.count(ext_psk.psk_id) == 0) {
+          throw ProtocolError("Unknown external PSK");
+        }
+
+        return _external_psks.at(ext_psk.psk_id);
+      },
+
+      [&](const ResumptionPSK& res_psk) {
+        auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
+        if (_resumption_psks.count(key) == 0) {
+          throw ProtocolError("Unknown Resumption PSK");
+        }
+
+        return _resumption_psks.at(key);
+      },
+    };
+
+    auto secret = var::visit(get_secret, psk_id.content);
+    return PSKWithSecret{ psk_id, secret };
+  });
 }
 
 std::vector<LeafIndex>
@@ -985,18 +1106,16 @@ State::apply(const std::vector<CachedProposal>& proposals)
   // Extract the PSK proposals and look up the secrets
   // TODO(RLB): Factor this out, and also factor the above methods into
   // apply_update, apply_remove, etc.
-  auto psks = std::vector<PSKWithSecret>{};
+  auto psk_ids = std::vector<PreSharedKeyID>{};
   for (const auto& cached : proposals) {
     if (cached.proposal.proposal_type() != ProposalType::psk) {
       continue;
     }
 
     const auto& proposal = var::get<PreSharedKey>(cached.proposal.content);
-    const auto& ext_psk = var::get<ExternalPSK>(proposal.psk.content);
-    const auto secret = _external_psks.at(ext_psk.psk_id);
-
-    psks.push_back({ proposal.psk, secret });
+    psk_ids.push_back(proposal.psk);
   }
+  auto psks = resolve(psk_ids);
 
   _tree.truncate();
   _tree_priv.truncate(_tree.size);
@@ -1169,14 +1288,24 @@ State::valid(const Remove& remove) const
 bool
 State::valid(const PreSharedKey& psk) const
 {
-  // Verify that it's an external PSK (we don't support any others)
-  if (!var::holds_alternative<ExternalPSK>(psk.psk.content)) {
-    return false;
-  }
+  // TODO(RLB) Verify that the resumption PSK usage is allowed.  We should only
+  // have branch or reinit PSKs when actually branching or reinitializing,
+  // respectively.  But to do that, we need to propagate that context down to
+  // here through a few layers of the call stack.
 
   // Verify that we have the appropriate PSK
-  const auto& ext_psk = var::get<ExternalPSK>(psk.psk.content);
-  return _external_psks.count(ext_psk.psk_id) > 0;
+  const auto have_psk = overloaded{
+    [&](const ExternalPSK& ext_psk) {
+      return _external_psks.count(ext_psk.psk_id) > 0;
+    },
+
+    [&](const ResumptionPSK& res_psk) {
+      auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
+      return _resumption_psks.count(key) > 0;
+    },
+  };
+
+  return var::visit(have_psk, psk.psk.content);
 }
 
 bool
