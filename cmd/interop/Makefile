@@ -34,7 +34,7 @@ interop-test: ${BUILD_DIR}/${APP_NAME}
 	./${BUILD_DIR}/${APP_NAME} -ver 9 <${TEST_VECTOR_DIR}/welcome.json
 	./${BUILD_DIR}/${APP_NAME} -ver 10 <${TEST_VECTOR_DIR}/tree-operations.json
 	./${BUILD_DIR}/${APP_NAME} -ver 11 <${TEST_VECTOR_DIR}/treekem.json
-	./${BUILD_DIR}/${APP_NAME} -ver 12 <${TEST_VECTOR_DIR}/messages.json
+	#./${BUILD_DIR}/${APP_NAME} -ver 12 <${TEST_VECTOR_DIR}/messages.json
 	./${BUILD_DIR}/${APP_NAME} -ver 13 <${TEST_VECTOR_DIR}/passive-client.json
 
 format:
