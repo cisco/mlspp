@@ -186,11 +186,19 @@ TreeKEMPrivateKey::dump() const
   std::cout << "  Index: " << NodeIndex(index).val << std::endl;
 
   std::cout << "  Secrets: " << std::endl;
-  for (const auto& [n, secret] : path_secrets) {
-    auto sk = opt::get(private_key(n));
-    auto ssm = to_hex(secret).substr(0, 8);
+  for (const auto& [n, path_secret] : path_secrets) {
+    auto node_secret = suite.derive_secret(path_secret, "node");
+    auto sk = HPKEPrivateKey::derive(suite, node_secret);
+
+    auto psm = to_hex(path_secret).substr(0, 8);
     auto pkm = to_hex(sk.public_key.data).substr(0, 8);
-    std::cout << "    " << n.val << " => " << ssm << " = " << pkm << std::endl;
+    std::cout << "    " << n.val << " => " << psm << " => " << pkm << std::endl;
+  }
+
+  std::cout << "  Cached key pairs: " << std::endl;
+  for (const auto& [n, sk] : private_key_cache) {
+    auto pkm = to_hex(sk.public_key.data).substr(0, 8);
+    std::cout << "    " << n.val << " => " << pkm << std::endl;
   }
 }
 

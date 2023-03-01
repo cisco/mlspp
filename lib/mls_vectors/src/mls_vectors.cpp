@@ -1964,4 +1964,38 @@ MessagesTestVector::verify() const
   return std::nullopt;
 }
 
+std::optional<std::string>
+PassiveClientTestVector::verify()
+{
+  // Import everything
+  signature_priv.set_public_key(cipher_suite);
+  encryption_priv.set_public_key(cipher_suite);
+  init_priv.set_public_key(cipher_suite);
+
+  const auto& key_package_raw = var::get<KeyPackage>(key_package.message);
+  const auto& welcome_raw = var::get<Welcome>(welcome.message);
+
+  auto state = State(init_priv,
+                     encryption_priv,
+                     signature_priv,
+                     key_package_raw,
+                     welcome_raw,
+                     std::nullopt,
+                     {});
+  VERIFY_EQUAL(
+    "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
+
+  for (const auto& tve : epochs) {
+    for (const auto& proposal : tve.proposals) {
+      state.handle(proposal);
+    }
+
+    state = opt::get(state.handle(tve.commit));
+    VERIFY_EQUAL(
+      "epoch auth", state.epoch_authenticator(), tve.epoch_authenticator)
+  }
+
+  return std::nullopt;
+}
+
 } // namespace mls_vectors
