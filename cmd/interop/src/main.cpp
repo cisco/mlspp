@@ -19,7 +19,8 @@ using namespace mls_vectors;
 
 // Values used on the command line to indicate the type of test vector to be
 // generated / verified
-enum struct TestVectorClass {
+enum struct TestVectorClass
+{
   tree_math = 1,
   crypto_basics = 2,
   secret_tree = 3,
@@ -53,8 +54,6 @@ make_test_vector(uint64_t type)
 
       return cases;
     }
-
-    // XXX crypto_basics?
 
     case TestVectorClass::secret_tree: {
       auto cases = std::vector<SecretTreeTestVector>();
@@ -157,7 +156,7 @@ make_test_vector(uint64_t type)
         MessagesTestVector(),
       };
 
-    // TODO(RLB) TestVectorClass::passive_client_scenarios
+      // TODO(RLB) TestVectorClass::passive_client_scenarios
 
     default:
       return nullptr;
