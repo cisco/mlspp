@@ -350,5 +350,4 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector,
                                    initial_epoch_authenticator,
                                    epochs)
 
-
 } // namespace mls_vectors
