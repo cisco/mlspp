@@ -21,13 +21,6 @@ class MLSClientImpl final : public MLSClient::Service
                                const SupportedCiphersuitesRequest* request,
                                SupportedCiphersuitesResponse* reply) override;
 
-  Status GenerateTestVector(ServerContext* context,
-                            const GenerateTestVectorRequest* request,
-                            GenerateTestVectorResponse* reply) override;
-  Status VerifyTestVector(ServerContext* context,
-                          const VerifyTestVectorRequest* request,
-                          VerifyTestVectorResponse* reply) override;
-
   // Ways to become a member of a group
   Status CreateGroup(ServerContext* context,
                      const CreateGroupRequest* request,
@@ -116,11 +109,6 @@ private:
   uint32_t store_state(mls::State&& state, bool encrypt_handshake);
   CachedState* load_state(uint32_t state_id);
   void remove_state(uint32_t state_id);
-
-  // Fallible method implementations, wrapped before being exposed to gRPC
-  Status verify_test_vector(const VerifyTestVectorRequest* request);
-  Status generate_test_vector(const GenerateTestVectorRequest* request,
-                              GenerateTestVectorResponse* reply);
 
   // Ways to join a group
   Status create_group(const CreateGroupRequest* request,

@@ -75,22 +75,6 @@ MLSClientImpl::SupportedCiphersuites(
   return Status::OK;
 }
 
-Status
-MLSClientImpl::GenerateTestVector(ServerContext* /* context */,
-                                  const GenerateTestVectorRequest* request,
-                                  GenerateTestVectorResponse* reply)
-{
-  return catch_wrap([=]() { return generate_test_vector(request, reply); });
-}
-
-Status
-MLSClientImpl::VerifyTestVector(ServerContext* /* context */,
-                                const VerifyTestVectorRequest* request,
-                                VerifyTestVectorResponse* /* reply */)
-{
-  return catch_wrap([=]() { return verify_test_vector(request); });
-}
-
 // Ways to become a member of a group
 Status
 MLSClientImpl::CreateGroup(ServerContext* /* context */,
@@ -290,107 +274,6 @@ void
 MLSClientImpl::remove_state(uint32_t state_id)
 {
   state_cache.erase(state_id);
-}
-
-// Fallible method implementations, wrapped before being exposed to gRPC
-Status
-MLSClientImpl::verify_test_vector(const VerifyTestVectorRequest* request)
-{
-  auto error = std::optional<std::string>();
-  auto tv_json = json::parse(request->test_vector());
-  switch (request->test_vector_type()) {
-    case TestVectorType::TREE_MATH: {
-      error = tv_json.get<mls_vectors::TreeMathTestVector>().verify();
-      break;
-    }
-
-    case TestVectorType::ENCRYPTION: {
-      error = tv_json.get<mls_vectors::SecretTreeTestVector>().verify();
-      break;
-    }
-
-    case TestVectorType::KEY_SCHEDULE: {
-      error = tv_json.get<mls_vectors::KeyScheduleTestVector>().verify();
-      break;
-    }
-
-    case TestVectorType::TRANSCRIPT: {
-      error = tv_json.get<mls_vectors::TranscriptTestVector>().verify();
-      break;
-    }
-
-    case TestVectorType::TREEKEM: {
-      auto tv = tv_json.get<mls_vectors::TreeKEMTestVector>();
-      error = tv.verify();
-      break;
-    }
-
-    case TestVectorType::MESSAGES: {
-      error = tv_json.get<mls_vectors::MessagesTestVector>().verify();
-      break;
-    }
-
-    default:
-      return Status(StatusCode::INVALID_ARGUMENT, "Invalid test vector type");
-  }
-
-  if (error) {
-    return Status(StatusCode::INVALID_ARGUMENT, error.value());
-  }
-
-  return Status::OK;
-}
-
-Status
-MLSClientImpl::generate_test_vector(const GenerateTestVectorRequest* request,
-                                    GenerateTestVectorResponse* reply)
-{
-  json j;
-  switch (request->test_vector_type()) {
-    case TestVectorType::TREE_MATH: {
-      j = mls_vectors::TreeMathTestVector{ request->n_leaves() };
-      break;
-    }
-
-    case TestVectorType::ENCRYPTION: {
-      auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::SecretTreeTestVector{ suite,
-                                             request->n_leaves(),
-                                             { request->n_generations() } };
-      break;
-    }
-
-    case TestVectorType::KEY_SCHEDULE: {
-      auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::KeyScheduleTestVector{ suite, request->n_epochs() };
-      break;
-    }
-
-    case TestVectorType::TRANSCRIPT: {
-      auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TranscriptTestVector{ suite };
-      break;
-    }
-
-    case TestVectorType::TREEKEM: {
-      auto suite = static_cast<mls::CipherSuite::ID>(request->cipher_suite());
-      j = mls_vectors::TreeKEMTestVector{
-        suite, mls_vectors::TreeStructure::full_tree_8
-      };
-      break;
-    }
-
-    case TestVectorType::MESSAGES: {
-      j = mls_vectors::MessagesTestVector();
-      break;
-    }
-
-    default:
-      return Status(StatusCode::INVALID_ARGUMENT, "Invalid test vector type");
-  }
-
-  reply->set_test_vector(j.dump());
-  return Status::OK;
 }
 
 // Ways to join a group
