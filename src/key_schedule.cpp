@@ -415,7 +415,7 @@ KeyScheduleEpoch::do_export(const std::string& label,
 {
   auto secret = suite.derive_secret(exporter_secret, label);
   auto context_hash = suite.digest().hash(context);
-  return suite.expand_with_label(secret, "exporter", context_hash, size);
+  return suite.expand_with_label(secret, "exported", context_hash, size);
 }
 
 PSKWithSecret
