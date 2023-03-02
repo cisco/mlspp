@@ -1980,13 +1980,18 @@ PassiveClientTestVector::verify()
   const auto& key_package_raw = var::get<KeyPackage>(key_package.message);
   const auto& welcome_raw = var::get<Welcome>(welcome.message);
 
+  auto ext_psks = std::map<bytes, bytes>{};
+  for (const auto& [id, psk] : external_psks) {
+    ext_psks.insert_or_assign(id, psk);
+  }
+
   auto state = State(init_priv,
                      encryption_priv,
                      signature_priv,
                      key_package_raw,
                      welcome_raw,
-                     std::nullopt,
-                     {});
+                     ratchet_tree,
+                     ext_psks);
   VERIFY_EQUAL(
     "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
 

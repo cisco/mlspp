@@ -1448,15 +1448,25 @@ State::valid(const Remove& remove) const
 bool
 State::valid(const PreSharedKey& psk) const
 {
-  // We forbid resumption PSKs here because this function is only called in the
-  // normal and external cases, both of which only allow external PSKs.
-  if (!var::holds_alternative<ExternalPSK>(psk.psk.content)) {
-    return false;
+  // External PSKs are allowed if we have the corresponding secret
+  if (var::holds_alternative<ExternalPSK>(psk.psk.content)) {
+    const auto& ext_psk = var::get<ExternalPSK>(psk.psk.content);
+    return _external_psks.count(ext_psk.psk_id) > 0;
   }
 
-  // Verify that we have the appropriate PSK
-  const auto& ext_psk = var::get<ExternalPSK>(psk.psk.content);
-  return _external_psks.count(ext_psk.psk_id) > 0;
+  // Resumption PSKs are allowed only with usage 'application', and only if we
+  // have the corresponding secret.
+  if (var::holds_alternative<ResumptionPSK>(psk.psk.content)) {
+    const auto& res_psk = var::get<ResumptionPSK>(psk.psk.content);
+    if (res_psk.usage != ResumptionPSKUsage::application) {
+      return false;
+    }
+
+    const auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
+    return _resumption_psks.count(key) > 0;
+  }
+
+  return false;
 }
 
 bool
@@ -2046,6 +2056,10 @@ State::successor() const
   // Copy everything, then clear things that shouldn't be copied
   auto next = *this;
   next._pending_proposals.clear();
+
+  // Copy forward a resumption PSK
+  next.add_resumption_psk(_group_id, _epoch, _key_schedule.resumption_psk);
+
   return next;
 }
 
