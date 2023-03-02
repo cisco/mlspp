@@ -36,7 +36,9 @@ jobs:
 
     - name: Build interop harness
       run: |
-        make -C cmd/interop
+        cd cmd/interop
+        cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build build
 
     - name: Test self-interop
       run: |
