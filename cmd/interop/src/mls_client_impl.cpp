@@ -167,6 +167,16 @@ MLSClientImpl::AddProposal(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::RemoveProposal(ServerContext* /* context */,
+                           const RemoveProposalRequest* request,
+                           ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return remove_proposal(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::Commit(ServerContext* /* context */,
                       const CommitRequest* request,
                       CommitResponse* response)
@@ -478,6 +488,38 @@ MLSClientImpl::add_proposal(CachedState& entry,
   auto key_package = tls::get<mls::KeyPackage>(key_package_data);
 
   auto message = entry.state.add(key_package, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::remove_proposal(CachedState& entry,
+                            const RemoveProposalRequest* request,
+                            ProposalResponse* response)
+{
+  auto removed_id = string_to_bytes(request->removed_id());
+
+  const auto& tree = entry.state.tree();
+  auto removed_index = mls::LeafIndex{ 0 };
+  for (; removed_index < tree.size; removed_index.val++) {
+    const auto maybe_leaf = tree.leaf_node(removed_index);
+    if (!maybe_leaf) {
+      continue;
+    }
+
+    const auto& leaf = opt::get(maybe_leaf);
+    const auto& basic = leaf.credential.get<mls::BasicCredential>();
+    if (basic.identity == removed_id) {
+      break;
+    }
+  }
+
+  if (!(removed_index < tree.size)) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Unknown member identity");
+  }
+
+  auto message = entry.state.remove(removed_index, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
   return Status::OK;

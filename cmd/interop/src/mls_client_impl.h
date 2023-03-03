@@ -56,6 +56,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status AddProposal(ServerContext* context,
                      const AddProposalRequest* request,
                      ProposalResponse* response) override;
+  Status RemoveProposal(ServerContext* context,
+                        const RemoveProposalRequest* request,
+                        ProposalResponse* response) override;
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
@@ -140,6 +143,9 @@ private:
   // Operations on a running group
   Status add_proposal(CachedState& entry,
                       const AddProposalRequest* request,
+                      ProposalResponse* response);
+  Status remove_proposal(CachedState& entry,
+                      const RemoveProposalRequest* request,
                       ProposalResponse* response);
   Status commit(CachedState& entry,
                 const CommitRequest* request,
