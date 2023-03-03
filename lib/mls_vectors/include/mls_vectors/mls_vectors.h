@@ -525,6 +525,12 @@ struct MessagesTestVector : PseudoRandom
 
 struct PassiveClientTestVector : PseudoRandom
 {
+  struct PSK
+  {
+    bytes psk_id;
+    bytes psk;
+  };
+
   struct Epoch
   {
     std::vector<mls::MLSMessage> proposals;
@@ -539,7 +545,10 @@ struct PassiveClientTestVector : PseudoRandom
   mls::HPKEPrivateKey encryption_priv;
   mls::HPKEPrivateKey init_priv;
 
+  std::vector<PSK> external_psks;
+
   mls::MLSMessage welcome;
+  std::optional<mls::TreeKEMPublicKey> ratchet_tree;
   bytes initial_epoch_authenticator;
 
   std::vector<Epoch> epochs;

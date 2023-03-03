@@ -17,61 +17,35 @@ using nlohmann::json;
 using namespace mls_client;
 using namespace mls_vectors;
 
-static constexpr uint64_t CRYPTO_BASICS = 10;
-static constexpr uint64_t SECRET_TREE = 11;
-static constexpr uint64_t MESSAGE_PROTECTION = 12;
-static constexpr uint64_t PSK_SECRET = 13;
-static constexpr uint64_t WELCOME = 14;
-static constexpr uint64_t TREE_HASHES = 15;
-static constexpr uint64_t TREE_OPERATIONS = 16;
-static constexpr uint64_t PASSIVE_CLIENT = 17;
+// Values used on the command line to indicate the type of test vector to be
+// generated / verified
+enum struct TestVectorClass
+{
+  tree_math = 1,
+  crypto_basics = 2,
+  secret_tree = 3,
+  message_protection = 4,
+  key_schedule = 5,
+  pre_shared_keys = 6,
+  tree_validation = 7,
+  transcript_hash = 8,
+  welcome = 9,
+  tree_modifications = 10,
+  treekem = 11,
+  messages = 12,
+  passive_client_scenarios = 13,
+};
 
 static json
 make_test_vector(uint64_t type)
 {
   auto n = uint32_t(5);
-  switch (type) {
-    case TestVectorType::TREE_MATH:
-      return TreeMathTestVector{ n };
+  auto tv_class = static_cast<TestVectorClass>(type);
+  switch (tv_class) {
+    case TestVectorClass::tree_math:
+      return std::vector<TreeMathTestVector>{ { n } };
 
-    case TestVectorType::KEY_SCHEDULE: {
-      auto cases = std::vector<KeyScheduleTestVector>();
-
-      for (const auto& suite : mls::all_supported_suites) {
-        cases.emplace_back(suite, n);
-      }
-
-      return cases;
-    }
-
-    case TestVectorType::TRANSCRIPT: {
-      auto cases = std::vector<TranscriptTestVector>();
-
-      for (const auto& suite : mls::all_supported_suites) {
-        cases.emplace_back(suite);
-      }
-
-      return cases;
-    }
-
-    case TestVectorType::TREEKEM: {
-      auto cases = std::vector<TreeKEMTestVector>();
-
-      for (const auto& suite : mls::all_supported_suites) {
-        for (const auto& tree_structure : treekem_test_tree_structures) {
-          cases.emplace_back(suite, tree_structure);
-        }
-      }
-
-      return cases;
-    }
-
-    case TestVectorType::MESSAGES:
-      return std::vector<MessagesTestVector>{
-        MessagesTestVector(),
-      };
-
-    case CRYPTO_BASICS: {
+    case TestVectorClass::crypto_basics: {
       auto cases = std::vector<CryptoBasicsTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
@@ -81,7 +55,7 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case SECRET_TREE: {
+    case TestVectorClass::secret_tree: {
       auto cases = std::vector<SecretTreeTestVector>();
       auto generations = std::vector<uint32_t>{ 1, 15 };
 
@@ -92,7 +66,7 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case MESSAGE_PROTECTION: {
+    case TestVectorClass::message_protection: {
       auto cases = std::vector<MessageProtectionTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
@@ -102,7 +76,17 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case PSK_SECRET: {
+    case TestVectorClass::key_schedule: {
+      auto cases = std::vector<KeyScheduleTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite, n);
+      }
+
+      return cases;
+    }
+
+    case TestVectorClass::pre_shared_keys: {
       auto cases = std::vector<PSKSecretTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
@@ -112,17 +96,7 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case WELCOME: {
-      auto cases = std::vector<WelcomeTestVector>();
-
-      for (const auto& suite : mls::all_supported_suites) {
-        cases.emplace_back(suite);
-      }
-
-      return cases;
-    }
-
-    case TREE_HASHES: {
+    case TestVectorClass::tree_validation: {
       auto cases = std::vector<TreeHashTestVector>();
 
       for (const auto& suite : mls::all_supported_suites) {
@@ -134,7 +108,27 @@ make_test_vector(uint64_t type)
       return cases;
     }
 
-    case TREE_OPERATIONS: {
+    case TestVectorClass::transcript_hash: {
+      auto cases = std::vector<TranscriptTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
+
+    case TestVectorClass::welcome: {
+      auto cases = std::vector<WelcomeTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        cases.emplace_back(suite);
+      }
+
+      return cases;
+    }
+
+    case TestVectorClass::tree_modifications: {
       auto cases = std::vector<TreeOperationsTestVector>();
 
       auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
@@ -144,6 +138,25 @@ make_test_vector(uint64_t type)
 
       return cases;
     }
+
+    case TestVectorClass::treekem: {
+      auto cases = std::vector<TreeKEMTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        for (const auto& tree_structure : treekem_test_tree_structures) {
+          cases.emplace_back(suite, tree_structure);
+        }
+      }
+
+      return cases;
+    }
+
+    case TestVectorClass::messages:
+      return std::vector<MessagesTestVector>{
+        MessagesTestVector(),
+      };
+
+      // TODO(RLB) TestVectorClass::passive_client_scenarios
 
     default:
       return nullptr;
@@ -181,44 +194,45 @@ static std::optional<std::string>
 verify_test_vector(uint64_t type)
 {
   auto j = json::parse(std::cin);
-  switch (type) {
-    case TestVectorType::TREE_MATH:
+  auto tv_class = static_cast<TestVectorClass>(type);
+  switch (tv_class) {
+    case TestVectorClass::tree_math:
       return verify_test_vector<TreeMathTestVector>(j);
 
-    case TestVectorType::KEY_SCHEDULE:
-      return verify_test_vector<KeyScheduleTestVector>(j);
-
-    case TestVectorType::TRANSCRIPT:
-      return verify_test_vector<TranscriptTestVector>(j);
-
-    case TestVectorType::TREEKEM:
-      return verify_test_vector<TreeKEMTestVector>(j);
-
-    case TestVectorType::MESSAGES:
-      return verify_test_vector<MessagesTestVector>(j);
-
-    case CRYPTO_BASICS:
+    case TestVectorClass::crypto_basics:
       return verify_test_vector<CryptoBasicsTestVector>(j);
 
-    case SECRET_TREE:
+    case TestVectorClass::secret_tree:
       return verify_test_vector<SecretTreeTestVector>(j);
 
-    case MESSAGE_PROTECTION:
+    case TestVectorClass::message_protection:
       return verify_test_vector<MessageProtectionTestVector>(j);
 
-    case PSK_SECRET:
+    case TestVectorClass::key_schedule:
+      return verify_test_vector<KeyScheduleTestVector>(j);
+
+    case TestVectorClass::pre_shared_keys:
       return verify_test_vector<PSKSecretTestVector>(j);
 
-    case WELCOME:
-      return verify_test_vector<WelcomeTestVector>(j);
-
-    case TREE_OPERATIONS:
-      return verify_test_vector<TreeOperationsTestVector>(j);
-
-    case TREE_HASHES:
+    case TestVectorClass::tree_validation:
       return verify_test_vector<TreeHashTestVector>(j);
 
-    case PASSIVE_CLIENT:
+    case TestVectorClass::transcript_hash:
+      return verify_test_vector<TranscriptTestVector>(j);
+
+    case TestVectorClass::welcome:
+      return verify_test_vector<WelcomeTestVector>(j);
+
+    case TestVectorClass::tree_modifications:
+      return verify_test_vector<TreeOperationsTestVector>(j);
+
+    case TestVectorClass::treekem:
+      return verify_test_vector<TreeKEMTestVector>(j);
+
+    case TestVectorClass::messages:
+      return verify_test_vector<MessagesTestVector>(j);
+
+    case TestVectorClass::passive_client_scenarios:
       return verify_test_vector<PassiveClientTestVector>(j);
 
     default:
@@ -249,14 +263,14 @@ main(int argc, char* argv[])
 
   // Need some action to do
   if (!do_gen && !do_ver && !do_live) {
-    gflags::ShowUsageWithFlags(nullptr);
+    gflags::ShowUsageWithFlags(argv[0]);
     return 1;
   }
 
   // Can only do one action per run
   if ((do_gen && do_ver) || (do_ver && do_live) || (do_gen && do_live)) {
     std::cout << "Please choose exactly one action" << std::endl;
-    gflags::ShowUsageWithFlags(nullptr);
+    gflags::ShowUsageWithFlags(argv[0]);
     return 1;
   }
 

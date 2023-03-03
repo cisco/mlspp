@@ -1161,6 +1161,7 @@ struct TreeTestCase
   TreeTestCase(CipherSuite suite_in, PseudoRandom::Generator&& prg_in)
     : suite(suite_in)
     , prg(prg_in)
+    , group_id(prg.secret("group_id"))
     , pub(suite)
   {
     auto [where, enc_priv, sig_priv] = add_leaf();
@@ -1606,13 +1607,6 @@ TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
   }
 
   // Create test update paths
-  auto group_context = GroupContext{ cipher_suite,
-                                     group_id,
-                                     epoch,
-                                     tc.pub.root_hash(),
-                                     confirmed_transcript_hash,
-                                     {} };
-  auto ctx = tls::marshal(group_context);
   for (LeafIndex sender{ 0 }; sender < ratchet_tree.size; sender.val++) {
     if (!tc.pub.has_leaf(sender)) {
       continue;
@@ -1624,6 +1618,15 @@ TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
     auto pub = tc.pub;
     auto new_sender_priv =
       pub.update(sender, leaf_secret, group_id, sig_priv, {});
+
+    auto group_context = GroupContext{ cipher_suite,
+                                       group_id,
+                                       epoch,
+                                       pub.root_hash(),
+                                       confirmed_transcript_hash,
+                                       {} };
+    auto ctx = tls::marshal(group_context);
+
     auto path = pub.encap(new_sender_priv, ctx, {});
 
     auto path_secrets = std::vector<std::optional<bytes>>{};
@@ -1694,13 +1697,6 @@ TreeKEMTestVector::verify()
     sig_privs.insert_or_assign(info.index, sig_priv);
   }
 
-  auto group_context = GroupContext{ cipher_suite,
-                                     group_id,
-                                     epoch,
-                                     ratchet_tree.root_hash(),
-                                     confirmed_transcript_hash,
-                                     {} };
-  auto ctx = tls::marshal(group_context);
   for (const auto& info : update_paths) {
     // Test decap of the existing group secrets
     const auto& from = info.sender;
@@ -1708,43 +1704,52 @@ TreeKEMTestVector::verify()
     VERIFY("path parent hash valid",
            ratchet_tree.parent_hash_valid(from, path));
 
-    for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
-      if (to == from || !ratchet_tree.has_leaf(to)) {
+    auto ratchet_tree_after = ratchet_tree;
+    ratchet_tree_after.merge(from, path);
+    ratchet_tree_after.set_hash_all();
+    VERIFY_EQUAL(
+      "tree hash after", ratchet_tree_after.root_hash(), info.tree_hash_after);
+
+    auto group_context = GroupContext{ cipher_suite,
+                                       group_id,
+                                       epoch,
+                                       ratchet_tree_after.root_hash(),
+                                       confirmed_transcript_hash,
+                                       {} };
+    auto ctx = tls::marshal(group_context);
+
+    for (LeafIndex to{ 0 }; to < ratchet_tree_after.size; to.val++) {
+      if (to == from || !ratchet_tree_after.has_leaf(to)) {
         continue;
       }
 
       auto priv = tree_privs.at(to);
-      priv.decap(from, ratchet_tree, ctx, path, {});
+      priv.decap(from, ratchet_tree_after, ctx, path, {});
       VERIFY_EQUAL("commit secret", priv.update_secret, info.commit_secret);
 
       auto [overlap, path_secret, ok] = priv.shared_path_secret(from);
       silence_unused(overlap);
       silence_unused(ok);
       VERIFY_EQUAL("path secret", path_secret, info.path_secrets[to.val]);
-
-      auto pub = ratchet_tree;
-      pub.merge(from, path);
-      pub.set_hash_all();
-      VERIFY_EQUAL("tree hash after", pub.root_hash(), info.tree_hash_after);
     }
 
     // Test encap/decap
-    auto pub = ratchet_tree;
+    auto ratchet_tree_encap = ratchet_tree;
     auto leaf_secret = random_bytes(cipher_suite.secret_size());
     const auto& sig_priv = sig_privs.at(from);
     auto new_sender_priv =
-      pub.update(from, leaf_secret, group_id, sig_priv, {});
-    auto new_path = pub.encap(new_sender_priv, ctx, {});
+      ratchet_tree_encap.update(from, leaf_secret, group_id, sig_priv, {});
+    auto new_path = ratchet_tree_encap.encap(new_sender_priv, ctx, {});
     VERIFY("new path parent hash valid",
            ratchet_tree.parent_hash_valid(from, path));
 
-    for (LeafIndex to{ 0 }; to < ratchet_tree.size; to.val++) {
-      if (to == from || !ratchet_tree.has_leaf(to)) {
+    for (LeafIndex to{ 0 }; to < ratchet_tree_encap.size; to.val++) {
+      if (to == from || !ratchet_tree_encap.has_leaf(to)) {
         continue;
       }
 
       auto priv = tree_privs.at(to);
-      priv.decap(from, ratchet_tree, ctx, new_path, {});
+      priv.decap(from, ratchet_tree_encap, ctx, new_path, {});
       VERIFY_EQUAL(
         "commit secret", priv.update_secret, new_sender_priv.update_secret);
     }
@@ -1975,13 +1980,18 @@ PassiveClientTestVector::verify()
   const auto& key_package_raw = var::get<KeyPackage>(key_package.message);
   const auto& welcome_raw = var::get<Welcome>(welcome.message);
 
+  auto ext_psks = std::map<bytes, bytes>{};
+  for (const auto& [id, psk] : external_psks) {
+    ext_psks.insert_or_assign(id, psk);
+  }
+
   auto state = State(init_priv,
                      encryption_priv,
                      signature_priv,
                      key_package_raw,
                      welcome_raw,
-                     std::nullopt,
-                     {});
+                     ratchet_tree,
+                     ext_psks);
   VERIFY_EQUAL(
     "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
 

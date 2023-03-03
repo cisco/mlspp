@@ -1,4 +1,4 @@
-name: Build the interop harness
+name: Test interoperability
 
 on:
   push:
@@ -36,6 +36,14 @@ jobs:
 
     - name: Build interop harness
       run: |
-         cd cmd/interop
-         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
-         cmake --build build
+        cd cmd/interop
+        cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build build
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
