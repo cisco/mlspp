@@ -336,9 +336,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesTestVector,
                                    public_message_commit,
                                    private_message)
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::PSK,
-                                   psk_id,
-                                   psk)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::PSK, psk_id, psk)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::Epoch,
                                    proposals,
                                    commit,
