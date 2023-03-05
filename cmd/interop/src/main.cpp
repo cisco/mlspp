@@ -240,10 +240,6 @@ verify_test_vector(uint64_t type)
   }
 }
 
-#define NO_SAMPLE 0xffffffffffffffff
-DEFINE_uint64(sample, NO_SAMPLE, "Generate a sample JSON file (by enum value)");
-DEFINE_uint64(port, 50001, "Listen for gRPC on this port");
-
 #define NO_U64 0xffffffffffffffff
 DEFINE_uint64(gen, NO_U64, "Generate test vectors of a given type");
 DEFINE_uint64(ver, NO_U64, "Verify test vectors of a given type");
@@ -299,7 +295,7 @@ main(int argc, char* argv[])
   if (do_live) {
     auto service = MLSClientImpl{};
     auto addr_stream = std::stringstream{};
-    addr_stream << "0.0.0.0:" << FLAGS_port;
+    addr_stream << "0.0.0.0:" << FLAGS_live;
     auto server_address = addr_stream.str();
 
     grpc::EnableDefaultHealthCheckService(true);

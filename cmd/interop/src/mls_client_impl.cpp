@@ -167,9 +167,19 @@ MLSClientImpl::AddProposal(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::UpdateProposal(ServerContext* /* context */,
+                              const UpdateProposalRequest* request,
+                              ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return update_proposal(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::RemoveProposal(ServerContext* /* context */,
-                           const RemoveProposalRequest* request,
-                           ProposalResponse* response)
+                              const RemoveProposalRequest* request,
+                              ProposalResponse* response)
 {
   return state_wrap(request, [=](auto& state) {
     return remove_proposal(state, request, response);
@@ -196,12 +206,12 @@ MLSClientImpl::HandleCommit(ServerContext* /* context */,
 }
 
 Status
-MLSClientImpl::HandleExternalCommit(ServerContext* /* context */,
-                                    const HandleExternalCommitRequest* request,
-                                    HandleExternalCommitResponse* response)
+MLSClientImpl::HandlePendingCommit(ServerContext* /* context */,
+                                   const HandlePendingCommitRequest* request,
+                                   HandleCommitResponse* response)
 {
   return state_wrap(request, [=](auto& state) {
-    return handle_external_commit(state, request, response);
+    return handle_pending_commit(state, request, response);
   });
 }
 
@@ -293,10 +303,11 @@ MLSClientImpl::create_group(const CreateGroupRequest* request,
 {
   auto group_id = string_to_bytes(request->group_id());
   auto cipher_suite = mls_suite(request->cipher_suite());
+  auto identity = string_to_bytes(request->identity());
 
   auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({});
+  auto cred = mls::Credential::basic(identity);
 
   auto leaf_node = mls::LeafNode{
     cipher_suite,
@@ -322,11 +333,12 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
                                   CreateKeyPackageResponse* response)
 {
   auto cipher_suite = mls_suite(request->cipher_suite());
+  auto identity = string_to_bytes(request->identity());
 
   auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic({});
+  auto cred = mls::Credential::basic(identity);
 
   auto leaf = mls::LeafNode{
     cipher_suite,
@@ -363,7 +375,8 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
   }
 
   auto welcome_data = string_to_bytes(request->welcome());
-  auto welcome = tls::get<mls::Welcome>(welcome_data);
+  auto welcome_msg = tls::get<mls::MLSMessage>(welcome_data);
+  auto welcome = var::get<mls::Welcome>(welcome_msg.message);
 
   auto state = mls::State(join->init_priv,
                           std::move(join->leaf_priv),
@@ -468,7 +481,7 @@ MLSClientImpl::unprotect(CachedState& entry,
                          UnprotectResponse* response)
 {
   auto ct_data = string_to_bytes(request->ciphertext());
-  auto ct = tls::get<mls::PrivateMessage>(ct_data);
+  auto ct = tls::get<mls::MLSMessage>(ct_data);
   auto [aad, pt] = entry.state.unprotect(ct);
   mls::silence_unused(aad);
 
@@ -494,9 +507,21 @@ MLSClientImpl::add_proposal(CachedState& entry,
 }
 
 Status
+MLSClientImpl::update_proposal(CachedState& entry,
+                               const UpdateProposalRequest* /* request */,
+                               ProposalResponse* response)
+{
+  auto leaf_priv = mls::HPKEPrivateKey::generate(entry.state.cipher_suite());
+  auto message = entry.state.update(leaf_priv, {}, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
 MLSClientImpl::remove_proposal(CachedState& entry,
-                            const RemoveProposalRequest* request,
-                            ProposalResponse* response)
+                               const RemoveProposalRequest* request,
+                               ProposalResponse* response)
 {
   auto removed_id = string_to_bytes(request->removed_id());
 
@@ -574,7 +599,7 @@ MLSClientImpl::commit(CachedState& entry,
   entry.pending_commit = commit_data;
   entry.pending_state_id = next_id;
 
-  auto welcome_data = tls::marshal(welcome);
+  auto welcome_data = tls::marshal(mls::MLSMessage{ welcome });
   response->set_welcome(bytes_to_string(welcome_data));
 
   return Status::OK;
@@ -619,20 +644,16 @@ MLSClientImpl::handle_commit(CachedState& entry,
 }
 
 Status
-MLSClientImpl::handle_external_commit(
+MLSClientImpl::handle_pending_commit(
   CachedState& entry,
-  const HandleExternalCommitRequest* request,
-  HandleExternalCommitResponse* response)
+  const HandlePendingCommitRequest* /* request */,
+  HandleCommitResponse* response)
 {
-  auto commit_data = string_to_bytes(request->commit());
-  auto commit = tls::get<mls::MLSMessage>(commit_data);
-  auto should_be_next = entry.state.handle(commit);
-  if (!should_be_next) {
-    throw std::runtime_error("Commit failed to produce a new state");
+  if (!entry.pending_commit || !entry.pending_state_id) {
+    throw std::runtime_error("No pending commit to handle");
   }
 
-  auto& next = opt::get(should_be_next);
-  auto next_id = store_state(std::move(next), entry.encrypt_handshake);
+  const auto& next_id = opt::get(entry.pending_state_id);
   response->set_state_id(next_id);
   return Status::OK;
 }

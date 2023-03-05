@@ -56,6 +56,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status AddProposal(ServerContext* context,
                      const AddProposalRequest* request,
                      ProposalResponse* response) override;
+  Status UpdateProposal(ServerContext* context,
+                        const UpdateProposalRequest* request,
+                        ProposalResponse* response) override;
   Status RemoveProposal(ServerContext* context,
                         const RemoveProposalRequest* request,
                         ProposalResponse* response) override;
@@ -65,9 +68,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status HandleCommit(ServerContext* context,
                       const HandleCommitRequest* request,
                       HandleCommitResponse* response) override;
-  Status HandleExternalCommit(ServerContext* context,
-                              const HandleExternalCommitRequest* request,
-                              HandleExternalCommitResponse* response) override;
+  Status HandlePendingCommit(ServerContext* context,
+                             const HandlePendingCommitRequest* request,
+                             HandleCommitResponse* response) override;
 
 private:
   // Wrapper for methods that rely on state
@@ -144,16 +147,19 @@ private:
   Status add_proposal(CachedState& entry,
                       const AddProposalRequest* request,
                       ProposalResponse* response);
+  Status update_proposal(CachedState& entry,
+                         const UpdateProposalRequest* request,
+                         ProposalResponse* response);
   Status remove_proposal(CachedState& entry,
-                      const RemoveProposalRequest* request,
-                      ProposalResponse* response);
+                         const RemoveProposalRequest* request,
+                         ProposalResponse* response);
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);
   Status handle_commit(CachedState& entry,
                        const HandleCommitRequest* request,
                        HandleCommitResponse* response);
-  Status handle_external_commit(CachedState& entry,
-                                const HandleExternalCommitRequest* request,
-                                HandleExternalCommitResponse* response);
+  Status handle_pending_commit(CachedState& entry,
+                               const HandlePendingCommitRequest* request,
+                               HandleCommitResponse* response);
 };

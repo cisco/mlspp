@@ -13,7 +13,7 @@ ${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR} src/*.cpp
 	cmake --build ${BUILD_DIR} --target ${APP_NAME}
 
 run: ${BUILD_DIR}/${APP_NAME}
-	./${BUILD_DIR}/${APP_NAME} -port 50001
+	./${BUILD_DIR}/${APP_NAME} -live 50001
 
 self-test: ${BUILD_DIR}/${APP_NAME}
 	# TODO(RLB) Extend to 13 to cover passive client tests
