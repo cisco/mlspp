@@ -18,6 +18,21 @@ string_to_bytes(const std::string& str)
   return { str.begin(), str.end() };
 }
 
+static inline std::string
+marshal_message(mls::MLSMessage&& msg)
+{
+  return bytes_to_string(tls::marshal(msg));
+}
+
+template<typename T>
+T
+unmarshal_message(const std::string& str)
+{
+  auto data = string_to_bytes(str);
+  auto msg = tls::get<mls::MLSMessage>(data);
+  return var::get<T>(msg.message);
+}
+
 static inline mls::CipherSuite
 mls_suite(uint32_t suite_id)
 {
@@ -353,15 +368,14 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
 
   auto kp =
     mls::KeyPackage(cipher_suite, init_priv.public_key, leaf, {}, sig_priv);
+  response->set_key_package(marshal_message(kp));
 
-  auto kp_data = tls::marshal(kp);
   auto join_id = store_join(std::move(init_priv),
                             std::move(leaf_priv),
                             std::move(sig_priv),
                             std::move(kp));
-
   response->set_transaction_id(join_id);
-  response->set_key_package(bytes_to_string(kp_data));
+
   return Status::OK;
 }
 
@@ -374,10 +388,7 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
     return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
   }
 
-  auto welcome_data = string_to_bytes(request->welcome());
-  auto welcome_msg = tls::get<mls::MLSMessage>(welcome_data);
-  auto welcome = var::get<mls::Welcome>(welcome_msg.message);
-
+  auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
   auto state = mls::State(join->init_priv,
                           std::move(join->leaf_priv),
                           std::move(join->sig_priv),
@@ -395,8 +406,7 @@ Status
 MLSClientImpl::external_join(const ExternalJoinRequest* request,
                              ExternalJoinResponse* response)
 {
-  const auto group_info_data = string_to_bytes(request->public_group_state());
-  const auto group_info = tls::get<mls::GroupInfo>(group_info_data);
+  const auto group_info = unmarshal_message<mls::GroupInfo>(request->public_group_state());
   const auto suite = group_info.group_context.cipher_suite;
 
   auto init_priv = mls::HPKEPrivateKey::generate(suite);
@@ -421,11 +431,10 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   auto leaf_secret = mls::random_bytes(suite.secret_size());
   auto [commit, state] = mls::State::external_join(
     leaf_secret, sig_priv, kp, group_info, std::nullopt, { {}, encrypt, 0 });
-  auto commit_data = tls::marshal(commit);
   auto state_id = store_state(std::move(state), encrypt);
 
   response->set_state_id(state_id);
-  response->set_commit(bytes_to_string(commit_data));
+  response->set_commit(marshal_message(std::move(commit)));
   return Status::OK;
 }
 
@@ -435,8 +444,8 @@ MLSClientImpl::public_group_state(CachedState& entry,
                                   const PublicGroupStateRequest* /* request */,
                                   PublicGroupStateResponse* response)
 {
-  auto group_info_data = tls::marshal(entry.state.group_info());
-  response->set_public_group_state(bytes_to_string(group_info_data));
+  auto group_info = entry.state.group_info();
+  response->set_public_group_state(marshal_message(group_info));
   return Status::OK;
 }
 
@@ -470,8 +479,7 @@ MLSClientImpl::protect(CachedState& entry,
 {
   auto pt = string_to_bytes(request->application_data());
   auto ct = entry.state.protect({}, pt, 0);
-  auto ct_data = tls::marshal(ct);
-  response->set_ciphertext(bytes_to_string(ct_data));
+  response->set_ciphertext(marshal_message(std::move(ct)));
   return Status::OK;
 }
 
@@ -497,9 +505,7 @@ MLSClientImpl::add_proposal(CachedState& entry,
                             const AddProposalRequest* request,
                             ProposalResponse* response)
 {
-  auto key_package_data = string_to_bytes(request->key_package());
-  auto key_package = tls::get<mls::KeyPackage>(key_package_data);
-
+  auto key_package = unmarshal_message<mls::KeyPackage>(request->key_package());
   auto message = entry.state.add(key_package, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
@@ -599,8 +605,7 @@ MLSClientImpl::commit(CachedState& entry,
   entry.pending_commit = commit_data;
   entry.pending_state_id = next_id;
 
-  auto welcome_data = tls::marshal(mls::MLSMessage{ welcome });
-  response->set_welcome(bytes_to_string(welcome_data));
+  response->set_welcome(marshal_message(welcome));
 
   return Status::OK;
 }
