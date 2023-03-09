@@ -20,7 +20,7 @@ struct CommitOpts
 {
   std::vector<Proposal> extra_proposals;
   bool inline_tree;
-  bool encrypt_handshake;
+  bool force_path;
   LeafNodeOptions leaf_node_opts;
 };
 

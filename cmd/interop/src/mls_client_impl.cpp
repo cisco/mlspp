@@ -412,12 +412,18 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
   }
 
   auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
+  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  if (!ratchet_tree_data.empty()) {
+    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  }
+
   auto state = mls::State(join->init_priv,
                           std::move(join->leaf_priv),
                           std::move(join->sig_priv),
                           join->key_package,
                           welcome,
-                          std::nullopt,
+                          ratchet_tree,
                           join->psks);
   auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
@@ -632,6 +638,8 @@ MLSClientImpl::commit(CachedState& entry,
     }
   }
 
+  auto force_path = request->force_path();
+  auto inline_tree = !request->external_tree();
   auto inline_proposals = std::vector<mls::Proposal>();
 #if 0
   // TODO(#265): Re-enable
@@ -655,9 +663,13 @@ MLSClientImpl::commit(CachedState& entry,
     mls::random_bytes(entry.state.cipher_suite().secret_size());
   auto [commit, welcome, next] = entry.state.commit(
     leaf_secret,
-    mls::CommitOpts{ inline_proposals, true, entry.encrypt_handshake, {} },
+    mls::CommitOpts{ inline_proposals, inline_tree, force_path, {} },
     entry.message_opts());
-  auto epoch_authenticator = next.epoch_authenticator();
+
+  if (!inline_tree) {
+    auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));
+    response->set_ratchet_tree(ratchet_tree);
+  }
 
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 
