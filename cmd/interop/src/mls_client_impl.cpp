@@ -406,7 +406,8 @@ Status
 MLSClientImpl::external_join(const ExternalJoinRequest* request,
                              ExternalJoinResponse* response)
 {
-  const auto group_info = unmarshal_message<mls::GroupInfo>(request->public_group_state());
+  const auto group_info =
+    unmarshal_message<mls::GroupInfo>(request->public_group_state());
   const auto suite = group_info.group_context.cipher_suite;
 
   auto init_priv = mls::HPKEPrivateKey::generate(suite);
