@@ -377,7 +377,7 @@ Session::do_export(const std::string& label,
 GroupInfo
 Session::group_info() const
 {
-  return inner->history.front().group_info();
+  return inner->history.front().group_info(true);
 }
 
 std::vector<LeafNode>

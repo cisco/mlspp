@@ -36,9 +36,9 @@ class MLSClientImpl final : public MLSClient::Service
                       ExternalJoinResponse* response) override;
 
   // Access information from a group state
-  Status PublicGroupState(ServerContext* context,
-                          const PublicGroupStateRequest* request,
-                          PublicGroupStateResponse* response) override;
+  Status GroupInfo(ServerContext* context,
+                   const GroupInfoRequest* request,
+                   GroupInfoResponse* response) override;
   Status StateAuth(ServerContext* context,
                    const StateAuthRequest* request,
                    StateAuthResponse* response) override;
@@ -127,9 +127,9 @@ private:
                        ExternalJoinResponse* response);
 
   // Access information from a group state
-  Status public_group_state(CachedState& entry,
-                            const PublicGroupStateRequest* request,
-                            PublicGroupStateResponse* response);
+  Status group_info(CachedState& entry,
+                    const GroupInfoRequest* request,
+                    GroupInfoResponse* response);
   Status state_auth(CachedState& entry,
                     const StateAuthRequest* request,
                     StateAuthResponse* response);

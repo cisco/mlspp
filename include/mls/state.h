@@ -64,7 +64,9 @@ public:
     const KeyPackage& key_package,
     const GroupInfo& group_info,
     const std::optional<TreeKEMPublicKey>& tree,
-    const MessageOpts& msg_opts);
+    const MessageOpts& msg_opts,
+    std::optional<LeafIndex> remove_prior,
+    const std::map<bytes, bytes>& psks);
 
   // Propose that a new member be added a group
   static MLSMessage new_member_add(const bytes& group_id,
@@ -133,7 +135,7 @@ public:
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  GroupInfo group_info() const;
+  GroupInfo group_info(bool inline_tree) const;
 
   // Ordered list of credentials from non-blank leaves
   std::vector<LeafNode> roster() const;
