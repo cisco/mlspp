@@ -263,7 +263,7 @@ MLSClientImpl::load_join(uint32_t join_id)
 mls::MessageOpts
 MLSClientImpl::CachedState::message_opts() const
 {
-  return { {}, encrypt_handshake, 0 };
+  return { encrypt_handshake, {}, 0 };
 }
 
 void
