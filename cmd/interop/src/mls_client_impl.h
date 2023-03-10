@@ -134,8 +134,7 @@ private:
   Status external_join(const ExternalJoinRequest* request,
                        ExternalJoinResponse* response);
 
-  Status store_psk(const StorePSKRequest* request,
-                   StorePSKResponse* response);
+  Status store_psk(const StorePSKRequest* request, StorePSKResponse* response);
 
   // Access information from a group state
   Status public_group_state(CachedState& entry,

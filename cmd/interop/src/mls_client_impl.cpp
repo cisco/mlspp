@@ -389,8 +389,8 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
     signature_priv,
   };
 
-  auto kp =
-    mls::KeyPackage(cipher_suite, init_priv.public_key, leaf, {}, signature_priv);
+  auto kp = mls::KeyPackage(
+    cipher_suite, init_priv.public_key, leaf, {}, signature_priv);
   response->set_key_package(marshal_message(kp));
 
   auto join_id = store_join(std::move(init_priv),
@@ -469,7 +469,6 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   response->set_commit(marshal_message(std::move(commit)));
   return Status::OK;
 }
-
 
 Status
 MLSClientImpl::store_psk(const StorePSKRequest* request,
