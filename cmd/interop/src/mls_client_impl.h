@@ -35,6 +35,10 @@ class MLSClientImpl final : public MLSClient::Service
                       const ExternalJoinRequest* request,
                       ExternalJoinResponse* response) override;
 
+  Status StorePSK(ServerContext* context,
+                  const StorePSKRequest* request,
+                  StorePSKResponse* response) override;
+
   // Access information from a group state
   Status PublicGroupState(ServerContext* context,
                           const PublicGroupStateRequest* request,
@@ -62,6 +66,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status RemoveProposal(ServerContext* context,
                         const RemoveProposalRequest* request,
                         ProposalResponse* response) override;
+  Status PSKProposal(ServerContext* context,
+                     const PSKProposalRequest* request,
+                     ProposalResponse* response) override;
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
@@ -84,6 +91,7 @@ private:
     mls::HPKEPrivateKey leaf_priv;
     mls::SignaturePrivateKey sig_priv;
     mls::KeyPackage key_package;
+    std::map<bytes, bytes> psks;
   };
 
   std::map<uint32_t, CachedJoin> join_cache;
@@ -126,6 +134,8 @@ private:
   Status external_join(const ExternalJoinRequest* request,
                        ExternalJoinResponse* response);
 
+  Status store_psk(const StorePSKRequest* request, StorePSKResponse* response);
+
   // Access information from a group state
   Status public_group_state(CachedState& entry,
                             const PublicGroupStateRequest* request,
@@ -153,6 +163,9 @@ private:
   Status remove_proposal(CachedState& entry,
                          const RemoveProposalRequest* request,
                          ProposalResponse* response);
+  Status psk_proposal(CachedState& entry,
+                      const PSKProposalRequest* request,
+                      ProposalResponse* response);
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);

@@ -123,6 +123,14 @@ MLSClientImpl::ExternalJoin(ServerContext* /* context */,
   return catch_wrap([=]() { return external_join(request, response); });
 }
 
+Status
+MLSClientImpl::StorePSK(ServerContext* /* context */,
+                        const StorePSKRequest* request,
+                        StorePSKResponse* response)
+{
+  return catch_wrap([=]() { return store_psk(request, response); });
+}
+
 // Access information from a group state
 Status
 MLSClientImpl::PublicGroupState(ServerContext* /* context */,
@@ -202,6 +210,16 @@ MLSClientImpl::RemoveProposal(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::PSKProposal(ServerContext* /* context */,
+                           const PSKProposalRequest* request,
+                           ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return psk_proposal(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::Commit(ServerContext* /* context */,
                       const CommitRequest* request,
                       CommitResponse* response)
@@ -245,7 +263,8 @@ MLSClientImpl::store_join(mls::HPKEPrivateKey&& init_priv,
   auto entry = CachedJoin{ std::move(init_priv),
                            std::move(leaf_priv),
                            std::move(sig_priv),
-                           std::move(kp) };
+                           std::move(kp),
+                           {} };
   join_cache.emplace(std::make_pair(join_id, std::move(entry)));
   return join_id;
 }
@@ -351,28 +370,32 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
   auto identity = string_to_bytes(request->identity());
 
   auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
+  auto encryption_priv = mls::HPKEPrivateKey::generate(cipher_suite);
+  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
   auto cred = mls::Credential::basic(identity);
+
+  response->set_init_priv(bytes_to_string(init_priv.data));
+  response->set_encryption_priv(bytes_to_string(encryption_priv.data));
+  response->set_signature_priv(bytes_to_string(signature_priv.data));
 
   auto leaf = mls::LeafNode{
     cipher_suite,
-    leaf_priv.public_key,
-    sig_priv.public_key,
+    encryption_priv.public_key,
+    signature_priv.public_key,
     cred,
     mls::Capabilities::create_default(),
     mls::Lifetime::create_default(),
     {},
-    sig_priv,
+    signature_priv,
   };
 
-  auto kp =
-    mls::KeyPackage(cipher_suite, init_priv.public_key, leaf, {}, sig_priv);
+  auto kp = mls::KeyPackage(
+    cipher_suite, init_priv.public_key, leaf, {}, signature_priv);
   response->set_key_package(marshal_message(kp));
 
   auto join_id = store_join(std::move(init_priv),
-                            std::move(leaf_priv),
-                            std::move(sig_priv),
+                            std::move(encryption_priv),
+                            std::move(signature_priv),
                             std::move(kp));
   response->set_transaction_id(join_id);
 
@@ -389,16 +412,24 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
   }
 
   auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
+  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  if (!ratchet_tree_data.empty()) {
+    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  }
+
   auto state = mls::State(join->init_priv,
                           std::move(join->leaf_priv),
                           std::move(join->sig_priv),
                           join->key_package,
                           welcome,
-                          std::nullopt,
-                          {});
+                          ratchet_tree,
+                          join->psks);
+  auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
 
@@ -436,6 +467,27 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 
   response->set_state_id(state_id);
   response->set_commit(marshal_message(std::move(commit)));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::store_psk(const StorePSKRequest* request,
+                         StorePSKResponse* /* response */)
+{
+  // Handle pre-join PSKs
+  auto id = request->state_or_transaction_id();
+  auto psk_id = string_to_bytes(request->psk_id());
+  auto psk_secret = string_to_bytes(request->psk_secret());
+  if (join_cache.count(id) > 0) {
+    auto& cached = join_cache.at(id);
+    cached.psks.insert_or_assign(psk_id, psk_secret);
+  } else if (state_cache.count(id) > 0) {
+    auto& cached = state_cache.at(id);
+    cached.state.add_external_psk(psk_id, psk_secret);
+  } else {
+    throw std::runtime_error("Unknown state or transaction ID");
+  }
+
   return Status::OK;
 }
 
@@ -558,6 +610,19 @@ MLSClientImpl::remove_proposal(CachedState& entry,
 }
 
 Status
+MLSClientImpl::psk_proposal(CachedState& entry,
+                            const PSKProposalRequest* request,
+                            ProposalResponse* response)
+{
+  auto psk_id = string_to_bytes(request->psk_id());
+
+  auto message = entry.state.pre_shared_key(psk_id, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
 MLSClientImpl::commit(CachedState& entry,
                       const CommitRequest* request,
                       CommitResponse* response)
@@ -572,6 +637,8 @@ MLSClientImpl::commit(CachedState& entry,
     }
   }
 
+  auto force_path = request->force_path();
+  auto inline_tree = !request->external_tree();
   auto inline_proposals = std::vector<mls::Proposal>();
 #if 0
   // TODO(#265): Re-enable
@@ -595,8 +662,13 @@ MLSClientImpl::commit(CachedState& entry,
     mls::random_bytes(entry.state.cipher_suite().secret_size());
   auto [commit, welcome, next] = entry.state.commit(
     leaf_secret,
-    mls::CommitOpts{ inline_proposals, true, entry.encrypt_handshake, {} },
+    mls::CommitOpts{ inline_proposals, inline_tree, force_path, {} },
     entry.message_opts());
+
+  if (!inline_tree) {
+    auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));
+    response->set_ratchet_tree(ratchet_tree);
+  }
 
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
 
@@ -607,7 +679,6 @@ MLSClientImpl::commit(CachedState& entry,
   entry.pending_state_id = next_id;
 
   response->set_welcome(marshal_message(welcome));
-
   return Status::OK;
 }
 
@@ -644,8 +715,11 @@ MLSClientImpl::handle_commit(CachedState& entry,
   }
 
   auto& next = opt::get(should_be_next);
+  auto epoch_authenticator = next.epoch_authenticator();
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
+
   response->set_state_id(next_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
 
@@ -660,6 +734,10 @@ MLSClientImpl::handle_pending_commit(
   }
 
   const auto& next_id = opt::get(entry.pending_state_id);
+  const auto* next = load_state(next_id);
+  const auto epoch_authenticator = next->state.epoch_authenticator();
+
   response->set_state_id(next_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
