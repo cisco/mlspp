@@ -619,8 +619,9 @@ MLSClientImpl::protect(CachedState& entry,
                        const ProtectRequest* request,
                        ProtectResponse* response)
 {
+  auto aad = string_to_bytes(request->authenticated_data());
   auto pt = string_to_bytes(request->plaintext());
-  auto ct = entry.state.protect({}, pt, 0);
+  auto ct = entry.state.protect(aad, pt, 0);
   response->set_ciphertext(marshal_message(std::move(ct)));
   return Status::OK;
 }
@@ -632,11 +633,31 @@ MLSClientImpl::unprotect(CachedState& entry,
 {
   auto ct_data = string_to_bytes(request->ciphertext());
   auto ct = tls::get<mls::MLSMessage>(ct_data);
-  auto [aad, pt] = entry.state.unprotect(ct);
-  mls::silence_unused(aad);
 
-  // TODO(RLB) We should update the gRPC spec so that it returns the AAD as well
-  // as the plaintext.
+  // Locate the right epoch to decrypt with
+  auto* state = &entry.state;
+  const auto group_id = state->group_id();
+
+  const auto epoch = var::get<mls::PrivateMessage>(ct.message).get_epoch();
+
+  if (state->epoch() != epoch) {
+    auto prior_state = std::find_if(
+      state_cache.begin(), state_cache.end(), [&](const auto& entry) {
+        const auto& [id, cached] = entry;
+        return cached.state.group_id() == group_id &&
+               cached.state.epoch() == epoch;
+      });
+    if (prior_state == state_cache.end()) {
+      throw std::runtime_error("Unknown state for decryption");
+    }
+
+    state = &prior_state->second.state;
+  }
+
+  // Decrypt the message
+  auto [aad, pt] = state->unprotect(ct);
+
+  response->set_authenticated_data(bytes_to_string(aad));
   response->set_plaintext(bytes_to_string(pt));
   return Status::OK;
 }
