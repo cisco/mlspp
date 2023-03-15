@@ -225,6 +225,16 @@ MLSClientImpl::RemoveProposal(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::ExternalPSKProposal(ServerContext* /* context */,
+                              const ExternalPSKProposalRequest* request,
+                              ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return external_psk_proposal(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::Commit(ServerContext* /* context */,
                       const CommitRequest* request,
                       CommitResponse* response)
@@ -648,6 +658,19 @@ MLSClientImpl::remove_proposal(CachedState& entry,
   }
 
   auto message = entry.state.remove(removed_index, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::external_psk_proposal(CachedState& entry,
+                               const ExternalPSKProposalRequest* request,
+                               ProposalResponse* response)
+{
+  auto psk_id = string_to_bytes(request->psk_id());
+
+  auto message = entry.state.pre_shared_key(psk_id, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
   return Status::OK;
