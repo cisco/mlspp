@@ -782,6 +782,15 @@ MLSClientImpl::handle_pending_commit(
   }
 
   const auto& next_id = opt::get(entry.pending_state_id);
+
+  const auto* next = load_state(next_id);
+  if (!next) {
+    throw std::runtime_error("Internal error: No state for next ID");
+  }
+
+  const auto epoch_authenticator = next->state.epoch_authenticator();
+
   response->set_state_id(next_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
