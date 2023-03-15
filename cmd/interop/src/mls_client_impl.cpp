@@ -235,6 +235,28 @@ MLSClientImpl::ExternalPSKProposal(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::ResumptionPSKProposal(
+  ServerContext* /* context */,
+  const ResumptionPSKProposalRequest* request,
+  ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return resumption_psk_proposal(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::GroupContextExtensionsProposal(
+  ServerContext* /* context */,
+  const GroupContextExtensionsProposalRequest* request,
+  ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return group_context_extensions_proposal(state, request, response);
+  });
+}
+
+Status
 MLSClientImpl::Commit(ServerContext* /* context */,
                       const CommitRequest* request,
                       CommitResponse* response)
@@ -430,9 +452,11 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
                           welcome,
                           std::nullopt,
                           join->external_psks);
+  auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
 
@@ -671,6 +695,55 @@ MLSClientImpl::external_psk_proposal(CachedState& entry,
   auto psk_id = string_to_bytes(request->psk_id());
 
   auto message = entry.state.pre_shared_key(psk_id, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::resumption_psk_proposal(
+  CachedState& entry,
+  const ResumptionPSKProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto group_id = entry.state.group_id();
+  auto epoch = request->epoch_id();
+  auto prior_state = std::find_if(
+    state_cache.begin(), state_cache.end(), [&](const auto& entry) {
+      const auto& [id, cached] = entry;
+      return cached.state.group_id() == group_id &&
+             cached.state.epoch() == epoch;
+    });
+  if (prior_state == state_cache.end()) {
+    throw std::runtime_error("Unknown state for resumption PSK");
+  }
+
+  const auto& psk_secret = prior_state->second.state.resumption_psk();
+  entry.state.add_resumption_psk(group_id, epoch, psk_secret);
+
+  auto message =
+    entry.state.pre_shared_key(group_id, epoch, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::group_context_extensions_proposal(
+  CachedState& entry,
+  const GroupContextExtensionsProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < request->extensions_size(); i++) {
+    auto ext = request->extensions(i);
+    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
+
+  auto message =
+    entry.state.group_context_extensions(ext_list, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
   return Status::OK;

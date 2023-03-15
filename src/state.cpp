@@ -444,6 +444,20 @@ State::pre_shared_key_proposal(const bytes& external_psk_id) const
 }
 
 Proposal
+State::pre_shared_key_proposal(const bytes& group_id, epoch_t epoch) const
+{
+  if (_resumption_psks.count({ group_id, epoch }) == 0) {
+    throw InvalidParameterError("Unknown PSK");
+  }
+
+  auto psk_id = PreSharedKeyID{
+    { ResumptionPSK{ ResumptionPSKUsage::application, group_id, epoch } },
+    random_bytes(_suite.secret_size()),
+  };
+  return { PreSharedKey{ psk_id } };
+}
+
+Proposal
 State::reinit_proposal(bytes group_id,
                        ProtocolVersion version,
                        CipherSuite cipher_suite,
@@ -490,6 +504,14 @@ MLSMessage
 State::pre_shared_key(const bytes& external_psk_id, const MessageOpts& msg_opts)
 {
   return protect_full(pre_shared_key_proposal(external_psk_id), msg_opts);
+}
+
+MLSMessage
+State::pre_shared_key(const bytes& group_id,
+                      epoch_t epoch,
+                      const MessageOpts& msg_opts)
+{
+  return protect_full(pre_shared_key_proposal(group_id, epoch), msg_opts);
 }
 
 MLSMessage
@@ -1173,13 +1195,6 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
     return opt::get(resolve(id, sender_index));
   };
   return stdx::transform<CachedProposal>(ids, must_resolve);
-}
-
-void
-State::add_resumption_psk(bytes group_id, epoch_t epoch, bytes secret)
-{
-  auto key = std::make_tuple(std::move(group_id), epoch);
-  _resumption_psks.insert_or_assign(std::move(key), std::move(secret));
 }
 
 std::vector<PSKWithSecret>
@@ -1986,6 +2001,18 @@ State::verify(const AuthenticatedContent& content_auth) const
     default:
       throw ProtocolError("Invalid sender type");
   }
+}
+
+void
+State::add_resumption_psk(const bytes& group_id, epoch_t epoch, bytes secret)
+{
+  _resumption_psks.insert_or_assign({ group_id, epoch }, std::move(secret));
+}
+
+void
+State::remove_resumption_psk(const bytes& group_id, epoch_t epoch)
+{
+  _resumption_psks.erase({ group_id, epoch });
 }
 
 void
