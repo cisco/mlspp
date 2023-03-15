@@ -169,6 +169,30 @@ MLSClientImpl::Unprotect(ServerContext* /* context */,
     request, [=](auto& state) { return unprotect(state, request, response); });
 }
 
+Status
+MLSClientImpl::StorePSK(ServerContext* /* context */,
+                         const StorePSKRequest* request,
+                         StorePSKResponse* /* response */)
+{
+  auto id = request->state_or_transaction_id();
+  auto psk_id = string_to_bytes(request->psk_id());
+  auto psk_secret = string_to_bytes(request->psk_secret());
+
+  auto* join = load_join(id);
+  if (join) {
+    join->external_psks.insert_or_assign(psk_id, psk_secret);
+    return Status::OK;
+  }
+
+  auto* cached = load_state(id);
+  if (!cached) {
+    throw Status(StatusCode::NOT_FOUND, "Unknown state");
+  }
+
+  cached->state.add_external_psk(psk_id, psk_secret);
+  return Status::OK;
+}
+
 // Operations using a group state
 Status
 MLSClientImpl::AddProposal(ServerContext* /* context */,
@@ -244,7 +268,8 @@ MLSClientImpl::store_join(mls::HPKEPrivateKey&& init_priv,
   auto entry = CachedJoin{ std::move(init_priv),
                            std::move(leaf_priv),
                            std::move(sig_priv),
-                           std::move(kp) };
+                           std::move(kp),
+                           {} };
   join_cache.emplace(std::make_pair(join_id, std::move(entry)));
   return join_id;
 }
@@ -394,7 +419,7 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
                           join->key_package,
                           welcome,
                           std::nullopt,
-                          {});
+                          join->external_psks);
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
@@ -715,8 +740,11 @@ MLSClientImpl::handle_commit(CachedState& entry,
   }
 
   auto& next = opt::get(should_be_next);
+  auto epoch_authenticator = next.epoch_authenticator();
   auto next_id = store_state(std::move(next), entry.encrypt_handshake);
+
   response->set_state_id(next_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
 

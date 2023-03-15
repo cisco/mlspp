@@ -51,6 +51,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status Unprotect(ServerContext* context,
                    const UnprotectRequest* request,
                    UnprotectResponse* response) override;
+  Status StorePSK(ServerContext* context,
+                  const StorePSKRequest* request,
+                  StorePSKResponse* response) override;
 
   // Operations using a group state
   Status AddProposal(ServerContext* context,
@@ -84,6 +87,7 @@ private:
     mls::HPKEPrivateKey leaf_priv;
     mls::SignaturePrivateKey sig_priv;
     mls::KeyPackage key_package;
+    std::map<bytes, bytes> external_psks;
   };
 
   std::map<uint32_t, CachedJoin> join_cache;
