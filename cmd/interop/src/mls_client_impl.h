@@ -66,8 +66,8 @@ class MLSClientImpl final : public MLSClient::Service
                         const RemoveProposalRequest* request,
                         ProposalResponse* response) override;
   Status ExternalPSKProposal(ServerContext* context,
-                        const ExternalPSKProposalRequest* request,
-                        ProposalResponse* response) override;
+                             const ExternalPSKProposalRequest* request,
+                             ProposalResponse* response) override;
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
@@ -161,8 +161,8 @@ private:
                          const RemoveProposalRequest* request,
                          ProposalResponse* response);
   Status external_psk_proposal(CachedState& entry,
-                         const ExternalPSKProposalRequest* request,
-                         ProposalResponse* response);
+                               const ExternalPSKProposalRequest* request,
+                               ProposalResponse* response);
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);

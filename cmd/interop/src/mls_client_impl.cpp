@@ -171,8 +171,8 @@ MLSClientImpl::Unprotect(ServerContext* /* context */,
 
 Status
 MLSClientImpl::StorePSK(ServerContext* /* context */,
-                         const StorePSKRequest* request,
-                         StorePSKResponse* /* response */)
+                        const StorePSKRequest* request,
+                        StorePSKResponse* /* response */)
 {
   auto id = request->state_or_transaction_id();
   auto psk_id = string_to_bytes(request->psk_id());
@@ -226,8 +226,8 @@ MLSClientImpl::RemoveProposal(ServerContext* /* context */,
 
 Status
 MLSClientImpl::ExternalPSKProposal(ServerContext* /* context */,
-                              const ExternalPSKProposalRequest* request,
-                              ProposalResponse* response)
+                                   const ExternalPSKProposalRequest* request,
+                                   ProposalResponse* response)
 {
   return state_wrap(request, [=](auto& state) {
     return external_psk_proposal(state, request, response);
@@ -665,8 +665,8 @@ MLSClientImpl::remove_proposal(CachedState& entry,
 
 Status
 MLSClientImpl::external_psk_proposal(CachedState& entry,
-                               const ExternalPSKProposalRequest* request,
-                               ProposalResponse* response)
+                                     const ExternalPSKProposalRequest* request,
+                                     ProposalResponse* response)
 {
   auto psk_id = string_to_bytes(request->psk_id());
 
