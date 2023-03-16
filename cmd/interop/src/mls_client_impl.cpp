@@ -123,14 +123,6 @@ MLSClientImpl::ExternalJoin(ServerContext* /* context */,
   return catch_wrap([=]() { return external_join(request, response); });
 }
 
-Status
-MLSClientImpl::StorePSK(ServerContext* /* context */,
-                        const StorePSKRequest* request,
-                        StorePSKResponse* response)
-{
-  return catch_wrap([=]() { return store_psk(request, response); });
-}
-
 // Access information from a group state
 Status
 MLSClientImpl::GroupInfo(ServerContext* /* context */,
@@ -580,27 +572,6 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   return Status::OK;
 }
 
-Status
-MLSClientImpl::store_psk(const StorePSKRequest* request,
-                         StorePSKResponse* /* response */)
-{
-  // Handle pre-join PSKs
-  auto id = request->state_or_transaction_id();
-  auto psk_id = string_to_bytes(request->psk_id());
-  auto psk_secret = string_to_bytes(request->psk_secret());
-  if (join_cache.count(id) > 0) {
-    auto& cached = join_cache.at(id);
-    cached.psks.insert_or_assign(psk_id, psk_secret);
-  } else if (state_cache.count(id) > 0) {
-    auto& cached = state_cache.at(id);
-    cached.state.add_external_psk(psk_id, psk_secret);
-  } else {
-    throw std::runtime_error("Unknown state or transaction ID");
-  }
-
-  return Status::OK;
-}
-
 // Access information from a group state
 Status
 MLSClientImpl::group_info(CachedState& entry,
@@ -648,7 +619,7 @@ MLSClientImpl::protect(CachedState& entry,
                        const ProtectRequest* request,
                        ProtectResponse* response)
 {
-  auto pt = string_to_bytes(request->application_data());
+  auto pt = string_to_bytes(request->plaintext());
   auto ct = entry.state.protect({}, pt, 0);
   response->set_ciphertext(marshal_message(std::move(ct)));
   return Status::OK;
@@ -666,7 +637,7 @@ MLSClientImpl::unprotect(CachedState& entry,
 
   // TODO(RLB) We should update the gRPC spec so that it returns the AAD as well
   // as the plaintext.
-  response->set_application_data(bytes_to_string(pt));
+  response->set_plaintext(bytes_to_string(pt));
   return Status::OK;
 }
 

@@ -35,10 +35,6 @@ class MLSClientImpl final : public MLSClient::Service
                       const ExternalJoinRequest* request,
                       ExternalJoinResponse* response) override;
 
-  Status StorePSK(ServerContext* context,
-                  const StorePSKRequest* request,
-                  StorePSKResponse* response) override;
-
   // Access information from a group state
   Status GroupInfo(ServerContext* context,
                    const GroupInfoRequest* request,
@@ -144,8 +140,6 @@ private:
                     JoinGroupResponse* response);
   Status external_join(const ExternalJoinRequest* request,
                        ExternalJoinResponse* response);
-
-  Status store_psk(const StorePSKRequest* request, StorePSKResponse* response);
 
   // Access information from a group state
   Status group_info(CachedState& entry,
