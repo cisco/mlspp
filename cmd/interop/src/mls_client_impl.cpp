@@ -123,23 +123,14 @@ MLSClientImpl::ExternalJoin(ServerContext* /* context */,
   return catch_wrap([=]() { return external_join(request, response); });
 }
 
-Status
-MLSClientImpl::StorePSK(ServerContext* /* context */,
-                        const StorePSKRequest* request,
-                        StorePSKResponse* response)
-{
-  return catch_wrap([=]() { return store_psk(request, response); });
-}
-
 // Access information from a group state
 Status
-MLSClientImpl::PublicGroupState(ServerContext* /* context */,
-                                const PublicGroupStateRequest* request,
-                                PublicGroupStateResponse* response)
+MLSClientImpl::GroupInfo(ServerContext* /* context */,
+                         const GroupInfoRequest* request,
+                         GroupInfoResponse* response)
 {
-  return state_wrap(request, [=](auto& state) {
-    return public_group_state(state, request, response);
-  });
+  return state_wrap(
+    request, [=](auto& state) { return group_info(state, request, response); });
 }
 
 Status
@@ -178,6 +169,30 @@ MLSClientImpl::Unprotect(ServerContext* /* context */,
     request, [=](auto& state) { return unprotect(state, request, response); });
 }
 
+Status
+MLSClientImpl::StorePSK(ServerContext* /* context */,
+                        const StorePSKRequest* request,
+                        StorePSKResponse* /* response */)
+{
+  auto id = request->state_or_transaction_id();
+  auto psk_id = string_to_bytes(request->psk_id());
+  auto psk_secret = string_to_bytes(request->psk_secret());
+
+  auto* join = load_join(id);
+  if (join) {
+    join->external_psks.insert_or_assign(psk_id, psk_secret);
+    return Status::OK;
+  }
+
+  auto* cached = load_state(id);
+  if (!cached) {
+    throw Status(StatusCode::NOT_FOUND, "Unknown state");
+  }
+
+  cached->state.add_external_psk(psk_id, psk_secret);
+  return Status::OK;
+}
+
 // Operations using a group state
 Status
 MLSClientImpl::AddProposal(ServerContext* /* context */,
@@ -210,12 +225,34 @@ MLSClientImpl::RemoveProposal(ServerContext* /* context */,
 }
 
 Status
-MLSClientImpl::PSKProposal(ServerContext* /* context */,
-                           const PSKProposalRequest* request,
-                           ProposalResponse* response)
+MLSClientImpl::ExternalPSKProposal(ServerContext* /* context */,
+                                   const ExternalPSKProposalRequest* request,
+                                   ProposalResponse* response)
 {
   return state_wrap(request, [=](auto& state) {
-    return psk_proposal(state, request, response);
+    return external_psk_proposal(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::ResumptionPSKProposal(
+  ServerContext* /* context */,
+  const ResumptionPSKProposalRequest* request,
+  ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return resumption_psk_proposal(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::GroupContextExtensionsProposal(
+  ServerContext* /* context */,
+  const GroupContextExtensionsProposalRequest* request,
+  ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return group_context_extensions_proposal(state, request, response);
   });
 }
 
@@ -424,7 +461,8 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
                           join->key_package,
                           welcome,
                           ratchet_tree,
-                          join->psks);
+                          join->external_psks);
+
   auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
@@ -437,14 +475,15 @@ Status
 MLSClientImpl::external_join(const ExternalJoinRequest* request,
                              ExternalJoinResponse* response)
 {
-  const auto group_info =
-    unmarshal_message<mls::GroupInfo>(request->public_group_state());
-  const auto suite = group_info.group_context.cipher_suite;
+  const auto group_info_msg =
+    unmarshal_message<mls::GroupInfo>(request->group_info());
+  const auto suite = group_info_msg.group_context.cipher_suite;
 
   auto init_priv = mls::HPKEPrivateKey::generate(suite);
   auto leaf_priv = mls::HPKEPrivateKey::generate(suite);
   auto sig_priv = mls::SignaturePrivateKey::generate(suite);
-  auto cred = mls::Credential::basic({});
+  auto identity = string_to_bytes(request->identity());
+  auto cred = mls::Credential::basic(identity);
 
   auto leaf = mls::LeafNode{
     suite,
@@ -459,46 +498,96 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
 
   auto kp = mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
 
+  // Import an external tree if present
+  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  if (!ratchet_tree_data.empty()) {
+    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  }
+
+  // If required, find our prior appearance and remove it
+  auto remove_prior = std::optional<mls::LeafIndex>{};
+  if (request->remove_prior()) {
+    // Find the tree we're going to look at
+    // XXX(RLB): This replicates logic in State::import_tree, but we need to do
+    // it out here since this is where the knowledge of which leaf to remove
+    // resides.
+    auto tree = mls::TreeKEMPublicKey(suite);
+    auto maybe_tree_extn =
+      group_info_msg.extensions.find<mls::RatchetTreeExtension>();
+    if (ratchet_tree) {
+      tree = opt::get(ratchet_tree);
+    } else if (maybe_tree_extn) {
+      tree = opt::get(maybe_tree_extn).tree;
+    } else {
+      throw std::runtime_error("No tree available");
+    }
+
+    // Scan through to find a matching identity
+    for (auto i = mls::LeafIndex{ 0 }; i < tree.size; i.val++) {
+      const auto maybe_leaf = tree.leaf_node(i);
+      if (!maybe_leaf) {
+        continue;
+      }
+
+      const auto& leaf = opt::get(maybe_leaf);
+      const auto& cred = leaf.credential.get<mls::BasicCredential>();
+      if (cred.identity != identity) {
+        continue;
+      }
+
+      remove_prior = i;
+    }
+
+    if (!remove_prior) {
+      throw std::runtime_error("Prior appearance not found");
+    }
+  }
+
+  // Install PSKs
+  auto psks = std::map<bytes, bytes>{};
+  for (int i = 0; i < request->psks_size(); i++) {
+    const auto& psk = request->psks(i);
+    const auto psk_id = string_to_bytes(psk.psk_id());
+    const auto psk_secret = string_to_bytes(psk.psk_secret());
+    psks.insert_or_assign(psk_id, psk_secret);
+  }
+
   auto encrypt = request->encrypt_handshake();
   auto leaf_secret = mls::random_bytes(suite.secret_size());
-  auto [commit, state] = mls::State::external_join(
-    leaf_secret, sig_priv, kp, group_info, std::nullopt, { {}, encrypt, 0 });
+  auto [commit, state] = mls::State::external_join(leaf_secret,
+                                                   sig_priv,
+                                                   kp,
+                                                   group_info_msg,
+                                                   ratchet_tree,
+                                                   { {}, encrypt, 0 },
+                                                   remove_prior,
+                                                   psks);
+  auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), encrypt);
 
   response->set_state_id(state_id);
   response->set_commit(marshal_message(std::move(commit)));
-  return Status::OK;
-}
-
-Status
-MLSClientImpl::store_psk(const StorePSKRequest* request,
-                         StorePSKResponse* /* response */)
-{
-  // Handle pre-join PSKs
-  auto id = request->state_or_transaction_id();
-  auto psk_id = string_to_bytes(request->psk_id());
-  auto psk_secret = string_to_bytes(request->psk_secret());
-  if (join_cache.count(id) > 0) {
-    auto& cached = join_cache.at(id);
-    cached.psks.insert_or_assign(psk_id, psk_secret);
-  } else if (state_cache.count(id) > 0) {
-    auto& cached = state_cache.at(id);
-    cached.state.add_external_psk(psk_id, psk_secret);
-  } else {
-    throw std::runtime_error("Unknown state or transaction ID");
-  }
-
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
 
 // Access information from a group state
 Status
-MLSClientImpl::public_group_state(CachedState& entry,
-                                  const PublicGroupStateRequest* /* request */,
-                                  PublicGroupStateResponse* response)
+MLSClientImpl::group_info(CachedState& entry,
+                          const GroupInfoRequest* request,
+                          GroupInfoResponse* response)
 {
-  auto group_info = entry.state.group_info();
-  response->set_public_group_state(marshal_message(group_info));
+  auto inline_tree = !request->external_tree();
+
+  auto group_info = entry.state.group_info(inline_tree);
+
+  response->set_group_info(marshal_message(group_info));
+  if (!inline_tree) {
+    auto ratchet_tree = bytes_to_string(tls::marshal(entry.state.tree()));
+    response->set_ratchet_tree(ratchet_tree);
+  }
+
   return Status::OK;
 }
 
@@ -530,7 +619,7 @@ MLSClientImpl::protect(CachedState& entry,
                        const ProtectRequest* request,
                        ProtectResponse* response)
 {
-  auto pt = string_to_bytes(request->application_data());
+  auto pt = string_to_bytes(request->plaintext());
   auto ct = entry.state.protect({}, pt, 0);
   response->set_ciphertext(marshal_message(std::move(ct)));
   return Status::OK;
@@ -548,7 +637,7 @@ MLSClientImpl::unprotect(CachedState& entry,
 
   // TODO(RLB) We should update the gRPC spec so that it returns the AAD as well
   // as the plaintext.
-  response->set_application_data(bytes_to_string(pt));
+  response->set_plaintext(bytes_to_string(pt));
   return Status::OK;
 }
 
@@ -610,13 +699,63 @@ MLSClientImpl::remove_proposal(CachedState& entry,
 }
 
 Status
-MLSClientImpl::psk_proposal(CachedState& entry,
-                            const PSKProposalRequest* request,
-                            ProposalResponse* response)
+MLSClientImpl::external_psk_proposal(CachedState& entry,
+                                     const ExternalPSKProposalRequest* request,
+                                     ProposalResponse* response)
+
 {
   auto psk_id = string_to_bytes(request->psk_id());
 
   auto message = entry.state.pre_shared_key(psk_id, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::resumption_psk_proposal(
+  CachedState& entry,
+  const ResumptionPSKProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto group_id = entry.state.group_id();
+  auto epoch = request->epoch_id();
+  auto prior_state = std::find_if(
+    state_cache.begin(), state_cache.end(), [&](const auto& entry) {
+      const auto& [id, cached] = entry;
+      return cached.state.group_id() == group_id &&
+             cached.state.epoch() == epoch;
+    });
+  if (prior_state == state_cache.end()) {
+    throw std::runtime_error("Unknown state for resumption PSK");
+  }
+
+  const auto& psk_secret = prior_state->second.state.resumption_psk();
+  entry.state.add_resumption_psk(group_id, epoch, psk_secret);
+
+  auto message =
+    entry.state.pre_shared_key(group_id, epoch, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::group_context_extensions_proposal(
+  CachedState& entry,
+  const GroupContextExtensionsProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < request->extensions_size(); i++) {
+    auto ext = request->extensions(i);
+    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
+
+  auto message =
+    entry.state.group_context_extensions(ext_list, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
   return Status::OK;
@@ -734,7 +873,12 @@ MLSClientImpl::handle_pending_commit(
   }
 
   const auto& next_id = opt::get(entry.pending_state_id);
+
   const auto* next = load_state(next_id);
+  if (!next) {
+    throw std::runtime_error("Internal error: No state for next ID");
+  }
+
   const auto epoch_authenticator = next->state.epoch_authenticator();
 
   response->set_state_id(next_id);

@@ -210,7 +210,9 @@ State::external_join(const bytes& leaf_secret,
                      const KeyPackage& key_package,
                      const GroupInfo& group_info,
                      const std::optional<TreeKEMPublicKey>& tree,
-                     const MessageOpts& msg_opts)
+                     const MessageOpts& msg_opts,
+                     std::optional<LeafIndex> remove_prior,
+                     const std::map<bytes, bytes>& psks)
 {
   // Create a preliminary state
   auto initial_state = State(std::move(sig_priv), group_info, tree);
@@ -225,14 +227,26 @@ State::external_join(const bytes& leaf_secret,
   const auto& external_pub = opt::get(maybe_external_pub).external_pub;
 
   // Insert an ExternalInit proposal
+  auto opts = CommitOpts{};
   auto [enc, force_init_secret] =
     KeyScheduleEpoch::external_init(key_package.cipher_suite, external_pub);
-  auto ext_init_proposal = Proposal{ ExternalInit{ enc } };
+  auto ext_init = Proposal{ ExternalInit{ enc } };
+  opts.extra_proposals.push_back(ext_init);
 
-  // Create an initial state that contains the joiner and use it to ommit
-  auto opts = CommitOpts{};
-  opts.extra_proposals.push_back(ext_init_proposal);
+  // Evict a prior appearance if required
+  if (remove_prior) {
+    auto remove = initial_state.remove_proposal(opt::get(remove_prior));
+    opts.extra_proposals.push_back(remove);
+  }
 
+  // Inject PSKs
+  for (const auto& [id, secret] : psks) {
+    initial_state.add_external_psk(id, secret);
+    auto psk = initial_state.pre_shared_key_proposal(id);
+    opts.extra_proposals.push_back(psk);
+  }
+
+  // Use the preliminary state to create a commit and advance to a real state
   auto params = ExternalCommitParams{ key_package, force_init_secret };
   auto [commit_msg, welcome, state] =
     initial_state.commit(leaf_secret, opts, msg_opts, params);
@@ -430,6 +444,20 @@ State::pre_shared_key_proposal(const bytes& external_psk_id) const
 }
 
 Proposal
+State::pre_shared_key_proposal(const bytes& group_id, epoch_t epoch) const
+{
+  if (_resumption_psks.count({ group_id, epoch }) == 0) {
+    throw InvalidParameterError("Unknown PSK");
+  }
+
+  auto psk_id = PreSharedKeyID{
+    { ResumptionPSK{ ResumptionPSKUsage::application, group_id, epoch } },
+    random_bytes(_suite.secret_size()),
+  };
+  return { PreSharedKey{ psk_id } };
+}
+
+Proposal
 State::reinit_proposal(bytes group_id,
                        ProtocolVersion version,
                        CipherSuite cipher_suite,
@@ -476,6 +504,14 @@ MLSMessage
 State::pre_shared_key(const bytes& external_psk_id, const MessageOpts& msg_opts)
 {
   return protect_full(pre_shared_key_proposal(external_psk_id), msg_opts);
+}
+
+MLSMessage
+State::pre_shared_key(const bytes& group_id,
+                      epoch_t epoch,
+                      const MessageOpts& msg_opts)
+{
+  return protect_full(pre_shared_key_proposal(group_id, epoch), msg_opts);
 }
 
 MLSMessage
@@ -1068,10 +1104,6 @@ State::apply(const Remove& remove)
     throw ProtocolError("Attempt to remove non-member");
   }
 
-  if (remove.removed == _index) {
-    throw ProtocolError("Cannot apply a commit removing self");
-  }
-
   _tree.blank_path(remove.removed);
   return remove.removed;
 }
@@ -1164,13 +1196,6 @@ State::must_resolve(const std::vector<ProposalOrRef>& ids,
     return opt::get(resolve(id, sender_index));
   };
   return stdx::transform<CachedProposal>(ids, must_resolve);
-}
-
-void
-State::add_resumption_psk(bytes group_id, epoch_t epoch, bytes secret)
-{
-  auto key = std::make_tuple(std::move(group_id), epoch);
-  _resumption_psks.insert_or_assign(std::move(key), std::move(secret));
 }
 
 std::vector<PSKWithSecret>
@@ -1453,7 +1478,12 @@ State::valid(LeafIndex sender, const Update& update) const
 bool
 State::valid(const Remove& remove) const
 {
-  return remove.removed < _tree.size && _tree.leaf_node(remove.removed);
+  // We mark self-removes invalid here even though a resync Commit will
+  // sometimes cause them.  This is OK because this method is only called from
+  // the normal proposal list validation method, not the external commit one.
+  auto in_tree = remove.removed < _tree.size && _tree.has_leaf(remove.removed);
+  auto not_me = remove.removed != _index;
+  return in_tree && not_me;
 }
 
 bool
@@ -1975,6 +2005,18 @@ State::verify(const AuthenticatedContent& content_auth) const
 }
 
 void
+State::add_resumption_psk(const bytes& group_id, epoch_t epoch, bytes secret)
+{
+  _resumption_psks.insert_or_assign({ group_id, epoch }, std::move(secret));
+}
+
+void
+State::remove_resumption_psk(const bytes& group_id, epoch_t epoch)
+{
+  _resumption_psks.erase({ group_id, epoch });
+}
+
+void
 State::add_external_psk(const bytes& id, const bytes& secret)
 {
   _external_psks.insert_or_assign(id, secret);
@@ -1995,7 +2037,7 @@ State::do_export(const std::string& label,
 }
 
 GroupInfo
-State::group_info() const
+State::group_info(bool inline_tree) const
 {
   auto group_info = GroupInfo{
     {
@@ -2012,7 +2054,11 @@ State::group_info() const
 
   group_info.extensions.add(
     ExternalPubExtension{ _key_schedule.external_priv.public_key });
-  group_info.extensions.add(RatchetTreeExtension{ _tree });
+
+  if (inline_tree) {
+    group_info.extensions.add(RatchetTreeExtension{ _tree });
+  }
+
   group_info.sign(_tree, _index, _identity_priv);
   return group_info;
 }

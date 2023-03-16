@@ -374,20 +374,22 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
                        identity_privs[0],
                        key_packages[0].leaf_node,
                        {} };
-  auto group_info = first0.group_info();
+  auto group_info = first0.group_info(true);
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(fresh_secret(),
+  auto [commit, second1] = State::external_join(fresh_secret(),
                                                 identity_privs[1],
                                                 key_packages[1],
                                                 group_info,
+                                                std::nullopt,
+                                                {},
                                                 std::nullopt,
                                                 {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
 
-  auto group = std::vector<State>{ first1, second0 };
+  auto group = std::vector<State>{ first1, second1 };
   verify_group_functionality(group);
 }
 
@@ -400,18 +402,107 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
                        identity_privs[0],
                        key_packages[0].leaf_node,
                        {} };
-  auto group_info = first0.group_info();
+  auto group_info = first0.group_info(false);
   auto tree = first0.tree();
 
   // Initialize the second participant as an external joiner
-  auto [commit, second0] = State::external_join(
-    fresh_secret(), identity_privs[1], key_packages[1], group_info, tree, {});
+  auto [commit, second1] = State::external_join(fresh_secret(),
+                                                identity_privs[1],
+                                                key_packages[1],
+                                                group_info,
+                                                tree,
+                                                {},
+                                                std::nullopt,
+                                                {});
 
   // Creator processes the commit
   auto first1 = opt::get(first0.handle(commit));
 
-  auto group = std::vector<State>{ first1, second0 };
+  auto group = std::vector<State>{ first1, second1 };
   verify_group_functionality(group);
+}
+
+TEST_CASE_FIXTURE(StateTest, "External Join with PSK")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+  auto group_info = first0.group_info(true);
+
+  // Inject a PSK
+  auto psk_id = from_ascii("pre shared key");
+  auto psk_secret = random_bytes(suite.secret_size());
+  first0.add_external_psk(psk_id, psk_secret);
+
+  auto psks = std::map<bytes, bytes>{};
+  psks.insert_or_assign(psk_id, psk_secret);
+
+  // Initialize the second participant as an external joiner
+  auto [commit, second1] = State::external_join(fresh_secret(),
+                                                identity_privs[1],
+                                                key_packages[1],
+                                                group_info,
+                                                std::nullopt,
+                                                {},
+                                                std::nullopt,
+                                                psks);
+
+  // Creator processes the commit
+  auto first1 = opt::get(first0.handle(commit));
+
+  auto group = std::vector<State>{ first1, second1 };
+  verify_group_functionality(group);
+}
+
+TEST_CASE_FIXTURE(StateTest, "External Join with Eviction of Prior Appearance")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Add the second participant
+  auto add = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  auto group1 = std::vector<State>{ first1, second1 };
+  verify_group_functionality(group1);
+
+  // First participant resyncs
+  auto group_info = first1.group_info(true);
+  auto [commit2, first2_] = State::external_join(fresh_secret(),
+                                                 identity_privs[2],
+                                                 key_packages[2],
+                                                 group_info,
+                                                 std::nullopt,
+                                                 {},
+                                                 LeafIndex{ 0 },
+                                                 {});
+  auto first2 = first2_;
+  auto second2 = opt::get(second1.handle(commit2));
+
+  // Check that the group is coherent
+  auto group2 = std::vector<State>{ first2, second2 };
+  verify_group_functionality(group2);
+
+  // Check that the old appeareance is gone
+  REQUIRE(first2.roster().size() == 2);
 }
 
 TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")

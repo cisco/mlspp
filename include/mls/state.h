@@ -64,7 +64,9 @@ public:
     const KeyPackage& key_package,
     const GroupInfo& group_info,
     const std::optional<TreeKEMPublicKey>& tree,
-    const MessageOpts& msg_opts);
+    const MessageOpts& msg_opts,
+    std::optional<LeafIndex> remove_prior,
+    const std::map<bytes, bytes>& psks);
 
   // Propose that a new member be added a group
   static MLSMessage new_member_add(const bytes& group_id,
@@ -83,6 +85,7 @@ public:
   Proposal remove_proposal(LeafIndex removed) const;
   Proposal group_context_extensions_proposal(ExtensionList exts) const;
   Proposal pre_shared_key_proposal(const bytes& external_psk_id) const;
+  Proposal pre_shared_key_proposal(const bytes& group_id, epoch_t epoch) const;
   static Proposal reinit_proposal(bytes group_id,
                                   ProtocolVersion version,
                                   CipherSuite cipher_suite,
@@ -97,6 +100,9 @@ public:
   MLSMessage group_context_extensions(ExtensionList exts,
                                       const MessageOpts& msg_opts);
   MLSMessage pre_shared_key(const bytes& external_psk_id,
+                            const MessageOpts& msg_opts);
+  MLSMessage pre_shared_key(const bytes& group_id,
+                            epoch_t epoch,
                             const MessageOpts& msg_opts);
   MLSMessage reinit(bytes group_id,
                     ProtocolVersion version,
@@ -118,22 +124,26 @@ public:
   ///
   /// PSK management
   ///
+  void add_resumption_psk(const bytes& group_id, epoch_t epoch, bytes secret);
+  void remove_resumption_psk(const bytes& group_id, epoch_t epoch);
   void add_external_psk(const bytes& id, const bytes& secret);
   void remove_external_psk(const bytes& id);
 
   ///
   /// Accessors
   ///
+  const bytes& group_id() const { return _group_id; }
   epoch_t epoch() const { return _epoch; }
   LeafIndex index() const { return _index; }
   CipherSuite cipher_suite() const { return _suite; }
   const ExtensionList& extensions() const { return _extensions; }
   const TreeKEMPublicKey& tree() const { return _tree; }
+  const bytes& resumption_psk() const { return _key_schedule.resumption_psk; }
 
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
-  GroupInfo group_info() const;
+  GroupInfo group_info(bool inline_tree) const;
 
   // Ordered list of credentials from non-blank leaves
   std::vector<LeafNode> roster() const;
@@ -345,7 +355,6 @@ protected:
     const std::vector<ProposalOrRef>& ids,
     std::optional<LeafIndex> sender_index) const;
 
-  void add_resumption_psk(bytes group_id, epoch_t epoch, bytes secret);
   std::vector<PSKWithSecret> resolve(
     const std::vector<PreSharedKeyID>& psks) const;
 

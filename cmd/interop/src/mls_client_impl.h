@@ -35,14 +35,10 @@ class MLSClientImpl final : public MLSClient::Service
                       const ExternalJoinRequest* request,
                       ExternalJoinResponse* response) override;
 
-  Status StorePSK(ServerContext* context,
-                  const StorePSKRequest* request,
-                  StorePSKResponse* response) override;
-
   // Access information from a group state
-  Status PublicGroupState(ServerContext* context,
-                          const PublicGroupStateRequest* request,
-                          PublicGroupStateResponse* response) override;
+  Status GroupInfo(ServerContext* context,
+                   const GroupInfoRequest* request,
+                   GroupInfoResponse* response) override;
   Status StateAuth(ServerContext* context,
                    const StateAuthRequest* request,
                    StateAuthResponse* response) override;
@@ -55,6 +51,9 @@ class MLSClientImpl final : public MLSClient::Service
   Status Unprotect(ServerContext* context,
                    const UnprotectRequest* request,
                    UnprotectResponse* response) override;
+  Status StorePSK(ServerContext* context,
+                  const StorePSKRequest* request,
+                  StorePSKResponse* response) override;
 
   // Operations using a group state
   Status AddProposal(ServerContext* context,
@@ -66,9 +65,17 @@ class MLSClientImpl final : public MLSClient::Service
   Status RemoveProposal(ServerContext* context,
                         const RemoveProposalRequest* request,
                         ProposalResponse* response) override;
-  Status PSKProposal(ServerContext* context,
-                     const PSKProposalRequest* request,
-                     ProposalResponse* response) override;
+  Status ExternalPSKProposal(ServerContext* context,
+                             const ExternalPSKProposalRequest* request,
+                             ProposalResponse* response) override;
+  Status ResumptionPSKProposal(ServerContext* context,
+                               const ResumptionPSKProposalRequest* request,
+                               ProposalResponse* response) override;
+  Status GroupContextExtensionsProposal(
+    ServerContext* context,
+    const GroupContextExtensionsProposalRequest* request,
+    ProposalResponse* response) override;
+
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
@@ -91,7 +98,7 @@ private:
     mls::HPKEPrivateKey leaf_priv;
     mls::SignaturePrivateKey sig_priv;
     mls::KeyPackage key_package;
-    std::map<bytes, bytes> psks;
+    std::map<bytes, bytes> external_psks;
   };
 
   std::map<uint32_t, CachedJoin> join_cache;
@@ -134,12 +141,10 @@ private:
   Status external_join(const ExternalJoinRequest* request,
                        ExternalJoinResponse* response);
 
-  Status store_psk(const StorePSKRequest* request, StorePSKResponse* response);
-
   // Access information from a group state
-  Status public_group_state(CachedState& entry,
-                            const PublicGroupStateRequest* request,
-                            PublicGroupStateResponse* response);
+  Status group_info(CachedState& entry,
+                    const GroupInfoRequest* request,
+                    GroupInfoResponse* response);
   Status state_auth(CachedState& entry,
                     const StateAuthRequest* request,
                     StateAuthResponse* response);
@@ -163,9 +168,17 @@ private:
   Status remove_proposal(CachedState& entry,
                          const RemoveProposalRequest* request,
                          ProposalResponse* response);
-  Status psk_proposal(CachedState& entry,
-                      const PSKProposalRequest* request,
-                      ProposalResponse* response);
+  Status external_psk_proposal(CachedState& entry,
+                               const ExternalPSKProposalRequest* request,
+                               ProposalResponse* response);
+  Status resumption_psk_proposal(CachedState& entry,
+                                 const ResumptionPSKProposalRequest* request,
+                                 ProposalResponse* response);
+  Status group_context_extensions_proposal(
+    CachedState& entry,
+    const GroupContextExtensionsProposalRequest* request,
+    ProposalResponse* response);
+
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);
