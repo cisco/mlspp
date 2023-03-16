@@ -1985,6 +1985,7 @@ PassiveClientTestVector::verify()
     ext_psks.insert_or_assign(id, psk);
   }
 
+  // Join the group and follow along
   auto state = State(init_priv,
                      encryption_priv,
                      signature_priv,

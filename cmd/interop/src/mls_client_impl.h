@@ -35,6 +35,10 @@ class MLSClientImpl final : public MLSClient::Service
                       const ExternalJoinRequest* request,
                       ExternalJoinResponse* response) override;
 
+  Status StorePSK(ServerContext* context,
+                  const StorePSKRequest* request,
+                  StorePSKResponse* response) override;
+
   // Access information from a group state
   Status GroupInfo(ServerContext* context,
                    const GroupInfoRequest* request,
@@ -75,6 +79,7 @@ class MLSClientImpl final : public MLSClient::Service
     ServerContext* context,
     const GroupContextExtensionsProposalRequest* request,
     ProposalResponse* response) override;
+
   Status Commit(ServerContext* context,
                 const CommitRequest* request,
                 CommitResponse* response) override;
@@ -140,6 +145,8 @@ private:
   Status external_join(const ExternalJoinRequest* request,
                        ExternalJoinResponse* response);
 
+  Status store_psk(const StorePSKRequest* request, StorePSKResponse* response);
+
   // Access information from a group state
   Status group_info(CachedState& entry,
                     const GroupInfoRequest* request,
@@ -177,6 +184,7 @@ private:
     CachedState& entry,
     const GroupContextExtensionsProposalRequest* request,
     ProposalResponse* response);
+
   Status commit(CachedState& entry,
                 const CommitRequest* request,
                 CommitResponse* response);

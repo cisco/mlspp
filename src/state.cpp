@@ -607,7 +607,8 @@ State::commit(const bytes& leaf_secret,
   auto commit_secret = _suite.zero();
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
-  if (path_required(proposals)) {
+  auto force_path = opts && opt::get(opts).force_path;
+  if (force_path || path_required(proposals)) {
     auto leaf_node_opts = LeafNodeOptions{};
     if (opts) {
       leaf_node_opts = opt::get(opts).leaf_node_opts;
@@ -900,7 +901,7 @@ State::create_branch(bytes group_id,
   auto opts = CommitOpts{
     proposals,
     commit_opts.inline_tree,
-    commit_opts.encrypt_handshake,
+    commit_opts.force_path,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -977,7 +978,7 @@ State::Tombstone::create_welcome(HPKEPrivateKey enc_priv,
   auto opts = CommitOpts{
     proposals,
     commit_opts.inline_tree,
-    commit_opts.encrypt_handshake,
+    commit_opts.force_path,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
