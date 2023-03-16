@@ -384,6 +384,108 @@ MLSClientImpl::remove_state(uint32_t state_id)
   state_cache.erase(state_id);
 }
 
+Status
+MLSClientImpl::group_context_extensions_proposal(
+  CachedState& entry,
+  const GroupContextExtensionsProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < request->extensions_size(); i++) {
+    auto ext = request->extensions(i);
+    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
+
+  auto message =
+    entry.state.group_context_extensions(ext_list, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+mls::LeafIndex
+MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
+{
+  const auto id = string_to_bytes(identity);
+  const auto& tree = state.tree();
+  auto removed_index = mls::LeafIndex{ 0 };
+  for (; removed_index < tree.size; removed_index.val++) {
+    const auto maybe_leaf = tree.leaf_node(removed_index);
+    if (!maybe_leaf) {
+      continue;
+    }
+
+    const auto& leaf = opt::get(maybe_leaf);
+    const auto& basic = leaf.credential.get<mls::BasicCredential>();
+    if (basic.identity == id) {
+      break;
+    }
+  }
+
+  if (!(removed_index < tree.size)) {
+    throw std::runtime_error("Unknown member identity");
+  }
+
+  return removed_index;
+}
+
+void
+MLSClientImpl::ensure_resumption_psk(mls::State& state, mls::epoch_t epoch)
+{
+  const auto& group_id = state.group_id();
+  const auto* prior_state = find_state(group_id, epoch);
+  if (!prior_state) {
+    throw std::runtime_error("Unknown state for resumption PSK");
+  }
+
+  const auto& psk_secret = prior_state->state.resumption_psk();
+  state.add_resumption_psk(group_id, epoch, psk_secret);
+}
+
+mls::Proposal
+MLSClientImpl::proposal_from_description(mls::State& state,
+                                         const ProposalDescription& desc)
+{
+  if (desc.proposal_type() == "add") {
+    const auto kp_data = string_to_bytes(desc.key_package());
+    const auto kp = tls::get<mls::KeyPackage>(kp_data);
+    return state.add_proposal(kp);
+  }
+
+  if (desc.proposal_type() == "remove") {
+    const auto removed_index = find_member(state, desc.removed_id());
+    return state.remove_proposal(removed_index);
+  }
+
+  if (desc.proposal_type() == "externalPSK") {
+    const auto psk_id = string_to_bytes(desc.psk_id());
+    return state.pre_shared_key_proposal(psk_id);
+  }
+
+  if (desc.proposal_type() == "resumptionPSK") {
+    const auto& group_id = state.group_id();
+    const auto epoch = desc.epoch_id();
+    ensure_resumption_psk(state, epoch);
+    return state.pre_shared_key_proposal(group_id, epoch);
+  }
+
+  if (desc.proposal_type() == "groupContextExtensions") {
+    auto ext_list = mls::ExtensionList{};
+    for (int i = 0; i < desc.extensions_size(); i++) {
+      auto ext = desc.extensions(i);
+      auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+      auto ext_data = string_to_bytes(ext.extension_data());
+      ext_list.add(ext_type, ext_data);
+    }
+
+    return state.group_context_extensions_proposal(ext_list);
+  }
+
+  throw std::runtime_error("Unknown proposal-by-value type");
+}
+
 // Ways to join a group
 Status
 MLSClientImpl::create_group(const CreateGroupRequest* request,
@@ -703,27 +805,7 @@ MLSClientImpl::remove_proposal(CachedState& entry,
                                const RemoveProposalRequest* request,
                                ProposalResponse* response)
 {
-  auto removed_id = string_to_bytes(request->removed_id());
-
-  const auto& tree = entry.state.tree();
-  auto removed_index = mls::LeafIndex{ 0 };
-  for (; removed_index < tree.size; removed_index.val++) {
-    const auto maybe_leaf = tree.leaf_node(removed_index);
-    if (!maybe_leaf) {
-      continue;
-    }
-
-    const auto& leaf = opt::get(maybe_leaf);
-    const auto& basic = leaf.credential.get<mls::BasicCredential>();
-    if (basic.identity == removed_id) {
-      break;
-    }
-  }
-
-  if (!(removed_index < tree.size)) {
-    return Status(StatusCode::INVALID_ARGUMENT, "Unknown member identity");
-  }
-
+  auto removed_index = find_member(entry.state, request->removed_id());
   auto message = entry.state.remove(removed_index, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
@@ -752,37 +834,10 @@ MLSClientImpl::resumption_psk_proposal(
 {
   auto group_id = entry.state.group_id();
   auto epoch = request->epoch_id();
-  auto prior_state = find_state(group_id, epoch);
-  if (!prior_state) {
-    throw std::runtime_error("Unknown state for resumption PSK");
-  }
-
-  const auto& psk_secret = prior_state->state.resumption_psk();
-  entry.state.add_resumption_psk(group_id, epoch, psk_secret);
+  ensure_resumption_psk(entry.state, epoch);
 
   auto message =
     entry.state.pre_shared_key(group_id, epoch, entry.message_opts());
-
-  response->set_proposal(entry.marshal(message));
-  return Status::OK;
-}
-
-Status
-MLSClientImpl::group_context_extensions_proposal(
-  CachedState& entry,
-  const GroupContextExtensionsProposalRequest* request,
-  ProposalResponse* response)
-{
-  auto ext_list = mls::ExtensionList{};
-  for (int i = 0; i < request->extensions_size(); i++) {
-    auto ext = request->extensions(i);
-    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
-    auto ext_data = string_to_bytes(ext.extension_data());
-    ext_list.add(ext_type, ext_data);
-  }
-
-  auto message =
-    entry.state.group_context_extensions(ext_list, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
   return Status::OK;
@@ -803,33 +858,23 @@ MLSClientImpl::commit(CachedState& entry,
     }
   }
 
+  // Create by-value proposals
+  auto by_value = std::vector<mls::Proposal>();
+  for (int i = 0; i < request->by_value_size(); i++) {
+    const auto desc = request->by_value(i);
+    const auto proposal = proposal_from_description(entry.state, desc);
+    by_value.emplace_back(std::move(proposal));
+  }
+
   auto force_path = request->force_path();
   auto inline_tree = !request->external_tree();
-  auto inline_proposals = std::vector<mls::Proposal>();
-#if 0
-  // TODO(#265): Re-enable
-  for (size_t i = 0; i < inline_proposals.size(); i++) {
-    auto msg = entry.unmarshal(request->by_value(i));
-    if (pt.sender.sender != entry.state.index().val) {
-      return Status(grpc::INVALID_ARGUMENT,
-                    "Inline proposal not from this member");
-    }
-
-    auto proposal = var::get_if<mls::Proposal>(&pt.content);
-    if (!proposal) {
-      return Status(grpc::INVALID_ARGUMENT, "Inline proposal not a proposal");
-    }
-
-    inline_proposals[i] = std::move(*proposal);
-  }
-#endif // 0
 
   auto leaf_secret =
     mls::random_bytes(entry.state.cipher_suite().secret_size());
-  auto [commit, welcome, next] = entry.state.commit(
-    leaf_secret,
-    mls::CommitOpts{ inline_proposals, inline_tree, force_path, {} },
-    entry.message_opts());
+  auto [commit, welcome, next] =
+    entry.state.commit(leaf_secret,
+                       mls::CommitOpts{ by_value, inline_tree, force_path, {} },
+                       entry.message_opts());
 
   if (!inline_tree) {
     auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));

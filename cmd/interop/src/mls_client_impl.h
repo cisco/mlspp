@@ -132,6 +132,12 @@ private:
   CachedState* find_state(const bytes& group_id, const mls::epoch_t epoch);
   void remove_state(uint32_t state_id);
 
+  mls::LeafIndex find_member(const mls::State& state,
+                             const std::string& identity);
+  void ensure_resumption_psk(mls::State& state, mls::epoch_t epoch);
+  mls::Proposal proposal_from_description(mls::State& state,
+                                          const ProposalDescription& desc);
+
   // Ways to join a group
   Status create_group(const CreateGroupRequest* request,
                       CreateGroupResponse* response);
