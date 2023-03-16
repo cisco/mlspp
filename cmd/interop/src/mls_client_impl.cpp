@@ -361,6 +361,23 @@ MLSClientImpl::load_state(uint32_t state_id)
   return &state_cache.at(state_id);
 }
 
+MLSClientImpl::CachedState*
+MLSClientImpl::find_state(const bytes& group_id, const mls::epoch_t epoch)
+{
+  auto entry = std::find_if(
+    state_cache.begin(), state_cache.end(), [&](const auto& entry) {
+      const auto& [id, cached] = entry;
+      return cached.state.group_id() == group_id &&
+             cached.state.epoch() == epoch;
+    });
+
+  if (entry == state_cache.end()) {
+    return nullptr;
+  }
+
+  return &entry->second;
+}
+
 void
 MLSClientImpl::remove_state(uint32_t state_id)
 {
@@ -635,23 +652,17 @@ MLSClientImpl::unprotect(CachedState& entry,
   auto ct = tls::get<mls::MLSMessage>(ct_data);
 
   // Locate the right epoch to decrypt with
-  auto* state = &entry.state;
-  const auto group_id = state->group_id();
-
+  const auto group_id = entry.state.group_id();
   const auto epoch = var::get<mls::PrivateMessage>(ct.message).get_epoch();
 
-  if (state->epoch() != epoch) {
-    auto prior_state = std::find_if(
-      state_cache.begin(), state_cache.end(), [&](const auto& entry) {
-        const auto& [id, cached] = entry;
-        return cached.state.group_id() == group_id &&
-               cached.state.epoch() == epoch;
-      });
-    if (prior_state == state_cache.end()) {
-      throw std::runtime_error("Unknown state for decryption");
+  auto* state = &entry.state;
+  if (entry.state.epoch() != epoch) {
+    auto prior_entry = find_state(group_id, epoch);
+    if (!prior_entry) {
+      throw std::runtime_error("Unknown state for unprotect");
     }
 
-    state = &prior_state->second.state;
+    state = &prior_entry->state;
   }
 
   // Decrypt the message
@@ -741,17 +752,12 @@ MLSClientImpl::resumption_psk_proposal(
 {
   auto group_id = entry.state.group_id();
   auto epoch = request->epoch_id();
-  auto prior_state = std::find_if(
-    state_cache.begin(), state_cache.end(), [&](const auto& entry) {
-      const auto& [id, cached] = entry;
-      return cached.state.group_id() == group_id &&
-             cached.state.epoch() == epoch;
-    });
-  if (prior_state == state_cache.end()) {
+  auto prior_state = find_state(group_id, epoch);
+  if (!prior_state) {
     throw std::runtime_error("Unknown state for resumption PSK");
   }
 
-  const auto& psk_secret = prior_state->second.state.resumption_psk();
+  const auto& psk_secret = prior_state->state.resumption_psk();
   entry.state.add_resumption_psk(group_id, epoch, psk_secret);
 
   auto message =
