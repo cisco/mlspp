@@ -197,14 +197,15 @@ public:
 
     TLS_SERIALIZABLE(prior_group_id, prior_epoch, resumption_psk, reinit);
 
+    const bytes epoch_authenticator;
+    const ReInit reinit;
+
   private:
     Tombstone(const State& state_in, ReInit reinit_in);
 
     bytes prior_group_id;
     epoch_t prior_epoch;
     bytes resumption_psk;
-
-    ReInit reinit;
 
     friend class State;
   };

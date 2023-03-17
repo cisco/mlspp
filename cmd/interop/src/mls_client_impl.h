@@ -86,27 +86,53 @@ class MLSClientImpl final : public MLSClient::Service
                              const HandlePendingCommitRequest* request,
                              HandleCommitResponse* response) override;
 
+  // Reinitialization
+  Status ReInitProposal(ServerContext* context,
+                        const ReInitProposalRequest* request,
+                        ProposalResponse* response) override;
+  Status ReInitCommit(ServerContext* context,
+                      const CommitRequest* request,
+                      CommitResponse* response) override;
+  Status HandlePendingReInitCommit(
+    ServerContext* context,
+    const HandlePendingCommitRequest* request,
+    HandleReInitCommitResponse* response) override;
+  Status HandleReInitCommit(ServerContext* context,
+                            const HandleCommitRequest* request,
+                            HandleReInitCommitResponse* response) override;
+  Status ReInitWelcome(ServerContext* context,
+                       const ReInitWelcomeRequest* request,
+                       ReInitWelcomeResponse* response) override;
+  Status HandleReInitWelcome(ServerContext* context,
+                             const HandleReInitWelcomeRequest* request,
+                             JoinGroupResponse* response) override;
+
 private:
   // Wrapper for methods that rely on state
   template<typename Req, typename F>
   Status state_wrap(const Req* req, F&& f);
 
+  struct KeyPackageWithSecrets
+  {
+    mls::HPKEPrivateKey init_priv;
+    mls::HPKEPrivateKey encryption_priv;
+    mls::SignaturePrivateKey signature_priv;
+    mls::KeyPackage key_package;
+  };
+
+  KeyPackageWithSecrets new_key_package(mls::CipherSuite cipher_suite,
+                                        const bytes& identity);
+
   // Cached join transactions
   struct CachedJoin
   {
-    mls::HPKEPrivateKey init_priv;
-    mls::HPKEPrivateKey leaf_priv;
-    mls::SignaturePrivateKey sig_priv;
-    mls::KeyPackage key_package;
+    KeyPackageWithSecrets kp_priv;
     std::map<bytes, bytes> external_psks;
   };
 
   std::map<uint32_t, CachedJoin> join_cache;
 
-  uint32_t store_join(mls::HPKEPrivateKey&& init_priv,
-                      mls::HPKEPrivateKey&& leaf_priv,
-                      mls::SignaturePrivateKey&& sig_priv,
-                      mls::KeyPackage&& kp);
+  uint32_t store_join(KeyPackageWithSecrets&& kp);
   CachedJoin* load_join(uint32_t join_id);
 
   // Cached group state
@@ -136,6 +162,22 @@ private:
                              const std::string& identity);
   mls::Proposal proposal_from_description(mls::State& state,
                                           const ProposalDescription& desc);
+
+  // Cached ReInit
+  struct CachedReInit
+  {
+    KeyPackageWithSecrets kp_priv;
+    mls::State::Tombstone tombstone;
+    bool encrypt_handshake;
+  };
+
+  std::map<uint32_t, CachedReInit> reinit_cache;
+
+  uint32_t store_reinit(KeyPackageWithSecrets&& kp_priv,
+                        mls::State::Tombstone&& tombstone,
+                        bool encrypt_handshake);
+  CachedReInit* load_reinit(uint32_t reinit_id);
+  void remove_reinit(uint32_t reinit_id);
 
   // Ways to join a group
   Status create_group(const CreateGroupRequest* request,
@@ -194,4 +236,22 @@ private:
   Status handle_pending_commit(CachedState& entry,
                                const HandlePendingCommitRequest* request,
                                HandleCommitResponse* response);
+
+  // Reinitialization
+  Status reinit_proposal(CachedState& entry,
+                         const ReInitProposalRequest* request,
+                         ProposalResponse* response);
+  Status reinit_commit(CachedState& entry,
+                       const CommitRequest* request,
+                       CommitResponse* response);
+  Status handle_pending_reinit_commit(CachedState& entry,
+                                      const HandlePendingCommitRequest* request,
+                                      HandleReInitCommitResponse* response);
+  Status handle_reinit_commit(CachedState& entry,
+                              const HandleCommitRequest* request,
+                              HandleReInitCommitResponse* response);
+  Status reinit_welcome(const ReInitWelcomeRequest* request,
+                        ReInitWelcomeResponse* response);
+  Status handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
+                               JoinGroupResponse* response);
 };
