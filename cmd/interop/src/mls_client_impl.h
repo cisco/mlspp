@@ -129,6 +129,7 @@ private:
 
   uint32_t store_state(mls::State&& state, bool encrypt_handshake);
   CachedState* load_state(uint32_t state_id);
+  CachedState* find_state(const bytes& group_id, const mls::epoch_t epoch);
   void remove_state(uint32_t state_id);
 
   // Ways to join a group
