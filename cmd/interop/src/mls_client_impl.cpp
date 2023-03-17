@@ -1240,5 +1240,4 @@ MLSClientImpl::handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
   response->set_state_id(state_id);
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
-
 }
