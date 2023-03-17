@@ -431,19 +431,6 @@ MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
   return removed_index;
 }
 
-void
-MLSClientImpl::ensure_resumption_psk(mls::State& state, mls::epoch_t epoch)
-{
-  const auto& group_id = state.group_id();
-  const auto* prior_state = find_state(group_id, epoch);
-  if (!prior_state) {
-    throw std::runtime_error("Unknown state for resumption PSK");
-  }
-
-  const auto& psk_secret = prior_state->state.resumption_psk();
-  state.add_resumption_psk(group_id, epoch, psk_secret);
-}
-
 mls::Proposal
 MLSClientImpl::proposal_from_description(mls::State& state,
                                          const ProposalDescription& desc)
@@ -468,7 +455,6 @@ MLSClientImpl::proposal_from_description(mls::State& state,
   if (desc.proposal_type() == "resumptionPSK") {
     const auto& group_id = state.group_id();
     const auto epoch = desc.epoch_id();
-    ensure_resumption_psk(state, epoch);
     return state.pre_shared_key_proposal(group_id, epoch);
   }
 
@@ -835,7 +821,6 @@ MLSClientImpl::resumption_psk_proposal(
 {
   auto group_id = entry.state.group_id();
   auto epoch = request->epoch_id();
-  ensure_resumption_psk(entry.state, epoch);
 
   auto message =
     entry.state.pre_shared_key(group_id, epoch, entry.message_opts());

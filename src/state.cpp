@@ -446,7 +446,7 @@ State::pre_shared_key_proposal(const bytes& external_psk_id) const
 Proposal
 State::pre_shared_key_proposal(const bytes& group_id, epoch_t epoch) const
 {
-  if (_resumption_psks.count({ group_id, epoch }) == 0) {
+  if (epoch != _epoch && _resumption_psks.count({ group_id, epoch }) == 0) {
     throw InvalidParameterError("Unknown PSK");
   }
 
@@ -1212,6 +1212,10 @@ State::resolve(const std::vector<PreSharedKeyID>& psks) const
       },
 
       [&](const ResumptionPSK& res_psk) {
+        if (res_psk.psk_epoch == _epoch) {
+          return _key_schedule.resumption_psk;
+        }
+
         auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
         if (_resumption_psks.count(key) == 0) {
           throw ProtocolError("Unknown Resumption PSK");
@@ -1504,7 +1508,7 @@ State::valid(const PreSharedKey& psk) const
     }
 
     const auto key = std::make_tuple(res_psk.psk_group_id, res_psk.psk_epoch);
-    return _resumption_psks.count(key) > 0;
+    return res_psk.psk_epoch == _epoch || _resumption_psks.count(key) > 0;
   }
 
   return false;

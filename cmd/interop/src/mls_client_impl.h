@@ -134,7 +134,6 @@ private:
 
   mls::LeafIndex find_member(const mls::State& state,
                              const std::string& identity);
-  void ensure_resumption_psk(mls::State& state, mls::epoch_t epoch);
   mls::Proposal proposal_from_description(mls::State& state,
                                           const ProposalDescription& desc);
 
