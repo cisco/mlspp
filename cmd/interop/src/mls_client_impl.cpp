@@ -449,8 +449,9 @@ MLSClientImpl::proposal_from_description(mls::State& state,
                                          const ProposalDescription& desc)
 {
   if (desc.proposal_type() == "add") {
-    const auto kp_data = string_to_bytes(desc.key_package());
-    const auto kp = tls::get<mls::KeyPackage>(kp_data);
+    const auto kp_msg_data = string_to_bytes(desc.key_package());
+    const auto kp_msg = tls::get<mls::MLSMessage>(kp_msg_data);
+    const auto kp = var::get<mls::KeyPackage>(kp_msg.message);
     return state.add_proposal(kp);
   }
 
