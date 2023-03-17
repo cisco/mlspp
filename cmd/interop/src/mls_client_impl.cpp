@@ -410,9 +410,9 @@ MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
 {
   const auto id = string_to_bytes(identity);
   const auto& tree = state.tree();
-  auto removed_index = mls::LeafIndex{ 0 };
-  for (; removed_index < tree.size; removed_index.val++) {
-    const auto maybe_leaf = tree.leaf_node(removed_index);
+  auto index = mls::LeafIndex{ 0 };
+  for (; index < tree.size; index.val++) {
+    const auto maybe_leaf = tree.leaf_node(index);
     if (!maybe_leaf) {
       continue;
     }
@@ -424,11 +424,11 @@ MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
     }
   }
 
-  if (!(removed_index < tree.size)) {
+  if (!(index < tree.size)) {
     throw std::runtime_error("Unknown member identity");
   }
 
-  return removed_index;
+  return index;
 }
 
 mls::Proposal
