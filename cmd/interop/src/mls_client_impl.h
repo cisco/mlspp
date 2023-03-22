@@ -86,6 +86,21 @@ class MLSClientImpl final : public MLSClient::Service
                              const HandlePendingCommitRequest* request,
                              HandleCommitResponse* response) override;
 
+  // External Proposals
+  Status SelfSignedAddProposal(
+    ServerContext* context,
+    const SelfSignedAddProposalRequest* request,
+    SelfSignedAddProposalResponse* response) override;
+  Status CreateExternalSigner(ServerContext* context,
+                              const CreateExternalSignerRequest* request,
+                              CreateExternalSignerResponse* response) override;
+  Status AddExternalSigner(ServerContext* context,
+                           const AddExternalSignerRequest* request,
+                           ProposalResponse* response) override;
+  Status ExternalSignerProposal(ServerContext* context,
+                                const ExternalSignerProposalRequest* request,
+                                ProposalResponse* response) override;
+
 private:
   // Wrapper for methods that rely on state
   template<typename Req, typename F>
@@ -132,10 +147,23 @@ private:
   CachedState* find_state(const bytes& group_id, const mls::epoch_t epoch);
   void remove_state(uint32_t state_id);
 
-  mls::LeafIndex find_member(const mls::State& state,
+  mls::LeafIndex find_member(const mls::TreeKEMPublicKey& tree,
                              const std::string& identity);
-  mls::Proposal proposal_from_description(mls::State& state,
+  mls::Proposal proposal_from_description(mls::CipherSuite suite,
+                                          const bytes& group_id,
+                                          const mls::TreeKEMPublicKey& tree,
                                           const ProposalDescription& desc);
+
+  // Cached external signers
+  struct CachedSigner
+  {
+    mls::SignaturePrivateKey signature_priv;
+  };
+
+  std::map<uint32_t, CachedSigner> signer_cache;
+
+  uint32_t store_signer(mls::SignaturePrivateKey&& signature_priv);
+  CachedSigner* load_signer(uint32_t signer_id);
 
   // Ways to join a group
   Status create_group(const CreateGroupRequest* request,
@@ -194,4 +222,14 @@ private:
   Status handle_pending_commit(CachedState& entry,
                                const HandlePendingCommitRequest* request,
                                HandleCommitResponse* response);
+
+  Status self_signed_add_proposal(const SelfSignedAddProposalRequest* request,
+                                  SelfSignedAddProposalResponse* response);
+  Status create_external_signer(const CreateExternalSignerRequest* request,
+                                CreateExternalSignerResponse* response);
+  Status add_external_signer(CachedState& entry,
+                             const AddExternalSignerRequest* request,
+                             ProposalResponse* response);
+  Status external_signer_proposal(const ExternalSignerProposalRequest* request,
+                                  ProposalResponse* response);
 };
