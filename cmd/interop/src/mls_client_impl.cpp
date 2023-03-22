@@ -286,10 +286,9 @@ MLSClientImpl::HandlePendingCommit(ServerContext* /* context */,
 }
 
 Status
-MLSClientImpl::NewMemberAddProposal(
-  ServerContext* /* context */,
-  const NewMemberAddProposalRequest* request,
-  NewMemberAddProposalResponse* response)
+MLSClientImpl::NewMemberAddProposal(ServerContext* /* context */,
+                                    const NewMemberAddProposalRequest* request,
+                                    NewMemberAddProposalResponse* response)
 {
   return catch_wrap(
     [=]() { return new_member_add_proposal(request, response); });
@@ -1077,7 +1076,8 @@ MLSClientImpl::create_external_signer(
   auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
   const auto cred = mls::Credential::basic(identity);
 
-  const auto external_sender = mls::ExternalSender{ signature_priv.public_key, cred };
+  const auto external_sender =
+    mls::ExternalSender{ signature_priv.public_key, cred };
   response->set_external_sender(bytes_to_string(tls::marshal(external_sender)));
 
   const auto signer_id = store_signer(std::move(signature_priv));
@@ -1151,17 +1151,14 @@ MLSClientImpl::external_signer_proposal(
   const auto signer_index = static_cast<uint32_t>(where - ext_senders.begin());
 
   // Sign the proposal
-  const auto proposal =
-    proposal_from_description(cipher_suite,
-                              group_id,
-                              ratchet_tree,
-                              request->description());
+  const auto proposal = proposal_from_description(
+    cipher_suite, group_id, ratchet_tree, request->description());
   auto signed_proposal = mls::external_proposal(cipher_suite,
-                                                      group_id,
-                                                      epoch,
-                                                      proposal,
-                                                      signer_index,
-                                                      signer->signature_priv);
+                                                group_id,
+                                                epoch,
+                                                proposal,
+                                                signer_index,
+                                                signer->signature_priv);
   response->set_proposal(marshal_message(std::move(signed_proposal)));
 
   return Status::OK;

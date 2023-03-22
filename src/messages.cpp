@@ -861,20 +861,6 @@ MLSMessage::MLSMessage(KeyPackage key_package)
 }
 
 MLSMessage
-self_signed_add_proposal(CipherSuite suite,
-                         const bytes& group_id,
-                         epoch_t epoch,
-                         const KeyPackage& key_package,
-                         const SignaturePrivateKey& sig_priv)
-{
-  auto proposal = Proposal{ Add{ key_package } };
-  auto content = GroupContent{ group_id, epoch, { NewMemberProposalSender{} }, {}, { proposal } };
-  auto content_auth = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
-  return PublicMessage::protect(std::move(content_auth), suite, {}, {});
-}
-
-MLSMessage
 external_proposal(CipherSuite suite,
                   const bytes& group_id,
                   epoch_t epoch,

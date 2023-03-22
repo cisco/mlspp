@@ -183,6 +183,51 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with New Member Add")
   verify_group_functionality(group);
 }
 
+TEST_CASE_FIXTURE(StateTest, "Two Person with External Proposal")
+{
+  // Initialize the creator's state, with two trusted external parties
+  auto external_priv_0 = SignaturePrivateKey::generate(suite);
+  auto external_priv_1 = SignaturePrivateKey::generate(suite);
+
+  auto ext_list = ExtensionList{};
+  ext_list.add(ExternalSendersExtension{ {
+    { external_priv_0.public_key, Credential::basic({ 0 }) },
+    { external_priv_1.public_key, Credential::basic({ 1 }) },
+  } });
+
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       ext_list };
+
+  // Have the first external signer generate an add proposal
+  auto add_proposal = Proposal{ Add{ key_packages[1] } };
+  auto add =
+    external_proposal(suite, group_id, 0, add_proposal, 1, external_priv_1);
+
+  // Handle the Add proposal and create a Commit
+  first0.handle(add);
+  auto opts = CommitOpts{ {}, true, false, {} };
+  auto [commit, welcome, first1_] = first0.commit(fresh_secret(), opts, {});
+  silence_unused(commit);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome
+  auto second0 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome,
+                        std::nullopt,
+                        {} };
+  REQUIRE(first1 == second0);
+
+  auto group = std::vector<State>{ first1, second0 };
+  verify_group_functionality(group);
+}
+
 TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
 {
   // Initialize the creator's state
