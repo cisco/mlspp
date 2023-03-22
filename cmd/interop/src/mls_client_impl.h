@@ -87,10 +87,10 @@ class MLSClientImpl final : public MLSClient::Service
                              HandleCommitResponse* response) override;
 
   // External Proposals
-  Status SelfSignedAddProposal(
+  Status NewMemberAddProposal(
     ServerContext* context,
-    const SelfSignedAddProposalRequest* request,
-    SelfSignedAddProposalResponse* response) override;
+    const NewMemberAddProposalRequest* request,
+    NewMemberAddProposalResponse* response) override;
   Status CreateExternalSigner(ServerContext* context,
                               const CreateExternalSignerRequest* request,
                               CreateExternalSignerResponse* response) override;
@@ -223,8 +223,8 @@ private:
                                const HandlePendingCommitRequest* request,
                                HandleCommitResponse* response);
 
-  Status self_signed_add_proposal(const SelfSignedAddProposalRequest* request,
-                                  SelfSignedAddProposalResponse* response);
+  Status new_member_add_proposal(const NewMemberAddProposalRequest* request,
+                                  NewMemberAddProposalResponse* response);
   Status create_external_signer(const CreateExternalSignerRequest* request,
                                 CreateExternalSignerResponse* response);
   Status add_external_signer(CachedState& entry,

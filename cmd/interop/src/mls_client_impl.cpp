@@ -286,13 +286,13 @@ MLSClientImpl::HandlePendingCommit(ServerContext* /* context */,
 }
 
 Status
-MLSClientImpl::SelfSignedAddProposal(
+MLSClientImpl::NewMemberAddProposal(
   ServerContext* /* context */,
-  const SelfSignedAddProposalRequest* request,
-  SelfSignedAddProposalResponse* response)
+  const NewMemberAddProposalRequest* request,
+  NewMemberAddProposalResponse* response)
 {
   return catch_wrap(
-    [=]() { return self_signed_add_proposal(request, response); });
+    [=]() { return new_member_add_proposal(request, response); });
 }
 
 Status
@@ -1015,9 +1015,9 @@ MLSClientImpl::handle_pending_commit(
 }
 
 Status
-MLSClientImpl::self_signed_add_proposal(
-  const SelfSignedAddProposalRequest* request,
-  SelfSignedAddProposalResponse* response)
+MLSClientImpl::new_member_add_proposal(
+  const NewMemberAddProposalRequest* request,
+  NewMemberAddProposalResponse* response)
 {
   auto group_info_msg_data = string_to_bytes(request->group_info());
   auto group_info_msg = tls::get<mls::MLSMessage>(group_info_msg_data);
