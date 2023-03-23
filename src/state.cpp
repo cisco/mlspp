@@ -943,10 +943,11 @@ State::handle_branch(const HPKEPrivateKey& init_priv,
 }
 
 State::Tombstone::Tombstone(const State& state_in, ReInit reinit_in)
-  : prior_group_id(state_in._group_id)
+  : epoch_authenticator(state_in.epoch_authenticator())
+  , reinit(std::move(reinit_in))
+  , prior_group_id(state_in._group_id)
   , prior_epoch(state_in._epoch)
   , resumption_psk(state_in._key_schedule.resumption_psk)
-  , reinit(std::move(reinit_in))
 {
 }
 

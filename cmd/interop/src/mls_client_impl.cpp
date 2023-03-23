@@ -285,23 +285,96 @@ MLSClientImpl::HandlePendingCommit(ServerContext* /* context */,
   });
 }
 
+Status
+MLSClientImpl::ReInitProposal(ServerContext* /* context */,
+                              const ReInitProposalRequest* request,
+                              ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return reinit_proposal(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::ReInitCommit(ServerContext* /* context */,
+                            const CommitRequest* request,
+                            CommitResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return reinit_commit(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::HandlePendingReInitCommit(
+  ServerContext* /* context */,
+  const HandlePendingCommitRequest* request,
+  HandleReInitCommitResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return handle_pending_reinit_commit(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::HandleReInitCommit(ServerContext* /* context */,
+                                  const HandleCommitRequest* request,
+                                  HandleReInitCommitResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return handle_reinit_commit(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::ReInitWelcome(ServerContext* /* context */,
+                             const ReInitWelcomeRequest* request,
+                             ReInitWelcomeResponse* response)
+{
+  return catch_wrap([=]() { return reinit_welcome(request, response); });
+}
+
+Status
+MLSClientImpl::HandleReInitWelcome(ServerContext* /* context */,
+                                   const HandleReInitWelcomeRequest* request,
+                                   JoinGroupResponse* response)
+{
+  return catch_wrap([=]() { return handle_reinit_welcome(request, response); });
+}
+
+// Factory for key packages
+MLSClientImpl::KeyPackageWithSecrets
+MLSClientImpl::new_key_package(mls::CipherSuite cipher_suite,
+                               const bytes& identity)
+{
+  auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
+  auto encryption_priv = mls::HPKEPrivateKey::generate(cipher_suite);
+  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
+  auto cred = mls::Credential::basic(identity);
+
+  auto key_package = mls::KeyPackage(cipher_suite,
+                                     init_priv.public_key,
+                                     {
+                                       cipher_suite,
+                                       encryption_priv.public_key,
+                                       signature_priv.public_key,
+                                       cred,
+                                       mls::Capabilities::create_default(),
+                                       mls::Lifetime::create_default(),
+                                       {},
+                                       signature_priv,
+                                     },
+                                     {},
+                                     signature_priv);
+  return { init_priv, encryption_priv, signature_priv, key_package };
+}
+
 // Cached join transactions
 uint32_t
-MLSClientImpl::store_join(mls::HPKEPrivateKey&& init_priv,
-                          mls::HPKEPrivateKey&& leaf_priv,
-                          mls::SignaturePrivateKey&& sig_priv,
-                          mls::KeyPackage&& kp)
+MLSClientImpl::store_join(KeyPackageWithSecrets&& kp_priv)
 {
-  auto ref = kp.ref();
-  auto ref_data = bytes(ref.size());
-  std::copy(ref.begin(), ref.end(), ref_data.begin());
-
-  auto join_id = tls::get<uint32_t>(ref_data);
-  auto entry = CachedJoin{ std::move(init_priv),
-                           std::move(leaf_priv),
-                           std::move(sig_priv),
-                           std::move(kp),
-                           {} };
+  auto join_id = tls::get<uint32_t>(kp_priv.key_package.ref());
+  auto entry = CachedJoin{ std::move(kp_priv), {} };
   join_cache.emplace(std::make_pair(join_id, std::move(entry)));
   return join_id;
 }
@@ -382,6 +455,33 @@ void
 MLSClientImpl::remove_state(uint32_t state_id)
 {
   state_cache.erase(state_id);
+}
+
+uint32_t
+MLSClientImpl::store_reinit(KeyPackageWithSecrets&& kp_priv,
+                            mls::State::Tombstone&& tombstone,
+                            bool encrypt_handshake)
+{
+  auto reinit_id = tls::get<uint32_t>(kp_priv.key_package.ref());
+  auto entry =
+    CachedReInit{ std::move(kp_priv), std::move(tombstone), encrypt_handshake };
+  reinit_cache.emplace(std::make_pair(reinit_id, std::move(entry)));
+  return reinit_id;
+}
+
+MLSClientImpl::CachedReInit*
+MLSClientImpl::load_reinit(uint32_t reinit_id)
+{
+  if (reinit_cache.count(reinit_id) == 0) {
+    return nullptr;
+  }
+  return &reinit_cache.at(reinit_id);
+}
+
+void
+MLSClientImpl::remove_reinit(uint32_t reinit_id)
+{
+  reinit_cache.erase(reinit_id);
 }
 
 Status
@@ -512,34 +612,16 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
   auto cipher_suite = mls_suite(request->cipher_suite());
   auto identity = string_to_bytes(request->identity());
 
-  auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto encryption_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic(identity);
+  auto kp_priv = new_key_package(cipher_suite, identity);
 
-  response->set_init_priv(bytes_to_string(init_priv.data));
-  response->set_encryption_priv(bytes_to_string(encryption_priv.data));
-  response->set_signature_priv(bytes_to_string(signature_priv.data));
+  response->set_init_priv(bytes_to_string(kp_priv.init_priv.data));
+  response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
+  response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
 
-  auto leaf = mls::LeafNode{
-    cipher_suite,
-    encryption_priv.public_key,
-    signature_priv.public_key,
-    cred,
-    mls::Capabilities::create_default(),
-    mls::Lifetime::create_default(),
-    {},
-    signature_priv,
-  };
+  auto key_package = tls::marshal(mls::MLSMessage{ kp_priv.key_package });
+  response->set_key_package(bytes_to_string(key_package));
 
-  auto kp = mls::KeyPackage(
-    cipher_suite, init_priv.public_key, leaf, {}, signature_priv);
-  response->set_key_package(marshal_message(kp));
-
-  auto join_id = store_join(std::move(init_priv),
-                            std::move(encryption_priv),
-                            std::move(signature_priv),
-                            std::move(kp));
+  auto join_id = store_join(std::move(kp_priv));
   response->set_transaction_id(join_id);
 
   return Status::OK;
@@ -561,10 +643,10 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
     ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
   }
 
-  auto state = mls::State(join->init_priv,
-                          std::move(join->leaf_priv),
-                          std::move(join->sig_priv),
-                          join->key_package,
+  auto state = mls::State(join->kp_priv.init_priv,
+                          std::move(join->kp_priv.encryption_priv),
+                          std::move(join->kp_priv.signature_priv),
+                          join->kp_priv.key_package,
                           welcome,
                           ratchet_tree,
                           join->external_psks);
@@ -940,6 +1022,222 @@ MLSClientImpl::handle_pending_commit(
   const auto epoch_authenticator = next->state.epoch_authenticator();
 
   response->set_state_id(next_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::reinit_proposal(CachedState& entry,
+                               const ReInitProposalRequest* request,
+                               ProposalResponse* response)
+{
+  auto group_id = string_to_bytes(request->group_id());
+  auto version = mls::ProtocolVersion::mls10;
+  auto cipher_suite = mls_suite(request->cipher_suite());
+
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < request->extensions_size(); i++) {
+    auto ext = request->extensions(i);
+    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
+
+  auto message = entry.state.reinit(
+    group_id, version, cipher_suite, ext_list, entry.message_opts());
+
+  response->set_proposal(entry.marshal(message));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::reinit_commit(CachedState& entry,
+                             const CommitRequest* request,
+                             CommitResponse* response)
+{
+  const auto inline_tree = !request->external_tree();
+  const auto force_path = request->force_path();
+
+  // XXX(RLB): Right now, the ReInit proposal must be provided by reference
+  if (request->by_reference_size() != 1) {
+    throw std::runtime_error("Malformed ReInit CommitRequest");
+  }
+  const auto reinit_proposal = entry.unmarshal(request->by_reference(0));
+  const auto should_be_null = entry.state.handle(reinit_proposal);
+  if (should_be_null) {
+    throw std::runtime_error("Commit included among proposals");
+  }
+
+  const auto leaf_secret =
+    mls::random_bytes(entry.state.cipher_suite().secret_size());
+  const auto commit_opts = mls::CommitOpts{ {}, inline_tree, force_path, {} };
+  auto [tombstone, commit] =
+    entry.state.reinit_commit(leaf_secret, commit_opts, entry.message_opts());
+
+  // Cache the reinit
+  const auto my_leaf =
+    opt::get(entry.state.tree().leaf_node(entry.state.index()));
+  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+  auto kp_priv = new_key_package(tombstone.reinit.cipher_suite, identity);
+
+  const auto reinit_id = store_reinit(
+    std::move(kp_priv), std::move(tombstone), entry.encrypt_handshake);
+
+  const auto commit_data = entry.marshal(commit);
+  response->set_commit(commit_data);
+
+  entry.pending_commit = commit_data;
+  entry.pending_state_id = reinit_id;
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::handle_pending_reinit_commit(
+  CachedState& entry,
+  const HandlePendingCommitRequest* /* request */,
+  HandleReInitCommitResponse* response)
+{
+  if (!entry.pending_commit || !entry.pending_state_id) {
+    throw std::runtime_error("No pending commit to handle");
+  }
+
+  const auto& reinit_id = opt::get(entry.pending_state_id);
+
+  const auto* reinit = load_reinit(reinit_id);
+  if (!reinit) {
+    throw std::runtime_error("Internal error: No state for next ID");
+  }
+
+  const auto key_package = entry.marshal(reinit->kp_priv.key_package);
+  const auto epoch_authenticator = reinit->tombstone.epoch_authenticator;
+
+  response->set_reinit_id(reinit_id);
+  response->set_key_package(key_package);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::handle_reinit_commit(CachedState& entry,
+                                    const HandleCommitRequest* request,
+                                    HandleReInitCommitResponse* response)
+{
+  // XXX(RLB): Right now, the ReInit proposal must be provided by reference
+  if (request->proposal_size() != 1) {
+    throw std::runtime_error("Malformed ReInit CommitRequest");
+  }
+  const auto reinit_proposal = entry.unmarshal(request->proposal(0));
+  const auto should_be_null = entry.state.handle(reinit_proposal);
+  if (should_be_null) {
+    throw std::runtime_error("Commit included among proposals");
+  }
+
+  const auto commit = entry.unmarshal(request->commit());
+  auto tombstone = entry.state.handle_reinit_commit(commit);
+
+  // Cache the reinit
+  const auto my_leaf =
+    opt::get(entry.state.tree().leaf_node(entry.state.index()));
+  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+  auto kp_priv = new_key_package(tombstone.reinit.cipher_suite, identity);
+
+  const auto key_package = entry.marshal(kp_priv.key_package);
+  const auto epoch_authenticator =
+    bytes_to_string(tombstone.epoch_authenticator);
+
+  auto reinit_id = store_reinit(
+    std::move(kp_priv), std::move(tombstone), entry.encrypt_handshake);
+
+  response->set_reinit_id(reinit_id);
+  response->set_key_package(key_package);
+  response->set_epoch_authenticator(epoch_authenticator);
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
+                              ReInitWelcomeResponse* response)
+{
+  // Load the reinit
+  const auto reinit = load_reinit(request->reinit_id());
+  if (!reinit) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Unknown reinit ID");
+  }
+
+  // Import the KeyPackages
+  auto key_packages = std::vector<mls::KeyPackage>{};
+  for (int i = 0; i < request->key_package_size(); i++) {
+    const auto key_package_msg_data = string_to_bytes(request->key_package(i));
+    const auto key_package_msg =
+      tls::get<mls::MLSMessage>(key_package_msg_data);
+    key_packages.emplace_back(
+      var::get<mls::KeyPackage>(key_package_msg.message));
+  }
+
+  // Create the Welcome
+  const auto inline_tree = !request->external_tree();
+  const auto force_path = request->force_path();
+  const auto cipher_suite = reinit->tombstone.reinit.cipher_suite;
+  const auto leaf_secret = mls::random_bytes(cipher_suite.secret_size());
+  auto [state, welcome] =
+    reinit->tombstone.create_welcome(reinit->kp_priv.encryption_priv,
+                                     reinit->kp_priv.signature_priv,
+                                     reinit->kp_priv.key_package.leaf_node,
+                                     key_packages,
+                                     leaf_secret,
+                                     { {}, inline_tree, force_path, {} });
+
+  const auto welcome_data = tls::marshal(mls::MLSMessage{ welcome });
+
+  // Store the resulting state
+  auto epoch_authenticator = state.epoch_authenticator();
+  auto tree = state.tree();
+  auto state_id = store_state(std::move(state), reinit->encrypt_handshake);
+
+  response->set_state_id(state_id);
+  response->set_welcome(bytes_to_string(welcome_data));
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+  if (!inline_tree) {
+    response->set_ratchet_tree(bytes_to_string(tls::marshal(tree)));
+  }
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
+                                     JoinGroupResponse* response)
+{
+  // Load the reinit
+  const auto reinit = load_reinit(request->reinit_id());
+  if (!reinit) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Unknown reinit ID");
+  }
+
+  // Process the welcome
+  const auto welcome_msg_data = string_to_bytes(request->welcome());
+  const auto welcome_msg = tls::get<mls::MLSMessage>(welcome_msg_data);
+  const auto welcome = var::get<mls::Welcome>(welcome_msg.message);
+
+  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  if (!ratchet_tree_data.empty()) {
+    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  }
+
+  auto state = reinit->tombstone.handle_welcome(reinit->kp_priv.init_priv,
+                                                reinit->kp_priv.encryption_priv,
+                                                reinit->kp_priv.signature_priv,
+                                                reinit->kp_priv.key_package,
+                                                welcome,
+                                                ratchet_tree);
+
+  // Store the resulting state
+  auto epoch_authenticator = state.epoch_authenticator();
+  auto state_id = store_state(std::move(state), reinit->encrypt_handshake);
+
+  response->set_state_id(state_id);
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   return Status::OK;
 }
