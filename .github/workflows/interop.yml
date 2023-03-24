@@ -50,4 +50,5 @@ jobs:
 
     - name: Test gRPC live interop with self
       run: |
+        cd cmd/interop
         ./grpc-self-test.sh
