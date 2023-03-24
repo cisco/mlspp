@@ -1270,6 +1270,7 @@ State::apply(const std::vector<CachedProposal>& proposals,
         }
 
         apply(target, update, cached_update.update_priv);
+        _cached_update.reset();
         locations.push_back(target);
         break;
       }
