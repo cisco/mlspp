@@ -10,16 +10,29 @@ ${BIN} -live ${PORT} &
 BIN_PID=$!
 sleep 1
 
-# Run the test scenarios
+# Build the test runner
 cd ${INTEROP_DIR}
 go mod tidy
 make test-runner/test-runner
-for CONFIG in `ls configs`;
-do
-  echo "Running ${CONFIG}..."
-  ./test-runner/test-runner -client localhost:${PORT} -config configs/${CONFIG} -public -suite 1 \
-        | grep -i error
-done
+cd ../../../../..
+
+# Run the tests
+find ${INTEROP_DIR}/configs -name "*.json" \
+    | xargs ${INTEROP_DIR}/test-runner/test-runner -client localhost:50001 -public -suite 1 -config \
+    | grep error
+have_error=$?
 
 # Clean up
 kill ${BIN_PID}
+
+# Exit status is flipped from `grep` status, because `grep` succeeds when an
+# error line has been matched.
+if [ $have_error == 0 ]; 
+then 
+  echo FAIL
+  exit 1
+else
+  echo PASS
+  exit 0
+fi
+

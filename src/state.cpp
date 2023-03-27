@@ -390,7 +390,7 @@ Proposal
 State::update_proposal(HPKEPrivateKey leaf_priv, const LeafNodeOptions& opts)
 {
   if (_cached_update) {
-    return { opt::get(_cached_update).proposal };
+    throw ProtocolError("Only one update may be generated per epoch");
   }
 
   auto leaf = opt::get(_tree.leaf_node(_index));
@@ -943,10 +943,11 @@ State::handle_branch(const HPKEPrivateKey& init_priv,
 }
 
 State::Tombstone::Tombstone(const State& state_in, ReInit reinit_in)
-  : prior_group_id(state_in._group_id)
+  : epoch_authenticator(state_in.epoch_authenticator())
+  , reinit(std::move(reinit_in))
+  , prior_group_id(state_in._group_id)
   , prior_epoch(state_in._epoch)
   , resumption_psk(state_in._key_schedule.resumption_psk)
-  , reinit(std::move(reinit_in))
 {
 }
 
@@ -1291,6 +1292,10 @@ State::apply(const std::vector<CachedProposal>& proposals,
         throw ProtocolError("Unsupported proposal type");
     }
   }
+
+  // The cached update needs to be reset after applying proposals, so that it is
+  // in a clean state for the next epoch.
+  _cached_update.reset();
 
   return locations;
 }
