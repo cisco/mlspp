@@ -47,3 +47,8 @@ jobs:
     - name: Test interop on test vectors
       run: |
         make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
