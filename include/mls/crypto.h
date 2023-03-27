@@ -52,6 +52,23 @@ struct CipherSuite
     P521_AES256GCM_SHA512_P521 = 0x0005,
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
     P384_AES256GCM_SHA384_P384 = 0x0007,
+
+    // GREASE values, included here mainly so that debugger output looks nice
+    GREASE_0 = 0x0A0A,
+    GREASE_1 = 0x1A1A,
+    GREASE_2 = 0x2A2A,
+    GREASE_3 = 0x3A3A,
+    GREASE_4 = 0x4A4A,
+    GREASE_5 = 0x5A5A,
+    GREASE_6 = 0x6A6A,
+    GREASE_7 = 0x7A7A,
+    GREASE_8 = 0x8A8A,
+    GREASE_9 = 0x9A9A,
+    GREASE_A = 0xAAAA,
+    GREASE_B = 0xBABA,
+    GREASE_C = 0xCACA,
+    GREASE_D = 0xDADA,
+    GREASE_E = 0xEAEA,
   };
 
   CipherSuite();

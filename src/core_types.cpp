@@ -1,6 +1,8 @@
 #include "mls/core_types.h"
 #include "mls/messages.h"
 
+#include "grease.h"
+
 #include <set>
 
 namespace mls {
@@ -132,9 +134,9 @@ LeafNode::LeafNode(CipherSuite cipher_suite,
   : encryption_key(std::move(encryption_key_in))
   , signature_key(std::move(signature_key_in))
   , credential(std::move(credential_in))
-  , capabilities(std::move(capabilities_in))
+  , capabilities(grease(std::move(capabilities_in)))
   , content(lifetime_in)
-  , extensions(std::move(extensions_in))
+  , extensions(grease(std::move(extensions_in)))
 {
   sign(cipher_suite, sig_priv, std::nullopt);
 }
@@ -372,7 +374,7 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , cipher_suite(suite_in)
   , init_key(std::move(init_key_in))
   , leaf_node(std::move(leaf_node_in))
-  , extensions(std::move(extensions_in))
+  , extensions(grease(std::move(extensions_in)))
 {
   sign(sig_priv_in);
 }
