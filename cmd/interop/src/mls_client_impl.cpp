@@ -286,6 +286,44 @@ MLSClientImpl::HandlePendingCommit(ServerContext* /* context */,
 }
 
 Status
+MLSClientImpl::NewMemberAddProposal(ServerContext* /* context */,
+                                    const NewMemberAddProposalRequest* request,
+                                    NewMemberAddProposalResponse* response)
+{
+  return catch_wrap(
+    [=]() { return new_member_add_proposal(request, response); });
+}
+
+Status
+MLSClientImpl::CreateExternalSigner(ServerContext* /* context */,
+                                    const CreateExternalSignerRequest* request,
+                                    CreateExternalSignerResponse* response)
+{
+  return catch_wrap(
+    [=]() { return create_external_signer(request, response); });
+}
+
+Status
+MLSClientImpl::AddExternalSigner(ServerContext* /* context */,
+                                 const AddExternalSignerRequest* request,
+                                 ProposalResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return add_external_signer(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::ExternalSignerProposal(
+  ServerContext* /* context */,
+  const ExternalSignerProposalRequest* request,
+  ProposalResponse* response)
+{
+  return catch_wrap(
+    [=]() { return external_signer_proposal(request, response); });
+}
+
+Status
 MLSClientImpl::ReInitProposal(ServerContext* /* context */,
                               const ReInitProposalRequest* request,
                               ProposalResponse* response)
@@ -434,6 +472,24 @@ MLSClientImpl::load_state(uint32_t state_id)
   return &state_cache.at(state_id);
 }
 
+uint32_t
+MLSClientImpl::store_signer(mls::SignaturePrivateKey&& priv)
+{
+  auto signer_id = tls::get<uint32_t>(priv.public_key.data);
+  auto entry = CachedSigner{ std::move(priv) };
+  signer_cache.emplace(std::make_pair(signer_id, std::move(entry)));
+  return signer_id;
+}
+
+MLSClientImpl::CachedSigner*
+MLSClientImpl::load_signer(uint32_t signer_id)
+{
+  if (signer_cache.count(signer_id) == 0) {
+    return nullptr;
+  }
+  return &signer_cache.at(signer_id);
+}
+
 MLSClientImpl::CachedState*
 MLSClientImpl::find_state(const bytes& group_id, const mls::epoch_t epoch)
 {
@@ -506,10 +562,10 @@ MLSClientImpl::group_context_extensions_proposal(
 }
 
 mls::LeafIndex
-MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
+MLSClientImpl::find_member(const mls::TreeKEMPublicKey& tree,
+                           const std::string& identity)
 {
   const auto id = string_to_bytes(identity);
-  const auto& tree = state.tree();
   auto index = mls::LeafIndex{ 0 };
   for (; index < tree.size; index.val++) {
     const auto maybe_leaf = tree.leaf_node(index);
@@ -532,30 +588,40 @@ MLSClientImpl::find_member(const mls::State& state, const std::string& identity)
 }
 
 mls::Proposal
-MLSClientImpl::proposal_from_description(mls::State& state,
+MLSClientImpl::proposal_from_description(mls::CipherSuite suite,
+                                         const bytes& group_id,
+                                         const mls::TreeKEMPublicKey& tree,
                                          const ProposalDescription& desc)
 {
   if (desc.proposal_type() == "add") {
     const auto kp_msg_data = string_to_bytes(desc.key_package());
     const auto kp_msg = tls::get<mls::MLSMessage>(kp_msg_data);
     const auto kp = var::get<mls::KeyPackage>(kp_msg.message);
-    return state.add_proposal(kp);
+    return { mls::Add{ kp } };
   }
 
   if (desc.proposal_type() == "remove") {
-    const auto removed_index = find_member(state, desc.removed_id());
-    return state.remove_proposal(removed_index);
+    const auto removed_index = find_member(tree, desc.removed_id());
+    return { mls::Remove{ removed_index } };
   }
 
   if (desc.proposal_type() == "externalPSK") {
-    const auto psk_id = string_to_bytes(desc.psk_id());
-    return state.pre_shared_key_proposal(psk_id);
+    const auto external_psk_id = string_to_bytes(desc.psk_id());
+    const auto psk_id = mls::PreSharedKeyID{
+      { mls::ExternalPSK{ external_psk_id } },
+      mls::random_bytes(suite.secret_size()),
+    };
+    return { mls::PreSharedKey{ psk_id } };
   }
 
   if (desc.proposal_type() == "resumptionPSK") {
-    const auto& group_id = state.group_id();
     const auto epoch = desc.epoch_id();
-    return state.pre_shared_key_proposal(group_id, epoch);
+    const auto psk_id = mls::PreSharedKeyID{
+      { mls::ResumptionPSK{
+        mls::ResumptionPSKUsage::application, group_id, epoch } },
+      mls::random_bytes(suite.secret_size()),
+    };
+    return { mls::PreSharedKey{ psk_id } };
   }
 
   if (desc.proposal_type() == "groupContextExtensions") {
@@ -567,7 +633,7 @@ MLSClientImpl::proposal_from_description(mls::State& state,
       ext_list.add(ext_type, ext_data);
     }
 
-    return state.group_context_extensions_proposal(ext_list);
+    return { mls::GroupContextExtensions{ ext_list } };
   }
 
   throw std::runtime_error("Unknown proposal-by-value type");
@@ -697,9 +763,9 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   auto remove_prior = std::optional<mls::LeafIndex>{};
   if (request->remove_prior()) {
     // Find the tree we're going to look at
-    // XXX(RLB): This replicates logic in State::import_tree, but we need to do
-    // it out here since this is where the knowledge of which leaf to remove
-    // resides.
+    // XXX(RLB): This replicates logic in State::import_tree, but we need to
+    // do it out here since this is where the knowledge of which leaf to
+    // remove resides.
     auto tree = mls::TreeKEMPublicKey(suite);
     auto maybe_tree_extn =
       group_info_msg.extensions.find<mls::RatchetTreeExtension>();
@@ -874,7 +940,7 @@ MLSClientImpl::remove_proposal(CachedState& entry,
                                const RemoveProposalRequest* request,
                                ProposalResponse* response)
 {
-  auto removed_index = find_member(entry.state, request->removed_id());
+  auto removed_index = find_member(entry.state.tree(), request->removed_id());
   auto message = entry.state.remove(removed_index, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
@@ -930,7 +996,10 @@ MLSClientImpl::commit(CachedState& entry,
   auto by_value = std::vector<mls::Proposal>();
   for (int i = 0; i < request->by_value_size(); i++) {
     const auto desc = request->by_value(i);
-    const auto proposal = proposal_from_description(entry.state, desc);
+    const auto proposal = proposal_from_description(entry.state.cipher_suite(),
+                                                    entry.state.group_id(),
+                                                    entry.state.tree(),
+                                                    desc);
     by_value.emplace_back(std::move(proposal));
   }
 
@@ -1023,6 +1092,136 @@ MLSClientImpl::handle_pending_commit(
 
   response->set_state_id(next_id);
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::new_member_add_proposal(
+  const NewMemberAddProposalRequest* request,
+  NewMemberAddProposalResponse* response)
+{
+  auto group_info_msg_data = string_to_bytes(request->group_info());
+  auto group_info_msg = tls::get<mls::MLSMessage>(group_info_msg_data);
+  auto group_info = var::get<mls::GroupInfo>(group_info_msg.message);
+
+  auto cipher_suite = group_info.group_context.cipher_suite;
+  auto group_id = group_info.group_context.group_id;
+  auto epoch = group_info.group_context.epoch;
+
+  auto identity = string_to_bytes(request->identity());
+
+  auto kp_priv = new_key_package(cipher_suite, identity);
+
+  response->set_init_priv(bytes_to_string(kp_priv.init_priv.data));
+  response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
+  response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
+
+  auto proposal = mls::State::new_member_add(
+    group_id, epoch, kp_priv.key_package, kp_priv.signature_priv);
+  response->set_proposal(marshal_message(std::move(proposal)));
+
+  auto join_id = store_join(std::move(kp_priv));
+  response->set_transaction_id(join_id);
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::create_external_signer(
+  const CreateExternalSignerRequest* request,
+  CreateExternalSignerResponse* response)
+{
+  const auto cipher_suite = mls_suite(request->cipher_suite());
+  const auto identity = string_to_bytes(request->identity());
+
+  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
+  const auto cred = mls::Credential::basic(identity);
+
+  const auto external_sender =
+    mls::ExternalSender{ signature_priv.public_key, cred };
+  response->set_external_sender(bytes_to_string(tls::marshal(external_sender)));
+
+  const auto signer_id = store_signer(std::move(signature_priv));
+  response->set_signer_id(signer_id);
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::add_external_signer(CachedState& entry,
+                                   const AddExternalSignerRequest* request,
+                                   ProposalResponse* response)
+{
+  auto external_sender_data = string_to_bytes(request->external_sender());
+  auto external_sender = tls::get<mls::ExternalSender>(external_sender_data);
+
+  auto ext_list = entry.state.extensions();
+  auto ext_senders = mls::ExternalSendersExtension{};
+  auto curr_ext_senders = ext_list.find<mls::ExternalSendersExtension>();
+  if (curr_ext_senders) {
+    ext_senders = opt::get(curr_ext_senders);
+  }
+
+  ext_senders.senders.push_back(external_sender);
+  ext_list.add(ext_senders);
+  auto proposal =
+    entry.state.group_context_extensions(ext_list, entry.message_opts());
+  response->set_proposal(marshal_message(std::move(proposal)));
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::external_signer_proposal(
+  const ExternalSignerProposalRequest* request,
+  ProposalResponse* response)
+{
+  auto group_info_msg_data = string_to_bytes(request->group_info());
+  auto group_info_msg = tls::get<mls::MLSMessage>(group_info_msg_data);
+  auto group_info = var::get<mls::GroupInfo>(group_info_msg.message);
+
+  auto cipher_suite = group_info.group_context.cipher_suite;
+  auto group_id = group_info.group_context.group_id;
+  auto epoch = group_info.group_context.epoch;
+
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  auto ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+
+  // Look up the signer
+  auto* signer = load_signer(request->signer_id());
+  if (!signer) {
+    throw std::runtime_error("Unknown signer ID");
+  }
+
+  // Look up the signer index of this signer
+  const auto maybe_ext_senders =
+    group_info.group_context.extensions.find<mls::ExternalSendersExtension>();
+  if (!maybe_ext_senders) {
+    throw std::runtime_error("No external senders allowed");
+  }
+
+  const auto& ext_senders = opt::get(maybe_ext_senders).senders;
+  const auto where = std::find_if(
+    ext_senders.begin(), ext_senders.end(), [&](const auto& sender) {
+      return sender.signature_key == signer->signature_priv.public_key;
+    });
+  if (where == ext_senders.end()) {
+    throw std::runtime_error("Requested signer not allowed for this group");
+  }
+
+  const auto signer_index = static_cast<uint32_t>(where - ext_senders.begin());
+
+  // Sign the proposal
+  const auto proposal = proposal_from_description(
+    cipher_suite, group_id, ratchet_tree, request->description());
+  auto signed_proposal = mls::external_proposal(cipher_suite,
+                                                group_id,
+                                                epoch,
+                                                proposal,
+                                                signer_index,
+                                                signer->signature_priv);
+  response->set_proposal(marshal_message(std::move(signed_proposal)));
+
   return Status::OK;
 }
 
