@@ -1116,8 +1116,8 @@ MLSClientImpl::new_member_add_proposal(
   response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
   response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
 
-  auto proposal =
-    mls::State::new_member_add(group_id, epoch, kp_priv.key_package, kp_priv.signature_priv);
+  auto proposal = mls::State::new_member_add(
+    group_id, epoch, kp_priv.key_package, kp_priv.signature_priv);
   response->set_proposal(marshal_message(std::move(proposal)));
 
   auto join_id = store_join(std::move(kp_priv));
