@@ -1110,40 +1110,19 @@ MLSClientImpl::new_member_add_proposal(
 
   auto identity = string_to_bytes(request->identity());
 
-  auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto encryption_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic(identity);
+  auto kp_priv = new_key_package(cipher_suite, identity);
 
-  response->set_init_priv(bytes_to_string(init_priv.data));
-  response->set_encryption_priv(bytes_to_string(encryption_priv.data));
-  response->set_signature_priv(bytes_to_string(signature_priv.data));
-
-  auto leaf = mls::LeafNode{
-    cipher_suite,
-    encryption_priv.public_key,
-    signature_priv.public_key,
-    cred,
-    mls::Capabilities::create_default(),
-    mls::Lifetime::create_default(),
-    {},
-    signature_priv,
-  };
-
-  auto kp = mls::KeyPackage(
-    cipher_suite, init_priv.public_key, leaf, {}, signature_priv);
+  response->set_init_priv(bytes_to_string(kp_priv.init_priv.data));
+  response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
+  response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
 
   auto proposal =
-    mls::State::new_member_add(group_id, epoch, kp, signature_priv);
+    mls::State::new_member_add(group_id, epoch, kp_priv.key_package, kp_priv.signature_priv);
   response->set_proposal(marshal_message(std::move(proposal)));
 
-  auto join_id = store_join(std::move(init_priv),
-                            std::move(encryption_priv),
-                            std::move(signature_priv),
-                            std::move(kp));
+  auto join_id = store_join(std::move(kp_priv));
   response->set_transaction_id(join_id);
 
-  return Status::OK;
   return Status::OK;
 }
 
