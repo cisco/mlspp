@@ -18,7 +18,7 @@ const std::array<uint16_t, 15> grease_values = { 0x0A0A, 0x1A1A, 0x2A2A, 0x3A3A,
                                                  0x8A8A, 0x9A9A, 0xAAAA, 0xBABA,
                                                  0xCACA, 0xDADA, 0xEAEA };
 
-size_t
+static size_t
 rand_int(size_t n)
 {
   static auto seed = std::random_device()();
@@ -26,14 +26,14 @@ rand_int(size_t n)
   return std::uniform_int_distribution<size_t>(0, n)(rng);
 }
 
-uint16_t
+static uint16_t
 grease_value()
 {
   const auto where = rand_int(grease_values.size() - 1);
   return grease_values.at(where);
 }
 
-std::set<uint16_t>
+static std::set<uint16_t>
 grease_sample(size_t count)
 {
   auto vals = std::set<uint16_t>{};
@@ -51,7 +51,7 @@ grease_sample(size_t count)
 }
 
 template<typename T>
-std::vector<T>
+static std::vector<T>
 grease(std::vector<T>&& in)
 {
   auto out = in;
