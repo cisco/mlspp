@@ -121,6 +121,14 @@ class MLSClientImpl final : public MLSClient::Service
                              const HandleReInitWelcomeRequest* request,
                              JoinGroupResponse* response) override;
 
+  // Subgroup branching
+  Status CreateBranch(ServerContext* context,
+                      const CreateBranchRequest* request,
+                      CreateBranchResponse* response) override;
+  Status HandleBranch(ServerContext* context,
+                      const HandleBranchRequest* request,
+                      HandleBranchResponse* response) override;
+
 private:
   // Wrapper for methods that rely on state
   template<typename Req, typename F>
@@ -291,4 +299,12 @@ private:
                         ReInitWelcomeResponse* response);
   Status handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
                                JoinGroupResponse* response);
+
+  // Subgroup branching
+  Status create_branch(CachedState& entry,
+                       const CreateBranchRequest* request,
+                       CreateBranchResponse* response);
+  Status handle_branch(CachedState& entry,
+                       const HandleBranchRequest* request,
+                       HandleBranchResponse* response);
 };

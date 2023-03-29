@@ -407,6 +407,26 @@ MLSClientImpl::new_key_package(mls::CipherSuite cipher_suite,
   return { init_priv, encryption_priv, signature_priv, key_package };
 }
 
+Status
+MLSClientImpl::CreateBranch(ServerContext* /* context */,
+                            const CreateBranchRequest* request,
+                            CreateBranchResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return create_branch(state, request, response);
+  });
+}
+
+Status
+MLSClientImpl::HandleBranch(ServerContext* /* context */,
+                            const HandleBranchRequest* request,
+                            HandleBranchResponse* response)
+{
+  return state_wrap(request, [=](auto& state) {
+    return handle_branch(state, request, response);
+  });
+}
+
 // Cached join transactions
 uint32_t
 MLSClientImpl::store_join(KeyPackageWithSecrets&& kp_priv)
@@ -1435,6 +1455,98 @@ MLSClientImpl::handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
   // Store the resulting state
   auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), reinit->encrypt_handshake);
+
+  response->set_state_id(state_id);
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::create_branch(CachedState& entry,
+                             const CreateBranchRequest* request,
+                             CreateBranchResponse* response)
+{
+  // Import KeyPackages
+  auto key_packages = std::vector<mls::KeyPackage>{};
+  for (int i = 0; i < request->key_packages_size(); i++) {
+    const auto kp_msg_data = string_to_bytes(request->key_packages(i));
+    const auto kp_msg = tls::get<mls::MLSMessage>(kp_msg_data);
+    key_packages.emplace_back(var::get<mls::KeyPackage>(kp_msg.message));
+  }
+
+  // Import extensions
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < request->extensions_size(); i++) {
+    const auto ext = request->extensions(i);
+    const auto ext_type =
+      static_cast<mls::Extension::Type>(ext.extension_type());
+    const auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
+
+  // Create the branch
+  const auto my_leaf =
+    opt::get(entry.state.tree().leaf_node(entry.state.index()));
+  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+
+  const auto inline_tree = !request->external_tree();
+  const auto force_path = request->force_path();
+  const auto group_id = string_to_bytes(request->group_id());
+  const auto cipher_suite = entry.state.cipher_suite();
+  const auto kp_priv = new_key_package(cipher_suite, identity);
+  const auto leaf_secret = mls::random_bytes(cipher_suite.secret_size());
+  auto [next, welcome] =
+    entry.state.create_branch(group_id,
+                              kp_priv.encryption_priv,
+                              kp_priv.signature_priv,
+                              kp_priv.key_package.leaf_node,
+                              ext_list,
+                              key_packages,
+                              leaf_secret,
+                              { {}, inline_tree, force_path, {} });
+
+  const auto epoch_authenticator = next.epoch_authenticator();
+
+  const auto next_id = store_state(std::move(next), entry.encrypt_handshake);
+
+  response->set_state_id(next_id);
+  response->set_welcome(marshal_message(welcome));
+  response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
+
+  if (!inline_tree) {
+    auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));
+    response->set_ratchet_tree(ratchet_tree);
+  }
+
+  return Status::OK;
+}
+
+Status
+MLSClientImpl::handle_branch(CachedState& entry,
+                             const HandleBranchRequest* request,
+                             HandleBranchResponse* response)
+{
+  auto join = load_join(request->transaction_id());
+  if (!join) {
+    return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
+  }
+
+  auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
+  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
+  if (!ratchet_tree_data.empty()) {
+    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  }
+
+  auto state = entry.state.handle_branch(join->kp_priv.init_priv,
+                                         join->kp_priv.encryption_priv,
+                                         join->kp_priv.signature_priv,
+                                         join->kp_priv.key_package,
+                                         welcome,
+                                         ratchet_tree);
+
+  auto epoch_authenticator = state.epoch_authenticator();
+  auto state_id = store_state(std::move(state), entry.encrypt_handshake);
 
   response->set_state_id(state_id);
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
