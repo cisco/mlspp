@@ -3,6 +3,8 @@
 #include <mls/state.h>
 #include <mls/treekem.h>
 
+#include "grease.h"
+
 namespace mls {
 
 // Extensions
@@ -44,7 +46,7 @@ GroupInfo::GroupInfo(GroupContext group_context_in,
                      ExtensionList extensions_in,
                      bytes confirmation_tag_in)
   : group_context(std::move(group_context_in))
-  , extensions(std::move(extensions_in))
+  , extensions(grease(std::move(extensions_in)))
   , confirmation_tag(std::move(confirmation_tag_in))
   , signer(0)
 {

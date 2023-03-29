@@ -1014,14 +1014,14 @@ TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
 tls::ostream&
 operator<<(tls::ostream& str, const TreeKEMPublicKey& obj)
 {
+  // Empty tree
+  if (obj.size.val == 0) {
+    return str << std::vector<OptionalNode>{};
+  }
+
   LeafIndex cut = LeafIndex{ obj.size.val - 1 };
   while (cut.val > 0 && obj.node_at(cut).blank()) {
     cut.val -= 1;
-  }
-
-  if (obj.node_at(cut).blank()) {
-    // Empty tree
-    return str << std::vector<OptionalNode>{};
   }
 
   const auto begin = obj.nodes.begin();
