@@ -367,7 +367,7 @@ MLSClientImpl::HandleReInitCommit(ServerContext* /* context */,
 Status
 MLSClientImpl::ReInitWelcome(ServerContext* /* context */,
                              const ReInitWelcomeRequest* request,
-                             ReInitWelcomeResponse* response)
+                             CreateSubgroupResponse* response)
 {
   return catch_wrap([=]() { return reinit_welcome(request, response); });
 }
@@ -410,7 +410,7 @@ MLSClientImpl::new_key_package(mls::CipherSuite cipher_suite,
 Status
 MLSClientImpl::CreateBranch(ServerContext* /* context */,
                             const CreateBranchRequest* request,
-                            CreateBranchResponse* response)
+                            CreateSubgroupResponse* response)
 {
   return state_wrap(request, [=](auto& state) {
     return create_branch(state, request, response);
@@ -644,16 +644,24 @@ MLSClientImpl::proposal_from_description(mls::CipherSuite suite,
     return { mls::PreSharedKey{ psk_id } };
   }
 
-  if (desc.proposal_type() == "groupContextExtensions") {
-    auto ext_list = mls::ExtensionList{};
-    for (int i = 0; i < desc.extensions_size(); i++) {
-      auto ext = desc.extensions(i);
-      auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
-      auto ext_data = string_to_bytes(ext.extension_data());
-      ext_list.add(ext_type, ext_data);
-    }
+  auto ext_list = mls::ExtensionList{};
+  for (int i = 0; i < desc.extensions_size(); i++) {
+    auto ext = desc.extensions(i);
+    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_data = string_to_bytes(ext.extension_data());
+    ext_list.add(ext_type, ext_data);
+  }
 
+  if (desc.proposal_type() == "groupContextExtensions") {
     return { mls::GroupContextExtensions{ ext_list } };
+  }
+
+  if (desc.proposal_type() == "reinit") {
+    return { mls::ReInit{
+      string_to_bytes(desc.group_id()),
+      mls::ProtocolVersion::mls10,
+      static_cast<mls::CipherSuite::ID>(desc.cipher_suite()),
+      ext_list } };
   }
 
   throw std::runtime_error("Unknown proposal-by-value type");
@@ -1376,7 +1384,7 @@ MLSClientImpl::handle_reinit_commit(CachedState& entry,
 
 Status
 MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
-                              ReInitWelcomeResponse* response)
+                              CreateSubgroupResponse* response)
 {
   // Load the reinit
   const auto reinit = load_reinit(request->reinit_id());
@@ -1464,7 +1472,7 @@ MLSClientImpl::handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
 Status
 MLSClientImpl::create_branch(CachedState& entry,
                              const CreateBranchRequest* request,
-                             CreateBranchResponse* response)
+                             CreateSubgroupResponse* response)
 {
   // Import KeyPackages
   auto key_packages = std::vector<mls::KeyPackage>{};

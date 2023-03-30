@@ -116,7 +116,7 @@ class MLSClientImpl final : public MLSClient::Service
                             HandleReInitCommitResponse* response) override;
   Status ReInitWelcome(ServerContext* context,
                        const ReInitWelcomeRequest* request,
-                       ReInitWelcomeResponse* response) override;
+                       CreateSubgroupResponse* response) override;
   Status HandleReInitWelcome(ServerContext* context,
                              const HandleReInitWelcomeRequest* request,
                              JoinGroupResponse* response) override;
@@ -124,7 +124,7 @@ class MLSClientImpl final : public MLSClient::Service
   // Subgroup branching
   Status CreateBranch(ServerContext* context,
                       const CreateBranchRequest* request,
-                      CreateBranchResponse* response) override;
+                      CreateSubgroupResponse* response) override;
   Status HandleBranch(ServerContext* context,
                       const HandleBranchRequest* request,
                       HandleBranchResponse* response) override;
@@ -296,14 +296,14 @@ private:
                               const HandleCommitRequest* request,
                               HandleReInitCommitResponse* response);
   Status reinit_welcome(const ReInitWelcomeRequest* request,
-                        ReInitWelcomeResponse* response);
+                        CreateSubgroupResponse* response);
   Status handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
                                JoinGroupResponse* response);
 
   // Subgroup branching
   Status create_branch(CachedState& entry,
                        const CreateBranchRequest* request,
-                       CreateBranchResponse* response);
+                       CreateSubgroupResponse* response);
   Status handle_branch(CachedState& entry,
                        const HandleBranchRequest* request,
                        HandleBranchResponse* response);
