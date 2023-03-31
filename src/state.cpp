@@ -719,12 +719,19 @@ State::handle(const MLSMessage& msg,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
-  // Verify the signature on the message
   auto content_auth = unprotect_to_content_auth(msg);
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
 
+  return handle(content_auth, cached_state, expected_params);
+}
+
+std::optional<State>
+State::handle(const AuthenticatedContent& content_auth,
+              std::optional<State> cached_state,
+              const std::optional<CommitParams>& expected_params)
+{
   // Validate the GroupContent
   const auto& content = content_auth.content;
   if (content.group_id != _group_id) {
@@ -1051,17 +1058,16 @@ State::reinit_commit(const bytes& leaf_secret,
 State::Tombstone
 State::handle_reinit_commit(const MLSMessage& commit_msg)
 {
-  auto new_state =
-    opt::get(handle(commit_msg, std::nullopt, ReInitCommitParams{}));
-
-  // XXX(RLB): This is pretty brute force, replicating a bunch of logic in
-  // State::handle() so that we can find the ReInit commit.  There is probably a
-  // more elegant way to extract the reinit parameters.
-  //
-  // XXX(RLB): We also skip a bunch of checks that are done in State::handle(),
-  // on the theory that they will have already been done in the State::handle()
-  // call above.
+  // Verify the signature and process the commit
   auto content_auth = unprotect_to_content_auth(commit_msg);
+  if (!verify(content_auth)) {
+    throw InvalidParameterError("Message signature failed to verify");
+  }
+
+  auto new_state =
+    opt::get(handle(content_auth, std::nullopt, ReInitCommitParams{}));
+
+  // Extract the ReInit and create the Tombstone
   const auto& commit = var::get<Commit>(content_auth.content.content);
   const auto proposals = must_resolve(commit.proposals, std::nullopt);
   if (!valid_reinit(proposals)) {
