@@ -1379,7 +1379,6 @@ State::valid(const LeafNode& leaf_node,
 
   // Verify the leaf_node_source field:
   const auto correct_source = (leaf_node.source() == required_source);
-  const auto source_is_update = leaf_node.source() == LeafNodeSource::update;
 
   // Verify that the signature on the LeafNode is valid using signature_key.
   auto binding = std::optional<LeafNode::MemberBinding>{};
@@ -1428,8 +1427,8 @@ State::valid(const LeafNode& leaf_node,
 
     // Signature keys are allowed to repeat within a leaf
     unique_signature_key =
-      unique_signature_key && ((source_is_update && (i == index)) ||
-                               (signature_key != leaf.signature_key));
+      unique_signature_key &&
+      ((i == index) || (signature_key != leaf.signature_key));
     unique_encryption_key =
       unique_encryption_key && (encryption_key != leaf.encryption_key);
     mutual_credential_support =
