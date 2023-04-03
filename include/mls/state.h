@@ -316,7 +316,7 @@ protected:
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
   std::optional<State> handle(
-    const AuthenticatedContent& msg,
+    const AuthenticatedContent& content_auth,
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
 

@@ -724,7 +724,7 @@ State::handle(const MLSMessage& msg,
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-  return handle(content_auth, cached_state, expected_params);
+  return handle(content_auth, std::move(cached_state), expected_params);
 }
 
 std::optional<State>
