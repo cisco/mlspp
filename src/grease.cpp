@@ -33,10 +33,11 @@ grease_value()
   return grease_values.at(where);
 }
 
-bool
+static bool
 grease_value(uint16_t val)
 {
-  return ((val & 0x0F0F) == 0x0A0A) && val != 0xFAFA;
+  static constexpr auto grease_mask = uint16_t(0x0F0F);
+  return ((val & grease_mask) == 0x0A0A) && val != 0xFAFA;
 }
 
 static std::set<uint16_t>
