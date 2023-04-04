@@ -571,12 +571,12 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   auto kp_no = kp_no_;
 
   auto [init_yes, leaf_yes, id_yes, kp_yes] = make_client();
-  kp_yes.leaf_node.capabilities = extended_capabilities;
+  kp_yes.leaf_node.set_capabilities(extended_capabilities);
   kp_yes.leaf_node.sign(suite, id_yes, std::nullopt);
   kp_yes.sign(id_yes);
 
   auto [init_yes_2, leaf_yes_2, id_yes_2, kp_yes_2] = make_client();
-  kp_yes_2.leaf_node.capabilities = extended_capabilities;
+  kp_yes_2.leaf_node.set_capabilities(extended_capabilities);
   kp_yes_2.leaf_node.sign(suite, id_yes_2, std::nullopt);
   kp_yes_2.sign(id_yes_2);
 

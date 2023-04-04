@@ -33,6 +33,13 @@ grease_value()
   return grease_values.at(where);
 }
 
+static bool
+grease_value(uint16_t val)
+{
+  static constexpr auto grease_mask = uint16_t(0x0F0F);
+  return ((val & grease_mask) == 0x0A0A) && val != 0xFAFA;
+}
+
 static std::set<uint16_t>
 grease_sample(size_t count)
 {
@@ -66,21 +73,39 @@ grease(std::vector<T>&& in)
 }
 
 Capabilities
-grease(Capabilities&& in)
+grease(Capabilities&& capabilities, const ExtensionList& extensions)
 {
-  return {
-    std::move(in.versions),
-    grease(std::move(in.cipher_suites)),
-    grease(std::move(in.extensions)),
-    grease(std::move(in.proposals)),
-    grease(std::move(in.credentials)),
+  auto capas = Capabilities{
+    std::move(capabilities.versions),
+    grease(std::move(capabilities.cipher_suites)),
+    grease(std::move(capabilities.extensions)),
+    grease(std::move(capabilities.proposals)),
+    grease(std::move(capabilities.credentials)),
   };
+
+  // Ensure that the GREASE extensions are reflected in Capabilities.extensions
+  for (const auto& ext : extensions.extensions) {
+    if (!grease_value(ext.type)) {
+      continue;
+    }
+
+    if (stdx::contains(capas.extensions, ext.type)) {
+      continue;
+    }
+
+    const auto where =
+      static_cast<ptrdiff_t>(rand_int(capas.extensions.size()));
+    const auto where_ptr = std::begin(capas.extensions) + where;
+    capas.extensions.insert(where_ptr, ext.type);
+  }
+
+  return capas;
 }
 
 ExtensionList
-grease(ExtensionList&& in)
+grease(ExtensionList&& extensions)
 {
-  auto ext = in.extensions;
+  auto ext = extensions.extensions;
 
   const auto count = std::max(size_t(1), rand_int(ext.size() >> log_p_grease));
   for (const auto ext_type : grease_sample(count)) {

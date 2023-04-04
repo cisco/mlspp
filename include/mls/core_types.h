@@ -212,6 +212,8 @@ struct LeafNode
                       const LeafNodeOptions& opts,
                       const SignaturePrivateKey& sig_priv_in) const;
 
+  void set_capabilities(Capabilities capabilities_in);
+
   LeafNodeSource source() const;
 
   struct MemberBinding

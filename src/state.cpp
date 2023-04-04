@@ -1437,9 +1437,17 @@ State::valid(const LeafNode& leaf_node,
       leaf_node.capabilities.credential_supported(leaf.credential);
   }
 
+  // Verify that the extensions in the LeafNode are supported by checking that
+  // the ID for each extension in the extensions field is listed in the
+  // capabilities.extensions field of the LeafNode.
+  auto all_extensions_supported =
+    stdx::all_of(leaf_node.extensions.extensions, [&](const auto& ext) {
+      return stdx::contains(leaf_node.capabilities.extensions, ext.type);
+    });
+
   return (signature_valid && supports_group_extensions && correct_source &&
           mutual_credential_support && unique_signature_key &&
-          unique_encryption_key);
+          unique_encryption_key && all_extensions_supported);
 }
 
 bool

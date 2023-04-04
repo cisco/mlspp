@@ -5,8 +5,9 @@
 namespace mls {
 
 Capabilities
-grease(Capabilities&& in);
+grease(Capabilities&& capabilities, const ExtensionList& extensions);
+
 ExtensionList
-grease(ExtensionList&& in);
+grease(ExtensionList&& extensions);
 
 } // namespace mls
