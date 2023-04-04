@@ -315,6 +315,10 @@ protected:
     const MLSMessage& msg,
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
+  std::optional<State> handle(
+    const AuthenticatedContent& content_auth,
+    std::optional<State> cached_state,
+    const std::optional<CommitParams>& expected_params);
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
