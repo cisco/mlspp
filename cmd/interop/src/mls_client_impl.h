@@ -129,6 +129,11 @@ class MLSClientImpl final : public MLSClient::Service
                       const HandleBranchRequest* request,
                       HandleBranchResponse* response) override;
 
+  // Cleanup
+  Status Free(ServerContext* context,
+              const FreeRequest* request,
+              FreeResponse* response) override;
+
 private:
   // Wrapper for methods that rely on state
   template<typename Req, typename F>
