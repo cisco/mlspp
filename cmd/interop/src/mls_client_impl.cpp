@@ -427,6 +427,20 @@ MLSClientImpl::HandleBranch(ServerContext* /* context */,
   });
 }
 
+Status
+MLSClientImpl::Free(ServerContext* /* context */,
+                    const FreeRequest* request,
+                    FreeResponse* /* response */)
+{
+  const auto state_id = request->state_id();
+  if (state_cache.count(state_id) == 0) {
+    return Status(StatusCode::NOT_FOUND, "Unknown state");
+  }
+
+  remove_state(state_id);
+  return Status::OK;
+}
+
 // Cached join transactions
 uint32_t
 MLSClientImpl::store_join(KeyPackageWithSecrets&& kp_priv)
