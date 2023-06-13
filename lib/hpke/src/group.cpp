@@ -530,10 +530,9 @@ private:
   int curve_nid;
 
 #if !defined(WITH_OPENSSL3)
-  EC_KEY* new_ec_key() const
-  {
-    return EC_KEY_new_by_curve_name(curve_nid);
-  }
+  // clang-format off
+  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(curve_nid); }
+  // clang-format on
 
   static EVP_PKEY* to_pkey(EC_KEY* eckey)
   {

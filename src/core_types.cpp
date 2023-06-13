@@ -45,9 +45,10 @@ const std::array<CipherSuite::ID, 6> all_supported_ciphersuites = {
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
 };
 
-const std::array<CredentialType, 2> all_supported_credentials = {
+const std::array<CredentialType, 3> all_supported_credentials = {
   CredentialType::basic,
   CredentialType::x509,
+  CredentialType::userinfo_vc
 };
 
 Capabilities

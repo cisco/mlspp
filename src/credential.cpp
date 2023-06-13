@@ -135,6 +135,14 @@ Credential::x509(const std::vector<bytes>& der_chain)
   return cred;
 }
 
+Credential
+Credential::userinfo_vc(const bytes& userinfo_vc_jwt)
+{
+  Credential cred;
+  cred._cred = UserInfoVCCredential{ userinfo_vc_jwt };
+  return cred;
+}
+
 bool
 Credential::valid_for(const SignaturePublicKey& pub) const
 {
@@ -142,6 +150,8 @@ Credential::valid_for(const SignaturePublicKey& pub) const
     [&](const X509Credential& x509) { return x509.valid_for(pub); },
 
     [](const BasicCredential& /* basic */) { return true; },
+
+    [](const UserInfoVCCredential&) { return true; },
   };
 
   return var::visit(pub_key_match, _cred);

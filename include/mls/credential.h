@@ -11,9 +11,9 @@ namespace mls {
 // } BasicCredential;
 struct BasicCredential
 {
-  BasicCredential() {}
+  BasicCredential() = default;
 
-  BasicCredential(bytes identity_in)
+  explicit BasicCredential(bytes identity_in)
     : identity(std::move(identity_in))
   {
   }
@@ -47,6 +47,20 @@ private:
   SignatureScheme _signature_scheme;
 };
 
+struct UserInfoVCCredential
+{
+  UserInfoVCCredential() = default;
+
+  explicit UserInfoVCCredential(bytes userinfo_vc_jwt)
+    : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
+  {
+  }
+
+  bytes userinfo_vc_jwt;
+
+  TLS_SERIALIZABLE(userinfo_vc_jwt)
+};
+
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj);
 
@@ -61,6 +75,7 @@ enum struct CredentialType : uint16_t
   reserved = 0,
   basic = 1,
   x509 = 2,
+  userinfo_vc = 3,
 
   // GREASE values, included here mainly so that debugger output looks nice
   GREASE_0 = 0x0A0A,
@@ -103,6 +118,7 @@ public:
 
   static Credential basic(const bytes& identity);
   static Credential x509(const std::vector<bytes>& der_chain);
+  static Credential userinfo_vc(const bytes& userinfo_vc_jwt);
 
   bool valid_for(const SignaturePublicKey& pub) const;
 
@@ -110,7 +126,7 @@ public:
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  var::variant<BasicCredential, X509Credential> _cred;
+  var::variant<BasicCredential, X509Credential, UserInfoVCCredential> _cred;
 };
 
 } // namespace mls
@@ -119,5 +135,6 @@ namespace tls {
 
 TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
 TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
+TLS_VARIANT_MAP(mls::CredentialType, mls::UserInfoVCCredential, userinfo_vc)
 
 } // namespace TLS
