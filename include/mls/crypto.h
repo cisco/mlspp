@@ -205,6 +205,7 @@ extern const std::string mls_content;
 extern const std::string leaf_node;
 extern const std::string key_package;
 extern const std::string group_info;
+extern const std::string multi_credential;
 } // namespace sign_label
 
 struct SignaturePublicKey

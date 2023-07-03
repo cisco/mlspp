@@ -362,6 +362,7 @@ const std::string mls_content = "FramedContentTBS";
 const std::string leaf_node = "LeafNodeTBS";
 const std::string key_package = "KeyPackageTBS";
 const std::string group_info = "GroupInfoTBS";
+const std::string multi_credential = "MultiCredential";
 } // namespace sign_label
 
 struct SignContent
