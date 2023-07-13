@@ -134,7 +134,9 @@ TreeTestCase::commit(LeafIndex from,
   }
 
   // Add a private entry for the joiner if we added someone
-  if (!joiner.empty()) {
+  // XXX(RLB): These checks are unnecessary in principle, but clang-tidy's
+  // checker for bugprone-unchecked-optional-access crashes without them.
+  if (!joiner.empty() && maybe_enc_priv && maybe_sig_priv) {
     auto index = joiner.front();
     auto ancestor = index.ancestor(from);
     auto enc_priv = opt::get(maybe_enc_priv);
