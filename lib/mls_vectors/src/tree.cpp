@@ -86,14 +86,10 @@ TreeTestCase::commit(LeafIndex from,
   }
   pub.set_hash_all();
 
-  auto joiner = std::vector<LeafIndex>{};
-  auto maybe_enc_priv = std::optional<HPKEPrivateKey>{};
-  auto maybe_sig_priv = std::optional<SignaturePrivateKey>{};
+  auto joiner = std::optional<std::tuple<LeafIndex, HPKEPrivateKey, SignaturePrivateKey>>{};
   if (add) {
     auto [where, enc_priv, sig_priv] = add_leaf();
-    joiner.push_back(where);
-    maybe_enc_priv = enc_priv;
-    maybe_sig_priv = sig_priv;
+    joiner = { where, enc_priv, sig_priv };
   }
 
   auto path_secret = std::optional<bytes>{};
@@ -108,7 +104,13 @@ TreeTestCase::commit(LeafIndex from,
     auto pub_before = pub;
     auto sender_priv =
       pub.update(from, leaf_secret, group_id, priv.sig_priv, {});
-    auto path = pub.encap(sender_priv, context, joiner);
+
+    auto except = std::vector<LeafIndex>{};
+    if (joiner) {
+      except.push_back(std::get<0>(opt::get(joiner)));
+    }
+
+    auto path = pub.encap(sender_priv, context, except);
 
     // Process the UpdatePath at all the members
     for (auto& [leaf, priv_state] : privs) {
@@ -117,15 +119,18 @@ TreeTestCase::commit(LeafIndex from,
         continue;
       }
 
-      priv_state.priv.decap(from, pub_before, context, path, joiner);
+      priv_state.priv.decap(from, pub_before, context, path, except);
       priv_state.senders.push_back(from);
     }
 
     // Look up the path secret for the joiner
-    if (!joiner.empty()) {
-      auto index = joiner.front();
+    if (joiner) {
+      const auto& [where, _enc_priv, _sig_priv] = opt::get(joiner);
+      silence_unused(_enc_priv);
+      silence_unused(_sig_priv);
+
       auto [overlap, shared_path_secret, ok] =
-        sender_priv.shared_path_secret(index);
+        sender_priv.shared_path_secret(where);
       silence_unused(overlap);
       silence_unused(ok);
 
@@ -136,14 +141,12 @@ TreeTestCase::commit(LeafIndex from,
   // Add a private entry for the joiner if we added someone
   // XXX(RLB): These checks are unnecessary in principle, but clang-tidy's
   // checker for bugprone-unchecked-optional-access crashes without them.
-  if (!joiner.empty() && maybe_enc_priv && maybe_sig_priv) {
-    auto index = joiner.front();
-    auto ancestor = index.ancestor(from);
-    auto enc_priv = opt::get(maybe_enc_priv);
-    auto sig_priv = opt::get(maybe_sig_priv);
-    auto tree_priv =
-      TreeKEMPrivateKey::joiner(pub, index, enc_priv, ancestor, path_secret);
-    privs.insert_or_assign(index,
+  if (joiner) {
+    const auto& [where, enc_priv, sig_priv] = opt::get(joiner);
+    const auto ancestor = where.ancestor(from);
+    const auto tree_priv =
+      TreeKEMPrivateKey::joiner(pub, where, enc_priv, ancestor, path_secret);
+    privs.insert_or_assign(where,
                            PrivateState{ sig_priv, tree_priv, { from } });
   }
 }
