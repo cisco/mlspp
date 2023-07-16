@@ -50,6 +50,9 @@ struct Signature
   virtual std::unique_ptr<PrivateKey> deserialize_private(
     const bytes& skm) const;
 
+  virtual std::unique_ptr<PrivateKey> deserialize_private_der(
+    const bytes& der) const;
+
   virtual bytes sign(const bytes& data, const PrivateKey& sk) const = 0;
   virtual bool verify(const bytes& data,
                       const bytes& sig,

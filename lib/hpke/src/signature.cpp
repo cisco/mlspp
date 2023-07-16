@@ -7,6 +7,7 @@
 #include "group.h"
 #include "rsa.h"
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/rsa.h>
 
 namespace hpke {
@@ -87,6 +88,13 @@ struct GroupSignature : public Signature
   {
     return std::make_unique<PrivateKey>(
       group.deserialize_private(skm).release());
+  }
+
+  std::unique_ptr<Signature::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    return std::make_unique<PrivateKey>(
+      group.deserialize_private_der(der).release());
   }
 
   bytes sign(const bytes& data, const Signature::PrivateKey& sk) const override
@@ -184,6 +192,12 @@ Signature::serialize_private(const PrivateKey& /* unused */) const
 
 std::unique_ptr<Signature::PrivateKey>
 Signature::deserialize_private(const bytes& /* unused */) const
+{
+  throw std::runtime_error("Not implemented");
+}
+
+std::unique_ptr<Signature::PrivateKey>
+Signature::deserialize_private_der(const bytes&) const
 {
   throw std::runtime_error("Not implemented");
 }

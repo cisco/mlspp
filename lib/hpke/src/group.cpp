@@ -8,6 +8,7 @@
 #include "openssl/ec.h"
 #include "openssl/evp.h"
 #include "openssl/obj_mac.h"
+#include "openssl/pem.h"
 #if defined(WITH_OPENSSL3)
 #include "openssl/core_names.h"
 #include "openssl/param_build.h"
@@ -526,14 +527,27 @@ struct ECKeyGroup : public EVPGroup
 #endif
   }
 
+  std::unique_ptr<Group::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    BIO* mem = BIO_new_mem_buf(der.data(), static_cast<int>(der.size()));
+    if (!mem) {
+      throw openssl_error();
+    }
+    EVP_PKEY* pkey = d2i_PrivateKey_bio(mem, NULL);
+    BIO_free(mem);
+    if (!pkey) {
+      throw openssl_error();
+    }
+
+    return std::make_unique<EVPGroup::PrivateKey>(pkey);
+  }
+
 private:
   int curve_nid;
 
 #if !defined(WITH_OPENSSL3)
-  EC_KEY* new_ec_key() const
-  {
-    return EC_KEY_new_by_curve_name(curve_nid);
-  }
+  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(curve_nid); }
 
   static EVP_PKEY* to_pkey(EC_KEY* eckey)
   {
@@ -649,6 +663,22 @@ struct RawKeyGroup : public EVPGroup
     }
 
     return std::make_unique<EVPGroup::PrivateKey>(pkey);
+  }
+
+  std::unique_ptr<Group::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    BIO* mem = BIO_new_mem_buf(der.data(), static_cast<int>(der.size()));
+    if (!mem) {
+      throw openssl_error();
+    }
+    EVP_PKEY* pkey = d2i_PrivateKey_bio(mem, NULL);
+    BIO_free(mem);
+    if (!pkey) {
+      throw openssl_error();
+    }
+
+    return std::make_unique<RawKeyGroup::PrivateKey>(pkey);
   }
 
 private:
