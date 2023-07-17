@@ -73,6 +73,12 @@ TreeTestCase::add_leaf()
   return { where, enc_priv, sig_priv };
 }
 
+// XXX(RLB) For some reason, the version of clang-tidy used by GitHub runners
+// segfaults when trying to evaluate this lint on this method.  I tried several
+// variations to amek it easier for the linter to evaluate, but to no avail.
+// This lint isn't super-critical for us anyway as long as we use `opt::get`,
+// since that throws on a bad access instead of reading uninitialized memory.
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
 void
 TreeTestCase::commit(LeafIndex from,
                      const std::vector<LeafIndex>& remove,
@@ -88,8 +94,7 @@ TreeTestCase::commit(LeafIndex from,
 
   auto joiner = std::optional<std::tuple<LeafIndex, HPKEPrivateKey, SignaturePrivateKey>>{};
   if (add) {
-    auto [where, enc_priv, sig_priv] = add_leaf();
-    joiner = { where, enc_priv, sig_priv };
+    joiner = add_leaf();
   }
 
   auto path_secret = std::optional<bytes>{};
@@ -139,8 +144,6 @@ TreeTestCase::commit(LeafIndex from,
   }
 
   // Add a private entry for the joiner if we added someone
-  // XXX(RLB): These checks are unnecessary in principle, but clang-tidy's
-  // checker for bugprone-unchecked-optional-access crashes without them.
   if (joiner) {
     const auto& [where, enc_priv, sig_priv] = opt::get(joiner);
     const auto ancestor = where.ancestor(from);
@@ -150,6 +153,7 @@ TreeTestCase::commit(LeafIndex from,
                            PrivateState{ sig_priv, tree_priv, { from } });
   }
 }
+// NOLINTEND(bugprone-unchecked-optional-access)
 
 TreeTestCase
 TreeTestCase::full(CipherSuite suite,
