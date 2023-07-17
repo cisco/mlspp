@@ -71,19 +71,25 @@ endif()
 ###
 
 # External libraries
+
+set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../boringssl/")
+set(OPENSSL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../boringssl/include")
+set(OPENSSL_CRYPTO_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/../boringssl/build/crypto/libcrypto.a")
 find_package(OpenSSL REQUIRED)
-if ( OPENSSL_FOUND )
-    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-        add_compile_definitions(WITH_OPENSSL3)
-    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
-        message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
-    endif()
-    message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
-    message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
-    message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
-else()
-    message(FATAL_ERROR "No OpenSSL library found")
-endif()
+
+#find_package(OpenSSL REQUIRED)
+#if ( OPENSSL_FOUND )
+#    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
+#        add_compile_definitions(WITH_OPENSSL3)
+#    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
+#        message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
+#    endif()
+#    message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
+#    message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
+#    message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
+#else()
+#    message(FATAL_ERROR "No OpenSSL library found")
+#endif()
 
 # Internal libraries
 add_subdirectory(lib)
