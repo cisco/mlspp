@@ -86,7 +86,8 @@ TreeTestCase::commit(LeafIndex from,
   }
   pub.set_hash_all();
 
-  auto joiner = std::optional<std::tuple<LeafIndex, HPKEPrivateKey, SignaturePrivateKey>>{};
+  auto joiner =
+    std::optional<std::tuple<LeafIndex, HPKEPrivateKey, SignaturePrivateKey>>{};
   if (add) {
     joiner = add_leaf();
   }
