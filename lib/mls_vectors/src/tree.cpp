@@ -73,12 +73,6 @@ TreeTestCase::add_leaf()
   return { where, enc_priv, sig_priv };
 }
 
-// XXX(RLB) For some reason, the version of clang-tidy used by GitHub runners
-// segfaults when trying to evaluate this lint on this method.  I tried several
-// variations to amek it easier for the linter to evaluate, but to no avail.
-// This lint isn't super-critical for us anyway as long as we use `opt::get`,
-// since that throws on a bad access instead of reading uninitialized memory.
-// NOLINTBEGIN(bugprone-unchecked-optional-access)
 void
 TreeTestCase::commit(LeafIndex from,
                      const std::vector<LeafIndex>& remove,
@@ -118,7 +112,14 @@ TreeTestCase::commit(LeafIndex from,
     auto path = pub.encap(sender_priv, context, except);
 
     // Process the UpdatePath at all the members
-    for (auto& [leaf, priv_state] : privs) {
+    for (auto& pair : privs) {
+      // XXX(RLB): It might seem like this could be done with a simple
+      // destructuring assignment, either here or in the `for` clause above.
+      // However, either of these options cause clang-tidy to segfault when
+      // evaulating the "bugprone-unchecked-optional-access" lint.
+      const auto& leaf = pair.first;
+      auto& priv_state = pair.second;
+
       if (leaf == from) {
         priv_state = PrivateState{ priv_state.sig_priv, sender_priv, { from } };
         continue;
@@ -153,7 +154,6 @@ TreeTestCase::commit(LeafIndex from,
                            PrivateState{ sig_priv, tree_priv, { from } });
   }
 }
-// NOLINTEND(bugprone-unchecked-optional-access)
 
 TreeTestCase
 TreeTestCase::full(CipherSuite suite,
