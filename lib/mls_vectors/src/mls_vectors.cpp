@@ -1229,28 +1229,25 @@ struct TreeTestCase
       auto path = pub.encap(sender_priv, context, joiner);
 
       // Process the UpdatePath at all the members
-      for (auto& [leaf, priv_state] : privs) {
-        if (leaf == from) {
-          priv_state =
-            PrivateState{ priv_state.sig_priv, sender_priv, { from } };
-          continue;
+      for (auto& pair : privs) {
+        // XXX(RLB): It might seem like this could be done with a simple
+        // destructuring assignment, either here or in the `for` clause above.
+        // However, either of these options cause clang-tidy to segfault when
+        // evaulating the "bugprone-unchecked-optional-access" lint.
+        const auto& leaf = pair.first;
+        auto& priv_state = pair.second;
+
+        // Look up the path secret for the joiner
+        if (!joiner.empty()) {
+          auto index = joiner.front();
+          auto [overlap, shared_path_secret, ok] =
+            sender_priv.shared_path_secret(index);
+          silence_unused(overlap);
+          silence_unused(ok);
+
+          path_secret = shared_path_secret;
         }
-
-        priv_state.priv.decap(from, pub_before, context, path, joiner);
-        priv_state.senders.push_back(from);
       }
-
-      // Look up the path secret for the joiner
-      if (!joiner.empty()) {
-        auto index = joiner.front();
-        auto [overlap, shared_path_secret, ok] =
-          sender_priv.shared_path_secret(index);
-        silence_unused(overlap);
-        silence_unused(ok);
-
-        path_secret = shared_path_secret;
-      }
-    }
 
     // Add a private entry for the joiner if we added someone
     if (!joiner.empty()) {
