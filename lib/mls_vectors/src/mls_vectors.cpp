@@ -1236,18 +1236,27 @@ struct TreeTestCase
         // evaulating the "bugprone-unchecked-optional-access" lint.
         const auto& leaf = pair.first;
         auto& priv_state = pair.second;
-
-        // Look up the path secret for the joiner
-        if (!joiner.empty()) {
-          auto index = joiner.front();
-          auto [overlap, shared_path_secret, ok] =
-            sender_priv.shared_path_secret(index);
-          silence_unused(overlap);
-          silence_unused(ok);
-
-          path_secret = shared_path_secret;
+        if (leaf == from) {
+          priv_state =
+            PrivateState{ priv_state.sig_priv, sender_priv, { from } };
+          continue;
         }
+
+        priv_state.priv.decap(from, pub_before, context, path, joiner);
+        priv_state.senders.push_back(from);
       }
+
+      // Look up the path secret for the joiner
+      if (!joiner.empty()) {
+        auto index = joiner.front();
+        auto [overlap, shared_path_secret, ok] =
+          sender_priv.shared_path_secret(index);
+        silence_unused(overlap);
+        silence_unused(ok);
+
+        path_secret = shared_path_secret;
+      }
+    }
 
     // Add a private entry for the joiner if we added someone
     if (!joiner.empty()) {
