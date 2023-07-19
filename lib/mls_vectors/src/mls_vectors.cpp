@@ -1229,7 +1229,13 @@ struct TreeTestCase
       auto path = pub.encap(sender_priv, context, joiner);
 
       // Process the UpdatePath at all the members
-      for (auto& [leaf, priv_state] : privs) {
+      for (auto& pair : privs) {
+        // XXX(RLB): It might seem like this could be done with a simple
+        // destructuring assignment, either here or in the `for` clause above.
+        // However, either of these options cause clang-tidy to segfault when
+        // evaulating the "bugprone-unchecked-optional-access" lint.
+        const auto& leaf = pair.first;
+        auto& priv_state = pair.second;
         if (leaf == from) {
           priv_state =
             PrivateState{ priv_state.sig_priv, sender_priv, { from } };
