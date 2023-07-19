@@ -156,8 +156,10 @@ struct Credential
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  using SpecificCredential =
-    var::variant<BasicCredential, X509Credential, UserInfoVCCredential, MultiCredential>;
+  using SpecificCredential = var::variant<BasicCredential,
+                                          X509Credential,
+                                          UserInfoVCCredential,
+                                          MultiCredential>;
 
   Credential(SpecificCredential _cred);
   SpecificCredential _cred;
