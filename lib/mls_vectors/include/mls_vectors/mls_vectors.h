@@ -444,11 +444,16 @@ struct TreeOperationsTestVector : PseudoRandom
 
   static const std::vector<Scenario> all_scenarios;
 
+  mls::CipherSuite cipher_suite;
+
   mls::TreeKEMPublicKey tree_before;
+  bytes tree_hash_before;
+
   mls::Proposal proposal;
   mls::LeafIndex proposal_sender;
 
   mls::TreeKEMPublicKey tree_after;
+  bytes tree_hash_after;
 
   TreeOperationsTestVector() = default;
   TreeOperationsTestVector(mls::CipherSuite suite, Scenario scenario);
