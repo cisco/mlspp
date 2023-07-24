@@ -43,6 +43,8 @@ struct Group
   const size_t dh_size;
   const size_t pk_size;
   const size_t sk_size;
+  const std::string jwt_key_type;
+  const std::string jwt_curve_name;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
@@ -62,6 +64,13 @@ struct Group
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+  virtual void get_coordinates(const Group::PublicKey& pk,
+                               bytes& x,
+                               bytes& y) const = 0;
+  virtual std::unique_ptr<Group::PublicKey> set_coordinates(
+    const bytes& x,
+    const bytes& y) const = 0;
 
 protected:
   const KDF& kdf;

@@ -526,11 +526,170 @@ struct ECKeyGroup : public EVPGroup
 #endif
   }
 
+  // EC Key
+  void get_coordinates(const Group::PublicKey& pk,
+                       bytes& x,
+                       bytes& y) const override
+  {
+    auto bnX = make_typed_unique(BN_new());
+    auto bnY = make_typed_unique(BN_new());
+    const auto& rpk = dynamic_cast<const PublicKey&>(pk);
+
+#if defined(WITH_OPENSSL3)
+    OSSL_PARAM* param = nullptr;
+
+    if (1 != EVP_PKEY_todata(rpk.pkey.get(), EVP_PKEY_PUBLIC_KEY, &param)) {
+      throw openssl_error();
+    }
+    auto param_ptr = make_typed_unique(param);
+    const OSSL_PARAM* pk_param =
+      OSSL_PARAM_locate_const(param_ptr.get(), OSSL_PKEY_PARAM_PUB_KEY);
+
+    if (pk_param == nullptr) {
+      throw std::runtime_error("Failed to locate OSSL_PKEY_PARAM_PUB_KEY");
+    }
+    size_t len = 0;
+
+    if (1 != OSSL_PARAM_get_octet_string(pk_param, nullptr, 0, &len)) {
+      throw std::runtime_error("Failed to get OSSL_PKEY_PARAM_PUB_KEY len");
+    }
+    bytes buf(len);
+    void* data_ptr = buf.data();
+
+    if (1 != OSSL_PARAM_get_octet_string(pk_param, &data_ptr, len, nullptr)) {
+      throw std::runtime_error("Failed to get OSSL_PKEY_PARAM_PUB_KEY data");
+    }
+    auto group = make_typed_unique(
+      EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid));
+
+    if (group == nullptr) {
+      throw openssl_error();
+    }
+    auto point = make_typed_unique(EC_POINT_new(group.get()));
+
+    if (point == nullptr) {
+      throw openssl_error();
+    }
+    const auto* oct_ptr = static_cast<const unsigned char*>(data_ptr);
+
+    if (1 !=
+        EC_POINT_oct2point(group.get(), point.get(), oct_ptr, len, nullptr)) {
+      throw openssl_error();
+    }
+
+    if (1 != EC_POINT_get_affine_coordinates(
+               group.get(), point.get(), bnX.get(), bnY.get(), nullptr)) {
+      throw openssl_error();
+    }
+#else
+    auto* pub = EVP_PKEY_get0_EC_KEY(rpk.pkey.get());
+    const auto* point = EC_KEY_get0_public_key(pub);
+    const auto* group = EC_KEY_get0_group(pub);
+
+    if (1 != EC_POINT_get_affine_coordinates_GFp(
+               group, point, bnX.get(), bnY.get(), nullptr)) {
+      throw openssl_error();
+    }
+#endif
+    auto outX = bytes(BN_num_bytes(bnX.get()));
+    auto outY = bytes(BN_num_bytes(bnY.get()));
+
+    if (BN_bn2bin(bnX.get(), outX.data()) != int(outX.size())) {
+      throw openssl_error();
+    }
+
+    if (BN_bn2bin(bnY.get(), outY.data()) != int(outY.size())) {
+      throw openssl_error();
+    }
+    const auto zeros_neededX = dh_size - outX.size();
+    const auto zeros_neededY = dh_size - outY.size();
+    auto leading_zerosX = bytes(zeros_neededX, 0);
+    auto leading_zerosY = bytes(zeros_neededY, 0);
+    x = leading_zerosX + outX;
+    y = leading_zerosY + outY;
+  }
+
+  // EC Key
+  std::unique_ptr<Group::PublicKey> set_coordinates(
+    const bytes& x,
+    const bytes& y) const override
+  {
+    auto bnX = make_typed_unique(
+      BN_bin2bn(x.data(), static_cast<int>(x.size()), nullptr));
+    auto bnY = make_typed_unique(
+      BN_bin2bn(y.data(), static_cast<int>(y.size()), nullptr));
+
+    if (bnX == nullptr || bnY == nullptr) {
+      throw std::runtime_error("Failed to convert bnX or bnY");
+    }
+
+#if defined(WITH_OPENSSL3)
+    auto* group = EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid);
+    auto group_ptr = make_typed_unique(group);
+
+    auto* point = EC_POINT_new(group);
+    auto point_ptr = make_typed_unique(point);
+
+    if (point == nullptr || group == nullptr) {
+      throw std::runtime_error("Failed to create EC_POINT or EC_GROUP");
+    }
+
+    if (1 != EC_POINT_set_affine_coordinates(
+               group, point, bnX.get(), bnY.get(), nullptr)) {
+      throw openssl_error();
+    }
+
+    const auto point_size = EC_POINT_point2oct(
+      group, point, POINT_CONVERSION_UNCOMPRESSED, nullptr, 0, nullptr);
+
+    if (0 == point_size) {
+      throw openssl_error();
+    }
+    bytes pub(point_size);
+
+    if (EC_POINT_point2oct(group,
+                           point,
+                           POINT_CONVERSION_UNCOMPRESSED,
+                           pub.data(),
+                           point_size,
+                           nullptr) != point_size) {
+      throw openssl_error();
+    }
+    auto key = public_evp_key(pub);
+    return std::make_unique<EVPGroup::PublicKey>(key.release());
+#else
+    auto eckey = make_typed_unique(new_ec_key());
+
+    if (eckey == nullptr) {
+      throw std::runtime_error("Failed to create EC_KEY");
+    }
+
+    const auto* group = EC_KEY_get0_group(eckey.get());
+    auto* point = EC_POINT_new(group);
+    auto point_ptr = make_typed_unique(point);
+
+    if (1 != EC_POINT_set_affine_coordinates_GFp(
+               group, point, bnX.get(), bnY.get(), nullptr)) {
+      throw openssl_error();
+    }
+
+    if (1 != EC_KEY_set_public_key(eckey.get(), point)) {
+      throw openssl_error();
+    }
+    return std::make_unique<EVPGroup::PublicKey>(to_pkey(eckey.release()));
+#endif
+  }
+
 private:
   int curve_nid;
 
 #if !defined(WITH_OPENSSL3)
-  EC_KEY* new_ec_key() const { return EC_KEY_new_by_curve_name(curve_nid); }
+  // clang-format off
+  EC_KEY* new_ec_key() const
+  {
+    return EC_KEY_new_by_curve_name(curve_nid);
+  }
+  // clang-format on
 
   static EVP_PKEY* to_pkey(EC_KEY* eckey)
   {
@@ -646,6 +805,30 @@ struct RawKeyGroup : public EVPGroup
     }
 
     return std::make_unique<EVPGroup::PrivateKey>(pkey);
+  }
+
+  // Raw Key
+  void get_coordinates(const Group::PublicKey& pk,
+                       bytes& x,
+                       bytes& /*unused*/) const override
+  {
+    const auto& rpk = dynamic_cast<const PublicKey&>(pk);
+    auto raw = bytes(pk_size);
+    auto* data_ptr = raw.data();
+    auto data_len = raw.size();
+
+    if (1 != EVP_PKEY_get_raw_public_key(rpk.pkey.get(), data_ptr, &data_len)) {
+      throw openssl_error();
+    }
+    x = raw;
+  }
+
+  // Raw Key
+  std::unique_ptr<Group::PublicKey> set_coordinates(
+    const bytes& x,
+    const bytes& /*unused*/) const override
+  {
+    return deserialize(x);
   }
 
 private:
@@ -809,11 +992,54 @@ group_sk_size(Group::ID group_id)
   }
 }
 
+static inline std::string
+group_jwt_curve_name(Group::ID group_id)
+{
+  switch (group_id) {
+    case Group::ID::P256:
+      return "P-256";
+    case Group::ID::P384:
+      return "P-384";
+    case Group::ID::P521:
+      return "P-521";
+    case Group::ID::Ed25519:
+      return "Ed25519";
+    case Group::ID::Ed448:
+      return "Ed448";
+    case Group::ID::X25519:
+      return "X25519";
+    case Group::ID::X448:
+      return "X448";
+    default:
+      throw std::runtime_error("Unknown group");
+  }
+}
+
+static inline std::string
+group_jwt_key_type(Group::ID group_id)
+{
+  switch (group_id) {
+    case Group::ID::P256:
+    case Group::ID::P384:
+    case Group::ID::P521:
+      return "EC";
+    case Group::ID::Ed25519:
+    case Group::ID::Ed448:
+    case Group::ID::X25519:
+    case Group::ID::X448:
+      return "OKP";
+    default:
+      throw std::runtime_error("Unknown group");
+  }
+}
+
 Group::Group(ID group_id_in, const KDF& kdf_in)
   : id(group_id_in)
   , dh_size(group_dh_size(group_id_in))
   , pk_size(group_pk_size(group_id_in))
   , sk_size(group_sk_size(group_id_in))
+  , jwt_key_type(group_jwt_key_type(group_id_in))
+  , jwt_curve_name(group_jwt_curve_name(group_id_in))
   , kdf(kdf_in)
 {
 }

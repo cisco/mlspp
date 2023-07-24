@@ -7,7 +7,8 @@
       "name": "openssl",
       "version>=": "3.0.7"
     },
-    "doctest"
+    "doctest",
+    "nlohmann-json"
   ],
   "builtin-baseline": "5908d702d61cea1429b223a0b7a10ab86bad4c78",
   "overrides": [

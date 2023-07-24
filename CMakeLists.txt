@@ -114,6 +114,8 @@ target_include_directories(${LIB_NAME}
     ${OPENSSL_INCLUDE_DIR}
 )
 
+install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
+
 ###
 ### Tests
 ###
@@ -125,9 +127,7 @@ endif()
 ### Exports
 ###
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
-export(EXPORT mlspp-targets 
-       NAMESPACE MLSPP::
-       FILE ${CMAKE_CURRENT_BINARY_DIR}/mlspp-targets.cmake)
+export(EXPORT mlspp-targets NAMESPACE MLSPP:: FILE mlspp-targets.cmake)
 export(PACKAGE MLSPP)
 
 configure_package_config_file(cmake/config.cmake.in
@@ -144,8 +144,6 @@ write_basic_package_version_file(
 ### Install
 ###
 
-install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
-
 install(
   DIRECTORY
     include/
@@ -156,7 +154,16 @@ install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config-version.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-targets.cmake
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/mlspp)
+
+install(
+  EXPORT
+    mlspp-targets
+  NAMESPACE
+    MLSPP::
+  FILE
+    mlspp-targets.cmake
   DESTINATION
     ${CMAKE_INSTALL_DATADIR}/mlspp)
 

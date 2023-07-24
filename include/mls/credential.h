@@ -11,9 +11,9 @@ namespace mls {
 // } BasicCredential;
 struct BasicCredential
 {
-  BasicCredential() = default;
+  BasicCredential() {}
 
-  explicit BasicCredential(bytes identity_in)
+  BasicCredential(bytes identity_in)
     : identity(std::move(identity_in))
   {
   }
