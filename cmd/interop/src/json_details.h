@@ -290,6 +290,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WelcomeTestVector,
                                    welcome)
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TreeOperationsTestVector,
+                                   cipher_suite,
                                    tree_before,
                                    tree_hash_before,
                                    proposal,

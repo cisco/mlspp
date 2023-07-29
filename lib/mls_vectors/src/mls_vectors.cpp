@@ -1553,8 +1553,11 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
 }
 
 std::optional<std::string>
-TreeOperationsTestVector::verify() const
+TreeOperationsTestVector::verify()
 {
+  tree_before.suite = cipher_suite;
+  tree_before.set_hash_all();
+
   auto tree = tree_before;
   VERIFY_EQUAL("tree hash before", tree.root_hash(), tree_hash_before);
 

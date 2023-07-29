@@ -457,7 +457,7 @@ struct TreeOperationsTestVector : PseudoRandom
 
   TreeOperationsTestVector() = default;
   TreeOperationsTestVector(mls::CipherSuite suite, Scenario scenario);
-  std::optional<std::string> verify() const;
+  std::optional<std::string> verify();
 };
 
 struct TreeKEMTestVector : PseudoRandom
