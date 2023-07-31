@@ -1451,6 +1451,7 @@ const std::vector<TreeOperationsTestVector::Scenario>
 TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
                                                    Scenario scenario)
   : PseudoRandom(suite, "tree-operations")
+  , cipher_suite(suite)
   , proposal_sender(0)
 {
   auto init_priv = prg.hpke_key("init_key");
@@ -1480,6 +1481,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Add{ key_package } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.add_leaf(key_package.leaf_node);
@@ -1493,6 +1495,8 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
 
       tree_before = tc.pub;
       tree_before.blank_path(LeafIndex{ 4 });
+      tree_before.set_hash_all();
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.add_leaf(key_package.leaf_node);
@@ -1506,6 +1510,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Update{ key_package.leaf_node } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.update_leaf(proposal_sender, key_package.leaf_node);
@@ -1519,6 +1524,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Remove{ removed } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.blank_path(removed);
@@ -1533,6 +1539,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Remove{ removed } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.blank_path(removed);
@@ -1540,12 +1547,20 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       break;
     }
   }
+
+  tree_after.set_hash_all();
+  tree_hash_after = tree_after.root_hash();
 }
 
 std::optional<std::string>
-TreeOperationsTestVector::verify() const
+TreeOperationsTestVector::verify()
 {
+  tree_before.suite = cipher_suite;
+  tree_before.set_hash_all();
+
   auto tree = tree_before;
+  VERIFY_EQUAL("tree hash before", tree.root_hash(), tree_hash_before);
+
   auto apply = overloaded{
     [&](const Add& add) { tree.add_leaf(add.key_package.leaf_node); },
 
@@ -1565,6 +1580,9 @@ TreeOperationsTestVector::verify() const
 
   var::visit(apply, proposal.content);
   VERIFY_EQUAL("tree after", tree, tree_after);
+
+  tree.set_hash_all();
+  VERIFY_EQUAL("tree hash after", tree.root_hash(), tree_hash_after);
 
   return std::nullopt;
 }
