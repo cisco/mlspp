@@ -148,7 +148,7 @@ struct GroupSignature : public Signature
     if (jwk_json.contains("y")) {
       y = from_base64url(jwk_json["y"]);
     }
-    return group.set_coordinates(x, y);
+    return group.get_public_key_from_coordinates(x, y);
   }
 
   std::string export_jwk(const bytes& enc) const override
@@ -162,7 +162,7 @@ struct GroupSignature : public Signature
     std::unique_ptr<hpke::Signature::PublicKey> pk = deserialize(enc);
     const auto& rpk =
       dynamic_cast<const hpke::Group::PublicKey&>(*(pk.release()));
-    group.get_coordinates(rpk, x, y);
+    group.get_coordinates_from_public_key(rpk, x, y);
 
     if (!x.empty()) {
       json_jwk["x"] = to_base64url(x);
@@ -188,7 +188,7 @@ struct GroupSignature : public Signature
     const auto priv = group.deserialize_private(enc);
     const auto& rpk =
       dynamic_cast<const Group::PublicKey&>(*(priv->public_key().release()));
-    group.get_coordinates(rpk, x, y);
+    group.get_coordinates_from_public_key(rpk, x, y);
 
     if (!x.empty()) {
       json_jwk["x"] = to_base64url(x);

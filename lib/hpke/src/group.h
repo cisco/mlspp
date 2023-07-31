@@ -65,10 +65,10 @@ struct Group
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
 
-  virtual void get_coordinates(const Group::PublicKey& pk,
-                               bytes& x,
-                               bytes& y) const = 0;
-  virtual std::unique_ptr<Group::PublicKey> set_coordinates(
+  virtual void get_coordinates_from_public_key(const Group::PublicKey& pk,
+                                               bytes& x,
+                                               bytes& y) const = 0;
+  virtual std::unique_ptr<Group::PublicKey> get_public_key_from_coordinates(
     const bytes& x,
     const bytes& y) const = 0;
 

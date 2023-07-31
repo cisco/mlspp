@@ -527,9 +527,9 @@ struct ECKeyGroup : public EVPGroup
   }
 
   // EC Key
-  void get_coordinates(const Group::PublicKey& pk,
-                       bytes& x,
-                       bytes& y) const override
+  void get_coordinates_from_public_key(const Group::PublicKey& pk,
+                                       bytes& x,
+                                       bytes& y) const override
   {
     auto bnX = make_typed_unique(BN_new());
     auto bnY = make_typed_unique(BN_new());
@@ -610,7 +610,7 @@ struct ECKeyGroup : public EVPGroup
   }
 
   // EC Key
-  std::unique_ptr<Group::PublicKey> set_coordinates(
+  std::unique_ptr<Group::PublicKey> get_public_key_from_coordinates(
     const bytes& x,
     const bytes& y) const override
   {
@@ -808,9 +808,9 @@ struct RawKeyGroup : public EVPGroup
   }
 
   // Raw Key
-  void get_coordinates(const Group::PublicKey& pk,
-                       bytes& x,
-                       bytes& /*unused*/) const override
+  void get_coordinates_from_public_key(const Group::PublicKey& pk,
+                                       bytes& x,
+                                       bytes& /*unused*/) const override
   {
     const auto& rpk = dynamic_cast<const PublicKey&>(pk);
     auto raw = bytes(pk_size);
@@ -824,7 +824,7 @@ struct RawKeyGroup : public EVPGroup
   }
 
   // Raw Key
-  std::unique_ptr<Group::PublicKey> set_coordinates(
+  std::unique_ptr<Group::PublicKey> get_public_key_from_coordinates(
     const bytes& x,
     const bytes& /*unused*/) const override
   {
