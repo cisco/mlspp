@@ -22,12 +22,21 @@ struct PseudoRandom
     bytes secret(const std::string& label) const;
     bytes generate(const std::string& label, size_t size) const;
 
+    bool boolean(const std::string& label) const;
     uint16_t uint16(const std::string& label) const;
     uint32_t uint32(const std::string& label) const;
     uint64_t uint64(const std::string& label) const;
 
+    uint32_t rand(const std::string& label, uint32_t max) const;
+
     mls::SignaturePrivateKey signature_key(const std::string& label) const;
     mls::HPKEPrivateKey hpke_key(const std::string& label) const;
+
+    std::tuple<mls::HPKEPrivateKey,
+               mls::HPKEPrivateKey,
+               mls::SignaturePrivateKey,
+               mls::KeyPackage>
+    key_package(const std::string& label) const;
 
     size_t output_length() const;
 
@@ -530,6 +539,19 @@ struct MessagesTestVector : PseudoRandom
 
 struct PassiveClientTestVector : PseudoRandom
 {
+  enum struct Scenario : uint32_t
+  {
+    join_via_welcome,
+    join_via_welcome_external_tree,
+    handle_commit_public,
+    handle_commit_private,
+    handle_commit_by_reference,
+    handle_external_commit,
+    handle_100_random_commits,
+  };
+
+  static const std::vector<Scenario> all_scenarios;
+
   struct PSK
   {
     bytes psk_id;
@@ -541,6 +563,8 @@ struct PassiveClientTestVector : PseudoRandom
     std::vector<mls::MLSMessage> proposals;
     mls::MLSMessage commit;
     bytes epoch_authenticator;
+    bytes application_data;
+    mls::MLSMessage application_message;
   };
 
   mls::CipherSuite cipher_suite;
@@ -554,10 +578,14 @@ struct PassiveClientTestVector : PseudoRandom
 
   mls::MLSMessage welcome;
   std::optional<mls::TreeKEMPublicKey> ratchet_tree;
+
   bytes initial_epoch_authenticator;
+  bytes initial_epoch_application_data;
+  mls::MLSMessage initial_epoch_application_message;
 
   std::vector<Epoch> epochs;
 
+  PassiveClientTestVector(mls::CipherSuite suite, Scenario scenario);
   PassiveClientTestVector() = default;
   std::optional<std::string> verify();
 };
