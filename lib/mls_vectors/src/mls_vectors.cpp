@@ -5,8 +5,6 @@
 
 #include <limits>
 
-#include <iostream> // XXX
-
 namespace mls_vectors {
 
 using namespace mls;
@@ -2228,8 +2226,6 @@ PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
         const auto msg_opts = MessageOpts{ encrypt, {}, 0 };
         switch (op) {
           case ADD_OP: {
-            std::cout << "step=" << epoch << " op=add" << std::endl;
-
             const auto [joiner_init_priv,
                         joiner_enc_priv,
                         joiner_sig_priv,
@@ -2261,8 +2257,6 @@ PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
             const auto new_member_index = next.tree().find(joiner_kp.leaf_node);
             members.insert_or_assign(opt::get(new_member_index).val, new_member);
 
-            std::cout << "  @ " << opt::get(new_member_index).val << " by " << committer_index << std::endl;
-
             // Record the epoch
             const auto application_data = epoch_prg.secret("application_data");
             epochs.push_back({
@@ -2276,12 +2270,8 @@ PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
           }
 
           case UPDATE_OP: {
-            std::cout << "step=" << epoch << " op=update" << std::endl;
-
             const auto updater_index = random_member("updater");
             auto& updater = members.at(updater_index);
-
-            std::cout << "  @ " << updater_index << " by " << committer_index << std::endl;
 
             auto proposals = std::vector<MLSMessage>{};
             if (updater_index != committer_index) {
@@ -2324,8 +2314,6 @@ PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
           }
 
           case REMOVE_OP: {
-            std::cout << "step=" << epoch << " op=remove" << std::endl;
-
             if (members.size() == 1) {
               // re-roll
               break;
@@ -2369,9 +2357,6 @@ PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
           }
 
           case PSK_OP: {
-            std::cout << "step=" << epoch << " op=psk" << std::endl;
-            std::cout << "  by " << committer_index << std::endl;
-
             const auto psk_id = epoch_prg.secret("epoch_prg");
             const auto psk_secret = epoch_prg.secret("epoch_secret");
 

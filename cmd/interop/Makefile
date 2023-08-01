@@ -16,8 +16,7 @@ run: ${BUILD_DIR}/${APP_NAME}
 	./${BUILD_DIR}/${APP_NAME} -live 50001
 
 self-test: ${BUILD_DIR}/${APP_NAME}
-	# TODO(RLB) Extend to 13 to cover passive client tests
-	for tv_type in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+	for tv_type in 1 2 3 4 5 6 7 8 9 10 11 12 13; do \
 		echo Self-test on test vector type $$tv_type; \
 		./${BUILD_DIR}/${APP_NAME} -gen $$tv_type | ./${BUILD_DIR}/${APP_NAME} -ver $$tv_type; \
 	done
@@ -34,8 +33,7 @@ interop-test: ${BUILD_DIR}/${APP_NAME}
 	./${BUILD_DIR}/${APP_NAME} -ver 9 <${TEST_VECTOR_DIR}/welcome.json
 	./${BUILD_DIR}/${APP_NAME} -ver 10 <${TEST_VECTOR_DIR}/tree-operations.json
 	./${BUILD_DIR}/${APP_NAME} -ver 11 <${TEST_VECTOR_DIR}/treekem.json
-	# TODO(RLB) Uncomment once the messages test vectors are fixed
-	#./${BUILD_DIR}/${APP_NAME} -ver 12 <${TEST_VECTOR_DIR}/messages.json
+	./${BUILD_DIR}/${APP_NAME} -ver 12 <${TEST_VECTOR_DIR}/messages.json
 	./${BUILD_DIR}/${APP_NAME} -ver 13 <${TEST_VECTOR_DIR}/passive-client-welcome.json
 	./${BUILD_DIR}/${APP_NAME} -ver 13 <${TEST_VECTOR_DIR}/passive-client-handling-commit.json
 
