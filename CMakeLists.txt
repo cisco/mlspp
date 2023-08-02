@@ -109,7 +109,7 @@ target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
@@ -150,7 +150,7 @@ install(
   DIRECTORY
     include/
   DESTINATION
-    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION})
+    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
 
 install(
   FILES

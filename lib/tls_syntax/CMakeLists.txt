@@ -13,7 +13,7 @@ target_link_libraries(${CURRENT_LIB_NAME} third_party)
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 
 ###
@@ -25,7 +25,7 @@ install(
   DIRECTORY
     include/
   DESTINATION
-    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION}
+    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 )
 
 ###
