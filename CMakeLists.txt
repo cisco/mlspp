@@ -15,6 +15,8 @@ option(SANITIZERS "Enable sanitizers" OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 include(CheckCXXCompilerFlag)
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -107,7 +109,7 @@ target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
@@ -123,5 +125,38 @@ endif()
 ### Exports
 ###
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
-export(TARGETS mlspp tls_syntax hpke bytes mls_vectors third_party NAMESPACE MLSPP:: FILE MLSPPConfig.cmake)
+export(EXPORT mlspp-targets 
+       NAMESPACE MLSPP::
+       FILE ${CMAKE_CURRENT_BINARY_DIR}/mlspp-targets.cmake)
 export(PACKAGE MLSPP)
+
+configure_package_config_file(cmake/config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/mlspp
+  NO_SET_AND_CHECK_MACRO)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config-version.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion)
+
+###
+### Install
+###
+
+install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
+
+install(
+  DIRECTORY
+    include/
+  DESTINATION
+    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
+
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config-version.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-targets.cmake
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/mlspp)
+
