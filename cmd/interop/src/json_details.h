@@ -343,7 +343,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::PSK, psk_id, psk)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector::Epoch,
                                    proposals,
                                    commit,
-                                   epoch_authenticator)
+                                   epoch_authenticator,
+                                   application_data,
+                                   application_message)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector,
                                    cipher_suite,
                                    key_package,
@@ -354,6 +356,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PassiveClientTestVector,
                                    welcome,
                                    ratchet_tree,
                                    initial_epoch_authenticator,
+                                   initial_epoch_application_data,
+                                   initial_epoch_application_message,
                                    epochs)
 
 } // namespace mls_vectors

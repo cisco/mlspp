@@ -16,8 +16,7 @@ run: ${BUILD_DIR}/${APP_NAME}
 	./${BUILD_DIR}/${APP_NAME} -live 50001
 
 self-test: ${BUILD_DIR}/${APP_NAME}
-	# TODO(RLB) Extend to 13 to cover passive client tests
-	for tv_type in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+	for tv_type in 1 2 3 4 5 6 7 8 9 10 11 12 13; do \
 		echo Self-test on test vector type $$tv_type; \
 		./${BUILD_DIR}/${APP_NAME} -gen $$tv_type | ./${BUILD_DIR}/${APP_NAME} -ver $$tv_type; \
 	done

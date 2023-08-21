@@ -109,3 +109,13 @@ TEST_CASE("Messages")
   auto tv = MessagesTestVector();
   REQUIRE(tv.verify() == std::nullopt);
 }
+
+TEST_CASE("Passive Client")
+{
+  for (auto suite : supported_suites) {
+    for (auto scenario : PassiveClientTestVector::all_scenarios) {
+      auto tv = PassiveClientTestVector{ suite, scenario };
+      REQUIRE(tv.verify() == std::nullopt);
+    }
+  }
+}

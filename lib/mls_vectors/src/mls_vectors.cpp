@@ -3,7 +3,7 @@
 #include <mls/tree_math.h>
 #include <mls_vectors/mls_vectors.h>
 
-#include <iostream> // XXX
+#include <limits>
 
 namespace mls_vectors {
 
@@ -196,6 +196,13 @@ PseudoRandom::Generator::generate(const std::string& label, size_t size) const
   return suite.expand_with_label(seed, label, {}, size);
 }
 
+bool
+PseudoRandom::Generator::boolean(const std::string& label) const
+{
+  auto data = generate(label, 1);
+  return (data.at(0) & 1) == 1;
+}
+
 uint16_t
 PseudoRandom::Generator::uint16(const std::string& label) const
 {
@@ -217,6 +224,23 @@ PseudoRandom::Generator::uint64(const std::string& label) const
   return tls::get<uint16_t>(data);
 }
 
+uint32_t
+PseudoRandom::Generator::rand(const std::string& label, uint32_t max) const
+{
+  auto max_uint32 = std::numeric_limits<uint32_t>::max();
+  auto max_residue = (max_uint32 % max);
+  auto max_multiple = max_uint32 - max_residue;
+
+  auto val = uint32_t(0);
+  auto attempts = uint32_t(0);
+  do {
+    val = uint32(label + " attempt " + std::to_string(attempts));
+    attempts += 1;
+  } while (val >= max_multiple);
+
+  return val % max;
+}
+
 SignaturePrivateKey
 PseudoRandom::Generator::signature_key(const std::string& label) const
 {
@@ -229,6 +253,35 @@ PseudoRandom::Generator::hpke_key(const std::string& label) const
 {
   auto data = generate(label, suite.secret_size());
   return HPKEPrivateKey::derive(suite, data);
+}
+
+std::tuple<mls::HPKEPrivateKey,
+           mls::HPKEPrivateKey,
+           mls::SignaturePrivateKey,
+           mls::KeyPackage>
+PseudoRandom::Generator::key_package(const std::string& label) const
+{
+  const auto prg = sub(label);
+  const auto init_priv = prg.hpke_key("init_key");
+  const auto encryption_priv = prg.hpke_key("encryption_key");
+  const auto signature_priv = prg.signature_key("signature_key");
+  const auto identity = prg.secret("identity");
+  const auto key_package = KeyPackage{
+    suite,
+    init_priv.public_key,
+    { suite,
+      encryption_priv.public_key,
+      signature_priv.public_key,
+      Credential::basic(identity),
+      Capabilities::create_default(),
+      Lifetime::create_default(),
+      {},
+      signature_priv },
+    {},
+    signature_priv,
+  };
+
+  return { init_priv, encryption_priv, signature_priv, key_package };
 }
 
 size_t
@@ -1993,6 +2046,361 @@ MessagesTestVector::verify() const
   return std::nullopt;
 }
 
+///
+/// MessagesTestVector
+///
+
+const std::vector<PassiveClientTestVector::Scenario>
+  PassiveClientTestVector::all_scenarios{
+    Scenario::join_via_welcome,
+    Scenario::join_via_welcome_external_tree,
+    Scenario::handle_commit_public,
+    Scenario::handle_commit_private,
+    Scenario::handle_commit_by_reference,
+    Scenario::handle_external_commit,
+    Scenario::handle_100_random_commits,
+  };
+
+static inline std::string
+to_string(PassiveClientTestVector::Scenario scenario)
+{
+  return std::to_string(static_cast<uint32_t>(scenario));
+}
+
+static void
+add_epoch(PassiveClientTestVector& tv,
+          State& leader,
+          bool encrypt,
+          const std::vector<Proposal>& by_value,
+          const std::vector<MLSMessage>& by_reference)
+{
+  auto prg = tv.prg.sub("epoch " + std::to_string(leader.epoch()));
+
+  auto commit_secret = prg.secret("commit_secret");
+  auto commit_opts = CommitOpts{ by_value, false, false, {} };
+  auto msg_opts = MessageOpts{ encrypt, {}, 0 };
+
+  auto [commit, _welcome, leader_next] =
+    leader.commit(commit_secret, commit_opts, msg_opts);
+  leader = leader_next;
+
+  auto epoch_authenticator = leader.epoch_authenticator();
+  auto application_data = prg.secret("application_data");
+  auto application_message = leader.protect({}, application_data, 0);
+
+  tv.epochs.push_back({
+    by_reference,
+    commit,
+    epoch_authenticator,
+    application_data,
+    application_message,
+  });
+}
+
+PassiveClientTestVector::PassiveClientTestVector(CipherSuite suite,
+                                                 Scenario scenario)
+  : PseudoRandom(suite, "passive-client " + to_string(scenario))
+  , cipher_suite(suite)
+{
+  // Initialize base parameters
+  auto [follower_init_priv, follower_enc_priv, follower_sig_priv, follower_kp] =
+    prg.key_package("follower");
+
+  init_priv = follower_init_priv;
+  encryption_priv = follower_enc_priv;
+  signature_priv = follower_sig_priv;
+  key_package = follower_kp;
+
+  // Initialize leader state and add follower
+  auto group_id = prg.secret("group_id");
+  auto [_leader_init_priv, leader_enc_priv, leader_sig_priv, leader_kp] =
+    prg.key_package("leader");
+
+  auto leader = State(
+    group_id, suite, leader_enc_priv, leader_sig_priv, leader_kp.leaf_node, {});
+  auto add = leader.add_proposal(follower_kp);
+  auto commit_secret = prg.secret("commit_secret");
+  auto inline_tree = (scenario != Scenario::join_via_welcome_external_tree);
+  auto commit_opts = CommitOpts{ { add }, inline_tree, false, {} };
+  auto [_commit, welcome_obj, leader_next] =
+    leader.commit(commit_secret, commit_opts, {});
+  leader = leader_next;
+  welcome = welcome_obj;
+  ratchet_tree = leader.tree();
+
+  initial_epoch_authenticator = leader.epoch_authenticator();
+  initial_epoch_application_data = prg.secret("application_data");
+  initial_epoch_application_message =
+    leader.protect({}, initial_epoch_application_data, 0);
+
+  // Generate further epochs
+  switch (scenario) {
+    case Scenario::join_via_welcome:
+    case Scenario::join_via_welcome_external_tree: {
+      // Nothing further
+      break;
+    }
+
+    case Scenario::handle_commit_public: {
+      add_epoch(*this, leader, false, {}, {});
+      break;
+    }
+
+    case Scenario::handle_commit_private: {
+      add_epoch(*this, leader, true, {}, {});
+      break;
+    }
+
+    case Scenario::handle_commit_by_reference: {
+      auto psk_id = prg.secret("psk_id");
+      auto psk_secret = prg.secret("psk_secret");
+      external_psks.push_back({ psk_id, psk_secret });
+      leader.add_external_psk(psk_id, psk_secret);
+
+      auto pre_shared_key = leader.pre_shared_key(psk_id, {});
+      add_epoch(*this, leader, false, {}, { pre_shared_key });
+      break;
+    }
+
+    case Scenario::handle_external_commit: {
+      auto group_info = leader.group_info(true);
+
+      auto [_joiner_init_priv, joiner_enc_priv, joiner_sig_priv, joiner_kp] =
+        prg.key_package("joiner");
+
+      auto [commit, _joiner] =
+        State::external_join(prg.secret("joiner_leaf_secret"),
+                             joiner_sig_priv,
+                             joiner_kp,
+                             group_info,
+                             std::nullopt,
+                             {},
+                             std::nullopt,
+                             {});
+      leader = opt::get(leader.handle(commit));
+
+      auto epoch_authenticator = leader.epoch_authenticator();
+      auto application_data = prg.secret("application_data");
+      auto application_message = leader.protect({}, application_data, 0);
+      epochs.push_back({
+        {},
+        commit,
+        epoch_authenticator,
+        application_data,
+        application_message,
+      });
+      break;
+    }
+
+    case Scenario::handle_100_random_commits: {
+      constexpr auto N_OPERATIONS = uint32_t(4);
+      constexpr auto ADD_OP = uint32_t(0);
+      constexpr auto UPDATE_OP = uint32_t(1);
+      constexpr auto REMOVE_OP = uint32_t(2);
+      constexpr auto PSK_OP = uint32_t(3);
+
+      auto members = std::map<uint32_t, State>{};
+      members.insert_or_assign(0, leader);
+
+      auto epoch = int(2);
+      while (epochs.size() < 100) {
+        epoch += 1;
+        const auto epoch_prg =
+          prg.sub("epoch " + std::to_string(epoch));
+        const auto random_member = [&](const std::string& label) {
+          const auto map_index = epoch_prg.rand(label + " map_index", members.size());
+          auto iter = members.begin();
+          for (auto i = uint32_t(0); i + 1 < map_index; i++) {
+            iter = std::next(iter);
+          }
+          return iter->first;
+        };
+
+        // XXX(RLB) std::map iterators don't have operator+, so we have to index
+        // the map manually.
+        const auto committer_index = random_member("committer");
+        auto& committer = members.at(committer_index);
+
+        const auto op = epoch_prg.rand("operation", N_OPERATIONS);
+        const auto encrypt = epoch_prg.boolean("encrypt");
+        const auto msg_opts = MessageOpts{ encrypt, {}, 0 };
+        switch (op) {
+          case ADD_OP: {
+            const auto [joiner_init_priv,
+                        joiner_enc_priv,
+                        joiner_sig_priv,
+                        joiner_kp] = epoch_prg.key_package("joiner");
+
+            const auto add = committer.add_proposal(joiner_kp);
+            const auto commit_opts = CommitOpts{ { add }, true, false, {} };
+            const auto commit_secret = epoch_prg.secret("commit_secret");
+            const auto [commit, welcome, next] =
+              committer.commit(commit_secret, commit_opts, msg_opts);
+
+            // Group members handle the commit
+            for (auto& [index, member] : members) {
+              if (index == committer_index) {
+                member = next;
+              } else {
+                member = opt::get(member.handle(commit));
+              }
+            }
+
+            // New member joins
+            auto new_member = State{ joiner_init_priv,
+                                           joiner_enc_priv,
+                                           joiner_sig_priv,
+                                           joiner_kp,
+                                           welcome,
+                                           std::nullopt,
+                                           {} };
+            const auto new_member_index = next.tree().find(joiner_kp.leaf_node);
+            members.insert_or_assign(opt::get(new_member_index).val, new_member);
+
+            // Record the epoch
+            const auto application_data = epoch_prg.secret("application_data");
+            epochs.push_back({
+                {},
+                commit,
+                committer.epoch_authenticator(),
+                application_data,
+                committer.protect({}, application_data, 0),
+            });
+            break;
+          }
+
+          case UPDATE_OP: {
+            const auto updater_index = random_member("updater");
+            auto& updater = members.at(updater_index);
+
+            auto proposals = std::vector<MLSMessage>{};
+            if (updater_index != committer_index) {
+              const auto update_enc_priv = epoch_prg.hpke_key("update_enc_priv");
+              const auto update = updater.update(update_enc_priv, {}, msg_opts);
+              proposals.push_back(update);
+            }
+
+            for (const auto& proposal : proposals) {
+              committer.handle(proposal);
+            }
+
+            const auto commit_secret = epoch_prg.secret("commit_secret");
+            const auto [commit, welcome, next] =
+              committer.commit(commit_secret, {}, msg_opts);
+
+            // Group members handle the commit
+            for (auto& [index, member] : members) {
+              if (index == committer_index) {
+                member = next;
+              } else {
+                for (const auto& proposal : proposals) {
+                  member.handle(proposal);
+                }
+
+                member = opt::get(member.handle(commit));
+              }
+            }
+
+            // Record the epoch
+            const auto application_data = epoch_prg.secret("application_data");
+            epochs.push_back({
+                proposals,
+                commit,
+                committer.epoch_authenticator(),
+                application_data,
+                committer.protect({}, application_data, 0),
+            });
+            break;
+          }
+
+          case REMOVE_OP: {
+            if (members.size() == 1) {
+              // re-roll
+              break;
+            }
+
+            const auto removed_index = random_member("updater");
+            const auto remove = committer.remove_proposal(LeafIndex{ removed_index });
+            const auto commit_opts = CommitOpts{ { remove }, false, false, {} };
+
+            const auto commit_secret = epoch_prg.secret("commit_secret");
+            auto [commit, welcome, next] =
+              committer.commit(commit_secret, {}, msg_opts);
+
+            const auto epoch_authenticator = next.epoch_authenticator();
+            const auto application_data = epoch_prg.secret("application_data");
+            const auto application_message = next.protect({}, application_data, 0);
+
+            // Remove the old user
+            // NB: This invalidates the `committer` reference.
+            members.erase(removed_index);
+
+            // Group members handle the commit
+            for (auto& [index, member] : members) {
+              if (index == committer_index) {
+                member = next;
+              } else {
+                member = opt::get(member.handle(commit));
+              }
+            }
+
+            // Record the epoch
+            epochs.push_back({
+                {},
+                commit,
+                epoch_authenticator,
+                application_data,
+                application_message,
+            });
+
+            break;
+          }
+
+          case PSK_OP: {
+            const auto psk_id = epoch_prg.secret("epoch_prg");
+            const auto psk_secret = epoch_prg.secret("epoch_secret");
+
+            external_psks.push_back({ psk_id, psk_secret });
+            committer.add_external_psk(psk_id, psk_secret);
+
+            const auto psk = committer.pre_shared_key_proposal(psk_id);
+            const auto commit_opts = CommitOpts{ { psk }, false, false, {} };
+            const auto commit_secret = epoch_prg.secret("commit_secret");
+            const auto [commit, welcome, next] =
+              committer.commit(commit_secret, commit_opts, msg_opts);
+
+            // Group members handle the commit
+            for (auto& [index, member] : members) {
+              if (index == committer_index) {
+                member = next;
+              } else {
+                member.add_external_psk(psk_id, psk_secret);
+                member = opt::get(member.handle(commit));
+              }
+            }
+
+            // Record the epoch
+            const auto application_data = epoch_prg.secret("application_data");
+            epochs.push_back({
+                {},
+                commit,
+                committer.epoch_authenticator(),
+                application_data,
+                committer.protect({}, application_data, 0),
+            });
+            break;
+          }
+
+          default: {
+            throw std::runtime_error("Illegal operation");
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
 std::optional<std::string>
 PassiveClientTestVector::verify()
 {
@@ -2017,8 +2425,12 @@ PassiveClientTestVector::verify()
                      welcome_raw,
                      ratchet_tree,
                      ext_psks);
-  VERIFY_EQUAL(
-    "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
+  VERIFY_EQUAL("initial epoch authenticator",
+               state.epoch_authenticator(),
+               initial_epoch_authenticator);
+
+  auto [_aad, pt] = state.unprotect(initial_epoch_application_message);
+  VERIFY_EQUAL("initial epoch plaintext", pt, initial_epoch_application_data);
 
   for (const auto& tve : epochs) {
     for (const auto& proposal : tve.proposals) {
@@ -2028,6 +2440,9 @@ PassiveClientTestVector::verify()
     state = opt::get(state.handle(tve.commit));
     VERIFY_EQUAL(
       "epoch auth", state.epoch_authenticator(), tve.epoch_authenticator)
+
+    auto [_aad, pt] = state.unprotect(tve.application_message);
+    VERIFY_EQUAL("initial epoch plaintext", pt, tve.application_data);
   }
 
   return std::nullopt;

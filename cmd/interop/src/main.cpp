@@ -156,7 +156,17 @@ make_test_vector(uint64_t type)
         MessagesTestVector(),
       };
 
-      // TODO(RLB) TestVectorClass::passive_client_scenarios
+    case TestVectorClass::passive_client_scenarios: {
+      auto cases = std::vector<PassiveClientTestVector>();
+
+      for (const auto& suite : mls::all_supported_suites) {
+        for (const auto& scenario : PassiveClientTestVector::all_scenarios) {
+          cases.emplace_back(suite, scenario);
+        }
+      }
+
+      return cases;
+    }
 
     default:
       return nullptr;
