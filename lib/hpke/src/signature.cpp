@@ -1,5 +1,6 @@
 #include <hpke/digest.h>
 #include <hpke/signature.h>
+#include <hpke/base64.h>
 #include <string>
 
 #include "dhkem.h"

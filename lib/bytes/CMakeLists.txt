@@ -9,11 +9,7 @@ file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src
 
 add_library(${CURRENT_LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
 add_dependencies(${CURRENT_LIB_NAME} tls_syntax)
-target_link_libraries(${CURRENT_LIB_NAME}
-  PUBLIC
-    tls_syntax
-  PRIVATE
-    OpenSSL::Crypto)
+target_link_libraries(${CURRENT_LIB_NAME} tls_syntax)
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
