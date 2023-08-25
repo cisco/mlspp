@@ -79,6 +79,12 @@ bytes::operator^(const bytes& rhs) const
   return out;
 }
 
+std::string
+to_ascii(const bytes& data)
+{
+  return { data.begin(), data.end() };
+}
+
 bytes
 from_ascii(const std::string& ascii)
 {

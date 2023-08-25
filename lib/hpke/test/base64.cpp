@@ -1,5 +1,5 @@
-#include <hpke/base64.h>
 #include <doctest/doctest.h>
+#include <hpke/base64.h>
 
 using namespace hpke;
 using namespace bytes_ns;

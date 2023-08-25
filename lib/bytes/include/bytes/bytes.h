@@ -106,6 +106,9 @@ private:
   std::vector<uint8_t> _data;
 };
 
+std::string
+to_ascii(const bytes& data);
+
 bytes
 from_ascii(const std::string& ascii);
 
