@@ -107,7 +107,7 @@ TEST_CASE("Signature Key Serializion To JWK")
     std::string y;
   };
 
-  std::vector<KnownAnswerTest> cases{
+  const auto cases = std::vector<KnownAnswerTest>{
     { CipherSuite::ID::P256_AES128GCM_SHA256_P256,
       true,
       from_hex(

@@ -161,8 +161,9 @@ struct GroupSignature : public Signature
 
   std::string export_jwk_private(const Signature::PrivateKey& sk) const override
   {
-    const auto& gsk = dynamic_cast<const Group::PrivateKey&>(sk);
-    const auto gpk = gsk.public_key();
+    const auto& gssk = dynamic_cast<const GroupSignature::PrivateKey&>(sk);
+    const auto& gsk = gssk.group_priv;
+    const auto gpk = gsk->public_key();
 
     auto json_jwk = export_jwk_json(*gpk);
 

@@ -61,10 +61,11 @@ from_base64(const std::string& enc)
 
   const auto in = from_ascii(enc);
   const auto in_size = static_cast<int>(in.size());
-  auto out = bytes(in.size() / 4 * 3);
+  const auto out_size = in_size / 4 * 3;
+  auto out = bytes(out_size);
 
   const auto result = EVP_DecodeBlock(out.data(), in.data(), in_size);
-  if (result != 0) {
+  if (result != out_size) {
     throw openssl_error();
   }
 
