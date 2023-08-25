@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 #include <hpke/base64.h>
 
-using namespace hpke;
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::hpke;
+using namespace MLS_NAMESPACE::bytes_ns;
 
 TEST_CASE("To Base64 / To Base64Url")
 {

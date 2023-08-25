@@ -1,8 +1,9 @@
 #include "dhkem.h"
 
 #include "common.h"
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 DHKEM::PrivateKey::PrivateKey(Group::PrivateKey* group_priv_in)
   : group_priv(group_priv_in)
@@ -211,4 +212,4 @@ DHKEM::extract_and_expand(const bytes& dh, const bytes& kem_context) const
     suite_id, eae_prk, label_shared_secret, kem_context, secret_size);
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

@@ -1,11 +1,12 @@
 #include "mls/core_types.h"
 #include "mls/messages.h"
+#include <namespace.h>
 
 #include "grease.h"
 
 #include <set>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Extensions
@@ -437,4 +438,4 @@ KeyPackage::to_be_signed() const
   return out.bytes();
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

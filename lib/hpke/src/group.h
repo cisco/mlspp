@@ -2,11 +2,12 @@
 
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
+#include <namespace.h>
 
 #include "openssl_common.h"
 #include <openssl/evp.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct Group
 {
@@ -113,4 +114,4 @@ struct EVPGroup : public Group
               const Group::PublicKey& pk) const override;
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

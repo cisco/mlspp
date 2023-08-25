@@ -1,17 +1,18 @@
 #include <mls/core_types.h>
 #include <mls/crypto.h>
 #include <mls/messages.h>
+#include <namespace.h>
 
 #include <string>
 
-using hpke::AEAD;      // NOLINT(misc-unused-using-decls)
-using hpke::Digest;    // NOLINT(misc-unused-using-decls)
-using hpke::HPKE;      // NOLINT(misc-unused-using-decls)
-using hpke::KDF;       // NOLINT(misc-unused-using-decls)
-using hpke::KEM;       // NOLINT(misc-unused-using-decls)
-using hpke::Signature; // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::AEAD;      // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Digest;    // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::HPKE;      // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::KDF;       // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::KEM;       // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Signature; // NOLINT(misc-unused-using-decls)
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 SignatureScheme
 tls_signature_scheme(Signature::ID id)
@@ -470,4 +471,4 @@ SignaturePrivateKey::to_jwk(CipherSuite suite) const
   return suite.sig().export_jwk_private(*priv);
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

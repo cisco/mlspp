@@ -5,8 +5,9 @@
 #include <mls/credential.h>
 #include <mls/crypto.h>
 #include <mls/state.h>
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 class PendingJoin;
 class Session;
@@ -95,4 +96,4 @@ protected:
   friend bool operator!=(const Session& lhs, const Session& rhs);
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

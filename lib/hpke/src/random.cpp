@@ -1,10 +1,11 @@
 #include <hpke/random.h>
+#include <namespace.h>
 
 #include "openssl_common.h"
 
 #include <openssl/rand.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 bytes
 random_bytes(size_t size)
@@ -16,4 +17,4 @@ random_bytes(size_t size)
   return rand;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

@@ -5,10 +5,11 @@
 #include "mls/credential.h"
 #include "mls/crypto.h"
 #include "mls/treekem.h"
+#include <namespace.h>
 #include <optional>
 #include <tls/tls_syntax.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 struct ExternalPubExtension
 {
@@ -668,41 +669,63 @@ external_proposal(CipherSuite suite,
                   uint32_t signer_index,
                   const SignaturePrivateKey& sig_priv);
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::PSKType, mls::ExternalPSK, external)
-TLS_VARIANT_MAP(mls::PSKType, mls::ResumptionPSK, resumption)
+TLS_VARIANT_MAP(MLS_NAMESPACE::PSKType, MLS_NAMESPACE::ExternalPSK, external)
+TLS_VARIANT_MAP(MLS_NAMESPACE::PSKType,
+                MLS_NAMESPACE::ResumptionPSK,
+                resumption)
 
-TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::Proposal, value)
-TLS_VARIANT_MAP(mls::ProposalOrRefType, mls::ProposalRef, reference)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalOrRefType,
+                MLS_NAMESPACE::Proposal,
+                value)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalOrRefType,
+                MLS_NAMESPACE::ProposalRef,
+                reference)
 
-TLS_VARIANT_MAP(mls::ProposalType, mls::Add, add)
-TLS_VARIANT_MAP(mls::ProposalType, mls::Update, update)
-TLS_VARIANT_MAP(mls::ProposalType, mls::Remove, remove)
-TLS_VARIANT_MAP(mls::ProposalType, mls::PreSharedKey, psk)
-TLS_VARIANT_MAP(mls::ProposalType, mls::ReInit, reinit)
-TLS_VARIANT_MAP(mls::ProposalType, mls::ExternalInit, external_init)
-TLS_VARIANT_MAP(mls::ProposalType,
-                mls::GroupContextExtensions,
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType, MLS_NAMESPACE::Add, add)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType, MLS_NAMESPACE::Update, update)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType, MLS_NAMESPACE::Remove, remove)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType, MLS_NAMESPACE::PreSharedKey, psk)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType, MLS_NAMESPACE::ReInit, reinit)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType,
+                MLS_NAMESPACE::ExternalInit,
+                external_init)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ProposalType,
+                MLS_NAMESPACE::GroupContextExtensions,
                 group_context_extensions)
 
-TLS_VARIANT_MAP(mls::ContentType, mls::ApplicationData, application)
-TLS_VARIANT_MAP(mls::ContentType, mls::Proposal, proposal)
-TLS_VARIANT_MAP(mls::ContentType, mls::Commit, commit)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ContentType,
+                MLS_NAMESPACE::ApplicationData,
+                application)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ContentType, MLS_NAMESPACE::Proposal, proposal)
+TLS_VARIANT_MAP(MLS_NAMESPACE::ContentType, MLS_NAMESPACE::Commit, commit)
 
-TLS_VARIANT_MAP(mls::SenderType, mls::MemberSender, member)
-TLS_VARIANT_MAP(mls::SenderType, mls::ExternalSenderIndex, external)
-TLS_VARIANT_MAP(mls::SenderType,
-                mls::NewMemberProposalSender,
+TLS_VARIANT_MAP(MLS_NAMESPACE::SenderType, MLS_NAMESPACE::MemberSender, member)
+TLS_VARIANT_MAP(MLS_NAMESPACE::SenderType,
+                MLS_NAMESPACE::ExternalSenderIndex,
+                external)
+TLS_VARIANT_MAP(MLS_NAMESPACE::SenderType,
+                MLS_NAMESPACE::NewMemberProposalSender,
                 new_member_proposal)
-TLS_VARIANT_MAP(mls::SenderType, mls::NewMemberCommitSender, new_member_commit)
+TLS_VARIANT_MAP(MLS_NAMESPACE::SenderType,
+                MLS_NAMESPACE::NewMemberCommitSender,
+                new_member_commit)
 
-TLS_VARIANT_MAP(mls::WireFormat, mls::PublicMessage, mls_plaintext)
-TLS_VARIANT_MAP(mls::WireFormat, mls::PrivateMessage, mls_ciphertext)
-TLS_VARIANT_MAP(mls::WireFormat, mls::Welcome, mls_welcome)
-TLS_VARIANT_MAP(mls::WireFormat, mls::GroupInfo, mls_group_info)
-TLS_VARIANT_MAP(mls::WireFormat, mls::KeyPackage, mls_key_package)
+TLS_VARIANT_MAP(MLS_NAMESPACE::WireFormat,
+                MLS_NAMESPACE::PublicMessage,
+                mls_plaintext)
+TLS_VARIANT_MAP(MLS_NAMESPACE::WireFormat,
+                MLS_NAMESPACE::PrivateMessage,
+                mls_ciphertext)
+TLS_VARIANT_MAP(MLS_NAMESPACE::WireFormat, MLS_NAMESPACE::Welcome, mls_welcome)
+TLS_VARIANT_MAP(MLS_NAMESPACE::WireFormat,
+                MLS_NAMESPACE::GroupInfo,
+                mls_group_info)
+TLS_VARIANT_MAP(MLS_NAMESPACE::WireFormat,
+                MLS_NAMESPACE::KeyPackage,
+                mls_key_package)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

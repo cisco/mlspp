@@ -1,15 +1,16 @@
 #include "mls/credential.h"
 #include "hpke/certificate.h"
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// X509Credential
 ///
 
-using hpke::Certificate; // NOLINT(misc-unused-using-decls)
-using hpke::Signature;   // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Certificate; // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Signature;   // NOLINT(misc-unused-using-decls)
 
 static const Signature&
 find_signature(Signature::ID id)
@@ -251,4 +252,4 @@ Credential::Credential(SpecificCredential specific)
 {
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

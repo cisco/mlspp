@@ -16,7 +16,7 @@ struct PseudoRandom
   struct Generator
   {
     Generator() = default;
-    Generator(mls::CipherSuite suite_in, const std::string& label);
+    Generator(MLS_NAMESPACE::CipherSuite suite_in, const std::string& label);
     Generator sub(const std::string& label) const;
 
     bytes secret(const std::string& label) const;
@@ -26,38 +26,40 @@ struct PseudoRandom
     uint32_t uint32(const std::string& label) const;
     uint64_t uint64(const std::string& label) const;
 
-    mls::SignaturePrivateKey signature_key(const std::string& label) const;
-    mls::HPKEPrivateKey hpke_key(const std::string& label) const;
+    MLS_NAMESPACE::SignaturePrivateKey signature_key(
+      const std::string& label) const;
+    MLS_NAMESPACE::HPKEPrivateKey hpke_key(const std::string& label) const;
 
     size_t output_length() const;
 
   private:
-    mls::CipherSuite suite;
+    MLS_NAMESPACE::CipherSuite suite;
     bytes seed;
 
-    Generator(mls::CipherSuite suite_in, bytes&& seed_in);
+    Generator(MLS_NAMESPACE::CipherSuite suite_in, bytes&& seed_in);
   };
 
   PseudoRandom() = default;
-  PseudoRandom(mls::CipherSuite suite, const std::string& label);
+  PseudoRandom(MLS_NAMESPACE::CipherSuite suite, const std::string& label);
 
   Generator prg;
 };
 
 struct TreeMathTestVector
 {
-  using OptionalNode = std::optional<mls::NodeIndex>;
+  using OptionalNode = std::optional<MLS_NAMESPACE::NodeIndex>;
 
-  mls::LeafCount n_leaves;
-  mls::NodeCount n_nodes;
-  mls::NodeIndex root;
+  MLS_NAMESPACE::LeafCount n_leaves;
+  MLS_NAMESPACE::NodeCount n_nodes;
+  MLS_NAMESPACE::NodeIndex root;
   std::vector<OptionalNode> left;
   std::vector<OptionalNode> right;
   std::vector<OptionalNode> parent;
   std::vector<OptionalNode> sibling;
 
-  std::optional<mls::NodeIndex> null_if_invalid(mls::NodeIndex input,
-                                                mls::NodeIndex answer) const;
+  std::optional<MLS_NAMESPACE::NodeIndex> null_if_invalid(
+    MLS_NAMESPACE::NodeIndex input,
+    MLS_NAMESPACE::NodeIndex answer) const;
 
   TreeMathTestVector() = default;
   TreeMathTestVector(uint32_t n_leaves);
@@ -73,8 +75,8 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes out;
 
     RefHash() = default;
-    RefHash(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    RefHash(MLS_NAMESPACE::CipherSuite suite, PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct ExpandWithLabel
@@ -86,8 +88,9 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes out;
 
     ExpandWithLabel() = default;
-    ExpandWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    ExpandWithLabel(MLS_NAMESPACE::CipherSuite suite,
+                    PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct DeriveSecret
@@ -97,8 +100,9 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes out;
 
     DeriveSecret() = default;
-    DeriveSecret(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    DeriveSecret(MLS_NAMESPACE::CipherSuite suite,
+                 PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct DeriveTreeSecret
@@ -110,27 +114,29 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes out;
 
     DeriveTreeSecret() = default;
-    DeriveTreeSecret(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    DeriveTreeSecret(MLS_NAMESPACE::CipherSuite suite,
+                     PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct SignWithLabel
   {
-    mls::SignaturePrivateKey priv;
-    mls::SignaturePublicKey pub;
+    MLS_NAMESPACE::SignaturePrivateKey priv;
+    MLS_NAMESPACE::SignaturePublicKey pub;
     bytes content;
     std::string label;
     bytes signature;
 
     SignWithLabel() = default;
-    SignWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    SignWithLabel(MLS_NAMESPACE::CipherSuite suite,
+                  PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct EncryptWithLabel
   {
-    mls::HPKEPrivateKey priv;
-    mls::HPKEPublicKey pub;
+    MLS_NAMESPACE::HPKEPrivateKey priv;
+    MLS_NAMESPACE::HPKEPublicKey pub;
     std::string label;
     bytes context;
     bytes plaintext;
@@ -138,11 +144,12 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes ciphertext;
 
     EncryptWithLabel() = default;
-    EncryptWithLabel(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    EncryptWithLabel(MLS_NAMESPACE::CipherSuite suite,
+                     PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   RefHash ref_hash;
   ExpandWithLabel expand_with_label;
@@ -152,7 +159,7 @@ struct CryptoBasicsTestVector : PseudoRandom
   EncryptWithLabel encrypt_with_label;
 
   CryptoBasicsTestVector() = default;
-  CryptoBasicsTestVector(mls::CipherSuite suite);
+  CryptoBasicsTestVector(MLS_NAMESPACE::CipherSuite suite);
   std::optional<std::string> verify() const;
 };
 
@@ -166,8 +173,8 @@ struct SecretTreeTestVector : PseudoRandom
     bytes nonce;
 
     SenderData() = default;
-    SenderData(mls::CipherSuite suite, PseudoRandom::Generator&& prg);
-    std::optional<std::string> verify(mls::CipherSuite suite) const;
+    SenderData(MLS_NAMESPACE::CipherSuite suite, PseudoRandom::Generator&& prg);
+    std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
   struct RatchetStep
@@ -179,7 +186,7 @@ struct SecretTreeTestVector : PseudoRandom
     bytes application_nonce;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   SenderData sender_data;
 
@@ -187,7 +194,7 @@ struct SecretTreeTestVector : PseudoRandom
   std::vector<std::vector<RatchetStep>> leaves;
 
   SecretTreeTestVector() = default;
-  SecretTreeTestVector(mls::CipherSuite suite,
+  SecretTreeTestVector(MLS_NAMESPACE::CipherSuite suite,
                        uint32_t n_leaves,
                        const std::vector<uint32_t>& generations);
   std::optional<std::string> verify() const;
@@ -227,11 +234,11 @@ struct KeyScheduleTestVector : PseudoRandom
     bytes membership_key;
     bytes resumption_psk;
 
-    mls::HPKEPublicKey external_pub;
+    MLS_NAMESPACE::HPKEPublicKey external_pub;
     Export exporter;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   bytes group_id;
   bytes initial_init_secret;
@@ -239,50 +246,51 @@ struct KeyScheduleTestVector : PseudoRandom
   std::vector<Epoch> epochs;
 
   KeyScheduleTestVector() = default;
-  KeyScheduleTestVector(mls::CipherSuite suite, uint32_t n_epochs);
+  KeyScheduleTestVector(MLS_NAMESPACE::CipherSuite suite, uint32_t n_epochs);
   std::optional<std::string> verify() const;
 };
 
 struct MessageProtectionTestVector : PseudoRandom
 {
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   bytes group_id;
-  mls::epoch_t epoch;
+  MLS_NAMESPACE::epoch_t epoch;
   bytes tree_hash;
   bytes confirmed_transcript_hash;
 
-  mls::SignaturePrivateKey signature_priv;
-  mls::SignaturePublicKey signature_pub;
+  MLS_NAMESPACE::SignaturePrivateKey signature_priv;
+  MLS_NAMESPACE::SignaturePublicKey signature_pub;
 
   bytes encryption_secret;
   bytes sender_data_secret;
   bytes membership_key;
 
-  mls::Proposal proposal;
-  mls::MLSMessage proposal_pub;
-  mls::MLSMessage proposal_priv;
+  MLS_NAMESPACE::Proposal proposal;
+  MLS_NAMESPACE::MLSMessage proposal_pub;
+  MLS_NAMESPACE::MLSMessage proposal_priv;
 
-  mls::Commit commit;
-  mls::MLSMessage commit_pub;
-  mls::MLSMessage commit_priv;
+  MLS_NAMESPACE::Commit commit;
+  MLS_NAMESPACE::MLSMessage commit_pub;
+  MLS_NAMESPACE::MLSMessage commit_priv;
 
   bytes application;
-  mls::MLSMessage application_priv;
+  MLS_NAMESPACE::MLSMessage application_priv;
 
   MessageProtectionTestVector() = default;
-  MessageProtectionTestVector(mls::CipherSuite suite);
+  MessageProtectionTestVector(MLS_NAMESPACE::CipherSuite suite);
   std::optional<std::string> verify();
 
 private:
-  mls::GroupKeySource group_keys() const;
-  mls::GroupContext group_context() const;
+  MLS_NAMESPACE::GroupKeySource group_keys() const;
+  MLS_NAMESPACE::GroupContext group_context() const;
 
-  mls::MLSMessage protect_pub(
-    const mls::GroupContent::RawContent& raw_content) const;
-  mls::MLSMessage protect_priv(
-    const mls::GroupContent::RawContent& raw_content);
-  std::optional<mls::GroupContent> unprotect(const mls::MLSMessage& message);
+  MLS_NAMESPACE::MLSMessage protect_pub(
+    const MLS_NAMESPACE::GroupContent::RawContent& raw_content) const;
+  MLS_NAMESPACE::MLSMessage protect_priv(
+    const MLS_NAMESPACE::GroupContent::RawContent& raw_content);
+  std::optional<MLS_NAMESPACE::GroupContent> unprotect(
+    const MLS_NAMESPACE::MLSMessage& message);
 };
 
 struct PSKSecretTestVector : PseudoRandom
@@ -294,44 +302,44 @@ struct PSKSecretTestVector : PseudoRandom
     bytes psk;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
   std::vector<PSK> psks;
   bytes psk_secret;
 
   PSKSecretTestVector() = default;
-  PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks);
+  PSKSecretTestVector(MLS_NAMESPACE::CipherSuite suite, size_t n_psks);
   std::optional<std::string> verify() const;
 };
 
 struct TranscriptTestVector : PseudoRandom
 {
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   bytes confirmation_key;
   bytes interim_transcript_hash_before;
 
-  mls::AuthenticatedContent authenticated_content;
+  MLS_NAMESPACE::AuthenticatedContent authenticated_content;
 
   bytes confirmed_transcript_hash_after;
   bytes interim_transcript_hash_after;
 
   TranscriptTestVector() = default;
-  TranscriptTestVector(mls::CipherSuite suite);
+  TranscriptTestVector(MLS_NAMESPACE::CipherSuite suite);
   std::optional<std::string> verify() const;
 };
 
 struct WelcomeTestVector : PseudoRandom
 {
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
-  mls::HPKEPrivateKey init_priv;
-  mls::SignaturePublicKey signer_pub;
+  MLS_NAMESPACE::HPKEPrivateKey init_priv;
+  MLS_NAMESPACE::SignaturePublicKey signer_pub;
 
-  mls::MLSMessage key_package;
-  mls::MLSMessage welcome;
+  MLS_NAMESPACE::MLSMessage key_package;
+  MLS_NAMESPACE::MLSMessage welcome;
 
   WelcomeTestVector() = default;
-  WelcomeTestVector(mls::CipherSuite suite);
+  WelcomeTestVector(MLS_NAMESPACE::CipherSuite suite);
   std::optional<std::string> verify() const;
 };
 
@@ -419,15 +427,16 @@ extern std::array<TreeStructure, 11> treekem_test_tree_structures;
 
 struct TreeHashTestVector : PseudoRandom
 {
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
   bytes group_id;
 
-  mls::TreeKEMPublicKey tree;
+  MLS_NAMESPACE::TreeKEMPublicKey tree;
   std::vector<bytes> tree_hashes;
-  std::vector<std::vector<mls::NodeIndex>> resolutions;
+  std::vector<std::vector<MLS_NAMESPACE::NodeIndex>> resolutions;
 
   TreeHashTestVector() = default;
-  TreeHashTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  TreeHashTestVector(MLS_NAMESPACE::CipherSuite suite,
+                     TreeStructure tree_structure);
   std::optional<std::string> verify();
 };
 
@@ -444,19 +453,19 @@ struct TreeOperationsTestVector : PseudoRandom
 
   static const std::vector<Scenario> all_scenarios;
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
-  mls::TreeKEMPublicKey tree_before;
+  MLS_NAMESPACE::TreeKEMPublicKey tree_before;
   bytes tree_hash_before;
 
-  mls::Proposal proposal;
-  mls::LeafIndex proposal_sender;
+  MLS_NAMESPACE::Proposal proposal;
+  MLS_NAMESPACE::LeafIndex proposal_sender;
 
-  mls::TreeKEMPublicKey tree_after;
+  MLS_NAMESPACE::TreeKEMPublicKey tree_after;
   bytes tree_hash_after;
 
   TreeOperationsTestVector() = default;
-  TreeOperationsTestVector(mls::CipherSuite suite, Scenario scenario);
+  TreeOperationsTestVector(MLS_NAMESPACE::CipherSuite suite, Scenario scenario);
   std::optional<std::string> verify();
 };
 
@@ -464,40 +473,41 @@ struct TreeKEMTestVector : PseudoRandom
 {
   struct PathSecret
   {
-    mls::NodeIndex node;
+    MLS_NAMESPACE::NodeIndex node;
     bytes path_secret;
   };
 
   struct LeafPrivateInfo
   {
-    mls::LeafIndex index;
-    mls::HPKEPrivateKey encryption_priv;
-    mls::SignaturePrivateKey signature_priv;
+    MLS_NAMESPACE::LeafIndex index;
+    MLS_NAMESPACE::HPKEPrivateKey encryption_priv;
+    MLS_NAMESPACE::SignaturePrivateKey signature_priv;
     std::vector<PathSecret> path_secrets;
   };
 
   struct UpdatePathInfo
   {
-    mls::LeafIndex sender;
-    mls::UpdatePath update_path;
+    MLS_NAMESPACE::LeafIndex sender;
+    MLS_NAMESPACE::UpdatePath update_path;
     std::vector<std::optional<bytes>> path_secrets;
     bytes commit_secret;
     bytes tree_hash_after;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
   bytes group_id;
-  mls::epoch_t epoch;
+  MLS_NAMESPACE::epoch_t epoch;
   bytes confirmed_transcript_hash;
 
-  mls::TreeKEMPublicKey ratchet_tree;
+  MLS_NAMESPACE::TreeKEMPublicKey ratchet_tree;
 
   std::vector<LeafPrivateInfo> leaves_private;
   std::vector<UpdatePathInfo> update_paths;
 
   TreeKEMTestVector() = default;
-  TreeKEMTestVector(mls::CipherSuite suite, TreeStructure tree_structure);
+  TreeKEMTestVector(MLS_NAMESPACE::CipherSuite suite,
+                    TreeStructure tree_structure);
   std::optional<std::string> verify();
 };
 
@@ -538,22 +548,22 @@ struct PassiveClientTestVector : PseudoRandom
 
   struct Epoch
   {
-    std::vector<mls::MLSMessage> proposals;
-    mls::MLSMessage commit;
+    std::vector<MLS_NAMESPACE::MLSMessage> proposals;
+    MLS_NAMESPACE::MLSMessage commit;
     bytes epoch_authenticator;
   };
 
-  mls::CipherSuite cipher_suite;
+  MLS_NAMESPACE::CipherSuite cipher_suite;
 
-  mls::MLSMessage key_package;
-  mls::SignaturePrivateKey signature_priv;
-  mls::HPKEPrivateKey encryption_priv;
-  mls::HPKEPrivateKey init_priv;
+  MLS_NAMESPACE::MLSMessage key_package;
+  MLS_NAMESPACE::SignaturePrivateKey signature_priv;
+  MLS_NAMESPACE::HPKEPrivateKey encryption_priv;
+  MLS_NAMESPACE::HPKEPrivateKey init_priv;
 
   std::vector<PSK> external_psks;
 
-  mls::MLSMessage welcome;
-  std::optional<mls::TreeKEMPublicKey> ratchet_tree;
+  MLS_NAMESPACE::MLSMessage welcome;
+  std::optional<MLS_NAMESPACE::TreeKEMPublicKey> ratchet_tree;
   bytes initial_epoch_authenticator;
 
   std::vector<Epoch> epochs;

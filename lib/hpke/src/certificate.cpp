@@ -4,13 +4,14 @@
 #include <hpke/certificate.h>
 #include <hpke/signature.h>
 #include <memory>
+#include <namespace.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <tls/compat.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 ///
 /// Utility functions
 ///
@@ -518,4 +519,4 @@ operator==(const Certificate& lhs, const Certificate& rhs)
   return lhs.raw == rhs.raw;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

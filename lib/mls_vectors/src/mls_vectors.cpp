@@ -7,7 +7,7 @@
 
 namespace mls_vectors {
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 ///
 /// Assertions for verifying test vectors
@@ -248,7 +248,7 @@ PseudoRandom::PseudoRandom(CipherSuite suite, const std::string& label)
 
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
-std::optional<mls::NodeIndex>
+std::optional<MLS_NAMESPACE::NodeIndex>
 TreeMathTestVector::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
   // For some invalid cases (e.g., leaf.left()), we currently return the node
@@ -476,7 +476,7 @@ CryptoBasicsTestVector::verify() const
 /// SecretTreeTestVector
 ///
 
-SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite,
+SecretTreeTestVector::SenderData::SenderData(MLS_NAMESPACE::CipherSuite suite,
                                              PseudoRandom::Generator&& prg)
   : sender_data_secret(prg.secret("sender_data_secret"))
   , ciphertext(prg.secret("ciphertext"))
@@ -488,7 +488,7 @@ SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite,
 }
 
 std::optional<std::string>
-SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
+SecretTreeTestVector::SenderData::verify(MLS_NAMESPACE::CipherSuite suite) const
 {
   auto key_and_nonce =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
@@ -498,7 +498,7 @@ SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
 }
 
 SecretTreeTestVector::SecretTreeTestVector(
-  mls::CipherSuite suite,
+  MLS_NAMESPACE::CipherSuite suite,
   uint32_t n_leaves,
   const std::vector<uint32_t>& generations)
   : PseudoRandom(suite, "secret-tree")
@@ -820,7 +820,7 @@ MessageProtectionTestVector::group_context() const
 
 MLSMessage
 MessageProtectionTestVector::protect_pub(
-  const mls::GroupContent::RawContent& raw_content) const
+  const MLS_NAMESPACE::GroupContent::RawContent& raw_content) const
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
@@ -844,7 +844,7 @@ MessageProtectionTestVector::protect_pub(
 
 MLSMessage
 MessageProtectionTestVector::protect_priv(
-  const mls::GroupContent::RawContent& raw_content)
+  const MLS_NAMESPACE::GroupContent::RawContent& raw_content)
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
@@ -914,7 +914,8 @@ to_psk_w_secret(const std::vector<PSKSecretTestVector::PSK>& psks)
   return pskws;
 }
 
-PSKSecretTestVector::PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks)
+PSKSecretTestVector::PSKSecretTestVector(MLS_NAMESPACE::CipherSuite suite,
+                                         size_t n_psks)
   : PseudoRandom(suite, "psk_secret")
   , cipher_suite(suite)
   , psks(n_psks)
@@ -1385,7 +1386,7 @@ struct TreeTestCase
 ///
 /// TreeHashTestVector
 ///
-TreeHashTestVector::TreeHashTestVector(mls::CipherSuite suite,
+TreeHashTestVector::TreeHashTestVector(MLS_NAMESPACE::CipherSuite suite,
                                        TreeStructure tree_structure)
   : PseudoRandom(suite, "tree-hashes")
   , cipher_suite(suite)
@@ -1448,8 +1449,9 @@ const std::vector<TreeOperationsTestVector::Scenario>
     Scenario::remove_right_edge, Scenario::remove_internal,
   };
 
-TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
-                                                   Scenario scenario)
+TreeOperationsTestVector::TreeOperationsTestVector(
+  MLS_NAMESPACE::CipherSuite suite,
+  Scenario scenario)
   : PseudoRandom(suite, "tree-operations")
   , cipher_suite(suite)
   , proposal_sender(0)
@@ -1591,7 +1593,7 @@ TreeOperationsTestVector::verify()
 /// TreeKEMTestVector
 ///
 
-TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
+TreeKEMTestVector::TreeKEMTestVector(MLS_NAMESPACE::CipherSuite suite,
                                      TreeStructure tree_structure)
   : PseudoRandom(suite, "treekem")
   , cipher_suite(suite)
