@@ -137,11 +137,11 @@ struct GroupSignature : public Signature
       throw std::runtime_error("import_jwk: malformed json input");
     }
 
-    if (jwk_json["kty"] != group.jwt_key_type) {
+    if (jwk_json["kty"] != group.jwk_key_type) {
       throw std::runtime_error("import_jwk: group keytype does not match json");
     }
 
-    if (jwk_json["crv"] != group.jwt_curve_name) {
+    if (jwk_json["crv"] != group.jwk_curve_name) {
       throw std::runtime_error("import_jwk: group curve does not match json");
     }
     x = from_base64url(jwk_json["x"]);
@@ -149,60 +149,52 @@ struct GroupSignature : public Signature
     if (jwk_json.contains("y")) {
       y = from_base64url(jwk_json["y"]);
     }
-    return group.get_public_key_from_coordinates(x, y);
+    return group.public_key_from_coordinates(x, y);
   }
 
-  std::string export_jwk(const bytes& enc) const override
+  std::string export_jwk(const Signature::PublicKey& pk) const override
   {
-    bytes x;
-    bytes y;
-    json json_jwk;
-    json_jwk["crv"] = group.jwt_curve_name;
-    json_jwk["kty"] = group.jwt_key_type;
-
-    std::unique_ptr<hpke::Signature::PublicKey> pk = deserialize(enc);
-    const auto& rpk =
-      dynamic_cast<const hpke::Group::PublicKey&>(*(pk.release()));
-    group.get_coordinates_from_public_key(rpk, x, y);
-
-    if (!x.empty()) {
-      json_jwk["x"] = to_base64url(x);
-    }
-
-    if (!y.empty()) {
-      json_jwk["y"] = to_base64url(y);
-    }
+    const auto& gpk = dynamic_cast<const Group::PublicKey&>(pk);
+    const auto json_jwk = export_jwk_json(gpk);
     return json_jwk.dump();
   }
 
-  std::string export_jwk_private(const bytes& enc) const override
+  std::string export_jwk_private(const Signature::PrivateKey& sk) const override
   {
-    bytes x;
-    bytes y;
-    json json_jwk;
-    json_jwk["crv"] = group.jwt_curve_name;
-    json_jwk["kty"] = group.jwt_key_type;
+    const auto& gsk = dynamic_cast<const Group::PrivateKey&>(sk);
+    const auto gpk = gsk.public_key();
+
+    auto json_jwk = export_jwk_json(*gpk);
 
     // encode the private key
+    const auto enc = serialize_private(sk);
     json_jwk["d"] = to_base64url(enc);
 
-    const auto priv = group.deserialize_private(enc);
-    const auto& rpk =
-      dynamic_cast<const Group::PublicKey&>(*(priv->public_key().release()));
-    group.get_coordinates_from_public_key(rpk, x, y);
-
-    if (!x.empty()) {
-      json_jwk["x"] = to_base64url(x);
-    }
-
-    if (!y.empty()) {
-      json_jwk["y"] = to_base64url(y);
-    }
     return json_jwk.dump();
   }
 
 private:
   const Group& group;
+
+  json export_jwk_json(const Group::PublicKey& pk) const
+  {
+    const auto [x, y] = group.coordinates(pk);
+
+    json json_jwk;
+    json_jwk["crv"] = group.jwk_curve_name;
+    json_jwk["kty"] = group.jwk_key_type;
+
+    if (group.jwk_key_type == "EC") {
+      json_jwk["x"] = to_base64url(x);
+      json_jwk["y"] = to_base64url(y);
+    } else if (group.jwk_key_type == "OKP") {
+      json_jwk["x"] = to_base64url(x);
+    } else {
+      throw std::runtime_error("unknown key type");
+    }
+
+    return json_jwk;
+  }
 };
 
 template<>
@@ -272,42 +264,6 @@ Signature::get<Signature::ID::RSA_SHA512>()
 Signature::Signature(Signature::ID id_in)
   : id(id_in)
 {
-}
-
-bytes
-Signature::serialize_private(const PrivateKey& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
-}
-
-std::unique_ptr<Signature::PublicKey>
-Signature::import_jwk(const std::string& /* unused */) const
-{
-  throw std::runtime_error("Not implemented.");
-}
-
-std::unique_ptr<Signature::PrivateKey>
-Signature::import_jwk_private(const std::string& /* unused */) const
-{
-  throw std::runtime_error("Not implemented.");
-}
-
-std::string
-Signature::export_jwk(const bytes& /* unused */) const
-{
-  throw std::runtime_error("Not implemented.");
-}
-
-std::string
-Signature::export_jwk_private(const bytes& /* unused */) const
-{
-  throw std::runtime_error("Not implemented.");
-}
-
-std::unique_ptr<Signature::PrivateKey>
-Signature::deserialize_private(const bytes& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
 }
 
 std::unique_ptr<Signature::PrivateKey>

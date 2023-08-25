@@ -395,7 +395,8 @@ SignaturePublicKey::from_jwk(CipherSuite suite, const std::string& json_str)
 std::string
 SignaturePublicKey::to_jwk(CipherSuite suite) const
 {
-  return suite.sig().export_jwk(data);
+  auto pub = suite.sig().deserialize(data);
+  return suite.sig().export_jwk(*pub);
 }
 
 SignaturePrivateKey
@@ -465,7 +466,8 @@ SignaturePrivateKey::from_jwk(CipherSuite suite, const std::string& json_str)
 std::string
 SignaturePrivateKey::to_jwk(CipherSuite suite) const
 {
-  return suite.sig().export_jwk_private(data);
+  const auto priv = suite.sig().deserialize_private(data);
+  return suite.sig().export_jwk_private(*priv);
 }
 
 } // namespace mls
