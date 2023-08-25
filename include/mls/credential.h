@@ -161,7 +161,7 @@ private:
                                           UserInfoVCCredential,
                                           MultiCredential>;
 
-  Credential(SpecificCredential _cred);
+  Credential(SpecificCredential specific);
   SpecificCredential _cred;
 };
 
@@ -187,7 +187,7 @@ struct CredentialBinding
                     const SignaturePrivateKey& credential_priv,
                     const SignaturePublicKey& signature_key);
 
-  bool valid_for(const SignaturePublicKey& pub) const;
+  bool valid_for(const SignaturePublicKey& signature_key) const;
 
   TLS_SERIALIZABLE(credential, credential_key, signature)
 

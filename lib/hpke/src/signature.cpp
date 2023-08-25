@@ -119,7 +119,7 @@ struct GroupSignature : public Signature
     // TODO(ghewett): jwk_json should patch cipher suite
 
     // TODO(ghewett): handle the absense of 'd'
-    bytes d = from_base64url(jwk_json["d"]);
+    const bytes d = from_base64url(jwk_json["d"]);
 
     return std::make_unique<PrivateKey>(group.deserialize_private(d).release());
   }

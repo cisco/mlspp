@@ -170,7 +170,7 @@ to_base64(const bytes& data)
   char* string_ptr = nullptr;
   // long string_len = BIO_get_mem_data(out, &string_ptr);
   // BIO_get_mem_data failed clang-tidy
-  long string_len = BIO_ctrl(out, BIO_CTRL_INFO, 0, &string_ptr);
+  const auto string_len = BIO_ctrl(out, BIO_CTRL_INFO, 0, &string_ptr);
   auto return_value = std::string(string_ptr, string_len);
 
   BIO_set_close(out, BIO_NOCLOSE);
@@ -219,11 +219,11 @@ from_base64(const std::string& enc)
   EVP_ENCODE_CTX* ctx = EVP_ENCODE_CTX_new();
   EVP_DecodeInit(ctx);
 
-  int result = EVP_DecodeUpdate(ctx,
-                                output.data(),
-                                &output_buffer_length,
-                                input.data(),
-                                static_cast<int>(input.size()));
+  auto result = EVP_DecodeUpdate(ctx,
+                                 output.data(),
+                                 &output_buffer_length,
+                                 input.data(),
+                                 static_cast<int>(input.size()));
 
   if (result == -1) {
     auto code = ERR_get_error();

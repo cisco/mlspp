@@ -191,28 +191,26 @@ Credential::type() const
 Credential
 Credential::basic(const bytes& identity)
 {
-  return Credential(BasicCredential{ identity });
+  return { BasicCredential{ identity } };
 }
 
 Credential
 Credential::x509(const std::vector<bytes>& der_chain)
 {
-  return Credential(X509Credential{ der_chain });
+  return { X509Credential{ der_chain } };
 }
 
 Credential
 Credential::multi(const std::vector<CredentialBindingInput>& binding_inputs,
                   const SignaturePublicKey& signature_key)
 {
-  return Credential(MultiCredential{ binding_inputs, signature_key });
+  return { MultiCredential{ binding_inputs, signature_key } };
 }
 
 Credential
 Credential::userinfo_vc(const bytes& userinfo_vc_jwt)
 {
-  Credential cred;
-  cred._cred = UserInfoVCCredential{ userinfo_vc_jwt };
-  return cred;
+  return { UserInfoVCCredential{ userinfo_vc_jwt } };
 }
 
 bool
