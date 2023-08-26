@@ -98,9 +98,9 @@ TEST_CASE("Signature Key JWK Import/Export")
     const auto pub = priv.public_key;
 
     const auto encoded_priv = priv.to_jwk(suite);
-    const auto decoded_priv = SignaturePrivateKey::from_jwk(suite, encoded_priv);
+    const auto decoded_priv =
+      SignaturePrivateKey::from_jwk(suite, encoded_priv);
     REQUIRE(decoded_priv == priv);
-
 
     const auto encoded_pub = pub.to_jwk(suite);
     const auto decoded_pub = SignaturePublicKey::from_jwk(suite, encoded_pub);

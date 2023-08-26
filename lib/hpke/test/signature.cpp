@@ -251,7 +251,6 @@ TEST_CASE("Signature Key JWK Round-Trip")
     Signature::ID::Ed448,
   };
 
-
   for (const auto& id : ids) {
     if (fips() && fips_disable(id)) {
       continue;
@@ -282,6 +281,8 @@ TEST_CASE("Signature Key JWK Known-Answer")
     std::string jwk_pub;
   };
 
+  // XXX(RLB) clang-format wants to indent this really far to the right.
+  // clang-format off
   const std::vector<KnownAnswerTest> cases{
     {
       Signature::ID::P256_SHA256,
@@ -358,8 +359,9 @@ TEST_CASE("Signature Key JWK Known-Answer")
         "kty": "OKP",
         "x":"0P_035gQbBr8mHe_4uLu8wUI22JiSBYWq9Yzb3Tr3C4ksfv85Xo5OIRrWzE-L0QFRez78nrNA4wA"
       })",
-    }
+    },
   };
+  // clang-format on
 
   for (const auto& tc : cases) {
     const auto& sig = select_signature(tc.id);

@@ -200,7 +200,9 @@ namespace tls {
 
 TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
 TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
-TLS_VARIANT_MAP(mls::CredentialType, mls::UserInfoVCCredential, userinfo_vc_draft_00)
+TLS_VARIANT_MAP(mls::CredentialType,
+                mls::UserInfoVCCredential,
+                userinfo_vc_draft_00)
 TLS_VARIANT_MAP(mls::CredentialType, mls::MultiCredential, multi_draft_00)
 
 } // namespace tls

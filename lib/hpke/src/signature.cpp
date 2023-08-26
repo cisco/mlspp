@@ -117,7 +117,7 @@ struct GroupSignature : public Signature
     const auto jwk_json = validate_jwk_json(json_str, true);
 
     const auto d = from_base64url(jwk_json["d"]);
-    auto gsk =  group.deserialize_private(d);
+    auto gsk = group.deserialize_private(d);
 
     return std::make_unique<PrivateKey>(gsk.release());
   }

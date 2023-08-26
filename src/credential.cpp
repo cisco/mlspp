@@ -113,8 +113,9 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 /// UserInfoVCCredential
 ///
 UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt)
-    : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
-{}
+  : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
+{
+}
 
 bool
 UserInfoVCCredential::valid_for(const SignaturePublicKey& /* pub */) const
