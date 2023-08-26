@@ -146,7 +146,8 @@ RSASignature::verify(const bytes& data,
   return rv == 1;
 }
 
-// TODO(RLB) Implement these methods
+// TODO(RLB) Implement these methods.  No concrete need, but might be nice for
+// completeness.
 std::unique_ptr<Signature::PrivateKey>
 RSASignature::import_jwk_private(const std::string& /* json_str */) const
 {

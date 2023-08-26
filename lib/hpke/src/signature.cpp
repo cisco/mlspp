@@ -114,49 +114,33 @@ struct GroupSignature : public Signature
   std::unique_ptr<Signature::PrivateKey> import_jwk_private(
     const std::string& json_str) const override
   {
-    // TODO(ghewett): handle failed parse
-    json jwk_json = json::parse(json_str);
+    const auto jwk_json = validate_jwk_json(json_str, true);
 
-    // TODO(ghewett): jwk_json should patch cipher suite
+    const auto d = from_base64url(jwk_json["d"]);
+    auto gsk =  group.deserialize_private(d);
 
-    // TODO(ghewett): handle the absense of 'd'
-    const bytes d = from_base64url(jwk_json["d"]);
-
-    return std::make_unique<PrivateKey>(group.deserialize_private(d).release());
+    return std::make_unique<PrivateKey>(gsk.release());
   }
 
   std::unique_ptr<Signature::PublicKey> import_jwk(
     const std::string& json_str) const override
   {
-    bytes x = bytes({}, 0);
-    bytes y = bytes({}, 0);
-    json jwk_json = json::parse(json_str);
+    const auto jwk_json = validate_jwk_json(json_str, false);
 
-    if (jwk_json.empty() || !jwk_json.contains("kty") ||
-        !jwk_json.contains("crv") || !jwk_json.contains("x")) {
-      throw std::runtime_error("import_jwk: malformed json input");
-    }
-
-    if (jwk_json["kty"] != group.jwk_key_type) {
-      throw std::runtime_error("import_jwk: group keytype does not match json");
-    }
-
-    if (jwk_json["crv"] != group.jwk_curve_name) {
-      throw std::runtime_error("import_jwk: group curve does not match json");
-    }
-    x = from_base64url(jwk_json["x"]);
-
+    const auto x = from_base64url(jwk_json["x"]);
+    auto y = bytes{};
     if (jwk_json.contains("y")) {
       y = from_base64url(jwk_json["y"]);
     }
+
     return group.public_key_from_coordinates(x, y);
   }
 
   std::string export_jwk(const Signature::PublicKey& pk) const override
   {
     const auto& gpk = dynamic_cast<const Group::PublicKey&>(pk);
-    const auto json_jwk = export_jwk_json(gpk);
-    return json_jwk.dump();
+    const auto jwk_json = export_jwk_json(gpk);
+    return jwk_json.dump();
   }
 
   std::string export_jwk_private(const Signature::PrivateKey& sk) const override
@@ -165,36 +149,57 @@ struct GroupSignature : public Signature
     const auto& gsk = gssk.group_priv;
     const auto gpk = gsk->public_key();
 
-    auto json_jwk = export_jwk_json(*gpk);
+    auto jwk_json = export_jwk_json(*gpk);
 
     // encode the private key
     const auto enc = serialize_private(sk);
-    json_jwk["d"] = to_base64url(enc);
+    jwk_json["d"] = to_base64url(enc);
 
-    return json_jwk.dump();
+    return jwk_json.dump();
   }
 
 private:
   const Group& group;
 
+  json validate_jwk_json(const std::string json_str, bool private_key) const
+  {
+    json jwk_json = json::parse(json_str);
+
+    if (jwk_json.empty() || !jwk_json.contains("kty") ||
+        !jwk_json.contains("crv") || !jwk_json.contains("x") ||
+        (private_key && !jwk_json.contains("d"))) {
+      throw std::runtime_error("malformed JWK");
+    }
+
+    if (jwk_json["kty"] != group.jwk_key_type) {
+      throw std::runtime_error("invalid JWK key type");
+    }
+
+    if (jwk_json["crv"] != group.jwk_curve_name) {
+      throw std::runtime_error("invalid JWK curve");
+    }
+
+    return jwk_json;
+  }
+
   json export_jwk_json(const Group::PublicKey& pk) const
   {
     const auto [x, y] = group.coordinates(pk);
 
-    json json_jwk;
-    json_jwk["crv"] = group.jwk_curve_name;
-    json_jwk["kty"] = group.jwk_key_type;
+    json jwk_json;
+    jwk_json["crv"] = group.jwk_curve_name;
+    jwk_json["kty"] = group.jwk_key_type;
 
     if (group.jwk_key_type == "EC") {
-      json_jwk["x"] = to_base64url(x);
-      json_jwk["y"] = to_base64url(y);
+      jwk_json["x"] = to_base64url(x);
+      jwk_json["y"] = to_base64url(y);
     } else if (group.jwk_key_type == "OKP") {
-      json_jwk["x"] = to_base64url(x);
+      jwk_json["x"] = to_base64url(x);
     } else {
       throw std::runtime_error("unknown key type");
     }
 
-    return json_jwk;
+    return jwk_json;
   }
 };
 
