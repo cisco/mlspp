@@ -118,10 +118,10 @@ UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt)
 }
 
 bool
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 UserInfoVCCredential::valid_for(const SignaturePublicKey& /* pub */) const
 {
-  // TODO Extract payload
-  // TODO Extract did:jwk
+  // TODO(RLB) Extract payload -> did:jwk, compare
   throw NotImplementedError();
 }
 

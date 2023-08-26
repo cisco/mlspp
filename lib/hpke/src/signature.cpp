@@ -161,7 +161,7 @@ struct GroupSignature : public Signature
 private:
   const Group& group;
 
-  json validate_jwk_json(const std::string json_str, bool private_key) const
+  json validate_jwk_json(const std::string& json_str, bool private_key) const
   {
     json jwk_json = json::parse(json_str);
 
