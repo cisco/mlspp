@@ -110,6 +110,21 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 }
 
 ///
+/// UserInfoVCCredential
+///
+UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt)
+    : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
+{}
+
+bool
+UserInfoVCCredential::valid_for(const SignaturePublicKey& /* pub */) const
+{
+  // TODO Extract payload
+  // TODO Extract did:jwk
+  throw NotImplementedError();
+}
+
+///
 /// CredentialBinding and MultiCredential
 ///
 
@@ -219,7 +234,7 @@ Credential::valid_for(const SignaturePublicKey& pub) const
   const auto pub_key_match = overloaded{
     [&](const X509Credential& x509) { return x509.valid_for(pub); },
     [](const BasicCredential& /* basic */) { return true; },
-    [](const UserInfoVCCredential&) { return true; },
+    [&](const UserInfoVCCredential& vc) { return vc.valid_for(pub); },
     [&](const MultiCredential& multi) { return multi.valid_for(pub); },
   };
 

@@ -50,13 +50,11 @@ private:
 struct UserInfoVCCredential
 {
   UserInfoVCCredential() = default;
-
-  explicit UserInfoVCCredential(bytes userinfo_vc_jwt)
-    : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
-  {
-  }
+  explicit UserInfoVCCredential(bytes userinfo_vc_jwt);
 
   bytes userinfo_vc_jwt;
+
+  bool valid_for(const SignaturePublicKey& pub) const;
 
   TLS_SERIALIZABLE(userinfo_vc_jwt)
 };
@@ -75,8 +73,9 @@ enum struct CredentialType : uint16_t
   reserved = 0,
   basic = 1,
   x509 = 2,
-  userinfo_vc = 3,
-  multi = 4,
+
+  userinfo_vc_draft_00 = 0xFE00,
+  multi_draft_00 = 0xFF00,
 
   // GREASE values, included here mainly so that debugger output looks nice
   GREASE_0 = 0x0A0A,
@@ -201,7 +200,7 @@ namespace tls {
 
 TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
 TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
-TLS_VARIANT_MAP(mls::CredentialType, mls::UserInfoVCCredential, userinfo_vc)
-TLS_VARIANT_MAP(mls::CredentialType, mls::MultiCredential, multi)
+TLS_VARIANT_MAP(mls::CredentialType, mls::UserInfoVCCredential, userinfo_vc_draft_00)
+TLS_VARIANT_MAP(mls::CredentialType, mls::MultiCredential, multi_draft_00)
 
 } // namespace tls
