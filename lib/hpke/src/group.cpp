@@ -540,8 +540,7 @@ struct ECKeyGroup : public EVPGroup
 #if defined(WITH_OPENSSL3)
     // Raw pointer OK here because it becomes managed as soon as possible
     OSSL_PARAM* param_ptr = nullptr;
-    if (1 !=
-        EVP_PKEY_todata(rpk.pkey.get(), EVP_PKEY_PUBLIC_KEY, &param_ptr)) {
+    if (1 != EVP_PKEY_todata(rpk.pkey.get(), EVP_PKEY_PUBLIC_KEY, &param_ptr)) {
       throw openssl_error();
     }
 
@@ -564,7 +563,8 @@ struct ECKeyGroup : public EVPGroup
     auto* buf_ptr = buf.data();
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     auto* buf_ptr_void = reinterpret_cast<void*>(buf_ptr);
-    if (1 != OSSL_PARAM_get_octet_string(pk_param, &buf_ptr_void, len, nullptr)) {
+    if (1 !=
+        OSSL_PARAM_get_octet_string(pk_param, &buf_ptr_void, len, nullptr)) {
       throw std::runtime_error("Failed to get OSSL_PKEY_PARAM_PUB_KEY data");
     }
 
@@ -654,8 +654,12 @@ struct ECKeyGroup : public EVPGroup
     }
 
     // Serialize the point
-    const auto point_size = EC_POINT_point2oct(
-      group.get(), point.get(), POINT_CONVERSION_UNCOMPRESSED, nullptr, 0, nullptr);
+    const auto point_size = EC_POINT_point2oct(group.get(),
+                                               point.get(),
+                                               POINT_CONVERSION_UNCOMPRESSED,
+                                               nullptr,
+                                               0,
+                                               nullptr);
     if (0 == point_size) {
       throw openssl_error();
     }
