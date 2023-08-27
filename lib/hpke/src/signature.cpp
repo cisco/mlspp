@@ -116,7 +116,7 @@ struct GroupSignature : public Signature
   {
     const auto jwk_json = validate_jwk_json(json_str, true);
 
-    const auto d = from_base64url(jwk_json["d"]);
+    const auto d = from_base64url(jwk_json.at("d"));
     auto gsk = group.deserialize_private(d);
 
     return std::make_unique<PrivateKey>(gsk.release());
@@ -127,10 +127,10 @@ struct GroupSignature : public Signature
   {
     const auto jwk_json = validate_jwk_json(json_str, false);
 
-    const auto x = from_base64url(jwk_json["x"]);
+    const auto x = from_base64url(jwk_json.at("x"));
     auto y = bytes{};
     if (jwk_json.contains("y")) {
-      y = from_base64url(jwk_json["y"]);
+      y = from_base64url(jwk_json.at("y"));
     }
 
     return group.public_key_from_coordinates(x, y);
@@ -153,7 +153,7 @@ struct GroupSignature : public Signature
 
     // encode the private key
     const auto enc = serialize_private(sk);
-    jwk_json["d"] = to_base64url(enc);
+    jwk_json.emplace("d", to_base64url(enc));
 
     return jwk_json.dump();
   }
@@ -171,11 +171,11 @@ private:
       throw std::runtime_error("malformed JWK");
     }
 
-    if (jwk_json["kty"] != group.jwk_key_type) {
+    if (jwk_json.at("kty") != group.jwk_key_type) {
       throw std::runtime_error("invalid JWK key type");
     }
 
-    if (jwk_json["crv"] != group.jwk_curve_name) {
+    if (jwk_json.at("crv") != group.jwk_curve_name) {
       throw std::runtime_error("invalid JWK curve");
     }
 
@@ -186,15 +186,16 @@ private:
   {
     const auto [x, y] = group.coordinates(pk);
 
-    json jwk_json;
-    jwk_json["crv"] = group.jwk_curve_name;
-    jwk_json["kty"] = group.jwk_key_type;
+    json jwk_json = json::object({
+      { "crv", group.jwk_curve_name },
+      { "kty", group.jwk_key_type },
+    });
 
     if (group.jwk_key_type == "EC") {
-      jwk_json["x"] = to_base64url(x);
-      jwk_json["y"] = to_base64url(y);
+      jwk_json.emplace("x", to_base64url(x));
+      jwk_json.emplace("y", to_base64url(y));
     } else if (group.jwk_key_type == "OKP") {
-      jwk_json["x"] = to_base64url(x);
+      jwk_json.emplace("x", to_base64url(x));
     } else {
       throw std::runtime_error("unknown key type");
     }

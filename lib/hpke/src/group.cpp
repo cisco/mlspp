@@ -541,29 +541,31 @@ struct ECKeyGroup : public EVPGroup
     // Raw pointer OK here because it becomes managed as soon as possible
     OSSL_PARAM* param_ptr = nullptr;
     if (1 !=
-        EVP_PKE_y_todata(rpk.pkey.get(), EVP_PKE_y_PUBLIC_KE_y, &param_ptr)) {
+        EVP_PKEY_todata(rpk.pkey.get(), EVP_PKEY_PUBLIC_KEY, &param_ptr)) {
       throw openssl_error();
     }
 
-    auto param = make_typed_unique(param);
+    auto param = make_typed_unique(param_ptr);
 
     // Raw pointer OK here because it is non-owning
     const auto* pk_param =
-      OSSL_PARAM_locate_const(param.get(), OSSL_PKE_y_PARAM_PUB_KE_y);
+      OSSL_PARAM_locate_const(param.get(), OSSL_PKEY_PARAM_PUB_KEY);
     if (pk_param == nullptr) {
-      throw std::runtime_error("Failed to locate OSSL_PKE_y_PARAM_PUB_KE_y");
+      throw std::runtime_error("Failed to locate OSSL_PKEY_PARAM_PUB_KEY");
     }
 
     // Copy the octet string representation of the key into a buffer
     auto len = size_t(0);
     if (1 != OSSL_PARAM_get_octet_string(pk_param, nullptr, 0, &len)) {
-      throw std::runtime_error("Failed to get OSSL_PKE_y_PARAM_PUB_KE_y len");
+      throw std::runtime_error("Failed to get OSSL_PKEY_PARAM_PUB_KEY len");
     }
 
     auto buf = bytes(len);
     auto* buf_ptr = buf.data();
-    if (1 != OSSL_PARAM_get_octet_string(pk_param, &buf_ptr, len, nullptr)) {
-      throw std::runtime_error("Failed to get OSSL_PKE_y_PARAM_PUB_KE_y data");
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* buf_ptr_void = reinterpret_cast<void*>(buf_ptr);
+    if (1 != OSSL_PARAM_get_octet_string(pk_param, &buf_ptr_void, len, nullptr)) {
+      throw std::runtime_error("Failed to get OSSL_PKEY_PARAM_PUB_KEY data");
     }
 
     // Parse the octet string representation into an EC_POINT
@@ -641,7 +643,7 @@ struct ECKeyGroup : public EVPGroup
     }
 
     // Construct a point with the given coordinates
-    auto point = make_typed_unique(EC_POINT_new(group));
+    auto point = make_typed_unique(EC_POINT_new(group.get()));
     if (group == nullptr) {
       throw std::runtime_error("Failed to create EC_POINT");
     }
@@ -653,14 +655,14 @@ struct ECKeyGroup : public EVPGroup
 
     // Serialize the point
     const auto point_size = EC_POINT_point2oct(
-      group, point, POINT_CONVERSION_UNCOMPRESSED, nullptr, 0, nullptr);
+      group.get(), point.get(), POINT_CONVERSION_UNCOMPRESSED, nullptr, 0, nullptr);
     if (0 == point_size) {
       throw openssl_error();
     }
 
     auto pub = bytes(point_size);
-    if (EC_POINT_point2oct(group,
-                           point,
+    if (EC_POINT_point2oct(group.get(),
+                           point.get(),
                            POINT_CONVERSION_UNCOMPRESSED,
                            pub.data(),
                            point_size,
