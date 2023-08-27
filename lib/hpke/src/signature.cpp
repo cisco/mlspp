@@ -279,4 +279,50 @@ Signature::generate_rsa(size_t bits)
   return RSASignature::generate_key_pair(bits);
 }
 
+static const Signature&
+sig_from_jwk(const std::string& json_str)
+{
+  using KeyTypeAndCurve = std::tuple<std::string, std::string>;
+  static const auto alg_sig_map = std::map<KeyTypeAndCurve, const Signature&>{
+    { { "EC", "P-256" }, Signature::get<Signature::ID::P256_SHA256>() },
+    { { "EC", "P-384" }, Signature::get<Signature::ID::P384_SHA384>() },
+    { { "EC", "P-512" }, Signature::get<Signature::ID::P521_SHA512>() },
+    { { "OKP", "Ed25519" }, Signature::get<Signature::ID::Ed25519>() },
+    { { "OKP", "Ed448" }, Signature::get<Signature::ID::Ed448>() },
+    { { "RSA", "" }, Signature::get<Signature::ID::RSA_SHA256>() },
+    { { "RSA", "" }, Signature::get<Signature::ID::RSA_SHA384>() },
+    { { "RSA", "" }, Signature::get<Signature::ID::RSA_SHA512>() },
+  };
+
+  const auto jwk = json::parse(json_str);
+  const auto kty = jwk.at("kty");
+
+  auto crv = std::string("");
+  if (jwk.contains("crv")) {
+    crv = jwk.at("crv");
+  }
+
+  const auto key = KeyTypeAndCurve{ kty, crv };
+  return alg_sig_map.at(key);
+}
+
+std::tuple<Signature::ID, std::unique_ptr<Signature::PrivateKey>>
+Signature::parse_jwk_private(const std::string& json_str)
+{
+  // XXX(RLB): This JSON-parses the JWK twice.  I'm assuming that this is a less
+  // bad cost than changing the import_jwk method signature to take `json`.
+  const auto& sig = sig_from_jwk(json_str);
+  auto priv = sig.import_jwk_private(json_str);
+  return { sig.id, std::move(priv) };
+}
+
+std::tuple<Signature::ID, std::unique_ptr<Signature::PublicKey>>
+Signature::parse_jwk(const std::string& json_str)
+{
+  // XXX(RLB): Same double-parsing comment as with `parse_jwk_private`
+  const auto& sig = sig_from_jwk(json_str);
+  auto pub = sig.import_jwk(json_str);
+  return { sig.id, std::move(pub) };
+}
+
 } // namespace hpke
