@@ -531,7 +531,7 @@ TreeKEMPublicKey::parent_hash_valid() const
 }
 
 std::vector<NodeIndex>
-TreeKEMPublicKey::resolve(NodeIndex index) const // NOLINT(misc-no-recursion)
+TreeKEMPublicKey::resolve(NodeIndex index) const
 {
   auto at_leaf = (index.level() == 0);
   if (!node_at(index).blank()) {
@@ -797,7 +797,7 @@ struct TreeHashInput
 };
 
 const bytes&
-TreeKEMPublicKey::get_hash(NodeIndex index) // NOLINT(misc-no-recursion)
+TreeKEMPublicKey::get_hash(NodeIndex index)
 {
   if (hashes.count(index) > 0) {
     return hashes.at(index);
@@ -905,7 +905,6 @@ TreeKEMPublicKey::parent_hashes(
 }
 
 const bytes&
-// NOLINTNEXTLINE(misc-no-recursion)
 TreeKEMPublicKey::original_tree_hash(TreeHashCache& cache,
                                      NodeIndex index,
                                      std::vector<LeafIndex> parent_except) const

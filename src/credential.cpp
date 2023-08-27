@@ -147,6 +147,10 @@ CredentialBinding::CredentialBinding(CipherSuite cipher_suite_in,
   , credential(std::move(credential_in))
   , credential_key(credential_priv.public_key)
 {
+  if (credential.type() == CredentialType::multi_draft_00) {
+    throw InvalidParameterError("Multi-credentials cannot be nested");
+  }
+
   if (!credential.valid_for(credential_key)) {
     throw InvalidParameterError("Credential key does not match credential");
   }
