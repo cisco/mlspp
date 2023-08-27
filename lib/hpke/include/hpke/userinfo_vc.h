@@ -19,7 +19,7 @@ private:
 
 public:
   explicit UserInfoVC(std::string jwt);
-  UserInfoVC() = delete;
+  UserInfoVC() = default;
   UserInfoVC(const UserInfoVC& other) = default;
   ~UserInfoVC() = default;
 
