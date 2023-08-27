@@ -15,22 +15,23 @@ struct UserInfoVC
 {
 private:
   struct ParsedCredential;
-  std::unique_ptr<ParsedCredential> parsed_cred;
+  std::shared_ptr<ParsedCredential> parsed_cred;
 
 public:
   explicit UserInfoVC(std::string jwt);
   UserInfoVC() = delete;
-  UserInfoVC(const UserInfoVC& other);
+  UserInfoVC(const UserInfoVC& other) = default;
   ~UserInfoVC() = default;
 
   std::string issuer() const;
   std::string key_id() const;
-  bool valid_from(const Signature::PublicKey& issuer_key) const;
-
-  // Accessors
-  std::map<std::string, std::string> subject() const;
   std::chrono::system_clock::time_point not_before() const;
   std::chrono::system_clock::time_point not_after() const;
+  std::map<std::string, std::string> subject() const;
+  Signature::ID public_key_algorithm() const;
+  const Signature::PublicKey public_key() const;
+
+  bool valid_from(const Signature::PublicKey& issuer_key) const;
 
   const std::string raw;
 };

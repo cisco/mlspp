@@ -38,7 +38,7 @@ epoch_time(int64_t seconds_since_epoch)
 struct UserInfoVC::ParsedCredential
 {
   // Header fields
-  const Signature& algorithm; // `alg`
+  const Signature& signature_algorithm; // `alg`
   std::string key_id;         // `kid`
 
   // Top-level Payload fields
@@ -48,12 +48,14 @@ struct UserInfoVC::ParsedCredential
 
   // Credential subject fields
   std::map<std::string, std::string> credential_subject;
+  Signature::ID public_key_algorithm;
+  std::shared_ptr<Signature::PublicKey> public_key;
 
   // Signature verification information
   bytes to_be_signed;
   bytes signature;
 
-  static std::unique_ptr<ParsedCredential> parse(const std::string& jwt)
+  static std::shared_ptr<ParsedCredential> parse(const std::string& jwt)
   {
     // Split the JWT into its header, payload, and signature
     const auto first_dot = jwt.find_first_of('.');
@@ -78,7 +80,7 @@ struct UserInfoVC::ParsedCredential
 
     static const std::string context = "https://www.w3.org/2018/credentials/v1";
     if (vc.at("context") != context) {
-      throw std::runtime_error("malformed VC; incorrect context value");
+      throw std::runtime_error("malformed VC: incorrect context value");
     }
 
     static const auto type = std::vector<std::string>{
@@ -86,31 +88,45 @@ struct UserInfoVC::ParsedCredential
       "UserInfoCredential",
     };
     if (vc.at("type") != type) {
-      throw std::runtime_error("malformed VC; incorrect type value");
+      throw std::runtime_error("malformed VC: incorrect type value");
     }
+
+    // Parse the subject public key
+    auto credential_subject = vc.at("credentialSubject");
+    const auto id = credential_subject.at("id").get<std::string>();
+    credential_subject.erase("id");
+
+    static const std::string did_jwk_prefix = "did:jwk:";
+    if (id.find(did_jwk_prefix) != 0) {
+      throw std::runtime_error("malformed UserInfo VC: ID is not did:jwk");
+    }
+
+    const auto jwk = to_ascii(from_base64url(id.substr(did_jwk_prefix.size())));
+    auto [public_key_algorithm, public_key] = Signature::parse_jwk(jwk);
 
     // Extract the salient parts
     const auto cred = ParsedCredential{
-      .algorithm = signature_from_alg(header.at("alg")),
+      .signature_algorithm = signature_from_alg(header.at("alg")),
       .key_id = header.at("kid"),
 
       .issuer = payload.at("iss"),
       .not_before = epoch_time(payload.at("nbf").get<int64_t>()),
       .not_after = epoch_time(payload.at("exp").get<int64_t>()),
 
-      .credential_subject =
-        vc.at("credentialSubject").get<std::map<std::string, std::string>>(),
+      .credential_subject = credential_subject,
+      .public_key_algorithm = public_key_algorithm,
+      .public_key = std::shared_ptr<Signature::PublicKey>(public_key.release()),
 
       .to_be_signed = to_be_signed,
       .signature = signature,
     };
 
-    return std::make_unique<ParsedCredential>(std::move(cred));
+    return std::make_shared<ParsedCredential>(std::move(cred));
   }
 
   bool verify(const Signature::PublicKey& issuer_key)
   {
-    return algorithm.verify(to_be_signed, signature, issuer_key);
+    return signature_algorithm.verify(to_be_signed, signature, issuer_key);
   }
 };
 
@@ -121,12 +137,6 @@ struct UserInfoVC::ParsedCredential
 UserInfoVC::UserInfoVC(std::string jwt)
   : parsed_cred(ParsedCredential::parse(jwt))
   , raw(std::move(jwt))
-{
-}
-
-UserInfoVC::UserInfoVC(const UserInfoVC& other)
-  : parsed_cred(std::make_unique<ParsedCredential>(*other.parsed_cred))
-  , raw(other.raw)
 {
 }
 
@@ -164,6 +174,18 @@ std::chrono::system_clock::time_point
 UserInfoVC::not_after() const
 {
   return parsed_cred->not_after;
+}
+
+Signature::ID
+UserInfoVC::public_key_algorithm() const
+{
+  return parsed_cred->public_key_algorithm;
+}
+
+const Signature::PublicKey
+UserInfoVC::public_key() const
+{
+  return *parsed_cred->public_key;
 }
 
 bool
