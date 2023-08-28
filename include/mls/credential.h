@@ -188,7 +188,7 @@ struct CredentialBinding
 
   bool valid_for(const SignaturePublicKey& signature_key) const;
 
-  TLS_SERIALIZABLE(credential, credential_key, signature)
+  TLS_SERIALIZABLE(cipher_suite, credential, credential_key, signature)
 
 private:
   bytes to_be_signed(const SignaturePublicKey& signature_key) const;

@@ -16,6 +16,8 @@ to_base64(const bytes& data)
   }
 
   const auto data_size = static_cast<int>(data.size());
+
+  // base64 encoding produces 4 characters for every 3 input bytes (rounded up)
   const auto out_size = (data_size + 2) / 3 * 4;
   auto out = bytes(out_size + 1); // NUL terminator
 
