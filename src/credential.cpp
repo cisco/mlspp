@@ -110,6 +110,95 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 }
 
 ///
+/// UserInfoVCCredential
+///
+UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt)
+  : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
+{
+}
+
+bool
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+UserInfoVCCredential::valid_for(const SignaturePublicKey& /* pub */) const
+{
+  // TODO(RLB) Extract payload -> did:jwk, compare
+  throw NotImplementedError();
+}
+
+///
+/// CredentialBinding and MultiCredential
+///
+
+struct CredentialBindingTBS
+{
+  const CipherSuite& cipher_suite;
+  const Credential& credential;
+  const SignaturePublicKey& credential_key;
+  const SignaturePublicKey& signature_key;
+
+  TLS_SERIALIZABLE(cipher_suite, credential, credential_key, signature_key)
+};
+
+CredentialBinding::CredentialBinding(CipherSuite cipher_suite_in,
+                                     Credential credential_in,
+                                     const SignaturePrivateKey& credential_priv,
+                                     const SignaturePublicKey& signature_key)
+  : cipher_suite(cipher_suite_in)
+  , credential(std::move(credential_in))
+  , credential_key(credential_priv.public_key)
+{
+  if (credential.type() == CredentialType::multi_draft_00) {
+    throw InvalidParameterError("Multi-credentials cannot be nested");
+  }
+
+  if (!credential.valid_for(credential_key)) {
+    throw InvalidParameterError("Credential key does not match credential");
+  }
+
+  signature = credential_priv.sign(
+    cipher_suite, sign_label::multi_credential, to_be_signed(signature_key));
+}
+
+bytes
+CredentialBinding::to_be_signed(const SignaturePublicKey& signature_key) const
+{
+  return tls::marshal(CredentialBindingTBS{
+    cipher_suite, credential, credential_key, signature_key });
+}
+
+bool
+CredentialBinding::valid_for(const SignaturePublicKey& signature_key) const
+{
+  auto valid_self = credential.valid_for(credential_key);
+  auto valid_other = credential_key.verify(cipher_suite,
+                                           sign_label::multi_credential,
+                                           to_be_signed(signature_key),
+                                           signature);
+
+  return valid_self && valid_other;
+}
+
+MultiCredential::MultiCredential(
+  const std::vector<CredentialBindingInput>& binding_inputs,
+  const SignaturePublicKey& signature_key)
+{
+  bindings =
+    stdx::transform<CredentialBinding>(binding_inputs, [&](auto&& input) {
+      return CredentialBinding(input.cipher_suite,
+                               input.credential,
+                               input.credential_priv,
+                               signature_key);
+    });
+}
+
+bool
+MultiCredential::valid_for(const SignaturePublicKey& pub) const
+{
+  return stdx::all_of(
+    bindings, [&](const auto& binding) { return binding.valid_for(pub); });
+}
+
+///
 /// Credential
 ///
 
@@ -122,17 +211,26 @@ Credential::type() const
 Credential
 Credential::basic(const bytes& identity)
 {
-  Credential cred;
-  cred._cred = BasicCredential{ identity };
-  return cred;
+  return { BasicCredential{ identity } };
 }
 
 Credential
 Credential::x509(const std::vector<bytes>& der_chain)
 {
-  Credential cred;
-  cred._cred = X509Credential{ der_chain };
-  return cred;
+  return { X509Credential{ der_chain } };
+}
+
+Credential
+Credential::multi(const std::vector<CredentialBindingInput>& binding_inputs,
+                  const SignaturePublicKey& signature_key)
+{
+  return { MultiCredential{ binding_inputs, signature_key } };
+}
+
+Credential
+Credential::userinfo_vc(const bytes& userinfo_vc_jwt)
+{
+  return { UserInfoVCCredential{ userinfo_vc_jwt } };
 }
 
 bool
@@ -140,11 +238,17 @@ Credential::valid_for(const SignaturePublicKey& pub) const
 {
   const auto pub_key_match = overloaded{
     [&](const X509Credential& x509) { return x509.valid_for(pub); },
-
     [](const BasicCredential& /* basic */) { return true; },
+    [&](const UserInfoVCCredential& vc) { return vc.valid_for(pub); },
+    [&](const MultiCredential& multi) { return multi.valid_for(pub); },
   };
 
   return var::visit(pub_key_match, _cred);
+}
+
+Credential::Credential(SpecificCredential specific)
+  : _cred(std::move(specific))
+{
 }
 
 } // namespace mls

@@ -205,16 +205,22 @@ extern const std::string mls_content;
 extern const std::string leaf_node;
 extern const std::string key_package;
 extern const std::string group_info;
+extern const std::string multi_credential;
 } // namespace sign_label
 
 struct SignaturePublicKey
 {
+  static SignaturePublicKey from_jwk(CipherSuite suite,
+                                     const std::string& json_str);
+
   bytes data;
 
   bool verify(const CipherSuite& suite,
               const std::string& label,
               const bytes& message,
               const bytes& signature) const;
+
+  std::string to_jwk(CipherSuite suite) const;
 
   TLS_SERIALIZABLE(data)
 };
@@ -224,6 +230,8 @@ struct SignaturePrivateKey
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
+  static SignaturePrivateKey from_jwk(CipherSuite suite,
+                                      const std::string& json_str);
 
   SignaturePrivateKey() = default;
 
@@ -235,6 +243,7 @@ struct SignaturePrivateKey
              const bytes& message) const;
 
   void set_public_key(CipherSuite suite);
+  std::string to_jwk(CipherSuite suite) const;
 
   TLS_SERIALIZABLE(data)
 

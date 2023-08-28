@@ -47,6 +47,18 @@ private:
   SignatureScheme _signature_scheme;
 };
 
+struct UserInfoVCCredential
+{
+  UserInfoVCCredential() = default;
+  explicit UserInfoVCCredential(bytes userinfo_vc_jwt);
+
+  bytes userinfo_vc_jwt;
+
+  bool valid_for(const SignaturePublicKey& pub) const;
+
+  TLS_SERIALIZABLE(userinfo_vc_jwt)
+};
+
 tls::ostream&
 operator<<(tls::ostream& str, const X509Credential& obj);
 
@@ -61,6 +73,9 @@ enum struct CredentialType : uint16_t
   reserved = 0,
   basic = 1,
   x509 = 2,
+
+  userinfo_vc_draft_00 = 0xFE00,
+  multi_draft_00 = 0xFF00,
 
   // GREASE values, included here mainly so that debugger output looks nice
   GREASE_0 = 0x0A0A,
@@ -81,6 +96,31 @@ enum struct CredentialType : uint16_t
 };
 
 // struct {
+//   Credential credential;
+//   SignaturePublicKey credential_key;
+//   opaque signature<V>;
+// } CredentialBinding
+//
+// struct {
+//   CredentialBinding bindings<V>;
+// } MultiCredential;
+struct CredentialBinding;
+struct CredentialBindingInput;
+
+struct MultiCredential
+{
+  MultiCredential() = default;
+  MultiCredential(const std::vector<CredentialBindingInput>& binding_inputs,
+                  const SignaturePublicKey& signature_key);
+
+  std::vector<CredentialBinding> bindings;
+
+  bool valid_for(const SignaturePublicKey& pub) const;
+
+  TLS_SERIALIZABLE(bindings)
+};
+
+// struct {
 //     CredentialType credential_type;
 //     select (credential_type) {
 //         case basic:
@@ -90,9 +130,10 @@ enum struct CredentialType : uint16_t
 //             opaque cert_data<1..2^24-1>;
 //     };
 // } Credential;
-class Credential
+struct Credential
 {
-public:
+  Credential() = default;
+
   CredentialType type() const;
 
   template<typename T>
@@ -103,6 +144,10 @@ public:
 
   static Credential basic(const bytes& identity);
   static Credential x509(const std::vector<bytes>& der_chain);
+  static Credential userinfo_vc(const bytes& userinfo_vc_jwt);
+  static Credential multi(
+    const std::vector<CredentialBindingInput>& binding_inputs,
+    const SignaturePublicKey& signature_key);
 
   bool valid_for(const SignaturePublicKey& pub) const;
 
@@ -110,7 +155,43 @@ public:
   TLS_TRAITS(tls::variant<CredentialType>)
 
 private:
-  var::variant<BasicCredential, X509Credential> _cred;
+  using SpecificCredential = var::variant<BasicCredential,
+                                          X509Credential,
+                                          UserInfoVCCredential,
+                                          MultiCredential>;
+
+  Credential(SpecificCredential specific);
+  SpecificCredential _cred;
+};
+
+// XXX(RLB): This struct needs to appear below Credential so that all types are
+// concrete at the appropriate points.
+struct CredentialBindingInput
+{
+  CipherSuite cipher_suite;
+  Credential credential;
+  const SignaturePrivateKey& credential_priv;
+};
+
+struct CredentialBinding
+{
+  CipherSuite cipher_suite;
+  Credential credential;
+  SignaturePublicKey credential_key;
+  bytes signature;
+
+  CredentialBinding() = default;
+  CredentialBinding(CipherSuite suite_in,
+                    Credential credential_in,
+                    const SignaturePrivateKey& credential_priv,
+                    const SignaturePublicKey& signature_key);
+
+  bool valid_for(const SignaturePublicKey& signature_key) const;
+
+  TLS_SERIALIZABLE(cipher_suite, credential, credential_key, signature)
+
+private:
+  bytes to_be_signed(const SignaturePublicKey& signature_key) const;
 };
 
 } // namespace mls
@@ -119,5 +200,9 @@ namespace tls {
 
 TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
 TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
+TLS_VARIANT_MAP(mls::CredentialType,
+                mls::UserInfoVCCredential,
+                userinfo_vc_draft_00)
+TLS_VARIANT_MAP(mls::CredentialType, mls::MultiCredential, multi_draft_00)
 
-} // namespace TLS
+} // namespace tls

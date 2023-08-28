@@ -1,13 +1,21 @@
+#include <hpke/base64.h>
 #include <hpke/digest.h>
 #include <hpke/signature.h>
+#include <string>
 
 #include "dhkem.h"
 
 #include "common.h"
 #include "group.h"
 #include "rsa.h"
+#include <nlohmann/json.hpp>
+#include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/ec.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
+
+using nlohmann::json;
 
 namespace hpke {
 
@@ -103,8 +111,97 @@ struct GroupSignature : public Signature
     return group.verify(data, sig, rpk);
   }
 
+  std::unique_ptr<Signature::PrivateKey> import_jwk_private(
+    const std::string& json_str) const override
+  {
+    const auto jwk_json = validate_jwk_json(json_str, true);
+
+    const auto d = from_base64url(jwk_json.at("d"));
+    auto gsk = group.deserialize_private(d);
+
+    return std::make_unique<PrivateKey>(gsk.release());
+  }
+
+  std::unique_ptr<Signature::PublicKey> import_jwk(
+    const std::string& json_str) const override
+  {
+    const auto jwk_json = validate_jwk_json(json_str, false);
+
+    const auto x = from_base64url(jwk_json.at("x"));
+    auto y = bytes{};
+    if (jwk_json.contains("y")) {
+      y = from_base64url(jwk_json.at("y"));
+    }
+
+    return group.public_key_from_coordinates(x, y);
+  }
+
+  std::string export_jwk(const Signature::PublicKey& pk) const override
+  {
+    const auto& gpk = dynamic_cast<const Group::PublicKey&>(pk);
+    const auto jwk_json = export_jwk_json(gpk);
+    return jwk_json.dump();
+  }
+
+  std::string export_jwk_private(const Signature::PrivateKey& sk) const override
+  {
+    const auto& gssk = dynamic_cast<const GroupSignature::PrivateKey&>(sk);
+    const auto& gsk = gssk.group_priv;
+    const auto gpk = gsk->public_key();
+
+    auto jwk_json = export_jwk_json(*gpk);
+
+    // encode the private key
+    const auto enc = serialize_private(sk);
+    jwk_json.emplace("d", to_base64url(enc));
+
+    return jwk_json.dump();
+  }
+
 private:
   const Group& group;
+
+  json validate_jwk_json(const std::string& json_str, bool private_key) const
+  {
+    json jwk_json = json::parse(json_str);
+
+    if (jwk_json.empty() || !jwk_json.contains("kty") ||
+        !jwk_json.contains("crv") || !jwk_json.contains("x") ||
+        (private_key && !jwk_json.contains("d"))) {
+      throw std::runtime_error("malformed JWK");
+    }
+
+    if (jwk_json.at("kty") != group.jwk_key_type) {
+      throw std::runtime_error("invalid JWK key type");
+    }
+
+    if (jwk_json.at("crv") != group.jwk_curve_name) {
+      throw std::runtime_error("invalid JWK curve");
+    }
+
+    return jwk_json;
+  }
+
+  json export_jwk_json(const Group::PublicKey& pk) const
+  {
+    const auto [x, y] = group.coordinates(pk);
+
+    json jwk_json = json::object({
+      { "crv", group.jwk_curve_name },
+      { "kty", group.jwk_key_type },
+    });
+
+    if (group.jwk_key_type == "EC") {
+      jwk_json.emplace("x", to_base64url(x));
+      jwk_json.emplace("y", to_base64url(y));
+    } else if (group.jwk_key_type == "OKP") {
+      jwk_json.emplace("x", to_base64url(x));
+    } else {
+      throw std::runtime_error("unknown key type");
+    }
+
+    return jwk_json;
+  }
 };
 
 template<>
@@ -174,18 +271,6 @@ Signature::get<Signature::ID::RSA_SHA512>()
 Signature::Signature(Signature::ID id_in)
   : id(id_in)
 {
-}
-
-bytes
-Signature::serialize_private(const PrivateKey& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
-}
-
-std::unique_ptr<Signature::PrivateKey>
-Signature::deserialize_private(const bytes& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
 }
 
 std::unique_ptr<Signature::PrivateKey>

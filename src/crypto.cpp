@@ -362,6 +362,7 @@ const std::string mls_content = "FramedContentTBS";
 const std::string leaf_node = "LeafNodeTBS";
 const std::string key_package = "KeyPackageTBS";
 const std::string group_info = "GroupInfoTBS";
+const std::string multi_credential = "MultiCredential";
 } // namespace sign_label
 
 struct SignContent
@@ -381,6 +382,21 @@ SignaturePublicKey::verify(const CipherSuite& suite,
   const auto content = tls::marshal(SignContent{ label_plus, message });
   auto pub = suite.sig().deserialize(data);
   return suite.sig().verify(content, signature, *pub);
+}
+
+SignaturePublicKey
+SignaturePublicKey::from_jwk(CipherSuite suite, const std::string& json_str)
+{
+  auto pub = suite.sig().import_jwk(json_str);
+  auto pub_data = suite.sig().serialize(*pub);
+  return SignaturePublicKey{ pub_data };
+}
+
+std::string
+SignaturePublicKey::to_jwk(CipherSuite suite) const
+{
+  auto pub = suite.sig().deserialize(data);
+  return suite.sig().export_jwk(*pub);
 }
 
 SignaturePrivateKey
@@ -435,6 +451,23 @@ SignaturePrivateKey::set_public_key(CipherSuite suite)
   const auto priv = suite.sig().deserialize_private(data);
   auto pub = priv->public_key();
   public_key.data = suite.sig().serialize(*pub);
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::from_jwk(CipherSuite suite, const std::string& json_str)
+{
+  auto priv = suite.sig().import_jwk_private(json_str);
+  auto priv_data = suite.sig().serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig().serialize(*pub);
+  return { priv_data, pub_data };
+}
+
+std::string
+SignaturePrivateKey::to_jwk(CipherSuite suite) const
+{
+  const auto priv = suite.sig().deserialize_private(data);
+  return suite.sig().export_jwk_private(*priv);
 }
 
 } // namespace mls

@@ -78,6 +78,14 @@ struct RSASignature : public Signature
               const bytes& sig,
               const Signature::PublicKey& pk) const override;
 
+  std::unique_ptr<Signature::PrivateKey> import_jwk_private(
+    const std::string& json_str) const override;
+  std::unique_ptr<Signature::PublicKey> import_jwk(
+    const std::string& json_str) const override;
+  std::string export_jwk_private(
+    const Signature::PrivateKey& sk) const override;
+  std::string export_jwk(const Signature::PublicKey& pk) const override;
+
 private:
   const EVP_MD* md;
 
