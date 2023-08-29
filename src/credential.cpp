@@ -1,6 +1,6 @@
-#include <mls/credential.h>
 #include <hpke/certificate.h>
 #include <hpke/userinfo_vc.h>
+#include <mls/credential.h>
 #include <tls/tls_syntax.h>
 
 namespace mls {
@@ -10,8 +10,8 @@ namespace mls {
 ///
 
 using hpke::Certificate; // NOLINT(misc-unused-using-decls)
-using hpke::UserInfoVC; // NOLINT(misc-unused-using-decls)
 using hpke::Signature;   // NOLINT(misc-unused-using-decls)
+using hpke::UserInfoVC;  // NOLINT(misc-unused-using-decls)
 
 static const Signature&
 find_signature(Signature::ID id)

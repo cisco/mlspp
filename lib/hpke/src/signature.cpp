@@ -306,23 +306,39 @@ sig_from_jwk(const std::string& json_str)
   return alg_sig_map.at(key);
 }
 
-std::tuple<Signature::ID, std::unique_ptr<Signature::PrivateKey>>
-Signature::parse_jwk_private(const std::string& json_str)
+Signature::PrivateJWK
+Signature::parse_jwk_private(const std::string& jwk_json)
 {
   // XXX(RLB): This JSON-parses the JWK twice.  I'm assuming that this is a less
   // bad cost than changing the import_jwk method signature to take `json`.
-  const auto& sig = sig_from_jwk(json_str);
-  auto priv = sig.import_jwk_private(json_str);
-  return { sig.id, std::move(priv) };
+  const auto jwk = json::parse(jwk_json);
+  const auto& sig = sig_from_jwk(jwk);
+
+  auto kty = std::optional<std::string>{};
+  if (jwk.contains("kty")) {
+    kty = jwk.at("kty").get<std::string>();
+  }
+
+  auto priv = sig.import_jwk_private(jwk_json);
+
+  return { sig, kty, std::move(priv) };
 }
 
-std::tuple<Signature::ID, std::unique_ptr<Signature::PublicKey>>
-Signature::parse_jwk(const std::string& json_str)
+Signature::PublicJWK
+Signature::parse_jwk(const std::string& jwk_json)
 {
   // XXX(RLB): Same double-parsing comment as with `parse_jwk_private`
-  const auto& sig = sig_from_jwk(json_str);
-  auto pub = sig.import_jwk(json_str);
-  return { sig.id, std::move(pub) };
+  const auto jwk = json::parse(jwk_json);
+  const auto& sig = sig_from_jwk(jwk);
+
+  auto kty = std::optional<std::string>{};
+  if (jwk.contains("kty")) {
+    kty = jwk.at("kty").get<std::string>();
+  }
+
+  auto pub = sig.import_jwk(jwk_json);
+
+  return { sig, kty, std::move(pub) };
 }
 
 } // namespace hpke

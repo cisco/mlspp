@@ -64,7 +64,7 @@ struct UserInfoVCCredential
 
   TLS_SERIALIZABLE(userinfo_vc_jwt)
 
-  private:
+private:
   SignaturePublicKey _public_key;
   SignatureScheme _signature_scheme;
 };

@@ -39,7 +39,7 @@ struct UserInfoVC::ParsedCredential
 {
   // Header fields
   const Signature& signature_algorithm; // `alg`
-  std::string key_id;         // `kid`
+  std::string key_id;                   // `kid`
 
   // Top-level Payload fields
   std::string issuer;                               // `iss`
@@ -102,7 +102,7 @@ struct UserInfoVC::ParsedCredential
     }
 
     const auto jwk = to_ascii(from_base64url(id.substr(did_jwk_prefix.size())));
-    auto [public_key_algorithm, public_key] = Signature::parse_jwk(jwk);
+    auto [public_key_algorithm, _kid, public_key] = Signature::parse_jwk(jwk);
 
     // Extract the salient parts
     const auto cred = ParsedCredential{
@@ -114,7 +114,7 @@ struct UserInfoVC::ParsedCredential
       .not_after = epoch_time(payload.at("exp").get<int64_t>()),
 
       .credential_subject = credential_subject,
-      .public_key_algorithm = public_key_algorithm,
+      .public_key_algorithm = public_key_algorithm.id,
       .public_key = std::shared_ptr<Signature::PublicKey>(public_key.release()),
 
       .to_be_signed = to_be_signed,
