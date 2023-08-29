@@ -37,9 +37,10 @@ jobs:
     env:
       CMAKE_BUILD_DIR: ${{ github.workspace }}/build
       CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+      VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: dependencies (macos)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -49,11 +50,10 @@ jobs:
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Restore cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        path: |
-            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
-        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ runner.os }}
 
     - name: Configure to use clang-tidy and sanitizers
       run: |

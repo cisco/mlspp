@@ -18,27 +18,27 @@ jobs:
     env:
         CMAKE_BUILD_DIR: ${{ github.workspace }}/build
         TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+        VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Restore cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        path: |
-            ${{ env.CMAKE_BUILD_DIR }}/vcpkg_installed
-        key: ${{ runner.os }}-${{ hashFiles( '**/vcpkg.json' ) }}
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ runner.os }}
 
     - name: Build the library      
       run: |
         cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
-        cmake --build build          
+        cmake --build build --parallel 2
 
     - name: Build interop harness
       run: |
         cd cmd/interop
         cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
-        cmake --build build
+        cmake --build build --parallel 2
 
     - name: Test self-interop
       run: |
