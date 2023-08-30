@@ -94,6 +94,7 @@ jobs:
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
 
   platform-sanitizer-tests:
+    if: github.event.pull_request.draft == false
     needs: quick-linux-interop-check
     name: Build and test platforms using sanitizers and clang-tidy
     runs-on: ${{ matrix.os }}
@@ -155,6 +156,7 @@ jobs:
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
 
   old-macos-compatibility:
+    if: github.event.pull_request.draft == false
     needs: quick-linux-interop-check
     name: Build for older MacOS
     runs-on: macos-latest
