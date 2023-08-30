@@ -10,8 +10,9 @@ option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 
 # Default values for the namespaces are adequate for most uses.
-set(MLS_CPP_NAMESPACE "mls" CACHE STRING "top-level namespace for cpp")
-set(MLS_EXPORT_NAMESPACE "MLSPP" CACHE STRING "namespace for cmake export")
+set(MLS_NAMESPACE_SUFFIX "" CACHE STRING "Namespace Suffix for CPP and CMake Export")
+set(MLS_CPP_NAMESPACE "mls${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CPP")
+set(MLS_EXPORT_NAMESPACE "MLSPP${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Namespace for CMake Export")
 
 ###
 ### Global Config
