@@ -28,17 +28,18 @@ jobs:
           - 'lib'
     steps:
     - uses: actions/checkout@v3
-    - name: Run clang-format style check for C/C++ programs.
+
+    - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.6.2
       with:
         clang-format-version: '14'
         check-path: ${{ matrix.path }}
 
   build-test-interop:
-    name: Build and Test
+    name: Build, Test and Interop
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
@@ -51,75 +52,74 @@ jobs:
             - os: macos-latest
               vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               ctest-target: test
-     
-      steps:
-      - uses: actions/checkout@v3
+    steps:
+    - uses: actions/checkout@v3
 
-      - name: dependencies (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew install llvm pkg-config
-          ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-          ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+    - name: dependencies (macos)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-      - name: dependencies (ubuntu)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          sudo apt-get install -y linux-headers-$(uname -r)
+    - name: dependencies (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
 
-      - name: Restore cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ github.workspace }}/build/cache
-          key: ${{ runner.os }}
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
 
-      - name: Configure to use clang-tidy and sanitizers      
-        run: |
-          cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+    - name: Configure to use clang-tidy and sanitizers      
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
-      - name: Build All
-        run: |
-          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
+    - name: Build
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
 
-      - name: Unit tests
-        run: |
-          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+    - name: Unit tests
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
 
-      - name: Clean
-        run: |
-          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target clean
+    - name: Clean
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target clean
 
-      - name: Configure to use clang-tidy and sanitizers (openssl3)
-        run: |
-          cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+    - name: Configure to use clang-tidy and sanitizers (openssl3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
 
-      - name: Build (openssl3)
-        run: |
-          cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+    - name: Build (openssl3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
-      - name: Unit tests (openssl3)
-        run: |
-          cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-          
-      - name: Build interop harness
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cd cmd/interop
-          cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
-          cmake --build build --parallel 2
+    - name: Unit tests (openssl3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        
+    - name: Build interop harness
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        cd cmd/interop
+        cmake -B build -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}" .
+        cmake --build build --parallel 2
 
-      - name: Test self-interop
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          make -C cmd/interop self-test
+    - name: Test self-interop
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        make -C cmd/interop self-test
 
-      - name: Test interop on test vectors
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          make -C cmd/interop interop-test
+    - name: Test interop on test vectors
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        make -C cmd/interop interop-test
 
-      - name: Test gRPC live interop with self
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          cd cmd/interop
-          ./grpc-self-test.sh
+    - name: Test gRPC live interop with self
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
