@@ -1,5 +1,13 @@
 name: MLSPP CI
 
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
