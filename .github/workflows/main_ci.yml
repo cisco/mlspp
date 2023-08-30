@@ -1,0 +1,162 @@
+name: MLSPP CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+  CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
+  CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
+  CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+
+jobs:
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - 'include'
+          - 'src'
+          - 'test'
+          - 'cmd'
+          - 'lib'
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run clang-format style check for C/C++ programs
+      uses: jidicula/clang-format-action@v4
+      with:
+        clang-format-version: '16'
+        check-path: ${{ matrix.path }}
+        fallback-style: 'Mozilla'
+
+  quick-linux-interop-check:
+    needs: formatting-check
+    name: Quick Linux Check and Interop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: dependencies (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Configure
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+
+    - name: Build
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
+
+    - name: Test
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
+        
+    - name: Configure (OpenSSL 3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+    - name: Build (openssl3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Unit tests (openssl3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+
+  platform-sanitizer-tests:
+    needs: quick-linux-interop-check
+    name: Build and test platforms using sanitizers and clang-tidy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives\\openssl_3"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+            - os: macos-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: dependencies (macos)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: dependencies (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Configure (OpenSSL1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+
+    - name: Build (OpenSSL1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
+
+    - name: Test (OpenSSL1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Configure (OpenSSL3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" .
+
+    - name: Build (OpenSSL3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Test (OpenSSL3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+
