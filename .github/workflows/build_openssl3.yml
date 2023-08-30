@@ -52,7 +52,7 @@ jobs:
     - name: dependencies (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        apt-get install linux-headers-$(uname -r)
+        sudo apt-get install -y linux-headers-$(uname -r)
 
     - name: Restore cache
       uses: actions/cache@v3
