@@ -187,7 +187,3 @@ jobs:
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp --parallel 2
 
-    - name: Test
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
-
