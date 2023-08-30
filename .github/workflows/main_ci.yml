@@ -68,6 +68,12 @@ jobs:
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
 
+    - name: Build (Interop Harness)
+      run: |
+        cd cmd/interop
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake --build build
+
     - name: Test self-interop
       run: |
         make -C cmd/interop self-test
