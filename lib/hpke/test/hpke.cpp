@@ -1,10 +1,11 @@
 #include <doctest/doctest.h>
 #include <hpke/hpke.h>
+#include <namespace.h>
 
 #include "common.h"
 #include "test_vectors.h"
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct HPKETest
 {
@@ -16,18 +17,18 @@ struct HPKETest
   }
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke
 
 static void
 test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 {
-  auto key = hpke::HPKETest::key(ctxR);
+  auto key = MLS_NAMESPACE::hpke::HPKETest::key(ctxR);
   REQUIRE(key == tv.key);
 
-  auto nonce = hpke::HPKETest::nonce(ctxR);
+  auto nonce = MLS_NAMESPACE::hpke::HPKETest::nonce(ctxR);
   REQUIRE(nonce == tv.nonce);
 
-  auto exporter_secret = hpke::HPKETest::exporter_secret(ctxR);
+  auto exporter_secret = MLS_NAMESPACE::hpke::HPKETest::exporter_secret(ctxR);
   REQUIRE(exporter_secret == tv.exporter_secret);
 
   for (const auto& enc : tv.encryptions) {
@@ -135,7 +136,8 @@ TEST_CASE("HPKE Test Vectors")
   ensure_fips_if_required();
 
   auto test_vector_bytes = bytes(test_vector_data);
-  auto test_vectors = tls::get<HPKETestVectors>(test_vector_bytes);
+  auto test_vectors =
+    MLS_NAMESPACE::tls::get<HPKETestVectors>(test_vector_bytes);
 
   for (const auto& tv : test_vectors.vectors) {
     if (fips() && fips_disable(tv.aead_id)) {

@@ -3,12 +3,13 @@
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
+#include <namespace.h>
 
 #include "openssl_common.h"
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 // XXX(RLB): There is a lot of code in RSASignature that is duplicated in
 // EVPGroup.  I have allowed this duplication rather than factoring it out
@@ -94,4 +95,4 @@ private:
   static Signature::ID digest_to_sig(Digest::ID digest);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

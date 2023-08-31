@@ -1,10 +1,11 @@
 #pragma once
 
+#include <namespace.h>
 #include <string>
 #include <tls/tls_syntax.h>
 #include <vector>
 
-namespace bytes_ns {
+namespace MLS_NAMESPACE::bytes_ns {
 
 struct bytes
 {
@@ -118,4 +119,4 @@ to_hex(const bytes& data);
 bytes
 from_hex(const std::string& hex);
 
-} // namespace bytes_ns
+} // namespace MLS_NAMESPACE::bytes_ns

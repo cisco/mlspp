@@ -2,8 +2,9 @@
 
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct HKDF : public KDF
 {
@@ -21,4 +22,4 @@ private:
   explicit HKDF(const Digest& digest_in);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

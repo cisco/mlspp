@@ -1,8 +1,9 @@
 #pragma once
 
 #include <hpke/hpke.h>
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct ExportOnlyCipher : public AEAD
 {
@@ -42,4 +43,4 @@ private:
   friend AEADCipher make_aead(AEAD::ID cipher_in);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

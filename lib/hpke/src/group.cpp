@@ -1,6 +1,7 @@
 #include "group.h"
 
 #include <hpke/random.h>
+#include <namespace.h>
 
 #include "common.h"
 #include "openssl_common.h"
@@ -13,7 +14,7 @@
 #include "openssl/param_build.h"
 #endif
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 static inline size_t
 group_dh_size(Group::ID group_id);
@@ -1063,4 +1064,4 @@ Group::Group(ID group_id_in, const KDF& kdf_in)
 {
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

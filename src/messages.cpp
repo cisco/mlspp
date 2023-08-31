@@ -2,10 +2,11 @@
 #include <mls/messages.h>
 #include <mls/state.h>
 #include <mls/treekem.h>
+#include <namespace.h>
 
 #include "grease.h"
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // Extensions
 
@@ -897,4 +898,4 @@ external_proposal(CipherSuite suite,
   return PublicMessage::protect(std::move(content_auth), suite, {}, {});
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

@@ -4,7 +4,7 @@
 #include <mls/treekem.h>
 #include <mls_vectors/mls_vectors.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 using namespace mls_vectors;
 
 class TreeKEMTest

@@ -8,11 +8,29 @@ project(mlspp
 option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
+option(MLS_NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
+
+if(MLS_NAMESPACE_SUFFIX)
+    set(MLS_CXX_NAMESPACE "mls_${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CXX")
+    set(MLS_EXPORT_NAMESPACE "MLSPP${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Namespace for CMake Export")
+else()
+    set(MLS_CXX_NAMESPACE "mls" CACHE STRING "Top-level Namespace for CXX")
+    set(MLS_EXPORT_NAMESPACE "MLSPP" CACHE STRING "Namespace for CMake Export")
+endif()
+message(STATUS "CXX Namespace: ${MLS_CXX_NAMESPACE}")
+message(STATUS "CMake Export Namespace: ${MLS_EXPORT_NAMESPACE}")
+
 
 ###
 ### Global Config
 ###
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/namespace.h.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/namespace.h"
+  @ONLY
+)
 
 include(CheckCXXCompilerFlag)
 include(CMakePackageConfigHelpers)
@@ -127,22 +145,38 @@ endif()
 ### Exports
 ###
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
-export(EXPORT mlspp-targets NAMESPACE MLSPP:: FILE mlspp-targets.cmake)
-export(PACKAGE MLSPP)
+export(
+  EXPORT
+    mlspp-targets
+  NAMESPACE
+    ${MLS_EXPORT_NAMESPACE}::
+  FILE
+    ${MLS_EXPORT_NAMESPACE}Targets.cmake)
+export(PACKAGE ${MLS_EXPORT_NAMESPACE})
 
 configure_package_config_file(cmake/config.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config.cmake
-  INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/mlspp
+  ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE}
   NO_SET_AND_CHECK_MACRO)
 
 write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config-version.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY SameMajorVersion)
 
 ###
 ### Install
 ###
+
+install(
+  EXPORT
+    mlspp-targets
+  NAMESPACE
+    ${MLS_EXPORT_NAMESPACE}::
+  FILE
+    ${MLS_EXPORT_NAMESPACE}Targets.cmake
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
 
 install(
   DIRECTORY
@@ -152,18 +186,16 @@ install(
 
 install(
   FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/mlspp-config-version.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
   DESTINATION
-    ${CMAKE_INSTALL_DATADIR}/mlspp)
+    ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
 
 install(
-  EXPORT
-    mlspp-targets
-  NAMESPACE
-    MLSPP::
-  FILE
-    mlspp-targets.cmake
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
   DESTINATION
-    ${CMAKE_INSTALL_DATADIR}/mlspp)
+    ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+  RENAME
+    copyright)
 

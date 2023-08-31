@@ -1,10 +1,10 @@
-#include <mls/session.h>
-
 #include <mls/messages.h>
+#include <mls/session.h>
+#include <namespace.h>
 
 #include <deque>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Inner struct declarations for PendingJoin and Session
@@ -435,4 +435,4 @@ operator!=(const Session& lhs, const Session& rhs)
   return !(lhs == rhs);
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

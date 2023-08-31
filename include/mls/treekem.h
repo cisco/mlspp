@@ -4,11 +4,12 @@
 #include "mls/core_types.h"
 #include "mls/crypto.h"
 #include "mls/tree_math.h"
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 
 #define ENABLE_TREE_DUMP 1
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 enum struct NodeType : uint8_t
 {
@@ -200,14 +201,16 @@ operator>>(tls::istream& str, TreeKEMPublicKey& obj);
 struct LeafNodeHashInput;
 struct ParentNodeHashInput;
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::NodeType, mls::LeafNodeHashInput, leaf)
-TLS_VARIANT_MAP(mls::NodeType, mls::ParentNodeHashInput, parent)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::LeafNodeHashInput, leaf)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType,
+                MLS_NAMESPACE::ParentNodeHashInput,
+                parent)
 
-TLS_VARIANT_MAP(mls::NodeType, mls::LeafNode, leaf)
-TLS_VARIANT_MAP(mls::NodeType, mls::ParentNode, parent)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::LeafNode, leaf)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::ParentNode, parent)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

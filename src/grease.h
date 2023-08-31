@@ -1,8 +1,9 @@
 #pragma once
 
 #include "mls/core_types.h"
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 Capabilities
 grease(Capabilities&& capabilities, const ExtensionList& extensions);
@@ -10,4 +11,4 @@ grease(Capabilities&& capabilities, const ExtensionList& extensions);
 ExtensionList
 grease(ExtensionList&& extensions);
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

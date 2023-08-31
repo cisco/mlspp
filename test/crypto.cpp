@@ -3,7 +3,7 @@
 #include <mls_vectors/mls_vectors.h>
 #include <string>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 using namespace mls_vectors;
 
 TEST_CASE("Basic HPKE")

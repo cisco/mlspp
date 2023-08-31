@@ -1,10 +1,11 @@
 #include <mls/treekem.h>
+#include <namespace.h>
 
 #if ENABLE_TREE_DUMP
 #include <iostream>
 #endif
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // Utility method used for removing leaves from a resolution
 static void
@@ -1079,4 +1080,4 @@ operator>>(tls::istream& str, TreeKEMPublicKey& obj)
   return str;
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

@@ -1,5 +1,6 @@
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
+#include <namespace.h>
 
 #include "aead_cipher.h"
 #include "common.h"
@@ -10,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 ///
 /// Helper functions and constants
@@ -533,4 +534,4 @@ HPKE::key_schedule(Mode mode,
   return { suite, key, nonce, exporter_secret, kdf, aead };
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

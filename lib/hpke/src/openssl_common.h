@@ -2,9 +2,10 @@
 
 #include <hpke/hpke.h>
 #include <memory>
+#include <namespace.h>
 #include <stdexcept>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 template<typename T>
 void
@@ -23,4 +24,4 @@ make_typed_unique(T* ptr)
 std::runtime_error
 openssl_error();
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

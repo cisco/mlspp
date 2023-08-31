@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 #include <mls/credential.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 TEST_CASE("Basic Credential")
 {

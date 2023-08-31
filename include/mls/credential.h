@@ -2,8 +2,9 @@
 
 #include <mls/common.h>
 #include <mls/crypto.h>
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // struct {
 //     opaque identity<0..2^16-1>;
@@ -194,15 +195,21 @@ private:
   bytes to_be_signed(const SignaturePublicKey& signature_key) const;
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::CredentialType, mls::BasicCredential, basic)
-TLS_VARIANT_MAP(mls::CredentialType, mls::X509Credential, x509)
-TLS_VARIANT_MAP(mls::CredentialType,
-                mls::UserInfoVCCredential,
+TLS_VARIANT_MAP(MLS_NAMESPACE::CredentialType,
+                MLS_NAMESPACE::BasicCredential,
+                basic)
+TLS_VARIANT_MAP(MLS_NAMESPACE::CredentialType,
+                MLS_NAMESPACE::X509Credential,
+                x509)
+TLS_VARIANT_MAP(MLS_NAMESPACE::CredentialType,
+                MLS_NAMESPACE::UserInfoVCCredential,
                 userinfo_vc_draft_00)
-TLS_VARIANT_MAP(mls::CredentialType, mls::MultiCredential, multi_draft_00)
+TLS_VARIANT_MAP(MLS_NAMESPACE::CredentialType,
+                MLS_NAMESPACE::MultiCredential,
+                multi_draft_00)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

@@ -5,11 +5,11 @@
 #include <hpke/random.h>
 #include <hpke/signature.h>
 #include <mls/common.h>
+#include <namespace.h>
 #include <tls/tls_syntax.h>
-
 #include <vector>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 /// Signature Code points, borrowed from RFC 8446
 enum struct SignatureScheme : uint16_t
@@ -136,7 +136,7 @@ private:
 extern const std::array<CipherSuite::ID, 7> all_supported_suites;
 
 // Utilities
-using hpke::random_bytes;
+using MLS_NAMESPACE::hpke::random_bytes;
 
 // HPKE Keys
 namespace encrypt_label {
@@ -251,4 +251,4 @@ private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

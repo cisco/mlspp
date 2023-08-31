@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 #include <vector>
 
@@ -27,7 +28,7 @@
 //
 //    01x = <00x, 10x>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // Index types go in the overall namespace
 // XXX(rlb@ipv.sx): Seems like this stuff can probably get
@@ -104,4 +105,4 @@ struct NodeIndex : public UInt32
   uint32_t level() const;
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

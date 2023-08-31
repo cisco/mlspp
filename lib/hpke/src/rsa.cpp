@@ -3,8 +3,9 @@
 #include "common.h"
 #include "openssl/rsa.h"
 #include "openssl_common.h"
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 std::unique_ptr<Signature::PrivateKey>
 RSASignature::generate_key_pair() const
@@ -204,4 +205,4 @@ RSASignature::digest_to_sig(Digest::ID digest)
   }
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

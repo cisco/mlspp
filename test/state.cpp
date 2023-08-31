@@ -3,7 +3,7 @@
 #include <mls/common.h>
 #include <mls/state.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 struct CustomExtension
 {
