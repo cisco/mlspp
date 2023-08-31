@@ -164,9 +164,8 @@ private:
   {
     json jwk = json::parse(jwk_json);
 
-    if (jwk.empty() || !jwk.contains("kty") ||
-        !jwk.contains("crv") || !jwk.contains("x") ||
-        (private_key && !jwk.contains("d"))) {
+    if (jwk.empty() || !jwk.contains("kty") || !jwk.contains("crv") ||
+        !jwk.contains("x") || (private_key && !jwk.contains("d"))) {
       throw std::runtime_error("malformed JWK");
     }
 

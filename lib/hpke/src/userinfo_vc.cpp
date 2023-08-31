@@ -98,7 +98,8 @@ jws_to_der_sig(const bytes& jws_sig)
   // Write R, virtually padding with a zero byte if needed
   const auto r_start = der_header_size;
   const auto r_data_start = r_start + int_header_size + (r_big ? 1 : 0);
-  const auto r_data_begin = der.begin() + static_cast<std::ptrdiff_t>(r_data_start);
+  const auto r_data_begin =
+    der.begin() + static_cast<std::ptrdiff_t>(r_data_start);
 
   der.at(r_start) = 0x02;
   der.at(r_start + 1) = static_cast<uint8_t>(r_size);
@@ -107,7 +108,8 @@ jws_to_der_sig(const bytes& jws_sig)
   // Write S, virtually padding with a zero byte if needed
   const auto s_start = der_header_size + r_int_size;
   const auto s_data_start = s_start + int_header_size + (s_big ? 1 : 0);
-  const auto s_data_begin = der.begin() + static_cast<std::ptrdiff_t>(s_data_start);
+  const auto s_data_begin =
+    der.begin() + static_cast<std::ptrdiff_t>(s_data_start);
 
   der.at(s_start) = 0x02;
   der.at(s_start + 1) = static_cast<uint8_t>(s_size);
