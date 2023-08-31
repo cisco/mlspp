@@ -28,8 +28,7 @@ public:
   std::chrono::system_clock::time_point not_before() const;
   std::chrono::system_clock::time_point not_after() const;
   std::map<std::string, std::string> subject() const;
-  Signature::ID public_key_algorithm() const;
-  const Signature::PublicKey public_key() const;
+  const Signature::PublicJWK& public_key() const;
 
   bool valid_from(const Signature::PublicKey& issuer_key) const;
 

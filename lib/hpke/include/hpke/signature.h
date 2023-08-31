@@ -50,14 +50,16 @@ struct Signature
   virtual std::unique_ptr<PrivateKey> deserialize_private(
     const bytes& skm) const = 0;
 
-  struct PrivateJWK {
+  struct PrivateJWK
+  {
     const Signature& sig;
     std::optional<std::string> key_id;
     std::unique_ptr<PrivateKey> key;
   };
   static PrivateJWK parse_jwk_private(const std::string& json_str);
 
-  struct PublicJWK {
+  struct PublicJWK
+  {
     const Signature& sig;
     std::optional<std::string> key_id;
     std::unique_ptr<PublicKey> key;

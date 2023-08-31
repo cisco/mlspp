@@ -11,7 +11,7 @@ namespace hpke {
 ///
 /// ParsedCredential
 ///
-const Signature&
+static const Signature&
 signature_from_alg(const std::string& alg)
 {
   static const auto alg_sig_map = std::map<std::string, const Signature&>{
@@ -28,11 +28,90 @@ signature_from_alg(const std::string& alg)
   return alg_sig_map.at(alg);
 }
 
-std::chrono::system_clock::time_point
+static std::chrono::system_clock::time_point
 epoch_time(int64_t seconds_since_epoch)
 {
   const auto delta = std::chrono::seconds(seconds_since_epoch);
   return std::chrono::system_clock::time_point(delta);
+}
+
+static bool
+is_ecdsa(const Signature& sig)
+{
+  return sig.id == Signature::ID::P256_SHA256 ||
+         sig.id == Signature::ID::P384_SHA384 ||
+         sig.id == Signature::ID::P521_SHA512;
+}
+
+// OpenSSL expects ECDSA signatures to be in DER form.  JWS provides the
+// signature in raw R||S form.  So we need to do some manual DER encoding.
+static bytes
+jws_to_der_sig(const bytes& jws_sig)
+{
+  // Inputs that are too large will result in invalid DER encodings with this
+  // code.  At this size, the combination of the DER integer headers and the
+  // integer data will overflow the one-byte DER struct length.
+  static const auto max_sig_size = size_t(250);
+  if (jws_sig.size() > max_sig_size) {
+    throw std::runtime_error("JWS signature too large");
+  }
+
+  if (jws_sig.size() % 2 != 0) {
+    throw std::runtime_error("Malformed JWS signature");
+  }
+
+  const auto int_size = jws_sig.size() / 2;
+
+  // Compute the encoded size of R and S integer data, adding a zero byte if
+  // needed to clear the sign bit
+  const auto r_big = (jws_sig.at(0) >= 0x80);
+  const auto s_big = (jws_sig.at(int_size) >= 0x80);
+
+  const auto r_size = int_size + (r_big ? 1 : 0);
+  const auto s_size = int_size + (s_big ? 1 : 0);
+
+  // Compute the size of the DER-encoded signature
+  static const auto int_header_size = 2;
+  const auto r_int_size = int_header_size + r_size;
+  const auto s_int_size = int_header_size + s_size;
+
+  const auto content_size = r_int_size + s_int_size;
+  const auto content_big = (content_size > 0x80);
+
+  auto der_header_size = 2 + (content_big ? 1 : 0);
+  const auto der_size = der_header_size + content_size;
+
+  // Allocate the DER buffer
+  auto der = bytes(der_size, 0);
+
+  // Write the header
+  der.at(0) = 0x30;
+  if (content_big) {
+    der.at(1) = 0x81;
+    der.at(2) = static_cast<uint8_t>(content_size);
+  } else {
+    der.at(1) = static_cast<uint8_t>(content_size);
+  }
+
+  // Write R, virtually padding with a zero byte if needed
+  const auto r_start = der_header_size;
+  const auto r_data_start = r_start + int_header_size + (r_big ? 1 : 0);
+
+  der.at(r_start) = 0x02;
+  der.at(r_start + 1) = static_cast<uint8_t>(r_size);
+  std::copy(
+    jws_sig.begin(), jws_sig.begin() + int_size, der.begin() + r_data_start);
+
+  // Write S, virtually padding with a zero byte if needed
+  const auto s_start = der_header_size + r_int_size;
+  const auto s_data_start = s_start + int_header_size + (s_big ? 1 : 0);
+
+  der.at(s_start) = 0x02;
+  der.at(s_start + 1) = static_cast<uint8_t>(s_size);
+  std::copy(
+    jws_sig.begin() + int_size, jws_sig.end(), der.begin() + s_data_start);
+
+  return der;
 }
 
 struct UserInfoVC::ParsedCredential
@@ -48,12 +127,32 @@ struct UserInfoVC::ParsedCredential
 
   // Credential subject fields
   std::map<std::string, std::string> credential_subject;
-  Signature::ID public_key_algorithm;
-  std::shared_ptr<Signature::PublicKey> public_key;
+  Signature::PublicJWK public_key;
 
   // Signature verification information
   bytes to_be_signed;
   bytes signature;
+
+  ParsedCredential(const Signature& signature_algorithm_in,
+                   std::string key_id_in,
+                   std::string issuer_in,
+                   std::chrono::system_clock::time_point not_before_in,
+                   std::chrono::system_clock::time_point not_after_in,
+                   std::map<std::string, std::string> credential_subject_in,
+                   Signature::PublicJWK&& public_key_in,
+                   bytes to_be_signed_in,
+                   bytes signature_in)
+    : signature_algorithm(signature_algorithm_in)
+    , key_id(std::move(key_id_in))
+    , issuer(std::move(issuer_in))
+    , not_before(not_before_in)
+    , not_after(not_after_in)
+    , credential_subject(credential_subject_in)
+    , public_key(std::move(public_key_in))
+    , to_be_signed(std::move(to_be_signed_in))
+    , signature(std::move(signature_in))
+  {
+  }
 
   static std::shared_ptr<ParsedCredential> parse(const std::string& jwt)
   {
@@ -61,25 +160,34 @@ struct UserInfoVC::ParsedCredential
     const auto first_dot = jwt.find_first_of('.');
     const auto last_dot = jwt.find_last_of('.');
     if (first_dot == std::string::npos || last_dot == std::string::npos ||
-        first_dot == last_dot) {
+        first_dot == last_dot || last_dot > jwt.length() - 2) {
       throw std::runtime_error("malformed JWT; not enough '.' characters");
     }
 
     const auto header_b64 = jwt.substr(0, first_dot);
-    const auto payload_b64 = jwt.substr(first_dot, last_dot - first_dot);
-    const auto signature_b64 = jwt.substr(last_dot);
+    const auto payload_b64 =
+      jwt.substr(first_dot + 1, last_dot - first_dot - 1);
+    const auto signature_b64 = jwt.substr(last_dot + 1);
 
     // Parse the components
     const auto header = json::parse(from_base64url(header_b64));
     const auto payload = json::parse(from_base64url(payload_b64));
+
+    // Prepare the validation inputs
+    const auto& sig = signature_from_alg(header.at("alg"));
     const auto to_be_signed = from_ascii(header_b64 + "." + payload_b64);
-    const auto signature = from_base64url(signature_b64);
+    auto signature = from_base64url(signature_b64);
+    if (is_ecdsa(sig)) {
+      signature = jws_to_der_sig(signature);
+    }
 
     // Verify the VC parts
     const auto vc = payload.at("vc");
 
-    static const std::string context = "https://www.w3.org/2018/credentials/v1";
-    if (vc.at("context") != context) {
+    static const auto context =
+      std::vector<std::string>{ { "https://www.w3.org/2018/credentials/v1" } };
+    const auto vc_context = vc.at("@context").get<std::vector<std::string>>();
+    if (vc_context != context) {
       throw std::runtime_error("malformed VC: incorrect context value");
     }
 
@@ -102,26 +210,22 @@ struct UserInfoVC::ParsedCredential
     }
 
     const auto jwk = to_ascii(from_base64url(id.substr(did_jwk_prefix.size())));
-    auto [public_key_algorithm, _kid, public_key] = Signature::parse_jwk(jwk);
+    auto public_key = Signature::parse_jwk(jwk);
 
     // Extract the salient parts
-    const auto cred = ParsedCredential{
-      .signature_algorithm = signature_from_alg(header.at("alg")),
-      .key_id = header.at("kid"),
+    return std::make_shared<ParsedCredential>(
+      sig,
+      header.at("kid"),
 
-      .issuer = payload.at("iss"),
-      .not_before = epoch_time(payload.at("nbf").get<int64_t>()),
-      .not_after = epoch_time(payload.at("exp").get<int64_t>()),
+      payload.at("iss"),
+      epoch_time(payload.at("nbf").get<int64_t>()),
+      epoch_time(payload.at("exp").get<int64_t>()),
 
-      .credential_subject = credential_subject,
-      .public_key_algorithm = public_key_algorithm.id,
-      .public_key = std::shared_ptr<Signature::PublicKey>(public_key.release()),
+      credential_subject,
+      std::move(public_key),
 
-      .to_be_signed = to_be_signed,
-      .signature = signature,
-    };
-
-    return std::make_shared<ParsedCredential>(std::move(cred));
+      to_be_signed,
+      signature);
   }
 
   bool verify(const Signature::PublicKey& issuer_key)
@@ -176,16 +280,10 @@ UserInfoVC::not_after() const
   return parsed_cred->not_after;
 }
 
-Signature::ID
-UserInfoVC::public_key_algorithm() const
-{
-  return parsed_cred->public_key_algorithm;
-}
-
-const Signature::PublicKey
+const Signature::PublicJWK&
 UserInfoVC::public_key() const
 {
-  return *parsed_cred->public_key;
+  return parsed_cred->public_key;
 }
 
 bool

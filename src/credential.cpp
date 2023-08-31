@@ -119,9 +119,9 @@ UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt_in)
 {
   const auto vc = UserInfoVC(to_ascii(userinfo_vc_jwt));
 
-  const auto& sig = find_signature(vc.public_key_algorithm());
-  const auto pub_data = sig.serialize(vc.public_key());
-  _signature_scheme = tls_signature_scheme(vc.public_key_algorithm());
+  const auto& pub = vc.public_key();
+  const auto pub_data = pub.sig.serialize(*pub.key);
+  _signature_scheme = tls_signature_scheme(pub.sig.id);
   _public_key = SignaturePublicKey{ pub_data };
 }
 

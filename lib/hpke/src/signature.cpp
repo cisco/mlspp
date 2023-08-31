@@ -311,34 +311,32 @@ Signature::parse_jwk_private(const std::string& jwk_json)
 {
   // XXX(RLB): This JSON-parses the JWK twice.  I'm assuming that this is a less
   // bad cost than changing the import_jwk method signature to take `json`.
+  const auto& sig = sig_from_jwk(jwk_json);
   const auto jwk = json::parse(jwk_json);
-  const auto& sig = sig_from_jwk(jwk);
-
-  auto kty = std::optional<std::string>{};
-  if (jwk.contains("kty")) {
-    kty = jwk.at("kty").get<std::string>();
-  }
-
   auto priv = sig.import_jwk_private(jwk_json);
 
-  return { sig, kty, std::move(priv) };
+  auto kid = std::optional<std::string>{};
+  if (jwk.contains("kid")) {
+    kid = jwk.at("kid").get<std::string>();
+  }
+
+  return { sig, kid, std::move(priv) };
 }
 
 Signature::PublicJWK
 Signature::parse_jwk(const std::string& jwk_json)
 {
   // XXX(RLB): Same double-parsing comment as with `parse_jwk_private`
+  const auto& sig = sig_from_jwk(jwk_json);
   const auto jwk = json::parse(jwk_json);
-  const auto& sig = sig_from_jwk(jwk);
-
-  auto kty = std::optional<std::string>{};
-  if (jwk.contains("kty")) {
-    kty = jwk.at("kty").get<std::string>();
-  }
-
   auto pub = sig.import_jwk(jwk_json);
 
-  return { sig, kty, std::move(pub) };
+  auto kid = std::optional<std::string>{};
+  if (jwk.contains("kid")) {
+    kid = jwk.at("kid").get<std::string>();
+  }
+
+  return { sig, kid, std::move(pub) };
 }
 
 } // namespace hpke
