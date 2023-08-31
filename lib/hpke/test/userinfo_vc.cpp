@@ -7,7 +7,7 @@ namespace opt = MLS_NAMESPACE::tls::opt;
 using namespace MLS_NAMESPACE::hpke;
 using namespace std::string_literals;
 
-bool
+static bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
 {
   const auto sig = (&lhs.sig == &rhs.sig);
