@@ -8,11 +8,18 @@ project(mlspp
 option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
+option(MLS_NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
 
-# Default values for the namespaces are adequate for most uses.
-set(MLS_NAMESPACE_SUFFIX "" CACHE STRING "Namespace Suffix for CPP and CMake Export")
-set(MLS_CPP_NAMESPACE "mls${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CPP")
-set(MLS_EXPORT_NAMESPACE "MLSPP${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Namespace for CMake Export")
+if(MLS_NAMESPACE_SUFFIX)
+    set(MLS_CXX_NAMESPACE "mls_${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CXX")
+    set(MLS_EXPORT_NAMESPACE "MLSPP${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Namespace for CMake Export")
+else()
+    set(MLS_CXX_NAMESPACE "mls" CACHE STRING "Top-level Namespace for CXX")
+    set(MLS_EXPORT_NAMESPACE "MLSPP" CACHE STRING "Namespace for CMake Export")
+endif()
+message(STATUS "CXX Namespace: ${MLS_CXX_NAMESPACE}")
+message(STATUS "CMake Export Namespace: ${MLS_EXPORT_NAMESPACE}")
+
 
 ###
 ### Global Config
