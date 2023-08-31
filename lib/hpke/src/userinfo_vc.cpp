@@ -61,6 +61,8 @@ jws_to_der_sig(const bytes& jws_sig)
   }
 
   const auto int_size = jws_sig.size() / 2;
+  const auto jws_sig_cut =
+    jws_sig.begin() + static_cast<std::ptrdiff_t>(int_size);
 
   // Compute the encoded size of R and S integer data, adding a zero byte if
   // needed to clear the sign bit
@@ -96,20 +98,20 @@ jws_to_der_sig(const bytes& jws_sig)
   // Write R, virtually padding with a zero byte if needed
   const auto r_start = der_header_size;
   const auto r_data_start = r_start + int_header_size + (r_big ? 1 : 0);
+  const auto r_data_begin = der.begin() + static_cast<std::ptrdiff_t>(r_data_start);
 
   der.at(r_start) = 0x02;
   der.at(r_start + 1) = static_cast<uint8_t>(r_size);
-  std::copy(
-    jws_sig.begin(), jws_sig.begin() + int_size, der.begin() + r_data_start);
+  std::copy(jws_sig.begin(), jws_sig_cut, r_data_begin);
 
   // Write S, virtually padding with a zero byte if needed
   const auto s_start = der_header_size + r_int_size;
   const auto s_data_start = s_start + int_header_size + (s_big ? 1 : 0);
+  const auto s_data_begin = der.begin() + static_cast<std::ptrdiff_t>(s_data_start);
 
   der.at(s_start) = 0x02;
   der.at(s_start + 1) = static_cast<uint8_t>(s_size);
-  std::copy(
-    jws_sig.begin() + int_size, jws_sig.end(), der.begin() + s_data_start);
+  std::copy(jws_sig_cut, jws_sig.end(), s_data_begin);
 
   return der;
 }
@@ -147,7 +149,7 @@ struct UserInfoVC::ParsedCredential
     , issuer(std::move(issuer_in))
     , not_before(not_before_in)
     , not_after(not_after_in)
-    , credential_subject(credential_subject_in)
+    , credential_subject(std::move(credential_subject_in))
     , public_key(std::move(public_key_in))
     , to_be_signed(std::move(to_be_signed_in))
     , signature(std::move(signature_in))
@@ -182,7 +184,7 @@ struct UserInfoVC::ParsedCredential
     }
 
     // Verify the VC parts
-    const auto vc = payload.at("vc");
+    const auto& vc = payload.at("vc");
 
     static const auto context =
       std::vector<std::string>{ { "https://www.w3.org/2018/credentials/v1" } };

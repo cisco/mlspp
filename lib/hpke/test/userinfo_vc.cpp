@@ -5,6 +5,7 @@
 namespace opt = MLS_NAMESPACE::tls::opt;
 
 using namespace MLS_NAMESPACE::hpke;
+using namespace std::string_literals;
 
 bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
@@ -79,10 +80,10 @@ TEST_CASE("UserInfoVC Parsing and Validation")
     "ImNsaWVudF9pZCIsImlhdCI6MTY5MzUwNjYyMH0"
     "."
     "lSU3pbjPCcBpQID6w1WeAYO_ZyYRDZ3rsJiPD1uWPOILWzeUIHTwjjyqaL9sko9k"
-    "FV0Xch-16qwdOlpTgzaHrw";
+    "FV0Xch-16qwdOlpTgzaHrw"s;
 
-  const auto known_issuer = "https://localhost:3000";
-  const auto known_key_id = "gyAKXvQA8X-m9JxDBgv9rULPxlU7fjB9O7D_gmIrDXs";
+  const auto known_issuer = "https://localhost:3000"s;
+  const auto known_key_id = "gyAKXvQA8X-m9JxDBgv9rULPxlU7fjB9O7D_gmIrDXs"s;
   const auto known_not_before = std::chrono::seconds(1693420220);
   const auto known_not_after = std::chrono::seconds(1694025020);
   const auto known_subject = std::map<std::string, std::string>{
@@ -103,7 +104,7 @@ TEST_CASE("UserInfoVC Parsing and Validation")
     "crv": "P-256",
     "x": "p19rYzeCbvyTzrXkjLb2VDFbYDsm2TZqIDlzT2Bq3AA",
     "y": "UUgFgpZ6wZwGfK-XN-UkIJUgLypgz61nqUf83SskjhE"
-  })";
+  })"s;
 
   const auto issuer_jwk_raw = R"({
     "kty": "EC",
@@ -113,7 +114,7 @@ TEST_CASE("UserInfoVC Parsing and Validation")
     "crv": "P-256",
     "x": "2-MG_vi7KtZNzbwrbT2JX4kJTw7iJcnVXj7ucBZHUCg",
     "y":"ZwQq_CgT-1vfeE77uoWGM9Pm-8DyH7p-SIi1RKHEB8E"
-  })";
+  })"s;
 
   const auto vc = UserInfoVC(userinfo_vc_raw);
   const auto known_subject_jwk = Signature::parse_jwk(known_subject_jwk_raw);
