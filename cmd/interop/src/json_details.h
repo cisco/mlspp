@@ -55,8 +55,7 @@ struct uint_serializer
 #define UINT_SERIALIZER(T)                                                     \
   template<>                                                                   \
   struct adl_serializer<T> : uint_serializer<T>                                \
-  {                                                                            \
-  };
+  {};
 
 UINT_SERIALIZER(MLS_NAMESPACE::LeafCount)
 UINT_SERIALIZER(MLS_NAMESPACE::NodeCount)
@@ -95,8 +94,7 @@ struct asymmetric_key_serializer
 #define ASYMM_KEY_SERIALIZER(T)                                                \
   template<>                                                                   \
   struct adl_serializer<T> : asymmetric_key_serializer<T>                      \
-  {                                                                            \
-  };
+  {};
 
 ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::HPKEPublicKey)
 ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::HPKEPrivateKey)
@@ -121,8 +119,7 @@ struct tls_serializer
 #define TLS_SERIALIZER(T)                                                      \
   template<>                                                                   \
   struct adl_serializer<T> : tls_serializer<T>                                 \
-  {                                                                            \
-  };
+  {};
 
 TLS_SERIALIZER(MLS_NAMESPACE::TreeKEMPublicKey)
 TLS_SERIALIZER(MLS_NAMESPACE::AuthenticatedContent)
