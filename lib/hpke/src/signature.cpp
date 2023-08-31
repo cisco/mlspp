@@ -1,13 +1,12 @@
 #include <hpke/base64.h>
 #include <hpke/digest.h>
 #include <hpke/signature.h>
+#include <namespace.h>
 #include <string>
 
 #include "dhkem.h"
-
-#include "common.h"
-#include "group.h"
 #include "rsa.h"
+
 #include <nlohmann/json.hpp>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -17,7 +16,7 @@
 
 using nlohmann::json;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct GroupSignature : public Signature
 {
@@ -339,4 +338,4 @@ Signature::parse_jwk(const std::string& jwk_json)
   return { sig, kid, std::move(pub) };
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

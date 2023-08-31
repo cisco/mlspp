@@ -1,7 +1,8 @@
 #include <mls/state.h>
+#include <namespace.h>
 #include <set>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Constructors
@@ -2143,4 +2144,4 @@ State::successor() const
   return next;
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

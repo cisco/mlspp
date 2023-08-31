@@ -2,10 +2,11 @@
 
 #include <iomanip>
 #include <iostream>
+#include <namespace.h>
 #include <sstream>
 #include <stdexcept>
 
-namespace bytes_ns {
+namespace MLS_NAMESPACE::bytes_ns {
 
 bool
 bytes::operator==(const bytes& other) const
@@ -143,4 +144,4 @@ operator!=(const std::vector<uint8_t>& lhs, const bytes_ns::bytes& rhs)
   return rhs != lhs;
 }
 
-} // namespace bytes_ns
+} // namespace MLS_NAMESPACE::bytes_ns

@@ -4,7 +4,7 @@
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 using namespace mls_vectors;
 
 TEST_CASE("Extensions")

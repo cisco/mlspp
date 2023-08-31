@@ -5,10 +5,11 @@
 #include "mls/messages.h"
 #include "mls/treekem.h"
 #include <list>
+#include <namespace.h>
 #include <optional>
 #include <vector>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // Index into the session roster
 struct RosterIndex : public UInt32
@@ -417,4 +418,4 @@ protected:
   State successor() const;
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

@@ -8,7 +8,7 @@
 #include <vector>
 
 #include <tls/compat.h>
-namespace opt = tls::opt;
+namespace opt = MLS_NAMESPACE::tls::opt;
 
 TEST_CASE("Certificate Known-Answer depth 2")
 {

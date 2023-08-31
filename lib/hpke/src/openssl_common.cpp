@@ -1,4 +1,5 @@
 #include "openssl_common.h"
+#include <namespace.h>
 
 #include <openssl/ec.h>
 #include <openssl/err.h>
@@ -10,7 +11,7 @@
 #include <openssl/param_build.h>
 #endif
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 template<>
 void
@@ -148,4 +149,4 @@ openssl_error()
   return std::runtime_error(ERR_error_string(code, nullptr));
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

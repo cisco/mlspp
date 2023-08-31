@@ -3,8 +3,9 @@
 #include "mls/credential.h"
 #include "mls/crypto.h"
 #include "mls/tree_math.h"
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // enum {
 //   reserved(0),
@@ -357,12 +358,16 @@ struct UpdatePath
   TLS_SERIALIZABLE(leaf_node, nodes)
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Lifetime, key_package)
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Empty, update)
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::ParentHash, commit)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource,
+                MLS_NAMESPACE::Lifetime,
+                key_package)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource, MLS_NAMESPACE::Empty, update)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource,
+                MLS_NAMESPACE::ParentHash,
+                commit)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

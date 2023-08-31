@@ -3,9 +3,10 @@
 #include <memory>
 
 #include <bytes/bytes.h>
-using namespace bytes_ns;
+#include <namespace.h>
+using namespace MLS_NAMESPACE::bytes_ns;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct Signature
 {
@@ -84,4 +85,4 @@ protected:
   Signature(ID id_in);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

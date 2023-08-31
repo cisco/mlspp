@@ -1,8 +1,9 @@
 #include <bytes/bytes.h>
 #include <doctest/doctest.h>
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
 // An enum to test enum encoding, and as a type for variants
 enum struct IntType : uint16_t
@@ -11,12 +12,12 @@ enum struct IntType : uint16_t
   uint16 = 0xBBBB,
 };
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
 TLS_VARIANT_MAP(IntType, uint8_t, uint8)
 TLS_VARIANT_MAP(IntType, uint16_t, uint16)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls
 
 // A struct to test struct encoding and traits
 struct ExampleStruct
@@ -25,20 +26,20 @@ struct ExampleStruct
   std::array<uint32_t, 4> b{ 0, 0, 0, 0 };
   std::optional<uint8_t> c;
   std::vector<uint8_t> d;
-  tls::var::variant<uint8_t, uint16_t> e;
+  MLS_NAMESPACE::tls::var::variant<uint8_t, uint16_t> e;
   uint64_t f{ 0 };
   uint64_t g{ 0 };
   uint64_t h{ 0 };
 
   TLS_SERIALIZABLE(a, b, c, d, e, f, g, h)
-  TLS_TRAITS(tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::pass,
-             tls::variant<IntType>,
-             tls::varint,
-             tls::varint,
-             tls::varint)
+  TLS_TRAITS(MLS_NAMESPACE::tls::pass,
+             MLS_NAMESPACE::tls::pass,
+             MLS_NAMESPACE::tls::pass,
+             MLS_NAMESPACE::tls::pass,
+             MLS_NAMESPACE::tls::variant<IntType>,
+             MLS_NAMESPACE::tls::varint,
+             MLS_NAMESPACE::tls::varint,
+             MLS_NAMESPACE::tls::varint)
 };
 
 static bool
@@ -99,7 +100,7 @@ template<typename T>
 void
 ostream_test(T val, const std::vector<uint8_t>& enc)
 {
-  tls::ostream w; // NOLINT(misc-const-correctness)
+  MLS_NAMESPACE::tls::ostream w; // NOLINT(misc-const-correctness)
   w << val;
   REQUIRE(w.bytes() == enc);
   REQUIRE(w.size() == enc.size());
@@ -108,7 +109,7 @@ ostream_test(T val, const std::vector<uint8_t>& enc)
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
 {
   bytes answer{ 1, 2, 3, 4 };
-  tls::ostream w;
+  MLS_NAMESPACE::tls::ostream w;
   w.write_raw(answer);
   REQUIRE(w.bytes() == answer);
 
@@ -129,7 +130,7 @@ template<typename T>
 void
 istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 {
-  tls::istream r(enc); // NOLINT(misc-const-correctness)
+  MLS_NAMESPACE::tls::istream r(enc); // NOLINT(misc-const-correctness)
   r >> data;
   REQUIRE(data == val);
   REQUIRE(r.empty());
@@ -175,26 +176,26 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
 {
   ExampleStruct val_in = val_struct;
 
-  tls::ostream w;
+  MLS_NAMESPACE::tls::ostream w;
   w << val_struct;
   auto streamed = w.bytes();
-  auto marshaled = tls::marshal(val_struct);
+  auto marshaled = MLS_NAMESPACE::tls::marshal(val_struct);
   REQUIRE(streamed == marshaled);
 
   ExampleStruct val_out1;
-  tls::unmarshal(marshaled, val_out1);
+  MLS_NAMESPACE::tls::unmarshal(marshaled, val_out1);
   REQUIRE(val_in == val_out1);
 
-  auto val_out2 = tls::get<ExampleStruct>(marshaled);
+  auto val_out2 = MLS_NAMESPACE::tls::get<ExampleStruct>(marshaled);
   REQUIRE(val_in == val_out2);
 }
 
 TEST_CASE("TLS varint failure cases")
 {
   // Encoding a value that is to large
-  tls::ostream w;
+  MLS_NAMESPACE::tls::ostream w;
   // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS(tls::varint::encode(w, uint64_t(0xffffffff)));
+  REQUIRE_THROWS(MLS_NAMESPACE::tls::varint::encode(w, uint64_t(0xffffffff)));
 
   // Too large and non-minimal values
   auto decode_failure_cases = std::vector<bytes>{
@@ -204,9 +205,9 @@ TEST_CASE("TLS varint failure cases")
   };
   for (const auto& enc : decode_failure_cases) {
     auto val = uint64_t(0);
-    auto r = tls::istream(enc);
+    auto r = MLS_NAMESPACE::tls::istream(enc);
     // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-    REQUIRE_THROWS(tls::varint::decode(r, val));
+    REQUIRE_THROWS(MLS_NAMESPACE::tls::varint::decode(r, val));
   }
 }
 

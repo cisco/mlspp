@@ -13,6 +13,7 @@ target_link_libraries(${CURRENT_LIB_NAME} mlspp bytes tls_syntax)
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 

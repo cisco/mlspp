@@ -43,7 +43,8 @@ struct adl_serializer<std::optional<T>>
 };
 
 // LeafCount, NodeCount, etc.
-// XXX(RLB): For some reason, just defining this for mls::Uint32 didn't work.
+// XXX(RLB): For some reason, just defining this for MLS_NAMESPACE::Uint32
+// didn't work.
 template<typename T>
 struct uint_serializer
 {
@@ -54,26 +55,25 @@ struct uint_serializer
 #define UINT_SERIALIZER(T)                                                     \
   template<>                                                                   \
   struct adl_serializer<T> : uint_serializer<T>                                \
-  {                                                                            \
-  };
+  {};
 
-UINT_SERIALIZER(mls::LeafCount)
-UINT_SERIALIZER(mls::NodeCount)
-UINT_SERIALIZER(mls::LeafIndex)
-UINT_SERIALIZER(mls::NodeIndex)
+UINT_SERIALIZER(MLS_NAMESPACE::LeafCount)
+UINT_SERIALIZER(MLS_NAMESPACE::NodeCount)
+UINT_SERIALIZER(MLS_NAMESPACE::LeafIndex)
+UINT_SERIALIZER(MLS_NAMESPACE::NodeIndex)
 
-// mls::Ciphersuite
+// MLS_NAMESPACE::Ciphersuite
 template<>
-struct adl_serializer<mls::CipherSuite>
+struct adl_serializer<MLS_NAMESPACE::CipherSuite>
 {
-  static void to_json(json& j, const mls::CipherSuite& v)
+  static void to_json(json& j, const MLS_NAMESPACE::CipherSuite& v)
   {
     j = v.cipher_suite();
   }
 
-  static void from_json(const json& j, mls::CipherSuite& v)
+  static void from_json(const json& j, MLS_NAMESPACE::CipherSuite& v)
   {
-    v = mls::CipherSuite(j.get<mls::CipherSuite::ID>());
+    v = MLS_NAMESPACE::CipherSuite(j.get<MLS_NAMESPACE::CipherSuite::ID>());
   }
 };
 
@@ -94,43 +94,44 @@ struct asymmetric_key_serializer
 #define ASYMM_KEY_SERIALIZER(T)                                                \
   template<>                                                                   \
   struct adl_serializer<T> : asymmetric_key_serializer<T>                      \
-  {                                                                            \
-  };
+  {};
 
-ASYMM_KEY_SERIALIZER(mls::HPKEPublicKey)
-ASYMM_KEY_SERIALIZER(mls::HPKEPrivateKey)
-ASYMM_KEY_SERIALIZER(mls::SignaturePublicKey)
-ASYMM_KEY_SERIALIZER(mls::SignaturePrivateKey)
+ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::HPKEPublicKey)
+ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::HPKEPrivateKey)
+ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::SignaturePublicKey)
+ASYMM_KEY_SERIALIZER(MLS_NAMESPACE::SignaturePrivateKey)
 
 // Other TLS-serializable things
 template<typename T>
 struct tls_serializer
 {
-  static void to_json(json& j, const T& v) { j = bytes(tls::marshal(v)); }
+  static void to_json(json& j, const T& v)
+  {
+    j = bytes(MLS_NAMESPACE::tls::marshal(v));
+  }
 
   static void from_json(const json& j, T& v)
   {
-    v = tls::get<T>(j.get<bytes>());
+    v = MLS_NAMESPACE::tls::get<T>(j.get<bytes>());
   }
 };
 
 #define TLS_SERIALIZER(T)                                                      \
   template<>                                                                   \
   struct adl_serializer<T> : tls_serializer<T>                                 \
-  {                                                                            \
-  };
+  {};
 
-TLS_SERIALIZER(mls::TreeKEMPublicKey)
-TLS_SERIALIZER(mls::AuthenticatedContent)
-TLS_SERIALIZER(mls::Credential)
-TLS_SERIALIZER(mls::Proposal)
-TLS_SERIALIZER(mls::Commit)
-TLS_SERIALIZER(mls::ApplicationData)
-TLS_SERIALIZER(mls::MLSMessage)
-TLS_SERIALIZER(mls::LeafNode)
-TLS_SERIALIZER(mls::UpdatePath)
-TLS_SERIALIZER(mls::KeyPackage)
-TLS_SERIALIZER(mls::Welcome)
+TLS_SERIALIZER(MLS_NAMESPACE::TreeKEMPublicKey)
+TLS_SERIALIZER(MLS_NAMESPACE::AuthenticatedContent)
+TLS_SERIALIZER(MLS_NAMESPACE::Credential)
+TLS_SERIALIZER(MLS_NAMESPACE::Proposal)
+TLS_SERIALIZER(MLS_NAMESPACE::Commit)
+TLS_SERIALIZER(MLS_NAMESPACE::ApplicationData)
+TLS_SERIALIZER(MLS_NAMESPACE::MLSMessage)
+TLS_SERIALIZER(MLS_NAMESPACE::LeafNode)
+TLS_SERIALIZER(MLS_NAMESPACE::UpdatePath)
+TLS_SERIALIZER(MLS_NAMESPACE::KeyPackage)
+TLS_SERIALIZER(MLS_NAMESPACE::Welcome)
 
 } // namespace nlohmann
 

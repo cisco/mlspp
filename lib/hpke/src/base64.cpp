@@ -6,7 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 std::string
 to_base64(const bytes& data)
@@ -98,4 +98,4 @@ from_base64url(const std::string& enc)
   return from_base64(enc_copy);
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

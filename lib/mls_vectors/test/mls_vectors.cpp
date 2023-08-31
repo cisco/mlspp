@@ -4,13 +4,13 @@
 
 using namespace mls_vectors;
 
-static const std::vector<mls::CipherSuite> supported_suites{
-  { mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
-  { mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
-  { mls::CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519 },
-  { mls::CipherSuite::ID::X448_AES256GCM_SHA512_Ed448 },
-  { mls::CipherSuite::ID::P521_AES256GCM_SHA512_P521 },
-  { mls::CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448 },
+static const std::vector<MLS_NAMESPACE::CipherSuite> supported_suites{
+  { MLS_NAMESPACE::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519 },
+  { MLS_NAMESPACE::CipherSuite::ID::P256_AES128GCM_SHA256_P256 },
+  { MLS_NAMESPACE::CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519 },
+  { MLS_NAMESPACE::CipherSuite::ID::X448_AES256GCM_SHA512_Ed448 },
+  { MLS_NAMESPACE::CipherSuite::ID::P521_AES256GCM_SHA512_P521 },
+  { MLS_NAMESPACE::CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448 },
 };
 
 TEST_CASE("Tree Math")
@@ -87,7 +87,7 @@ TEST_CASE("Tree Hashes")
 
 TEST_CASE("Tree Operations")
 {
-  auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
+  auto suite = MLS_NAMESPACE::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
   for (auto scenario : TreeOperationsTestVector::all_scenarios) {
     auto tv = TreeOperationsTestVector{ suite, scenario };
     REQUIRE(tv.verify() == std::nullopt);
