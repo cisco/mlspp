@@ -1,3 +1,5 @@
+[![MLSPP CI](https://github.com/cisco/mlspp/actions/workflows/main_ci.yml/badge.svg)](https://github.com/cisco/mlspp/actions/workflows/main_ci.yml)
+
 MLS++
 =====
 
