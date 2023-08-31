@@ -6,7 +6,7 @@
 
 using nlohmann::json;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 ///
 /// ParsedCredential
@@ -292,4 +292,4 @@ operator==(const UserInfoVC& lhs, const UserInfoVC& rhs)
   return lhs.raw == rhs.raw;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

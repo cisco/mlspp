@@ -7,9 +7,9 @@
 #include <hpke/signature.h>
 #include <map>
 
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct UserInfoVC
 {
@@ -38,4 +38,4 @@ public:
 bool
 operator==(const UserInfoVC& lhs, const UserInfoVC& rhs);
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

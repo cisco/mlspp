@@ -1,10 +1,10 @@
 #include <doctest/doctest.h>
 #include <hpke/userinfo_vc.h>
 
-#include "common.h"
-
 #include <tls/compat.h>
-namespace opt = tls::opt;
+namespace opt = MLS_NAMESPACE::tls::opt;
+
+using namespace MLS_NAMESPACE::hpke;
 
 bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
