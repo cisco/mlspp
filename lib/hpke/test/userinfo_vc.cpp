@@ -86,7 +86,11 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   const auto known_not_before = std::chrono::seconds(1693420220);
   const auto known_not_after = std::chrono::seconds(1694025020);
   const auto known_subject = std::map<std::string, std::string>{
-    { { "sub", "248289761001" },
+    { { "id",
+        "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6InAxOXJZemVDYnZ5"
+        "VHpyWGtqTGIyVkRGYllEc20yVFpxSURselQyQnEzQUEiLCJ5IjoiVVVnRmdwWjZ3"
+        "WndHZkstWE4tVWtJSlVnTHlwZ3o2MW5xVWY4M1Nza2poRSJ9" },
+      { "sub", "248289761001" },
       { "name", "Jane Doe" },
       { "given_name", "Jane" },
       { "family_name", "Doe" },
