@@ -22,6 +22,8 @@ public:
   UserInfoVC() = default;
   UserInfoVC(const UserInfoVC& other) = default;
   ~UserInfoVC() = default;
+  UserInfoVC& operator=(const UserInfoVC& other) = default;
+  UserInfoVC& operator=(UserInfoVC&& other) = default;
 
   std::string issuer() const;
   std::string key_id() const;
@@ -32,7 +34,7 @@ public:
 
   bool valid_from(const Signature::PublicKey& issuer_key) const;
 
-  const std::string raw;
+  std::string raw;
 };
 
 bool

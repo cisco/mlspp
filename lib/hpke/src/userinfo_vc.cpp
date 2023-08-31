@@ -200,11 +200,8 @@ struct UserInfoVC::ParsedCredential
     }
 
     // Parse the subject public key
-    auto credential_subject = vc.at("credentialSubject");
-    const auto id = credential_subject.at("id").get<std::string>();
-    credential_subject.erase("id");
-
     static const std::string did_jwk_prefix = "did:jwk:";
+    const auto id = vc.at("credentialSubject").at("id").get<std::string>();
     if (id.find(did_jwk_prefix) != 0) {
       throw std::runtime_error("malformed UserInfo VC: ID is not did:jwk");
     }
@@ -221,7 +218,7 @@ struct UserInfoVC::ParsedCredential
       epoch_time(payload.at("nbf").get<int64_t>()),
       epoch_time(payload.at("exp").get<int64_t>()),
 
-      credential_subject,
+      vc.at("credentialSubject"),
       std::move(public_key),
 
       to_be_signed,
