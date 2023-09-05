@@ -1,5 +1,6 @@
-#include "mls/credential.h"
-#include "hpke/certificate.h"
+#include <hpke/certificate.h>
+#include <hpke/userinfo_vc.h>
+#include <mls/credential.h>
 #include <namespace.h>
 #include <tls/tls_syntax.h>
 
@@ -11,6 +12,7 @@ namespace MLS_NAMESPACE {
 
 using MLS_NAMESPACE::hpke::Certificate; // NOLINT(misc-unused-using-decls)
 using MLS_NAMESPACE::hpke::Signature;   // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::UserInfoVC;  // NOLINT(misc-unused-using-decls)
 
 static const Signature&
 find_signature(Signature::ID id)
@@ -113,17 +115,22 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 ///
 /// UserInfoVCCredential
 ///
-UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt)
-  : userinfo_vc_jwt(std::move(userinfo_vc_jwt))
+UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt_in)
+  : userinfo_vc_jwt(std::move(userinfo_vc_jwt_in))
 {
+  const auto vc = UserInfoVC(to_ascii(userinfo_vc_jwt));
+
+  const auto& pub = vc.public_key();
+  const auto pub_data = pub.sig.serialize(*pub.key);
+  _signature_scheme = tls_signature_scheme(pub.sig.id);
+  _public_key = SignaturePublicKey{ pub_data };
 }
 
 bool
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-UserInfoVCCredential::valid_for(const SignaturePublicKey& /* pub */) const
+UserInfoVCCredential::valid_for(const SignaturePublicKey& pub) const
 {
-  // TODO(RLB) Extract payload -> did:jwk, compare
-  throw NotImplementedError();
+  return pub == _public_key;
 }
 
 ///

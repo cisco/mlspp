@@ -51,10 +51,26 @@ struct Signature
   virtual std::unique_ptr<PrivateKey> deserialize_private(
     const bytes& skm) const = 0;
 
+  struct PrivateJWK
+  {
+    const Signature& sig;
+    std::optional<std::string> key_id;
+    std::unique_ptr<PrivateKey> key;
+  };
+  static PrivateJWK parse_jwk_private(const std::string& jwk_json);
+
+  struct PublicJWK
+  {
+    const Signature& sig;
+    std::optional<std::string> key_id;
+    std::unique_ptr<PublicKey> key;
+  };
+  static PublicJWK parse_jwk(const std::string& jwk_json);
+
   virtual std::unique_ptr<PrivateKey> import_jwk_private(
-    const std::string& json_str) const = 0;
+    const std::string& jwk_json) const = 0;
   virtual std::unique_ptr<PublicKey> import_jwk(
-    const std::string& json_str) const = 0;
+    const std::string& jwk_json) const = 0;
   virtual std::string export_jwk_private(const PrivateKey& env) const = 0;
   virtual std::string export_jwk(const PublicKey& env) const = 0;
 

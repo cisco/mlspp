@@ -2,6 +2,7 @@
 Checks:            '*,
                     -altera-*,
                     -fuchsia-*,
+                    -abseil-string-find-startswith,
                     -bugprone-easily-swappable-parameters,
                     -bugprone-exception-escape,
                     -cert-err58-cpp,

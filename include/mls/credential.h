@@ -48,23 +48,27 @@ private:
   SignatureScheme _signature_scheme;
 };
 
+tls::ostream&
+operator<<(tls::ostream& str, const X509Credential& obj);
+
+tls::istream&
+operator>>(tls::istream& str, X509Credential& obj);
+
 struct UserInfoVCCredential
 {
   UserInfoVCCredential() = default;
-  explicit UserInfoVCCredential(bytes userinfo_vc_jwt);
+  explicit UserInfoVCCredential(bytes userinfo_vc_jwt_in);
 
   bytes userinfo_vc_jwt;
 
   bool valid_for(const SignaturePublicKey& pub) const;
 
   TLS_SERIALIZABLE(userinfo_vc_jwt)
+
+private:
+  SignaturePublicKey _public_key;
+  SignatureScheme _signature_scheme;
 };
-
-tls::ostream&
-operator<<(tls::ostream& str, const X509Credential& obj);
-
-tls::istream&
-operator>>(tls::istream& str, X509Credential& obj);
 
 bool
 operator==(const X509Credential& lhs, const X509Credential& rhs);
