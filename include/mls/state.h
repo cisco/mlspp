@@ -277,6 +277,7 @@ protected:
   TreeKEMPublicKey import_tree(const bytes& tree_hash,
                                const std::optional<TreeKEMPublicKey>& external,
                                const ExtensionList& extensions);
+  bool validate_tree() const;
 
   // Form a commit, covering all the cases with slightly different validation
   // rules:
