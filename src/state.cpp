@@ -86,21 +86,22 @@ State::validate_tree() const
   }
 
   // Validate the signatures on all leaves
-  const auto signature_valid = _tree.all_leaves([&](auto i, const auto& leaf_node) {
-    auto binding = std::optional<LeafNode::MemberBinding>{};
-    switch (leaf_node.source()) {
-      case LeafNodeSource::commit:
-      case LeafNodeSource::update:
-        binding = LeafNode::MemberBinding{ _group_id, i };
-        break;
+  const auto signature_valid =
+    _tree.all_leaves([&](auto i, const auto& leaf_node) {
+      auto binding = std::optional<LeafNode::MemberBinding>{};
+      switch (leaf_node.source()) {
+        case LeafNodeSource::commit:
+        case LeafNodeSource::update:
+          binding = LeafNode::MemberBinding{ _group_id, i };
+          break;
 
-      default:
-        // Nothing to do
-        break;
-    }
+        default:
+          // Nothing to do
+          break;
+      }
 
-    return leaf_node.verify(_suite, binding);
-  });
+      return leaf_node.verify(_suite, binding);
+    });
   if (!signature_valid) {
     return false;
   }
@@ -135,7 +136,8 @@ State::validate_tree() const
       leaf_node.verify_extension_support(leaf_node.extensions);
     const auto supports_group_credentials =
       leaf_node.capabilities.credentials_supported(credential_types);
-    return supports_group_extensions && supports_own_extensions && supports_group_credentials;
+    return supports_group_extensions && supports_own_extensions &&
+           supports_group_credentials;
   });
 }
 
@@ -246,7 +248,6 @@ State::State(const HPKEPrivateKey& init_priv,
   if (!validate_tree()) {
     throw InvalidParameterError("Invalid tree");
   }
-
 
   // Construct TreeKEM private key from parts provided
   auto maybe_index = _tree.find(key_package.leaf_node);
@@ -2126,8 +2127,8 @@ State::roster() const
   leaves.reserve(_tree.size.val);
 
   _tree.all_leaves([&](auto /* i */, auto leaf) {
-      leaves.push_back(leaf);
-      return true;
+    leaves.push_back(leaf);
+    return true;
   });
 
   return leaves;
