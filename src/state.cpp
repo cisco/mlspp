@@ -74,19 +74,69 @@ State::import_tree(const bytes& tree_hash,
 bool
 State::validate_tree() const
 {
+  // XXX(RLB): The functionality here is somewhat duplicative of
+  // State::valid(const LeafNode&).  Simply calling that method, however, would
+  // result in this method having quadratic scaling, since each call to valid()
+  // does a linear scan through the tree to check uniqueness of keys and
+  // compatibility of credential support.
+
   // Validate that the tree is parent-hash valid
   if (!_tree.parent_hash_valid()) {
     return false;
   }
 
-  // Validate that each leaf node would be valid to add to the tree now.  This
-  // includes signature verification as well as support for ciphersuites and
-  // extensions.
-  _tree.all_leaves([&](auto i, const auto& leaf_node) {
-    return valid(leaf_node, leaf_node.source(), i);
+  // Validate the signatures on all leaves
+  const auto signature_valid = _tree.all_leaves([&](auto i, const auto& leaf_node) {
+    auto binding = std::optional<LeafNode::MemberBinding>{};
+    switch (leaf_node.source()) {
+      case LeafNodeSource::commit:
+      case LeafNodeSource::update:
+        binding = LeafNode::MemberBinding{ _group_id, i };
+        break;
+
+      default:
+        // Nothing to do
+        break;
+    }
+
+    return leaf_node.verify(_suite, binding);
+  });
+  if (!signature_valid) {
+    return false;
+  }
+
+  // Collect cross-tree properties
+  auto n_leaves = size_t(0);
+  auto encryption_keys = std::set<bytes>{};
+  auto signature_keys = std::set<bytes>{};
+  auto credential_types = std::set<CredentialType>{};
+  _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
+    n_leaves += 1;
+    encryption_keys.insert(leaf_node.encryption_key.data);
+    signature_keys.insert(leaf_node.signature_key.data);
+    credential_types.insert(leaf_node.credential.type());
+    return true;
   });
 
-  return true;
+  // Verify uniqueness of keys
+  if (encryption_keys.size() != n_leaves) {
+    return false;
+  }
+
+  if (signature_keys.size() != n_leaves) {
+    return false;
+  }
+
+  // Verify that each leaf indicates support for all required parameters
+  return _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
+    const auto supports_group_extensions =
+      leaf_node.verify_extension_support(_extensions);
+    const auto supports_own_extensions =
+      leaf_node.verify_extension_support(leaf_node.extensions);
+    const auto supports_group_credentials =
+      leaf_node.capabilities.credentials_supported(credential_types);
+    return supports_group_extensions && supports_own_extensions && supports_group_credentials;
+  });
 }
 
 State::State(SignaturePrivateKey sig_priv,
@@ -1445,9 +1495,7 @@ State::valid(const LeafNode& leaf_node,
   // the ID for each extension in the extensions field is listed in the
   // capabilities.extensions field of the LeafNode.
   auto supports_own_extensions =
-    stdx::all_of(leaf_node.extensions.extensions, [&](const auto& ext) {
-      return stdx::contains(leaf_node.capabilities.extensions, ext.type);
-    });
+    leaf_node.verify_extension_support(leaf_node.extensions);
 
   return (signature_valid && supports_group_extensions && correct_source &&
           mutual_credential_support && supports_own_extensions);
