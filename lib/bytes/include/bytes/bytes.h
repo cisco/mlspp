@@ -79,6 +79,8 @@ struct bytes
   auto& at(size_t pos) { return _data.at(pos); }
 
   void resize(size_t count) { _data.resize(count); }
+  void reserve(size_t len) { _data.reserve(len); }
+  void push_back(uint8_t byte) { _data.push_back(byte); }
 
   // Equality operators
   bool operator==(const bytes& other) const;

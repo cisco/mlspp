@@ -630,6 +630,19 @@ operator>>(tls::istream& str, PublicMessage& obj)
   return str;
 }
 
+bool
+operator==(const PublicMessage& lhs, const PublicMessage& rhs)
+{
+  return lhs.content == rhs.content && lhs.auth == rhs.auth &&
+         lhs.membership_tag == rhs.membership_tag;
+}
+
+bool
+operator!=(const PublicMessage& lhs, const PublicMessage& rhs)
+{
+  return !(lhs == rhs);
+}
+
 static bytes
 marshal_ciphertext_content(const GroupContent& content,
                            const GroupContentAuthData& auth,
