@@ -851,13 +851,13 @@ MLSMessage::wire_format() const
   return tls::variant<WireFormat>::type(message);
 }
 
-MLSMessage::MLSMessage(PublicMessage mls_plaintext)
-  : message(std::move(mls_plaintext))
+MLSMessage::MLSMessage(PublicMessage public_message)
+  : message(std::move(public_message))
 {
 }
 
-MLSMessage::MLSMessage(PrivateMessage mls_ciphertext)
-  : message(std::move(mls_ciphertext))
+MLSMessage::MLSMessage(PrivateMessage private_message)
+  : message(std::move(private_message))
 {
 }
 
