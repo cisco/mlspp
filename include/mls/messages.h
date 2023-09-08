@@ -592,6 +592,8 @@ struct PublicMessage
 
   friend tls::ostream& operator<<(tls::ostream& str, const PublicMessage& obj);
   friend tls::istream& operator>>(tls::istream& str, PublicMessage& obj);
+  friend bool operator==(const PublicMessage& lhs, const PublicMessage& rhs);
+  friend bool operator!=(const PublicMessage& lhs, const PublicMessage& rhs);
 
 private:
   GroupContent content;
