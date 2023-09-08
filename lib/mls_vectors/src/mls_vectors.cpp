@@ -828,7 +828,7 @@ MessageProtectionTestVector::protect_pub(
   auto content =
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_public_message,
                                                  content,
                                                  cipher_suite,
                                                  signature_priv,
@@ -853,7 +853,7 @@ MessageProtectionTestVector::protect_priv(
   auto content =
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_ciphertext,
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_private_message,
                                                  content,
                                                  cipher_suite,
                                                  signature_priv,
@@ -973,7 +973,7 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   auto leaf_index = LeafIndex{ 0 };
 
   authenticated_content = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext,
+    WireFormat::mls_public_message,
     GroupContent{
       group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} },
     suite,
@@ -1898,7 +1898,7 @@ MessagesTestVector::MessagesTestVector()
   auto membership_key = prg.secret("membership_key");
 
   auto content_auth_proposal = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext,
+    WireFormat::mls_public_message,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
     sig_priv,
@@ -1907,7 +1907,7 @@ MessagesTestVector::MessagesTestVector()
     content_auth_proposal, suite, membership_key, group_context);
 
   auto content_auth_commit =
-    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+    AuthenticatedContent::sign(WireFormat::mls_public_message,
                                { group_id, epoch, sender, {}, commit_obj },
                                suite,
                                sig_priv,
@@ -1918,7 +1918,7 @@ MessagesTestVector::MessagesTestVector()
 
   // PrivateMessage
   auto content_auth_application_obj = AuthenticatedContent::sign(
-    WireFormat::mls_ciphertext,
+    WireFormat::mls_private_message,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
@@ -1994,15 +1994,15 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT_VAL("Public(Proposal)",
                      MLSMessage,
                      public_message_proposal,
-                     require_format(WireFormat::mls_plaintext));
+                     require_format(WireFormat::mls_public_message));
   VERIFY_TLS_RTT_VAL("Public(Commit)",
                      MLSMessage,
                      public_message_commit,
-                     require_format(WireFormat::mls_plaintext));
+                     require_format(WireFormat::mls_public_message));
   VERIFY_TLS_RTT_VAL("PrivateMessage",
                      MLSMessage,
                      private_message,
-                     require_format(WireFormat::mls_ciphertext));
+                     require_format(WireFormat::mls_private_message));
 
   return std::nullopt;
 }

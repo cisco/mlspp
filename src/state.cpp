@@ -269,7 +269,7 @@ State::new_member_add(const bytes& group_id,
                                { /* no authenticated data */ },
                                { std::move(proposal) } };
   auto content_auth = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+    WireFormat::mls_public_message, std::move(content), suite, sig_priv, {});
 
   return PublicMessage::protect(std::move(content_auth), suite, {}, {});
 }
@@ -300,7 +300,7 @@ State::sign(const Sender& sender,
   };
 
   auto wire_format =
-    (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
+    (encrypt) ? WireFormat::mls_private_message : WireFormat::mls_public_message;
 
   auto content_auth = AuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
@@ -312,13 +312,13 @@ MLSMessage
 State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 {
   switch (content_auth.wire_format) {
-    case WireFormat::mls_plaintext:
+    case WireFormat::mls_public_message:
       return PublicMessage::protect(std::move(content_auth),
                                     _suite,
                                     _key_schedule.membership_key,
                                     group_context());
 
-    case WireFormat::mls_ciphertext:
+    case WireFormat::mls_private_message:
       return PrivateMessage::protect(std::move(content_auth),
                                      _suite,
                                      _keys,
@@ -1360,7 +1360,7 @@ State::unprotect(const MLSMessage& ct)
     throw ProtocolError("Unprotect of handshake message");
   }
 
-  if (content_auth.wire_format != WireFormat::mls_ciphertext) {
+  if (content_auth.wire_format != WireFormat::mls_private_message) {
     throw ProtocolError("Application data not sent as PrivateMessage");
   }
 

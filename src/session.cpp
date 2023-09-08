@@ -200,14 +200,14 @@ Session::Inner::import_handshake(const bytes& encoded) const
   auto msg = tls::get<MLSMessage>(encoded);
 
   switch (msg.wire_format()) {
-    case WireFormat::mls_plaintext:
+    case WireFormat::mls_public_message:
       if (encrypt_handshake) {
         throw ProtocolError("Handshake not encrypted as required");
       }
 
       return msg;
 
-    case WireFormat::mls_ciphertext: {
+    case WireFormat::mls_private_message: {
       if (!encrypt_handshake) {
         throw ProtocolError("Unexpected handshake encryption");
       }
