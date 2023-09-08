@@ -163,7 +163,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     REQUIRE(found_leaf == leaf_before);
 
     // Manually construct a direct path to populate nodes above the new leaf
-    const auto [_init_priv_after, sig_priv_after, leaf_after_] = new_leaf_node();
+    const auto [_init_priv_after, sig_priv_after, leaf_after_] =
+      new_leaf_node();
     const auto leaf_after = leaf_after_;
     auto path = UpdatePath{ leaf_after, {} };
     auto dp = pub.filtered_direct_path(NodeIndex(index));

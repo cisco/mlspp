@@ -299,8 +299,8 @@ State::sign(const Sender& sender,
     _group_id, _epoch, sender, authenticated_data, { inner_content }
   };
 
-  auto wire_format =
-    (encrypt) ? WireFormat::mls_private_message : WireFormat::mls_public_message;
+  auto wire_format = (encrypt) ? WireFormat::mls_private_message
+                               : WireFormat::mls_public_message;
 
   auto content_auth = AuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
@@ -1421,10 +1421,11 @@ State::valid(const LeafNode& leaf_node,
   //
   // Note: Uniqueness of signature and encryption keys is assured by the
   // tree operations (add/update), so we do not need to verify those here.
-  const auto mutual_credential_support = _tree.all_leaves([&](auto /* i */, const auto& leaf) {
-    return leaf.capabilities.credential_supported(leaf_node.credential) &&
-      leaf_node.capabilities.credential_supported(leaf.credential);
-  });
+  const auto mutual_credential_support =
+    _tree.all_leaves([&](auto /* i */, const auto& leaf) {
+      return leaf.capabilities.credential_supported(leaf_node.credential) &&
+             leaf_node.capabilities.credential_supported(leaf.credential);
+    });
 
   // Verify that the extensions in the LeafNode are supported by checking that
   // the ID for each extension in the extensions field is listed in the

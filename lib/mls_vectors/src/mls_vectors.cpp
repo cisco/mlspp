@@ -853,11 +853,12 @@ MessageProtectionTestVector::protect_priv(
   auto content =
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_private_message,
-                                                 content,
-                                                 cipher_suite,
-                                                 signature_priv,
-                                                 group_context());
+  auto auth_content =
+    AuthenticatedContent::sign(WireFormat::mls_private_message,
+                               content,
+                               cipher_suite,
+                               signature_priv,
+                               group_context());
   if (content.content_type() == ContentType::commit) {
     auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
@@ -1833,13 +1834,13 @@ MessagesTestVector::MessagesTestVector()
                              ext_list,
                              sig_priv };
   auto leaf_node_2 = LeafNode{ suite,
-                             hpke_pub_2,
-                             sig_pub_2,
-                             cred,
-                             Capabilities::create_default(),
-                             Lifetime::create_default(),
-                             ext_list,
-                             sig_priv_2 };
+                               hpke_pub_2,
+                               sig_pub_2,
+                               cred,
+                               Capabilities::create_default(),
+                               Lifetime::create_default(),
+                               ext_list,
+                               sig_priv_2 };
   auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
 
   auto leaf_node_update =
