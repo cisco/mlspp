@@ -74,11 +74,11 @@ State::import_tree(const bytes& tree_hash,
 bool
 State::validate_tree() const
 {
-  // XXX(RLB): The functionality here is somewhat duplicative of
-  // State::valid(const LeafNode&).  Simply calling that method, however, would
-  // result in this method having quadratic scaling, since each call to valid()
-  // does a linear scan through the tree to check uniqueness of keys and
-  // compatibility of credential support.
+  // The functionality here is somewhat duplicative of State::valid(const
+  // LeafNode&).  Simply calling that method, however, would result in this
+  // method having quadratic scaling, since each call to valid() does a linear
+  // scan through the tree to check uniqueness of keys and compatibility of
+  // credential support.
 
   // Validate that the tree is parent-hash valid
   if (!_tree.parent_hash_valid()) {
