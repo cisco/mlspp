@@ -869,19 +869,19 @@ TreeKEMPublicKey::parent_hashes(
   const FilteredDirectPath& fdp,
   const std::vector<UpdatePathNode>& path_nodes) const
 {
+  // An empty filtered direct path indicates a one-member tree, since there's
+  // nobody else there to encrypt with.  In this special case, there's no
+  // parent hashing to be done.
+  if (fdp.empty()) {
+    return {};
+  }
+
   // The list of nodes for whom parent hashes are computed, namely: Direct path
   // excluding root, including leaf
   auto from_node = NodeIndex(from);
   auto dp = fdp;
-  if (!dp.empty()) {
-    // pop_back() on an empty list is undefined behavior
-    dp.pop_back();
-  }
-
-  if (from_node != NodeIndex::root(size)) {
-    // Handle the special case of a one-leaf tree
-    dp.insert(dp.begin(), { from_node, {} });
-  }
+  dp.pop_back();
+  dp.insert(dp.begin(), { from_node, {} });
 
   if (dp.size() != path_nodes.size()) {
     throw ProtocolError("Malformed UpdatePath");
