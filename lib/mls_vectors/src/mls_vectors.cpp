@@ -1812,11 +1812,15 @@ MessagesTestVector::MessagesTestVector()
 
   auto version = ProtocolVersion::mls10;
   auto hpke_priv = prg.hpke_key("hpke_priv");
+  auto hpke_priv_2 = prg.hpke_key("hpke_priv_2");
   auto hpke_pub = hpke_priv.public_key;
+  auto hpke_pub_2 = hpke_priv_2.public_key;
   auto hpke_ct =
     HPKECiphertext{ prg.secret("kem_output"), prg.secret("ciphertext") };
   auto sig_priv = prg.signature_key("signature_priv");
+  auto sig_priv_2 = prg.signature_key("signature_priv_2");
   auto sig_pub = sig_priv.public_key;
+  auto sig_pub_2 = sig_priv_2.public_key;
 
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id);
@@ -1828,6 +1832,14 @@ MessagesTestVector::MessagesTestVector()
                              Lifetime::create_default(),
                              ext_list,
                              sig_priv };
+  auto leaf_node_2 = LeafNode{ suite,
+                             hpke_pub_2,
+                             sig_pub_2,
+                             cred,
+                             Capabilities::create_default(),
+                             Lifetime::create_default(),
+                             ext_list,
+                             sig_priv_2 };
   auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
 
   auto leaf_node_update =
@@ -1839,7 +1851,7 @@ MessagesTestVector::MessagesTestVector()
 
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);
-  tree.add_leaf(leaf_node);
+  tree.add_leaf(leaf_node_2);
   auto ratchet_tree_obj = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents

@@ -123,6 +123,7 @@ struct TreeKEMPublicKey
   TreeKEMPublicKey& operator=(const TreeKEMPublicKey& other) = default;
   TreeKEMPublicKey& operator=(TreeKEMPublicKey&& other) = default;
 
+  LeafIndex allocate_leaf();
   LeafIndex add_leaf(const LeafNode& leaf);
   void update_leaf(LeafIndex index, const LeafNode& leaf);
   void blank_path(LeafIndex index);
@@ -148,6 +149,40 @@ struct TreeKEMPublicKey
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
+
+  template<typename UnaryPredicate>
+  bool all_leaves(const UnaryPredicate& pred) const
+  {
+    for (LeafIndex i{ 0 }; i < size; i.val++) {
+      const auto& node = node_at(i);
+      if (node.blank()) {
+        continue;
+      }
+
+      if (!pred(i, node.leaf_node())) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  template<typename UnaryPredicate>
+  bool any_leaf(const UnaryPredicate& pred) const
+  {
+    for (LeafIndex i{ 0 }; i < size; i.val++) {
+      const auto& node = node_at(i);
+      if (node.blank()) {
+        continue;
+      }
+
+      if (pred(i, node.leaf_node())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   using FilteredDirectPath =
     std::vector<std::tuple<NodeIndex, std::vector<NodeIndex>>>;
@@ -187,6 +222,11 @@ private:
   bytes original_parent_hash(TreeHashCache& cache,
                              NodeIndex parent,
                              NodeIndex sibling) const;
+
+  bool exists_in_tree(const HPKEPublicKey& key,
+                      std::optional<LeafIndex> except) const;
+  bool exists_in_tree(const SignaturePublicKey& key,
+                      std::optional<LeafIndex> except) const;
 
   OptionalNode blank_node;
 
