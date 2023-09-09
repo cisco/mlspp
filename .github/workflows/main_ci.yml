@@ -36,25 +36,25 @@ jobs:
 #        check-path: ${{ matrix.path }}
 #        include-regex: ${{ matrix.path }}\/(src|include|test|lib)\/.*\.(cpp|h)
 
-  quick-linux-interop-check:
+#  quick-linux-interop-check:
 #    needs: formatting-check
-    name: Quick Linux Check and Interop
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
-
-    - uses: lukka/get-cmake@latest
-
-    - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v10
-      with:
-        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
-        vcpkgDirectory: vcpkg
+#    name: Quick Linux Check and Interop
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v3
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r)
+#
+#    - uses: lukka/get-cmake@latest
+#
+#    - name: Setup vcpkg
+#      uses: lukka/run-vcpkg@v10
+#      with:
+#        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
+#        vcpkgDirectory: vcpkg
 #
 #    - name: Build (OpenSSL 1.1)
 #      run: |
@@ -83,78 +83,82 @@ jobs:
 #      run: |
 #        cd cmd/interop
 #        ./grpc-self-test.sh
-
-    - name: Build (OpenSSL 3)
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
-
-    - name: Unit Test (OpenSSL 3)
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
-
-#  platform-sanitizer-tests:
-#    if: github.event.pull_request.draft == false
-#    needs: quick-linux-interop-check
-#    name: Build and test platforms using sanitizers and clang-tidy
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os: [windows-latest, ubuntu-latest, macos-latest]
-#        include:
-#            - os: windows-latest
-#              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
-#              ossl3-vcpkg-dir: "alternatives\\openssl_3"
-#              ctest-target: RUN_TESTS
-#            - os: ubuntu-latest
-#              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-#              ossl3-vcpkg-dir: "alternatives/openssl_3"
-#              ctest-target: test
-#            - os: macos-latest
-#              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-#              ossl3-vcpkg-dir: "alternatives/openssl_3"
-#              ctest-target: test
 #
-#    steps:
-#    - uses: actions/checkout@v3
-#
-#    - name: Dependencies (macOS)
-#      if: ${{ matrix.os == 'macos-latest' }}
+#    - name: Build (OpenSSL 3)
 #      run: |
-#        brew install llvm pkg-config
-#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-#
-#    - name: Dependencies (Ubuntu)
-#      if: ${{ matrix.os == 'ubuntu-latest' }}
-#      run: |
-#        sudo apt-get install -y linux-headers-$(uname -r)
-#
-#    - name: Restore cache
-#      uses: actions/cache@v3
-#      with:
-#        path: ${{ github.workspace }}/build/cache
-#        key: VCPKG-BinaryCache-${{ runner.os }}
-#
-#    - name: Build (OpenSSL1.1)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
-#        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
-#
-#    - name: Unit Test (OpenSSL1.1)
-#      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-#
-#    - name: Build (OpenSSL3)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
 #        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 #
-#    - name: Unit Test (OpenSSL3)
+#    - name: Unit Test (OpenSSL 3)
 #      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
-#
+#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+
+  platform-sanitizer-tests:
+    if: github.event.pull_request.draft == false
+#    needs: quick-linux-interop-check
+    name: Build and test platforms using sanitizers and clang-tidy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              ossl3-vcpkg-dir: "alternatives\\openssl_3"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+            - os: macos-latest
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              ctest-target: test
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies (macOS)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
+        vcpkgDirectory: vcpkg
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Build (OpenSSL1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Unit Test (OpenSSL1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build (OpenSSL3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Unit Test (OpenSSL3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+
 #  old-macos-compatibility:
 #    if: github.event.pull_request.draft == false
 #    needs: quick-linux-interop-check
