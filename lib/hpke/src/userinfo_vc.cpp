@@ -1,6 +1,8 @@
 #include <hpke/base64.h>
 #include <hpke/signature.h>
 #include <hpke/userinfo_vc.h>
+#include <iostream>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <tls/compat.h>
 
@@ -158,7 +160,9 @@ struct UserInfoVC::ParsedCredential
   {
   }
 
-  static std::shared_ptr<ParsedCredential> parse(const std::string& jwt)
+  static std::shared_ptr<ParsedCredential> parse(
+    const std::string& jwt,
+    const std::map<std::string, std::string>& keep_list)
   {
     // Split the JWT into its header, payload, and signature
     const auto first_dot = jwt.find_first_of('.');
@@ -209,7 +213,21 @@ struct UserInfoVC::ParsedCredential
     if (id.find(did_jwk_prefix) != 0) {
       throw std::runtime_error("malformed UserInfo VC: ID is not did:jwk");
     }
+    std::map<std::string, std::string> subject_cred_data;
 
+    if (keep_list.empty()) {
+      subject_cred_data = vc.at("credentialSubject");
+    } else {
+      for (const auto& [keep_attr, new_attr] : keep_list) {
+        for (const auto& [cred_attr, cred_value] :
+             vc.at("credentialSubject").items()) {
+          if (keep_attr == cred_attr) {
+            subject_cred_data.try_emplace(new_attr, cred_value);
+            break;
+          }
+        }
+      }
+    }
     const auto jwk = to_ascii(from_base64url(id.substr(did_jwk_prefix.size())));
     auto public_key = Signature::parse_jwk(jwk);
 
@@ -222,7 +240,7 @@ struct UserInfoVC::ParsedCredential
       epoch_time(payload.at("nbf").get<int64_t>()),
       epoch_time(payload.at("exp").get<int64_t>()),
 
-      vc.at("credentialSubject"),
+      subject_cred_data,
       std::move(public_key),
 
       to_be_signed,
@@ -239,8 +257,8 @@ struct UserInfoVC::ParsedCredential
 /// UserInfoVC
 ///
 
-UserInfoVC::UserInfoVC(std::string jwt)
-  : parsed_cred(ParsedCredential::parse(jwt))
+UserInfoVC::UserInfoVC(std::string jwt, const std::map<std::string, std::string>& keep_list)
+  : parsed_cred(ParsedCredential::parse(jwt, keep_list))
   , raw(std::move(jwt))
 {
 }

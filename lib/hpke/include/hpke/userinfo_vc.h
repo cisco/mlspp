@@ -18,7 +18,7 @@ private:
   std::shared_ptr<ParsedCredential> parsed_cred;
 
 public:
-  explicit UserInfoVC(std::string jwt);
+  explicit UserInfoVC(std::string jwt, const std::map<std::string, std::string>& keep_list);
   UserInfoVC() = default;
   UserInfoVC(const UserInfoVC& other) = default;
   ~UserInfoVC() = default;

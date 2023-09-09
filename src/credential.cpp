@@ -115,10 +115,12 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 ///
 /// UserInfoVCCredential
 ///
-UserInfoVCCredential::UserInfoVCCredential(bytes userinfo_vc_jwt_in)
+UserInfoVCCredential::UserInfoVCCredential(
+  bytes userinfo_vc_jwt_in,
+  const std::map<std::string, std::string>& keep_list)
   : userinfo_vc_jwt(std::move(userinfo_vc_jwt_in))
 {
-  const auto vc = UserInfoVC(to_ascii(userinfo_vc_jwt));
+  const auto vc = UserInfoVC(to_ascii(userinfo_vc_jwt), keep_list);
 
   const auto& pub = vc.public_key();
   const auto pub_data = pub.sig.serialize(*pub.key);
@@ -236,9 +238,10 @@ Credential::multi(const std::vector<CredentialBindingInput>& binding_inputs,
 }
 
 Credential
-Credential::userinfo_vc(const bytes& userinfo_vc_jwt)
+Credential::userinfo_vc(const bytes& userinfo_vc_jwt,
+                        const std::map<std::string, std::string>& keep_list)
 {
-  return { UserInfoVCCredential{ userinfo_vc_jwt } };
+  return { UserInfoVCCredential{ userinfo_vc_jwt, keep_list } };
 }
 
 bool

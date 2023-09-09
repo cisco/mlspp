@@ -57,7 +57,9 @@ operator>>(tls::istream& str, X509Credential& obj);
 struct UserInfoVCCredential
 {
   UserInfoVCCredential() = default;
-  explicit UserInfoVCCredential(bytes userinfo_vc_jwt_in);
+  explicit UserInfoVCCredential(
+    bytes userinfo_vc_jwt_in,
+    const std::map<std::string, std::string>& keep_list);
 
   bytes userinfo_vc_jwt;
 
@@ -149,7 +151,9 @@ struct Credential
 
   static Credential basic(const bytes& identity);
   static Credential x509(const std::vector<bytes>& der_chain);
-  static Credential userinfo_vc(const bytes& userinfo_vc_jwt);
+  static Credential userinfo_vc(
+    const bytes& userinfo_vc_jwt,
+    const std::map<std::string, std::string>& keep_list);
   static Credential multi(
     const std::vector<CredentialBindingInput>& binding_inputs,
     const SignaturePublicKey& signature_key);

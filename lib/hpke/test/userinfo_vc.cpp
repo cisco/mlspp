@@ -1,11 +1,15 @@
 #include <doctest/doctest.h>
 #include <hpke/userinfo_vc.h>
+#include <nlohmann/json.hpp>
 
 #include <tls/compat.h>
+using json = nlohmann::json;
 namespace opt = MLS_NAMESPACE::tls::opt;
 
 using namespace MLS_NAMESPACE::hpke;
 using namespace std::string_literals;
+
+#include <iostream>
 
 static bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
@@ -99,6 +103,13 @@ TEST_CASE("UserInfoVC Parsing and Validation")
       { "email", "janedoe@example.com" },
       { "picture", "http://example.com/janedoe/me.jpg" } }
   };
+
+  const auto known_subject_after_keep = std::map<std::string, std::string>{
+    { { "EMAIL", "janedoe@example.com" },
+      { "IMAGE", "http://example.com/janedoe/me.jpg" },
+      { "NAME", "Jane Doe" }},
+  };
+
   const auto known_subject_jwk_raw = R"({
     "kty": "EC",
     "crv": "P-256",
@@ -116,7 +127,7 @@ TEST_CASE("UserInfoVC Parsing and Validation")
     "y":"ZwQq_CgT-1vfeE77uoWGM9Pm-8DyH7p-SIi1RKHEB8E"
   })"s;
 
-  const auto vc = UserInfoVC(userinfo_vc_raw);
+  const auto vc = UserInfoVC(userinfo_vc_raw, {});
   const auto known_subject_jwk = Signature::parse_jwk(known_subject_jwk_raw);
   const auto issuer_jwk = Signature::parse_jwk(issuer_jwk_raw);
 
@@ -129,4 +140,10 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   CHECK(vc.not_after().time_since_epoch() == known_not_after);
   CHECK(vc.subject() == known_subject);
   CHECK(vc.public_key() == known_subject_jwk);
+
+  // test filter
+  const auto vc_keep = UserInfoVC(
+    userinfo_vc_raw,
+    { { { "name", "NAME" }, { "email", "EMAIL" }, { "picture", "IMAGE" } } });
+  CHECK(vc_keep.subject() == known_subject_after_keep);
 }
