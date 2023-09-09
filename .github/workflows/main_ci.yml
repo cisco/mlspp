@@ -116,16 +116,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Dependencies (macOS)
-      if: ${{ matrix.os == 'macos-latest' }}
-      run: |
-        brew install llvm
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
+#    - name: Dependencies (macOS)
+#      if: ${{ matrix.os == 'macos-latest' }}
+#      run: |
+#        brew install llvm
+#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r)
 
     - uses: lukka/get-cmake@latest
 
