@@ -9,7 +9,7 @@ namespace MLS_NAMESPACE {
 ///
 
 State::State(bytes group_id,
-                CipherSuite suite,
+             CipherSuite suite,
              HPKEPrivateKey enc_priv,
              SignaturePrivateKey sig_priv,
              const LeafNode& leaf_node,
