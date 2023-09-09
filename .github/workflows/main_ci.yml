@@ -135,12 +135,6 @@ jobs:
         vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
         vcpkgDirectory: vcpkg
 
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
-
     - name: Build (OpenSSL1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
