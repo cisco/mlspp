@@ -64,34 +64,34 @@ jobs:
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
 
-#    - name: Build (Interop Harness)
-#      run: |
-#        cd cmd/interop
-#        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-#        cmake --build build
-#
-#    - name: Test self-interop
-#      run: |
-#        make -C cmd/interop self-test
-#
-#    - name: Test interop on test vectors
-#      run: |
-#        make -C cmd/interop interop-test
-#
-#    - name: Test gRPC live interop with self
-#      run: |
-#        cd cmd/interop
-#        ./grpc-self-test.sh
-#
-#    - name: Build (OpenSSL 3)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
-#
-#    - name: Unit Test (OpenSSL 3)
-#      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
-#
+    - name: Build (Interop Harness)
+      run: |
+        cd cmd/interop
+        cmake -B build
+        cmake --build build
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
+
+    - name: Build (OpenSSL 3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Unit Test (OpenSSL 3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+
 #  platform-sanitizer-tests:
 #    if: github.event.pull_request.draft == false
 #    needs: quick-linux-interop-check
