@@ -24,6 +24,8 @@ jobs:
         path:
           - '.'
           - 'cmd/interop'
+    env:
+      PATH: ${{ matrix.path }}
     steps:
     - uses: actions/checkout@v3
 
@@ -32,7 +34,7 @@ jobs:
       with:
         clang-format-version: '16'
         check-path: ${{ matrix.path }}
-        include-regex: '(src|include|test|lib)\/.*\.(cpp|h)'
+        include-regex: "$PATH\/(src|include|test|lib)\/.*\.(cpp|h)"
 
 #  quick-linux-interop-check:
 #    needs: formatting-check
