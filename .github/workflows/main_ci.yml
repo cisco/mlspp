@@ -14,7 +14,7 @@ env:
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
   CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
   CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
-  VCPKG_INSTALLATION_ROOT: ${{ github.workspace }}/vcpkg
+  CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
 #  formatting-check:
@@ -57,7 +57,7 @@ jobs:
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
 
     - name: Unit Test (OpenSSL 1.1)
@@ -82,7 +82,7 @@ jobs:
 #      run: |
 #        cd cmd/interop
 #        ./grpc-self-test.sh
-#        
+#
 #    - name: Build (OpenSSL 3)
 #      run: |
 #        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
