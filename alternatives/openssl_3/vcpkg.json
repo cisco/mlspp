@@ -10,7 +10,7 @@
     "doctest",
     "nlohmann-json"
   ],
-  "builtin-baseline": "5908d702d61cea1429b223a0b7a10ab86bad4c78",
+  "builtin-baseline": "3b3bd424827a1f7f4813216f6b32b6c61e386b2e",
   "overrides": [
     {
       "name": "openssl",

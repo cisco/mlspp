@@ -36,25 +36,25 @@ jobs:
 #        check-path: ${{ matrix.path }}
 #        include-regex: ${{ matrix.path }}\/(src|include|test|lib)\/.*\.(cpp|h)
 
-#  quick-linux-interop-check:
+  quick-linux-interop-check:
 #    needs: formatting-check
-#    name: Quick Linux Check and Interop
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v3
-#
-#    - name: Dependencies (Ubuntu)
-#      if: ${{ matrix.os == 'ubuntu-latest' }}
-#      run: |
-#        sudo apt-get install -y linux-headers-$(uname -r)
-#
-#    - uses: lukka/get-cmake@latest
-#
-#    - name: Setup vcpkg
-#      uses: lukka/run-vcpkg@v10
-#      with:
-#        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
-#        vcpkgDirectory: vcpkg
+    name: Quick Linux Check and Interop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
+        vcpkgDirectory: vcpkg
 #
 #    - name: Build (OpenSSL 1.1)
 #      run: |
@@ -83,15 +83,15 @@ jobs:
 #      run: |
 #        cd cmd/interop
 #        ./grpc-self-test.sh
-#
-#    - name: Build (OpenSSL 3)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
-#
-#    - name: Unit Test (OpenSSL 3)
-#      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+
+    - name: Build (OpenSSL 3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Unit Test (OpenSSL 3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
 
 #  platform-sanitizer-tests:
 #    if: github.event.pull_request.draft == false
@@ -155,28 +155,28 @@ jobs:
 #      run: |
 #        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
 #
-  old-macos-compatibility:
+#  old-macos-compatibility:
 #    if: github.event.pull_request.draft == false
 #    needs: quick-linux-interop-check
-    name: Build for older macOS
-    runs-on: macos-latest
-
-    env:
-      MACOSX_DEPLOYMENT_TARGET: 10.11
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - uses: lukka/get-cmake@latest
-
-    - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v10
-      with:
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-        vcpkgDirectory: vcpkg
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
+#    name: Build for older macOS
+#    runs-on: macos-latest
+#
+#    env:
+#      MACOSX_DEPLOYMENT_TARGET: 10.11
+#
+#    steps:
+#    - uses: actions/checkout@v3
+#
+#    - uses: lukka/get-cmake@latest
+#
+#    - name: Setup vcpkg
+#      uses: lukka/run-vcpkg@v10
+#      with:
+#        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+#        vcpkgDirectory: vcpkg
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_DIR }}"
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
 
