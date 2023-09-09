@@ -1,7 +1,6 @@
 #include <hpke/base64.h>
 #include <hpke/signature.h>
 #include <hpke/userinfo_vc.h>
-#include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <tls/compat.h>
@@ -257,7 +256,8 @@ struct UserInfoVC::ParsedCredential
 /// UserInfoVC
 ///
 
-UserInfoVC::UserInfoVC(std::string jwt, const std::map<std::string, std::string>& keep_list)
+UserInfoVC::UserInfoVC(std::string jwt,
+                       const std::map<std::string, std::string>& keep_list)
   : parsed_cred(ParsedCredential::parse(jwt, keep_list))
   , raw(std::move(jwt))
 {

@@ -9,8 +9,6 @@ namespace opt = MLS_NAMESPACE::tls::opt;
 using namespace MLS_NAMESPACE::hpke;
 using namespace std::string_literals;
 
-#include <iostream>
-
 static bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
 {
@@ -107,7 +105,7 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   const auto known_subject_after_keep = std::map<std::string, std::string>{
     { { "EMAIL", "janedoe@example.com" },
       { "IMAGE", "http://example.com/janedoe/me.jpg" },
-      { "NAME", "Jane Doe" }},
+      { "NAME", "Jane Doe" } },
   };
 
   const auto known_subject_jwk_raw = R"({
