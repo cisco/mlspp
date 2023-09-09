@@ -113,6 +113,14 @@ struct Capabilities
   bool proposals_supported(const std::vector<uint16_t>& required) const;
   bool credential_supported(const Credential& credential) const;
 
+  template<typename Container>
+  bool credentials_supported(const Container& required) const
+  {
+    return stdx::all_of(required, [&](CredentialType type) {
+      return stdx::contains(credentials, type);
+    });
+  }
+
   TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals, credentials)
 };
 
