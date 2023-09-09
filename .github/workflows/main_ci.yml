@@ -156,7 +156,7 @@ jobs:
 #        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
 #
   old-macos-compatibility:
-    if: github.event.pull_request.draft == false
+#    if: github.event.pull_request.draft == false
 #    needs: quick-linux-interop-check
     name: Build for older macOS
     runs-on: macos-latest
