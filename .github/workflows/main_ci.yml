@@ -15,7 +15,7 @@ env:
   CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
   CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-  VCPKG_COMMIT_ID: 3b3bd424827a1f7f4813216f6b32b6c61e386b2e
+  VCPKG_COMMIT_ID: 962e5e39f8a25f42522f51fffc574e05a3efd26b
 
 jobs:
 #  formatting-check:
