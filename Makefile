@@ -9,6 +9,7 @@ TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
 CLANG_TIDY=OFF
 OPENSSL3_MANIFEST=alternatives/openssl_3
+TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
 
 .PHONY: all dev dev3 test ctest dtest dbtest libs test-libs test-all everything ci ci3 clean cclean format
 
@@ -18,14 +19,21 @@ all: ${BUILD_DIR}
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
+vcpkg:
+	git submodule update --init --recursive
+
 dev:
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug .
 
-dev3:
+vcpkg-dev: vcpkg
+	# Like `dev`, but retrieve dependencies using vcpkg
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+
+dev3: vcpkg
 	# Like `dev`, but using OpenSSL 3
-	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test

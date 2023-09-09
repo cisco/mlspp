@@ -29,7 +29,7 @@ jobs:
           - 'cmd'
           - 'lib'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.11.0
@@ -43,22 +43,42 @@ jobs:
     name: Quick Linux Check and Interop
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+
+    # check out the repository with recursively pulling the submodules
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+        git -C vcpkg rev-parse HEAD > vcpkg-commit.txt
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get install -y linux-headers-$(uname -r)
 
-    - name: Restore cache
+    # First, attempt to pull key key, if that is not present, pull one of the
+    # restore-keys so we do not need to build from scratch.
+    # VCPKG-BinaryCache - description of cache
+    # v1 - provide a way to reset cache
+    # matrix.os - cache per OS and version
+    # hashFiles - Recache if the vcpkg files change
+    - name: Restore Cache
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
+        key: VCPKG-BinaryCache-ubuntu-latest-v1-${{ hashFiles('vcpkg-commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          VCPKG-BinaryCache-ubuntu-latest-v1
+          VCPKG-BinaryCache-ubuntu-latest
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="vcpkg/scripts/buildsystems/vcpkg.cmake"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
 
     - name: Unit Test (OpenSSL 1.1)
@@ -68,7 +88,7 @@ jobs:
     - name: Build (Interop Harness)
       run: |
         cd cmd/interop
-        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="../../vcpkg/scripts/buildsystems/vcpkg.cmake"
         cmake --build build
 
     - name: Test self-interop
@@ -86,13 +106,17 @@ jobs:
         
     - name: Build (OpenSSL 3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="vcpkg/scripts/buildsystems/vcpkg.cmake"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
     - name: Unit Test (OpenSSL 3)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
 
+  # recently, the oldest supported macos image was added to this matrix. This is
+  # to ensure backward compatibility on existing integrations.  The goal is to
+  # have the newest and oldest OS's represented for macOs. Only using latest
+  # windows and linux images because they have not been an challenge.
   platform-sanitizer-tests:
     if: github.event.pull_request.draft == false
     needs: quick-linux-interop-check
@@ -101,23 +125,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest, macos-11]
         include:
-            - os: windows-latest
-              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
-              ossl3-vcpkg-dir: "alternatives\\openssl_3"
-              ctest-target: RUN_TESTS
-            - os: ubuntu-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-              ossl3-vcpkg-dir: "alternatives/openssl_3"
-              ctest-target: test
-            - os: macos-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-              ossl3-vcpkg-dir: "alternatives/openssl_3"
-              ctest-target: test
+          - os: windows-latest
+            vcpkg-cmake-file: "vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+            ossl3-vcpkg-dir: "alternatives\\openssl_3"
+            ctest-target: RUN_TESTS
+          - os: ubuntu-latest
+            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
+            ossl3-vcpkg-dir: "alternatives/openssl_3"
+            ctest-target: test
+          - os: macos-latest
+            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
+            ossl3-vcpkg-dir: "alternatives/openssl_3"
+            ctest-target: test
+          - os: macos-11
+            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
+            ossl3-vcpkg-dir: "alternatives/openssl_3"
+            ctest-target: test
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+        git -C vcpkg rev-parse HEAD > vcpkg-commit.txt
 
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -131,11 +168,14 @@ jobs:
       run: |
         sudo apt-get install -y linux-headers-$(uname -r)
 
-    - name: Restore cache
+    - name: Restore Cache
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
+        key: VCPKG-BinaryCache-${{ matrix.os }}-v1-${{ hashFiles('vcpkg-commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          VCPKG-BinaryCache-${{ matrix.os }}-v1
+          VCPKG-BinaryCache-${{ matrix.os }}
 
     - name: Build (OpenSSL1.1)
       run: |
@@ -154,36 +194,3 @@ jobs:
     - name: Unit Test (OpenSSL3)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
-
-  old-macos-compatibility:
-    if: github.event.pull_request.draft == false
-    needs: quick-linux-interop-check
-    name: Build for older MacOS
-    runs-on: macos-latest
-
-    env:
-        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
-        VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
-        MACOSX_DEPLOYMENT_TARGET: 10.11
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: dependencies
-      run: |
-        brew install llvm pkg-config
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp --parallel 2
-
