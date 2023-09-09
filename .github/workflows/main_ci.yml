@@ -167,12 +167,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: dependencies
-      run: |
-        brew install llvm pkg-config
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
     - uses: lukka/get-cmake@latest
 
     - name: Setup vcpkg
