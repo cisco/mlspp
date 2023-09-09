@@ -43,7 +43,7 @@ make_test_vector(uint64_t type)
   auto tv_class = static_cast<TestVectorClass>(type);
   switch (tv_class) {
     case TestVectorClass::tree_math:
-      return std::vector<TreeMathTestVector>{ { n } };
+        return std::vector<TreeMathTestVector>{ { n } };
 
     case TestVectorClass::crypto_basics: {
       auto cases = std::vector<CryptoBasicsTestVector>();
