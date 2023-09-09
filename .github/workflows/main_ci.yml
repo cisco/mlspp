@@ -50,10 +50,10 @@ jobs:
     - uses: lukka/get-cmake@latest
 
     - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v10
-        with:
-          vcpkgGitCommitId: 3b3bd424827a1f7f4813216f6b32b6c61e386b2e
-          vcpkgDirectory: "$VCPKG_INSTALLATION_ROOT"
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId: 3b3bd424827a1f7f4813216f6b32b6c61e386b2e
+        vcpkgDirectory: "$VCPKG_INSTALLATION_ROOT"
 
     - name: Build (OpenSSL 1.1)
       run: |
