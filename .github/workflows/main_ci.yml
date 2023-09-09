@@ -10,92 +10,91 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
-  CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-  CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
-  CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
-  CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_COMMIT_ID: 962e5e39f8a25f42522f51fffc574e05a3efd26b
 
 jobs:
-#  formatting-check:
-#    name: Formatting Check
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        path:
-#          - '.'
-#          - 'cmd/interop'
-#    steps:
-#    - uses: actions/checkout@v3
-#
-#    - name: Run clang-format style check for C/C++ programs
-#      uses: jidicula/clang-format-action@v4.11.0
-#      with:
-#        clang-format-version: '16'
-#        check-path: ${{ matrix.path }}
-#        include-regex: ${{ matrix.path }}\/(src|include|test|lib)\/.*\.(cpp|h)
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - '.'
+          - 'cmd/interop'
+    steps:
+    - uses: actions/checkout@v3
 
-#  quick-linux-interop-check:
-#    needs: formatting-check
-#    name: Quick Linux Check and Interop
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v3
-#
-#    - name: Dependencies (Ubuntu)
-#      if: ${{ matrix.os == 'ubuntu-latest' }}
-#      run: |
-#        sudo apt-get install -y linux-headers-$(uname -r)
-#
-#    - uses: lukka/get-cmake@latest
-#
-#    - name: Setup vcpkg
-#      uses: lukka/run-vcpkg@v10
-#      with:
-#        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
-#        vcpkgDirectory: vcpkg
-#
-#    - name: Build (OpenSSL 1.1)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON
-#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all
-#
-#    - name: Unit Test (OpenSSL 1.1)
-#      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
-#
-#    - name: Build (Interop Harness)
-#      run: |
-#        cd cmd/interop
-#        cmake -B build
-#        cmake --build build
-#
-#    - name: Test self-interop
-#      run: |
-#        make -C cmd/interop self-test
-#
-#    - name: Test interop on test vectors
-#      run: |
-#        make -C cmd/interop interop-test
-#
-#    - name: Test gRPC live interop with self
-#      run: |
-#        cd cmd/interop
-#        ./grpc-self-test.sh
-#
-#    - name: Build (OpenSSL 3)
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
-#
-#    - name: Unit Test (OpenSSL 3)
-#      run: |
-#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+    - name: Run clang-format style check for C/C++ programs
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '16'
+        check-path: ${{ matrix.path }}
+        include-regex: ${{ matrix.path }}\/(src|include|test|lib)\/.*\.(cpp|h)
+
+  quick-linux-interop-check:
+    needs: formatting-check
+    name: Quick Linux Check and Interop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
+        vcpkgDirectory: vcpkg
+
+    - name: Build (OpenSSL 1.1)
+      run: |
+        cmake -B build -DTESTING=ON
+        cmake --build build --target all
+
+    - name: Unit Test (OpenSSL 1.1)
+      run: |
+        cmake --build build --target test
+
+    - name: Remove build artifacts (OpenSSL 1.1)
+      run: |
+        rm -rf build
+
+    - name: Build (Interop Harness)
+      run: |
+        cd cmd/interop
+        cmake -B build
+        cmake --build build
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
+
+    - name: Remove build artifacts (Interop Harness)
+      run: |
+        rm -rf cmd/interop/build
+
+    - name: Build (OpenSSL 3)
+      run: |
+        cmake -B build -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
+        cmake --build build
+
+    - name: Unit Test (OpenSSL 3)
+      run: |
+        cmake --build build --target test
 
   platform-sanitizer-tests:
-#    if: github.event.pull_request.draft == false
-#    needs: quick-linux-interop-check
+    if: github.event.pull_request.draft == false
+    needs: quick-linux-interop-check
     name: Build and test platforms using sanitizers and clang-tidy
     runs-on: ${{ matrix.os }}
     strategy:
@@ -116,17 +115,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-#    - name: Dependencies (macOS)
-#      if: ${{ matrix.os == 'macos-latest' }}
-#      run: |
-#        brew install llvm
-#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-#
-#    - name: Dependencies (Ubuntu)
-#      if: ${{ matrix.os == 'ubuntu-latest' }}
-#      run: |
-#        sudo apt-get install -y linux-headers-$(uname -r)
-
     - uses: lukka/get-cmake@latest
 
     - name: Setup vcpkg
@@ -135,46 +123,49 @@ jobs:
         vcpkgGitCommitId:  ${{ env.VCPKG_COMMIT_ID }}
         vcpkgDirectory: vcpkg
 
-    - name: Build (OpenSSL1.1)
+    - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+        cmake -B build -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+        cmake --build build
 
-    - name: Unit Test (OpenSSL1.1)
+    - name: Unit Test (OpenSSL 1.1)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build build --target "${{ matrix.ctest-target}}"
 
-    - name: Build (OpenSSL3)
+    - name: Remove build artifacts (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+        rm -rf build
+
+    - name: Build (OpenSSL 3)
+      run: |
+        cmake -B build -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}"
+        cmake --build build
 
     - name: Unit Test (OpenSSL3)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build build --target "${{ matrix.ctest-target}}"
 
-#  old-macos-compatibility:
-#    if: github.event.pull_request.draft == false
-#    needs: quick-linux-interop-check
-#    name: Build for older macOS
-#    runs-on: macos-latest
-#
-#    env:
-#      MACOSX_DEPLOYMENT_TARGET: 10.11
-#
-#    steps:
-#    - uses: actions/checkout@v3
-#
-#    - uses: lukka/get-cmake@latest
-#
-#    - name: Setup vcpkg
-#      uses: lukka/run-vcpkg@v10
-#      with:
-#        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-#        vcpkgDirectory: vcpkg
-#
-#    - name: Build
-#      run: |
-#        cmake -B "${{ env.CMAKE_BUILD_DIR }}"
-#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
+  old-macos-compatibility:
+    if: github.event.pull_request.draft == false
+    needs: quick-linux-interop-check
+    name: Build for older macOS
+    runs-on: macos-latest
 
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 10.11
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+        vcpkgDirectory: vcpkg
+
+    - name: Build
+      run: |
+        cmake -B build 
+        cmake --build build --target mlspp
