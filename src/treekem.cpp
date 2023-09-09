@@ -382,7 +382,7 @@ TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
 }
 
 LeafIndex
-TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
+TreeKEMPublicKey::allocate_leaf()
 {
   // Find the leftmost blank leaf node
   auto index = LeafIndex(0);
@@ -391,7 +391,6 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
   }
 
   // Extend the tree if necessary
-  auto ni = NodeIndex(index);
   if (index.val >= size.val) {
     if (size.val == 0) {
       size.val = 1;
@@ -402,11 +401,29 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
     }
   }
 
+  return index;
+}
+
+LeafIndex
+TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
+{
+  // Check that the leaf node's keys are not already present in the tree
+  if (exists_in_tree(leaf.encryption_key, std::nullopt)) {
+    throw InvalidParameterError("Duplicate encryption key");
+  }
+
+  if (exists_in_tree(leaf.signature_key, std::nullopt)) {
+    throw InvalidParameterError("Duplicate signature key");
+  }
+
+  // Allocate a blank leaf for this node
+  const auto index = allocate_leaf();
+
   // Set the leaf
   node_at(index).node = Node{ leaf };
 
   // Update the unmerged list
-  for (auto& n : ni.dirpath(size)) {
+  for (auto& n : NodeIndex(index).dirpath(size)) {
     if (!node_at(n).node) {
       continue;
     }
@@ -425,6 +442,16 @@ TreeKEMPublicKey::add_leaf(const LeafNode& leaf)
 void
 TreeKEMPublicKey::update_leaf(LeafIndex index, const LeafNode& leaf)
 {
+  // Check that the leaf node's keys are not already present in the tree, except
+  // for the signature key, which is allowed to repeat.
+  if (exists_in_tree(leaf.encryption_key, std::nullopt)) {
+    throw InvalidParameterError("Duplicate encryption key");
+  }
+
+  if (exists_in_tree(leaf.signature_key, index)) {
+    throw InvalidParameterError("Duplicate signature key");
+  }
+
   blank_path(index);
   node_at(NodeIndex(index)).node = Node{ leaf };
   clear_hash_path(index);
@@ -449,7 +476,7 @@ TreeKEMPublicKey::blank_path(LeafIndex index)
 void
 TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
 {
-  node_at(from).node = Node{ path.leaf_node };
+  update_leaf(from, path.leaf_node);
 
   auto dp = filtered_direct_path(NodeIndex(from));
   if (dp.size() != path.nodes.size()) {
@@ -469,7 +496,6 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
       path.nodes[i].public_key, parent_hash, {} } };
   }
 
-  clear_hash_path(from);
   set_hash_all();
 }
 
@@ -869,19 +895,19 @@ TreeKEMPublicKey::parent_hashes(
   const FilteredDirectPath& fdp,
   const std::vector<UpdatePathNode>& path_nodes) const
 {
+  // An empty filtered direct path indicates a one-member tree, since there's
+  // nobody else there to encrypt with.  In this special case, there's no
+  // parent hashing to be done.
+  if (fdp.empty()) {
+    return {};
+  }
+
   // The list of nodes for whom parent hashes are computed, namely: Direct path
   // excluding root, including leaf
   auto from_node = NodeIndex(from);
   auto dp = fdp;
-  if (!dp.empty()) {
-    // pop_back() on an empty list is undefined behavior
-    dp.pop_back();
-  }
-
-  if (from_node != NodeIndex::root(size)) {
-    // Handle the special case of a one-leaf tree
-    dp.insert(dp.begin(), { from_node, {} });
-  }
+  dp.pop_back();
+  dp.insert(dp.begin(), { from_node, {} });
 
   if (dp.size() != path_nodes.size()) {
     throw ProtocolError("Malformed UpdatePath");
@@ -1009,6 +1035,24 @@ TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
   }
 
   return leaf_ph && opt::get(leaf_ph) == hash_chain[0];
+}
+
+bool
+TreeKEMPublicKey::exists_in_tree(const HPKEPublicKey& key,
+                                 std::optional<LeafIndex> except) const
+{
+  return any_leaf([&](auto i, const auto& node) {
+    return i != except && node.encryption_key == key;
+  });
+}
+
+bool
+TreeKEMPublicKey::exists_in_tree(const SignaturePublicKey& key,
+                                 std::optional<LeafIndex> except) const
+{
+  return any_leaf([&](auto i, const auto& node) {
+    return i != except && node.signature_key == key;
+  });
 }
 
 tls::ostream&

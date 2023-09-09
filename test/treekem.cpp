@@ -69,9 +69,9 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
   const auto hash_size = suite.digest().hash_size;
 
   // Create a tree with N blank leaves
-  auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();
   auto pub = TreeKEMPublicKey(suite);
   for (auto i = uint32_t(0); i < size.val; i++) {
+    auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();
     pub.add_leaf(leaf_node);
   }
 
@@ -144,9 +144,10 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   auto pub = TreeKEMPublicKey{ suite };
   for (uint32_t i = 0; i < size.val; i++) {
     // Add a leaf
-    auto [init_priv, sig_priv, leaf_before_] = new_leaf_node();
+    auto [_init_priv_before, _sig_priv_before, leaf_before_] = new_leaf_node();
     auto leaf_before = leaf_before_;
-    silence_unused(init_priv);
+    silence_unused(_init_priv_before);
+    silence_unused(_sig_priv_before);
 
     auto index = LeafIndex(i);
 
@@ -162,20 +163,23 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     REQUIRE(found_leaf == leaf_before);
 
     // Manually construct a direct path to populate nodes above the new leaf
-    auto path = UpdatePath{ leaf_before, {} };
+    const auto [_init_priv_after, sig_priv_after, leaf_after_] =
+      new_leaf_node();
+    const auto leaf_after = leaf_after_;
+    auto path = UpdatePath{ leaf_after, {} };
     auto dp = pub.filtered_direct_path(NodeIndex(index));
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
       path.nodes.push_back({ node_pub, {} });
     }
 
-    path.leaf_node.sign(suite, sig_priv, std::nullopt);
+    path.leaf_node.sign(suite, sig_priv_after, std::nullopt);
 
     // Merge the direct path (ignoring parent hash validity)
     pub.merge(index, path);
 
-    auto leaf_after = path.leaf_node;
-    found = pub.find(leaf_after);
+    const auto& re_signed_leaf = path.leaf_node;
+    found = pub.find(re_signed_leaf);
     REQUIRE(found);
     REQUIRE(found == index);
     for (const auto& [n_, _res] : dp) {
@@ -185,7 +189,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
 
     found_leaf = pub.leaf_node(index);
     REQUIRE(found_leaf);
-    REQUIRE(found_leaf == leaf_after);
+    REQUIRE(found_leaf == re_signed_leaf);
   }
 
   // Remove a node and verify that the resolution comes out right
@@ -237,7 +241,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
     auto ok = ok_;
     REQUIRE(ok);
 
-    pubs[i].merge(adder, path);
     REQUIRE(privs[i].consistent(pubs[i]));
 
     // New joiner initializes their private key

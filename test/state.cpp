@@ -365,6 +365,60 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
   REQUIRE(first1 == second0);
 }
 
+TEST_CASE_FIXTURE(StateTest, "Two Person with Replacement")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Handle the Add proposal and create a Commit
+  const auto add1 = first0.add_proposal(key_packages[1]);
+  const auto [commit1, welcome1, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+  REQUIRE(first1 == second1);
+
+  // Create a new appearance of the first member
+  const auto [init_priv, leaf_priv, _identity_priv, key_package_] =
+    make_client();
+  const auto identity_priv = identity_privs[0];
+  auto key_package = key_package_;
+  key_package.leaf_node.signature_key = identity_priv.public_key;
+  key_package.leaf_node.sign(suite, identity_priv, std::nullopt);
+  key_package.sign(identity_priv);
+
+  // Create a commit replacing the first member
+  const auto remove2 = second1.remove_proposal(LeafIndex{ 0 });
+  const auto add2 = second1.add_proposal(key_package);
+  const auto [commit2, welcome2, second2_] = second1.commit(
+    fresh_secret(), CommitOpts{ { add2, remove2 }, true, false, {} }, {});
+  auto second2 = second2_;
+  silence_unused(commit2);
+
+  // Initialize the new first member from the Welcome
+  const auto first2 =
+    State{ init_priv,    leaf_priv, identity_priv, key_package, welcome2,
+           std::nullopt, {} };
+  REQUIRE(first2 == second2);
+
+  auto group = std::vector<State>{ first2, second2 };
+  verify_group_functionality(group);
+}
+
 TEST_CASE_FIXTURE(StateTest, "External Join")
 {
   // Initialize the creator's state

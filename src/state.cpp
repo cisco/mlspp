@@ -269,7 +269,7 @@ State::new_member_add(const bytes& group_id,
                                { /* no authenticated data */ },
                                { std::move(proposal) } };
   auto content_auth = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+    WireFormat::mls_public_message, std::move(content), suite, sig_priv, {});
 
   return PublicMessage::protect(std::move(content_auth), suite, {}, {});
 }
@@ -299,8 +299,8 @@ State::sign(const Sender& sender,
     _group_id, _epoch, sender, authenticated_data, { inner_content }
   };
 
-  auto wire_format =
-    (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
+  auto wire_format = (encrypt) ? WireFormat::mls_private_message
+                               : WireFormat::mls_public_message;
 
   auto content_auth = AuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
@@ -312,13 +312,13 @@ MLSMessage
 State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 {
   switch (content_auth.wire_format) {
-    case WireFormat::mls_plaintext:
+    case WireFormat::mls_public_message:
       return PublicMessage::protect(std::move(content_auth),
                                     _suite,
                                     _key_schedule.membership_key,
                                     group_context());
 
-    case WireFormat::mls_ciphertext:
+    case WireFormat::mls_private_message:
       return PrivateMessage::protect(std::move(content_auth),
                                      _suite,
                                      _keys,
@@ -813,9 +813,8 @@ State::handle(const AuthenticatedContent& content_auth,
   if (!external_commit) {
     sender_location = opt::get(sender);
   } else {
-    // Add the joiner
-    const auto& path = opt::get(commit.path);
-    sender_location = next._tree.add_leaf(path.leaf_node);
+    // Find where the joiner will be added
+    sender_location = next._tree.allocate_leaf();
 
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
@@ -1361,7 +1360,7 @@ State::unprotect(const MLSMessage& ct)
     throw ProtocolError("Unprotect of handshake message");
   }
 
-  if (content_auth.wire_format != WireFormat::mls_ciphertext) {
+  if (content_auth.wire_format != WireFormat::mls_private_message) {
     throw ProtocolError("Application data not sent as PrivateMessage");
   }
 
@@ -1417,44 +1416,27 @@ State::valid(const LeafNode& leaf_node,
   // credential types currently in use by other members.
   //
   // Verify that the following fields are unique among the members of the group:
-  // signature_key
-  // encryption_key
-  const auto& signature_key = leaf_node.signature_key;
-  const auto& encryption_key = leaf_node.encryption_key;
-  auto unique_signature_key = true;
-  auto unique_encryption_key = true;
-  auto mutual_credential_support = true;
-  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
-    const auto maybe_leaf = _tree.leaf_node(i);
-    if (!maybe_leaf) {
-      continue;
-    }
-
-    const auto& leaf = opt::get(maybe_leaf);
-
-    // Signature keys are allowed to repeat within a leaf
-    unique_signature_key =
-      unique_signature_key &&
-      ((i == index) || (signature_key != leaf.signature_key));
-    unique_encryption_key =
-      unique_encryption_key && (encryption_key != leaf.encryption_key);
-    mutual_credential_support =
-      mutual_credential_support &&
-      leaf.capabilities.credential_supported(leaf_node.credential) &&
-      leaf_node.capabilities.credential_supported(leaf.credential);
-  }
+  //   signature_key
+  //   encryption_key
+  //
+  // Note: Uniqueness of signature and encryption keys is assured by the
+  // tree operations (add/update), so we do not need to verify those here.
+  const auto mutual_credential_support =
+    _tree.all_leaves([&](auto /* i */, const auto& leaf) {
+      return leaf.capabilities.credential_supported(leaf_node.credential) &&
+             leaf_node.capabilities.credential_supported(leaf.credential);
+    });
 
   // Verify that the extensions in the LeafNode are supported by checking that
   // the ID for each extension in the extensions field is listed in the
   // capabilities.extensions field of the LeafNode.
-  auto all_extensions_supported =
+  auto supports_own_extensions =
     stdx::all_of(leaf_node.extensions.extensions, [&](const auto& ext) {
       return stdx::contains(leaf_node.capabilities.extensions, ext.type);
     });
 
   return (signature_valid && supports_group_extensions && correct_source &&
-          mutual_credential_support && unique_signature_key &&
-          unique_encryption_key && all_extensions_supported);
+          mutual_credential_support && supports_own_extensions);
 }
 
 bool

@@ -98,23 +98,34 @@ protected:
 TEST_CASE_FIXTURE(MLSMessageTest, "AuthenticatedContent Sign/Verify")
 {
   // Verify that a sign / verify round-trip works
-  auto content_auth = AuthenticatedContent::sign(
-    WireFormat::mls_ciphertext, application_content, suite, sig_priv, context);
+  auto content_auth =
+    AuthenticatedContent::sign(WireFormat::mls_private_message,
+                               application_content,
+                               suite,
+                               sig_priv,
+                               context);
 
   REQUIRE(content_auth.verify(suite, sig_priv.public_key, context));
   REQUIRE(content_auth.content == application_content);
 
   // Verify that `mls_plaintext` is forbidden for ApplicationData
   // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
-  REQUIRE_THROWS(AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, application_content, suite, sig_priv, context));
+  REQUIRE_THROWS(AuthenticatedContent::sign(WireFormat::mls_public_message,
+                                            application_content,
+                                            suite,
+                                            sig_priv,
+                                            context));
 }
 
 TEST_CASE_FIXTURE(MLSMessageTest, "PublicMessage Protect/Unprotect")
 {
   auto content = proposal_content;
-  auto content_auth_original = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, context);
+  auto content_auth_original =
+    AuthenticatedContent::sign(WireFormat::mls_public_message,
+                               std::move(content),
+                               suite,
+                               sig_priv,
+                               context);
 
   auto pt = PublicMessage::protect(
     content_auth_original, suite, membership_key, context);
@@ -125,8 +136,12 @@ TEST_CASE_FIXTURE(MLSMessageTest, "PublicMessage Protect/Unprotect")
 TEST_CASE_FIXTURE(MLSMessageTest, "PrivateMessage Protect/Unprotect")
 {
   auto content = proposal_content;
-  auto content_auth_original = AuthenticatedContent::sign(
-    WireFormat::mls_ciphertext, std::move(content), suite, sig_priv, context);
+  auto content_auth_original =
+    AuthenticatedContent::sign(WireFormat::mls_private_message,
+                               std::move(content),
+                               suite,
+                               sig_priv,
+                               context);
 
   auto ct = PrivateMessage::protect(
     content_auth_original, suite, keys, sender_data_secret, padding_size);
