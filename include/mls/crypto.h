@@ -208,8 +208,14 @@ extern const std::string group_info;
 extern const std::string multi_credential;
 } // namespace sign_label
 
+struct PublicJWK;
+
 struct SignaturePublicKey
 {
+  // XXX(RLB) It would be nice to wrap this return value as a struct, but that
+  // results in a compiler error "field has incomplete type".
+  static PublicJWK parse_jwk(const std::string& jwk_json);
+
   static SignaturePublicKey from_jwk(CipherSuite suite,
                                      const std::string& json_str);
 
@@ -223,6 +229,12 @@ struct SignaturePublicKey
   std::string to_jwk(CipherSuite suite) const;
 
   TLS_SERIALIZABLE(data)
+};
+
+struct PublicJWK {
+  SignatureScheme signature_scheme;
+  std::optional<std::string> key_id;
+  SignaturePublicKey public_key;
 };
 
 struct SignaturePrivateKey

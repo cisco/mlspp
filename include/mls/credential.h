@@ -6,6 +6,10 @@
 
 namespace MLS_NAMESPACE {
 
+namespace hpke {
+  struct UserInfoVC;
+}
+
 // struct {
 //     opaque identity<0..2^16-1>;
 //     SignaturePublicKey public_key;
@@ -57,17 +61,20 @@ operator>>(tls::istream& str, X509Credential& obj);
 struct UserInfoVCCredential
 {
   UserInfoVCCredential() = default;
-  explicit UserInfoVCCredential(bytes userinfo_vc_jwt_in);
+  explicit UserInfoVCCredential(std::string userinfo_vc_jwt_in);
 
-  bytes userinfo_vc_jwt;
+  std::string userinfo_vc_jwt;
 
   bool valid_for(const SignaturePublicKey& pub) const;
+  bool valid_from(const PublicJWK& pub) const;
 
-  TLS_SERIALIZABLE(userinfo_vc_jwt)
+  friend tls::ostream operator<<(tls::ostream& str, const UserInfoVCCredential& obj);
+  friend tls::istream operator>>(tls::istream& str, UserInfoVCCredential& obj);
+  friend bool operator==(const UserInfoVCCredential& str, const UserInfoVCCredential& obj);
+  friend bool operator!=(const UserInfoVCCredential& str, const UserInfoVCCredential& obj);
 
 private:
-  SignaturePublicKey _public_key;
-  SignatureScheme _signature_scheme;
+  std::shared_ptr<hpke::UserInfoVC> _vc;
 };
 
 bool
@@ -149,7 +156,7 @@ struct Credential
 
   static Credential basic(const bytes& identity);
   static Credential x509(const std::vector<bytes>& der_chain);
-  static Credential userinfo_vc(const bytes& userinfo_vc_jwt);
+  static Credential userinfo_vc(const std::string& userinfo_vc_jwt);
   static Credential multi(
     const std::vector<CredentialBindingInput>& binding_inputs,
     const SignaturePublicKey& signature_key);

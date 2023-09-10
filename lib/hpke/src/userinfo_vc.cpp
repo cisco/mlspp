@@ -160,7 +160,7 @@ struct UserInfoVC::ParsedCredential
 {
   // Header fields
   const Signature& signature_algorithm; // `alg`
-  std::string key_id;                   // `kid`
+  std::optional<std::string> key_id;    // `kid`
 
   // Top-level Payload fields
   std::string issuer;                               // `iss`
@@ -176,7 +176,7 @@ struct UserInfoVC::ParsedCredential
   bytes signature;
 
   ParsedCredential(const Signature& signature_algorithm_in,
-                   std::string key_id_in,
+                   std::optional<std::string> key_id_in,
                    std::string issuer_in,
                    std::chrono::system_clock::time_point not_before_in,
                    std::chrono::system_clock::time_point not_after_in,
@@ -223,6 +223,11 @@ struct UserInfoVC::ParsedCredential
       signature = jws_to_der_sig(signature);
     }
 
+    auto kid = std::optional<std::string>{};
+    if (header.contains("kid")) {
+      kid = header.at("kid").get<std::string>();
+    }
+
     // Verify the VC parts
     const auto& vc = payload.at("vc");
 
@@ -254,7 +259,7 @@ struct UserInfoVC::ParsedCredential
     // Extract the salient parts
     return std::make_shared<ParsedCredential>(
       sig,
-      header.at("kid"),
+      kid,
 
       payload.at("iss"),
       epoch_time(payload.at("nbf").get<int64_t>()),
@@ -336,13 +341,19 @@ UserInfoVC::UserInfoVC(std::string jwt)
 {
 }
 
+const Signature&
+UserInfoVC::signature_algorithm() const
+{
+  return parsed_cred->signature_algorithm;
+}
+
 std::string
 UserInfoVC::issuer() const
 {
   return parsed_cred->issuer;
 }
 
-std::string
+std::optional<std::string>
 UserInfoVC::key_id() const
 {
   return parsed_cred->key_id;

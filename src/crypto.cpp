@@ -385,6 +385,15 @@ SignaturePublicKey::verify(const CipherSuite& suite,
   return suite.sig().verify(content, signature, *pub);
 }
 
+PublicJWK
+SignaturePublicKey::parse_jwk(const std::string& jwk_json)
+{
+  const auto parsed = Signature::parse_jwk(jwk_json);
+  const auto scheme = tls_signature_scheme(parsed.sig.id);
+  const auto pub_data = parsed.sig.serialize(*parsed.key);
+  return { scheme, parsed.key_id, { pub_data } };
+}
+
 SignaturePublicKey
 SignaturePublicKey::from_jwk(CipherSuite suite, const std::string& json_str)
 {
