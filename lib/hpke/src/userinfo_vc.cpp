@@ -130,7 +130,7 @@ struct UserInfoVC::ParsedCredential
   std::chrono::system_clock::time_point not_after;  // `exp`
 
   // Credential subject fields
-  std::map<std::string, std::string> credential_subject;
+  std::shared_ptr<UserInfoClaims> credential_subject;
   Signature::PublicJWK public_key;
 
   // Signature verification information
@@ -142,7 +142,7 @@ struct UserInfoVC::ParsedCredential
                    std::string issuer_in,
                    std::chrono::system_clock::time_point not_before_in,
                    std::chrono::system_clock::time_point not_after_in,
-                   std::map<std::string, std::string> credential_subject_in,
+                   std::shared_ptr<UserInfoClaims> credential_subject_in,
                    Signature::PublicJWK&& public_key_in,
                    bytes to_be_signed_in,
                    bytes signature_in)
@@ -222,7 +222,7 @@ struct UserInfoVC::ParsedCredential
       epoch_time(payload.at("nbf").get<int64_t>()),
       epoch_time(payload.at("exp").get<int64_t>()),
 
-      vc.at("credentialSubject"),
+      UserInfoClaims::from_json(vc.at("credentialSubject").dump()),
       std::move(public_key),
 
       to_be_signed,
@@ -234,6 +234,75 @@ struct UserInfoVC::ParsedCredential
     return signature_algorithm.verify(to_be_signed, signature, issuer_key);
   }
 };
+
+///
+/// UserInfoClaims
+///
+std::shared_ptr<UserInfoClaims>
+UserInfoClaims::from_json(const std::string& cred_subject)
+{
+  // parse the credentialSubject
+  auto cred_subject_json = nlohmann::json::parse(cred_subject);
+
+  // set default value for the nested object, address
+  auto cred_subject_address_json = nlohmann::json::object();
+  if (cred_subject_json.contains(address_attr)) {
+    cred_subject_address_json =
+      cred_subject_json.value<nlohmann::json::object_t>(address_attr, {});
+  }
+
+  // create the UserInfoClaims object
+  return std::make_shared<UserInfoClaims>(UserInfoClaims({
+    .sub = cred_subject_json.value<std::string>(UserInfoClaims::sub_attr, ""),
+    .name = cred_subject_json.value<std::string>(UserInfoClaims::name_attr, ""),
+    .given_name =
+      cred_subject_json.value<std::string>(UserInfoClaims::given_name_attr, ""),
+    .family_name = cred_subject_json.value<std::string>(
+      UserInfoClaims::family_name_attr, ""),
+    .middle_name = cred_subject_json.value<std::string>(
+      UserInfoClaims::middle_name_attr, ""),
+    .nickname =
+      cred_subject_json.value<std::string>(UserInfoClaims::nickname_attr, ""),
+    .preferred_username = cred_subject_json.value<std::string>(
+      UserInfoClaims::preferred_username_attr, ""),
+    .profile =
+      cred_subject_json.value<std::string>(UserInfoClaims::profile_attr, ""),
+    .picture =
+      cred_subject_json.value<std::string>(UserInfoClaims::picture_attr, ""),
+    .website =
+      cred_subject_json.value<std::string>(UserInfoClaims::website_attr, ""),
+    .email =
+      cred_subject_json.value<std::string>(UserInfoClaims::email_attr, ""),
+    .email_verified =
+      cred_subject_json.value<bool>(UserInfoClaims::email_verified_attr, false),
+    .gender =
+      cred_subject_json.value<std::string>(UserInfoClaims::gender_attr, ""),
+    .birthdate =
+      cred_subject_json.value<std::string>(UserInfoClaims::birthdate_attr, ""),
+    .zoneinfo =
+      cred_subject_json.value<std::string>(UserInfoClaims::zoneinfo_attr, ""),
+    .locale =
+      cred_subject_json.value<std::string>(UserInfoClaims::locale_attr, ""),
+    .phone_number = cred_subject_json.value<std::string>(
+      UserInfoClaims::phone_number_attr, ""),
+    .phone_number_verified = cred_subject_json.value<bool>(
+      UserInfoClaims::phone_number_verified_attr, false),
+    .address_formatted = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_formatted_attr, ""),
+    .address_street_address = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_street_address_attr, ""),
+    .address_locality = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_locality_attr, ""),
+    .address_region = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_region_attr, ""),
+    .address_postal_code = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_postal_code_attr, ""),
+    .address_country = cred_subject_address_json.value<std::string>(
+      UserInfoClaims::address_country_attr, ""),
+    .updated_at =
+      cred_subject_json.value<uint64_t>(UserInfoClaims::updated_at_attr, 0),
+  }));
+}
 
 ///
 /// UserInfoVC
@@ -263,7 +332,7 @@ UserInfoVC::valid_from(const Signature::PublicKey& issuer_key) const
   return parsed_cred->verify(issuer_key);
 }
 
-std::map<std::string, std::string>
+std::shared_ptr<UserInfoClaims>
 UserInfoVC::subject() const
 {
   return parsed_cred->credential_subject;

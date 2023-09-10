@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <hpke/userinfo_vc.h>
+#include <nlohmann/json.hpp>
 
 #include <tls/compat.h>
 namespace opt = MLS_NAMESPACE::tls::opt;
@@ -127,6 +128,37 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   CHECK(vc.key_id() == opt::get(issuer_jwk.key_id));
   CHECK(vc.not_before().time_since_epoch() == known_not_before);
   CHECK(vc.not_after().time_since_epoch() == known_not_after);
-  CHECK(vc.subject() == known_subject);
+
+  CHECK(vc.subject()->sub == known_subject.at("sub"));
+  CHECK(vc.subject()->name == known_subject.at("name"));
+  CHECK(vc.subject()->given_name == known_subject.at("given_name"));
+  CHECK(vc.subject()->family_name == known_subject.at("family_name"));
+  CHECK(vc.subject()->preferred_username ==
+        known_subject.at("preferred_username"));
+  CHECK(vc.subject()->email == known_subject.at("email"));
+  CHECK(vc.subject()->picture == known_subject.at("picture"));
+
   CHECK(vc.public_key() == known_subject_jwk);
+}
+
+TEST_CASE("UserInfoClaims Parsing")
+{
+
+  nlohmann::json credentialSubject = {
+    { "foo", "bar" },
+    { "sub", "sub" },
+    { "email_verified", true },
+    { "email", "email@example.com" },
+    { "address", { { "country", "Mexico" }, { "region", "MyRegion" } } },
+  };
+
+  auto userinfo_claims = UserInfoClaims::from_json(credentialSubject.dump());
+  CHECK(userinfo_claims->email == credentialSubject.at("email"));
+  CHECK(userinfo_claims->email_verified ==
+        credentialSubject.at("email_verified"));
+  CHECK(userinfo_claims->sub == credentialSubject.at("sub"));
+  CHECK(userinfo_claims->address_country ==
+        credentialSubject.at("address").at("country"));
+  CHECK(userinfo_claims->address_region ==
+        credentialSubject.at("address").at("region"));
 }
