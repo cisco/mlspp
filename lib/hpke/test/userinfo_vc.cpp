@@ -128,37 +128,100 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   CHECK(vc.key_id() == opt::get(issuer_jwk.key_id));
   CHECK(vc.not_before().time_since_epoch() == known_not_before);
   CHECK(vc.not_after().time_since_epoch() == known_not_after);
-
-  CHECK(vc.subject()->sub == known_subject.at("sub"));
-  CHECK(vc.subject()->name == known_subject.at("name"));
-  CHECK(vc.subject()->given_name == known_subject.at("given_name"));
-  CHECK(vc.subject()->family_name == known_subject.at("family_name"));
-  CHECK(vc.subject()->preferred_username ==
-        known_subject.at("preferred_username"));
-  CHECK(vc.subject()->email == known_subject.at("email"));
-  CHECK(vc.subject()->picture == known_subject.at("picture"));
-
   CHECK(vc.public_key() == known_subject_jwk);
+
+  const auto subject = vc.subject();
+  CHECK(subject.sub.value_or("") == known_subject.at("sub"));
+
+  CHECK(vc.subject().name.value_or("") == known_subject.at("name"));
+  CHECK(vc.subject().given_name.value_or("") == known_subject.at("given_name"));
+  CHECK(vc.subject().family_name.value_or("") ==
+        known_subject.at("family_name"));
+  CHECK(vc.subject().preferred_username.value_or("") ==
+        known_subject.at("preferred_username"));
+  CHECK(vc.subject().email.value_or("") == known_subject.at("email"));
+  CHECK(vc.subject().picture.value_or("") == known_subject.at("picture"));
 }
 
-TEST_CASE("UserInfoClaims Parsing")
+TEST_CASE("UserInfoClaims Field Parsing")
 {
-
   nlohmann::json credentialSubject = {
-    { "foo", "bar" },
+    { "test", "test" },
     { "sub", "sub" },
+    { "name", "name" },
+    { "given_name", "given_name" },
+    { "family_name", "family_name" },
+    { "middle_name", "middle_name" },
+    { "nickname", "nickname" },
+    { "preferred_username", "preferred_username" },
+    { "profile", "profile" },
+    { "picture", "picture" },
+    { "website", "website" },
+    { "email", "email" },
     { "email_verified", true },
-    { "email", "email@example.com" },
-    { "address", { { "country", "Mexico" }, { "region", "MyRegion" } } },
+    { "gender", "gender" },
+    { "birthdate", "birthdate" },
+    { "zoneinfo", "zoneinfo" },
+    { "locale", "locale" },
+    { "phone_number", "phone_number" },
+    { "phone_number_verified", true },
+    { "address",
+      { { "formatted", "formatted" },
+        { "street_address", "street_address" },
+        { "locality", "locality" },
+        { "region", "region" },
+        { "postal_code", "postal_code" },
+        { "country", "country" } } },
+    { "updated_at", 42 }
   };
 
-  auto userinfo_claims = UserInfoClaims::from_json(credentialSubject.dump());
-  CHECK(userinfo_claims->email == credentialSubject.at("email"));
-  CHECK(userinfo_claims->email_verified ==
+  const auto userinfo_claims = UserInfoClaims::from_json(credentialSubject);
+
+  CHECK(userinfo_claims.sub == credentialSubject.at("sub"));
+  CHECK(userinfo_claims.name == credentialSubject.at("name"));
+  CHECK(userinfo_claims.given_name == credentialSubject.at("given_name"));
+  CHECK(userinfo_claims.family_name == credentialSubject.at("family_name"));
+  CHECK(userinfo_claims.middle_name == credentialSubject.at("middle_name"));
+  CHECK(userinfo_claims.nickname == credentialSubject.at("nickname"));
+  CHECK(userinfo_claims.preferred_username ==
+        credentialSubject.at("preferred_username"));
+  CHECK(userinfo_claims.profile == credentialSubject.at("profile"));
+  CHECK(userinfo_claims.picture == credentialSubject.at("picture"));
+  CHECK(userinfo_claims.website == credentialSubject.at("website"));
+  CHECK(userinfo_claims.email == credentialSubject.at("email"));
+  CHECK(userinfo_claims.email_verified ==
         credentialSubject.at("email_verified"));
-  CHECK(userinfo_claims->sub == credentialSubject.at("sub"));
-  CHECK(userinfo_claims->address_country ==
-        credentialSubject.at("address").at("country"));
-  CHECK(userinfo_claims->address_region ==
-        credentialSubject.at("address").at("region"));
+  CHECK(userinfo_claims.gender == credentialSubject.at("gender"));
+  CHECK(userinfo_claims.birthdate == credentialSubject.at("birthdate"));
+  CHECK(userinfo_claims.zoneinfo == credentialSubject.at("zoneinfo"));
+  CHECK(userinfo_claims.locale == credentialSubject.at("locale"));
+  CHECK(userinfo_claims.phone_number == credentialSubject.at("phone_number"));
+  CHECK(userinfo_claims.phone_number_verified ==
+        credentialSubject.at("phone_number_verified"));
+  CHECK(userinfo_claims.updated_at == credentialSubject.at("updated_at"));
+
+  auto address = userinfo_claims.address.value_or(UserInfoClaimsAddress());
+  CHECK(address.formatted == credentialSubject.at("address").at("formatted"));
+  CHECK(address.street_address ==
+        credentialSubject.at("address").at("street_address"));
+  CHECK(address.locality == credentialSubject.at("address").at("locality"));
+  CHECK(address.region == credentialSubject.at("address").at("region"));
+  CHECK(address.postal_code ==
+        credentialSubject.at("address").at("postal_code"));
+  CHECK(address.country == credentialSubject.at("address").at("country"));
+}
+
+TEST_CASE("UserInfoClaims Edge Cases")
+{
+  CHECK_THROWS_WITH(
+    UserInfoClaims::from_json({ { "updated_at", "42" } }),
+    "[json.exception.type_error.302] type must be number, but is string");
+
+  CHECK_THROWS_WITH(
+    UserInfoClaims::from_json({ { "name", true } }),
+    "[json.exception.type_error.302] type must be string, but is boolean");
+
+  CHECK_THROWS_WITH(
+    UserInfoClaims::from_json({ { "email_verified", "true" } }),
+    "[json.exception.type_error.302] type must be boolean, but is string");
 }
