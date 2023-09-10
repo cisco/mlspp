@@ -8,6 +8,44 @@ using nlohmann::json;
 
 namespace MLS_NAMESPACE::hpke {
 
+static const std::string name_attr = "name";
+static const std::string sub_attr = "sub";
+static const std::string given_name_attr = "given_name";
+static const std::string family_name_attr = "family_name";
+static const std::string middle_name_attr = "middle_name";
+static const std::string nickname_attr = "nickname";
+static const std::string preferred_username_attr = "preferred_username";
+static const std::string profile_attr = "profile";
+static const std::string picture_attr = "picture";
+static const std::string website_attr = "website";
+static const std::string email_attr = "email";
+static const std::string email_verified_attr = "email_verified";
+static const std::string gender_attr = "gender";
+static const std::string birthdate_attr = "birthdate";
+static const std::string zoneinfo_attr = "zoneinfo";
+static const std::string locale_attr = "locale";
+static const std::string phone_number_attr = "phone_number";
+static const std::string phone_number_verified_attr = "phone_number_verified";
+static const std::string address_attr = "address";
+static const std::string address_formatted_attr = "formatted";
+static const std::string address_street_address_attr = "street_address";
+static const std::string address_locality_attr = "locality";
+static const std::string address_region_attr = "region";
+static const std::string address_postal_code_attr = "postal_code";
+static const std::string address_country_attr = "country";
+static const std::string updated_at_attr = "updated_at";
+
+template<typename T>
+static std::optional<T>
+get_optional(const json& json_object, const std::string& field_name)
+{
+  if (!json_object.contains(field_name)) {
+    return std::nullopt;
+  }
+
+  return { json_object.at(field_name).get<T>() };
+}
+
 ///
 /// ParsedCredential
 ///
@@ -130,7 +168,7 @@ struct UserInfoVC::ParsedCredential
   std::chrono::system_clock::time_point not_after;  // `exp`
 
   // Credential subject fields
-  std::map<std::string, std::string> credential_subject;
+  UserInfoClaims credential_subject;
   Signature::PublicJWK public_key;
 
   // Signature verification information
@@ -142,7 +180,7 @@ struct UserInfoVC::ParsedCredential
                    std::string issuer_in,
                    std::chrono::system_clock::time_point not_before_in,
                    std::chrono::system_clock::time_point not_after_in,
-                   std::map<std::string, std::string> credential_subject_in,
+                   UserInfoClaims credential_subject_in,
                    Signature::PublicJWK&& public_key_in,
                    bytes to_be_signed_in,
                    bytes signature_in)
@@ -222,7 +260,7 @@ struct UserInfoVC::ParsedCredential
       epoch_time(payload.at("nbf").get<int64_t>()),
       epoch_time(payload.at("exp").get<int64_t>()),
 
-      vc.at("credentialSubject"),
+      UserInfoClaims::from_json(vc.at("credentialSubject")),
       std::move(public_key),
 
       to_be_signed,
@@ -234,6 +272,59 @@ struct UserInfoVC::ParsedCredential
     return signature_algorithm.verify(to_be_signed, signature, issuer_key);
   }
 };
+
+///
+/// UserInfoClaimsAddress
+///
+UserInfoClaimsAddress
+UserInfoClaimsAddress::from_json(const nlohmann::json& address_json)
+{
+  return {
+    get_optional<std::string>(address_json, address_formatted_attr),
+    get_optional<std::string>(address_json, address_street_address_attr),
+    get_optional<std::string>(address_json, address_locality_attr),
+    get_optional<std::string>(address_json, address_region_attr),
+    get_optional<std::string>(address_json, address_postal_code_attr),
+    get_optional<std::string>(address_json, address_country_attr),
+  };
+}
+
+///
+/// UserInfoClaims
+///
+UserInfoClaims
+UserInfoClaims::from_json(const nlohmann::json& cred_subject_json)
+{
+  std::optional<UserInfoClaimsAddress> address_opt = {};
+
+  if (cred_subject_json.contains(address_attr)) {
+    address_opt =
+      UserInfoClaimsAddress::from_json(cred_subject_json.at(address_attr));
+  }
+
+  return {
+    get_optional<std::string>(cred_subject_json, sub_attr),
+    get_optional<std::string>(cred_subject_json, name_attr),
+    get_optional<std::string>(cred_subject_json, given_name_attr),
+    get_optional<std::string>(cred_subject_json, family_name_attr),
+    get_optional<std::string>(cred_subject_json, middle_name_attr),
+    get_optional<std::string>(cred_subject_json, nickname_attr),
+    get_optional<std::string>(cred_subject_json, preferred_username_attr),
+    get_optional<std::string>(cred_subject_json, profile_attr),
+    get_optional<std::string>(cred_subject_json, picture_attr),
+    get_optional<std::string>(cred_subject_json, website_attr),
+    get_optional<std::string>(cred_subject_json, email_attr),
+    get_optional<bool>(cred_subject_json, email_verified_attr),
+    get_optional<std::string>(cred_subject_json, gender_attr),
+    get_optional<std::string>(cred_subject_json, birthdate_attr),
+    get_optional<std::string>(cred_subject_json, zoneinfo_attr),
+    get_optional<std::string>(cred_subject_json, locale_attr),
+    get_optional<std::string>(cred_subject_json, phone_number_attr),
+    get_optional<bool>(cred_subject_json, phone_number_verified_attr),
+    address_opt,
+    get_optional<uint64_t>(cred_subject_json, updated_at_attr),
+  };
+}
 
 ///
 /// UserInfoVC
@@ -263,7 +354,13 @@ UserInfoVC::valid_from(const Signature::PublicKey& issuer_key) const
   return parsed_cred->verify(issuer_key);
 }
 
-std::map<std::string, std::string>
+const std::string&
+UserInfoVC::raw_credential() const
+{
+  return raw;
+}
+
+const UserInfoClaims&
 UserInfoVC::subject() const
 {
   return parsed_cred->credential_subject;
