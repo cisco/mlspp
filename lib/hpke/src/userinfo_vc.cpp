@@ -253,54 +253,39 @@ UserInfoClaims::from_json(const std::string& cred_subject)
 
   // create the UserInfoClaims object
   return std::make_shared<UserInfoClaims>(UserInfoClaims({
-    .sub = cred_subject_json.value<std::string>(UserInfoClaims::sub_attr, ""),
-    .name = cred_subject_json.value<std::string>(UserInfoClaims::name_attr, ""),
-    .given_name =
-      cred_subject_json.value<std::string>(UserInfoClaims::given_name_attr, ""),
-    .family_name = cred_subject_json.value<std::string>(
-      UserInfoClaims::family_name_attr, ""),
-    .middle_name = cred_subject_json.value<std::string>(
-      UserInfoClaims::middle_name_attr, ""),
-    .nickname =
-      cred_subject_json.value<std::string>(UserInfoClaims::nickname_attr, ""),
-    .preferred_username = cred_subject_json.value<std::string>(
+    cred_subject_json.value<std::string>(UserInfoClaims::sub_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::name_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::given_name_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::family_name_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::middle_name_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::nickname_attr, ""),
+    cred_subject_json.value<std::string>(
       UserInfoClaims::preferred_username_attr, ""),
-    .profile =
-      cred_subject_json.value<std::string>(UserInfoClaims::profile_attr, ""),
-    .picture =
-      cred_subject_json.value<std::string>(UserInfoClaims::picture_attr, ""),
-    .website =
-      cred_subject_json.value<std::string>(UserInfoClaims::website_attr, ""),
-    .email =
-      cred_subject_json.value<std::string>(UserInfoClaims::email_attr, ""),
-    .email_verified =
-      cred_subject_json.value<bool>(UserInfoClaims::email_verified_attr, false),
-    .gender =
-      cred_subject_json.value<std::string>(UserInfoClaims::gender_attr, ""),
-    .birthdate =
-      cred_subject_json.value<std::string>(UserInfoClaims::birthdate_attr, ""),
-    .zoneinfo =
-      cred_subject_json.value<std::string>(UserInfoClaims::zoneinfo_attr, ""),
-    .locale =
-      cred_subject_json.value<std::string>(UserInfoClaims::locale_attr, ""),
-    .phone_number = cred_subject_json.value<std::string>(
-      UserInfoClaims::phone_number_attr, ""),
-    .phone_number_verified = cred_subject_json.value<bool>(
-      UserInfoClaims::phone_number_verified_attr, false),
-    .address_formatted = cred_subject_address_json.value<std::string>(
+    cred_subject_json.value<std::string>(UserInfoClaims::profile_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::picture_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::website_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::email_attr, ""),
+    cred_subject_json.value<bool>(UserInfoClaims::email_verified_attr, false),
+    cred_subject_json.value<std::string>(UserInfoClaims::gender_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::birthdate_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::zoneinfo_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::locale_attr, ""),
+    cred_subject_json.value<std::string>(UserInfoClaims::phone_number_attr, ""),
+    cred_subject_json.value<bool>(UserInfoClaims::phone_number_verified_attr,
+                                  false),
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_formatted_attr, ""),
-    .address_street_address = cred_subject_address_json.value<std::string>(
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_street_address_attr, ""),
-    .address_locality = cred_subject_address_json.value<std::string>(
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_locality_attr, ""),
-    .address_region = cred_subject_address_json.value<std::string>(
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_region_attr, ""),
-    .address_postal_code = cred_subject_address_json.value<std::string>(
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_postal_code_attr, ""),
-    .address_country = cred_subject_address_json.value<std::string>(
+    cred_subject_address_json.value<std::string>(
       UserInfoClaims::address_country_attr, ""),
-    .updated_at =
-      cred_subject_json.value<uint64_t>(UserInfoClaims::updated_at_attr, 0),
+    cred_subject_json.value<uint64_t>(UserInfoClaims::updated_at_attr, 0),
   }));
 }
 
