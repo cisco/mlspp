@@ -130,7 +130,7 @@ TEST_CASE("UserInfoVC Parsing and Validation")
   CHECK(vc.not_after().time_since_epoch() == known_not_after);
   CHECK(vc.public_key() == known_subject_jwk);
 
-  const auto subject = vc.subject();
+  const auto& subject = vc.subject();
   CHECK(subject.sub.value_or("") == known_subject.at("sub"));
 
   CHECK(vc.subject().name.value_or("") == known_subject.at("name"));
