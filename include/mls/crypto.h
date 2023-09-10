@@ -212,10 +212,6 @@ struct PublicJWK;
 
 struct SignaturePublicKey
 {
-  // XXX(RLB) It would be nice to wrap this return value as a struct, but that
-  // results in a compiler error "field has incomplete type".
-  static PublicJWK parse_jwk(const std::string& jwk_json);
-
   static SignaturePublicKey from_jwk(CipherSuite suite,
                                      const std::string& json_str);
 
@@ -235,6 +231,8 @@ struct PublicJWK {
   SignatureScheme signature_scheme;
   std::optional<std::string> key_id;
   SignaturePublicKey public_key;
+
+  static PublicJWK parse(const std::string& jwk_json);
 };
 
 struct SignaturePrivateKey
