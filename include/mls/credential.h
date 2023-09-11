@@ -7,7 +7,7 @@
 namespace MLS_NAMESPACE {
 
 namespace hpke {
-  struct UserInfoVC;
+struct UserInfoVC;
 }
 
 // struct {
@@ -68,10 +68,13 @@ struct UserInfoVCCredential
   bool valid_for(const SignaturePublicKey& pub) const;
   bool valid_from(const PublicJWK& pub) const;
 
-  friend tls::ostream operator<<(tls::ostream& str, const UserInfoVCCredential& obj);
+  friend tls::ostream operator<<(tls::ostream& str,
+                                 const UserInfoVCCredential& obj);
   friend tls::istream operator>>(tls::istream& str, UserInfoVCCredential& obj);
-  friend bool operator==(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs);
-  friend bool operator!=(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs);
+  friend bool operator==(const UserInfoVCCredential& lhs,
+                         const UserInfoVCCredential& rhs);
+  friend bool operator!=(const UserInfoVCCredential& lhs,
+                         const UserInfoVCCredential& rhs);
 
 private:
   std::shared_ptr<hpke::UserInfoVC> _vc;

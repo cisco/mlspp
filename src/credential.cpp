@@ -118,7 +118,8 @@ operator==(const X509Credential& lhs, const X509Credential& rhs)
 UserInfoVCCredential::UserInfoVCCredential(std::string userinfo_vc_jwt_in)
   : userinfo_vc_jwt(std::move(userinfo_vc_jwt_in))
   , _vc(std::make_shared<hpke::UserInfoVC>(userinfo_vc_jwt))
-{}
+{
+}
 
 bool
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -140,27 +141,32 @@ UserInfoVCCredential::valid_from(const PublicJWK& pub) const
   return _vc->valid_from(*sig_pub);
 }
 
-tls::ostream operator<<(tls::ostream& str, const UserInfoVCCredential& obj) {
+tls::ostream
+operator<<(tls::ostream& str, const UserInfoVCCredential& obj)
+{
   return str << from_ascii(obj.userinfo_vc_jwt);
 }
 
-tls::istream operator>>(tls::istream& str, UserInfoVCCredential& obj) {
+tls::istream
+operator>>(tls::istream& str, UserInfoVCCredential& obj)
+{
   auto jwt = bytes{};
   str >> jwt;
   obj = UserInfoVCCredential(to_ascii(jwt));
   return str;
 }
 
-bool operator==(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs) {
+bool
+operator==(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs)
+{
   return lhs.userinfo_vc_jwt == rhs.userinfo_vc_jwt;
 }
 
-bool operator!=(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs) {
+bool
+operator!=(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs)
+{
   return !(lhs == rhs);
 }
-
-
-
 
 ///
 /// CredentialBinding and MultiCredential

@@ -227,7 +227,8 @@ struct SignaturePublicKey
   TLS_SERIALIZABLE(data)
 };
 
-struct PublicJWK {
+struct PublicJWK
+{
   SignatureScheme signature_scheme;
   std::optional<std::string> key_id;
   SignaturePublicKey public_key;
