@@ -113,7 +113,7 @@ TEST_CASE("Signature Key JWK Import/Export")
     "crv": "Ed25519",
     "kid": "059fc2ee-5ef6-456a-91d8-49c422c772b2",
     "x": "miljqilAZV2yFkqIBhrxhvt2wIMvPtkNEFzuziEGOtI"
-  })";
+  })"s;
 
   const auto known_scheme = SignatureScheme::ed25519;
   const auto known_key_id = std::string("059fc2ee-5ef6-456a-91d8-49c422c772b2");

@@ -70,8 +70,8 @@ struct UserInfoVCCredential
 
   friend tls::ostream operator<<(tls::ostream& str, const UserInfoVCCredential& obj);
   friend tls::istream operator>>(tls::istream& str, UserInfoVCCredential& obj);
-  friend bool operator==(const UserInfoVCCredential& str, const UserInfoVCCredential& obj);
-  friend bool operator!=(const UserInfoVCCredential& str, const UserInfoVCCredential& obj);
+  friend bool operator==(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs);
+  friend bool operator!=(const UserInfoVCCredential& lhs, const UserInfoVCCredential& rhs);
 
 private:
   std::shared_ptr<hpke::UserInfoVC> _vc;
