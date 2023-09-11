@@ -208,8 +208,6 @@ extern const std::string group_info;
 extern const std::string multi_credential;
 } // namespace sign_label
 
-struct PublicJWK;
-
 struct SignaturePublicKey
 {
   static SignaturePublicKey from_jwk(CipherSuite suite,
