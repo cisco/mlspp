@@ -10,6 +10,7 @@ on:
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_GENERATOR: Ninja
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_COMMIT_ID: 962e5e39f8a25f42522f51fffc574e05a3efd26b
 
