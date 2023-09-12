@@ -106,6 +106,24 @@ TEST_CASE("Signature Key JWK Import/Export")
     const auto decoded_pub = SignaturePublicKey::from_jwk(suite, encoded_pub);
     REQUIRE(decoded_pub == pub);
   }
+
+  // Test PublicJWK parsing
+  const auto full_jwk = R"({
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "kid": "059fc2ee-5ef6-456a-91d8-49c422c772b2",
+    "x": "miljqilAZV2yFkqIBhrxhvt2wIMvPtkNEFzuziEGOtI"
+  })"s;
+
+  const auto known_scheme = SignatureScheme::ed25519;
+  const auto known_key_id = std::string("059fc2ee-5ef6-456a-91d8-49c422c772b2");
+  const auto knwon_pub_data = from_hex(
+    "9a2963aa2940655db2164a88061af186fb76c0832f3ed90d105ceece21063ad2");
+
+  const auto jwk = PublicJWK::parse(full_jwk);
+  REQUIRE(jwk.signature_scheme == known_scheme);
+  REQUIRE(jwk.key_id == known_key_id);
+  REQUIRE(jwk.public_key == SignaturePublicKey{ knwon_pub_data });
 }
 
 TEST_CASE("Crypto Interop")

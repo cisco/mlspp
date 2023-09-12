@@ -65,8 +65,9 @@ public:
   UserInfoVC& operator=(const UserInfoVC& other) = default;
   UserInfoVC& operator=(UserInfoVC&& other) = default;
 
+  const Signature& signature_algorithm() const;
   std::string issuer() const;
-  std::string key_id() const;
+  std::optional<std::string> key_id() const;
   std::chrono::system_clock::time_point not_before() const;
   std::chrono::system_clock::time_point not_after() const;
   const std::string& raw_credential() const;

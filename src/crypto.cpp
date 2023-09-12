@@ -400,6 +400,15 @@ SignaturePublicKey::to_jwk(CipherSuite suite) const
   return suite.sig().export_jwk(*pub);
 }
 
+PublicJWK
+PublicJWK::parse(const std::string& jwk_json)
+{
+  const auto parsed = Signature::parse_jwk(jwk_json);
+  const auto scheme = tls_signature_scheme(parsed.sig.id);
+  const auto pub_data = parsed.sig.serialize(*parsed.key);
+  return { scheme, parsed.key_id, { pub_data } };
+}
+
 SignaturePrivateKey
 SignaturePrivateKey::generate(CipherSuite suite)
 {

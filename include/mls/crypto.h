@@ -225,6 +225,15 @@ struct SignaturePublicKey
   TLS_SERIALIZABLE(data)
 };
 
+struct PublicJWK
+{
+  SignatureScheme signature_scheme;
+  std::optional<std::string> key_id;
+  SignaturePublicKey public_key;
+
+  static PublicJWK parse(const std::string& jwk_json);
+};
+
 struct SignaturePrivateKey
 {
   static SignaturePrivateKey generate(CipherSuite suite);
