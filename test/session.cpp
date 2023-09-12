@@ -224,7 +224,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 // XXX(RLB) BoringSSL rejects the leaf certificate here with the following error
 // code:
 //
-//   error:0b00008b:X.509 certificate routines:OPENSSL_internal:INVALID_FIELD_FOR_VERSION
+//   error:0b00008b:X.509 certificate
+//   routines:OPENSSL_internal:INVALID_FIELD_FOR_VERSION
 //
 // I have disabled the test for now, but given that the BoringSSL maintainers
 // know what they're doing, there's probably a legitimate issue here and we
@@ -237,7 +238,8 @@ TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 // I think we generated these with Go!)  So the solution appears to be
 // regenerating with an explicit version field set to v3.
 //
-// [1] https://boringssl.googlesource.com/boringssl.git/+/dd86e75b24dcfd47d4ee6b3e4cdce907389335b2%5E%21/
+// [1]
+// https://boringssl.googlesource.com/boringssl.git/+/dd86e75b24dcfd47d4ee6b3e4cdce907389335b2%5E%21/
 #if !defined(WITH_BORINGSSL)
 TEST_CASE("Session with X509 Credential")
 {

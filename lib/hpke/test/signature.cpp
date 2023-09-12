@@ -273,11 +273,12 @@ TEST_CASE("Signature Round-Trip")
 TEST_CASE("Signature Key JWK Round-Trip")
 {
   ensure_fips_if_required();
-  const std::vector<Signature::ID> ids{
+  const std::vector<Signature::ID> ids
+  {
     Signature::ID::P256_SHA256, Signature::ID::P384_SHA384,
-    Signature::ID::P521_SHA512, Signature::ID::Ed25519,
+      Signature::ID::P521_SHA512, Signature::ID::Ed25519,
 #if !defined(WITH_BORINGSSL)
-    Signature::ID::Ed448,
+      Signature::ID::Ed448,
 #endif
   };
 
