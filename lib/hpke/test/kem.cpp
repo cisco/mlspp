@@ -9,11 +9,14 @@ TEST_CASE("KEM round-trip")
 {
   ensure_fips_if_required();
 
-  const std::vector<KEM::ID> ids{ KEM::ID::DHKEM_P256_SHA256,
-                                  KEM::ID::DHKEM_P384_SHA384,
-                                  KEM::ID::DHKEM_P384_SHA384,
-                                  KEM::ID::DHKEM_P521_SHA512,
-                                  KEM::ID::DHKEM_X448_SHA512 };
+  const std::vector<KEM::ID> ids
+  {
+    KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
+      KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
+#if !defined(WITH_BORINGSSL)
+      KEM::ID::DHKEM_X448_SHA512,
+#endif
+  };
 
   const auto plaintext = from_hex("00010203");
   const auto seedS = from_hex("A0A0A0A0");

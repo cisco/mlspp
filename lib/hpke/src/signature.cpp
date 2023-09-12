@@ -39,8 +39,10 @@ struct GroupSignature : public Signature
         return Signature::ID::P521_SHA512;
       case Group::ID::Ed25519:
         return Signature::ID::Ed25519;
+#if !defined(WITH_BORINGSSL)
       case Group::ID::Ed448:
         return Signature::ID::Ed448;
+#endif
       default:
         throw std::runtime_error("Unsupported group");
     }
@@ -139,6 +141,7 @@ Signature::get<Signature::ID::Ed25519>()
   return instance;
 }
 
+#if !defined(WITH_BORINGSSL)
 template<>
 const Signature&
 Signature::get<Signature::ID::Ed448>()
@@ -146,6 +149,7 @@ Signature::get<Signature::ID::Ed448>()
   static const auto instance = GroupSignature(Group::get<Group::ID::Ed448>());
   return instance;
 }
+#endif
 
 template<>
 const Signature&

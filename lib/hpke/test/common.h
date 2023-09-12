@@ -18,6 +18,9 @@ fips_disable(Signature::ID id);
 const Signature&
 select_signature(Signature::ID id);
 
+bool
+supported_kem(KEM::ID id);
+
 const KEM&
 select_kem(KEM::ID id);
 

@@ -74,8 +74,10 @@ endif()
 
 set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../boringssl/")
 set(OPENSSL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../boringssl/include")
-set(OPENSSL_CRYPTO_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/../boringssl/build/crypto/libcrypto.a")
+set(OPENSSL_CRYPTO_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/../boringssl/build/crypto/libcrypto.a")
 find_package(OpenSSL REQUIRED)
+add_compile_definitions(WITH_BORINGSSL)
+add_compile_options(-Wno-gnu-anonymous-struct -Wno-nested-anon-types)
 
 #find_package(OpenSSL REQUIRED)
 #if ( OPENSSL_FOUND )

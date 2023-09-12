@@ -227,13 +227,22 @@ struct Certificate::ParsedCertificate
 
   static Signature::ID public_key_algorithm(X509* x509)
   {
-    switch (EVP_PKEY_base_id(X509_get0_pubkey(x509))) {
+#if WITH_BORINGSSL
+    const auto pub = make_typed_unique(X509_get_pubkey(x509));
+    const auto* pub_ptr = pub.get();
+#else
+    const auto* pub_ptr = X509_get0_pubkey(x509);
+#endif
+
+    switch (EVP_PKEY_base_id(pub_ptr)) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
+#if !defined(WITH_BORINGSSL)
       case EVP_PKEY_ED448:
         return Signature::ID::Ed448;
+#endif
       case EVP_PKEY_EC: {
-        auto key_size = EVP_PKEY_bits(X509_get0_pubkey(x509));
+        auto key_size = EVP_PKEY_bits(pub_ptr);
         switch (key_size) {
           case 256:
             return Signature::ID::P256_SHA256;
@@ -260,8 +269,10 @@ struct Certificate::ParsedCertificate
     switch (nid) {
       case EVP_PKEY_ED25519:
         return Signature::ID::Ed25519;
+#if !defined(WITH_BORINGSSL)
       case EVP_PKEY_ED448:
         return Signature::ID::Ed448;
+#endif
       case NID_ecdsa_with_SHA256:
         return Signature::ID::P256_SHA256;
       case NID_ecdsa_with_SHA384:
