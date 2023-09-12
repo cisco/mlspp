@@ -1,9 +1,9 @@
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
-using namespace hpke;
+using namespace MLS_NAMESPACE::hpke;
 
 #include <bytes/bytes.h>
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
 void
 ensure_fips_if_required();

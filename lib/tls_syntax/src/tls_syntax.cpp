@@ -1,7 +1,8 @@
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 
 // NOLINTNEXTLINE(llvmlibc-implementation-in-namespace)
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
 void
 ostream::write_raw(const std::vector<uint8_t>& bytes)
@@ -175,4 +176,4 @@ varint::decode(istream& str, uint64_t& val)
   return str;
 }
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

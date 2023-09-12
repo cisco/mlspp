@@ -8,8 +8,9 @@
 #else
 #include <variant>
 #endif // VARIANT_COMPAT
+#include <namespace.h>
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
 // To balance backward-compatibility with macOS 10.11 with forward-compatibility
 // with future versions of C++, we use `mpark::variant` or `std::variant` as
@@ -65,4 +66,4 @@ get(const std::optional<T>&& opt)
 }
 
 } // namespace opt
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

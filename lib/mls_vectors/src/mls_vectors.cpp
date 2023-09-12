@@ -7,7 +7,7 @@
 
 namespace mls_vectors {
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 ///
 /// Assertions for verifying test vectors
@@ -248,7 +248,7 @@ PseudoRandom::PseudoRandom(CipherSuite suite, const std::string& label)
 
 // XXX(RLB): This is a hack to get the tests working in the right format.  In
 // reality, the tree math functions should be updated to be fallible.
-std::optional<mls::NodeIndex>
+std::optional<MLS_NAMESPACE::NodeIndex>
 TreeMathTestVector::null_if_invalid(NodeIndex input, NodeIndex answer) const
 {
   // For some invalid cases (e.g., leaf.left()), we currently return the node
@@ -476,7 +476,7 @@ CryptoBasicsTestVector::verify() const
 /// SecretTreeTestVector
 ///
 
-SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite,
+SecretTreeTestVector::SenderData::SenderData(MLS_NAMESPACE::CipherSuite suite,
                                              PseudoRandom::Generator&& prg)
   : sender_data_secret(prg.secret("sender_data_secret"))
   , ciphertext(prg.secret("ciphertext"))
@@ -488,7 +488,7 @@ SecretTreeTestVector::SenderData::SenderData(mls::CipherSuite suite,
 }
 
 std::optional<std::string>
-SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
+SecretTreeTestVector::SenderData::verify(MLS_NAMESPACE::CipherSuite suite) const
 {
   auto key_and_nonce =
     KeyScheduleEpoch::sender_data_keys(suite, sender_data_secret, ciphertext);
@@ -498,7 +498,7 @@ SecretTreeTestVector::SenderData::verify(mls::CipherSuite suite) const
 }
 
 SecretTreeTestVector::SecretTreeTestVector(
-  mls::CipherSuite suite,
+  MLS_NAMESPACE::CipherSuite suite,
   uint32_t n_leaves,
   const std::vector<uint32_t>& generations)
   : PseudoRandom(suite, "secret-tree")
@@ -820,7 +820,7 @@ MessageProtectionTestVector::group_context() const
 
 MLSMessage
 MessageProtectionTestVector::protect_pub(
-  const mls::GroupContent::RawContent& raw_content) const
+  const MLS_NAMESPACE::GroupContent::RawContent& raw_content) const
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
@@ -828,7 +828,7 @@ MessageProtectionTestVector::protect_pub(
   auto content =
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_plaintext,
+  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_public_message,
                                                  content,
                                                  cipher_suite,
                                                  signature_priv,
@@ -844,7 +844,7 @@ MessageProtectionTestVector::protect_pub(
 
 MLSMessage
 MessageProtectionTestVector::protect_priv(
-  const mls::GroupContent::RawContent& raw_content)
+  const MLS_NAMESPACE::GroupContent::RawContent& raw_content)
 {
   auto sender = Sender{ MemberSender{ LeafIndex{ 1 } } };
   auto authenticated_data = bytes{};
@@ -853,11 +853,12 @@ MessageProtectionTestVector::protect_priv(
   auto content =
     GroupContent{ group_id, epoch, sender, authenticated_data, raw_content };
 
-  auto auth_content = AuthenticatedContent::sign(WireFormat::mls_ciphertext,
-                                                 content,
-                                                 cipher_suite,
-                                                 signature_priv,
-                                                 group_context());
+  auto auth_content =
+    AuthenticatedContent::sign(WireFormat::mls_private_message,
+                               content,
+                               cipher_suite,
+                               signature_priv,
+                               group_context());
   if (content.content_type() == ContentType::commit) {
     auto confirmation_tag = prg.secret("confirmation_tag");
     auth_content.set_confirmation_tag(confirmation_tag);
@@ -914,7 +915,8 @@ to_psk_w_secret(const std::vector<PSKSecretTestVector::PSK>& psks)
   return pskws;
 }
 
-PSKSecretTestVector::PSKSecretTestVector(mls::CipherSuite suite, size_t n_psks)
+PSKSecretTestVector::PSKSecretTestVector(MLS_NAMESPACE::CipherSuite suite,
+                                         size_t n_psks)
   : PseudoRandom(suite, "psk_secret")
   , cipher_suite(suite)
   , psks(n_psks)
@@ -972,7 +974,7 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   auto leaf_index = LeafIndex{ 0 };
 
   authenticated_content = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext,
+    WireFormat::mls_public_message,
     GroupContent{
       group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} },
     suite,
@@ -1229,7 +1231,13 @@ struct TreeTestCase
       auto path = pub.encap(sender_priv, context, joiner);
 
       // Process the UpdatePath at all the members
-      for (auto& [leaf, priv_state] : privs) {
+      for (auto& pair : privs) {
+        // XXX(RLB): It might seem like this could be done with a simple
+        // destructuring assignment, either here or in the `for` clause above.
+        // However, either of these options cause clang-tidy to segfault when
+        // evaulating the "bugprone-unchecked-optional-access" lint.
+        const auto& leaf = pair.first;
+        auto& priv_state = pair.second;
         if (leaf == from) {
           priv_state =
             PrivateState{ priv_state.sig_priv, sender_priv, { from } };
@@ -1379,7 +1387,7 @@ struct TreeTestCase
 ///
 /// TreeHashTestVector
 ///
-TreeHashTestVector::TreeHashTestVector(mls::CipherSuite suite,
+TreeHashTestVector::TreeHashTestVector(MLS_NAMESPACE::CipherSuite suite,
                                        TreeStructure tree_structure)
   : PseudoRandom(suite, "tree-hashes")
   , cipher_suite(suite)
@@ -1442,9 +1450,11 @@ const std::vector<TreeOperationsTestVector::Scenario>
     Scenario::remove_right_edge, Scenario::remove_internal,
   };
 
-TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
-                                                   Scenario scenario)
+TreeOperationsTestVector::TreeOperationsTestVector(
+  MLS_NAMESPACE::CipherSuite suite,
+  Scenario scenario)
   : PseudoRandom(suite, "tree-operations")
+  , cipher_suite(suite)
   , proposal_sender(0)
 {
   auto init_priv = prg.hpke_key("init_key");
@@ -1474,6 +1484,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Add{ key_package } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.add_leaf(key_package.leaf_node);
@@ -1487,6 +1498,8 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
 
       tree_before = tc.pub;
       tree_before.blank_path(LeafIndex{ 4 });
+      tree_before.set_hash_all();
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.add_leaf(key_package.leaf_node);
@@ -1500,6 +1513,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Update{ key_package.leaf_node } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.update_leaf(proposal_sender, key_package.leaf_node);
@@ -1513,6 +1527,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Remove{ removed } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.blank_path(removed);
@@ -1527,6 +1542,7 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       proposal = Proposal{ Remove{ removed } };
 
       tree_before = tc.pub;
+      tree_hash_before = tree_before.root_hash();
 
       tree_after = tree_before;
       tree_after.blank_path(removed);
@@ -1534,12 +1550,20 @@ TreeOperationsTestVector::TreeOperationsTestVector(mls::CipherSuite suite,
       break;
     }
   }
+
+  tree_after.set_hash_all();
+  tree_hash_after = tree_after.root_hash();
 }
 
 std::optional<std::string>
-TreeOperationsTestVector::verify() const
+TreeOperationsTestVector::verify()
 {
+  tree_before.suite = cipher_suite;
+  tree_before.set_hash_all();
+
   auto tree = tree_before;
+  VERIFY_EQUAL("tree hash before", tree.root_hash(), tree_hash_before);
+
   auto apply = overloaded{
     [&](const Add& add) { tree.add_leaf(add.key_package.leaf_node); },
 
@@ -1560,6 +1584,9 @@ TreeOperationsTestVector::verify() const
   var::visit(apply, proposal.content);
   VERIFY_EQUAL("tree after", tree, tree_after);
 
+  tree.set_hash_all();
+  VERIFY_EQUAL("tree hash after", tree.root_hash(), tree_hash_after);
+
   return std::nullopt;
 }
 
@@ -1567,7 +1594,7 @@ TreeOperationsTestVector::verify() const
 /// TreeKEMTestVector
 ///
 
-TreeKEMTestVector::TreeKEMTestVector(mls::CipherSuite suite,
+TreeKEMTestVector::TreeKEMTestVector(MLS_NAMESPACE::CipherSuite suite,
                                      TreeStructure tree_structure)
   : PseudoRandom(suite, "treekem")
   , cipher_suite(suite)
@@ -1786,11 +1813,15 @@ MessagesTestVector::MessagesTestVector()
 
   auto version = ProtocolVersion::mls10;
   auto hpke_priv = prg.hpke_key("hpke_priv");
+  auto hpke_priv_2 = prg.hpke_key("hpke_priv_2");
   auto hpke_pub = hpke_priv.public_key;
+  auto hpke_pub_2 = hpke_priv_2.public_key;
   auto hpke_ct =
     HPKECiphertext{ prg.secret("kem_output"), prg.secret("ciphertext") };
   auto sig_priv = prg.signature_key("signature_priv");
+  auto sig_priv_2 = prg.signature_key("signature_priv_2");
   auto sig_pub = sig_priv.public_key;
+  auto sig_pub_2 = sig_priv_2.public_key;
 
   // KeyPackage and extensions
   auto cred = Credential::basic(user_id);
@@ -1802,6 +1833,14 @@ MessagesTestVector::MessagesTestVector()
                              Lifetime::create_default(),
                              ext_list,
                              sig_priv };
+  auto leaf_node_2 = LeafNode{ suite,
+                               hpke_pub_2,
+                               sig_pub_2,
+                               cred,
+                               Capabilities::create_default(),
+                               Lifetime::create_default(),
+                               ext_list,
+                               sig_priv_2 };
   auto key_package_obj = KeyPackage{ suite, hpke_pub, leaf_node, {}, sig_priv };
 
   auto leaf_node_update =
@@ -1813,7 +1852,7 @@ MessagesTestVector::MessagesTestVector()
 
   auto tree = TreeKEMPublicKey{ suite };
   tree.add_leaf(leaf_node);
-  tree.add_leaf(leaf_node);
+  tree.add_leaf(leaf_node_2);
   auto ratchet_tree_obj = RatchetTreeExtension{ tree };
 
   // Welcome and its substituents
@@ -1860,7 +1899,7 @@ MessagesTestVector::MessagesTestVector()
   auto membership_key = prg.secret("membership_key");
 
   auto content_auth_proposal = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext,
+    WireFormat::mls_public_message,
     { group_id, epoch, sender, {}, Proposal{ remove } },
     suite,
     sig_priv,
@@ -1869,7 +1908,7 @@ MessagesTestVector::MessagesTestVector()
     content_auth_proposal, suite, membership_key, group_context);
 
   auto content_auth_commit =
-    AuthenticatedContent::sign(WireFormat::mls_plaintext,
+    AuthenticatedContent::sign(WireFormat::mls_public_message,
                                { group_id, epoch, sender, {}, commit_obj },
                                suite,
                                sig_priv,
@@ -1880,7 +1919,7 @@ MessagesTestVector::MessagesTestVector()
 
   // PrivateMessage
   auto content_auth_application_obj = AuthenticatedContent::sign(
-    WireFormat::mls_ciphertext,
+    WireFormat::mls_private_message,
     { group_id, epoch, sender, {}, ApplicationData{} },
     suite,
     sig_priv,
@@ -1956,15 +1995,15 @@ MessagesTestVector::verify() const
   VERIFY_TLS_RTT_VAL("Public(Proposal)",
                      MLSMessage,
                      public_message_proposal,
-                     require_format(WireFormat::mls_plaintext));
+                     require_format(WireFormat::mls_public_message));
   VERIFY_TLS_RTT_VAL("Public(Commit)",
                      MLSMessage,
                      public_message_commit,
-                     require_format(WireFormat::mls_plaintext));
+                     require_format(WireFormat::mls_public_message));
   VERIFY_TLS_RTT_VAL("PrivateMessage",
                      MLSMessage,
                      private_message,
-                     require_format(WireFormat::mls_ciphertext));
+                     require_format(WireFormat::mls_private_message));
 
   return std::nullopt;
 }

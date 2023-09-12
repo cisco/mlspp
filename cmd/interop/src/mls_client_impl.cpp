@@ -4,7 +4,7 @@
 
 using grpc::StatusCode;
 using nlohmann::json;
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
 static inline std::string
 bytes_to_string(const std::vector<uint8_t>& data)
@@ -19,9 +19,9 @@ string_to_bytes(const std::string& str)
 }
 
 static inline std::string
-marshal_message(mls::MLSMessage&& msg)
+marshal_message(MLS_NAMESPACE::MLSMessage&& msg)
 {
-  return bytes_to_string(tls::marshal(msg));
+  return bytes_to_string(MLS_NAMESPACE::tls::marshal(msg));
 }
 
 template<typename T>
@@ -29,14 +29,14 @@ T
 unmarshal_message(const std::string& str)
 {
   auto data = string_to_bytes(str);
-  auto msg = tls::get<mls::MLSMessage>(data);
+  auto msg = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(data);
   return var::get<T>(msg.message);
 }
 
-static inline mls::CipherSuite
+static inline MLS_NAMESPACE::CipherSuite
 mls_suite(uint32_t suite_id)
 {
-  return static_cast<mls::CipherSuite::ID>(suite_id);
+  return static_cast<MLS_NAMESPACE::CipherSuite::ID>(suite_id);
 }
 
 // Map C++ exceptions to gRPC errors
@@ -84,7 +84,7 @@ MLSClientImpl::SupportedCiphersuites(
   SupportedCiphersuitesResponse* reply)
 {
   reply->clear_ciphersuites();
-  for (const auto suite : mls::all_supported_suites) {
+  for (const auto suite : MLS_NAMESPACE::all_supported_suites) {
     reply->add_ciphersuites(static_cast<uint32_t>(suite));
   }
   return Status::OK;
@@ -382,28 +382,30 @@ MLSClientImpl::HandleReInitWelcome(ServerContext* /* context */,
 
 // Factory for key packages
 MLSClientImpl::KeyPackageWithSecrets
-MLSClientImpl::new_key_package(mls::CipherSuite cipher_suite,
+MLSClientImpl::new_key_package(MLS_NAMESPACE::CipherSuite cipher_suite,
                                const bytes& identity)
 {
-  auto init_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto encryption_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic(identity);
+  auto init_priv = MLS_NAMESPACE::HPKEPrivateKey::generate(cipher_suite);
+  auto encryption_priv = MLS_NAMESPACE::HPKEPrivateKey::generate(cipher_suite);
+  auto signature_priv =
+    MLS_NAMESPACE::SignaturePrivateKey::generate(cipher_suite);
+  auto cred = MLS_NAMESPACE::Credential::basic(identity);
 
-  auto key_package = mls::KeyPackage(cipher_suite,
-                                     init_priv.public_key,
-                                     {
-                                       cipher_suite,
-                                       encryption_priv.public_key,
-                                       signature_priv.public_key,
-                                       cred,
-                                       mls::Capabilities::create_default(),
-                                       mls::Lifetime::create_default(),
-                                       {},
-                                       signature_priv,
-                                     },
-                                     {},
-                                     signature_priv);
+  auto key_package =
+    MLS_NAMESPACE::KeyPackage(cipher_suite,
+                              init_priv.public_key,
+                              {
+                                cipher_suite,
+                                encryption_priv.public_key,
+                                signature_priv.public_key,
+                                cred,
+                                MLS_NAMESPACE::Capabilities::create_default(),
+                                MLS_NAMESPACE::Lifetime::create_default(),
+                                {},
+                                signature_priv,
+                              },
+                              {},
+                              signature_priv);
   return { init_priv, encryption_priv, signature_priv, key_package };
 }
 
@@ -445,7 +447,7 @@ MLSClientImpl::Free(ServerContext* /* context */,
 uint32_t
 MLSClientImpl::store_join(KeyPackageWithSecrets&& kp_priv)
 {
-  auto join_id = tls::get<uint32_t>(kp_priv.key_package.ref());
+  auto join_id = MLS_NAMESPACE::tls::get<uint32_t>(kp_priv.key_package.ref());
   auto entry = CachedJoin{ std::move(kp_priv), {} };
   join_cache.emplace(std::make_pair(join_id, std::move(entry)));
   return join_id;
@@ -461,7 +463,7 @@ MLSClientImpl::load_join(uint32_t join_id)
 }
 
 // Cached group state
-mls::MessageOpts
+MLS_NAMESPACE::MessageOpts
 MLSClientImpl::CachedState::message_opts() const
 {
   return { encrypt_handshake, {}, 0 };
@@ -475,21 +477,23 @@ MLSClientImpl::CachedState::reset_pending()
 }
 
 std::string
-MLSClientImpl::CachedState::marshal(const mls::MLSMessage& msg)
+MLSClientImpl::CachedState::marshal(const MLS_NAMESPACE::MLSMessage& msg)
 {
-  return bytes_to_string(tls::marshal(msg));
+  return bytes_to_string(MLS_NAMESPACE::tls::marshal(msg));
 }
 
-mls::MLSMessage
+MLS_NAMESPACE::MLSMessage
 MLSClientImpl::CachedState::unmarshal(const std::string& wire)
 {
-  return tls::get<mls::MLSMessage>(string_to_bytes(wire));
+  return MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(
+    string_to_bytes(wire));
 }
 
 uint32_t
-MLSClientImpl::store_state(mls::State&& state, bool encrypt_handshake)
+MLSClientImpl::store_state(MLS_NAMESPACE::State&& state, bool encrypt_handshake)
 {
-  auto state_id = tls::get<uint32_t>(state.epoch_authenticator());
+  auto state_id =
+    MLS_NAMESPACE::tls::get<uint32_t>(state.epoch_authenticator());
   state_id += state.index().val;
 
   auto entry = CachedState{ std::move(state), encrypt_handshake, {}, {} };
@@ -507,9 +511,9 @@ MLSClientImpl::load_state(uint32_t state_id)
 }
 
 uint32_t
-MLSClientImpl::store_signer(mls::SignaturePrivateKey&& priv)
+MLSClientImpl::store_signer(MLS_NAMESPACE::SignaturePrivateKey&& priv)
 {
-  auto signer_id = tls::get<uint32_t>(priv.public_key.data);
+  auto signer_id = MLS_NAMESPACE::tls::get<uint32_t>(priv.public_key.data);
   auto entry = CachedSigner{ std::move(priv) };
   signer_cache.emplace(std::make_pair(signer_id, std::move(entry)));
   return signer_id;
@@ -525,7 +529,8 @@ MLSClientImpl::load_signer(uint32_t signer_id)
 }
 
 MLSClientImpl::CachedState*
-MLSClientImpl::find_state(const bytes& group_id, const mls::epoch_t epoch)
+MLSClientImpl::find_state(const bytes& group_id,
+                          const MLS_NAMESPACE::epoch_t epoch)
 {
   auto entry = std::find_if(
     state_cache.begin(), state_cache.end(), [&](const auto& entry) {
@@ -549,10 +554,10 @@ MLSClientImpl::remove_state(uint32_t state_id)
 
 uint32_t
 MLSClientImpl::store_reinit(KeyPackageWithSecrets&& kp_priv,
-                            mls::State::Tombstone&& tombstone,
+                            MLS_NAMESPACE::State::Tombstone&& tombstone,
                             bool encrypt_handshake)
 {
-  auto reinit_id = tls::get<uint32_t>(kp_priv.key_package.ref());
+  auto reinit_id = MLS_NAMESPACE::tls::get<uint32_t>(kp_priv.key_package.ref());
   auto entry =
     CachedReInit{ std::move(kp_priv), std::move(tombstone), encrypt_handshake };
   reinit_cache.emplace(std::make_pair(reinit_id, std::move(entry)));
@@ -580,10 +585,11 @@ MLSClientImpl::group_context_extensions_proposal(
   const GroupContextExtensionsProposalRequest* request,
   ProposalResponse* response)
 {
-  auto ext_list = mls::ExtensionList{};
+  auto ext_list = MLS_NAMESPACE::ExtensionList{};
   for (int i = 0; i < request->extensions_size(); i++) {
     auto ext = request->extensions(i);
-    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_type =
+      static_cast<MLS_NAMESPACE::Extension::Type>(ext.extension_type());
     auto ext_data = string_to_bytes(ext.extension_data());
     ext_list.add(ext_type, ext_data);
   }
@@ -595,12 +601,12 @@ MLSClientImpl::group_context_extensions_proposal(
   return Status::OK;
 }
 
-mls::LeafIndex
-MLSClientImpl::find_member(const mls::TreeKEMPublicKey& tree,
+MLS_NAMESPACE::LeafIndex
+MLSClientImpl::find_member(const MLS_NAMESPACE::TreeKEMPublicKey& tree,
                            const std::string& identity)
 {
   const auto id = string_to_bytes(identity);
-  auto index = mls::LeafIndex{ 0 };
+  auto index = MLS_NAMESPACE::LeafIndex{ 0 };
   for (; index < tree.size; index.val++) {
     const auto maybe_leaf = tree.leaf_node(index);
     if (!maybe_leaf) {
@@ -608,7 +614,7 @@ MLSClientImpl::find_member(const mls::TreeKEMPublicKey& tree,
     }
 
     const auto& leaf = opt::get(maybe_leaf);
-    const auto& basic = leaf.credential.get<mls::BasicCredential>();
+    const auto& basic = leaf.credential.get<MLS_NAMESPACE::BasicCredential>();
     if (basic.identity == id) {
       break;
     }
@@ -621,60 +627,63 @@ MLSClientImpl::find_member(const mls::TreeKEMPublicKey& tree,
   return index;
 }
 
-mls::Proposal
-MLSClientImpl::proposal_from_description(mls::CipherSuite suite,
-                                         const bytes& group_id,
-                                         const mls::TreeKEMPublicKey& tree,
-                                         const ProposalDescription& desc)
+MLS_NAMESPACE::Proposal
+MLSClientImpl::proposal_from_description(
+  MLS_NAMESPACE::CipherSuite suite,
+  const bytes& group_id,
+  const MLS_NAMESPACE::TreeKEMPublicKey& tree,
+  const ProposalDescription& desc)
 {
   if (desc.proposal_type() == "add") {
     const auto kp_msg_data = string_to_bytes(desc.key_package());
-    const auto kp_msg = tls::get<mls::MLSMessage>(kp_msg_data);
-    const auto kp = var::get<mls::KeyPackage>(kp_msg.message);
-    return { mls::Add{ kp } };
+    const auto kp_msg =
+      MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(kp_msg_data);
+    const auto kp = var::get<MLS_NAMESPACE::KeyPackage>(kp_msg.message);
+    return { MLS_NAMESPACE::Add{ kp } };
   }
 
   if (desc.proposal_type() == "remove") {
     const auto removed_index = find_member(tree, desc.removed_id());
-    return { mls::Remove{ removed_index } };
+    return { MLS_NAMESPACE::Remove{ removed_index } };
   }
 
   if (desc.proposal_type() == "externalPSK") {
     const auto external_psk_id = string_to_bytes(desc.psk_id());
-    const auto psk_id = mls::PreSharedKeyID{
-      { mls::ExternalPSK{ external_psk_id } },
-      mls::random_bytes(suite.secret_size()),
+    const auto psk_id = MLS_NAMESPACE::PreSharedKeyID{
+      { MLS_NAMESPACE::ExternalPSK{ external_psk_id } },
+      MLS_NAMESPACE::random_bytes(suite.secret_size()),
     };
-    return { mls::PreSharedKey{ psk_id } };
+    return { MLS_NAMESPACE::PreSharedKey{ psk_id } };
   }
 
   if (desc.proposal_type() == "resumptionPSK") {
     const auto epoch = desc.epoch_id();
-    const auto psk_id = mls::PreSharedKeyID{
-      { mls::ResumptionPSK{
-        mls::ResumptionPSKUsage::application, group_id, epoch } },
-      mls::random_bytes(suite.secret_size()),
+    const auto psk_id = MLS_NAMESPACE::PreSharedKeyID{
+      { MLS_NAMESPACE::ResumptionPSK{
+        MLS_NAMESPACE::ResumptionPSKUsage::application, group_id, epoch } },
+      MLS_NAMESPACE::random_bytes(suite.secret_size()),
     };
-    return { mls::PreSharedKey{ psk_id } };
+    return { MLS_NAMESPACE::PreSharedKey{ psk_id } };
   }
 
-  auto ext_list = mls::ExtensionList{};
+  auto ext_list = MLS_NAMESPACE::ExtensionList{};
   for (int i = 0; i < desc.extensions_size(); i++) {
     auto ext = desc.extensions(i);
-    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_type =
+      static_cast<MLS_NAMESPACE::Extension::Type>(ext.extension_type());
     auto ext_data = string_to_bytes(ext.extension_data());
     ext_list.add(ext_type, ext_data);
   }
 
   if (desc.proposal_type() == "groupContextExtensions") {
-    return { mls::GroupContextExtensions{ ext_list } };
+    return { MLS_NAMESPACE::GroupContextExtensions{ ext_list } };
   }
 
   if (desc.proposal_type() == "reinit") {
-    return { mls::ReInit{
+    return { MLS_NAMESPACE::ReInit{
       string_to_bytes(desc.group_id()),
-      mls::ProtocolVersion::mls10,
-      static_cast<mls::CipherSuite::ID>(desc.cipher_suite()),
+      MLS_NAMESPACE::ProtocolVersion::mls10,
+      static_cast<MLS_NAMESPACE::CipherSuite::ID>(desc.cipher_suite()),
       ext_list } };
   }
 
@@ -690,23 +699,23 @@ MLSClientImpl::create_group(const CreateGroupRequest* request,
   auto cipher_suite = mls_suite(request->cipher_suite());
   auto identity = string_to_bytes(request->identity());
 
-  auto leaf_priv = mls::HPKEPrivateKey::generate(cipher_suite);
-  auto sig_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  auto cred = mls::Credential::basic(identity);
+  auto leaf_priv = MLS_NAMESPACE::HPKEPrivateKey::generate(cipher_suite);
+  auto sig_priv = MLS_NAMESPACE::SignaturePrivateKey::generate(cipher_suite);
+  auto cred = MLS_NAMESPACE::Credential::basic(identity);
 
-  auto leaf_node = mls::LeafNode{
+  auto leaf_node = MLS_NAMESPACE::LeafNode{
     cipher_suite,
     leaf_priv.public_key,
     sig_priv.public_key,
     cred,
-    mls::Capabilities::create_default(),
-    mls::Lifetime::create_default(),
+    MLS_NAMESPACE::Capabilities::create_default(),
+    MLS_NAMESPACE::Lifetime::create_default(),
     {},
     sig_priv,
   };
 
-  auto state =
-    mls::State(group_id, cipher_suite, leaf_priv, sig_priv, leaf_node, {});
+  auto state = MLS_NAMESPACE::State(
+    group_id, cipher_suite, leaf_priv, sig_priv, leaf_node, {});
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
 
   response->set_state_id(state_id);
@@ -726,7 +735,8 @@ MLSClientImpl::create_key_package(const CreateKeyPackageRequest* request,
   response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
   response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
 
-  auto key_package = tls::marshal(mls::MLSMessage{ kp_priv.key_package });
+  auto key_package = MLS_NAMESPACE::tls::marshal(
+    MLS_NAMESPACE::MLSMessage{ kp_priv.key_package });
   response->set_key_package(bytes_to_string(key_package));
 
   auto join_id = store_join(std::move(kp_priv));
@@ -744,20 +754,21 @@ MLSClientImpl::join_group(const JoinGroupRequest* request,
     return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
   }
 
-  auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
-  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto welcome = unmarshal_message<MLS_NAMESPACE::Welcome>(request->welcome());
+  auto ratchet_tree = std::optional<MLS_NAMESPACE::TreeKEMPublicKey>{};
   auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
   if (!ratchet_tree_data.empty()) {
-    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+    ratchet_tree = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::TreeKEMPublicKey>(
+      ratchet_tree_data);
   }
 
-  auto state = mls::State(join->kp_priv.init_priv,
-                          std::move(join->kp_priv.encryption_priv),
-                          std::move(join->kp_priv.signature_priv),
-                          join->kp_priv.key_package,
-                          welcome,
-                          ratchet_tree,
-                          join->external_psks);
+  auto state = MLS_NAMESPACE::State(join->kp_priv.init_priv,
+                                    std::move(join->kp_priv.encryption_priv),
+                                    std::move(join->kp_priv.signature_priv),
+                                    join->kp_priv.key_package,
+                                    welcome,
+                                    ratchet_tree,
+                                    join->external_psks);
 
   auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), request->encrypt_handshake());
@@ -772,45 +783,47 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
                              ExternalJoinResponse* response)
 {
   const auto group_info_msg =
-    unmarshal_message<mls::GroupInfo>(request->group_info());
+    unmarshal_message<MLS_NAMESPACE::GroupInfo>(request->group_info());
   const auto suite = group_info_msg.group_context.cipher_suite;
 
-  auto init_priv = mls::HPKEPrivateKey::generate(suite);
-  auto leaf_priv = mls::HPKEPrivateKey::generate(suite);
-  auto sig_priv = mls::SignaturePrivateKey::generate(suite);
+  auto init_priv = MLS_NAMESPACE::HPKEPrivateKey::generate(suite);
+  auto leaf_priv = MLS_NAMESPACE::HPKEPrivateKey::generate(suite);
+  auto sig_priv = MLS_NAMESPACE::SignaturePrivateKey::generate(suite);
   auto identity = string_to_bytes(request->identity());
-  auto cred = mls::Credential::basic(identity);
+  auto cred = MLS_NAMESPACE::Credential::basic(identity);
 
-  auto leaf = mls::LeafNode{
+  auto leaf = MLS_NAMESPACE::LeafNode{
     suite,
     leaf_priv.public_key,
     sig_priv.public_key,
     cred,
-    mls::Capabilities::create_default(),
-    mls::Lifetime::create_default(),
+    MLS_NAMESPACE::Capabilities::create_default(),
+    MLS_NAMESPACE::Lifetime::create_default(),
     {},
     sig_priv,
   };
 
-  auto kp = mls::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
+  auto kp =
+    MLS_NAMESPACE::KeyPackage(suite, init_priv.public_key, leaf, {}, sig_priv);
 
   // Import an external tree if present
-  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree = std::optional<MLS_NAMESPACE::TreeKEMPublicKey>{};
   auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
   if (!ratchet_tree_data.empty()) {
-    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+    ratchet_tree = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::TreeKEMPublicKey>(
+      ratchet_tree_data);
   }
 
   // If required, find our prior appearance and remove it
-  auto remove_prior = std::optional<mls::LeafIndex>{};
+  auto remove_prior = std::optional<MLS_NAMESPACE::LeafIndex>{};
   if (request->remove_prior()) {
     // Find the tree we're going to look at
     // XXX(RLB): This replicates logic in State::import_tree, but we need to
     // do it out here since this is where the knowledge of which leaf to
     // remove resides.
-    auto tree = mls::TreeKEMPublicKey(suite);
+    auto tree = MLS_NAMESPACE::TreeKEMPublicKey(suite);
     auto maybe_tree_extn =
-      group_info_msg.extensions.find<mls::RatchetTreeExtension>();
+      group_info_msg.extensions.find<MLS_NAMESPACE::RatchetTreeExtension>();
     if (ratchet_tree) {
       tree = opt::get(ratchet_tree);
     } else if (maybe_tree_extn) {
@@ -820,14 +833,14 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
     }
 
     // Scan through to find a matching identity
-    for (auto i = mls::LeafIndex{ 0 }; i < tree.size; i.val++) {
+    for (auto i = MLS_NAMESPACE::LeafIndex{ 0 }; i < tree.size; i.val++) {
       const auto maybe_leaf = tree.leaf_node(i);
       if (!maybe_leaf) {
         continue;
       }
 
       const auto& leaf = opt::get(maybe_leaf);
-      const auto& cred = leaf.credential.get<mls::BasicCredential>();
+      const auto& cred = leaf.credential.get<MLS_NAMESPACE::BasicCredential>();
       if (cred.identity != identity) {
         continue;
       }
@@ -850,15 +863,15 @@ MLSClientImpl::external_join(const ExternalJoinRequest* request,
   }
 
   auto encrypt = request->encrypt_handshake();
-  auto leaf_secret = mls::random_bytes(suite.secret_size());
-  auto [commit, state] = mls::State::external_join(leaf_secret,
-                                                   sig_priv,
-                                                   kp,
-                                                   group_info_msg,
-                                                   ratchet_tree,
-                                                   { {}, encrypt, 0 },
-                                                   remove_prior,
-                                                   psks);
+  auto leaf_secret = MLS_NAMESPACE::random_bytes(suite.secret_size());
+  auto [commit, state] = MLS_NAMESPACE::State::external_join(leaf_secret,
+                                                             sig_priv,
+                                                             kp,
+                                                             group_info_msg,
+                                                             ratchet_tree,
+                                                             { {}, encrypt, 0 },
+                                                             remove_prior,
+                                                             psks);
   auto epoch_authenticator = state.epoch_authenticator();
   auto state_id = store_state(std::move(state), encrypt);
 
@@ -880,7 +893,8 @@ MLSClientImpl::group_info(CachedState& entry,
 
   response->set_group_info(marshal_message(group_info));
   if (!inline_tree) {
-    auto ratchet_tree = bytes_to_string(tls::marshal(entry.state.tree()));
+    auto ratchet_tree =
+      bytes_to_string(MLS_NAMESPACE::tls::marshal(entry.state.tree()));
     response->set_ratchet_tree(ratchet_tree);
   }
 
@@ -928,11 +942,12 @@ MLSClientImpl::unprotect(CachedState& entry,
                          UnprotectResponse* response)
 {
   auto ct_data = string_to_bytes(request->ciphertext());
-  auto ct = tls::get<mls::MLSMessage>(ct_data);
+  auto ct = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(ct_data);
 
   // Locate the right epoch to decrypt with
   const auto group_id = entry.state.group_id();
-  const auto epoch = var::get<mls::PrivateMessage>(ct.message).get_epoch();
+  const auto epoch =
+    var::get<MLS_NAMESPACE::PrivateMessage>(ct.message).get_epoch();
 
   auto* state = &entry.state;
   if (entry.state.epoch() != epoch) {
@@ -958,7 +973,8 @@ MLSClientImpl::add_proposal(CachedState& entry,
                             const AddProposalRequest* request,
                             ProposalResponse* response)
 {
-  auto key_package = unmarshal_message<mls::KeyPackage>(request->key_package());
+  auto key_package =
+    unmarshal_message<MLS_NAMESPACE::KeyPackage>(request->key_package());
   auto message = entry.state.add(key_package, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
@@ -970,7 +986,8 @@ MLSClientImpl::update_proposal(CachedState& entry,
                                const UpdateProposalRequest* /* request */,
                                ProposalResponse* response)
 {
-  auto leaf_priv = mls::HPKEPrivateKey::generate(entry.state.cipher_suite());
+  auto leaf_priv =
+    MLS_NAMESPACE::HPKEPrivateKey::generate(entry.state.cipher_suite());
   auto message = entry.state.update(leaf_priv, {}, entry.message_opts());
 
   response->set_proposal(entry.marshal(message));
@@ -1035,7 +1052,7 @@ MLSClientImpl::commit(CachedState& entry,
   }
 
   // Create by-value proposals
-  auto by_value = std::vector<mls::Proposal>();
+  auto by_value = std::vector<MLS_NAMESPACE::Proposal>();
   for (int i = 0; i < request->by_value_size(); i++) {
     const auto desc = request->by_value(i);
     const auto proposal = proposal_from_description(entry.state.cipher_suite(),
@@ -1049,14 +1066,15 @@ MLSClientImpl::commit(CachedState& entry,
   auto inline_tree = !request->external_tree();
 
   auto leaf_secret =
-    mls::random_bytes(entry.state.cipher_suite().secret_size());
-  auto [commit, welcome, next] =
-    entry.state.commit(leaf_secret,
-                       mls::CommitOpts{ by_value, inline_tree, force_path, {} },
-                       entry.message_opts());
+    MLS_NAMESPACE::random_bytes(entry.state.cipher_suite().secret_size());
+  auto [commit, welcome, next] = entry.state.commit(
+    leaf_secret,
+    MLS_NAMESPACE::CommitOpts{ by_value, inline_tree, force_path, {} },
+    entry.message_opts());
 
   if (!inline_tree) {
-    auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));
+    auto ratchet_tree =
+      bytes_to_string(MLS_NAMESPACE::tls::marshal(next.tree()));
     response->set_ratchet_tree(ratchet_tree);
   }
 
@@ -1143,8 +1161,9 @@ MLSClientImpl::new_member_add_proposal(
   NewMemberAddProposalResponse* response)
 {
   auto group_info_msg_data = string_to_bytes(request->group_info());
-  auto group_info_msg = tls::get<mls::MLSMessage>(group_info_msg_data);
-  auto group_info = var::get<mls::GroupInfo>(group_info_msg.message);
+  auto group_info_msg =
+    MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(group_info_msg_data);
+  auto group_info = var::get<MLS_NAMESPACE::GroupInfo>(group_info_msg.message);
 
   auto cipher_suite = group_info.group_context.cipher_suite;
   auto group_id = group_info.group_context.group_id;
@@ -1158,7 +1177,7 @@ MLSClientImpl::new_member_add_proposal(
   response->set_encryption_priv(bytes_to_string(kp_priv.encryption_priv.data));
   response->set_signature_priv(bytes_to_string(kp_priv.signature_priv.data));
 
-  auto proposal = mls::State::new_member_add(
+  auto proposal = MLS_NAMESPACE::State::new_member_add(
     group_id, epoch, kp_priv.key_package, kp_priv.signature_priv);
   response->set_proposal(marshal_message(std::move(proposal)));
 
@@ -1176,12 +1195,14 @@ MLSClientImpl::create_external_signer(
   const auto cipher_suite = mls_suite(request->cipher_suite());
   const auto identity = string_to_bytes(request->identity());
 
-  auto signature_priv = mls::SignaturePrivateKey::generate(cipher_suite);
-  const auto cred = mls::Credential::basic(identity);
+  auto signature_priv =
+    MLS_NAMESPACE::SignaturePrivateKey::generate(cipher_suite);
+  const auto cred = MLS_NAMESPACE::Credential::basic(identity);
 
   const auto external_sender =
-    mls::ExternalSender{ signature_priv.public_key, cred };
-  response->set_external_sender(bytes_to_string(tls::marshal(external_sender)));
+    MLS_NAMESPACE::ExternalSender{ signature_priv.public_key, cred };
+  response->set_external_sender(
+    bytes_to_string(MLS_NAMESPACE::tls::marshal(external_sender)));
 
   const auto signer_id = store_signer(std::move(signature_priv));
   response->set_signer_id(signer_id);
@@ -1195,11 +1216,13 @@ MLSClientImpl::add_external_signer(CachedState& entry,
                                    ProposalResponse* response)
 {
   auto external_sender_data = string_to_bytes(request->external_sender());
-  auto external_sender = tls::get<mls::ExternalSender>(external_sender_data);
+  auto external_sender = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::ExternalSender>(
+    external_sender_data);
 
   auto ext_list = entry.state.extensions();
-  auto ext_senders = mls::ExternalSendersExtension{};
-  auto curr_ext_senders = ext_list.find<mls::ExternalSendersExtension>();
+  auto ext_senders = MLS_NAMESPACE::ExternalSendersExtension{};
+  auto curr_ext_senders =
+    ext_list.find<MLS_NAMESPACE::ExternalSendersExtension>();
   if (curr_ext_senders) {
     ext_senders = opt::get(curr_ext_senders);
   }
@@ -1219,15 +1242,17 @@ MLSClientImpl::external_signer_proposal(
   ProposalResponse* response)
 {
   auto group_info_msg_data = string_to_bytes(request->group_info());
-  auto group_info_msg = tls::get<mls::MLSMessage>(group_info_msg_data);
-  auto group_info = var::get<mls::GroupInfo>(group_info_msg.message);
+  auto group_info_msg =
+    MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(group_info_msg_data);
+  auto group_info = var::get<MLS_NAMESPACE::GroupInfo>(group_info_msg.message);
 
   auto cipher_suite = group_info.group_context.cipher_suite;
   auto group_id = group_info.group_context.group_id;
   auto epoch = group_info.group_context.epoch;
 
   auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
-  auto ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+  auto ratchet_tree =
+    MLS_NAMESPACE::tls::get<MLS_NAMESPACE::TreeKEMPublicKey>(ratchet_tree_data);
 
   // Look up the signer
   auto* signer = load_signer(request->signer_id());
@@ -1237,7 +1262,8 @@ MLSClientImpl::external_signer_proposal(
 
   // Look up the signer index of this signer
   const auto maybe_ext_senders =
-    group_info.group_context.extensions.find<mls::ExternalSendersExtension>();
+    group_info.group_context.extensions
+      .find<MLS_NAMESPACE::ExternalSendersExtension>();
   if (!maybe_ext_senders) {
     throw std::runtime_error("No external senders allowed");
   }
@@ -1256,12 +1282,13 @@ MLSClientImpl::external_signer_proposal(
   // Sign the proposal
   const auto proposal = proposal_from_description(
     cipher_suite, group_id, ratchet_tree, request->description());
-  auto signed_proposal = mls::external_proposal(cipher_suite,
-                                                group_id,
-                                                epoch,
-                                                proposal,
-                                                signer_index,
-                                                signer->signature_priv);
+  auto signed_proposal =
+    MLS_NAMESPACE::external_proposal(cipher_suite,
+                                     group_id,
+                                     epoch,
+                                     proposal,
+                                     signer_index,
+                                     signer->signature_priv);
   response->set_proposal(marshal_message(std::move(signed_proposal)));
 
   return Status::OK;
@@ -1273,13 +1300,14 @@ MLSClientImpl::reinit_proposal(CachedState& entry,
                                ProposalResponse* response)
 {
   auto group_id = string_to_bytes(request->group_id());
-  auto version = mls::ProtocolVersion::mls10;
+  auto version = MLS_NAMESPACE::ProtocolVersion::mls10;
   auto cipher_suite = mls_suite(request->cipher_suite());
 
-  auto ext_list = mls::ExtensionList{};
+  auto ext_list = MLS_NAMESPACE::ExtensionList{};
   for (int i = 0; i < request->extensions_size(); i++) {
     auto ext = request->extensions(i);
-    auto ext_type = static_cast<mls::Extension::Type>(ext.extension_type());
+    auto ext_type =
+      static_cast<MLS_NAMESPACE::Extension::Type>(ext.extension_type());
     auto ext_data = string_to_bytes(ext.extension_data());
     ext_list.add(ext_type, ext_data);
   }
@@ -1310,15 +1338,17 @@ MLSClientImpl::reinit_commit(CachedState& entry,
   }
 
   const auto leaf_secret =
-    mls::random_bytes(entry.state.cipher_suite().secret_size());
-  const auto commit_opts = mls::CommitOpts{ {}, inline_tree, force_path, {} };
+    MLS_NAMESPACE::random_bytes(entry.state.cipher_suite().secret_size());
+  const auto commit_opts =
+    MLS_NAMESPACE::CommitOpts{ {}, inline_tree, force_path, {} };
   auto [tombstone, commit] =
     entry.state.reinit_commit(leaf_secret, commit_opts, entry.message_opts());
 
   // Cache the reinit
   const auto my_leaf =
     opt::get(entry.state.tree().leaf_node(entry.state.index()));
-  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+  const auto identity =
+    my_leaf.credential.get<MLS_NAMESPACE::BasicCredential>().identity;
   auto kp_priv = new_key_package(tombstone.reinit.cipher_suite, identity);
 
   const auto reinit_id = store_reinit(
@@ -1380,7 +1410,8 @@ MLSClientImpl::handle_reinit_commit(CachedState& entry,
   // Cache the reinit
   const auto my_leaf =
     opt::get(entry.state.tree().leaf_node(entry.state.index()));
-  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+  const auto identity =
+    my_leaf.credential.get<MLS_NAMESPACE::BasicCredential>().identity;
   auto kp_priv = new_key_package(tombstone.reinit.cipher_suite, identity);
 
   const auto key_package = entry.marshal(kp_priv.key_package);
@@ -1407,20 +1438,21 @@ MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
   }
 
   // Import the KeyPackages
-  auto key_packages = std::vector<mls::KeyPackage>{};
+  auto key_packages = std::vector<MLS_NAMESPACE::KeyPackage>{};
   for (int i = 0; i < request->key_package_size(); i++) {
     const auto key_package_msg_data = string_to_bytes(request->key_package(i));
     const auto key_package_msg =
-      tls::get<mls::MLSMessage>(key_package_msg_data);
+      MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(key_package_msg_data);
     key_packages.emplace_back(
-      var::get<mls::KeyPackage>(key_package_msg.message));
+      var::get<MLS_NAMESPACE::KeyPackage>(key_package_msg.message));
   }
 
   // Create the Welcome
   const auto inline_tree = !request->external_tree();
   const auto force_path = request->force_path();
   const auto cipher_suite = reinit->tombstone.reinit.cipher_suite;
-  const auto leaf_secret = mls::random_bytes(cipher_suite.secret_size());
+  const auto leaf_secret =
+    MLS_NAMESPACE::random_bytes(cipher_suite.secret_size());
   auto [state, welcome] =
     reinit->tombstone.create_welcome(reinit->kp_priv.encryption_priv,
                                      reinit->kp_priv.signature_priv,
@@ -1429,7 +1461,8 @@ MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
                                      leaf_secret,
                                      { {}, inline_tree, force_path, {} });
 
-  const auto welcome_data = tls::marshal(mls::MLSMessage{ welcome });
+  const auto welcome_data =
+    MLS_NAMESPACE::tls::marshal(MLS_NAMESPACE::MLSMessage{ welcome });
 
   // Store the resulting state
   auto epoch_authenticator = state.epoch_authenticator();
@@ -1440,7 +1473,8 @@ MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
   response->set_welcome(bytes_to_string(welcome_data));
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
   if (!inline_tree) {
-    response->set_ratchet_tree(bytes_to_string(tls::marshal(tree)));
+    response->set_ratchet_tree(
+      bytes_to_string(MLS_NAMESPACE::tls::marshal(tree)));
   }
 
   return Status::OK;
@@ -1458,13 +1492,15 @@ MLSClientImpl::handle_reinit_welcome(const HandleReInitWelcomeRequest* request,
 
   // Process the welcome
   const auto welcome_msg_data = string_to_bytes(request->welcome());
-  const auto welcome_msg = tls::get<mls::MLSMessage>(welcome_msg_data);
-  const auto welcome = var::get<mls::Welcome>(welcome_msg.message);
+  const auto welcome_msg =
+    MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(welcome_msg_data);
+  const auto welcome = var::get<MLS_NAMESPACE::Welcome>(welcome_msg.message);
 
-  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto ratchet_tree = std::optional<MLS_NAMESPACE::TreeKEMPublicKey>{};
   auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
   if (!ratchet_tree_data.empty()) {
-    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+    ratchet_tree = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::TreeKEMPublicKey>(
+      ratchet_tree_data);
   }
 
   auto state = reinit->tombstone.handle_welcome(reinit->kp_priv.init_priv,
@@ -1489,19 +1525,21 @@ MLSClientImpl::create_branch(CachedState& entry,
                              CreateSubgroupResponse* response)
 {
   // Import KeyPackages
-  auto key_packages = std::vector<mls::KeyPackage>{};
+  auto key_packages = std::vector<MLS_NAMESPACE::KeyPackage>{};
   for (int i = 0; i < request->key_packages_size(); i++) {
     const auto kp_msg_data = string_to_bytes(request->key_packages(i));
-    const auto kp_msg = tls::get<mls::MLSMessage>(kp_msg_data);
-    key_packages.emplace_back(var::get<mls::KeyPackage>(kp_msg.message));
+    const auto kp_msg =
+      MLS_NAMESPACE::tls::get<MLS_NAMESPACE::MLSMessage>(kp_msg_data);
+    key_packages.emplace_back(
+      var::get<MLS_NAMESPACE::KeyPackage>(kp_msg.message));
   }
 
   // Import extensions
-  auto ext_list = mls::ExtensionList{};
+  auto ext_list = MLS_NAMESPACE::ExtensionList{};
   for (int i = 0; i < request->extensions_size(); i++) {
     const auto ext = request->extensions(i);
     const auto ext_type =
-      static_cast<mls::Extension::Type>(ext.extension_type());
+      static_cast<MLS_NAMESPACE::Extension::Type>(ext.extension_type());
     const auto ext_data = string_to_bytes(ext.extension_data());
     ext_list.add(ext_type, ext_data);
   }
@@ -1509,14 +1547,16 @@ MLSClientImpl::create_branch(CachedState& entry,
   // Create the branch
   const auto my_leaf =
     opt::get(entry.state.tree().leaf_node(entry.state.index()));
-  const auto identity = my_leaf.credential.get<mls::BasicCredential>().identity;
+  const auto identity =
+    my_leaf.credential.get<MLS_NAMESPACE::BasicCredential>().identity;
 
   const auto inline_tree = !request->external_tree();
   const auto force_path = request->force_path();
   const auto group_id = string_to_bytes(request->group_id());
   const auto cipher_suite = entry.state.cipher_suite();
   const auto kp_priv = new_key_package(cipher_suite, identity);
-  const auto leaf_secret = mls::random_bytes(cipher_suite.secret_size());
+  const auto leaf_secret =
+    MLS_NAMESPACE::random_bytes(cipher_suite.secret_size());
   auto [next, welcome] =
     entry.state.create_branch(group_id,
                               kp_priv.encryption_priv,
@@ -1536,7 +1576,8 @@ MLSClientImpl::create_branch(CachedState& entry,
   response->set_epoch_authenticator(bytes_to_string(epoch_authenticator));
 
   if (!inline_tree) {
-    auto ratchet_tree = bytes_to_string(tls::marshal(next.tree()));
+    auto ratchet_tree =
+      bytes_to_string(MLS_NAMESPACE::tls::marshal(next.tree()));
     response->set_ratchet_tree(ratchet_tree);
   }
 
@@ -1553,11 +1594,12 @@ MLSClientImpl::handle_branch(CachedState& entry,
     return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
   }
 
-  auto welcome = unmarshal_message<mls::Welcome>(request->welcome());
-  auto ratchet_tree = std::optional<mls::TreeKEMPublicKey>{};
+  auto welcome = unmarshal_message<MLS_NAMESPACE::Welcome>(request->welcome());
+  auto ratchet_tree = std::optional<MLS_NAMESPACE::TreeKEMPublicKey>{};
   auto ratchet_tree_data = string_to_bytes(request->ratchet_tree());
   if (!ratchet_tree_data.empty()) {
-    ratchet_tree = tls::get<mls::TreeKEMPublicKey>(ratchet_tree_data);
+    ratchet_tree = MLS_NAMESPACE::tls::get<MLS_NAMESPACE::TreeKEMPublicKey>(
+      ratchet_tree_data);
   }
 
   auto state = entry.state.handle_branch(join->kp_priv.init_priv,

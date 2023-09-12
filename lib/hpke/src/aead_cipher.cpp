@@ -1,13 +1,14 @@
 #include "aead_cipher.h"
 #include "openssl_common.h"
 
+#include <namespace.h>
 #include <openssl/evp.h>
 
 #if WITH_BORINGSSL
 #include <openssl/aead.h>
 #endif
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 ///
 /// ExportOnlyCipher
@@ -318,4 +319,4 @@ AEADCipher::open(const bytes& key,
 #endif // WITH_BORINGSSL
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

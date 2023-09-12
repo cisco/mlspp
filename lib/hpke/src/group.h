@@ -2,11 +2,12 @@
 
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
+#include <namespace.h>
 
 #include "openssl_common.h"
 #include <openssl/evp.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct Group
 {
@@ -43,6 +44,8 @@ struct Group
   const size_t dh_size;
   const size_t pk_size;
   const size_t sk_size;
+  const std::string jwk_key_type;
+  const std::string jwk_curve_name;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
@@ -62,6 +65,11 @@ struct Group
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+  virtual std::tuple<bytes, bytes> coordinates(const PublicKey& pk) const = 0;
+  virtual std::unique_ptr<PublicKey> public_key_from_coordinates(
+    const bytes& x,
+    const bytes& y) const = 0;
 
 protected:
   const KDF& kdf;
@@ -106,4 +114,4 @@ struct EVPGroup : public Group
               const Group::PublicKey& pk) const override;
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

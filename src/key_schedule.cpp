@@ -1,6 +1,7 @@
 #include <mls/key_schedule.h>
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Key Derivation Functions
@@ -576,4 +577,4 @@ operator==(const TranscriptHash& lhs, const TranscriptHash& rhs)
   return confirmed && interim;
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

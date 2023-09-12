@@ -1,17 +1,18 @@
 #include <mls/core_types.h>
 #include <mls/crypto.h>
 #include <mls/messages.h>
+#include <namespace.h>
 
 #include <string>
 
-using hpke::AEAD;      // NOLINT(misc-unused-using-decls)
-using hpke::Digest;    // NOLINT(misc-unused-using-decls)
-using hpke::HPKE;      // NOLINT(misc-unused-using-decls)
-using hpke::KDF;       // NOLINT(misc-unused-using-decls)
-using hpke::KEM;       // NOLINT(misc-unused-using-decls)
-using hpke::Signature; // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::AEAD;      // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Digest;    // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::HPKE;      // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::KDF;       // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::KEM;       // NOLINT(misc-unused-using-decls)
+using MLS_NAMESPACE::hpke::Signature; // NOLINT(misc-unused-using-decls)
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 SignatureScheme
 tls_signature_scheme(Signature::ID id)
@@ -378,6 +379,7 @@ const std::string mls_content = "FramedContentTBS";
 const std::string leaf_node = "LeafNodeTBS";
 const std::string key_package = "KeyPackageTBS";
 const std::string group_info = "GroupInfoTBS";
+const std::string multi_credential = "MultiCredential";
 } // namespace sign_label
 
 struct SignContent
@@ -397,6 +399,30 @@ SignaturePublicKey::verify(const CipherSuite& suite,
   const auto content = tls::marshal(SignContent{ label_plus, message });
   auto pub = suite.sig().deserialize(data);
   return suite.sig().verify(content, signature, *pub);
+}
+
+SignaturePublicKey
+SignaturePublicKey::from_jwk(CipherSuite suite, const std::string& json_str)
+{
+  auto pub = suite.sig().import_jwk(json_str);
+  auto pub_data = suite.sig().serialize(*pub);
+  return SignaturePublicKey{ pub_data };
+}
+
+std::string
+SignaturePublicKey::to_jwk(CipherSuite suite) const
+{
+  auto pub = suite.sig().deserialize(data);
+  return suite.sig().export_jwk(*pub);
+}
+
+PublicJWK
+PublicJWK::parse(const std::string& jwk_json)
+{
+  const auto parsed = Signature::parse_jwk(jwk_json);
+  const auto scheme = tls_signature_scheme(parsed.sig.id);
+  const auto pub_data = parsed.sig.serialize(*parsed.key);
+  return { scheme, parsed.key_id, { pub_data } };
 }
 
 SignaturePrivateKey
@@ -453,4 +479,21 @@ SignaturePrivateKey::set_public_key(CipherSuite suite)
   public_key.data = suite.sig().serialize(*pub);
 }
 
-} // namespace mls
+SignaturePrivateKey
+SignaturePrivateKey::from_jwk(CipherSuite suite, const std::string& json_str)
+{
+  auto priv = suite.sig().import_jwk_private(json_str);
+  auto priv_data = suite.sig().serialize_private(*priv);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig().serialize(*pub);
+  return { priv_data, pub_data };
+}
+
+std::string
+SignaturePrivateKey::to_jwk(CipherSuite suite) const
+{
+  const auto priv = suite.sig().deserialize_private(data);
+  return suite.sig().export_jwk_private(*priv);
+}
+
+} // namespace MLS_NAMESPACE

@@ -48,7 +48,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::crypto_basics: {
       auto cases = std::vector<CryptoBasicsTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite);
       }
 
@@ -59,7 +59,7 @@ make_test_vector(uint64_t type)
       auto cases = std::vector<SecretTreeTestVector>();
       auto generations = std::vector<uint32_t>{ 1, 15 };
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite, 15, generations);
       }
 
@@ -69,7 +69,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::message_protection: {
       auto cases = std::vector<MessageProtectionTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite);
       }
 
@@ -79,7 +79,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::key_schedule: {
       auto cases = std::vector<KeyScheduleTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite, n);
       }
 
@@ -89,7 +89,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::pre_shared_keys: {
       auto cases = std::vector<PSKSecretTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite, 5);
       }
 
@@ -99,7 +99,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::tree_validation: {
       auto cases = std::vector<TreeHashTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         for (const auto& tree_structure : all_tree_structures) {
           cases.emplace_back(suite, tree_structure);
         }
@@ -111,7 +111,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::transcript_hash: {
       auto cases = std::vector<TranscriptTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite);
       }
 
@@ -121,7 +121,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::welcome: {
       auto cases = std::vector<WelcomeTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         cases.emplace_back(suite);
       }
 
@@ -131,7 +131,8 @@ make_test_vector(uint64_t type)
     case TestVectorClass::tree_modifications: {
       auto cases = std::vector<TreeOperationsTestVector>();
 
-      auto suite = mls::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
+      auto suite =
+        MLS_NAMESPACE::CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519;
       for (auto scenario : TreeOperationsTestVector::all_scenarios) {
         cases.emplace_back(suite, scenario);
       }
@@ -142,7 +143,7 @@ make_test_vector(uint64_t type)
     case TestVectorClass::treekem: {
       auto cases = std::vector<TreeKEMTestVector>();
 
-      for (const auto& suite : mls::all_supported_suites) {
+      for (const auto& suite : MLS_NAMESPACE::all_supported_suites) {
         for (const auto& tree_structure : treekem_test_tree_structures) {
           cases.emplace_back(suite, tree_structure);
         }

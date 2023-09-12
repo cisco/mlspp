@@ -1,6 +1,7 @@
 #include "common.h"
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 bytes
 i2osp(uint64_t val, size_t size)
@@ -17,4 +18,4 @@ i2osp(uint64_t val, size_t size)
   return out;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

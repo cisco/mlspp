@@ -1,4 +1,5 @@
 #include <hpke/digest.h>
+#include <namespace.h>
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -8,7 +9,7 @@
 
 #include "openssl_common.h"
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 static const EVP_MD*
 openssl_digest_type(Digest::ID digest)
@@ -184,4 +185,4 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   return md;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <iomanip>
+#include <namespace.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -11,14 +12,14 @@ using namespace std::literals::string_literals;
 
 // Expose the bytes library globally
 #include <bytes/bytes.h>
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
 // Expose the compatibility library globally
 #include <tls/compat.h>
-namespace var = tls::var;
-namespace opt = tls::opt;
+namespace var = MLS_NAMESPACE::tls::var;
+namespace opt = MLS_NAMESPACE::tls::opt;
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // Make variant equality work in the same way as optional equality, with
 // automatic unwrapping.  In other words
@@ -262,4 +263,4 @@ upper_bound(const Container& c, const Value& val)
 
 } // namespace stdx
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

@@ -3,8 +3,9 @@
 #include "mls/credential.h"
 #include "mls/crypto.h"
 #include "mls/tree_math.h"
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 // enum {
 //   reserved(0),
@@ -111,6 +112,14 @@ struct Capabilities
   bool extensions_supported(const std::vector<Extension::Type>& required) const;
   bool proposals_supported(const std::vector<uint16_t>& required) const;
   bool credential_supported(const Credential& credential) const;
+
+  template<typename Container>
+  bool credentials_supported(const Container& required) const
+  {
+    return stdx::all_of(required, [&](CredentialType type) {
+      return stdx::contains(credentials, type);
+    });
+  }
 
   TLS_SERIALIZABLE(versions, cipher_suites, extensions, proposals, credentials)
 };
@@ -357,12 +366,16 @@ struct UpdatePath
   TLS_SERIALIZABLE(leaf_node, nodes)
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Lifetime, key_package)
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::Empty, update)
-TLS_VARIANT_MAP(mls::LeafNodeSource, mls::ParentHash, commit)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource,
+                MLS_NAMESPACE::Lifetime,
+                key_package)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource, MLS_NAMESPACE::Empty, update)
+TLS_VARIANT_MAP(MLS_NAMESPACE::LeafNodeSource,
+                MLS_NAMESPACE::ParentHash,
+                commit)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

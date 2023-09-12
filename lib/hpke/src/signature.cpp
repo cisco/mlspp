@@ -1,15 +1,22 @@
+#include <hpke/base64.h>
 #include <hpke/digest.h>
 #include <hpke/signature.h>
+#include <namespace.h>
+#include <string>
 
 #include "dhkem.h"
-
-#include "common.h"
-#include "group.h"
 #include "rsa.h"
+
+#include <nlohmann/json.hpp>
+#include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/ec.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
-namespace hpke {
+using nlohmann::json;
+
+namespace MLS_NAMESPACE::hpke {
 
 struct GroupSignature : public Signature
 {
@@ -105,8 +112,96 @@ struct GroupSignature : public Signature
     return group.verify(data, sig, rpk);
   }
 
+  std::unique_ptr<Signature::PrivateKey> import_jwk_private(
+    const std::string& jwk_json) const override
+  {
+    const auto jwk = validate_jwk_json(jwk_json, true);
+
+    const auto d = from_base64url(jwk.at("d"));
+    auto gsk = group.deserialize_private(d);
+
+    return std::make_unique<PrivateKey>(gsk.release());
+  }
+
+  std::unique_ptr<Signature::PublicKey> import_jwk(
+    const std::string& jwk_json) const override
+  {
+    const auto jwk = validate_jwk_json(jwk_json, false);
+
+    const auto x = from_base64url(jwk.at("x"));
+    auto y = bytes{};
+    if (jwk.contains("y")) {
+      y = from_base64url(jwk.at("y"));
+    }
+
+    return group.public_key_from_coordinates(x, y);
+  }
+
+  std::string export_jwk(const Signature::PublicKey& pk) const override
+  {
+    const auto& gpk = dynamic_cast<const Group::PublicKey&>(pk);
+    const auto jwk_json = export_jwk_json(gpk);
+    return jwk_json.dump();
+  }
+
+  std::string export_jwk_private(const Signature::PrivateKey& sk) const override
+  {
+    const auto& gssk = dynamic_cast<const GroupSignature::PrivateKey&>(sk);
+    const auto& gsk = gssk.group_priv;
+    const auto gpk = gsk->public_key();
+
+    auto jwk_json = export_jwk_json(*gpk);
+
+    // encode the private key
+    const auto enc = serialize_private(sk);
+    jwk_json.emplace("d", to_base64url(enc));
+
+    return jwk_json.dump();
+  }
+
 private:
   const Group& group;
+
+  json validate_jwk_json(const std::string& jwk_json, bool private_key) const
+  {
+    json jwk = json::parse(jwk_json);
+
+    if (jwk.empty() || !jwk.contains("kty") || !jwk.contains("crv") ||
+        !jwk.contains("x") || (private_key && !jwk.contains("d"))) {
+      throw std::runtime_error("malformed JWK");
+    }
+
+    if (jwk.at("kty") != group.jwk_key_type) {
+      throw std::runtime_error("invalid JWK key type");
+    }
+
+    if (jwk.at("crv") != group.jwk_curve_name) {
+      throw std::runtime_error("invalid JWK curve");
+    }
+
+    return jwk;
+  }
+
+  json export_jwk_json(const Group::PublicKey& pk) const
+  {
+    const auto [x, y] = group.coordinates(pk);
+
+    json jwk = json::object({
+      { "crv", group.jwk_curve_name },
+      { "kty", group.jwk_key_type },
+    });
+
+    if (group.jwk_key_type == "EC") {
+      jwk.emplace("x", to_base64url(x));
+      jwk.emplace("y", to_base64url(y));
+    } else if (group.jwk_key_type == "OKP") {
+      jwk.emplace("x", to_base64url(x));
+    } else {
+      throw std::runtime_error("unknown key type");
+    }
+
+    return jwk;
+  }
 };
 
 template<>
@@ -180,22 +275,70 @@ Signature::Signature(Signature::ID id_in)
 {
 }
 
-bytes
-Signature::serialize_private(const PrivateKey& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
-}
-
-std::unique_ptr<Signature::PrivateKey>
-Signature::deserialize_private(const bytes& /* unused */) const
-{
-  throw std::runtime_error("Not implemented");
-}
-
 std::unique_ptr<Signature::PrivateKey>
 Signature::generate_rsa(size_t bits)
 {
   return RSASignature::generate_key_pair(bits);
 }
 
-} // namespace hpke
+static const Signature&
+sig_from_jwk(const std::string& jwk_json)
+{
+  using KeyTypeAndCurve = std::tuple<std::string, std::string>;
+  static const auto alg_sig_map = std::map<KeyTypeAndCurve, const Signature&>{
+    { { "EC", "P-256" }, Signature::get<Signature::ID::P256_SHA256>() },
+    { { "EC", "P-384" }, Signature::get<Signature::ID::P384_SHA384>() },
+    { { "EC", "P-512" }, Signature::get<Signature::ID::P521_SHA512>() },
+    { { "OKP", "Ed25519" }, Signature::get<Signature::ID::Ed25519>() },
+#if !defined(WITH_BORINGSSL)
+    { { "OKP", "Ed448" }, Signature::get<Signature::ID::Ed448>() },
+#endif
+    // TODO(RLB): RSA
+  };
+
+  const auto jwk = json::parse(jwk_json);
+  const auto& kty = jwk.at("kty");
+
+  auto crv = std::string("");
+  if (jwk.contains("crv")) {
+    crv = jwk.at("crv");
+  }
+
+  const auto key = KeyTypeAndCurve{ kty, crv };
+  return alg_sig_map.at(key);
+}
+
+Signature::PrivateJWK
+Signature::parse_jwk_private(const std::string& jwk_json)
+{
+  // XXX(RLB): This JSON-parses the JWK twice.  I'm assuming that this is a less
+  // bad cost than changing the import_jwk method signature to take `json`.
+  const auto& sig = sig_from_jwk(jwk_json);
+  const auto jwk = json::parse(jwk_json);
+  auto priv = sig.import_jwk_private(jwk_json);
+
+  auto kid = std::optional<std::string>{};
+  if (jwk.contains("kid")) {
+    kid = jwk.at("kid").get<std::string>();
+  }
+
+  return { sig, kid, std::move(priv) };
+}
+
+Signature::PublicJWK
+Signature::parse_jwk(const std::string& jwk_json)
+{
+  // XXX(RLB): Same double-parsing comment as with `parse_jwk_private`
+  const auto& sig = sig_from_jwk(jwk_json);
+  const auto jwk = json::parse(jwk_json);
+  auto pub = sig.import_jwk(jwk_json);
+
+  auto kid = std::optional<std::string>{};
+  if (jwk.contains("kid")) {
+    kid = jwk.at("kid").get<std::string>();
+  }
+
+  return { sig, kid, std::move(pub) };
+}
+
+} // namespace MLS_NAMESPACE::hpke

@@ -1,7 +1,8 @@
 #include <mls/state.h>
+#include <namespace.h>
 #include <set>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Constructors
@@ -67,11 +68,77 @@ State::import_tree(const bytes& tree_hash,
     throw InvalidParameterError("Tree does not match GroupInfo");
   }
 
-  if (!tree.parent_hash_valid()) {
-    throw InvalidParameterError("Invalid tree");
+  return tree;
+}
+
+bool
+State::validate_tree() const
+{
+  // The functionality here is somewhat duplicative of State::valid(const
+  // LeafNode&).  Simply calling that method, however, would result in this
+  // method having quadratic scaling, since each call to valid() does a linear
+  // scan through the tree to check uniqueness of keys and compatibility of
+  // credential support.
+
+  // Validate that the tree is parent-hash valid
+  if (!_tree.parent_hash_valid()) {
+    return false;
   }
 
-  return tree;
+  // Validate the signatures on all leaves
+  const auto signature_valid =
+    _tree.all_leaves([&](auto i, const auto& leaf_node) {
+      auto binding = std::optional<LeafNode::MemberBinding>{};
+      switch (leaf_node.source()) {
+        case LeafNodeSource::commit:
+        case LeafNodeSource::update:
+          binding = LeafNode::MemberBinding{ _group_id, i };
+          break;
+
+        default:
+          // Nothing to do
+          break;
+      }
+
+      return leaf_node.verify(_suite, binding);
+    });
+  if (!signature_valid) {
+    return false;
+  }
+
+  // Collect cross-tree properties
+  auto n_leaves = size_t(0);
+  auto encryption_keys = std::set<bytes>{};
+  auto signature_keys = std::set<bytes>{};
+  auto credential_types = std::set<CredentialType>{};
+  _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
+    n_leaves += 1;
+    encryption_keys.insert(leaf_node.encryption_key.data);
+    signature_keys.insert(leaf_node.signature_key.data);
+    credential_types.insert(leaf_node.credential.type());
+    return true;
+  });
+
+  // Verify uniqueness of keys
+  if (encryption_keys.size() != n_leaves) {
+    return false;
+  }
+
+  if (signature_keys.size() != n_leaves) {
+    return false;
+  }
+
+  // Verify that each leaf indicates support for all required parameters
+  return _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
+    const auto supports_group_extensions =
+      leaf_node.verify_extension_support(_extensions);
+    const auto supports_own_extensions =
+      leaf_node.verify_extension_support(leaf_node.extensions);
+    const auto supports_group_credentials =
+      leaf_node.capabilities.credentials_supported(credential_types);
+    return supports_group_extensions && supports_own_extensions &&
+           supports_group_credentials;
+  });
 }
 
 State::State(SignaturePrivateKey sig_priv,
@@ -91,6 +158,10 @@ State::State(SignaturePrivateKey sig_priv,
   , _index(0)
   , _identity_priv(std::move(sig_priv))
 {
+  if (!validate_tree()) {
+    throw InvalidParameterError("Invalid tree");
+  }
+
   // The following are not set:
   //    _index
   //    _tree_priv
@@ -172,6 +243,11 @@ State::State(const HPKEPrivateKey& init_priv,
   _transcript_hash.update_interim(group_info.confirmation_tag);
 
   _extensions = group_info.group_context.extensions;
+
+  // Validate that the tree is in fact consistent with the group's parameters
+  if (!validate_tree()) {
+    throw InvalidParameterError("Invalid tree");
+  }
 
   // Construct TreeKEM private key from parts provided
   auto maybe_index = _tree.find(key_package.leaf_node);
@@ -268,7 +344,7 @@ State::new_member_add(const bytes& group_id,
                                { /* no authenticated data */ },
                                { std::move(proposal) } };
   auto content_auth = AuthenticatedContent::sign(
-    WireFormat::mls_plaintext, std::move(content), suite, sig_priv, {});
+    WireFormat::mls_public_message, std::move(content), suite, sig_priv, {});
 
   return PublicMessage::protect(std::move(content_auth), suite, {}, {});
 }
@@ -298,8 +374,8 @@ State::sign(const Sender& sender,
     _group_id, _epoch, sender, authenticated_data, { inner_content }
   };
 
-  auto wire_format =
-    (encrypt) ? WireFormat::mls_ciphertext : WireFormat::mls_plaintext;
+  auto wire_format = (encrypt) ? WireFormat::mls_private_message
+                               : WireFormat::mls_public_message;
 
   auto content_auth = AuthenticatedContent::sign(
     wire_format, std::move(content), _suite, _identity_priv, group_context());
@@ -311,13 +387,13 @@ MLSMessage
 State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 {
   switch (content_auth.wire_format) {
-    case WireFormat::mls_plaintext:
+    case WireFormat::mls_public_message:
       return PublicMessage::protect(std::move(content_auth),
                                     _suite,
                                     _key_schedule.membership_key,
                                     group_context());
 
-    case WireFormat::mls_ciphertext:
+    case WireFormat::mls_private_message:
       return PrivateMessage::protect(std::move(content_auth),
                                      _suite,
                                      _keys,
@@ -812,9 +888,8 @@ State::handle(const AuthenticatedContent& content_auth,
   if (!external_commit) {
     sender_location = opt::get(sender);
   } else {
-    // Add the joiner
-    const auto& path = opt::get(commit.path);
-    sender_location = next._tree.add_leaf(path.leaf_node);
+    // Find where the joiner will be added
+    sender_location = next._tree.allocate_leaf();
 
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
@@ -1130,19 +1205,9 @@ State::apply(const GroupContextExtensions& gce)
 bool
 State::extensions_supported(const ExtensionList& exts) const
 {
-  for (LeafIndex i{ 0 }; i < _tree.size; i.val++) {
-    const auto& maybe_leaf = _tree.leaf_node(i);
-    if (!maybe_leaf) {
-      continue;
-    }
-
-    const auto& leaf = opt::get(maybe_leaf);
-    if (!leaf.verify_extension_support(exts)) {
-      return false;
-    }
-  }
-
-  return true;
+  return _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
+    return leaf_node.verify_extension_support(exts);
+  });
 }
 
 void
@@ -1360,7 +1425,7 @@ State::unprotect(const MLSMessage& ct)
     throw ProtocolError("Unprotect of handshake message");
   }
 
-  if (content_auth.wire_format != WireFormat::mls_ciphertext) {
+  if (content_auth.wire_format != WireFormat::mls_private_message) {
     throw ProtocolError("Application data not sent as PrivateMessage");
   }
 
@@ -1416,44 +1481,25 @@ State::valid(const LeafNode& leaf_node,
   // credential types currently in use by other members.
   //
   // Verify that the following fields are unique among the members of the group:
-  // signature_key
-  // encryption_key
-  const auto& signature_key = leaf_node.signature_key;
-  const auto& encryption_key = leaf_node.encryption_key;
-  auto unique_signature_key = true;
-  auto unique_encryption_key = true;
-  auto mutual_credential_support = true;
-  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
-    const auto maybe_leaf = _tree.leaf_node(i);
-    if (!maybe_leaf) {
-      continue;
-    }
-
-    const auto& leaf = opt::get(maybe_leaf);
-
-    // Signature keys are allowed to repeat within a leaf
-    unique_signature_key =
-      unique_signature_key &&
-      ((i == index) || (signature_key != leaf.signature_key));
-    unique_encryption_key =
-      unique_encryption_key && (encryption_key != leaf.encryption_key);
-    mutual_credential_support =
-      mutual_credential_support &&
-      leaf.capabilities.credential_supported(leaf_node.credential) &&
-      leaf_node.capabilities.credential_supported(leaf.credential);
-  }
+  //   signature_key
+  //   encryption_key
+  //
+  // Note: Uniqueness of signature and encryption keys is assured by the
+  // tree operations (add/update), so we do not need to verify those here.
+  const auto mutual_credential_support =
+    _tree.all_leaves([&](auto /* i */, const auto& leaf) {
+      return leaf.capabilities.credential_supported(leaf_node.credential) &&
+             leaf_node.capabilities.credential_supported(leaf.credential);
+    });
 
   // Verify that the extensions in the LeafNode are supported by checking that
   // the ID for each extension in the extensions field is listed in the
   // capabilities.extensions field of the LeafNode.
-  auto all_extensions_supported =
-    stdx::all_of(leaf_node.extensions.extensions, [&](const auto& ext) {
-      return stdx::contains(leaf_node.capabilities.extensions, ext.type);
-    });
+  auto supports_own_extensions =
+    leaf_node.verify_extension_support(leaf_node.extensions);
 
   return (signature_valid && supports_group_extensions && correct_source &&
-          mutual_credential_support && unique_signature_key &&
-          unique_encryption_key && all_extensions_supported);
+          mutual_credential_support && supports_own_extensions);
 }
 
 bool
@@ -1553,19 +1599,7 @@ State::valid(const ExternalInit& external_init) const
 bool
 State::valid(const GroupContextExtensions& gce) const
 {
-  // Verify that each extension is supported by all members
-  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
-    const auto maybe_leaf = _tree.leaf_node(i);
-    if (!maybe_leaf) {
-      continue;
-    }
-
-    const auto& leaf = opt::get(maybe_leaf);
-    if (!leaf.verify_extension_support(gce.group_context_extensions)) {
-      return false;
-    }
-  }
-  return true;
+  return extensions_supported(gce.group_context_extensions);
 }
 
 bool
@@ -2089,19 +2123,14 @@ State::group_info(bool inline_tree) const
 std::vector<LeafNode>
 State::roster() const
 {
-  auto leaves = std::vector<LeafNode>(_tree.size.val);
-  auto leaf_count = uint32_t(0);
+  auto leaves = std::vector<LeafNode>{};
+  leaves.reserve(_tree.size.val);
 
-  for (uint32_t i = 0; i < _tree.size.val; i++) {
-    const auto& maybe_leaf = _tree.leaf_node(LeafIndex{ i });
-    if (!maybe_leaf) {
-      continue;
-    }
-    leaves.at(leaf_count) = opt::get(maybe_leaf);
-    leaf_count++;
-  }
+  _tree.all_leaves([&](auto /* i */, auto leaf) {
+    leaves.push_back(leaf);
+    return true;
+  });
 
-  leaves.resize(leaf_count);
   return leaves;
 }
 
@@ -2114,20 +2143,19 @@ State::epoch_authenticator() const
 LeafIndex
 State::leaf_for_roster_entry(RosterIndex index) const
 {
-  auto non_blank_leaves = uint32_t(0);
-
-  for (auto i = LeafIndex{ 0 }; i < _tree.size; i.val++) {
-    const auto& maybe_leaf = _tree.leaf_node(i);
-    if (!maybe_leaf) {
-      continue;
+  auto visited = RosterIndex{ 0 };
+  auto found = std::optional<LeafIndex>{};
+  _tree.all_leaves([&](auto i, const auto& /* leaf_node */) {
+    if (visited == index) {
+      found = i;
+      return false;
     }
-    if (non_blank_leaves == index.val) {
-      return i;
-    }
-    non_blank_leaves += 1;
-  }
 
-  throw InvalidParameterError("Invalid roster index");
+    visited.val += 1;
+    return true;
+  });
+
+  return opt::get(found);
 }
 
 State
@@ -2143,4 +2171,4 @@ State::successor() const
   return next;
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
