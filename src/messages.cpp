@@ -160,7 +160,7 @@ Welcome::encrypt(const KeyPackage& kp, const std::optional<bytes>& path_secret)
 {
   auto gs = GroupSecrets{ _joiner_secret, std::nullopt, _psks };
   if (path_secret) {
-    gs.path_secret = { opt::get(path_secret) };
+    gs.path_secret = GroupSecrets::PathSecret{ opt::get(path_secret) };
   }
 
   auto gs_data = tls::marshal(gs);
