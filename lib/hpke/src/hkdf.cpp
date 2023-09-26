@@ -1,11 +1,12 @@
 #include "hkdf.h"
 #include "openssl_common.h"
+#include <namespace.h>
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <stdexcept>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 template<>
 const HKDF&
@@ -76,4 +77,4 @@ HKDF::expand(const bytes& prk, const bytes& info, size_t size) const
   return okm;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

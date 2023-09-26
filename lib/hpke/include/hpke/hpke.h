@@ -4,9 +4,10 @@
 #include <optional>
 
 #include <bytes/bytes.h>
-using namespace bytes_ns;
+#include <namespace.h>
+using namespace MLS_NAMESPACE::bytes_ns;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct KEM
 {
@@ -248,4 +249,4 @@ private:
                        const bytes& psk_id) const;
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

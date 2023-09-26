@@ -4,13 +4,14 @@
 #include <array>
 #include <limits>
 #include <map>
+#include <namespace.h>
 #include <optional>
 #include <stdexcept>
 #include <vector>
 
 #include <tls/compat.h>
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
 // For indicating no min or max in vector definitions
 const size_t none = std::numeric_limits<size_t>::max();
@@ -565,4 +566,4 @@ inline
   return str;
 }
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

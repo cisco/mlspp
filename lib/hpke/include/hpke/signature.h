@@ -3,9 +3,10 @@
 #include <memory>
 
 #include <bytes/bytes.h>
-using namespace bytes_ns;
+#include <namespace.h>
+using namespace MLS_NAMESPACE::bytes_ns;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct Signature
 {
@@ -46,9 +47,32 @@ struct Signature
   virtual bytes serialize(const PublicKey& pk) const = 0;
   virtual std::unique_ptr<PublicKey> deserialize(const bytes& enc) const = 0;
 
-  virtual bytes serialize_private(const PrivateKey& sk) const;
+  virtual bytes serialize_private(const PrivateKey& sk) const = 0;
   virtual std::unique_ptr<PrivateKey> deserialize_private(
-    const bytes& skm) const;
+    const bytes& skm) const = 0;
+
+  struct PrivateJWK
+  {
+    const Signature& sig;
+    std::optional<std::string> key_id;
+    std::unique_ptr<PrivateKey> key;
+  };
+  static PrivateJWK parse_jwk_private(const std::string& jwk_json);
+
+  struct PublicJWK
+  {
+    const Signature& sig;
+    std::optional<std::string> key_id;
+    std::unique_ptr<PublicKey> key;
+  };
+  static PublicJWK parse_jwk(const std::string& jwk_json);
+
+  virtual std::unique_ptr<PrivateKey> import_jwk_private(
+    const std::string& jwk_json) const = 0;
+  virtual std::unique_ptr<PublicKey> import_jwk(
+    const std::string& jwk_json) const = 0;
+  virtual std::string export_jwk_private(const PrivateKey& env) const = 0;
+  virtual std::string export_jwk(const PublicKey& env) const = 0;
 
   virtual bytes sign(const bytes& data, const PrivateKey& sk) const = 0;
   virtual bool verify(const bytes& data,
@@ -61,4 +85,4 @@ protected:
   Signature(ID id_in);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

@@ -8,8 +8,9 @@ BUILD_DIR=build
 TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
 CLANG_TIDY=OFF
+OPENSSL3_MANIFEST=alternatives/openssl_3
 
-.PHONY: all dev test ctest dtest dbtest libs test-libs test-all everything ci clean cclean format
+.PHONY: all dev dev3 test ctest dtest dbtest libs test-libs test-all everything ci ci3 clean cclean format
 
 all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
@@ -21,6 +22,10 @@ dev:
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug .
+
+dev3:
+	# Like `dev`, but using OpenSSL 3
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
@@ -53,7 +58,12 @@ everything: ${BUILD_DIR}
 
 ci:
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \
-		-DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE="${VCPKG_TOOLCHAIN_FILE}" .
+		-DCMAKE_BUILD_TYPE=Debug .
+
+ci3:
+	# Like `ci`, but using OpenSSL 3
+	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \
+		-DCMAKE_BUILD_TYPE=Debug -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean
@@ -65,4 +75,5 @@ format:
 	find include -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
+	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
 	find lib -iname "*.h" -or -iname "*.cpp" | grep -v "test_vectors.cpp" |  xargs ${CLANG_FORMAT}

@@ -1,5 +1,6 @@
 #include "mls/tree_math.h"
 #include "mls/common.h"
+#include <namespace.h>
 
 #include <algorithm>
 
@@ -19,7 +20,7 @@ log2(uint32_t x)
   return k - 1;
 }
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 LeafCount::LeafCount(const NodeCount w)
 {
@@ -220,4 +221,4 @@ NodeIndex::level() const
   return k;
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

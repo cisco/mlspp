@@ -3,7 +3,7 @@
 #include <memory>
 #include <sstream>
 
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 using namespace std::literals::string_literals;
 
 // To check that memory is safely zeroized on destroy, we have to deliberately

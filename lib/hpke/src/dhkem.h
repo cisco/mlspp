@@ -1,10 +1,11 @@
 #pragma once
 
 #include <hpke/hpke.h>
+#include <namespace.h>
 
 #include "group.h"
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct DHKEM : public KEM
 {
@@ -54,4 +55,4 @@ private:
                           const KDF& kdf_in);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

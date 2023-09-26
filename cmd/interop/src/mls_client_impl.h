@@ -141,13 +141,13 @@ private:
 
   struct KeyPackageWithSecrets
   {
-    mls::HPKEPrivateKey init_priv;
-    mls::HPKEPrivateKey encryption_priv;
-    mls::SignaturePrivateKey signature_priv;
-    mls::KeyPackage key_package;
+    MLS_NAMESPACE::HPKEPrivateKey init_priv;
+    MLS_NAMESPACE::HPKEPrivateKey encryption_priv;
+    MLS_NAMESPACE::SignaturePrivateKey signature_priv;
+    MLS_NAMESPACE::KeyPackage key_package;
   };
 
-  KeyPackageWithSecrets new_key_package(mls::CipherSuite cipher_suite,
+  KeyPackageWithSecrets new_key_package(MLS_NAMESPACE::CipherSuite cipher_suite,
                                         const bytes& identity);
 
   // Cached join transactions
@@ -165,56 +165,59 @@ private:
   // Cached group state
   struct CachedState
   {
-    mls::State state;
+    MLS_NAMESPACE::State state;
     bool encrypt_handshake;
-    mls::MessageOpts message_opts() const;
+    MLS_NAMESPACE::MessageOpts message_opts() const;
 
     std::optional<std::string> pending_commit;
     std::optional<uint32_t> pending_state_id;
     void reset_pending();
 
     // Marshal/unmarshal with encryption as required
-    std::string marshal(const mls::MLSMessage& msg);
-    mls::MLSMessage unmarshal(const std::string& wire);
+    std::string marshal(const MLS_NAMESPACE::MLSMessage& msg);
+    MLS_NAMESPACE::MLSMessage unmarshal(const std::string& wire);
   };
 
   std::map<uint32_t, CachedState> state_cache;
 
-  uint32_t store_state(mls::State&& state, bool encrypt_handshake);
+  uint32_t store_state(MLS_NAMESPACE::State&& state, bool encrypt_handshake);
   CachedState* load_state(uint32_t state_id);
-  CachedState* find_state(const bytes& group_id, const mls::epoch_t epoch);
+  CachedState* find_state(const bytes& group_id,
+                          const MLS_NAMESPACE::epoch_t epoch);
   void remove_state(uint32_t state_id);
 
-  mls::LeafIndex find_member(const mls::TreeKEMPublicKey& tree,
-                             const std::string& identity);
-  mls::Proposal proposal_from_description(mls::CipherSuite suite,
-                                          const bytes& group_id,
-                                          const mls::TreeKEMPublicKey& tree,
-                                          const ProposalDescription& desc);
+  MLS_NAMESPACE::LeafIndex find_member(
+    const MLS_NAMESPACE::TreeKEMPublicKey& tree,
+    const std::string& identity);
+  MLS_NAMESPACE::Proposal proposal_from_description(
+    MLS_NAMESPACE::CipherSuite suite,
+    const bytes& group_id,
+    const MLS_NAMESPACE::TreeKEMPublicKey& tree,
+    const ProposalDescription& desc);
 
   // Cached external signers
   struct CachedSigner
   {
-    mls::SignaturePrivateKey signature_priv;
+    MLS_NAMESPACE::SignaturePrivateKey signature_priv;
   };
 
   std::map<uint32_t, CachedSigner> signer_cache;
 
-  uint32_t store_signer(mls::SignaturePrivateKey&& signature_priv);
+  uint32_t store_signer(MLS_NAMESPACE::SignaturePrivateKey&& signature_priv);
   CachedSigner* load_signer(uint32_t signer_id);
 
   // Cached ReInit
   struct CachedReInit
   {
     KeyPackageWithSecrets kp_priv;
-    mls::State::Tombstone tombstone;
+    MLS_NAMESPACE::State::Tombstone tombstone;
     bool encrypt_handshake;
   };
 
   std::map<uint32_t, CachedReInit> reinit_cache;
 
   uint32_t store_reinit(KeyPackageWithSecrets&& kp_priv,
-                        mls::State::Tombstone&& tombstone,
+                        MLS_NAMESPACE::State::Tombstone&& tombstone,
                         bool encrypt_handshake);
   CachedReInit* load_reinit(uint32_t reinit_id);
   void remove_reinit(uint32_t reinit_id);

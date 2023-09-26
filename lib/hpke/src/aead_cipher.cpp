@@ -1,9 +1,10 @@
 #include "aead_cipher.h"
 #include "openssl_common.h"
 
+#include <namespace.h>
 #include <openssl/evp.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 ///
 /// ExportOnlyCipher
@@ -244,4 +245,4 @@ AEADCipher::open(const bytes& key,
   return pt;
 }
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

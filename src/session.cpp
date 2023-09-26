@@ -1,10 +1,10 @@
-#include <mls/session.h>
-
 #include <mls/messages.h>
+#include <mls/session.h>
+#include <namespace.h>
 
 #include <deque>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Inner struct declarations for PendingJoin and Session
@@ -200,14 +200,14 @@ Session::Inner::import_handshake(const bytes& encoded) const
   auto msg = tls::get<MLSMessage>(encoded);
 
   switch (msg.wire_format()) {
-    case WireFormat::mls_plaintext:
+    case WireFormat::mls_public_message:
       if (encrypt_handshake) {
         throw ProtocolError("Handshake not encrypted as required");
       }
 
       return msg;
 
-    case WireFormat::mls_ciphertext: {
+    case WireFormat::mls_private_message: {
       if (!encrypt_handshake) {
         throw ProtocolError("Unexpected handshake encryption");
       }
@@ -435,4 +435,4 @@ operator!=(const Session& lhs, const Session& rhs)
   return !(lhs == rhs);
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

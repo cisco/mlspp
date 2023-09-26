@@ -6,10 +6,11 @@
 #include <chrono>
 #include <hpke/signature.h>
 #include <map>
+#include <namespace.h>
 
-using namespace bytes_ns;
+using namespace MLS_NAMESPACE::bytes_ns;
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 struct Certificate
 {
@@ -72,4 +73,4 @@ public:
 bool
 operator==(const Certificate& lhs, const Certificate& rhs);
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

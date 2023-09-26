@@ -1,6 +1,7 @@
 #include "mls/common.h"
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 uint64_t
 seconds_since_epoch()
@@ -10,4 +11,4 @@ seconds_since_epoch()
   return std::time(nullptr);
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
