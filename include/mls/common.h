@@ -2,6 +2,7 @@
 
 #include <array>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
 #include <string>
