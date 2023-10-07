@@ -212,8 +212,8 @@ struct UserInfoVC::ParsedCredential
     const auto signature_b64 = jwt.substr(last_dot + 1);
 
     // Parse the components
-    const auto header = json::parse(from_base64url(header_b64));
-    const auto payload = json::parse(from_base64url(payload_b64));
+    const auto header = json::parse(to_ascii(from_base64url(header_b64)));
+    const auto payload = json::parse(to_ascii(from_base64url(payload_b64)));
 
     // Prepare the validation inputs
     const auto& sig = signature_from_alg(header.at("alg"));
