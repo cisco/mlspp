@@ -113,15 +113,15 @@ if ( OPENSSL_FOUND )
     endif ()
 
     if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-        add_compile_definitions(WITH_OPENSSL3)
+      add_compile_definitions(WITH_OPENSSL3)
     elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
-        message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
+      message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
     endif()
     message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
     message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
     message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
 else()
-    message(FATAL_ERROR "No OpenSSL library found")
+  message(FATAL_ERROR "No OpenSSL library found")
 endif()
 
 # Internal libraries
