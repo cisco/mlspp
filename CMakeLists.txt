@@ -93,7 +93,6 @@ endif()
 
 # External libraries
 find_package(OpenSSL REQUIRED)
-
 if ( OPENSSL_FOUND )
     find_path(BORINGSSL_INCLUDE_DIR openssl/is_boringssl.h HINTS ${OPENSSL_INCLUDE_DIR} NO_DEFAULT_PATH)
 
