@@ -1,0 +1,135 @@
+name: MLSPP CI (BoringSSL Test) 
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
+  CMAKE_TEST_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl/test
+  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+
+jobs:
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - 'include'
+          - 'src'
+          - 'test'
+          - 'cmd'
+          - 'lib'
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run clang-format style check for C/C++ programs
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '16'
+        check-path: ${{ matrix.path }}
+        fallback-style: 'Mozilla'
+
+  quick-linux-interop-check:
+    needs: formatting-check
+    name: Quick Linux Check and Interop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Build (BoringSSL 1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl_1.1" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DREQUIRE_BORINGSSL=1
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL 1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target test
+
+    - name: Build (Interop Harness)
+      run: |
+        cd cmd/interop
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake --build build
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
+
+  platform-sanitizer-tests:
+    if: github.event.pull_request.draft == false
+    needs: quick-linux-interop-check
+    name: Build and test platforms using sanitizers and clang-tidy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
+              boring-vcpkg-dir: "alternatives\\boringssl_1.1"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              boring-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+            - os: macos-latest
+              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+              boring-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Dependencies (macOs)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r)
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Build (BoringSSL 1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" -DREQUIRE_BORINGSSL=1
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL 1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
+
+
