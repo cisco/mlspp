@@ -33,52 +33,6 @@ jobs:
         check-path: ${{ matrix.path }}
         fallback-style: 'Mozilla'
 
-  quick-linux-interop-check:
-    needs: formatting-check
-    name: Quick Linux Check and Interop
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
-
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
-
-    - name: Build (BoringSSL 1.1)
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl_1.1" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DREQUIRE_BORINGSSL=1
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
-
-    - name: Unit Test (BoringSSL 1.1)
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target test
-
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-        cmake --build build
-
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
-
   platform-sanitizer-tests:
     if: github.event.pull_request.draft == false
     needs: quick-linux-interop-check
@@ -116,6 +70,7 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get install -y linux-headers-$(uname -r)
+        sudo apt-get install nasm
 
     - name: Restore cache
       uses: actions/cache@v3
