@@ -69,8 +69,7 @@ jobs:
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
-        sudo apt-get install nasm
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
 
     - name: Restore cache
       uses: actions/cache@v3
