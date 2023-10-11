@@ -101,12 +101,10 @@ supported_kem(KEM::ID id)
     case KEM::ID::DHKEM_P384_SHA384:
     case KEM::ID::DHKEM_P521_SHA512:
     case KEM::ID::DHKEM_X25519_SHA256:
-      return true;
-
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
-      return true;
 #endif
+      return true;
 
     default:
       return false;
