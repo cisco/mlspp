@@ -1,6 +1,9 @@
 name: MLSPP CI (BoringSSL Test) 
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
