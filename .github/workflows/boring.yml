@@ -37,8 +37,6 @@ jobs:
         fallback-style: 'Mozilla'
 
   platform-sanitizer-tests:
-    if: github.event.pull_request.draft == false
-    needs: quick-linux-interop-check
     name: Build and test platforms using sanitizers and clang-tidy
     runs-on: ${{ matrix.os }}
     strategy:
@@ -82,7 +80,7 @@ jobs:
 
     - name: Build (BoringSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" -DREQUIRE_BORINGSSL=1
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boring-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" -DREQUIRE_BORINGSSL=1
         cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
 
     - name: Unit Test (BoringSSL 1.1)
