@@ -158,7 +158,14 @@ struct Certificate::ParsedCertificate
   static std::vector<GeneralName> parse_san(X509* cert)
   {
     std::vector<GeneralName> names;
-    int san_names_nb = -1;
+
+#ifdef WITH_BORINGSSL
+    using san_names_nb_t = size_t;
+#else
+    using san_names_nb_t = int;
+#endif
+
+    san_names_nb_t san_names_nb = 0;
 
     auto* ext_ptr =
       X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr);
@@ -168,7 +175,7 @@ struct Certificate::ParsedCertificate
     san_names_nb = sk_GENERAL_NAME_num(san_names.get());
 
     // Check each name within the extension
-    for (int i = 0; i < san_names_nb; i++) {
+    for (san_names_nb_t i = 0; i < san_names_nb; i++) {
       auto* current_name = sk_GENERAL_NAME_value(san_names.get(), i);
       if (current_name->type == GEN_DNS) {
         const auto dns_name =
