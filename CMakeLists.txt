@@ -100,7 +100,10 @@ if ( OPENSSL_FOUND )
       message(STATUS "Found OpenSSL includes are for BoringSSL")
       
       add_compile_definitions(WITH_BORINGSSL)
-      add_compile_options(-Wno-gnu-anonymous-struct -Wno-nested-anon-types)
+
+      if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_compile_options(-Wno-gnu-anonymous-struct -Wno-nested-anon-types)
+      endif ()
 
       file(STRINGS "${OPENSSL_INCLUDE_DIR}/openssl/crypto.h" boringssl_version_str
            REGEX "^#[\t ]*define[\t ]+OPENSSL_VERSION_TEXT[\t ]+\"OpenSSL ([0-9])+\\.([0-9])+\\.([0-9])+ .+")
