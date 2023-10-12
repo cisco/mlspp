@@ -37,9 +37,7 @@ jobs:
         fallback-style: 'Mozilla'
 
   platform-sanitizer-tests:
-    if: github.event.pull_request.draft == false
-    needs: quick-linux-interop-check
-    name: Build and test platforms using sanitizers and clang-tidy
+    name: Build and test with BoringSSL
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
