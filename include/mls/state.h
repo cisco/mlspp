@@ -152,6 +152,11 @@ public:
   bytes epoch_authenticator() const;
 
   ///
+  /// Unwrap messages so that applications can inspect them
+  ///
+  AuthenticatedContent unwrap(const MLSMessage& msg);
+
+  ///
   /// Application encryption and decryption
   ///
   MLSMessage protect(const bytes& authenticated_data,
@@ -333,8 +338,6 @@ protected:
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
-
-  AuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   LeafIndex apply(const Add& add);

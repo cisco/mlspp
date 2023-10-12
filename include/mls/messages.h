@@ -574,6 +574,7 @@ struct PublicMessage
 {
   PublicMessage() = default;
 
+  bytes get_group_id() const { return content.group_id; }
   epoch_t get_epoch() const { return content.epoch; }
 
   static PublicMessage protect(AuthenticatedContent content_auth,
@@ -611,6 +612,7 @@ struct PrivateMessage
 {
   PrivateMessage() = default;
 
+  bytes get_group_id() const { return group_id; }
   epoch_t get_epoch() const { return epoch; }
 
   static PrivateMessage protect(AuthenticatedContent content_auth,
@@ -649,6 +651,7 @@ struct MLSMessage
   var::variant<PublicMessage, PrivateMessage, Welcome, GroupInfo, KeyPackage>
     message;
 
+  bytes group_id() const;
   epoch_t epoch() const;
   WireFormat wire_format() const;
 

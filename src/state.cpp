@@ -408,7 +408,7 @@ State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
 }
 
 AuthenticatedContent
-State::unprotect_to_content_auth(const MLSMessage& msg)
+State::unwrap(const MLSMessage& msg)
 {
   if (msg.version != ProtocolVersion::mls10) {
     throw InvalidParameterError("Unsupported version");
@@ -416,6 +416,14 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
 
   const auto unprotect = overloaded{
     [&](const PublicMessage& pt) -> AuthenticatedContent {
+      if (pt.get_group_id() != _group_id) {
+        throw ProtocolError("PublicMessage not for this group");
+      }
+
+      if (pt.get_epoch() != _epoch) {
+        throw ProtocolError("PublicMessage not for this epoch");
+      }
+
       auto maybe_content_auth =
         pt.unprotect(_suite, _key_schedule.membership_key, group_context());
       if (!maybe_content_auth) {
@@ -425,6 +433,14 @@ State::unprotect_to_content_auth(const MLSMessage& msg)
     },
 
     [&](const PrivateMessage& ct) -> AuthenticatedContent {
+      if (ct.get_group_id() != _group_id) {
+        throw ProtocolError("PrivateMessage not for this group");
+      }
+
+      if (ct.get_epoch() != _epoch) {
+        throw ProtocolError("PrivateMessage not for this epoch");
+      }
+
       auto maybe_content_auth =
         ct.unprotect(_suite, _keys, _key_schedule.sender_data_secret);
       if (!maybe_content_auth) {
@@ -797,7 +813,7 @@ State::handle(const MLSMessage& msg,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
-  auto content_auth = unprotect_to_content_auth(msg);
+  auto content_auth = unwrap(msg);
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
@@ -1136,7 +1152,7 @@ State::Tombstone
 State::handle_reinit_commit(const MLSMessage& commit_msg)
 {
   // Verify the signature and process the commit
-  auto content_auth = unprotect_to_content_auth(commit_msg);
+  auto content_auth = unwrap(commit_msg);
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
@@ -1417,7 +1433,7 @@ State::protect(const bytes& authenticated_data,
 std::tuple<bytes, bytes>
 State::unprotect(const MLSMessage& ct)
 {
-  auto content_auth = unprotect_to_content_auth(ct);
+  auto content_auth = unwrap(ct);
 
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");

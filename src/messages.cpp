@@ -832,6 +832,20 @@ PrivateMessage::PrivateMessage(GroupContent content,
 {
 }
 
+bytes
+MLSMessage::group_id() const
+{
+  return var::visit(
+    overloaded{
+      [](const PublicMessage& pt) -> bytes { return pt.get_group_id(); },
+      [](const PrivateMessage& pt) -> bytes { return pt.get_group_id(); },
+      [](const auto& /* unused */) -> bytes {
+        throw InvalidParameterError("MLSMessage has no group_id");
+      },
+    },
+    message);
+}
+
 epoch_t
 MLSMessage::epoch() const
 {
