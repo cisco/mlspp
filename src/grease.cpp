@@ -9,13 +9,15 @@ namespace MLS_NAMESPACE {
 #ifdef DISABLE_GREASE
 
 Capabilities
-grease(Capabilities&& capabilities, [[maybe_unused]] const ExtensionList& extensions)
+grease(Capabilities&& capabilities,
+       [[maybe_unused]] const ExtensionList& extensions)
 {
   return capabilities;
 }
 
 ExtensionList
-grease(ExtensionList&& extensions) {
+grease(ExtensionList&& extensions)
+{
   return extensions;
 }
 
