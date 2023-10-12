@@ -2,6 +2,7 @@
 
 #include <array>
 #include <iomanip>
+#include <iterator>
 #include <namespace.h>
 #include <sstream>
 #include <stdexcept>
