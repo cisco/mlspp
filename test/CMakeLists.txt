@@ -11,7 +11,7 @@ add_dependencies(${TEST_APP_NAME} ${LIB_NAME} bytes tls_syntax mls_vectors)
 target_include_directories(${TEST_APP_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(${TEST_APP_NAME} ${LIB_NAME} 
   bytes tls_syntax mls_vectors
-  doctest::doctest ${OPENSSL_CRYPTO_LIBRARY})
+  doctest::doctest OpenSSL::Crypto)
 
 # Enable CTest
 include(doctest)
