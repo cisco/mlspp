@@ -6,6 +6,23 @@
 
 namespace MLS_NAMESPACE {
 
+#ifdef DISABLE_GREASE
+
+Capabilities
+grease(Capabilities&& capabilities,
+       [[maybe_unused]] const ExtensionList& extensions)
+{
+  return capabilities;
+}
+
+ExtensionList
+grease(ExtensionList&& extensions)
+{
+  return extensions;
+}
+
+#else
+
 // Randomness parmeters:
 // * Given a list of N items, insert max(1, rand(p_grease * N)) GREASE values
 // * Each GREASE value added is distinct, unless more than 15 values are needed
@@ -117,5 +134,7 @@ grease(ExtensionList&& extensions)
 
   return { ext };
 }
+
+#endif // DISABLE_GREASE
 
 } // namespace MLS_NAMESPACE
