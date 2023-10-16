@@ -492,8 +492,8 @@ TreeKEMPublicKey::merge(LeafIndex from, const UpdatePath& path)
       parent_hash = ph[i + 1];
     }
 
-    node_at(n).node = { ParentNode{
-      path.nodes[i].public_key, parent_hash, {} } };
+    node_at(n).node =
+      Node{ ParentNode{ path.nodes[i].public_key, parent_hash, {} } };
   }
 
   set_hash_all();
