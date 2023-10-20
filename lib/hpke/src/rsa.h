@@ -3,12 +3,13 @@
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 #include <hpke/signature.h>
+#include <namespace.h>
 
 #include "openssl_common.h"
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 // XXX(RLB): There is a lot of code in RSASignature that is duplicated in
 // EVPGroup.  I have allowed this duplication rather than factoring it out
@@ -78,6 +79,14 @@ struct RSASignature : public Signature
               const bytes& sig,
               const Signature::PublicKey& pk) const override;
 
+  std::unique_ptr<Signature::PrivateKey> import_jwk_private(
+    const std::string& json_str) const override;
+  std::unique_ptr<Signature::PublicKey> import_jwk(
+    const std::string& json_str) const override;
+  std::string export_jwk_private(
+    const Signature::PrivateKey& sk) const override;
+  std::string export_jwk(const Signature::PublicKey& pk) const override;
+
 private:
   const EVP_MD* md;
 
@@ -86,4 +95,4 @@ private:
   static Signature::ID digest_to_sig(Digest::ID digest);
 };
 
-} // namespace hpke
+} // namespace MLS_NAMESPACE::hpke

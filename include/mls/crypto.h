@@ -5,11 +5,11 @@
 #include <hpke/random.h>
 #include <hpke/signature.h>
 #include <mls/common.h>
+#include <namespace.h>
 #include <tls/tls_syntax.h>
-
 #include <vector>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 /// Signature Code points, borrowed from RFC 8446
 enum struct SignatureScheme : uint16_t
@@ -136,7 +136,7 @@ private:
 extern const std::array<CipherSuite::ID, 7> all_supported_suites;
 
 // Utilities
-using hpke::random_bytes;
+using MLS_NAMESPACE::hpke::random_bytes;
 
 // HPKE Keys
 namespace encrypt_label {
@@ -205,10 +205,14 @@ extern const std::string mls_content;
 extern const std::string leaf_node;
 extern const std::string key_package;
 extern const std::string group_info;
+extern const std::string multi_credential;
 } // namespace sign_label
 
 struct SignaturePublicKey
 {
+  static SignaturePublicKey from_jwk(CipherSuite suite,
+                                     const std::string& json_str);
+
   bytes data;
 
   bool verify(const CipherSuite& suite,
@@ -216,7 +220,18 @@ struct SignaturePublicKey
               const bytes& message,
               const bytes& signature) const;
 
+  std::string to_jwk(CipherSuite suite) const;
+
   TLS_SERIALIZABLE(data)
+};
+
+struct PublicJWK
+{
+  SignatureScheme signature_scheme;
+  std::optional<std::string> key_id;
+  SignaturePublicKey public_key;
+
+  static PublicJWK parse(const std::string& jwk_json);
 };
 
 struct SignaturePrivateKey
@@ -225,6 +240,8 @@ struct SignaturePrivateKey
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey parse_der(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
+  static SignaturePrivateKey from_jwk(CipherSuite suite,
+                                      const std::string& json_str);
 
   SignaturePrivateKey() = default;
 
@@ -236,6 +253,7 @@ struct SignaturePrivateKey
              const bytes& message) const;
 
   void set_public_key(CipherSuite suite);
+  std::string to_jwk(CipherSuite suite) const;
 
   TLS_SERIALIZABLE(data)
 
@@ -243,4 +261,4 @@ private:
   SignaturePrivateKey(bytes priv_data, bytes pub_data);
 };
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

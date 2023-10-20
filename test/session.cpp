@@ -2,7 +2,7 @@
 #include <hpke/random.h>
 #include <mls/session.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 class SessionTest
 {
@@ -268,23 +268,24 @@ TEST_CASE("Session with X509 Credential")
              "d9865c93f3952abc7e671e625b8479214c1c9b62a7cc6a51a84a3610f4");
 
   const std::vector<bytes> der_chain{ leaf_der, issuing_der };
-  const mls::CipherSuite suite{
-    mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256
+  const MLS_NAMESPACE::CipherSuite suite{
+    MLS_NAMESPACE::CipherSuite::ID::P256_AES128GCM_SHA256_P256
   };
 
   auto alice_id = from_ascii("alice");
-  auto alice_sig_priv = mls::SignaturePrivateKey::parse(suite, key_raw);
-  auto alice_cred = mls::Credential::x509(der_chain);
-  auto alice_client = mls::Client(suite, alice_sig_priv, alice_cred);
+  auto alice_sig_priv =
+    MLS_NAMESPACE::SignaturePrivateKey::parse(suite, key_raw);
+  auto alice_cred = MLS_NAMESPACE::Credential::x509(der_chain);
+  auto alice_client = MLS_NAMESPACE::Client(suite, alice_sig_priv, alice_cred);
 
   auto group_id = bytes{ 0, 1, 2, 3 };
   auto alice_session = alice_client.begin_session(group_id);
 
   auto bob_id = from_ascii("bob");
-  auto bob_sig_priv = mls::SignaturePrivateKey::generate(suite);
-  auto bob_cred = mls::Credential::basic(bob_id);
+  auto bob_sig_priv = MLS_NAMESPACE::SignaturePrivateKey::generate(suite);
+  auto bob_cred = MLS_NAMESPACE::Credential::basic(bob_id);
 
-  auto bob_client = mls::Client(suite, bob_sig_priv, bob_cred);
+  auto bob_client = MLS_NAMESPACE::Client(suite, bob_sig_priv, bob_cred);
 
   auto bob_pending_join = bob_client.start_join();
 

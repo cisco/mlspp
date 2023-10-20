@@ -5,8 +5,9 @@
 #include <mls/crypto.h>
 #include <mls/messages.h>
 #include <mls/tree_math.h>
+#include <namespace.h>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 struct HashRatchet
 {
@@ -202,4 +203,4 @@ struct TranscriptHash
 bool
 operator==(const TranscriptHash& lhs, const TranscriptHash& rhs);
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

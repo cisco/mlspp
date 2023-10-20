@@ -1,9 +1,13 @@
 #include <doctest/doctest.h>
 #include <hpke/signature.h>
+#include <nlohmann/json.hpp>
+
+#include <vector>
 
 #include "common.h"
 
-#include <vector>
+using nlohmann::json;
+
 TEST_CASE("Signature Known-Answer")
 {
   ensure_fips_if_required();
@@ -235,5 +239,139 @@ TEST_CASE("Signature Round-Trip")
     auto pub_enc = sig.serialize(*pub);
     auto pub3 = sig.deserialize(pub_enc);
     CHECK(sig.verify(data, signature2, *pub3));
+  }
+}
+
+TEST_CASE("Signature Key JWK Round-Trip")
+{
+  ensure_fips_if_required();
+  const std::vector<Signature::ID> ids{
+    Signature::ID::P256_SHA256, Signature::ID::P384_SHA384,
+    Signature::ID::P521_SHA512, Signature::ID::Ed25519,
+    Signature::ID::Ed448,
+  };
+
+  for (const auto& id : ids) {
+    if (fips() && fips_disable(id)) {
+      continue;
+    }
+
+    const auto& sig = select_signature(id);
+
+    const auto priv = sig.generate_key_pair();
+    const auto encoded_priv = sig.export_jwk_private(*priv);
+    const auto decoded_priv = sig.import_jwk_private(encoded_priv);
+    CHECK(sig.serialize_private(*priv) == sig.serialize_private(*decoded_priv));
+
+    const auto pub = priv->public_key();
+    const auto encoded_pub = sig.export_jwk(*pub);
+    const auto decoded_pub = sig.import_jwk(encoded_pub);
+    CHECK(sig.serialize(*pub) == sig.serialize(*decoded_pub));
+  }
+}
+
+TEST_CASE("Signature Key JWK Known-Answer")
+{
+  ensure_fips_if_required();
+
+  struct KnownAnswerTest
+  {
+    Signature::ID id;
+    std::string jwk_priv;
+    std::string jwk_pub;
+  };
+
+  // XXX(RLB) clang-format wants to indent this really far to the right.
+  // clang-format off
+  const std::vector<KnownAnswerTest> cases{
+    {
+      Signature::ID::P256_SHA256,
+      R"({
+        "crv": "P-256",
+        "kty": "EC",
+        "d": "1J2hVVHFHYyeyfPmcXMG0uHLBn3i742jbRyUBGe2Jmg",
+        "x": "Bo8xjILpecBFkEwDa0H8p0_xCv7UPE2XMj8KcEe_LGE",
+        "y":"LbiO9VbkY1eRrR6UgdL7W4jhqej6Sfu6n6HvTRm5ySs"
+      })",
+      R"({
+        "crv": "P-256",
+        "kty": "EC",
+        "x": "Bo8xjILpecBFkEwDa0H8p0_xCv7UPE2XMj8KcEe_LGE",
+        "y":"LbiO9VbkY1eRrR6UgdL7W4jhqej6Sfu6n6HvTRm5ySs"
+      })",
+    },
+    {
+      Signature::ID::P384_SHA384,
+      R"({
+        "crv": "P-384",
+        "kty": "EC",
+        "d": "uLHpTwv2Pucmo4ZVgO-0IYJQEyKQlJdukO1M6vZp0EYyvgCJhzoYWsBTbIUEOG8e",
+        "x": "apvkQ2jdEkTr5MkLePjAt2vW-Sk_djA7WjcPN_Waw_MS327r3WFCrchYEFvrMLru",
+        "y":"In9wbO3tnH9CQn0NMJm3DvgLtBF3OmcfOnW9sAy1I1-yHVs_N8Bph2Z46YbJGbdS"
+      })",
+      R"({
+        "crv": "P-384",
+        "kty": "EC",
+        "x": "apvkQ2jdEkTr5MkLePjAt2vW-Sk_djA7WjcPN_Waw_MS327r3WFCrchYEFvrMLru",
+        "y":"In9wbO3tnH9CQn0NMJm3DvgLtBF3OmcfOnW9sAy1I1-yHVs_N8Bph2Z46YbJGbdS"
+      })",
+    },
+    {
+      Signature::ID::P521_SHA512,
+      R"({
+        "crv": "P-521",
+        "kty": "EC",
+        "d": "AckbSdZaMoA4ylPYStWyAUU20Wo5Yu8hsiocCmhqNniJ42ZXYzZ4EzQElB_sU6RGbPgwQmiKWTZ0jbi5NmZTC6mv",
+        "x": "AH9tp56TOvXzN_JWFGEAmk0HdkpDSPZBZOwX-xuT3RV0JjFVq3VWzMtMrf_x_Okt5QVNLBi-41no47VDDTK5UQiM",
+        "y":"AJtFy8ogaNhBxLx6CtjoOG5ptR3-z7CEz9I9ioIOJ9Q2a0vtixuNGa4ILQUY8vz-5_AuqHEWkIaK3sqrryYGPqdH"
+      })",
+      R"({
+        "crv": "P-521",
+        "kty": "EC",
+        "x": "AH9tp56TOvXzN_JWFGEAmk0HdkpDSPZBZOwX-xuT3RV0JjFVq3VWzMtMrf_x_Okt5QVNLBi-41no47VDDTK5UQiM",
+        "y":"AJtFy8ogaNhBxLx6CtjoOG5ptR3-z7CEz9I9ioIOJ9Q2a0vtixuNGa4ILQUY8vz-5_AuqHEWkIaK3sqrryYGPqdH"
+      })",
+    },
+    {
+      Signature::ID::Ed25519,
+      R"({
+        "crv": "Ed25519",
+        "kty": "OKP",
+        "d": "kH7Q5NRfGgX1GSTTSz7ofQuQZNnLE5jWKP_RKT76Um8",
+        "x":"Rv-rXr1oUaa29TdaXzIhJEOV3eJYzMqy_luvV0T80no"
+      })",
+      R"({
+        "crv": "Ed25519",
+        "kty": "OKP",
+        "x": "Rv-rXr1oUaa29TdaXzIhJEOV3eJYzMqy_luvV0T80no"
+      })",
+    },
+    {
+      Signature::ID::Ed448,
+      R"({
+        "crv": "Ed448",
+        "kty": "OKP",
+        "d": "NSnqhxrVgCDdREhKNkRsegr5o4WGIMUIdG9enGCBb413B4KgJ8URiZVPaVn0-AslPgHdkF--oFGV",
+        "x":"0P_035gQbBr8mHe_4uLu8wUI22JiSBYWq9Yzb3Tr3C4ksfv85Xo5OIRrWzE-L0QFRez78nrNA4wA"
+      })",
+      R"({
+        "crv": "Ed448",
+        "kty": "OKP",
+        "x":"0P_035gQbBr8mHe_4uLu8wUI22JiSBYWq9Yzb3Tr3C4ksfv85Xo5OIRrWzE-L0QFRez78nrNA4wA"
+      })",
+    },
+  };
+  // clang-format on
+
+  for (const auto& tc : cases) {
+    const auto& sig = select_signature(tc.id);
+
+    auto imported_priv = sig.import_jwk_private(tc.jwk_priv);
+    auto exported_priv = sig.export_jwk_private(*imported_priv);
+    CHECK(json::parse(tc.jwk_priv) == json::parse(exported_priv));
+
+    auto imported_pub = sig.import_jwk(tc.jwk_pub);
+    auto exported_pub = sig.export_jwk(*imported_pub);
+    CHECK(json::parse(tc.jwk_pub) == json::parse(exported_pub));
   }
 }

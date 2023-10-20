@@ -1,11 +1,12 @@
 #include "mls/core_types.h"
 #include "mls/messages.h"
+#include <namespace.h>
 
 #include "grease.h"
 
 #include <set>
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 ///
 /// Extensions
@@ -45,9 +46,11 @@ const std::array<CipherSuite::ID, 6> all_supported_ciphersuites = {
   CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
 };
 
-const std::array<CredentialType, 2> all_supported_credentials = {
+const std::array<CredentialType, 4> all_supported_credentials = {
   CredentialType::basic,
   CredentialType::x509,
+  CredentialType::userinfo_vc_draft_00,
+  CredentialType::multi_draft_00
 };
 
 Capabilities
@@ -435,4 +438,4 @@ KeyPackage::to_be_signed() const
   return out.bytes();
 }
 
-} // namespace mls
+} // namespace MLS_NAMESPACE

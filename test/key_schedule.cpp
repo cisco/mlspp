@@ -2,7 +2,7 @@
 #include <mls/state.h>
 #include <mls_vectors/mls_vectors.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 using namespace mls_vectors;
 
 TEST_CASE("Secret Tree Interop")

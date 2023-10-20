@@ -4,11 +4,12 @@
 #include "mls/core_types.h"
 #include "mls/crypto.h"
 #include "mls/tree_math.h"
+#include <namespace.h>
 #include <tls/tls_syntax.h>
 
 #define ENABLE_TREE_DUMP 1
 
-namespace mls {
+namespace MLS_NAMESPACE {
 
 enum struct NodeType : uint8_t
 {
@@ -122,6 +123,7 @@ struct TreeKEMPublicKey
   TreeKEMPublicKey& operator=(const TreeKEMPublicKey& other) = default;
   TreeKEMPublicKey& operator=(TreeKEMPublicKey&& other) = default;
 
+  LeafIndex allocate_leaf();
   LeafIndex add_leaf(const LeafNode& leaf);
   void update_leaf(LeafIndex index, const LeafNode& leaf);
   void blank_path(LeafIndex index);
@@ -147,6 +149,40 @@ struct TreeKEMPublicKey
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
+
+  template<typename UnaryPredicate>
+  bool all_leaves(const UnaryPredicate& pred) const
+  {
+    for (LeafIndex i{ 0 }; i < size; i.val++) {
+      const auto& node = node_at(i);
+      if (node.blank()) {
+        continue;
+      }
+
+      if (!pred(i, node.leaf_node())) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  template<typename UnaryPredicate>
+  bool any_leaf(const UnaryPredicate& pred) const
+  {
+    for (LeafIndex i{ 0 }; i < size; i.val++) {
+      const auto& node = node_at(i);
+      if (node.blank()) {
+        continue;
+      }
+
+      if (pred(i, node.leaf_node())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   using FilteredDirectPath =
     std::vector<std::tuple<NodeIndex, std::vector<NodeIndex>>>;
@@ -187,6 +223,11 @@ private:
                              NodeIndex parent,
                              NodeIndex sibling) const;
 
+  bool exists_in_tree(const HPKEPublicKey& key,
+                      std::optional<LeafIndex> except) const;
+  bool exists_in_tree(const SignaturePublicKey& key,
+                      std::optional<LeafIndex> except) const;
+
   OptionalNode blank_node;
 
   friend struct TreeKEMPrivateKey;
@@ -200,14 +241,16 @@ operator>>(tls::istream& str, TreeKEMPublicKey& obj);
 struct LeafNodeHashInput;
 struct ParentNodeHashInput;
 
-} // namespace mls
+} // namespace MLS_NAMESPACE
 
-namespace tls {
+namespace MLS_NAMESPACE::tls {
 
-TLS_VARIANT_MAP(mls::NodeType, mls::LeafNodeHashInput, leaf)
-TLS_VARIANT_MAP(mls::NodeType, mls::ParentNodeHashInput, parent)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::LeafNodeHashInput, leaf)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType,
+                MLS_NAMESPACE::ParentNodeHashInput,
+                parent)
 
-TLS_VARIANT_MAP(mls::NodeType, mls::LeafNode, leaf)
-TLS_VARIANT_MAP(mls::NodeType, mls::ParentNode, parent)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::LeafNode, leaf)
+TLS_VARIANT_MAP(MLS_NAMESPACE::NodeType, MLS_NAMESPACE::ParentNode, parent)
 
-} // namespace tls
+} // namespace MLS_NAMESPACE::tls

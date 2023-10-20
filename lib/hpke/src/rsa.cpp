@@ -3,8 +3,9 @@
 #include "common.h"
 #include "openssl/rsa.h"
 #include "openssl_common.h"
+#include <namespace.h>
 
-namespace hpke {
+namespace MLS_NAMESPACE::hpke {
 
 std::unique_ptr<Signature::PrivateKey>
 RSASignature::generate_key_pair() const
@@ -146,6 +147,32 @@ RSASignature::verify(const bytes& data,
   return rv == 1;
 }
 
+// TODO(RLB) Implement these methods.  No concrete need, but might be nice for
+// completeness.
+std::unique_ptr<Signature::PrivateKey>
+RSASignature::import_jwk_private(const std::string& /* json_str */) const
+{
+  throw std::runtime_error("not implemented");
+}
+
+std::unique_ptr<Signature::PublicKey>
+RSASignature::import_jwk(const std::string& /* json_str */) const
+{
+  throw std::runtime_error("not implemented");
+}
+
+std::string
+RSASignature::export_jwk_private(const Signature::PrivateKey& /* sk */) const
+{
+  throw std::runtime_error("not implemented");
+}
+
+std::string
+RSASignature::export_jwk(const Signature::PublicKey& /* pk */) const
+{
+  throw std::runtime_error("not implemented");
+}
+
 const EVP_MD*
 RSASignature::digest_to_md(Digest::ID digest)
 {
@@ -177,4 +204,5 @@ RSASignature::digest_to_sig(Digest::ID digest)
       throw std::runtime_error("Unsupported digest");
   }
 }
-} // namespace hpke
+
+} // namespace MLS_NAMESPACE::hpke

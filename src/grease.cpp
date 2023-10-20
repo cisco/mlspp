@@ -1,9 +1,27 @@
 #include "grease.h"
 
+#include <namespace.h>
 #include <random>
 #include <set>
 
-namespace mls {
+namespace MLS_NAMESPACE {
+
+#ifdef DISABLE_GREASE
+
+Capabilities
+grease(Capabilities&& capabilities,
+       [[maybe_unused]] const ExtensionList& extensions)
+{
+  return capabilities;
+}
+
+ExtensionList
+grease(ExtensionList&& extensions)
+{
+  return extensions;
+}
+
+#else
 
 // Randomness parmeters:
 // * Given a list of N items, insert max(1, rand(p_grease * N)) GREASE values
@@ -117,4 +135,6 @@ grease(ExtensionList&& extensions)
   return { ext };
 }
 
-} // namespace mls
+#endif // DISABLE_GREASE
+
+} // namespace MLS_NAMESPACE
