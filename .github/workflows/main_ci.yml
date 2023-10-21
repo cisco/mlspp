@@ -11,10 +11,17 @@ on:
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+  CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
   CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
-  CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+  OPENSSL3_MANIFEST_DIR: ${{ github.workspace }}/alternatives/openssl_3
+  DEFAULT_VCPKG_CONFIG: ${{ github.workspace }}/vcpkg.json
+  OPENSSL3_VCPKG_CONFIG: ${{ github.workspace }}/alternatives/openssl_3/vcpkg.json
+  VCPKG_REPO: ${{ github.workspace }}/vcpkg
+  DEFAULT_CTEST_TARGET: test
+  WINDOWS_CTEST_TARGET: RUN_TESTS
 
 jobs:
   formatting-check:
@@ -42,9 +49,10 @@ jobs:
     needs: formatting-check
     name: Quick Linux Check and Interop
     runs-on: ubuntu-latest
+
     steps:
 
-    # check out the repository with recursively pulling the submodules
+    # check out the repository recursively pulling the submodules
     - name: Checkout repository and submodules
       uses: actions/checkout@v4
       with:
@@ -54,7 +62,7 @@ jobs:
     # write the commit hash of vcpkg to a text file so we can use it in the
     # hashFiles for cache
     - run: |
-        git -C vcpkg rev-parse HEAD > vcpkg-commit.txt
+        git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -71,14 +79,15 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-ubuntu-latest-v1-${{ hashFiles('vcpkg-commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        key: VCPKG-BinaryCache-ubuntu-latest-0-v1-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
         restore-keys: |
-          VCPKG-BinaryCache-ubuntu-latest-v1
+          VCPKG-BinaryCache-ubuntu-latest-0-v1
+          VCPKG-BinaryCache-ubuntu-latest-0
           VCPKG-BinaryCache-ubuntu-latest
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="vcpkg/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
 
     - name: Unit Test (OpenSSL 1.1)
@@ -88,7 +97,7 @@ jobs:
     - name: Build (Interop Harness)
       run: |
         cd cmd/interop
-        cmake -B build -DCMAKE_TOOLCHAIN_FILE="../../vcpkg/scripts/buildsystems/vcpkg.cmake"
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build build
 
     - name: Test self-interop
@@ -106,7 +115,7 @@ jobs:
         
     - name: Build (OpenSSL 3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="vcpkg/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL3_MANIFEST_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
     - name: Unit Test (OpenSSL 3)
@@ -125,24 +134,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest, macos-11]
+        os: [windows-latest, ubuntu-latest, macos-13]
+        deployment_target: [0]
         include:
-          - os: windows-latest
-            vcpkg-cmake-file: "vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
-            ossl3-vcpkg-dir: "alternatives\\openssl_3"
-            ctest-target: RUN_TESTS
-          - os: ubuntu-latest
-            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
-            ossl3-vcpkg-dir: "alternatives/openssl_3"
-            ctest-target: test
-          - os: macos-latest
-            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
-            ossl3-vcpkg-dir: "alternatives/openssl_3"
-            ctest-target: test
-          - os: macos-11
-            vcpkg-cmake-file: "vcpkg/scripts/buildsystems/vcpkg.cmake"
-            ossl3-vcpkg-dir: "alternatives/openssl_3"
-            ctest-target: test
+          - os: macos-13
+            deployment_target: 10.11
 
     steps:
     - name: Checkout repository and submodules
@@ -154,7 +150,12 @@ jobs:
     # write the commit hash of vcpkg to a text file so we can use it in the
     # hashFiles for cache
     - run: |
-        git -C vcpkg rev-parse HEAD > vcpkg-commit.txt
+        git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+    - name: Set Deployment Target
+      if: ${{ matrix.os == 'macos-latest' && matrix.deployment_target > 0 }}
+      run: |
+        echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}" >> $GITHUB_ENV
 
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -172,25 +173,38 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ matrix.os }}-v1-${{ hashFiles('vcpkg-commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        key: VCPKG-BinaryCache-${{ matrix.os }}-${{ matrix.deployment_target }}-v1-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
         restore-keys: |
-          VCPKG-BinaryCache-${{ matrix.os }}-v1
+          VCPKG-BinaryCache-${{ matrix.os }}-${{ matrix.deployment_target }}-v1
+          VCPKG-BinaryCache-${{ matrix.os }}-${{ matrix.deployment_target }}
           VCPKG-BinaryCache-${{ matrix.os }}
 
     - name: Build (OpenSSL1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
 
     - name: Unit Test (OpenSSL1.1)
+      if: ${{ matrix.os == 'windows-latest' }}
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ env.WINDOWS_CTEST_TARGET }}"
+
+    - name: Unit Test (OpenSSL1.1)
+      if: ${{ matrix.os != 'windows-latest' }}
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ env.DEFAULT_CTEST_TARGET }}"
 
     - name: Build (OpenSSL3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL3_MANIFEST_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
     - name: Unit Test (OpenSSL3)
+      if: ${{ matrix.os == 'windows-latest' }}
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ env.WINDOWS_CTEST_TARGET }}"
+
+    - name: Unit Test (OpenSSL3)
+      if: ${{ matrix.os != 'windows-latest' }}
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ env.DEFAULT_CTEST_TARGET }}"

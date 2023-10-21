@@ -19,21 +19,20 @@ all: ${BUILD_DIR}
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
 
-vcpkg:
+${TOOLCHAIN_FILE}:
 	git submodule update --init --recursive
 
-dev:
+dev: ${TOOLCHAIN_FILE}
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
-	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug .
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
-vcpkg-dev: vcpkg
-	# Like `dev`, but retrieve dependencies using vcpkg
-	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
-
-dev3: vcpkg
+dev3: ${TOOLCHAIN_FILE}
 	# Like `dev`, but using OpenSSL 3
-	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST}
 
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
@@ -64,14 +63,16 @@ test-all: test-libs ctest
 everything: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR}
 
-ci:
+ci: ${TOOLCHAIN_FILE}
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \
-		-DCMAKE_BUILD_TYPE=Debug .
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
-ci3:
+ci3: ${TOOLCHAIN_FILE}
 	# Like `ci`, but using OpenSSL 3
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \
-		-DCMAKE_BUILD_TYPE=Debug -DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} .
+		-DCMAKE_BUILD_TYPE=Debug  \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST}
 
 clean:
 	cmake --build ${BUILD_DIR} --target clean
