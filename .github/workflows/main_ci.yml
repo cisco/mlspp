@@ -134,10 +134,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-13]
+        os: [windows-latest, ubuntu-latest, macos-latest]
         deployment_target: [0]
         include:
-          - os: macos-13
+          - os: macos-latest
             deployment_target: 10.11
 
     steps:
