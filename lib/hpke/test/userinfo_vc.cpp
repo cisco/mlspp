@@ -2,7 +2,6 @@
 #include <hpke/userinfo_vc.h>
 #include <nlohmann/json.hpp>
 
-#include <iostream>
 #include <tls/compat.h>
 namespace opt = MLS_NAMESPACE::tls::opt;
 
