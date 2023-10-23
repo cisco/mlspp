@@ -184,12 +184,12 @@ jobs:
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
 
-    - name: Unit Test (OpenSSL1.1)
+    - name: Unit Test (OpenSSL1.1) (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ env.WINDOWS_CTEST_TARGET }}"
 
-    - name: Unit Test (OpenSSL1.1)
+    - name: Unit Test (OpenSSL1.1) (Non-Windows)
       if: ${{ matrix.os != 'windows-latest' }}
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ env.DEFAULT_CTEST_TARGET }}"
@@ -199,12 +199,12 @@ jobs:
         cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL3_MANIFEST_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
-    - name: Unit Test (OpenSSL3)
+    - name: Unit Test (OpenSSL3) (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ env.WINDOWS_CTEST_TARGET }}"
 
-    - name: Unit Test (OpenSSL3)
+    - name: Unit Test (OpenSSL3) (Non-Windows)
       if: ${{ matrix.os != 'windows-latest' }}
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ env.DEFAULT_CTEST_TARGET }}"
