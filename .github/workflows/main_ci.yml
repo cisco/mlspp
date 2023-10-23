@@ -153,12 +153,12 @@ jobs:
         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
 
     - name: Set Deployment Target
-      if: ${{ matrix.os == 'macos-latest' && matrix.deployment_target > 0 }}
+      if: ${{ startsWith(matrix.os, 'macos') && matrix.deployment_target > 0 }}
       run: |
         echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}" >> $GITHUB_ENV
 
     - name: Dependencies (macOs)
-      if: ${{ matrix.os == 'macos-latest' }}
+      if: ${{ startsWith(matrix.os, 'macos') }}
       run: |
         brew install llvm pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
