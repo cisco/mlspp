@@ -157,10 +157,11 @@ jobs:
       run: |
         echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}" >> $GITHUB_ENV
 
+    # Because Homebrew promotes versions regularly this will locking llvm at 14
     - name: Dependencies (macOs)
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: |
-        brew install llvm pkg-config
+        brew install llvm@14 pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
