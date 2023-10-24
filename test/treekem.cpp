@@ -170,6 +170,8 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
     auto dp = pub.filtered_direct_path(NodeIndex(index));
     while (path.nodes.size() < dp.size()) {
       auto node_pub = HPKEPrivateKey::generate(suite).public_key;
+      // C++17 doesn't allow aggregate initialization in emplace()
+      // NOLINTNEXTLINE(hicpp-use-emplace,modernize-use-emplace)
       path.nodes.push_back({ node_pub, {} });
     }
 

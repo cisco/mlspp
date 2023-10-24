@@ -47,10 +47,11 @@ GroupInfo::GroupInfo(GroupContext group_context_in,
                      ExtensionList extensions_in,
                      bytes confirmation_tag_in)
   : group_context(std::move(group_context_in))
-  , extensions(grease(std::move(extensions_in)))
+  , extensions(std::move(extensions_in))
   , confirmation_tag(std::move(confirmation_tag_in))
   , signer(0)
 {
+  grease(extensions);
 }
 
 struct GroupInfoTBS
@@ -897,6 +898,7 @@ external_proposal(CipherSuite suite,
     case ProposalType::invalid:
     case ProposalType::update:
     case ProposalType::external_init:
+    default:
       throw ProtocolError("External proposal has invalid type");
   }
 

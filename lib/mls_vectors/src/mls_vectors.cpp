@@ -13,7 +13,7 @@ using namespace MLS_NAMESPACE;
 /// Assertions for verifying test vectors
 ///
 
-template<typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
+template<typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 std::ostream&
 operator<<(std::ostream& str, const T& obj)
 {
@@ -75,7 +75,7 @@ operator<<(std::ostream& str, const GroupContent::RawContent& obj)
 }
 
 template<typename T>
-inline typename std::enable_if<T::_tls_serializable, std::ostream&>::type
+inline std::enable_if_t<T::_tls_serializable, std::ostream&>
 operator<<(std::ostream& str, const T& obj)
 {
   return str << to_hex(tls::marshal(obj));
@@ -172,9 +172,9 @@ PseudoRandom::Generator::Generator(CipherSuite suite_in,
 {
 }
 
-PseudoRandom::Generator::Generator(CipherSuite suite_in, bytes&& seed_in)
+PseudoRandom::Generator::Generator(CipherSuite suite_in, bytes seed_in)
   : suite(suite_in)
-  , seed(seed_in)
+  , seed(std::move(seed_in))
 {
 }
 
@@ -304,7 +304,7 @@ TreeMathTestVector::verify() const
 ///
 
 CryptoBasicsTestVector::RefHash::RefHash(CipherSuite suite,
-                                         PseudoRandom::Generator&& prg)
+                                         const PseudoRandom::Generator& prg)
   : label("RefHash")
   , value(prg.secret("value"))
   , out(suite.raw_ref(from_ascii(label), value))
@@ -320,7 +320,7 @@ CryptoBasicsTestVector::RefHash::verify(CipherSuite suite) const
 
 CryptoBasicsTestVector::ExpandWithLabel::ExpandWithLabel(
   CipherSuite suite,
-  PseudoRandom::Generator&& prg)
+  const PseudoRandom::Generator& prg)
   : secret(prg.secret("secret"))
   , label("ExpandWithLabel")
   , context(prg.secret("context"))
@@ -340,7 +340,7 @@ CryptoBasicsTestVector::ExpandWithLabel::verify(CipherSuite suite) const
 
 CryptoBasicsTestVector::DeriveSecret::DeriveSecret(
   CipherSuite suite,
-  PseudoRandom::Generator&& prg)
+  const PseudoRandom::Generator& prg)
   : secret(prg.secret("secret"))
   , label("DeriveSecret")
   , out(suite.derive_secret(secret, label))
@@ -356,7 +356,7 @@ CryptoBasicsTestVector::DeriveSecret::verify(CipherSuite suite) const
 
 CryptoBasicsTestVector::DeriveTreeSecret::DeriveTreeSecret(
   CipherSuite suite,
-  PseudoRandom::Generator&& prg)
+  const PseudoRandom::Generator& prg)
   : secret(prg.secret("secret"))
   , label("DeriveTreeSecret")
   , generation(prg.uint32("generation"))
@@ -376,7 +376,7 @@ CryptoBasicsTestVector::DeriveTreeSecret::verify(CipherSuite suite) const
 
 CryptoBasicsTestVector::SignWithLabel::SignWithLabel(
   CipherSuite suite,
-  PseudoRandom::Generator&& prg)
+  const PseudoRandom::Generator& prg)
   : priv(prg.signature_key("priv"))
   , pub(priv.public_key)
   , content(prg.secret("content"))
@@ -398,7 +398,7 @@ CryptoBasicsTestVector::SignWithLabel::verify(CipherSuite suite) const
 
 CryptoBasicsTestVector::EncryptWithLabel::EncryptWithLabel(
   CipherSuite suite,
-  PseudoRandom::Generator&& prg)
+  const PseudoRandom::Generator& prg)
   : priv(prg.hpke_key("priv"))
   , pub(priv.public_key)
   , label("EncryptWithLabel")
@@ -477,7 +477,7 @@ CryptoBasicsTestVector::verify() const
 ///
 
 SecretTreeTestVector::SenderData::SenderData(MLS_NAMESPACE::CipherSuite suite,
-                                             PseudoRandom::Generator&& prg)
+                                             const PseudoRandom::Generator& prg)
   : sender_data_secret(prg.secret("sender_data_secret"))
   , ciphertext(prg.secret("ciphertext"))
 {
@@ -1160,9 +1160,9 @@ struct TreeTestCase
   std::map<LeafIndex, PrivateState> privs;
   TreeKEMPublicKey pub;
 
-  TreeTestCase(CipherSuite suite_in, PseudoRandom::Generator&& prg_in)
+  TreeTestCase(CipherSuite suite_in, PseudoRandom::Generator prg_in)
     : suite(suite_in)
-    , prg(prg_in)
+    , prg(std::move(prg_in))
     , group_id(prg.secret("group_id"))
     , pub(suite)
   {
