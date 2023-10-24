@@ -88,7 +88,7 @@ jobs:
     - name: Build (OpenSSL 1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 3
 
     - name: Unit Test (OpenSSL 1.1)
       run: |
@@ -98,7 +98,7 @@ jobs:
       run: |
         cd cmd/interop
         cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build build
+        cmake --build build --parallel 3
 
     - name: Test self-interop
       run: |
@@ -116,7 +116,7 @@ jobs:
     - name: Build (OpenSSL 3)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL3_MANIFEST_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --parallel 3
 
     - name: Unit Test (OpenSSL 3)
       run: |
@@ -182,7 +182,7 @@ jobs:
     - name: Build (OpenSSL1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 3
 
     - name: Unit Test (OpenSSL1.1) (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
@@ -197,7 +197,7 @@ jobs:
     - name: Build (OpenSSL3)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL3_MANIFEST_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --parallel 3
 
     - name: Unit Test (OpenSSL3) (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
