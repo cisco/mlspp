@@ -139,16 +139,18 @@ LeafNode::LeafNode(CipherSuite cipher_suite,
   , credential(std::move(credential_in))
   , capabilities(std::move(capabilities_in))
   , content(lifetime_in)
-  , extensions(grease(std::move(extensions_in)))
+  , extensions(std::move(extensions_in))
 {
-  capabilities = grease(std::move(capabilities), extensions);
+  grease(extensions);
+  grease(capabilities, extensions);
   sign(cipher_suite, sig_priv, std::nullopt);
 }
 
 void
 LeafNode::set_capabilities(Capabilities capabilities_in)
 {
-  capabilities = grease(std::move(capabilities_in), extensions);
+  capabilities = std::move(capabilities_in);
+  grease(capabilities, extensions);
 }
 
 LeafNode
@@ -384,8 +386,9 @@ KeyPackage::KeyPackage(CipherSuite suite_in,
   , cipher_suite(suite_in)
   , init_key(std::move(init_key_in))
   , leaf_node(std::move(leaf_node_in))
-  , extensions(grease(std::move(extensions_in)))
+  , extensions(std::move(extensions_in))
 {
+  grease(extensions);
   sign(sig_priv_in);
 }
 
