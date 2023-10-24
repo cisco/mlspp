@@ -370,9 +370,11 @@ State::sign(const Sender& sender,
             const bytes& authenticated_data,
             bool encrypt) const
 {
-  auto content = GroupContent{
-    _group_id, _epoch, sender, authenticated_data, { std::forward<Inner>(inner_content) }
-  };
+  auto content = GroupContent{ _group_id,
+                               _epoch,
+                               sender,
+                               authenticated_data,
+                               { std::forward<Inner>(inner_content) } };
 
   auto wire_format = (encrypt) ? WireFormat::mls_private_message
                                : WireFormat::mls_public_message;

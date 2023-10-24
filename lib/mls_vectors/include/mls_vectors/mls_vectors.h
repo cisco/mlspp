@@ -75,7 +75,8 @@ struct CryptoBasicsTestVector : PseudoRandom
     bytes out;
 
     RefHash() = default;
-    RefHash(MLS_NAMESPACE::CipherSuite suite, const PseudoRandom::Generator& prg);
+    RefHash(MLS_NAMESPACE::CipherSuite suite,
+            const PseudoRandom::Generator& prg);
     std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
@@ -173,7 +174,8 @@ struct SecretTreeTestVector : PseudoRandom
     bytes nonce;
 
     SenderData() = default;
-    SenderData(MLS_NAMESPACE::CipherSuite suite, const PseudoRandom::Generator& prg);
+    SenderData(MLS_NAMESPACE::CipherSuite suite,
+               const PseudoRandom::Generator& prg);
     std::optional<std::string> verify(MLS_NAMESPACE::CipherSuite suite) const;
   };
 
