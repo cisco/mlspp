@@ -30,7 +30,7 @@ jobs:
           - 'cmd'
           - 'lib'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.11.0
@@ -44,7 +44,11 @@ jobs:
     name: Quick Linux Check and Interop
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -115,7 +119,11 @@ jobs:
               ctest-target: test
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -165,7 +173,11 @@ jobs:
         MACOSX_DEPLOYMENT_TARGET: 10.11
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: dependencies
       run: |
