@@ -162,8 +162,8 @@ jobs:
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: |
         brew install llvm@14 pkg-config
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+        ln -s "/usr/local/opt/llvm@14/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm@14/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
