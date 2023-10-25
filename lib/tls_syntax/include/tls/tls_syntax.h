@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <namespace.h>
 #include <optional>
 #include <stdexcept>
 #include <vector>
-#include <cstdint>
 
 #include <tls/compat.h>
 
