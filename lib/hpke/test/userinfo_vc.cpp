@@ -215,15 +215,14 @@ TEST_CASE("UserInfoClaims Field Parsing")
 TEST_CASE("UserInfoClaims Edge Cases")
 {
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json(R"({"updated_at", "42"})"),
+    UserInfoClaims::from_json(R"({"updated_at": "42"})"),
     "[json.exception.type_error.302] type must be number, but is string");
 
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json(nlohmann::json({ { "name", true } }).dump()),
+    UserInfoClaims::from_json(R"({"name": true})"),
     "[json.exception.type_error.302] type must be string, but is boolean");
 
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json(
-      nlohmann::json({ { "email_verified", "true" } }).dump()),
+    UserInfoClaims::from_json(R"({"email_verified": "true"})"),
     "[json.exception.type_error.302] type must be boolean, but is string");
 }
