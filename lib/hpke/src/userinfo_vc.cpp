@@ -265,7 +265,7 @@ struct UserInfoVC::ParsedCredential
       epoch_time(payload.at("nbf").get<int64_t>()),
       epoch_time(payload.at("exp").get<int64_t>()),
 
-      UserInfoClaims::from_json(vc.at("credentialSubject")),
+      UserInfoClaims::from_json(vc.at("credentialSubject").dump()),
       std::move(public_key),
 
       to_be_signed,
@@ -282,8 +282,10 @@ struct UserInfoVC::ParsedCredential
 /// UserInfoClaimsAddress
 ///
 UserInfoClaimsAddress
-UserInfoClaimsAddress::from_json(const nlohmann::json& address_json)
+UserInfoClaimsAddress::from_json(const std::string& address)
 {
+  const auto& address_json = nlohmann::json::parse(address);
+
   return {
     get_optional<std::string>(address_json, address_formatted_attr),
     get_optional<std::string>(address_json, address_street_address_attr),
@@ -298,13 +300,15 @@ UserInfoClaimsAddress::from_json(const nlohmann::json& address_json)
 /// UserInfoClaims
 ///
 UserInfoClaims
-UserInfoClaims::from_json(const nlohmann::json& cred_subject_json)
+UserInfoClaims::from_json(const std::string& cred_subject)
 {
+  const auto& cred_subject_json = nlohmann::json::parse(cred_subject);
+
   std::optional<UserInfoClaimsAddress> address_opt = {};
 
   if (cred_subject_json.contains(address_attr)) {
-    address_opt =
-      UserInfoClaimsAddress::from_json(cred_subject_json.at(address_attr));
+    address_opt = UserInfoClaimsAddress::from_json(
+      cred_subject_json.at(address_attr).dump());
   }
 
   return {

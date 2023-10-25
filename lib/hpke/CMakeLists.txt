@@ -13,13 +13,23 @@ find_package(OpenSSL 1.1 REQUIRED)
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15415#note_334852
+# Warning: this will fail once nlohman_json stops being header-only!
+get_target_property(JSON_INCLUDE_INTERFACE nlohmann_json::nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+
 add_library(${CURRENT_LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
 add_dependencies(${CURRENT_LIB_NAME} bytes tls_syntax)
-target_link_libraries(${CURRENT_LIB_NAME} 
+target_include_directories(${CURRENT_LIB_NAME}
   PRIVATE
-    nlohmann_json::nlohmann_json OpenSSL::Crypto
+    "${JSON_INCLUDE_INTERFACE}")
+
+target_link_libraries(${CURRENT_LIB_NAME} 
   PUBLIC
-    bytes tls_syntax)
+    bytes tls_syntax
+  PRIVATE
+    OpenSSL::Crypto
+)
+
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
