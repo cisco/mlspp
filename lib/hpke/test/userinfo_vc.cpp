@@ -215,8 +215,7 @@ TEST_CASE("UserInfoClaims Field Parsing")
 TEST_CASE("UserInfoClaims Edge Cases")
 {
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json(
-      nlohmann::json({ { "updated_at", "42" } }).dump()),
+    UserInfoClaims::from_json(R"({"updated_at", "42"})"),
     "[json.exception.type_error.302] type must be number, but is string");
 
   CHECK_THROWS_WITH(
