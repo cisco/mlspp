@@ -14,6 +14,7 @@ env:
   CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
   CMAKE_TEST_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl/test
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
   formatting-check:
@@ -28,7 +29,7 @@ jobs:
           - 'cmd'
           - 'lib'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.11.0
@@ -46,20 +47,21 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
             - os: windows-latest
-              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
               boring-vcpkg-dir: "alternatives\\boringssl_1.1"
               ctest-target: RUN_TESTS
             - os: ubuntu-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               boring-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
             - os: macos-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               boring-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -81,7 +83,7 @@ jobs:
 
     - name: Build (BoringSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boring-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}" -DREQUIRE_BORINGSSL=1
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boring-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}" -DREQUIRE_BORINGSSL=1
         cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
 
     - name: Unit Test (BoringSSL 1.1)
