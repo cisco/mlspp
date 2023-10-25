@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <vector>
+#include <cstdint>
 
 #include <tls/compat.h>
 
