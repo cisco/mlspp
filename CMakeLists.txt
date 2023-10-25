@@ -9,6 +9,7 @@ option(TESTING    "Build tests" OFF)
 option(CLANG_TIDY "Perform linting with clang-tidy" OFF)
 option(SANITIZERS "Enable sanitizers" OFF)
 option(MLS_NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
+option(DISABLE_GREASE "Disables the inclusion of MLS protocol recommended GREASE values" OFF)
 option(REQUIRE_BORINGSSL "Require BoringSSL instead of OpenSSL" OFF)
 
 if(MLS_NAMESPACE_SUFFIX)
@@ -79,6 +80,10 @@ endif()
 if("$ENV{MACOSX_DEPLOYMENT_TARGET}" STREQUAL "10.11")
   add_compile_options(-DVARIANT_COMPAT)
 endif()
+
+if (DISABLE_GREASE)
+  add_compile_options(-DDISABLE_GREASE)
+endif ()
 
 ###
 ### Enable testing

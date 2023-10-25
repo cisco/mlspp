@@ -15,6 +15,7 @@ env:
   CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
   CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
   formatting-check:
@@ -29,7 +30,7 @@ jobs:
           - 'cmd'
           - 'lib'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.11.0
@@ -43,7 +44,11 @@ jobs:
     name: Quick Linux Check and Interop
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -58,7 +63,7 @@ jobs:
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
 
     - name: Unit Test (OpenSSL 1.1)
@@ -68,7 +73,7 @@ jobs:
     - name: Build (Interop Harness)
       run: |
         cd cmd/interop
-        cmake -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build build
 
     - name: Test self-interop
@@ -86,7 +91,7 @@ jobs:
         
     - name: Build (OpenSSL 3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
     - name: Unit Test (OpenSSL 3)
@@ -104,20 +109,21 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
             - os: windows-latest
-              vcpkg-cmake-file: "$env:VCPKG_INSTALLATION_ROOT\\scripts\\buildsystems\\vcpkg.cmake"
               ossl3-vcpkg-dir: "alternatives\\openssl_3"
               ctest-target: RUN_TESTS
             - os: ubuntu-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               ossl3-vcpkg-dir: "alternatives/openssl_3"
               ctest-target: test
             - os: macos-latest
-              vcpkg-cmake-file: "$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
               ossl3-vcpkg-dir: "alternatives/openssl_3"
               ctest-target: test
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
@@ -139,7 +145,7 @@ jobs:
 
     - name: Build (OpenSSL1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
 
     - name: Unit Test (OpenSSL1.1)
@@ -148,7 +154,7 @@ jobs:
 
     - name: Build (OpenSSL3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg-cmake-file}}"
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
     - name: Unit Test (OpenSSL3)
@@ -163,12 +169,15 @@ jobs:
 
     env:
         CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-        TOOLCHAIN_FILE: $VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
         VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
         MACOSX_DEPLOYMENT_TARGET: 10.11
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: dependencies
       run: |
@@ -184,6 +193,6 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp --parallel 2
 

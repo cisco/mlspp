@@ -357,7 +357,7 @@ MLSMessage
 State::protect_full(Inner&& inner_content, const MessageOpts& msg_opts)
 {
   auto content_auth = sign({ MemberSender{ _index } },
-                           inner_content,
+                           std::forward<Inner>(inner_content),
                            msg_opts.authenticated_data,
                            msg_opts.encrypt);
   return protect(std::move(content_auth), msg_opts.padding_size);
@@ -370,9 +370,11 @@ State::sign(const Sender& sender,
             const bytes& authenticated_data,
             bool encrypt) const
 {
-  auto content = GroupContent{
-    _group_id, _epoch, sender, authenticated_data, { inner_content }
-  };
+  auto content = GroupContent{ _group_id,
+                               _epoch,
+                               sender,
+                               authenticated_data,
+                               { std::forward<Inner>(inner_content) } };
 
   auto wire_format = (encrypt) ? WireFormat::mls_private_message
                                : WireFormat::mls_public_message;

@@ -5,10 +5,10 @@
 
 namespace MLS_NAMESPACE {
 
-Capabilities
-grease(Capabilities&& capabilities, const ExtensionList& extensions);
+void
+grease(Capabilities& capabilities, const ExtensionList& extensions);
 
-ExtensionList
-grease(ExtensionList&& extensions);
+void
+grease(ExtensionList& extensions);
 
 } // namespace MLS_NAMESPACE
