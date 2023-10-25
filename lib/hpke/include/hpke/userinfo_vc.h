@@ -6,7 +6,6 @@
 #include <chrono>
 #include <hpke/signature.h>
 #include <map>
-#include <nlohmann/json.hpp>
 
 using namespace MLS_NAMESPACE::bytes_ns;
 
@@ -21,7 +20,7 @@ struct UserInfoClaimsAddress
   std::optional<std::string> postal_code;
   std::optional<std::string> country;
 
-  static UserInfoClaimsAddress from_json(const nlohmann::json& address_json);
+  static UserInfoClaimsAddress from_json(const std::string& address);
 };
 
 struct UserInfoClaims
@@ -48,7 +47,7 @@ struct UserInfoClaims
   std::optional<UserInfoClaimsAddress> address;
   std::optional<uint64_t> updated_at;
 
-  static UserInfoClaims from_json(const nlohmann::json& cred_subject_json);
+  static UserInfoClaims from_json(const std::string& cred_subject);
 };
 
 struct UserInfoVC

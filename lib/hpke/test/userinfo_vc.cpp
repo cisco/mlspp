@@ -175,7 +175,8 @@ TEST_CASE("UserInfoClaims Field Parsing")
     { "updated_at", 42 }
   };
 
-  const auto userinfo_claims = UserInfoClaims::from_json(credentialSubject);
+  const auto userinfo_claims =
+    UserInfoClaims::from_json(credentialSubject.dump());
 
   CHECK(userinfo_claims.sub == credentialSubject.at("sub"));
   CHECK(userinfo_claims.name == credentialSubject.at("name"));
@@ -214,14 +215,14 @@ TEST_CASE("UserInfoClaims Field Parsing")
 TEST_CASE("UserInfoClaims Edge Cases")
 {
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json({ { "updated_at", "42" } }),
+    UserInfoClaims::from_json(R"({"updated_at": "42"})"),
     "[json.exception.type_error.302] type must be number, but is string");
 
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json({ { "name", true } }),
+    UserInfoClaims::from_json(R"({"name": true})"),
     "[json.exception.type_error.302] type must be string, but is boolean");
 
   CHECK_THROWS_WITH(
-    UserInfoClaims::from_json({ { "email_verified", "true" } }),
+    UserInfoClaims::from_json(R"({"email_verified": "true"})"),
     "[json.exception.type_error.302] type must be boolean, but is string");
 }
