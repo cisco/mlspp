@@ -32,7 +32,6 @@ Conventions
   * Private member variables start with underscore (`_`)
   * In general, prefer descriptive names
 
-
 OpenSSL / BoringSSL
 -------------------
 
