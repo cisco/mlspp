@@ -39,3 +39,4 @@ OpenSSL / BoringSSL
 MLS++ requires OpenSSL of at least version 1.1.1, or BoringSSL compatible with the same requirement. MLS++ is compatible with OpenSSL >= 3.0. 
 
 Pass `OPENSSL_ROOT_DIR` to guide CMake to select a specific OpenSSL/BoringSSL installation. You may also need to specify `OPENSSL_INCLUDE_DIR`, `OPENSSL_CRYPTO_LIBRARY`, and `OPENSSL_SSL_LIBRARY` depending on the file and folder structure of your installation. When manually passing `OPENSSL_*` options one should carefully verify that both the includes and libraries match the expected installation.
+  
