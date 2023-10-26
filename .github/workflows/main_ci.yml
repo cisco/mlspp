@@ -16,6 +16,9 @@ env:
   CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
   VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+  VCPKG_REPO: ${{ github.workspace }}/vcpkg
+  CACHE_VERSION: v01
+  CACHE_NAME: vcpkg
 
 jobs:
   formatting-check:
@@ -49,6 +52,25 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
+
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+    # First, attempt to pull key key, if that is not present, pull one of the
+    # restore-keys so we do not need to build from scratch.
+    # CACHE_VERSION - provide a way to reset cache
+    # CACHE_NAME - name of the cache in order to manage it
+    # matrix.os - cache per OS and version
+    # hashFiles - Recache if the vcpkg files change
+    - name: Restore Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -125,6 +147,25 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+    # First, attempt to pull key key, if that is not present, pull one of the
+    # restore-keys so we do not need to build from scratch.
+    # CACHE_VERSION - provide a way to reset cache
+    # CACHE_NAME - name of the cache in order to manage it
+    # matrix.os - cache per OS and version
+    # hashFiles - Recache if the vcpkg files change
+    - name: Restore Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
@@ -136,12 +177,6 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get install -y linux-headers-$(uname -r)
-
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
 
     - name: Build (OpenSSL1.1)
       run: |
@@ -179,17 +214,31 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+    # First, attempt to pull key key, if that is not present, pull one of the
+    # restore-keys so we do not need to build from scratch.
+    # CACHE_VERSION - provide a way to reset cache
+    # CACHE_NAME - name of the cache in order to manage it
+    # matrix.os - cache per OS and version
+    # hashFiles - Recache if the vcpkg files change
+    - name: Restore Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy
+          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest
+
     - name: dependencies
       run: |
         brew install llvm pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
-    - name: Restore cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: VCPKG-BinaryCache-${{ runner.os }}
 
     - name: Build
       run: |
