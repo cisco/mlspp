@@ -9,7 +9,7 @@ on:
       - main
 
 env:
-  CMAKE_GENERATOR: Ninja
+  CMAKE_BUILD_PARALLEL_LEVEL: 3
   CTEST_OUTPUT_ON_FAILURE: 1
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
