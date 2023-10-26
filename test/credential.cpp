@@ -102,7 +102,7 @@ TEST_CASE("Multi Credential")
     { { suite, cred_1, cred_priv_1 }, { suite, cred_2, cred_priv_2 } }, pub);
   REQUIRE(cred.valid_for(pub));
 
-  auto multi = cred.get<MultiCredential>();
+  const auto& multi = cred.get<MultiCredential>();
   const auto& bindings = multi.bindings;
   REQUIRE(bindings.size() == 2);
   REQUIRE(bindings[0].credential == cred_1);
