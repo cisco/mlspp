@@ -42,6 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
+        crypto: [openssl_1.1, openssl_3, boringssl]
         include:
             - os: windows-latest
               ctest-target: RUN_TESTS
@@ -80,32 +81,14 @@ jobs:
       run: |
         sudo apt-get install -y linux-headers-$(uname -r) nasm
 
-    - name: Build (OpenSSL 1.1)
+    - name: Build
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_1.1"
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
-    - name: Unit Test (OpenSSL 1.1)
+    - name: Unit Test
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-
-    - name: Build (OpenSSL 3)
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
-
-    - name: Unit Test (OpenSSL 3)
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
-
-    - name: Build (BoringSSL)
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl"
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
-
-    - name: Unit Test (BoringSSL)
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
 
 # TODO: Add the legacy macOS build to the main matrix
 # TODO: Add a clang-tidy build
