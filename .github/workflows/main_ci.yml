@@ -34,7 +34,7 @@ jobs:
 #        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
 #        fallback-style: 'Mozilla'
 #
-  platform-sanitizer-tests:
+  build-and-test:
 #    needs: formatting-check
     name: Build and test
     runs-on: ${{ matrix.os }}
@@ -50,6 +50,12 @@ jobs:
               ctest-target: test
             - os: macos-latest
               ctest-target: test
+            - os: macos-latest
+              ctest-target: test
+              macosx-deployment-target: 10.11
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx-deployment-target }}
 
     steps:
     - name: Checkout repository and submodules
@@ -89,6 +95,25 @@ jobs:
     - name: Unit Test
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build (Interop Harness)
+      run: |
+        cd cmd/interop
+        cmake -B build
+        cmake --build build
+
+    - name: Test self-interop
+      run: |
+        make -C cmd/interop self-test
+
+    - name: Test interop on test vectors
+      run: |
+        make -C cmd/interop interop-test
+
+    - name: Test gRPC live interop with self
+      run: |
+        cd cmd/interop
+        ./grpc-self-test.sh
 
 # TODO: Add the legacy macOS build to the main matrix
 # TODO: Add a clang-tidy build
