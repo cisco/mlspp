@@ -66,7 +66,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest
 
@@ -241,7 +241,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest
