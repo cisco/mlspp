@@ -26,8 +26,10 @@ tls_signature_scheme(Signature::ID id)
       return SignatureScheme::ecdsa_secp521r1_sha512;
     case Signature::ID::Ed25519:
       return SignatureScheme::ed25519;
+#if !defined(WITH_BORINGSSL)
     case Signature::ID::Ed448:
       return SignatureScheme::ed448;
+#endif
     case Signature::ID::RSA_SHA256:
       return SignatureScheme::rsa_pkcs1_sha256;
     default:
@@ -98,18 +100,26 @@ CipherSuite::get() const
       Signature::get<Signature::ID::Ed25519>(),
     };
 
-  static const auto ciphers_X448_AES256GCM_SHA512_Ed448 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA512>(),
-    Signature::get<Signature::ID::Ed448>(),
-  };
-
   static const auto ciphers_P521_AES256GCM_SHA512_P521 = CipherSuite::Ciphers{
     HPKE(
       KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
     Digest::get<Digest::ID::SHA512>(),
     Signature::get<Signature::ID::P521_SHA512>(),
+  };
+
+  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
+    HPKE(
+      KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA384>(),
+    Signature::get<Signature::ID::P384_SHA384>(),
+  };
+
+#if !defined(WITH_BORINGSSL)
+  static const auto ciphers_X448_AES256GCM_SHA512_Ed448 = CipherSuite::Ciphers{
+    HPKE(
+      KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
+    Digest::get<Digest::ID::SHA512>(),
+    Signature::get<Signature::ID::Ed448>(),
   };
 
   static const auto ciphers_X448_CHACHA20POLY1305_SHA512_Ed448 =
@@ -120,13 +130,7 @@ CipherSuite::get() const
       Digest::get<Digest::ID::SHA512>(),
       Signature::get<Signature::ID::Ed448>(),
     };
-
-  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA384>(),
-    Signature::get<Signature::ID::P384_SHA384>(),
-  };
+#endif
 
   switch (id) {
     case ID::unknown:
@@ -141,17 +145,19 @@ CipherSuite::get() const
     case ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
       return ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519;
 
-    case ID::X448_AES256GCM_SHA512_Ed448:
-      return ciphers_X448_AES256GCM_SHA512_Ed448;
-
     case ID::P521_AES256GCM_SHA512_P521:
       return ciphers_P521_AES256GCM_SHA512_P521;
 
-    case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
-      return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
-
     case ID::P384_AES256GCM_SHA384_P384:
       return ciphers_P384_AES256GCM_SHA384_P384;
+
+#if !defined(WITH_BORINGSSL)
+    case ID::X448_AES256GCM_SHA512_Ed448:
+      return ciphers_X448_AES256GCM_SHA512_Ed448;
+
+    case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
+      return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
+#endif
 
     default:
       throw InvalidParameterError("Unsupported ciphersuite");
@@ -194,15 +200,25 @@ CipherSuite::derive_tree_secret(const bytes& secret,
   return expand_with_label(secret, label, tls::marshal(generation), length);
 }
 
+#if WITH_BORINGSSL
+const std::array<CipherSuite::ID, 5> all_supported_suites = {
+  CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+  CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+  CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
+  CipherSuite::ID::P521_AES256GCM_SHA512_P521,
+  CipherSuite::ID::P384_AES256GCM_SHA384_P384,
+};
+#else
 const std::array<CipherSuite::ID, 7> all_supported_suites = {
   CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
   CipherSuite::ID::P256_AES128GCM_SHA256_P256,
   CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
-  CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
   CipherSuite::ID::P521_AES256GCM_SHA512_P521,
-  CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
   CipherSuite::ID::P384_AES256GCM_SHA384_P384,
+  CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
+  CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
 };
+#endif
 
 // MakeKeyPackageRef(value) = KDF.expand(
 //   KDF.extract("", value), "MLS 1.0 KeyPackage Reference", 16)

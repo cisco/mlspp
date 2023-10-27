@@ -62,6 +62,7 @@ DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>()
   return instance;
 }
 
+#if !defined(WITH_BORINGSSL)
 template<>
 const DHKEM&
 DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
@@ -71,6 +72,7 @@ DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
                                           KDF::get<KDF::ID::HKDF_SHA512>());
   return instance;
 }
+#endif
 
 DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
   : KEM(kem_id_in,

@@ -4,6 +4,10 @@
 #include <namespace.h>
 #include <openssl/evp.h>
 
+#if WITH_BORINGSSL
+#include <openssl/aead.h>
+#endif
+
 namespace MLS_NAMESPACE::hpke {
 
 ///
@@ -109,6 +113,25 @@ cipher_tag_size(AEAD::ID cipher)
   }
 }
 
+#if WITH_BORINGSSL
+static const EVP_AEAD*
+boringssl_cipher(AEAD::ID cipher)
+{
+  switch (cipher) {
+    case AEAD::ID::AES_128_GCM:
+      return EVP_aead_aes_128_gcm();
+
+    case AEAD::ID::AES_256_GCM:
+      return EVP_aead_aes_256_gcm();
+
+    case AEAD::ID::CHACHA20_POLY1305:
+      return EVP_aead_chacha20_poly1305();
+
+    default:
+      throw std::runtime_error("Unsupported algorithm");
+  }
+}
+#else
 static const EVP_CIPHER*
 openssl_cipher(AEAD::ID cipher)
 {
@@ -126,6 +149,7 @@ openssl_cipher(AEAD::ID cipher)
       throw std::runtime_error("Unsupported algorithm");
   }
 }
+#endif // WITH_BORINGSSL
 
 AEADCipher::AEADCipher(AEAD::ID id_in)
   : AEAD(id_in, cipher_key_size(id_in), cipher_nonce_size(id_in))
@@ -139,6 +163,30 @@ AEADCipher::seal(const bytes& key,
                  const bytes& aad,
                  const bytes& pt) const
 {
+#if WITH_BORINGSSL
+  auto ctx = make_typed_unique(
+    EVP_AEAD_CTX_new(boringssl_cipher(id), key.data(), key.size(), tag_size));
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
+
+  auto ct = bytes(pt.size() + tag_size);
+  auto out_len = ct.size();
+  if (1 != EVP_AEAD_CTX_seal(ctx.get(),
+                             ct.data(),
+                             &out_len,
+                             ct.size(),
+                             nonce.data(),
+                             nonce.size(),
+                             pt.data(),
+                             pt.size(),
+                             aad.data(),
+                             aad.size())) {
+    throw openssl_error();
+  }
+
+  return ct;
+#else
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx == nullptr) {
     throw openssl_error();
@@ -185,6 +233,7 @@ AEADCipher::seal(const bytes& key,
 
   ct += tag;
   return ct;
+#endif // WITH_BORINGSSL
 }
 
 std::optional<bytes>
@@ -197,6 +246,30 @@ AEADCipher::open(const bytes& key,
     throw std::runtime_error("AEAD ciphertext smaller than tag size");
   }
 
+#if WITH_BORINGSSL
+  auto ctx = make_typed_unique(EVP_AEAD_CTX_new(
+    boringssl_cipher(id), key.data(), key.size(), cipher_tag_size(id)));
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
+
+  auto pt = bytes(ct.size() - tag_size);
+  auto out_len = pt.size();
+  if (1 != EVP_AEAD_CTX_open(ctx.get(),
+                             pt.data(),
+                             &out_len,
+                             pt.size(),
+                             nonce.data(),
+                             nonce.size(),
+                             ct.data(),
+                             ct.size(),
+                             aad.data(),
+                             aad.size())) {
+    throw openssl_error();
+  }
+
+  return pt;
+#else
   auto ctx = make_typed_unique(EVP_CIPHER_CTX_new());
   if (ctx == nullptr) {
     throw openssl_error();
@@ -243,6 +316,7 @@ AEADCipher::open(const bytes& key,
   }
 
   return pt;
+#endif // WITH_BORINGSSL
 }
 
 } // namespace MLS_NAMESPACE::hpke

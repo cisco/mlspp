@@ -52,15 +52,18 @@ get_optional(const json& json_object, const std::string& field_name)
 static const Signature&
 signature_from_alg(const std::string& alg)
 {
-  static const auto alg_sig_map = std::map<std::string, const Signature&>{
+  static const auto alg_sig_map = std::map<std::string, const Signature&>
+  {
     { "ES256", Signature::get<Signature::ID::P256_SHA256>() },
-    { "ES384", Signature::get<Signature::ID::P384_SHA384>() },
-    { "ES512", Signature::get<Signature::ID::P521_SHA512>() },
-    { "Ed25519", Signature::get<Signature::ID::Ed25519>() },
-    { "Ed448", Signature::get<Signature::ID::Ed448>() },
-    { "RS256", Signature::get<Signature::ID::RSA_SHA256>() },
-    { "RS384", Signature::get<Signature::ID::RSA_SHA384>() },
-    { "RS512", Signature::get<Signature::ID::RSA_SHA512>() },
+      { "ES384", Signature::get<Signature::ID::P384_SHA384>() },
+      { "ES512", Signature::get<Signature::ID::P521_SHA512>() },
+      { "Ed25519", Signature::get<Signature::ID::Ed25519>() },
+#if !defined(WITH_BORINGSSL)
+      { "Ed448", Signature::get<Signature::ID::Ed448>() },
+#endif
+      { "RS256", Signature::get<Signature::ID::RSA_SHA256>() },
+      { "RS384", Signature::get<Signature::ID::RSA_SHA384>() },
+      { "RS512", Signature::get<Signature::ID::RSA_SHA512>() },
   };
 
   return alg_sig_map.at(alg);

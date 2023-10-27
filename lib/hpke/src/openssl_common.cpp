@@ -20,6 +20,15 @@ typed_delete(EVP_CIPHER_CTX* ptr)
   EVP_CIPHER_CTX_free(ptr);
 }
 
+#if WITH_BORINGSSL
+template<>
+void
+typed_delete(EVP_AEAD_CTX* ptr)
+{
+  EVP_AEAD_CTX_free(ptr);
+}
+#endif
+
 template<>
 void
 typed_delete(EVP_PKEY_CTX* ptr)

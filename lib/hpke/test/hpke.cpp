@@ -45,6 +45,10 @@ test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 static void
 test_base_vector(const HPKETestVector& tv)
 {
+  if (!supported_kem(tv.kem_id)) {
+    return;
+  }
+
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
@@ -63,6 +67,10 @@ test_base_vector(const HPKETestVector& tv)
 static void
 test_psk_vector(const HPKETestVector& tv)
 {
+  if (!supported_kem(tv.kem_id)) {
+    return;
+  }
+
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
@@ -81,6 +89,10 @@ test_psk_vector(const HPKETestVector& tv)
 static void
 test_auth_vector(const HPKETestVector& tv)
 {
+  if (!supported_kem(tv.kem_id)) {
+    return;
+  }
+
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
@@ -107,6 +119,10 @@ test_auth_vector(const HPKETestVector& tv)
 static void
 test_auth_psk_vector(const HPKETestVector& tv)
 {
+  if (!supported_kem(tv.kem_id)) {
+    return;
+  }
+
   const auto& kem = select_kem(tv.kem_id);
   auto hpke = HPKE(tv.kem_id, tv.kdf_id, tv.aead_id);
 
@@ -168,11 +184,14 @@ TEST_CASE("HPKE Round-Trip")
 {
   ensure_fips_if_required();
 
-  const std::vector<KEM::ID> kems{ KEM::ID::DHKEM_P256_SHA256,
-                                   KEM::ID::DHKEM_P384_SHA384,
-                                   KEM::ID::DHKEM_P384_SHA384,
-                                   KEM::ID::DHKEM_P521_SHA512,
-                                   KEM::ID::DHKEM_X448_SHA512 };
+  const std::vector<KEM::ID> kems
+  {
+    KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
+      KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
+#if !defined(WITH_BORINGSSL)
+      KEM::ID::DHKEM_X448_SHA512
+#endif
+  };
   const std::vector<KDF::ID> kdfs{ KDF::ID::HKDF_SHA256,
                                    KDF::ID::HKDF_SHA384,
                                    KDF::ID::HKDF_SHA512 };

@@ -26,8 +26,10 @@ find_signature(Signature::ID id)
       return Signature::get<Signature::ID::P521_SHA512>();
     case Signature::ID::Ed25519:
       return Signature::get<Signature::ID::Ed25519>();
+#if !defined(WITH_BORINGSSL)
     case Signature::ID::Ed448:
       return Signature::get<Signature::ID::Ed448>();
+#endif
     case Signature::ID::RSA_SHA256:
       return Signature::get<Signature::ID::RSA_SHA256>();
     default:

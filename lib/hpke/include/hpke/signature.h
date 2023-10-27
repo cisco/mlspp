@@ -16,7 +16,9 @@ struct Signature
     P384_SHA384,
     P521_SHA512,
     Ed25519,
+#if !defined(WITH_BORINGSSL)
     Ed448,
+#endif
     RSA_SHA256,
     RSA_SHA384,
     RSA_SHA512,

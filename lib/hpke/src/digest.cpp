@@ -143,7 +143,7 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
   // OpenSSL 3 does not support the flag EVP_MD_CTX_FLAG_NON_FIPS_ALLOW anymore.
   // However, OpenSSL 3 in FIPS mode doesn't seem to check the HMAC key size
   // constraint.
-#if !defined(WITH_OPENSSL3)
+#if !defined(WITH_OPENSSL3) && !defined(WITH_BORINGSSL)
   static const auto fips_min_hmac_key_len = 14;
   if (FIPS_mode() != 0 && key_size < fips_min_hmac_key_len) {
     HMAC_CTX_set_flags(ctx.get(), EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);

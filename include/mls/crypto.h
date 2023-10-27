@@ -133,7 +133,11 @@ private:
   static const bytes& reference_label();
 };
 
+#if WITH_BORINGSSL
+extern const std::array<CipherSuite::ID, 5> all_supported_suites;
+#else
 extern const std::array<CipherSuite::ID, 7> all_supported_suites;
+#endif
 
 // Utilities
 using MLS_NAMESPACE::hpke::random_bytes;

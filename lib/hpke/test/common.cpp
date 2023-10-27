@@ -49,8 +49,11 @@ fips_disable(AEAD::ID id)
 bool
 fips_disable(Signature::ID id)
 {
-  static const auto disabled = std::set<Signature::ID>{
+  static const auto disabled = std::set<Signature::ID>
+  {
+#if !defined(WITH_BORINGSSL)
     Signature::ID::Ed448,
+#endif
   };
   return disabled.count(id) > 0;
 }
@@ -71,8 +74,10 @@ select_signature(Signature::ID id)
     case Signature::ID::Ed25519:
       return Signature::get<Signature::ID::Ed25519>();
 
+#if !defined(WITH_BORINGSSL)
     case Signature::ID::Ed448:
       return Signature::get<Signature::ID::Ed448>();
+#endif
 
     case Signature::ID::RSA_SHA256:
       return Signature::get<Signature::ID::RSA_SHA256>();
@@ -85,6 +90,24 @@ select_signature(Signature::ID id)
 
     default:
       throw std::runtime_error("Unknown algorithm");
+  }
+}
+
+bool
+supported_kem(KEM::ID id)
+{
+  switch (id) {
+    case KEM::ID::DHKEM_P256_SHA256:
+    case KEM::ID::DHKEM_P384_SHA384:
+    case KEM::ID::DHKEM_P521_SHA512:
+    case KEM::ID::DHKEM_X25519_SHA256:
+#if !defined(WITH_BORINGSSL)
+    case KEM::ID::DHKEM_X448_SHA512:
+#endif
+      return true;
+
+    default:
+      return false;
   }
 }
 
@@ -104,8 +127,10 @@ select_kem(KEM::ID id)
     case KEM::ID::DHKEM_X25519_SHA256:
       return KEM::get<KEM::ID::DHKEM_X25519_SHA256>();
 
+#if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+#endif
 
     default:
       throw std::runtime_error("Unknown algorithm");

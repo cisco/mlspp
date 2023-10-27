@@ -17,7 +17,9 @@ struct KEM
     DHKEM_P384_SHA384 = 0x0011,
     DHKEM_P521_SHA512 = 0x0012,
     DHKEM_X25519_SHA256 = 0x0020,
+#if !defined(WITH_BORINGSSL)
     DHKEM_X448_SHA512 = 0x0021,
+#endif
   };
 
   template<KEM::ID>

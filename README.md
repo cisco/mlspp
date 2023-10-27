@@ -6,7 +6,7 @@ MLS++
 Implementation of the proposed [Messaging Layer
 Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md)
 protocol in C++.  Depends on C++17, STL for data structures, and
-OpenSSL for crypto.
+OpenSSL or BoringSSL for crypto.
 
 Quickstart
 ----------
@@ -31,4 +31,11 @@ Conventions
   * Snake case for variables, functions, members (`derive_epoch_keys`)
   * Private member variables start with underscore (`_`)
   * In general, prefer descriptive names
+
+OpenSSL / BoringSSL
+-------------------
+
+MLS++ requires OpenSSL of at least version 1.1.1, or BoringSSL compatible with the same requirement. MLS++ is compatible with OpenSSL >= 3.0. 
+
+Pass `OPENSSL_ROOT_DIR` to guide CMake to select a specific OpenSSL/BoringSSL installation. You may also need to specify `OPENSSL_INCLUDE_DIR`, `OPENSSL_CRYPTO_LIBRARY`, and `OPENSSL_SSL_LIBRARY` depending on the file and folder structure of your installation. When manually passing `OPENSSL_*` options one should carefully verify that both the includes and libraries match the expected installation.
   

@@ -125,12 +125,14 @@ KEM::get<KEM::ID::DHKEM_X25519_SHA256>()
   return DHKEM::get<KEM::ID::DHKEM_X25519_SHA256>();
 }
 
+#if !defined(WITH_BORINGSSL)
 template<>
 const KEM&
 KEM::get<KEM::ID::DHKEM_X448_SHA512>()
 {
   return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 }
+#endif
 
 bytes
 KEM::serialize_private(const KEM::PrivateKey& /* unused */) const
@@ -353,8 +355,10 @@ select_kem(KEM::ID id)
       return KEM::get<KEM::ID::DHKEM_P521_SHA512>();
     case KEM::ID::DHKEM_X25519_SHA256:
       return KEM::get<KEM::ID::DHKEM_X25519_SHA256>();
+#if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+#endif
     default:
       throw std::runtime_error("Unsupported algorithm");
   }

@@ -6,6 +6,7 @@
 #include "common.h"
 #include "openssl_common.h"
 
+#include "openssl/bn.h"
 #include "openssl/ec.h"
 #include "openssl/evp.h"
 #include "openssl/obj_mac.h"
@@ -494,7 +495,14 @@ struct ECKeyGroup : public EVPGroup
 #endif
 
     auto out = bytes(BN_num_bytes(d));
-    if (BN_bn2bin(d, out.data()) != int(out.size())) {
+#if WITH_BORINGSSL
+    // In BoringSSL, BN_bn2bin returns size_t
+    const auto out_size = out.size();
+#else
+    // In OpenSSL, BN_bn2bin returns int
+    const auto out_size = static_cast<int>(out.size());
+#endif
+    if (BN_bn2bin(d, out.data()) != out_size) {
       throw openssl_error();
     }
 
@@ -923,6 +931,8 @@ Group::get<Group::ID::Ed25519>()
   return instance;
 }
 
+// BoringSSL doesn't support X448 / Ed448
+#if !defined(WITH_BORINGSSL)
 template<>
 const Group&
 Group::get<Group::ID::X448>()
@@ -931,6 +941,7 @@ Group::get<Group::ID::X448>()
                                     KDF::get<KDF::ID::HKDF_SHA512>());
   return instance;
 }
+#endif
 
 template<>
 const Group&

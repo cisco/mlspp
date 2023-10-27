@@ -4,7 +4,6 @@ set(CURRENT_LIB_NAME hpke)
 ### Dependencies
 ###
 find_package(nlohmann_json REQUIRED)
-find_package(OpenSSL 1.1 REQUIRED)
 
 ###
 ### Library Config
@@ -35,6 +34,8 @@ target_include_directories(${CURRENT_LIB_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+  PRIVATE
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 ###

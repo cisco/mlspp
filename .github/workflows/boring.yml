@@ -1,0 +1,93 @@
+name: MLSPP CI (BoringSSL Test) 
+
+on:
+  push:
+    branches:
+      - main
+      - boring
+  pull_request:
+    branches:
+      - main
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
+  CMAKE_TEST_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl/test
+  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+jobs:
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path:
+          - 'include'
+          - 'src'
+          - 'test'
+          - 'cmd'
+          - 'lib'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run clang-format style check for C/C++ programs
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '16'
+        check-path: ${{ matrix.path }}
+        fallback-style: 'Mozilla'
+
+  platform-sanitizer-tests:
+    name: Build and test platforms using sanitizers and clang-tidy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              boring-vcpkg-dir: "alternatives\\boringssl_1.1"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              boring-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+            - os: macos-latest
+              boring-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+
+    steps:
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Dependencies (macOs)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config nasm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
+
+    - name: Restore cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: VCPKG-BinaryCache-${{ runner.os }}
+
+    - name: Build (BoringSSL 1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boring-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}" -DREQUIRE_BORINGSSL=1
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL 1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
+
+
