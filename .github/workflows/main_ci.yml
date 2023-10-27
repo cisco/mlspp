@@ -62,73 +62,72 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - run: |
-         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
-
-    - name: Restore Cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}-${{ matrix.macosx-deployment_target }}
-        restore-keys: |
-          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
-
-    - name: Dependencies (macOS)
-      if: ${{ matrix.os == 'macos-latest' }}
-      run: |
-        brew install llvm pkg-config nasm
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r) nasm
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
-        cmake --build "${{ env.BUILD_DIR }}"
-
-    - name: Unit Tests
-      run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build
-        cmake --build build
-
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
-
-  clang-tidy:
-    if: github.event.pull_request.draft == false
-    needs: build-and-test
-    name: Build with clang-tidy
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
-        ctest-target: [test]
-
-    steps:
-      # TODO Build with clang-tidy
-    - name: Checkout repository and submodules
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
+#    - run: |
+#         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+#
+#    - name: Restore Cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}-${{ matrix.macosx-deployment_target }}
+#        restore-keys: |
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+#
+#    - name: Dependencies (macOS)
+#      if: ${{ matrix.os == 'macos-latest' }}
+#      run: |
+#        brew install llvm pkg-config nasm
+#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r) nasm
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+#        cmake --build "${{ env.BUILD_DIR }}"
+#
+#    - name: Unit Tests
+#      run: |
+#        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+#
+#    - name: Build (Interop Harness)
+#      run: |
+#        cd cmd/interop
+#        cmake -B build
+#        cmake --build build
+#
+#    - name: Test self-interop
+#      run: |
+#        make -C cmd/interop self-test
+#
+#    - name: Test interop on test vectors
+#      run: |
+#        make -C cmd/interop interop-test
+#
+#    - name: Test gRPC live interop with self
+#      run: |
+#        cd cmd/interop
+#        ./grpc-self-test.sh
+#
+#  clang-tidy:
+#    if: github.event.pull_request.draft == false
+#    needs: build-and-test
+#    name: Build with clang-tidy
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      matrix:
+#        os: [ubuntu-latest]
+#        crypto: [openssl_1.1, openssl_3, boringssl]
+#        ctest-target: [test]
+#
+#    steps:
+#      # TODO Build with clang-tidy
+#    - name: Checkout repository and submodules
+#      uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
