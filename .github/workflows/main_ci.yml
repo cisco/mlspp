@@ -9,11 +9,13 @@ on:
       - main
 
 env:
-  CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   CMAKE_BUILD_PARALLEL_LEVEL: 3
   CTEST_OUTPUT_ON_FAILURE: 1
-
-  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/vcpkg_cache,readwrite
+  CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+  CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
+  CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
+  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_REPO: ${{ github.workspace }}/vcpkg
   CACHE_VERSION: v01
   CACHE_NAME: vcpkg
@@ -31,73 +33,60 @@ jobs:
 #        clang-format-version: 16
 #        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
 #        fallback-style: 'Mozilla'
-
-  build-and-test:
+#
+#  quick-linux-interop-check:
 #    needs: formatting-check
-    name: Build and Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
-        include:
-            - os: windows-latest
-              ctest-target: RUN_TESTS
-            - os: ubuntu-latest
-              ctest-target: test
-            - os: macos-latest
-              ctest-target: test
-            - os: macos-latest
-              ctest-target: test
-              macosx-deployment_target: 10.11
-
-    env:
-      BUILD_DIR: ${{ env.RUNNER_TEMP }}/build_${{ matrix.crypto }}
-      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx-deployment_target }}
-
-    steps:
-    - name: Checkout repository and submodules
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
+#    name: Quick Linux Check and Interop
+#    runs-on: ubuntu-latest
+#    steps:
+#    - name: Checkout repository and submodules
+#      uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    # write the commit hash of vcpkg to a text file so we can use it in the
+#    # hashFiles for cache
 #    - run: |
 #         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
 #
+#    # First, attempt to pull key key, if that is not present, pull one of the
+#    # restore-keys so we do not need to build from scratch.
+#    # CACHE_VERSION - provide a way to reset cache
+#    # CACHE_NAME - name of the cache in order to manage it
+#    # matrix.os - cache per OS and version
+#    # hashFiles - Recache if the vcpkg files change
 #    - name: Restore Cache
 #      uses: actions/cache@v3
 #      with:
 #        path: ${{ github.workspace }}/build/cache
-#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}-${{ matrix.macosx-deployment_target }}
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
 #        restore-keys: |
-#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest
 #
-#    - name: Dependencies (macOS)
-#      if: ${{ matrix.os == 'macos-latest' }}
-#      run: |
-#        brew install llvm pkg-config nasm
-#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-#
-#    - name: Dependencies (Ubuntu)
-#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#    - name: Dependencies
 #      run: |
 #        sudo apt-get install -y linux-headers-$(uname -r) nasm
 #
-#    - name: Build
-#      run: |
-#        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
-#        cmake --build "${{ env.BUILD_DIR }}"
+#    - name: Restore cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: VCPKG-BinaryCache-${{ runner.os }}
 #
-#    - name: Unit Tests
+#    - name: Build (OpenSSL 1.1)
 #      run: |
-#        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all
+#
+#    - name: Unit Test (OpenSSL 1.1)
+#      run: |
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
 #
 #    - name: Build (Interop Harness)
 #      run: |
 #        cd cmd/interop
-#        cmake -B build
+#        cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
 #        cmake --build build
 #
 #    - name: Test self-interop
@@ -112,22 +101,158 @@ jobs:
 #      run: |
 #        cd cmd/interop
 #        ./grpc-self-test.sh
+#        
+#    - name: Build (OpenSSL 3)
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 #
-#  clang-tidy:
+#    - name: Unit Test (OpenSSL 3)
+#      run: |
+#        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+#        
+#    - name: Build (BoringSSL)
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl_1.1" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+#        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+#
+#    - name: Unit Test (BoringSSL)
+#      run: |
+#        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target test
+
+  platform-sanitizer-tests:
+    if: github.event.pull_request.draft == false
+#    needs: quick-linux-interop-check
+    name: Build and test platforms using sanitizers and clang-tidy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+            - os: windows-latest
+              ossl3-vcpkg-dir: "alternatives\\openssl_3"
+              boringssl-vcpkg-dir: "alternatives\\boringssl_1.1"
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+            - os: macos-latest
+              ossl3-vcpkg-dir: "alternatives/openssl_3"
+              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
+              ctest-target: test
+
+    steps:
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    # write the commit hash of vcpkg to a text file so we can use it in the
+    # hashFiles for cache
+    - run: |
+         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+    # First, attempt to pull key key, if that is not present, pull one of the
+    # restore-keys so we do not need to build from scratch.
+    # CACHE_VERSION - provide a way to reset cache
+    # CACHE_NAME - name of the cache in order to manage it
+    # matrix.os - cache per OS and version
+    # hashFiles - Recache if the vcpkg files change
+    - name: Restore Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ github.workspace }}/build/cache
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        restore-keys: |
+          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+
+    - name: Dependencies (macOs)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        brew install llvm pkg-config nasm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+    - name: Dependencies (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
+
+    - name: Build (OpenSSL 1.1)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+
+    - name: Unit Test (OpenSSL 1.1)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build (OpenSSL 3)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+
+    - name: Unit Test (OpenSSL 3)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build (BoringSSL)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boringssl-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
+
+#  old-macos-compatibility:
 #    if: github.event.pull_request.draft == false
-#    needs: build-and-test
-#    name: Build with clang-tidy
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      matrix:
-#        os: [ubuntu-latest]
-#        crypto: [openssl_1.1, openssl_3, boringssl]
-#        ctest-target: [test]
+#    needs: quick-linux-interop-check
+#    name: Build for older MacOS
+#    runs-on: macos-latest
+#
+#    env:
+#        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+#        VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+#        MACOSX_DEPLOYMENT_TARGET: 10.11
 #
 #    steps:
-#      # TODO Build with clang-tidy
 #    - name: Checkout repository and submodules
 #      uses: actions/checkout@v4
 #      with:
 #        submodules: recursive
 #        fetch-depth: 0
+#
+#    # write the commit hash of vcpkg to a text file so we can use it in the
+#    # hashFiles for cache
+#    - run: |
+#         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+#
+#    # First, attempt to pull key key, if that is not present, pull one of the
+#    # restore-keys so we do not need to build from scratch.
+#    # CACHE_VERSION - provide a way to reset cache
+#    # CACHE_NAME - name of the cache in order to manage it
+#    # matrix.os - cache per OS and version
+#    # hashFiles - Recache if the vcpkg files change
+#    - name: Restore Cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+#        restore-keys: |
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest
+#
+#    - name: Dependencies
+#      run: |
+#        brew install llvm pkg-config
+#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
