@@ -9,6 +9,7 @@ on:
       - main
 
 env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 3
   CTEST_OUTPUT_ON_FAILURE: 1
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
@@ -64,7 +65,7 @@ jobs:
     - name: Build (OpenSSL 1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all --parallel 2
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all
 
     - name: Unit Test (OpenSSL 1.1)
       run: |
@@ -146,7 +147,7 @@ jobs:
     - name: Build (OpenSSL1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --parallel 2
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
     - name: Unit Test (OpenSSL1.1)
       run: |
@@ -194,5 +195,5 @@ jobs:
     - name: Build
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp --parallel 2
+        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
 
