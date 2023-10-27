@@ -39,7 +39,6 @@ jobs:
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         crypto: [openssl_1.1, openssl_3, boringssl]
@@ -50,6 +49,9 @@ jobs:
               ctest-target: test
             - os: macos-latest
               ctest-target: test
+
+    env:
+      BUILD_DIR: build_${{ matrix.crypto }}
 
     steps:
     - name: Checkout repository and submodules
@@ -65,7 +67,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}-${{ matrix.macosx-deployment-target }}
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
 
@@ -83,12 +85,12 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+        cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
 
     - name: Build (Interop Harness)
       run: |
@@ -109,4 +111,46 @@ jobs:
         cd cmd/interop
         ./grpc-self-test.sh
 
-# TODO: Add a clang-tidy build
+#  clang-tidy:
+#    if: github.event.pull_request.draft == false
+#    needs: build-and-test
+#    name: Build with clang-tidy
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      matrix:
+#        os: [ubuntu-latest]
+#        crypto: [openssl_1.1, openssl_3, boringssl]
+#        include:
+#            - os: ubuntu-latest
+#              ctest-target: test
+#
+#    env:
+#      BUILD_DIR: build_${{ matrix.crypto }}
+#
+#    steps:
+#    - name: Checkout repository and submodules
+#      uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    - run: |
+#         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+#
+#    - name: Restore Cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+#        restore-keys: |
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r) nasm
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
