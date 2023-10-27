@@ -122,7 +122,13 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         crypto: [openssl_1.1, openssl_3, boringssl]
-        ctest-target: test
+        ctest-target: [test]
 
     steps:
       # TODO Build with clang-tidy
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
