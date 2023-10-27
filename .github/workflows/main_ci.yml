@@ -25,22 +25,14 @@ jobs:
   formatting-check:
     name: Formatting Check
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        path:
-          - 'include'
-          - 'src'
-          - 'test'
-          - 'cmd'
-          - 'lib'
     steps:
     - uses: actions/checkout@v4
 
     - name: Run clang-format style check for C/C++ programs
       uses: jidicula/clang-format-action@v4.11.0
       with:
-        clang-format-version: '16'
-        check-path: ${{ matrix.path }}
+        clang-format-version: 16
+        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
         fallback-style: 'Mozilla'
 
   quick-linux-interop-check:
