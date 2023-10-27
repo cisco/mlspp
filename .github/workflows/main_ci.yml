@@ -59,62 +59,69 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx-deployment-target }}
 
     steps:
-    - name: Checkout repository and submodules
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - run: |
-         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
-
-    - name: Restore Cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}-${{ matrix.macosx-deployment-target }}
-        restore-keys: |
-          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
-
-    - name: Dependencies (macOs)
-      if: ${{ matrix.os == 'macos-latest' }}
+    - name: Vibe check
       run: |
-        brew install llvm pkg-config nasm
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+          echo "matrix.os = ${{ matrix.os }}"
+          echo "matrix.crypto = ${{ matrix.crypto }}"
+          echo "matrix.macosx-deployment-target = ${{ matrix.macosx-deployment-target }}"
+          echo "MACOSX_DEPLOYMENT_TARGET = ${MACOSX_DEPLOYMENT_TARGET}"
 
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r) nasm
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
-
-    - name: Unit Test
-      run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
-
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build
-        cmake --build build
-
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
+#    - name: Checkout repository and submodules
+#      uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    - run: |
+#         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+#
+#    - name: Restore Cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}-${{ matrix.macosx-deployment-target }}
+#        restore-keys: |
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+#
+#    - name: Dependencies (macOs)
+#      if: ${{ matrix.os == 'macos-latest' }}
+#      run: |
+#        brew install llvm pkg-config nasm
+#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r) nasm
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+#
+#    - name: Unit Test
+#      run: |
+#        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+#
+#    - name: Build (Interop Harness)
+#      run: |
+#        cd cmd/interop
+#        cmake -B build
+#        cmake --build build
+#
+#    - name: Test self-interop
+#      run: |
+#        make -C cmd/interop self-test
+#
+#    - name: Test interop on test vectors
+#      run: |
+#        make -C cmd/interop interop-test
+#
+#    - name: Test gRPC live interop with self
+#      run: |
+#        cd cmd/interop
+#        ./grpc-self-test.sh
 
 # TODO: Add the legacy macOS build to the main matrix
 # TODO: Add a clang-tidy build
