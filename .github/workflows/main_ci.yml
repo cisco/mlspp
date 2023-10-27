@@ -72,10 +72,9 @@ jobs:
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest
 
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+    - name: Dependencies
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
 
     - name: Restore cache
       uses: actions/cache@v3
@@ -181,14 +180,14 @@ jobs:
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm pkg-config
+        brew install llvm pkg-config nasm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
 
     - name: Build (OpenSSL 1.1)
       run: |
