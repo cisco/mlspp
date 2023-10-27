@@ -50,7 +50,7 @@ jobs:
               ctest-target: test
             - os: macos-latest
               ctest-target: test
-              macosx-deployment-target:
+              macosx-deployment-target: 10.12 # Note: Change when macos-latest changes
             - os: macos-latest
               ctest-target: test
               macosx-deployment-target: 10.11
