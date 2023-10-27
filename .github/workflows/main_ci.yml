@@ -51,7 +51,7 @@ jobs:
               ctest-target: test
 
     env:
-      BUILD_DIR: build_${{ matrix.crypto }}
+      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
 
     steps:
     - name: Checkout repository and submodules
