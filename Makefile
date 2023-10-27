@@ -8,6 +8,7 @@ BUILD_DIR=build
 TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
 CLANG_TIDY=OFF
+OPENSSL11_MANIFEST=alternatives/openssl_1.1
 OPENSSL3_MANIFEST=alternatives/openssl_3
 TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
 
@@ -26,6 +27,7 @@ dev: ${TOOLCHAIN_FILE}
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
 dev3: ${TOOLCHAIN_FILE}

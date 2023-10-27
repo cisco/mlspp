@@ -9,16 +9,22 @@ on:
       - main
 
 env:
+  CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   CMAKE_BUILD_PARALLEL_LEVEL: 3
   CTEST_OUTPUT_ON_FAILURE: 1
-  CMAKE_BUILD_DIR: ${{ github.workspace }}/build
-  CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
-  CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
+
+  BUILD_DIR: ${{ github.workspace }}/build
+  BUILD_DIR_OPENSSL3: ${{ github.workspace }}/build_openssl3
+  BUILD_DIR_BORINGSSL: ${{ github.workspace }}/build_boringssl
+
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
-  VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_REPO: ${{ github.workspace }}/vcpkg
   CACHE_VERSION: v01
   CACHE_NAME: vcpkg
+
+  OPENSSL_11_VCPKG: alternatives/openssl_1.1
+  OPENSSL_3_VCPKG: alternatives/openssl_3
+  BORINGSSL_VCPKG: alternatives/boringssl
 
 jobs:
   formatting-check:
@@ -76,17 +82,17 @@ jobs:
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target all
+        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL_11_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR }}" --target all
 
     - name: Unit Test (OpenSSL 1.1)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target test
+        cmake --build "${{ env.BUILD_DIR }}" --target test
 
     - name: Build (Interop Harness)
       run: |
         cd cmd/interop
-        cmake -B build -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake -B build
         cmake --build build
 
     - name: Test self-interop
@@ -104,21 +110,21 @@ jobs:
         
     - name: Build (OpenSSL 3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/openssl_3" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+        cmake -B "${{ env.BUILD_DIR_OPENSSL3 }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL_3_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR_OPENSSL3 }}"
 
     - name: Unit Test (OpenSSL 3)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+        cmake --build "${{ env.BUILD_DIR_OPENSSL3 }}" --target test
         
     - name: Build (BoringSSL)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl_1.1" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+        cmake -B "${{ env.BUILD_DIR_BORINGSSL }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="${{ env.BORINGSSL_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR_BORINGSSL }}"
 
     - name: Unit Test (BoringSSL)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target test
+        cmake --build "${{ env.BUILD_DIR_BORINGSSL }}" --target test
 
   platform-sanitizer-tests:
     if: github.event.pull_request.draft == false
@@ -131,16 +137,10 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
             - os: windows-latest
-              ossl3-vcpkg-dir: "alternatives\\openssl_3"
-              boringssl-vcpkg-dir: "alternatives\\boringssl_1.1"
               ctest-target: RUN_TESTS
             - os: ubuntu-latest
-              ossl3-vcpkg-dir: "alternatives/openssl_3"
-              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
             - os: macos-latest
-              ossl3-vcpkg-dir: "alternatives/openssl_3"
-              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
 
     steps:
@@ -165,7 +165,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'vcpkg.json', 'alternatives/openssl_3/vcpkg.json') }}
+        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/**/vcpkg.json') }}
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
 
@@ -183,30 +183,30 @@ jobs:
 
     - name: Build (OpenSSL 1.1)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}"
+        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL_11_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test (OpenSSL 1.1)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
 
     - name: Build (OpenSSL 3)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
+        cmake -B "${{ env.BUILD_DIR_OPENSSL3 }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL_3_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR_OPENSSL3 }}"
 
     - name: Unit Test (OpenSSL 3)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.BUILD_DIR_OPENSSL3 }}" --target "${{ matrix.ctest-target}}"
 
     - name: Build (BoringSSL)
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boringssl-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+        cmake -B "${{ env.BUILD_DIR_BORINGSSL }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ env.OPENSSL_3_VCPKG }}"
+        cmake --build "${{ env.BUILD_DIR_BORINGSSL }}"
 
     - name: Unit Test (BoringSSL)
       run: |
-        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.BUILD_DIR_BORINGSSL }}" --target "${{ matrix.ctest-target}}"
 
   old-macos-compatibility:
     if: github.event.pull_request.draft == false
@@ -215,7 +215,7 @@ jobs:
     runs-on: macos-latest
 
     env:
-        CMAKE_BUILD_DIR: ${{ github.workspace }}/build
+        BUILD_DIR: ${{ github.workspace }}/build
         VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
         MACOSX_DEPLOYMENT_TARGET: 10.11
 
@@ -254,6 +254,6 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
-        cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target mlspp
+        cmake -B "${{ env.BUILD_DIR }}"
+        cmake --build "${{ env.BUILD_DIR }}" --target mlspp
 
