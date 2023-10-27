@@ -204,7 +204,7 @@ jobs:
         cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boringssl-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
 
-    - name: Unit Test (OpenSSL 3)
+    - name: Unit Test (BoringSSL)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
 
@@ -246,7 +246,7 @@ jobs:
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest
 
-    - name: dependencies
+    - name: Dependencies
       run: |
         brew install llvm pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
