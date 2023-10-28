@@ -4,23 +4,15 @@ inputs:
   crypto:
     required: true
 
-env:
-  VCPKG_REPO: ${{ github.workspace }}/vcpkg
-  CACHE_VERSION: v01
-  CACHE_NAME: vcpkg
-
 runs:
   using: "composite"
   env:
+    VCPKG_REPO: ${{ github.workspace }}/vcpkg
+    CACHE_VERSION: v01
+    CACHE_NAME: vcpkg
     BUILD_DIR: "${RUNNER_TEMP}/build_${{ inputs.crypto }}"
 
   steps:
-  - name: Checkout repository and submodules
-    uses: actions/checkout@v4
-    with:
-      submodules: recursive
-      fetch-depth: 0
-
   - run: |
        git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
 
