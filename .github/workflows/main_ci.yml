@@ -94,7 +94,7 @@ jobs:
   
   interop-test:
     if: github.event.pull_request.draft == false
-    needs: build-and-test
+    needs: build-and-unit-test
     name: Interop test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -157,7 +157,7 @@ jobs:
 
   clang-tidy:
     if: github.event.pull_request.draft == false
-    needs: build-and-test
+    needs: build-and-unit-test
     name: Build with clang-tidy
     runs-on: ${{ matrix.os }}
     strategy:
