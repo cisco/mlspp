@@ -16,6 +16,9 @@ env:
   CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+  VCPKG_REPO: ${{ github.workspace }}/vcpkg
+  CACHE_VERSION: v01
+  CACHE_NAME: vcpkg
 
 jobs:
 #  formatting-check:
@@ -84,12 +87,6 @@ jobs:
       run: |
         cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
         cmake --build "${{ env.BUILD_DIR }}"
-
-    - name: Build MLSpp
-      uses: ./.github/actions/build
-      with:
-        crypto: ${{ matrix.crypto }}
-        build_dir: ${{ env.BUILD_DIR }}
 
     - name: Unit Test
       run: |
