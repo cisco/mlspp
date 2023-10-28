@@ -1,0 +1,50 @@
+name: Build MLSpp
+
+inputs:
+  crypto:
+    required: true
+
+env:
+  VCPKG_REPO: ${{ github.workspace }}/vcpkg
+  CACHE_VERSION: v01
+  CACHE_NAME: vcpkg
+
+runs:
+  using: "composite"
+  env:
+    BUILD_DIR: "${RUNNER_TEMP}/build_${{ inputs.crypto }}"
+
+  steps:
+  - name: Checkout repository and submodules
+    uses: actions/checkout@v4
+    with:
+      submodules: recursive
+      fetch-depth: 0
+
+  - run: |
+       git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+
+  - name: Restore Cache
+    uses: actions/cache@v3
+    with:
+      path: ${{ github.workspace }}/build/cache
+      key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+      restore-keys: |
+        ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ runner.os }}
+
+  - name: Dependencies (macOs)
+    if: ${{ runner.os == 'macos-latest' }}
+    run: |
+      brew install llvm pkg-config nasm
+      ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+      ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+
+  - name: Dependencies (Ubuntu)
+    if: ${{ runner.os == 'ubuntu-latest' }}
+    run: |
+      sudo apt-get install -y linux-headers-$(uname -r) nasm
+
+  - name: Build
+    run: |
+      cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ inputs.crypto }}"
+      cmake --build "${{ env.BUILD_DIR }}"

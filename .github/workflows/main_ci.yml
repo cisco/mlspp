@@ -16,9 +16,6 @@ env:
   CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-  VCPKG_REPO: ${{ github.workspace }}/vcpkg
-  CACHE_VERSION: v01
-  CACHE_NAME: vcpkg
 
 jobs:
 #  formatting-check:
@@ -35,7 +32,7 @@ jobs:
 #        fallback-style: 'Mozilla'
 #
   build-and-test:
-#    needs: formatting-check
+    needs: formatting-check
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,43 +47,46 @@ jobs:
             - os: macos-latest
               ctest-target: test
 
-    env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
-
-    steps:
-    - name: Checkout repository and submodules
-      uses: actions/checkout@v4
+#    env:
+#      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
+#
+#    steps:
+#    - name: Checkout repository and submodules
+#      uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    - run: |
+#         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+#
+#    - name: Restore Cache
+#      uses: actions/cache@v3
+#      with:
+#        path: ${{ github.workspace }}/build/cache
+#        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+#        restore-keys: |
+#          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+#
+#    - name: Dependencies (macOs)
+#      if: ${{ matrix.os == 'macos-latest' }}
+#      run: |
+#        brew install llvm pkg-config nasm
+#        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+#        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+#
+#    - name: Dependencies (Ubuntu)
+#      if: ${{ matrix.os == 'ubuntu-latest' }}
+#      run: |
+#        sudo apt-get install -y linux-headers-$(uname -r) nasm
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
+#        cmake --build "${{ env.BUILD_DIR }}"
+    - uses: cisco/mlspp/.github/workflows/build.yml
       with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - run: |
-         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
-
-    - name: Restore Cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
-        restore-keys: |
-          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
-
-    - name: Dependencies (macOs)
-      if: ${{ matrix.os == 'macos-latest' }}
-      run: |
-        brew install llvm pkg-config nasm
-        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
-        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
-
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt-get install -y linux-headers-$(uname -r) nasm
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
-        cmake --build "${{ env.BUILD_DIR }}"
+        crypto: ${{ matrix.crypto }}
 
     - name: Unit Test
       run: |
