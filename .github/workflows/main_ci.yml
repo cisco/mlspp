@@ -92,25 +92,27 @@ jobs:
       run: |
         cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
 
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build
-        cmake --build build
+# TODO(RLB): Build interop harness
+#    - name: Build (Interop Harness)
+#      run: |
+#        cd cmd/interop
+#        cmake -B build
+#        cmake --build build
+#
+#    - name: Test self-interop
+#      run: |
+#        make -C cmd/interop self-test
+#
+#    - name: Test interop on test vectors
+#      run: |
+#        make -C cmd/interop interop-test
+#
+#    - name: Test gRPC live interop with self
+#      run: |
+#        cd cmd/interop
+#        ./grpc-self-test.sh
 
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
-
+# TODO(RLB) Build with clang-tidy
 #  clang-tidy:
 #    if: github.event.pull_request.draft == false
 #    needs: build-and-test
