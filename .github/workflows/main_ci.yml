@@ -85,7 +85,7 @@ jobs:
 #        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
 #        cmake --build "${{ env.BUILD_DIR }}"
     - name: Build MLSpp
-      uses: ./.github/actuibs/build.yml
+      uses: ./.github/actions/build.yml
       with:
         crypto: ${{ matrix.crypto }}
 
