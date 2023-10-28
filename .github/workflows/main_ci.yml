@@ -51,12 +51,12 @@ jobs:
 #      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
 
     steps:
-#    - name: Checkout repository and submodules
-#      uses: actions/checkout@v4
-#      with:
-#        submodules: recursive
-#        fetch-depth: 0
-#
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
 #    - run: |
 #         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
 #
