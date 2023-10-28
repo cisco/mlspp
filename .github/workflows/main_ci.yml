@@ -47,8 +47,8 @@ jobs:
             - os: macos-latest
               ctest-target: test
 
-#    env:
-#      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
+    env:
+      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
 
     steps:
     - name: Checkout repository and submodules
@@ -88,6 +88,7 @@ jobs:
       uses: ./.github/actions/build
       with:
         crypto: ${{ matrix.crypto }}
+        build_dir: ${{ env.BUILD_DIR }}
 
     - name: Unit Test
       run: |

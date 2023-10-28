@@ -1,28 +1,29 @@
 name: Build MLSpp
 
 inputs:
+  build_dir:
+    required: true
   crypto:
     required: true
 
 runs:
   using: "composite"
-  env:
-    VCPKG_REPO: ${{ github.workspace }}/vcpkg
-    CACHE_VERSION: v01
-    CACHE_NAME: vcpkg
-    BUILD_DIR: "${RUNNER_TEMP}/build_${{ inputs.crypto }}"
 
   steps:
   - run: |
-       git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+       git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
 
   - name: Restore Cache
     uses: actions/cache@v3
     with:
-      path: ${{ github.workspace }}/build/cache
-      key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+      path: ./build/cache
+      key: vcpkg-v1-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
       restore-keys: |
-        ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ runner.os }}
+        vcpkg-v1-${{ runner.os }}
+  
+  - name: Check OS
+    run: |
+      echo ${{ runner.os }}
 
   - name: Dependencies (macOs)
     if: ${{ runner.os == 'macos-latest' }}
@@ -38,5 +39,5 @@ runs:
 
   - name: Build
     run: |
-      cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ inputs.crypto }}"
+      cmake -B "${{ inputs.build_dir }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ inputs.crypto }}"
       cmake --build "${{ env.BUILD_DIR }}"
