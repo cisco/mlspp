@@ -13,8 +13,7 @@ env:
   CTEST_OUTPUT_ON_FAILURE: 1
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
-  CMAKE_TEST_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3/test
-  CMAKE_TEST_DIR: ${{ github.workspace }}/build/test
+  CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
   VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
   VCPKG_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_REPO: ${{ github.workspace }}/vcpkg
@@ -65,10 +64,9 @@ jobs:
         restore-keys: |
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-ubuntu-latest
 
-    - name: Dependencies (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+    - name: Dependencies
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
 
     - name: Restore cache
       uses: actions/cache@v3
@@ -112,6 +110,15 @@ jobs:
     - name: Unit Test (OpenSSL 3)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target test
+        
+    - name: Build (BoringSSL)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/boringssl_1.1" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target test
 
   platform-sanitizer-tests:
     if: github.event.pull_request.draft == false
@@ -125,12 +132,15 @@ jobs:
         include:
             - os: windows-latest
               ossl3-vcpkg-dir: "alternatives\\openssl_3"
+              boringssl-vcpkg-dir: "alternatives\\boringssl_1.1"
               ctest-target: RUN_TESTS
             - os: ubuntu-latest
               ossl3-vcpkg-dir: "alternatives/openssl_3"
+              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
             - os: macos-latest
               ossl3-vcpkg-dir: "alternatives/openssl_3"
+              boringssl-vcpkg-dir: "alternatives/boringssl_1.1"
               ctest-target: test
 
     steps:
@@ -162,32 +172,41 @@ jobs:
     - name: Dependencies (macOs)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
-        brew install llvm pkg-config
+        brew install llvm pkg-config nasm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
     - name: Dependencies (Ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r)
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
 
-    - name: Build (OpenSSL1.1)
+    - name: Build (OpenSSL 1.1)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_DIR }}"
 
-    - name: Unit Test (OpenSSL1.1)
+    - name: Unit Test (OpenSSL 1.1)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
 
-    - name: Build (OpenSSL3)
+    - name: Build (OpenSSL 3)
       run: |
         cmake -B "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.ossl3-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}"
 
-    - name: Unit Test (OpenSSL3)
+    - name: Unit Test (OpenSSL 3)
       run: |
         cmake --build "${{ env.CMAKE_BUILD_OPENSSL3_DIR }}" --target "${{ matrix.ctest-target}}"
+
+    - name: Build (BoringSSL)
+      run: |
+        cmake -B "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DVCPKG_MANIFEST_DIR="${{ matrix.boringssl-vcpkg-dir }}" -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_TOOLCHAIN_FILE }}"
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}"
+
+    - name: Unit Test (BoringSSL)
+      run: |
+        cmake --build "${{ env.CMAKE_BUILD_BORINGSSL_DIR }}" --target "${{ matrix.ctest-target}}"
 
   old-macos-compatibility:
     if: github.event.pull_request.draft == false
@@ -227,7 +246,7 @@ jobs:
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest-legacy
           ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-macos-latest
 
-    - name: dependencies
+    - name: Dependencies
       run: |
         brew install llvm pkg-config
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
