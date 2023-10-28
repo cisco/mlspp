@@ -32,7 +32,7 @@ jobs:
 #        fallback-style: 'Mozilla'
 #
   build-and-test:
-    needs: formatting-check
+#    needs: formatting-check
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -49,8 +49,8 @@ jobs:
 
 #    env:
 #      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
-#
-#    steps:
+
+    steps:
 #    - name: Checkout repository and submodules
 #      uses: actions/checkout@v4
 #      with:
@@ -84,7 +84,8 @@ jobs:
 #      run: |
 #        cmake -B "${{ env.BUILD_DIR }}" -DTESTING=ON -DVCPKG_MANIFEST_DIR="alternatives/${{ matrix.crypto }}"
 #        cmake --build "${{ env.BUILD_DIR }}"
-    - uses: cisco/mlspp/.github/workflows/build.yml
+    - name: Build MLSpp
+      uses: ./.github/actuibs/build.yml
       with:
         crypto: ${{ matrix.crypto }}
 
