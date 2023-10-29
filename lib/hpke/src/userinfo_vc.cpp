@@ -293,7 +293,7 @@ UserInfoClaims::from_json(const std::string& cred_subject)
 
   if (cred_subject_json.contains(address_attr)) {
     auto address_json = cred_subject_json.at(address_attr);
-    address_opt = UserInfoClaimsAddress{
+    address_opt = {
       get_optional<std::string>(address_json, address_formatted_attr),
       get_optional<std::string>(address_json, address_street_address_attr),
       get_optional<std::string>(address_json, address_locality_attr),
