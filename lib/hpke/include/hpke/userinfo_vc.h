@@ -19,8 +19,6 @@ struct UserInfoClaimsAddress
   std::optional<std::string> region;
   std::optional<std::string> postal_code;
   std::optional<std::string> country;
-
-  static UserInfoClaimsAddress from_json(const std::string& address);
 };
 
 struct UserInfoClaims
