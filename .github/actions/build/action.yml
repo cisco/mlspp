@@ -8,12 +8,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Restore vcpkg cache
+    - name: Capture vcpkg revision for use in cache key
       shell: bash
       run: |
          git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
 
-    - name: Restore Cache
+    - name: Restore cache
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
@@ -21,7 +21,7 @@ runs:
         restore-keys: |
           v01-vcpkg-${{ runner.os }}
 
-    - name: Dependencies (macOS)
+    - name: Install dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}
       shell: bash
       run: |
@@ -29,7 +29,7 @@ runs:
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
         ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
-    - name: Dependencies (Ubuntu)
+    - name: Install dependencies (Ubuntu)
       if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
