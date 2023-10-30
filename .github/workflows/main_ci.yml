@@ -34,17 +34,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-#        os: [windows-latest, ubuntu-latest, macos-latest]
-#        crypto: [openssl_1.1, openssl_3, boringssl]
-        os: [ubuntu-latest]
-        crypto: [openssl_1.1]
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        crypto: [openssl_1.1, openssl_3, boringssl]
         include:
-#            - os: windows-latest
-#              ctest-target: RUN_TESTS
+            - os: windows-latest
+              ctest-target: RUN_TESTS
             - os: ubuntu-latest
               ctest-target: test
-#            - os: macos-latest
-#              ctest-target: test
+            - os: macos-latest
+              ctest-target: test
 
     env:
       BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
