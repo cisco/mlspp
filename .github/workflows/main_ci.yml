@@ -62,8 +62,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - run: |
-         git -C ${{ env.VCPKG_REPO }} rev-parse HEAD > vcpkg_commit.txt
+    - uses: ./.github/actions/build
 
     - name: Restore Cache
       uses: actions/cache@v3
