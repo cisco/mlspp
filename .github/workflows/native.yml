@@ -20,7 +20,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Dependencies
       run: |
-        sudo apt-get install -y linux-headers-$(uname -r) nasm ssl-dev nlohmann-json3-dev doctest-dev
+        sudo apt-get install -y linux-headers-$(uname -r) libssl-dev nlohmann-json3-dev doctest-dev
     - name: Create CMake Cache
       run: |
         cmake -B build -DTESTING=ON
