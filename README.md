@@ -18,7 +18,7 @@ MLSPP requires a few prerequisite libraries in order to fully build.
 
 The following should satisfy the prerequisites for these popular platforms. However, [vcpkg](https://vcpkg.io/en/) is recommended for developer builds.
 
-```
+```sh
 # Linux - Ubuntu 20.04, Ubuntu 22.04
 $ sudo apt install libssl-dev nlohmann-json3-dev doctest-dev
 
