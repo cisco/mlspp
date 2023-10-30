@@ -2,6 +2,7 @@
 #include <doctest/doctest.h>
 #include <memory>
 #include <sstream>
+#include <iostream>
 
 using namespace MLS_NAMESPACE::bytes_ns;
 using namespace std::literals::string_literals;
@@ -20,6 +21,9 @@ TEST_CASE("Zeroization")
   // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
   const auto* end = begin + size;
   vec.reset();
+
+  const auto snapshot = std::vector<uint8_t>(begin, end);
+  std::cout << "snapshot = " << to_hex(snapshot) << std::endl;
 
   // In principle, the memory previously owned by the vector should be all zero
   // at this point.  However, since this is now unallocated memory, the
