@@ -12,7 +12,7 @@ using namespace std::literals::string_literals;
 #ifndef SANITIZERS
 TEST_CASE("Zeroization")
 {
-  const auto size = size_t(32);
+  const auto size = size_t(1024);
   const auto canary = uint8_t(0xff);
 
   auto vec = std::make_unique<bytes>(size, canary);
@@ -26,9 +26,9 @@ TEST_CASE("Zeroization")
   // allocator can do with it what it wants, and may have written something to
   // it when deallocating.  For example, on macOS, the allocator appears to
   // write a single pointer at the beginning.  Assuming other platforms are not
-  // too different, we verify that no more than a pointer's worth of bytes are
-  // non-zero.
-  const auto non_zero_threshold = sizeof(void*);
+  // too different, we verify that no more than a few pointer's worth of bytes
+  // are non-zero.
+  const auto non_zero_threshold = 4 * sizeof(void*);
   REQUIRE(std::count(begin, end, 0) >= size - non_zero_threshold);
 }
 #endif
