@@ -3,7 +3,7 @@ name: Install build prerequisites
 inputs:
   cache_dir:  
     description: Where to put vcpkg cache
-#    required: true
+    required: true
 
 runs:
   using: "composite"
@@ -12,6 +12,14 @@ runs:
       shell: bash
       run: |
          git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
+
+    - name: Restore Cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.cache_dir }}
+        key: v01-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+        restore-keys: |
+          v01-vcpkg-${{ runner.os }}
 
     - name: Dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}

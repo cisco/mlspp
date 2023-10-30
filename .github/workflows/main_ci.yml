@@ -14,7 +14,7 @@ env:
   CMAKE_BUILD_DIR: ${{ github.workspace }}/build
   CMAKE_BUILD_OPENSSL3_DIR: ${{ github.workspace }}/build_openssl3
   CMAKE_BUILD_BORINGSSL_DIR: ${{ github.workspace }}/build_boringssl
-  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/build/cache,readwrite
+  VCPKG_BINARY_SOURCES: files,${{ github.workspace }}/vcpkg_cache,readwrite
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
   VCPKG_REPO: ${{ github.workspace }}/vcpkg
   CACHE_VERSION: v01
@@ -63,14 +63,8 @@ jobs:
         fetch-depth: 0
 
     - uses: ./.github/actions/build
-
-    - name: Restore Cache
-      uses: actions/cache@v3
       with:
-        path: ${{ github.workspace }}/build/cache
-        key: ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
-        restore-keys: |
-          ${{ env.CACHE_VERSION }}-${{ env.CACHE_NAME }}-${{ matrix.os }}
+        cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
       run: |
