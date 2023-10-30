@@ -1,26 +1,26 @@
-name: Build MLSpp
+name: Install build prerequisites
 
 inputs:
-  cache_dir:  
-    description: Where to put vcpkg cache
-    required: true
-  crypto_dir:  
-    description: Where to find the vcpkg manifest for the underlying crypto library
-    required: true
-  build_dir:
-    description: Where to put build artifacts
-    required: true
+#  cache_dir:  
+#    description: Where to put vcpkg cache
+#    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Determine vcpkg commit
+    - name: Restore vcpkg cache
       shell: bash
       run: |
          git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
 
-    - name: Determine OS
-      shell: bash
+    - name: Dependencies (macOS)
+      if: ${{ runner.os == 'macOS' }}
       run: |
-         echo ${{ runner.os }}
+        brew install llvm pkg-config nasm
+        ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
+        ln -s "/usr/local/opt/llvm/bin/clang-tidy" "/usr/local/bin/clang-tidy"
 
+    - name: Dependencies (Ubuntu)
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r) nasm
