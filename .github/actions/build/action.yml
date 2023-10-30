@@ -1,8 +1,8 @@
 name: Install build prerequisites
 
 inputs:
-#  cache_dir:  
-#    description: Where to put vcpkg cache
+  cache_dir:  
+    description: Where to put vcpkg cache
 #    required: true
 
 runs:
@@ -15,6 +15,7 @@ runs:
 
     - name: Dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}
+      shell: bash
       run: |
         brew install llvm pkg-config nasm
         ln -s "/usr/local/opt/llvm/bin/clang-format" "/usr/local/bin/clang-format"
@@ -22,5 +23,6 @@ runs:
 
     - name: Dependencies (Ubuntu)
       if: ${{ runner.os == 'Linux' }}
+      shell: bash
       run: |
         sudo apt-get install -y linux-headers-$(uname -r) nasm
