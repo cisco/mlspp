@@ -1,7 +1,7 @@
 name: Install build prerequisites
 
 inputs:
-  cache_dir:  
+  cache-dir:  
     description: Where to put vcpkg cache
     required: true
 
@@ -16,7 +16,7 @@ runs:
     - name: Restore Cache
       uses: actions/cache@v3
       with:
-        path: ${{ inputs.cache_dir }}
+        path: ${{ inputs.cache-dir }}
         key: v01-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
         restore-keys: |
           v01-vcpkg-${{ runner.os }}
