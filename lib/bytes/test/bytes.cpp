@@ -14,7 +14,7 @@ using namespace std::literals::string_literals;
 TEST_CASE("Zeroization")
 {
   const auto size = size_t(1024);
-  const auto canary = uint8_t(0xff);
+  const auto canary = uint8_t(0xa0);
 
   auto vec = std::make_unique<bytes>(size, canary);
   const auto* begin = vec->data();
