@@ -1,0 +1,17 @@
+name: Build MLSpp
+
+inputs:
+  who-to-greet:  # id of input
+    description: 'Who to greet'
+    required: true
+    default: 'World'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Determine vcpkg commit
+      shell: bash
+      run: |
+         git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
+
+
