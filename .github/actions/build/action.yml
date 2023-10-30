@@ -1,10 +1,15 @@
 name: Build MLSpp
 
 inputs:
-  who-to-greet:  # id of input
-    description: 'Who to greet'
+  cache_dir:  
+    description: Where to put vcpkg cache
     required: true
-    default: 'World'
+  crypto_dir:  
+    description: Where to find the vcpkg manifest for the underlying crypto library
+    required: true
+  build_dir:
+    description: Where to put build artifacts
+    required: true
 
 runs:
   using: "composite"
@@ -14,4 +19,8 @@ runs:
       run: |
          git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
 
+    - name: Determine OS
+      shell: bash
+      run: |
+         echo ${{ runner.os }}
 
