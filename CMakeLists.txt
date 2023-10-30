@@ -96,6 +96,9 @@ endif()
 ### Dependencies
 ###
 
+# Configure vcpkg to only build release libraries
+set(VCPKG_BUILD_TYPE release)
+
 # External libraries
 find_package(OpenSSL REQUIRED)
 if ( OPENSSL_FOUND )

@@ -28,12 +28,21 @@ TEST_CASE("Zeroization")
   // In principle, the memory previously owned by the vector should be all zero
   // at this point.  However, since this is now unallocated memory, the
   // allocator can do with it what it wants, and may have written something to
-  // it when deallocating.  For example, on macOS, the allocator appears to
-  // write a single pointer at the beginning.  Assuming other platforms are not
-  // too different, we verify that no more than a few pointer's worth of bytes
-  // are non-zero.
-  const auto non_zero_threshold = 4 * sizeof(void*);
-  REQUIRE(std::count(begin, end, 0) >= size - non_zero_threshold);
+  // it when deallocating.  This means we need to vary the test per OS.
+#ifndef _MSC_VER
+  // macOS and Linux mostly leave the buffer alone, writing a couple of pointers
+  // to the beginning.  So we look for the buffer to be basically all zero.
+  REQUIRE(std::count(snapshot.begin(), snapshot.end(), 0) == size);
+#else
+  // Windows appeares to overwrite the buffer with 0xcd, so we test for that
+  // behavior.  Note that this is testing for zeroization within a process,
+  // different from the page zeroization that happens when a page of memory is
+  // reallocated to another process.
+  //
+  // https://stackoverflow.com/questions/18385556/does-windows-clear-memory-pages
+  const auto ms_sentinel = uint8_t(0xcd);
+  REQUIRE(std::count(snapshot.begin(), snapshot.end(), ms_sentinel) == size);
+#endif
 }
 #endif
 

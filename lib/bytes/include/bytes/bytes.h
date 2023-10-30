@@ -16,8 +16,8 @@ struct bytes
   bytes(bytes&&) = default;
   bytes& operator=(bytes&&) = default;
 
-  // Zeroize on drop
-  ~bytes() { std::fill(_data.begin(), _data.end(), uint8_t(0)); }
+  // Zeroize on destruction
+  ~bytes();
 
   // Mimic std::vector ctors
   bytes(size_t count, const uint8_t& value = 0)
