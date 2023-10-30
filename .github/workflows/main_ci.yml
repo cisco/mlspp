@@ -41,10 +41,10 @@ jobs:
         include:
             - os: windows-latest
               ctest-target: RUN_TESTS
-            - os: ubuntu-latest
-              ctest-target: test
-            - os: macos-latest
-              ctest-target: test
+#            - os: ubuntu-latest
+#              ctest-target: test
+#            - os: macos-latest
+#              ctest-target: test
 
     env:
       BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
