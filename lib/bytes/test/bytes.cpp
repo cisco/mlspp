@@ -12,19 +12,24 @@ using namespace std::literals::string_literals;
 #ifndef SANITIZERS
 TEST_CASE("Zeroization")
 {
+  const auto size = size_t(1024);
   const auto canary = uint8_t(0xff);
-  auto vec = std::make_unique<bytes>(32, canary);
-  const auto size = vec->size();
-  const auto* ptr = vec->data();
+
+  auto vec = std::make_unique<bytes>(size, canary);
+  const auto* begin = vec->data();
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  const auto* end = begin + size;
   vec.reset();
 
-  for (size_t i = 0; i < size; i++) {
-    // We test for inequality instead of zero because the vector might already
-    // be partially overwritten at this point.
-    //
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    REQUIRE(*(ptr + i) != canary);
-  }
+  // In principle, the memory previously owned by the vector should be all zero
+  // at this point.  However, since this is now unallocated memory, the
+  // allocator can do with it what it wants, and may have written something to
+  // it when deallocating.  For example, on macOS, the allocator appears to
+  // write a single pointer at the beginning.  Assuming other platforms are not
+  // too different, we verify that no more than a few pointer's worth of bytes
+  // are non-zero.
+  const auto non_zero_threshold = 4 * sizeof(void*);
+  REQUIRE(std::count(begin, end, 0) >= size - non_zero_threshold);
 }
 #endif
 
