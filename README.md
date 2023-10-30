@@ -3,10 +3,28 @@
 MLS++
 =====
 
-Implementation of the proposed [Messaging Layer
-Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md)
-protocol in C++.  Depends on C++17, STL for data structures, and
-OpenSSL or BoringSSL for crypto.
+Implementation of the proposed [Messaging Layer Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md) protocol in C++.  Depends on C++17, STL for data structures, and OpenSSL or BoringSSL for crypto.
+
+Prerequisites
+-------------
+
+MLSPP requires a few prerequisite libraries in order to build.
+
+* [nlohmann::json](https://github.com/nlohmann/json) - Tested with latest versions.
+* SSL Implementation - OpenSSL 1.1.1, OpenSSL 3.0, BoringSSL compatible
+* [doctest](https://github.com/doctest/doctest) - Tested with latest versions.  Only required when building the test suite.
+
+### Installing Prerequisites 
+
+The following should satisfy the prerequisites for these popular platforms.
+
+```
+# Linux - Ubuntu 20.04
+$ sudo apt install ssl-dev nlohmann-json3-dev doctest-dev
+
+# MacOs - Homebrew
+$ brew install nlohmann-json doctest
+```
 
 Quickstart
 ----------

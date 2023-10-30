@@ -1,0 +1,52 @@
+name: Native Builds
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  CMAKE_BUILD_PARALLEL_LEVEL: 3
+  CTEST_OUTPUT_ON_FAILURE: 1
+
+jobs:
+  native-linux:
+    needs: formatting-check
+    name: Quick Linux Check and Interop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: |
+        sudo apt-get install -y linux-headers-$(uname -r) nasm ssl-dev nlohmann-json3-dev doctest-dev
+    - name: Create CMake Cache
+      run: |
+        cmake -B build -DTESTING=ON
+    - name: Build
+      run: |
+        cmake --build build
+    - name: Test
+      run: |
+        cmake --build build --target test
+
+  native-macos:
+    needs: formatting-check
+    name: Quick Linux Check and Interop
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: |
+        brew install nlohmann-json doctest
+    - name: Create CMake Cache
+      run: |
+        cmake -B build -DTESTING=ON
+    - name: Build
+      run: |
+        cmake --build build
+    - name: Test
+      run: |
+        cmake --build build --target test
