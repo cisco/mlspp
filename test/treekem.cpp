@@ -2,10 +2,8 @@
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/treekem.h>
-#include <mls_vectors/mls_vectors.h>
 
 using namespace MLS_NAMESPACE;
-using namespace mls_vectors;
 
 class TreeKEMTest
 {
@@ -262,16 +260,6 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
 
       REQUIRE(privs[j].consistent(privs[i]));
       REQUIRE(privs[j].consistent(pubs[j]));
-    }
-  }
-}
-
-TEST_CASE("TreeKEM Interop")
-{
-  for (auto suite : all_supported_suites) {
-    for (auto structure : treekem_test_tree_structures) {
-      auto tv = TreeKEMTestVector{ suite, structure };
-      REQUIRE(tv.verify() == std::nullopt);
     }
   }
 }

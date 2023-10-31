@@ -101,6 +101,10 @@ jobs:
 #        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
 #        cmake --build "${{ env.BUILD_DIR }}"
 #
+#    - name: Unit tests for test vector logic
+#      run: |
+#        ./${{ env.BUILD_DIR }}/lib/mls_vectors/test/mls_vectors_test
+#
 #    - name: Build (Interop Harness)
 #      run: |
 #        cd cmd/interop

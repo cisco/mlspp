@@ -46,7 +46,7 @@ TEST_CASE("Key Schedule")
   }
 }
 
-TEST_CASE("Message Protection" * doctest::skip(true))
+TEST_CASE("Message Protection")
 {
   for (auto suite : supported_suites) {
     auto tv = MessageProtectionTestVector{ suite };
