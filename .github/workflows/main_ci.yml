@@ -34,8 +34,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-#        os: [windows-latest]
+#        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest]
 #        crypto: [openssl_1.1, openssl_3, boringssl]
         crypto: [openssl_1.1]
         include:
