@@ -17,7 +17,7 @@ bytes::~bytes()
 #ifndef _MSC_VER
   std::fill(_data.begin(), _data.end(), uint8_t(0));
 #else
-  SecureZeroBytes(_data.data(), _data.size());
+  SecureZeroMemory(_data.data(), _data.size());
 #endif
 }
 
