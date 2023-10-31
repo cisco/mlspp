@@ -1,8 +1,8 @@
 #include <bytes/bytes.h>
 #include <doctest/doctest.h>
+#include <iostream>
 #include <memory>
 #include <sstream>
-#include <iostream>
 
 using namespace MLS_NAMESPACE::bytes_ns;
 using namespace std::literals::string_literals;
@@ -32,7 +32,8 @@ TEST_CASE("Zeroization")
 #ifndef _MSC_VER
   // macOS and Linux mostly leave the buffer alone, writing a couple of pointers
   // to the beginning.  So we look for the buffer to be basically all zero.
-  REQUIRE(std::count(snapshot.begin(), snapshot.end(), 0) == size);
+  const auto threshold = size - 4 * sizeof(void*);
+  REQUIRE(std::count(snapshot.begin(), snapshot.end(), 0) >= threshold);
 #else
   // Windows appeares to overwrite the buffer with 0xcd, so we test for that
   // behavior.  Note that this is testing for zeroization within a process,
