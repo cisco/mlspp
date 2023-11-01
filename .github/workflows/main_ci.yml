@@ -67,7 +67,8 @@ jobs:
 
     - name: Unit Test
       run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        ./${{ env.BUILD_DIR }}/test/mlspp_test -s
+#        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
   
 #  interop-test:
 #    if: github.event.pull_request.draft == false
