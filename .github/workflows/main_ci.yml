@@ -65,7 +65,7 @@ jobs:
         cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
-    - uses: actions/checkout/save@v3
+    - uses: actions/cache/save@v3
       with:
         path: ${{ github.workspace }}/vcpkg_cache
         key: v01-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
