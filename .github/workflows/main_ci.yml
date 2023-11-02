@@ -62,13 +62,12 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test
       run: |
-        .\${{ env.BUILD_DIR }}\test\mlspp_test -s
-#        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
+        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
   
 #  interop-test:
 #    if: github.event.pull_request.draft == false
