@@ -8,14 +8,13 @@ BUILD_DIR=build
 TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
 CLANG_TIDY=OFF
-OPENSSL11_MANIFEST=alternatives/openssl_1.1
 OPENSSL3_MANIFEST=alternatives/openssl_3
 TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
 
 .PHONY: all dev dev3 test ctest dtest dbtest libs test-libs test-all everything ci ci3 clean cclean format
 
 all: ${BUILD_DIR}
-	cmake --build ${BUILD_DIR}
+	cmake --build ${BUILD_DIR} --target mlspp
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 	cmake -B${BUILD_DIR} .
@@ -27,7 +26,6 @@ dev: ${TOOLCHAIN_FILE}
 	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
 	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
-		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
 dev3: ${TOOLCHAIN_FILE}
@@ -52,13 +50,18 @@ libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target bytes
 	cmake --build ${BUILD_DIR} --target hpke
 	cmake --build ${BUILD_DIR} --target tls_syntax
+	cmake --build ${BUILD_DIR} --target mls_vectors 
 
 test-libs: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target lib/bytes/test
 	cmake --build ${BUILD_DIR} --target lib/hpke/test
 	cmake --build ${BUILD_DIR} --target lib/tls_syntax/test
+	cmake --build ${BUILD_DIR} --target lib/mls_vectors/test
 
 test-all: test-libs ctest
+
+everything: ${BUILD_DIR}
+	cmake --build ${BUILD_DIR}
 
 ci: ${TOOLCHAIN_FILE}
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON \

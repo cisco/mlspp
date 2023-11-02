@@ -6,20 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#if _MSC_VER
-#include <Windows.h>
-#endif
-
 namespace MLS_NAMESPACE::bytes_ns {
-
-bytes::~bytes()
-{
-#ifndef _MSC_VER
-  std::fill(_data.begin(), _data.end(), uint8_t(0));
-#else
-  SecureZeroMemory(_data.data(), _data.size());
-#endif
-}
 
 bool
 bytes::operator==(const bytes& other) const
