@@ -62,7 +62,7 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test
