@@ -10,8 +10,9 @@ using namespace std::literals::string_literals;
 // To check that memory is safely zeroized on destroy, we have to deliberately
 // do a use-after-free.  This will be caught by the sanitizers, so we only do it
 // when sanitizers are not enabled.  This test is also disabled on Windows
-// because the use-after-free causes Windows CI runs to fail.
-#if !defined(SANITIZERS) || defined(WINDOWS)
+// because it appears to cause Windows CI runs to fail.  (In addition, Windows
+// appears to overwrite freed buffers with 0xCD, so this test is unnecessary.)
+#if !defined(SANITIZERS) && !defined(WINDOWS)
 TEST_CASE("Zeroization")
 {
   const auto size = size_t(1024);
