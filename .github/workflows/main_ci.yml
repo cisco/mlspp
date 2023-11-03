@@ -50,7 +50,7 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ${{ matrix.os }}
-        crypto-dir: ${{ env.CRYPTO_DIR }}
+        crypto: ${{ matrix.crypto }}
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
@@ -89,7 +89,7 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
-        crypto-dir: ${{ env.CRYPTO_DIR }}
+        crypto-dir: openssl_1.1
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
@@ -138,7 +138,7 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
-        crypto-dir: ${{ env.CRYPTO_DIR }}
+        crypto: matrix.crypto
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build with clang-tidy

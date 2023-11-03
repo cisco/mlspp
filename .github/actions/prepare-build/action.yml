@@ -4,8 +4,8 @@ inputs:
   os:
     description: The operating system on which the test is being run
     required: true
-  crypto-dir:
-    description: The manifest directory for crypto dependencies
+  crypto:
+    description: The crypto library being used
     required: true
   cache-dir:  
     description: Where to put vcpkg cache
@@ -14,17 +14,16 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Capture vcpkg revision and manifest for use in cache key
+    - name: Capture vcpkg revision for use in cache key
       shell: bash
       run: |
         git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
-        cp "${{ inputs.crypto-dir }}/vcpkg.json" vcpkg_manifest.txt
 
     - name: Restore cache
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
-        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles('vcpkg_commit.txt', 'vcpkg_manifest.txt') }}
+        key: v01-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
         restore-keys: |
           v01-vcpkg-${{ inputs.os }}
 
