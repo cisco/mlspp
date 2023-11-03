@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 project(mlspp
   VERSION 0.1
@@ -44,6 +44,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU"
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
 elseif(MSVC)
   add_compile_options(/W4 /WX)
+  add_definitions(-DWINDOWS)
 
   # MSVC helpfully recommends safer equivalents for things like
   # getenv, but they are not portable.
@@ -51,21 +52,16 @@ elseif(MSVC)
 endif()
 
 if (SANITIZERS)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set(SANITIZERS "-fsanitize=address -fsanitize=undefined")
-  elseif(MSVC)
-    set(SANITIZERS "/fsanitize=address")
-  endif()
-
-  set(CMAKE_C_FLAGS              "${CMAKE_C_FLAGS}             ${SANITIZERS}")
-  set(CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS}           ${SANITIZERS}")
-  set(CMAKE_EXE_LINKER_FLAGS     "${CMAKE_EXE_LINKER_FLAGS}    ${SANITIZERS}")
-  set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} ${SANITIZERS}")
-  set(CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} ${SANITIZERS}")
+  message(STATUS "Enabling sanitizers")
   add_definitions(-DSANITIZERS)
-elseif (SANITIZERS AND MSVC)
-  message("Enabling sanitizers")
-  add_definitions("/fsanitize=address")
+
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    add_compile_options(-fsanitize=address -fsanitize=undefined)
+    add_link_options(-fsanitize=address -fsanitize=undefined)
+  elseif(MSVC)
+    # MSVC uses a different flag, and doesn't require passing it to the linker 
+    add_compile_options("/fsanitize=address")
+  endif()
 endif()
 
 if(CLANG_TIDY)
@@ -95,6 +91,9 @@ endif()
 ###
 ### Dependencies
 ###
+
+# Configure vcpkg to only build release libraries
+set(VCPKG_BUILD_TYPE release)
 
 # External libraries
 find_package(OpenSSL REQUIRED)
