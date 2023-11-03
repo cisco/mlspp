@@ -52,7 +52,7 @@ elseif(MSVC)
 endif()
 
 if (SANITIZERS)
-  message("Enabling sanitizers")
+  message(STATUS "Enabling sanitizers")
   add_definitions(-DSANITIZERS)
 
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")

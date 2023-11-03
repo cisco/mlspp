@@ -1,6 +1,12 @@
 name: Install build prerequisites
 
 inputs:
+  os:
+    description: The operating system on which the test is being run
+    required: true
+  crypto-dir:
+    description: The manifest directory for crypto dependencies
+    required: true
   cache-dir:  
     description: Where to put vcpkg cache
     required: true
@@ -17,7 +23,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
-        key: v01-vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles('vcpkg_commit.txt', "${{ inputs.crypto-dir }}/vcpkg.json") }}
         restore-keys: |
           v01-vcpkg-${{ runner.os }}
 
