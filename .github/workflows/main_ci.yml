@@ -47,7 +47,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
@@ -84,7 +84,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
@@ -131,7 +131,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
