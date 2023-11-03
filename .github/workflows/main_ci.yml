@@ -36,6 +36,13 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         crypto: [openssl_1.1, openssl_3, boringssl]
+        include:
+            - os: windows-latest
+              ctest-target: RUN_TESTS
+            - os: ubuntu-latest
+              ctest-target: test
+            - os: macos-latest
+              ctest-target: test
 
     env:
       BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
@@ -49,8 +56,6 @@ jobs:
 
     - uses: ./.github/actions/build
       with:
-        os: ${{ matrix.os }}
-        crypto-dir: ${{ env.CRYPTO_DIR }}
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
@@ -60,15 +65,9 @@ jobs:
         cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
-    - name: Unit Test (non-Windows)
-      if: matrix.os != "windows-latest"
+    - name: Unit Test
       run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target test
-
-    - name: Unit Test (Windows)
-      if: matrix.os == "windows-latest"
-      run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
+        cmake --build "${{ env.BUILD_DIR }}" --target "${{ matrix.ctest-target}}"
   
   interop-test:
     if: github.event.pull_request.draft == false
@@ -88,8 +87,6 @@ jobs:
 
     - uses: ./.github/actions/build
       with:
-        os: ubuntu-latest
-        crypto-dir: ${{ env.CRYPTO_DIR }}
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
@@ -137,8 +134,6 @@ jobs:
 
     - uses: ./.github/actions/build
       with:
-        os: ubuntu-latest
-        crypto-dir: ${{ env.CRYPTO_DIR }}
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build with clang-tidy
