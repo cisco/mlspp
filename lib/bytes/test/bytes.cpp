@@ -1,6 +1,5 @@
 #include <bytes/bytes.h>
 #include <doctest/doctest.h>
-#include <iostream>
 #include <memory>
 #include <sstream>
 
@@ -24,15 +23,13 @@ TEST_CASE("Zeroization")
   const auto* end = begin + size;
   vec.reset();
 
-  const auto snapshot = std::vector<uint8_t>(begin, end);
-  std::cout << "snapshot = " << to_hex(snapshot) << std::endl;
-
   // In principle, the memory previously owned by the vector should be all zero
   // at this point.  However, since this is now unallocated memory, the
   // allocator can do with it what it wants, and may have written something to
   // it when deallocating.   macOS and Linux mostly leave the buffer alone,
   // writing a couple of pointers to the beginning.  So we look for the buffer
   // to be basically all zero.
+  const auto snapshot = std::vector<uint8_t>(begin, end);
   const auto threshold = size - 4 * sizeof(void*);
   REQUIRE(std::count(snapshot.begin(), snapshot.end(), 0) >= threshold);
 }
