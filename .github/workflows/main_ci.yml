@@ -47,7 +47,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         os: ${{ matrix.os }}
         crypto-dir: ${{ env.CRYPTO_DIR }}
@@ -86,7 +86,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
         crypto-dir: ${{ env.CRYPTO_DIR }}
@@ -135,7 +135,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - uses: ./.github/actions/build
+    - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
         crypto-dir: ${{ env.CRYPTO_DIR }}
