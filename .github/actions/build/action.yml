@@ -1,5 +1,4 @@
 name: Install build prerequisites
-description: Restores the cache and installs dependencies
 
 inputs:
   os:
@@ -24,7 +23,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
-        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles("vcpkg_commit.txt", "${{ inputs.crypto-dir }}/vcpkg.json") }}
+        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles('vcpkg_commit.txt', "${{ inputs.crypto-dir }}/vcpkg.json") }}
         restore-keys: |
           v01-vcpkg-${{ runner.os }}
 
