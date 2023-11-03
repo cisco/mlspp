@@ -14,18 +14,19 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Capture vcpkg revision for use in cache key
+    - name: Capture vcpkg revision and manifest for use in cache key
       shell: bash
       run: |
-         git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
+        git -C vcpkg rev-parse HEAD > vcpkg_commit.txt
+        cp "${{ inputs.crypto-dir }}/vcpkg.json" vcpkg_manifest.txt
 
     - name: Restore cache
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
-        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles('vcpkg_commit.txt', '${{ inputs.crypto-dir }}/vcpkg.json') }}
+        key: v01-vcpkg-${{ inputs.os }}-${{ hashFiles('vcpkg_commit.txt', 'vcpkg_manifest.txt') }}
         restore-keys: |
-          v01-vcpkg-${{ runner.os }}
+          v01-vcpkg-${{ inputs.os }}
 
     - name: Install dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}
