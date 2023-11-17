@@ -749,7 +749,7 @@ Status
 MLSClientImpl::join_group(const JoinGroupRequest* request,
                           JoinGroupResponse* response)
 {
-  auto join = load_join(request->transaction_id());
+  auto join = load_join(request->transaction_id() + 1);
   if (!join) {
     return Status(StatusCode::INVALID_ARGUMENT, "Unknown transaction ID");
   }

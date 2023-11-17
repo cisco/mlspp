@@ -19,7 +19,9 @@ all: ${BUILD_DIR}
 	cmake --build ${BUILD_DIR} --target mlspp
 
 ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
-	cmake -B${BUILD_DIR} .
+	cmake -B${BUILD_DIR}  \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
 ${TOOLCHAIN_FILE}:
 	git submodule update --init --recursive
