@@ -26,7 +26,6 @@ runs:
         key: v02-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
         restore-keys: |
           v02-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}
-          v02-vcpkg-${{ inputs.os }}
 
     - name: Install dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}
