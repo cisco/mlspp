@@ -3,6 +3,8 @@
 
 namespace MLS_NAMESPACE {
 
+// XXX BOGUS COMMENT
+
 uint64_t
 seconds_since_epoch()
 {
