@@ -799,13 +799,25 @@ State::group_context() const
 std::optional<State>
 State::handle(const MLSMessage& msg)
 {
-  return handle(msg, std::nullopt, std::nullopt);
+  return handle(unwrap(msg), std::nullopt, std::nullopt);
 }
 
 std::optional<State>
 State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 {
-  return handle(msg, std::move(cached_state), std::nullopt);
+  return handle(unwrap(msg), std::move(cached_state), std::nullopt);
+}
+
+std::optional<State>
+State::handle(const AuthenticatedContent& content_auth)
+{
+  return handle(content_auth, std::nullopt, std::nullopt);
+}
+
+std::optional<State>
+State::handle(const AuthenticatedContent& content_auth, std::optional<State> cached_state)
+{
+  return handle(content_auth, std::move(cached_state), std::nullopt);
 }
 
 std::optional<State>
@@ -813,12 +825,7 @@ State::handle(const MLSMessage& msg,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
-  auto content_auth = unwrap(msg);
-  if (!verify(content_auth)) {
-    throw InvalidParameterError("Message signature failed to verify");
-  }
-
-  return handle(content_auth, std::move(cached_state), expected_params);
+  return handle(unwrap(msg), std::move(cached_state), expected_params);
 }
 
 std::optional<State>
@@ -834,6 +841,10 @@ State::handle(const AuthenticatedContent& content_auth,
 
   if (content.epoch != _epoch) {
     throw InvalidParameterError("Epoch mismatch");
+  }
+
+  if (!verify(content_auth)) {
+    throw InvalidParameterError("Message signature failed to verify");
   }
 
   // Dispatch on content type

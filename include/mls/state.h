@@ -122,6 +122,14 @@ public:
   std::optional<State> handle(const MLSMessage& msg);
   std::optional<State> handle(const MLSMessage& msg,
                               std::optional<State> cached_state);
+
+  // In general, you should avoid these methods and prefer the MLSMessage
+  // variants. They are provided for cases where a message recipient wishes to
+  // unwrap and inspect a message before handling it.
+  std::optional<State> handle(const AuthenticatedContent& content_auth);
+  std::optional<State> handle(const AuthenticatedContent& content_auth,
+                              std::optional<State> cached_state);
+
   ///
   /// PSK management
   ///
