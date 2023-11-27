@@ -820,7 +820,8 @@ State::handle(const AuthenticatedContent& content_auth)
 }
 
 std::optional<State>
-State::handle(const AuthenticatedContent& content_auth, std::optional<State> cached_state)
+State::handle(const AuthenticatedContent& content_auth,
+              std::optional<State> cached_state)
 {
   return handle(content_auth, std::move(cached_state), std::nullopt);
 }
