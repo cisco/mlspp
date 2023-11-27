@@ -454,7 +454,12 @@ State::unwrap(const MLSMessage& msg)
     },
   };
 
-  return var::visit(unprotect, msg.message);
+  const auto content_auth = var::visit(unprotect, msg.message);
+  if (!verify(content_auth)) {
+    throw InvalidParameterError("Message signature failed to verify");
+  }
+
+  return content_auth;
 }
 
 Proposal
@@ -833,21 +838,12 @@ State::handle(const AuthenticatedContent& content_auth,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
-  // Validate the GroupContent
-  const auto& content = content_auth.content;
-  if (content.group_id != _group_id) {
-    throw InvalidParameterError("GroupID mismatch");
-  }
-
-  if (content.epoch != _epoch) {
-    throw InvalidParameterError("Epoch mismatch");
-  }
-
-  if (!verify(content_auth)) {
-    throw InvalidParameterError("Message signature failed to verify");
-  }
+  // XXX(RLB): We assume that the AuthenticatedContent has come to us by way of
+  // `unwrap()`, so that its authenticity has already been checked.  This avoids
+  // duplicate signature verification.
 
   // Dispatch on content type
+  const auto& content = content_auth.content;
   switch (content.content_type()) {
     // Proposals get queued, do not result in a state transition
     case ContentType::proposal:

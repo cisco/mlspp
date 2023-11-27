@@ -838,7 +838,8 @@ MLSMessage::group_id() const
   return var::visit(
     overloaded{
       [](const PublicMessage& pt) -> bytes { return pt.get_group_id(); },
-      [](const PrivateMessage& pt) -> bytes { return pt.get_group_id(); },
+      [](const PrivateMessage& ct) -> bytes { return ct.get_group_id(); },
+      [](const GroupInfo& gi) -> bytes { return gi.group_context.group_id; },
       [](const auto& /* unused */) -> bytes {
         throw InvalidParameterError("MLSMessage has no group_id");
       },
