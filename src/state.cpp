@@ -407,7 +407,7 @@ State::protect(AuthenticatedContent&& content_auth, size_t padding_size)
   }
 }
 
-AuthenticatedContent
+ValidatedContent
 State::unwrap(const MLSMessage& msg)
 {
   if (msg.version != ProtocolVersion::mls10) {
@@ -415,7 +415,7 @@ State::unwrap(const MLSMessage& msg)
   }
 
   const auto unprotect = overloaded{
-    [&](const PublicMessage& pt) -> AuthenticatedContent {
+    [&](const PublicMessage& pt) -> ValidatedContent {
       if (pt.get_group_id() != _group_id) {
         throw ProtocolError("PublicMessage not for this group");
       }
@@ -432,7 +432,7 @@ State::unwrap(const MLSMessage& msg)
       return opt::get(maybe_content_auth);
     },
 
-    [&](const PrivateMessage& ct) -> AuthenticatedContent {
+    [&](const PrivateMessage& ct) -> ValidatedContent {
       if (ct.get_group_id() != _group_id) {
         throw ProtocolError("PrivateMessage not for this group");
       }
@@ -449,17 +449,17 @@ State::unwrap(const MLSMessage& msg)
       return opt::get(maybe_content_auth);
     },
 
-    [](const auto& /* unused */) -> AuthenticatedContent {
+    [](const auto& /* unused */) -> ValidatedContent {
       throw ProtocolError("Invalid wire format");
     },
   };
 
-  const auto content_auth = var::visit(unprotect, msg.message);
-  if (!verify(content_auth)) {
+  const auto val_content = var::visit(unprotect, msg.message);
+  if (!verify(val_content.content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
 
-  return content_auth;
+  return val_content;
 }
 
 Proposal
@@ -814,13 +814,13 @@ State::handle(const MLSMessage& msg, std::optional<State> cached_state)
 }
 
 std::optional<State>
-State::handle(const AuthenticatedContent& content_auth)
+State::handle(const ValidatedContent& content_auth)
 {
   return handle(content_auth, std::nullopt, std::nullopt);
 }
 
 std::optional<State>
-State::handle(const AuthenticatedContent& content_auth,
+State::handle(const ValidatedContent& content_auth,
               std::optional<State> cached_state)
 {
   return handle(content_auth, std::move(cached_state), std::nullopt);
@@ -835,15 +835,12 @@ State::handle(const MLSMessage& msg,
 }
 
 std::optional<State>
-State::handle(const AuthenticatedContent& content_auth,
+State::handle(const ValidatedContent& val_content,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
-  // XXX(RLB): We assume that the AuthenticatedContent has come to us by way of
-  // `unwrap()`, so that its authenticity has already been checked.  This avoids
-  // duplicate signature verification.
-
   // Dispatch on content type
+  const auto& content_auth = val_content.authenticated_content();
   const auto& content = content_auth.content;
   switch (content.content_type()) {
     // Proposals get queued, do not result in a state transition
@@ -1160,7 +1157,8 @@ State::Tombstone
 State::handle_reinit_commit(const MLSMessage& commit_msg)
 {
   // Verify the signature and process the commit
-  auto content_auth = unwrap(commit_msg);
+  const auto val_content = unwrap(commit_msg);
+  const auto& content_auth = val_content.authenticated_content();
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
@@ -1441,7 +1439,8 @@ State::protect(const bytes& authenticated_data,
 std::tuple<bytes, bytes>
 State::unprotect(const MLSMessage& ct)
 {
-  auto content_auth = unwrap(ct);
+  const auto val_content = unwrap(ct);
+  const auto& content_auth = val_content.authenticated_content();
 
   if (!verify(content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");

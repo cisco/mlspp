@@ -880,7 +880,7 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
       auto keys = group_keys();
       return ct.unprotect(cipher_suite, keys, sender_data_secret);
     },
-    [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
+    [](const auto& /* other */) -> std::optional<ValidatedContent> {
       return std::nullopt;
     }
   };
@@ -890,7 +890,8 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
     return std::nullopt;
   }
 
-  auto auth_content = opt::get(maybe_auth_content);
+  auto val_content = opt::get(maybe_auth_content);
+  const auto& auth_content = val_content.authenticated_content();
   if (!auth_content.verify(cipher_suite, signature_pub, group_context())) {
     return std::nullopt;
   }

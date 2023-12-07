@@ -570,6 +570,23 @@ private:
   friend struct PrivateMessage;
 };
 
+struct ValidatedContent
+{
+  public:
+  const AuthenticatedContent& authenticated_content() const;
+
+  friend bool operator==(const ValidatedContent& lhs, const ValidatedContent& rhs);
+
+  private:
+  AuthenticatedContent content_auth;
+
+  ValidatedContent(AuthenticatedContent content_auth_in);
+
+  friend struct PublicMessage;
+  friend struct PrivateMessage;
+  friend class State;
+};
+
 struct PublicMessage
 {
   PublicMessage() = default;
@@ -581,7 +598,7 @@ struct PublicMessage
                                CipherSuite suite,
                                const std::optional<bytes>& membership_key,
                                const std::optional<GroupContext>& context);
-  std::optional<AuthenticatedContent> unprotect(
+  std::optional<ValidatedContent> unprotect(
     CipherSuite suite,
     const std::optional<bytes>& membership_key,
     const std::optional<GroupContext>& context) const;
@@ -620,7 +637,7 @@ struct PrivateMessage
                                 GroupKeySource& keys,
                                 const bytes& sender_data_secret,
                                 size_t padding_size);
-  std::optional<AuthenticatedContent> unprotect(
+  std::optional<ValidatedContent> unprotect(
     CipherSuite suite,
     GroupKeySource& keys,
     const bytes& sender_data_secret) const;
