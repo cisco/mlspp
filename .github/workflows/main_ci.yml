@@ -57,7 +57,7 @@ jobs:
       run: |
         # XXX(RLB): If we do not have SANITIZERS=ON here, the Windows CI builds
         # hang in the middle of unit testing.
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
+        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test (non-Windows)
