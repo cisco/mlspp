@@ -137,90 +137,91 @@ add_subdirectory(lib)
 # Third-Party libraries in tree
 add_subdirectory(third_party)
 
-# ###
-# ### Library Config
-# ###
-# 
-# set(LIB_NAME "${PROJECT_NAME}")
-# 
-# file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
-# file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-# 
-# add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
-# add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
-# target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
-# target_include_directories(${LIB_NAME}
-#   PUBLIC
-#     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-#     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
-#   PRIVATE
-#     ${OPENSSL_INCLUDE_DIR}
-# )
-# 
-# install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
-# 
-# ###
-# ### Tests
-# ###
-# if(TESTING)
-#   add_subdirectory(test)
-# endif()
-# 
-# ###
-# ### Exports
-# ###
-# set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
-# export(
-#   EXPORT
-#     mlspp-targets
-#   NAMESPACE
-#     ${MLS_EXPORT_NAMESPACE}::
-#   FILE
-#     ${MLS_EXPORT_NAMESPACE}Targets.cmake)
-# export(PACKAGE ${MLS_EXPORT_NAMESPACE})
-# 
-# configure_package_config_file(cmake/config.cmake.in
-#   ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
-#   INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE}
-#   NO_SET_AND_CHECK_MACRO)
-# 
-# write_basic_package_version_file(
-#   ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
-#   VERSION ${PROJECT_VERSION}
-#   COMPATIBILITY SameMajorVersion)
-# 
-# ###
-# ### Install
-# ###
-# 
-# install(
-#   EXPORT
-#     mlspp-targets
-#   NAMESPACE
-#     ${MLS_EXPORT_NAMESPACE}::
-#   FILE
-#     ${MLS_EXPORT_NAMESPACE}Targets.cmake
-#   DESTINATION
-#     ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
-# 
-# install(
-#   DIRECTORY
-#     include/
-#   DESTINATION
-#     ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
-# 
-# install(
-#   FILES
-#     ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
-#     ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
-#   DESTINATION
-#     ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
-# 
-# install(
-#   FILES
-#     ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
-#   DESTINATION
-#     ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
-#   RENAME
-#     copyright)
+
+###
+### Library Config
+###
+
+set(LIB_NAME "${PROJECT_NAME}")
+
+file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+
+add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
+target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
+target_include_directories(${LIB_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+  PRIVATE
+    ${OPENSSL_INCLUDE_DIR}
+)
+
+install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
+
+###
+### Tests
+###
+if(TESTING)
+  add_subdirectory(test)
+endif()
+
+###
+### Exports
+###
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+export(
+  EXPORT
+    mlspp-targets
+  NAMESPACE
+    ${MLS_EXPORT_NAMESPACE}::
+  FILE
+    ${MLS_EXPORT_NAMESPACE}Targets.cmake)
+export(PACKAGE ${MLS_EXPORT_NAMESPACE})
+
+configure_package_config_file(cmake/config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE}
+  NO_SET_AND_CHECK_MACRO)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion)
+
+###
+### Install
+###
+
+install(
+  EXPORT
+    mlspp-targets
+  NAMESPACE
+    ${MLS_EXPORT_NAMESPACE}::
+  FILE
+    ${MLS_EXPORT_NAMESPACE}Targets.cmake
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
+
+install(
+  DIRECTORY
+    include/
+  DESTINATION
+    ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
+
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}Config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${MLS_EXPORT_NAMESPACE}ConfigVersion.cmake
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/${MLS_EXPORT_NAMESPACE})
+
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
+  DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+  RENAME
+    copyright)
 
