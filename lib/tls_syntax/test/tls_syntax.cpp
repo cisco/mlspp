@@ -1,11 +1,9 @@
-// #include <bytes/bytes.h>
+#include <bytes/bytes.h>
 #include <doctest/doctest.h>
 #include <namespace.h>
 #include <tls/tls_syntax.h>
 
-#if 0
 using namespace MLS_NAMESPACE::bytes_ns;
-#endif // 0
 
 // An enum to test enum encoding, and as a type for variants
 enum struct IntType : uint16_t
@@ -44,19 +42,16 @@ struct ExampleStruct
              MLS_NAMESPACE::tls::varint)
 };
 
-#if 0
 static bool
 operator==(const ExampleStruct& lhs, const ExampleStruct& rhs)
 {
   return (lhs.a == rhs.a) && (lhs.b == rhs.b) && (lhs.c == rhs.c);
 }
-#endif
 
 // Known-answer tests
 class TLSSyntaxTest
 {
 protected:
-#if 0
   const bool val_bool = true;
   const bytes enc_bool = from_hex("01");
 
@@ -99,7 +94,6 @@ protected:
 
   const IntType val_enum = IntType::uint8;
   const bytes enc_enum = from_hex("aaaa");
-#endif // 0
 };
 
 template<typename T>
@@ -114,7 +108,6 @@ ostream_test(T val, const std::vector<uint8_t>& enc)
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
 {
-#if 0
   bytes answer{ 1, 2, 3, 4 };
   MLS_NAMESPACE::tls::ostream w;
   w.write_raw(answer);
@@ -131,7 +124,6 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
   ostream_test(val_optional, enc_optional);
   ostream_test(val_optional_null, enc_optional_null);
   ostream_test(val_enum, enc_enum);
-#endif // 0
 }
 
 template<typename T>
@@ -146,7 +138,6 @@ istream_test(T val, T& data, const std::vector<uint8_t>& enc)
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 {
-#if 0
   bool data_bool = false;
   istream_test(val_bool, data_bool, enc_bool);
 
@@ -179,12 +170,10 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
 
   IntType data_enum = IntType::uint16;
   istream_test(val_enum, data_enum, enc_enum);
-#endif // 0
 }
 
 TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
 {
-#if 0
   ExampleStruct val_in = val_struct;
 
   MLS_NAMESPACE::tls::ostream w;
@@ -199,12 +188,10 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
 
   auto val_out2 = MLS_NAMESPACE::tls::get<ExampleStruct>(marshaled);
   REQUIRE(val_in == val_out2);
-#endif // 0
 }
 
 TEST_CASE("TLS varint failure cases")
 {
-#if 0
   // Encoding a value that is to large
   MLS_NAMESPACE::tls::ostream w;
   // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
@@ -222,7 +209,6 @@ TEST_CASE("TLS varint failure cases")
     // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
     REQUIRE_THROWS(MLS_NAMESPACE::tls::varint::decode(r, val));
   }
-#endif // 0
 }
 
 // TODO(rlb@ipv.sx) Test failure cases

@@ -3,11 +3,11 @@
 #include <optional>
 #include <stdexcept>
 
-//#ifdef VARIANT_COMPAT
-//#include <variant.hpp>
-//#else
+#ifdef VARIANT_COMPAT
+#include <variant.hpp>
+#else
 #include <variant>
-//#endif // VARIANT_COMPAT
+#endif // VARIANT_COMPAT
 #include <namespace.h>
 
 namespace MLS_NAMESPACE::tls {
