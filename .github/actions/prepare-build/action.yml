@@ -23,9 +23,9 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ inputs.cache-dir }}
-        key: v01-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
+        key: v02-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}-${{ hashFiles('vcpkg_commit.txt', 'alternatives/*/vcpkg.json') }}
         restore-keys: |
-          v01-vcpkg-${{ inputs.os }}
+          v02-vcpkg-${{ inputs.os }}-${{ inputs.crypto }}
 
     - name: Install dependencies (macOS)
       if: ${{ runner.os == 'macOS' }}
