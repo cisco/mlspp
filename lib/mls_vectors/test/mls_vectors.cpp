@@ -90,7 +90,6 @@ TEST_CASE("Tree Hashes")
     }
   }
 }
-#endif // 0
 
 TEST_CASE("Tree Operations")
 {
@@ -110,6 +109,7 @@ TEST_CASE("TreeKEM")
     }
   }
 }
+#endif // 0
 
 TEST_CASE("Messages")
 {
