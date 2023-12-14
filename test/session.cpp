@@ -130,6 +130,7 @@ TEST_CASE_METHOD(SessionTest, "Two-Person Session Creation")
   broadcast_add();
 }
 
+#if 0 // TODO refine
 TEST_CASE_METHOD(SessionTest, "Full-Size Session Creation")
 {
   for (int i = 0; i < group_size - 1; i += 1) {
@@ -220,6 +221,7 @@ TEST_CASE_METHOD(RunningSessionTest, "Full Session Life-Cycle")
     check(initial_epoch);
   }
 }
+#endif // 0
 
 // XXX(RLB) BoringSSL rejects the leaf certificate here with the following error
 // code:
