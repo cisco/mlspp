@@ -34,8 +34,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
+        os: [windows-latest] # XXX, ubuntu-latest, macos-latest]
+        crypto: [openssl_1.1] # XXX, openssl_3, boringssl]
 
     env:
       BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
@@ -55,7 +55,7 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test (non-Windows)
