@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch.hpp>
 #include <hpke/signature.h>
 #include <nlohmann/json.hpp>
 

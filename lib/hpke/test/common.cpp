@@ -2,7 +2,7 @@
 #include <set>
 #include <stdexcept>
 
-#include <doctest/doctest.h>
+#include <catch2/catch.hpp>
 #include <openssl/crypto.h>
 
 #if defined(WITH_OPENSSL3)
