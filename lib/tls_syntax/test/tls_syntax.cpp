@@ -1,5 +1,5 @@
 #include <bytes/bytes.h>
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <namespace.h>
 #include <tls/tls_syntax.h>
 

@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/treekem.h>

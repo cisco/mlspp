@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <mls/credential.h>
 
 using namespace MLS_NAMESPACE;
