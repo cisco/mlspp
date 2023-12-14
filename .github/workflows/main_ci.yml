@@ -55,9 +55,7 @@ jobs:
 
     - name: Build
       run: |
-        # XXX(RLB): If we do not have SANITIZERS=ON here, the Windows CI builds
-        # hang in the middle of unit testing.
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON -DSANITIZERS=ON
+        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
         cmake --build "${{ env.BUILD_DIR }}"
 
     - name: Unit Test (non-Windows)
@@ -65,10 +63,16 @@ jobs:
       run: |
         cmake --build "${{ env.BUILD_DIR }}" --target test
 
-    - name: Unit Test (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
+# XXX(RLB): Unit tests are currently disabled on Windows because of two
+# conflicting bugs.  On the one hand, doctest has a bug that causes
+# doctest_discover_tests to fail when tests are built with sanitizers.  On the
+# other hand, if tests are not built with sanitizers, then the unit tests hang
+# in the middle of the test run.
+#
+#    - name: Unit Test (Windows)
+#      if: matrix.os == 'windows-latest'
+#      run: |
+#        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
   
   interop-test:
     if: github.event.pull_request.draft == false
