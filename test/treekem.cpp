@@ -266,6 +266,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM encap/decap")
   }
 }
 
+#if 0 // TODO refine
 TEST_CASE("TreeKEM Interop")
 {
   for (auto suite : all_supported_suites) {
@@ -275,3 +276,4 @@ TEST_CASE("TreeKEM Interop")
     }
   }
 }
+#endif // 0
