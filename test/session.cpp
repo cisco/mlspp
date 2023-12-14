@@ -1,4 +1,4 @@
-#include <catch2/catch_all.hpp>
+#include <doctest/doctest.h>
 #include <hpke/random.h>
 #include <mls/session.h>
 
@@ -125,13 +125,12 @@ protected:
   }
 };
 
-TEST_CASE_METHOD(SessionTest, "Two-Person Session Creation")
+TEST_CASE_FIXTURE(SessionTest, "Two-Person Session Creation")
 {
   broadcast_add();
 }
 
-#if 0 // TODO refine
-TEST_CASE_METHOD(SessionTest, "Full-Size Session Creation")
+TEST_CASE_FIXTURE(SessionTest, "Full-Size Session Creation")
 {
   for (int i = 0; i < group_size - 1; i += 1) {
     broadcast_add();
@@ -149,7 +148,7 @@ protected:
   }
 };
 
-TEST_CASE_METHOD(RunningSessionTest, "Update within Session")
+TEST_CASE_FIXTURE(RunningSessionTest, "Update within Session")
 {
   for (int i = 0; i < group_size; i += 1) {
     auto initial_epoch = sessions[0].epoch();
@@ -161,7 +160,7 @@ TEST_CASE_METHOD(RunningSessionTest, "Update within Session")
   }
 }
 
-TEST_CASE_METHOD(RunningSessionTest, "Remove within Session")
+TEST_CASE_FIXTURE(RunningSessionTest, "Remove within Session")
 {
   for (int i = group_size - 1; i > 0; i -= 1) {
     auto initial_epoch = sessions[0].epoch();
@@ -178,7 +177,7 @@ TEST_CASE_METHOD(RunningSessionTest, "Remove within Session")
   }
 }
 
-TEST_CASE_METHOD(RunningSessionTest, "Replace within Session")
+TEST_CASE_FIXTURE(RunningSessionTest, "Replace within Session")
 {
   for (int i = 0; i < group_size; ++i) {
     auto target = (i + 1) % group_size;
@@ -198,7 +197,7 @@ TEST_CASE_METHOD(RunningSessionTest, "Replace within Session")
   }
 }
 
-TEST_CASE_METHOD(RunningSessionTest, "Full Session Life-Cycle")
+TEST_CASE_FIXTURE(RunningSessionTest, "Full Session Life-Cycle")
 {
   // 1. Group is created in the ctor
 
@@ -320,4 +319,3 @@ TEST_CASE("Session with X509 Credential")
           bob_session.epoch_authenticator());
 }
 #endif
-#endif // 0

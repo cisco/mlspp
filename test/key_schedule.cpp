@@ -1,4 +1,4 @@
-#include <catch2/catch_all.hpp>
+#include <doctest/doctest.h>
 #include <mls/state.h>
 #include <mls_vectors/mls_vectors.h>
 

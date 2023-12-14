@@ -1,4 +1,4 @@
-#include <catch2/catch_all.hpp>
+#include <doctest/doctest.h>
 #include <mls/crypto.h>
 #include <mls_vectors/mls_vectors.h>
 #include <string>

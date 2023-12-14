@@ -1,5 +1,5 @@
 #include "grease.h"
-#include <catch2/catch_all.hpp>
+#include <doctest/doctest.h>
 #include <mls/core_types.h>
 #include <mls/messages.h>
 

@@ -46,7 +46,6 @@ TEST_CASE("Key Schedule")
   }
 }
 
-#if 0 // TODO refine
 TEST_CASE("Message Protection")
 {
   for (auto suite : supported_suites) {
@@ -54,7 +53,6 @@ TEST_CASE("Message Protection")
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
-#endif // 0
 
 TEST_CASE("PSK Secret")
 {
@@ -80,7 +78,6 @@ TEST_CASE("Welcome")
   }
 }
 
-#if 0 // TODO refine
 TEST_CASE("Tree Hashes")
 {
   for (auto suite : supported_suites) {
@@ -109,7 +106,6 @@ TEST_CASE("TreeKEM")
     }
   }
 }
-#endif // 0
 
 TEST_CASE("Messages")
 {
