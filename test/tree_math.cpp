@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch.hpp>
 #include <mls_vectors/mls_vectors.h>
 
 #include <vector>

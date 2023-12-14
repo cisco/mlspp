@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch.hpp>
 #include <mls/credential.h>
 
 using namespace MLS_NAMESPACE;
