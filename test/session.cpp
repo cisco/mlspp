@@ -221,7 +221,6 @@ TEST_CASE_METHOD(RunningSessionTest, "Full Session Life-Cycle")
     check(initial_epoch);
   }
 }
-#endif // 0
 
 // XXX(RLB) BoringSSL rejects the leaf certificate here with the following error
 // code:
@@ -321,3 +320,4 @@ TEST_CASE("Session with X509 Credential")
           bob_session.epoch_authenticator());
 }
 #endif
+#endif // 0
