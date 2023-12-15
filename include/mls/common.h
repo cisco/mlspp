@@ -84,7 +84,12 @@ struct overloaded : Ts...
 {
   using Ts::operator()...;
 
-  // TODO(RLB) explanatory comment
+  // XXX(RLB) MSVC has a bug where it incorrectly computes the size of this
+  // type.  Microsoft claims they have fixed it in the latest MSVC, and GitHub
+  // claims they are running a version with the fix.  But in practice, we still
+  // hit it.  Including this dummy variable is a work-around.
+  //
+  // https://developercommunity.visualstudio.com/t/runtime-stack-corruption-using-stdvisit/346200
   int dummy = 0;
 };
 
