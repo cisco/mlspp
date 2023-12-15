@@ -910,6 +910,7 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
   std::cout << ">>> MessageProtectionTestVector::unprotect" << std::endl;
 
+#if 0
   auto do_unprotect = overloaded{
     [&](const PublicMessage& pt) {
       std::cout << "  ~~~ PublicMessage ~~~" << std::endl;
@@ -931,7 +932,6 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
 
   auto maybe_auth_content = var::visit(do_unprotect, message.message);
 
-#if 0
   std::cout << "--- 2 ---" << std::endl;
 
   if (!maybe_auth_content) {
@@ -953,7 +953,12 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
   auto content = auth_content.content;
 
   std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
+
+  return content;
+
 #endif // 0
+
+  std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
   return std::nullopt;
 }
 
