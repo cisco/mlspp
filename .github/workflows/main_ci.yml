@@ -31,8 +31,14 @@ jobs:
         crypto: openssl_1.1
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+    - name: Build and Test
+      run: |
+        cmake -B build -DVCPKG_MANIFEST_DIR=./alternatives/openssl_1.1/ -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DTESTING=ON
+        cmake --build build
+        ./build/lib/mls_vectors/test/Debug/mls_vectors_test
+
+#    - name: Setup tmate session
+#      uses: mxschmitt/action-tmate@v3
 
 #  formatting-check:
 #    name: Formatting Check
