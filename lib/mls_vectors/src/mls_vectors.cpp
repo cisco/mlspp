@@ -945,9 +945,13 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
     return std::nullopt;
   }
 
+  std::cout << "--- 4 ---" << std::endl;
+
+  auto content = auth_content.content;
+
   std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
 
-  return auth_content.content;
+  return content;
 }
 
 ///
