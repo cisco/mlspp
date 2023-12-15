@@ -7,9 +7,6 @@
 #include <iostream>
 #include <vector>
 
-#include <tls/compat.h>
-namespace opt = MLS_NAMESPACE::tls::opt;
-
 TEST_CASE("Certificate Known-Answer depth 2")
 {
   // TODO(suhas) Do this for each supported signature algorithm
