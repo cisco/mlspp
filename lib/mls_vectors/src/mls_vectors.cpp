@@ -906,7 +906,7 @@ MessageProtectionTestVector::protect_priv(
 }
 
 std::optional<GroupContent>
-MessageProtectionTestVector::unprotect(const MLSMessage& message)
+MessageProtectionTestVector::unprotect(const MLSMessage& /* message */)
 {
   std::cout << ">>> MessageProtectionTestVector::unprotect" << std::endl;
 
