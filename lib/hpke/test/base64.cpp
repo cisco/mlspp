@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/base64.h>
 
 using namespace MLS_NAMESPACE::hpke;

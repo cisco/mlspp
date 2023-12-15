@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/state.h>
@@ -119,7 +119,7 @@ protected:
   }
 };
 
-TEST_CASE_FIXTURE(StateTest, "Two Person")
+TEST_CASE_METHOD(StateTest, "Two Person")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -150,7 +150,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with New Member Add")
+TEST_CASE_METHOD(StateTest, "Two Person with New Member Add")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -183,7 +183,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with New Member Add")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with External Proposal")
+TEST_CASE_METHOD(StateTest, "Two Person with External Proposal")
 {
   // Initialize the creator's state, with two trusted external parties
   auto external_priv_0 = SignaturePrivateKey::generate(suite);
@@ -228,7 +228,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with External Proposal")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
+TEST_CASE_METHOD(StateTest, "Two Person with custom extensions")
 {
   // Initialize the creator's state
   auto first_exts = ExtensionList{};
@@ -276,7 +276,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with custom extensions")
   REQUIRE(first2.extensions() == second_exts);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
+TEST_CASE_METHOD(StateTest, "Two Person with external tree for welcome")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -332,7 +332,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with external tree for welcome")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
+TEST_CASE_METHOD(StateTest, "Two Person with PSK")
 {
   const auto psk_id = from_ascii("external psk");
   const auto psk_secret = from_ascii("super secret");
@@ -365,7 +365,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with PSK")
   REQUIRE(first1 == second0);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Two Person with Replacement")
+TEST_CASE_METHOD(StateTest, "Two Person with Replacement")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -419,7 +419,7 @@ TEST_CASE_FIXTURE(StateTest, "Two Person with Replacement")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "External Join")
+TEST_CASE_METHOD(StateTest, "External Join")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -447,7 +447,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
+TEST_CASE_METHOD(StateTest, "External Join with External Tree")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -476,7 +476,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join with External Tree")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "External Join with PSK")
+TEST_CASE_METHOD(StateTest, "External Join with PSK")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -512,7 +512,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join with PSK")
   verify_group_functionality(group);
 }
 
-TEST_CASE_FIXTURE(StateTest, "External Join with Eviction of Prior Appearance")
+TEST_CASE_METHOD(StateTest, "External Join with Eviction of Prior Appearance")
 {
   // Initialize the creator's state
   auto first0 = State{ group_id,
@@ -559,7 +559,7 @@ TEST_CASE_FIXTURE(StateTest, "External Join with Eviction of Prior Appearance")
   REQUIRE(first2.roster().size() == 2);
 }
 
-TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
+TEST_CASE_METHOD(StateTest, "SFrame Parameter Negotiation")
 {
   // Set the SFrame parameters for the group
   auto specified_params = SFrameParameters{ 1, 8 };
@@ -603,7 +603,7 @@ TEST_CASE_FIXTURE(StateTest, "SFrame Parameter Negotiation")
   REQUIRE(opt::get(first_params) == opt::get(second_params));
 }
 
-TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
+TEST_CASE_METHOD(StateTest, "Enforce Required Capabilities")
 {
   // Require some capabilities that don't exist
   auto exotic_extension = uint16_t(0xffff);
@@ -660,7 +660,7 @@ TEST_CASE_FIXTURE(StateTest, "Enforce Required Capabilities")
   state.handle(state.add(kp_yes_2, msg_opts));
 }
 
-TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
+TEST_CASE_METHOD(StateTest, "Add Multiple Members")
 {
   // Initialize the creator's state
   states.emplace_back(group_id,
@@ -696,7 +696,7 @@ TEST_CASE_FIXTURE(StateTest, "Add Multiple Members")
   verify_group_functionality(states);
 }
 
-TEST_CASE_FIXTURE(StateTest, "Full Size Group")
+TEST_CASE_METHOD(StateTest, "Full Size Group")
 {
   // Initialize the creator's state
   states.emplace_back(group_id,
@@ -784,7 +784,7 @@ protected:
   }
 };
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone via Empty Commit")
+TEST_CASE_METHOD(RunningGroupTest, "Update Everyone via Empty Commit")
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto new_leaf = fresh_secret();
@@ -803,7 +803,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone via Empty Commit")
   }
 }
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
+TEST_CASE_METHOD(RunningGroupTest, "Update Everyone in a Group")
 {
   for (size_t i = 0; i < group_size; i += 1) {
     auto committer_index = (i + 1) % group_size;
@@ -831,7 +831,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Update Everyone in a Group")
   }
 }
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Add a PSK from Everyone in a Group")
+TEST_CASE_METHOD(RunningGroupTest, "Add a PSK from Everyone in a Group")
 {
   for (uint32_t i = 0; i < group_size; i += 1) {
     auto psk_id = tls::marshal(i);
@@ -856,7 +856,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Add a PSK from Everyone in a Group")
   }
 }
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
+TEST_CASE_METHOD(RunningGroupTest, "Remove Members from a Group")
 {
   for (uint32_t i = uint32_t(group_size) - 2; i > 0; i -= 1) {
     auto remove = states[i].remove_proposal(LeafIndex{ i + 1 });
@@ -877,7 +877,7 @@ TEST_CASE_FIXTURE(RunningGroupTest, "Remove Members from a Group")
   }
 }
 
-TEST_CASE_FIXTURE(RunningGroupTest, "Roster Updates")
+TEST_CASE_METHOD(RunningGroupTest, "Roster Updates")
 {
   static const auto get_creds = [](const auto& kps) {
     return stdx::transform<Credential>(
@@ -948,7 +948,7 @@ protected:
   }
 };
 
-TEST_CASE_FIXTURE(RelatedGroupTest, "Branch the group")
+TEST_CASE_METHOD(RelatedGroupTest, "Branch the group")
 {
   // Note the epoch authenticator before we branch
   auto original_epoch_authenticator = states[0].epoch_authenticator();
@@ -996,7 +996,7 @@ TEST_CASE_FIXTURE(RelatedGroupTest, "Branch the group")
   }
 }
 
-TEST_CASE_FIXTURE(RelatedGroupTest, "Reinitialize the group")
+TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
 {
   // Member 0 proposes reinitialization with a new group ID
   auto new_group_id = from_ascii("reinitialized group");

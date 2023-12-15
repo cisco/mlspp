@@ -7,14 +7,18 @@
       "name": "openssl",
       "version>=": "3.0.7"
     },
-    "doctest",
+    "catch2",
     "nlohmann-json"
   ],
-  "builtin-baseline": "5908d702d61cea1429b223a0b7a10ab86bad4c78",
+  "builtin-baseline": "eb33d2f7583405fca184bcdf7fdd5828ec88ac05",
   "overrides": [
     {
       "name": "openssl",
       "version": "3.0.7"
+    },
+    {
+      "name": "catch2",
+      "version": "3.5.0"
     }
   ]
 }

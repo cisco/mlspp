@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <mls_vectors/mls_vectors.h>
 #include <tls/tls_syntax.h>
 

@@ -1,5 +1,5 @@
 #include <bytes/bytes.h>
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <namespace.h>
 #include <tls/tls_syntax.h>
 
@@ -106,7 +106,7 @@ ostream_test(T val, const std::vector<uint8_t>& enc)
   REQUIRE(w.size() == enc.size());
 }
 
-TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS ostream")
+TEST_CASE_METHOD(TLSSyntaxTest, "TLS ostream")
 {
   bytes answer{ 1, 2, 3, 4 };
   MLS_NAMESPACE::tls::ostream w;
@@ -136,7 +136,7 @@ istream_test(T val, T& data, const std::vector<uint8_t>& enc)
   REQUIRE(r.empty());
 }
 
-TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
+TEST_CASE_METHOD(TLSSyntaxTest, "TLS istream")
 {
   bool data_bool = false;
   istream_test(val_bool, data_bool, enc_bool);
@@ -172,7 +172,7 @@ TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS istream")
   istream_test(val_enum, data_enum, enc_enum);
 }
 
-TEST_CASE_FIXTURE(TLSSyntaxTest, "TLS abbreviations")
+TEST_CASE_METHOD(TLSSyntaxTest, "TLS abbreviations")
 {
   ExampleStruct val_in = val_struct;
 
