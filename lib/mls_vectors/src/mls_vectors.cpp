@@ -60,19 +60,19 @@ operator<<(std::ostream& str, const std::vector<T>& obj)
   return str;
 }
 
-//static std::ostream&
-//operator<<(std::ostream& str, const GroupContent::RawContent& obj)
-//{
-//  return var::visit(
-//    overloaded{
-//      [&](const Proposal&) -> std::ostream& { return str << "[Proposal]"; },
-//      [&](const Commit&) -> std::ostream& { return str << "[Commit]"; },
-//      [&](const ApplicationData&) -> std::ostream& {
-//        return str << "[ApplicationData]";
-//      },
-//    },
-//    obj);
-//}
+static std::ostream&
+operator<<(std::ostream& str, const GroupContent::RawContent& obj)
+{
+  return var::visit(
+    overloaded{
+      [&](const Proposal&) -> std::ostream& { return str << "[Proposal]"; },
+      [&](const Commit&) -> std::ostream& { return str << "[Commit]"; },
+      [&](const ApplicationData&) -> std::ostream& {
+        return str << "[ApplicationData]";
+      },
+    },
+    obj);
+}
 
 template<typename T>
 inline std::enable_if_t<T::_tls_serializable, std::ostream&>
@@ -703,50 +703,32 @@ MessageProtectionTestVector::MessageProtectionTestVector(CipherSuite suite)
   , commit{ /* XXX(RLB) this is technically invalid, empty w/o path */ }
   , application{ prg.secret("application") }
 {
-  std::cout << ">>> MessageProtectionTestVector::MessageProtectionTestVector" << std::endl;
-
   proposal_pub = protect_pub(proposal);
   proposal_priv = protect_priv(proposal);
-
-  std::cout << "--- 1 ---" << std::endl;
 
   commit_pub = protect_pub(commit);
   commit_priv = protect_priv(commit);
 
-  std::cout << "--- 2 ---" << std::endl;
-
   application_priv = protect_priv(ApplicationData{ application });
-
-  std::cout << "<<< MessageProtectionTestVector::MessageProtectionTestVector" << std::endl;
 }
 
 std::optional<std::string>
 MessageProtectionTestVector::verify()
 {
-  std::cout << ">>> MessageProtectionTestVector::verify" << std::endl;
-
   // Initialize fields that don't get set from JSON
   prg = PseudoRandom::Generator(cipher_suite, "message-protection");
   signature_priv.set_public_key(cipher_suite);
 
-  std::cout << "--- 1 ---" << std::endl;
-
   // Sanity check the key pairs
   VERIFY_EQUAL("sig kp", signature_priv.public_key, signature_pub);
 
-  std::cout << "--- 2 ---" << std::endl;
-
   // Verify proposal unprotect as PublicMessage
-  unprotect(proposal_pub);
-//  auto proposal_pub_unprotected = unprotect(proposal_pub);
-//  VERIFY("proposal pub unprotect auth", proposal_pub_unprotected);
-//  VERIFY_EQUAL("proposal pub unprotect",
-//               opt::get(proposal_pub_unprotected).content,
-//               proposal);
+  auto proposal_pub_unprotected = unprotect(proposal_pub);
+  VERIFY("proposal pub unprotect auth", proposal_pub_unprotected);
+  VERIFY_EQUAL("proposal pub unprotect",
+               opt::get(proposal_pub_unprotected).content,
+               proposal);
 
-  std::cout << "--- 3 ---" << std::endl;
-
-#if 0
   // Verify proposal unprotect as PrivateMessage
   auto proposal_priv_unprotected = unprotect(proposal_priv);
   VERIFY("proposal priv unprotect auth", proposal_priv_unprotected);
@@ -754,15 +736,11 @@ MessageProtectionTestVector::verify()
                opt::get(proposal_priv_unprotected).content,
                proposal);
 
-  std::cout << "--- 4 ---" << std::endl;
-
   // Verify commit unprotect as PublicMessage
   auto commit_pub_unprotected = unprotect(commit_pub);
   VERIFY("commit pub unprotect auth", commit_pub_unprotected);
   VERIFY_EQUAL(
     "commit pub unprotect", opt::get(commit_pub_unprotected).content, commit);
-
-  std::cout << "--- 5 ---" << std::endl;
 
   // Verify commit unprotect as PrivateMessage
   auto commit_priv_unprotected = unprotect(commit_priv);
@@ -770,16 +748,12 @@ MessageProtectionTestVector::verify()
   VERIFY_EQUAL(
     "commit priv unprotect", opt::get(commit_priv_unprotected).content, commit);
 
-  std::cout << "--- 6 ---" << std::endl;
-
   // Verify application data unprotect as PrivateMessage
   auto app_unprotected = unprotect(application_priv);
   VERIFY("app priv unprotect auth", app_unprotected);
   VERIFY_EQUAL("app priv unprotect",
                opt::get(app_unprotected).content,
                ApplicationData{ application });
-
-  std::cout << "--- 7 ---" << std::endl;
 
   // Verify protect/unprotect round-trips
   // XXX(RLB): Note that because (a) unprotect() deletes keys from the ratchet
@@ -797,8 +771,6 @@ MessageProtectionTestVector::verify()
                opt::get(proposal_pub_protected_unprotected).content,
                proposal);
 
-  std::cout << "--- 8 ---" << std::endl;
-
   auto proposal_priv_protected = protect_priv(proposal);
   auto proposal_priv_protected_unprotected = unprotect(proposal_priv_protected);
   VERIFY("proposal priv protect/unprotect auth",
@@ -807,16 +779,12 @@ MessageProtectionTestVector::verify()
                opt::get(proposal_priv_protected_unprotected).content,
                proposal);
 
-  std::cout << "--- 9 ---" << std::endl;
-
   auto commit_pub_protected = protect_pub(commit);
   auto commit_pub_protected_unprotected = unprotect(commit_pub_protected);
   VERIFY("commit pub protect/unprotect auth", commit_pub_protected_unprotected);
   VERIFY_EQUAL("commit pub protect/unprotect",
                opt::get(commit_pub_protected_unprotected).content,
                commit);
-
-  std::cout << "--- a ---" << std::endl;
 
   auto commit_priv_protected = protect_priv(commit);
   auto commit_priv_protected_unprotected = unprotect(commit_priv_protected);
@@ -826,16 +794,12 @@ MessageProtectionTestVector::verify()
                opt::get(commit_priv_protected_unprotected).content,
                commit);
 
-  std::cout << "--- b ---" << std::endl;
-
   auto app_protected = protect_priv(ApplicationData{ application });
   auto app_protected_unprotected = unprotect(app_protected);
   VERIFY("app priv protect/unprotect auth", app_protected_unprotected);
   VERIFY_EQUAL("app priv protect/unprotect",
                opt::get(app_protected_unprotected).content,
                ApplicationData{ application });
-#endif // 0
-  std::cout << "<<< MessageProtectionTestVector::verify" << std::endl;
 
   return std::nullopt;
 }
@@ -908,64 +872,30 @@ MessageProtectionTestVector::protect_priv(
 std::optional<GroupContent>
 MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
-  std::cout << ">>> MessageProtectionTestVector::unprotect" << std::endl;
-
   auto do_unprotect = overloaded{
     [&](const PublicMessage& pt) {
-      std::cout << "  ~~~ PublicMessage ~~~" << std::endl;
       return pt.unprotect(cipher_suite, membership_key, group_context());
     },
     [&](const PrivateMessage& ct) {
-      std::cout << "  ~~~ PrivateMessage ~~~" << std::endl;
       auto keys = group_keys();
-      std::cout << "  ~~~ PrivateMessage ~~~" << std::endl;
       return ct.unprotect(cipher_suite, keys, sender_data_secret);
     },
     [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
-      std::cout << "  ~~~ /* other */ ~~~" << std::endl;
       return std::nullopt;
     }
   };
 
-#if 0
-  std::cout << "--- 1 ---" << std::endl;
-
   auto maybe_auth_content = var::visit(do_unprotect, message.message);
-#endif // 0
-
-  std::cout << "--- 1 ---" << std::endl;
-
-  const auto& pt = var::get<PublicMessage>(message.message);
-  auto maybe_auth_content = pt.unprotect(cipher_suite, membership_key, group_context());
-
-  std::cout << "--- 2 ---" << std::endl;
-
   if (!maybe_auth_content) {
     return std::nullopt;
   }
 
-  std::cout << "--- 3 ---" << std::endl;
-
   auto auth_content = opt::get(maybe_auth_content);
-
-  std::cout << "--- 4 ---" << std::endl;
-
   if (!auth_content.verify(cipher_suite, signature_pub, group_context())) {
     return std::nullopt;
   }
 
-  std::cout << "--- 5 ---" << std::endl;
-
-  auto content = auth_content.content;
-
-  std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
-
-  return content;
-
-#if 0
-  std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
-  return std::nullopt;
-#endif // 0
+  return auth_content.content;
 }
 
 ///

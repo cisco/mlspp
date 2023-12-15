@@ -16,7 +16,6 @@ static const std::vector<MLS_NAMESPACE::CipherSuite> supported_suites
 #endif
 };
 
-#if 0
 TEST_CASE("Tree Math")
 {
   const auto tv = TreeMathTestVector{ 15 };
@@ -46,7 +45,6 @@ TEST_CASE("Key Schedule")
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
-#endif // 0
 
 TEST_CASE("Message Protection")
 {
@@ -56,7 +54,6 @@ TEST_CASE("Message Protection")
   }
 }
 
-#if 0
 TEST_CASE("PSK Secret")
 {
   for (auto suite : supported_suites) {
@@ -115,4 +112,3 @@ TEST_CASE("Messages")
   auto tv = MessagesTestVector();
   REQUIRE(tv.verify() == std::nullopt);
 }
-#endif // 0
