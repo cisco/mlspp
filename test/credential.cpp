@@ -137,7 +137,7 @@ TEST_CASE("X509 Credential Depth 2")
 
   auto cred = Credential::x509(der_in);
   auto x509 = cred.get<X509Credential>();
-  CHECK(!x509.public_key().data.size());
+  CHECK(!x509.public_key().data.empty());
 
   const auto& x509_original = cred.get<X509Credential>();
   CHECK(x509.der_chain == x509_original.der_chain);
