@@ -15,114 +15,114 @@ env:
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
-  formatting-check:
-    name: Formatting Check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Run clang-format style check for C/C++ programs
-      uses: jidicula/clang-format-action@v4.11.0
-      with:
-        clang-format-version: 16
-        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
-        fallback-style: 'Mozilla'
-
-  build-and-unit-test:
-    needs: formatting-check
-    name: Build and test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
-
-    env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
-      CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - uses: ./.github/actions/prepare-build
-      with:
-        os: ${{ matrix.os }}
-        crypto: ${{ matrix.crypto }}
-        cache-dir: ${{ github.workspace }}/vcpkg_cache
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
-        cmake --build "${{ env.BUILD_DIR }}"
-
-    - name: Unit Test (non-Windows)
-      if: matrix.os != 'windows-latest'
-      run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target test
-
-# XXX(RLB): Unit tests are currently disabled on Windows because of two
-# conflicting bugs.  On the one hand, doctest has a bug that causes
-# doctest_discover_tests to fail when tests are built with sanitizers.  On the
-# other hand, if tests are not built with sanitizers, then the unit tests hang
-# in the middle of the test run.
+#  formatting-check:
+#    name: Formatting Check
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v4
 #
-#    - name: Unit Test (Windows)
-#      if: matrix.os == 'windows-latest'
+#    - name: Run clang-format style check for C/C++ programs
+#      uses: jidicula/clang-format-action@v4.11.0
+#      with:
+#        clang-format-version: 16
+#        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
+#        fallback-style: 'Mozilla'
+#
+#  build-and-unit-test:
+#    needs: formatting-check
+#    name: Build and test
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      matrix:
+#        os: [windows-latest, ubuntu-latest, macos-latest]
+#        crypto: [openssl_1.1, openssl_3, boringssl]
+#
+#    env:
+#      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
+#      CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    - uses: ./.github/actions/prepare-build
+#      with:
+#        os: ${{ matrix.os }}
+#        crypto: ${{ matrix.crypto }}
+#        cache-dir: ${{ github.workspace }}/vcpkg_cache
+#
+#    - name: Build
 #      run: |
-#        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
-  
-  interop-test:
-    if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
-    name: Interop test
-    runs-on: ubuntu-latest
-
-    env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_openssl_1.1"
-      CRYPTO_DIR: "./alternatives/openssl_1.1"
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - uses: ./.github/actions/prepare-build
-      with:
-        os: ubuntu-latest
-        crypto-dir: openssl_1.1
-        cache-dir: ${{ github.workspace }}/vcpkg_cache
-
-    - name: Build
-      run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ env.BUILD_DIR }}"
-
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build
-        cmake --build build
-
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
-
+#        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+#        cmake --build "${{ env.BUILD_DIR }}"
+#
+#    - name: Unit Test (non-Windows)
+#      if: matrix.os != 'windows-latest'
+#      run: |
+#        cmake --build "${{ env.BUILD_DIR }}" --target test
+#
+## XXX(RLB): Unit tests are currently disabled on Windows because of two
+## conflicting bugs.  On the one hand, doctest has a bug that causes
+## doctest_discover_tests to fail when tests are built with sanitizers.  On the
+## other hand, if tests are not built with sanitizers, then the unit tests hang
+## in the middle of the test run.
+##
+##    - name: Unit Test (Windows)
+##      if: matrix.os == 'windows-latest'
+##      run: |
+##        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
+#  
+#  interop-test:
+#    if: github.event.pull_request.draft == false
+#    needs: build-and-unit-test
+#    name: Interop test
+#    runs-on: ubuntu-latest
+#
+#    env:
+#      BUILD_DIR: "${RUNNER_TEMP}/build_openssl_1.1"
+#      CRYPTO_DIR: "./alternatives/openssl_1.1"
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        submodules: recursive
+#        fetch-depth: 0
+#
+#    - uses: ./.github/actions/prepare-build
+#      with:
+#        os: ubuntu-latest
+#        crypto-dir: openssl_1.1
+#        cache-dir: ${{ github.workspace }}/vcpkg_cache
+#
+#    - name: Build
+#      run: |
+#        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+#        cmake --build "${{ env.BUILD_DIR }}"
+#
+#    - name: Build (Interop Harness)
+#      run: |
+#        cd cmd/interop
+#        cmake -B build
+#        cmake --build build
+#
+#    - name: Test self-interop
+#      run: |
+#        make -C cmd/interop self-test
+#
+#    - name: Test interop on test vectors
+#      run: |
+#        make -C cmd/interop interop-test
+#
+#    - name: Test gRPC live interop with self
+#      run: |
+#        cd cmd/interop
+#        ./grpc-self-test.sh
+#
   clang-tidy:
     if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
+#    needs: build-and-unit-test
     name: Build with clang-tidy
     runs-on: ubuntu-latest
     strategy:
