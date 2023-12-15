@@ -572,12 +572,12 @@ private:
 
 struct ValidatedContent
 {
-  public:
   const AuthenticatedContent& authenticated_content() const;
 
-  friend bool operator==(const ValidatedContent& lhs, const ValidatedContent& rhs);
+  friend bool operator==(const ValidatedContent& lhs,
+                         const ValidatedContent& rhs);
 
-  private:
+private:
   AuthenticatedContent content_auth;
 
   ValidatedContent(AuthenticatedContent content_auth_in);
