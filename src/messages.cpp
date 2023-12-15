@@ -471,7 +471,7 @@ ValidatedContent::authenticated_content() const
 }
 
 ValidatedContent::ValidatedContent(AuthenticatedContent content_auth_in)
-  : content_auth(content_auth_in)
+  : content_auth(std::move(content_auth_in))
 {
 }
 
