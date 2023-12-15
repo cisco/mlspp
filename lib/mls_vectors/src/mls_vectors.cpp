@@ -953,7 +953,7 @@ MessageProtectionTestVector::unprotect(const MLSMessage& message)
 
   std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
 
-  return content;
+  return std::nullopt;
 }
 
 ///
