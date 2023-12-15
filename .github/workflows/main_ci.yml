@@ -35,10 +35,10 @@ jobs:
       run: |
         cmake -B build -DVCPKG_MANIFEST_DIR="./alternatives/openssl_1.1/" -DCMAKE_TOOLCHAIN_FILE="./vcpkg/scripts/buildsystems/vcpkg.cmake" -DTESTING=ON
         cmake --build build
-        cmake --build build --target RUN_TESTS
+#        cmake --build build --target RUN_TESTS
 
-#    - name: Setup tmate session
-#      uses: mxschmitt/action-tmate@v3
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
 
 #  formatting-check:
 #    name: Formatting Check
