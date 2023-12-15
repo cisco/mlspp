@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/userinfo_vc.h>
 #include <nlohmann/json.hpp>
 
@@ -7,6 +7,8 @@ namespace opt = MLS_NAMESPACE::tls::opt;
 
 using namespace MLS_NAMESPACE::hpke;
 using namespace std::string_literals;
+
+namespace mls::hpke {
 
 static bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
@@ -20,6 +22,8 @@ operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
 
   return sig && kid && key;
 }
+
+} // namespace mls::hpke
 
 TEST_CASE("UserInfoVC Parsing and Validation")
 {

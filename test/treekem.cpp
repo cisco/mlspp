@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/treekem.h>
@@ -29,7 +29,7 @@ protected:
   }
 };
 
-TEST_CASE_FIXTURE(TreeKEMTest, "ParentNode Equality")
+TEST_CASE_METHOD(TreeKEMTest, "ParentNode Equality")
 {
   auto initA = HPKEPrivateKey::generate(suite);
   auto initB = HPKEPrivateKey::generate(suite);
@@ -44,7 +44,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "ParentNode Equality")
   REQUIRE(nodeA != nodeB);
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
+TEST_CASE_METHOD(TreeKEMTest, "Node public key")
 {
   auto parent_priv = HPKEPrivateKey::generate(suite);
   auto parent = Node{ ParentNode{ parent_priv.public_key, {}, {} } };
@@ -58,7 +58,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "Node public key")
   REQUIRE(leaf_node.public_key() == leaf_priv.public_key);
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
+TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 {
   const auto size = LeafCount{ 5 };
   const auto index = LeafIndex{ 2 };
@@ -133,7 +133,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Private Key")
 //  X   _   _   _
 // X X _ X X _ _ _
 // 0123456789abcde
-TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
+TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Public Key")
 {
   const auto size = LeafCount{ 5 };
   const auto removed = LeafIndex{ 2 };
@@ -200,7 +200,7 @@ TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM Public Key")
   REQUIRE(root_resolution == pub.resolve(NodeIndex::root(size)));
 }
 
-TEST_CASE_FIXTURE(TreeKEMTest, "TreeKEM encap/decap")
+TEST_CASE_METHOD(TreeKEMTest, "TreeKEM encap/decap")
 {
   const auto size = LeafCount{ 10 };
 

@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/hpke.h>
 
 #include "common.h"
@@ -34,7 +34,7 @@ TEST_CASE("KEM round-trip")
     auto pkSm = kem.serialize(*pkS);
     REQUIRE(pkSm.size() == kem.pk_size);
 
-    SUBCASE("Encap/Decap")
+    SECTION("Encap/Decap")
     {
       auto [secretS_, enc_] = kem.encap(*pkR);
       auto secretS = secretS_;
@@ -47,7 +47,7 @@ TEST_CASE("KEM round-trip")
       REQUIRE(secretR == secretS);
     }
 
-    SUBCASE("AuthEncap/AuthDecap")
+    SECTION("AuthEncap/AuthDecap")
     {
       auto [secretS_, enc_] = kem.auth_encap(*pkR, *skS);
       auto secretS = secretS_;
