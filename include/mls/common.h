@@ -80,7 +80,7 @@ seconds_since_epoch();
 ///
 
 template<class... Ts>
-struct overloaded : Ts...
+struct __declspec(empty_bases) overloaded : Ts...
 {
   using Ts::operator()...;
 };
