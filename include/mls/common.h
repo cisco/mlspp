@@ -80,9 +80,12 @@ seconds_since_epoch();
 ///
 
 template<class... Ts>
-struct __declspec(empty_bases) overloaded : Ts...
+struct overloaded : Ts...
 {
   using Ts::operator()...;
+
+  // TODO(RLB) explanatory comment
+  int dummy = 0;
 };
 
 // clang-format off
