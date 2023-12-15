@@ -906,28 +906,46 @@ MessageProtectionTestVector::protect_priv(
 std::optional<GroupContent>
 MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
+  std::cout << ">>> MessageProtectionTestVector::unprotect" << std::endl;
+
   auto do_unprotect = overloaded{
     [&](const PublicMessage& pt) {
+      std::cout << "  ~~~ PublicMessage ~~~" << std::endl;
       return pt.unprotect(cipher_suite, membership_key, group_context());
     },
     [&](const PrivateMessage& ct) {
+      std::cout << "  ~~~ PrivateMessage ~~~" << std::endl;
       auto keys = group_keys();
+      std::cout << "  ~~~ PrivateMessage ~~~" << std::endl;
       return ct.unprotect(cipher_suite, keys, sender_data_secret);
     },
     [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
+      std::cout << "  ~~~ /* other */ ~~~" << std::endl;
       return std::nullopt;
     }
   };
 
+  std::cout << "--- 1 ---" << std::endl;
+
   auto maybe_auth_content = var::visit(do_unprotect, message.message);
+
+  std::cout << "--- 2 ---" << std::endl;
+
   if (!maybe_auth_content) {
     return std::nullopt;
   }
 
+  std::cout << "--- 3 ---" << std::endl;
+
   auto auth_content = opt::get(maybe_auth_content);
+
+  std::cout << "--- 4 ---" << std::endl;
+
   if (!auth_content.verify(cipher_suite, signature_pub, group_context())) {
     return std::nullopt;
   }
+
+  std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
 
   return auth_content.content;
 }
