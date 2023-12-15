@@ -33,7 +33,7 @@ jobs:
 
     - name: Build and Test
       run: |
-        cmake -B build -DVCPKG_MANIFEST_DIR=./alternatives/openssl_1.1/ -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DTESTING=ON
+        cmake -B build -DVCPKG_MANIFEST_DIR="./alternatives/openssl_1.1/" -DCMAKE_TOOLCHAIN_FILE="./vcpkg/scripts/buildsystems/vcpkg.cmake" -DTESTING=ON
         cmake --build build
         ./build/lib/mls_vectors/test/Debug/mls_vectors_test
 
