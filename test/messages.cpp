@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <mls/messages.h>
 #include <mls/state.h>
 #include <mls_vectors/mls_vectors.h>
@@ -95,7 +95,7 @@ protected:
   GroupContent proposal_content;
 };
 
-TEST_CASE_FIXTURE(MLSMessageTest, "AuthenticatedContent Sign/Verify")
+TEST_CASE_METHOD(MLSMessageTest, "AuthenticatedContent Sign/Verify")
 {
   // Verify that a sign / verify round-trip works
   auto content_auth =
@@ -117,7 +117,7 @@ TEST_CASE_FIXTURE(MLSMessageTest, "AuthenticatedContent Sign/Verify")
                                             context));
 }
 
-TEST_CASE_FIXTURE(MLSMessageTest, "PublicMessage Protect/Unprotect")
+TEST_CASE_METHOD(MLSMessageTest, "PublicMessage Protect/Unprotect")
 {
   auto content = proposal_content;
   auto content_auth_original =
@@ -133,7 +133,7 @@ TEST_CASE_FIXTURE(MLSMessageTest, "PublicMessage Protect/Unprotect")
   REQUIRE(content_auth_unprotected == content_auth_original);
 }
 
-TEST_CASE_FIXTURE(MLSMessageTest, "PrivateMessage Protect/Unprotect")
+TEST_CASE_METHOD(MLSMessageTest, "PrivateMessage Protect/Unprotect")
 {
   auto content = proposal_content;
   auto content_auth_original =

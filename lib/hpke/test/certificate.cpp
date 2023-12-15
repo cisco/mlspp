@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <hpke/certificate.h>
 
 #include "common.h"
@@ -6,9 +6,6 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-
-#include <tls/compat.h>
-namespace opt = MLS_NAMESPACE::tls::opt;
 
 TEST_CASE("Certificate Known-Answer depth 2")
 {
@@ -106,9 +103,9 @@ TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
     "4100314a485d01df4c7852ec5720b2af34f5620b2a32a50c4ee0481d013ebbfd8e243784"
     "123a0cfe4d59b1fb09a1738ee9bc2aab59a2b4af2c3ee60ce19afbe1eb03");
 
-  const auto root_skid = std::string("b9e672b8");
-  const auto issuing_skid = std::string("75ecb844");
-  const auto leaf_skid = std::string("dd3b0790");
+  const auto root_skid = from_hex("b9e672b8");
+  const auto issuing_skid = from_hex("75ecb844");
+  const auto leaf_skid = from_hex("dd3b0790");
 
   auto root = Certificate{ root_der };
   auto issuing = Certificate{ issuing_der };
@@ -130,13 +127,11 @@ TEST_CASE("Certificate Known-Answer depth 2 with SKID/ADID")
 
   REQUIRE(root.subject_key_id().has_value());
 
-  CHECK_EQ(to_hex(opt::get(leaf.subject_key_id())), leaf_skid);
-  CHECK_EQ(to_hex(opt::get(leaf.authority_key_id())),
-           to_hex(opt::get(issuing.subject_key_id())));
-  CHECK_EQ(to_hex(opt::get(issuing.subject_key_id())), issuing_skid);
-  CHECK_EQ(to_hex(opt::get(issuing.authority_key_id())),
-           to_hex(opt::get(root.subject_key_id())));
-  CHECK_EQ(to_hex(opt::get(root.subject_key_id())), root_skid);
+  CHECK(leaf.subject_key_id() == leaf_skid);
+  CHECK(leaf.authority_key_id() == issuing.subject_key_id());
+  CHECK(issuing.subject_key_id() == issuing_skid);
+  CHECK(issuing.authority_key_id() == root.subject_key_id());
+  CHECK(root.subject_key_id() == root_skid);
 }
 
 TEST_CASE("Certificate Known-Answer depth 2 with SAN RFC822Name")
@@ -174,7 +169,7 @@ TEST_CASE("Certificate Known-Answer depth 2 with SAN RFC822Name")
   CHECK(issuing.valid_from(root));
   CHECK(root.valid_from(root));
 
-  CHECK_EQ(leaf.email_addresses().at(0), "user@domain.com");
+  CHECK(leaf.email_addresses().at(0) == "user@domain.com");
 }
 
 TEST_CASE("RSA-SHA256 Certificate Known-Answer depth 2")
@@ -593,12 +588,15 @@ TEST_CASE("Test Subject Parsing")
 
   auto leaf = Certificate{ leaf_der };
   CHECK(leaf.raw == leaf_der);
+
   auto parsed_subject = leaf.subject();
-  CHECK_EQ(parsed_subject.size(), 2);
+  CHECK(parsed_subject.size() == 2);
+
   auto it = parsed_subject.find(Certificate::NameType::common_name);
-  CHECK_EQ(it->second, "custom:12345");
+  CHECK(it->second == "custom:12345");
+
   it = parsed_subject.find(Certificate::NameType::serial_number);
-  CHECK_EQ(it->second, "11-22-33");
+  CHECK(it->second == "11-22-33");
 }
 
 TEST_CASE("Test Certificate notBefore status")

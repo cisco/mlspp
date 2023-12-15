@@ -1,5 +1,5 @@
 #include <bytes/bytes.h>
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <memory>
 #include <sstream>
 
@@ -31,7 +31,8 @@ TEST_CASE("Zeroization")
   // to be basically all zero.
   const auto snapshot = std::vector<uint8_t>(begin, end);
   const auto threshold = size - 4 * sizeof(void*);
-  REQUIRE(std::count(snapshot.begin(), snapshot.end(), 0) >= threshold);
+  const auto count = std::count(snapshot.begin(), snapshot.end(), 0);
+  REQUIRE(static_cast<size_t>(count) >= threshold);
 }
 #endif
 

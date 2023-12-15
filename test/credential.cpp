@@ -1,4 +1,4 @@
-#include <doctest/doctest.h>
+#include <catch2/catch_all.hpp>
 #include <mls/credential.h>
 
 using namespace MLS_NAMESPACE;
@@ -137,7 +137,7 @@ TEST_CASE("X509 Credential Depth 2")
 
   auto cred = Credential::x509(der_in);
   auto x509 = cred.get<X509Credential>();
-  CHECK(x509.public_key().data.size() != 0);
+  CHECK(!x509.public_key().data.empty());
 
   const auto& x509_original = cred.get<X509Credential>();
   CHECK(x509.der_chain == x509_original.der_chain);
@@ -167,7 +167,7 @@ TEST_CASE("X509 Credential Depth 2 Marshal/Unmarshal")
 
   auto original = Credential::x509(der_in);
   const auto& x509_original = original.get<X509Credential>();
-  CHECK(x509_original.public_key().data.size() != 0);
+  CHECK(!x509_original.public_key().data.empty());
 
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
@@ -193,7 +193,7 @@ TEST_CASE("X509 Credential Depth 1 Marshal/Unmarshal")
 
   auto original = Credential::x509(der_in);
   auto x509_original = original.get<X509Credential>();
-  CHECK(x509_original.public_key().data.size() != 0);
+  CHECK(!x509_original.public_key().data.empty());
 
   auto marshalled = tls::marshal(original);
   auto unmarshaled = tls::get<Credential>(marshalled);
