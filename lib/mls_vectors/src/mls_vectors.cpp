@@ -906,7 +906,7 @@ MessageProtectionTestVector::protect_priv(
 }
 
 std::optional<GroupContent>
-MessageProtectionTestVector::unprotect(const MLSMessage& /* message */)
+MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
   std::cout << ">>> MessageProtectionTestVector::unprotect" << std::endl;
 
@@ -931,6 +931,12 @@ MessageProtectionTestVector::unprotect(const MLSMessage& /* message */)
   std::cout << "--- 1 ---" << std::endl;
 
   auto maybe_auth_content = var::visit(do_unprotect, message.message);
+#endif // 0
+
+  std::cout << "--- 1 ---" << std::endl;
+
+  const auto& pt = var::get<PublicMessage>(message.message);
+  auto maybe_auth_content = pt.unprotect(cipher_suite, membership_key, group_context());
 
   std::cout << "--- 2 ---" << std::endl;
 
@@ -956,10 +962,10 @@ MessageProtectionTestVector::unprotect(const MLSMessage& /* message */)
 
   return content;
 
-#endif // 0
-
+#if 0
   std::cout << "<<< MessageProtectionTestVector::unprotect" << std::endl;
   return std::nullopt;
+#endif // 0
 }
 
 ///
