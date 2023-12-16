@@ -454,7 +454,7 @@ State::unwrap(const MLSMessage& msg)
     },
   };
 
-  const auto val_content = var::visit(unprotect, msg.message);
+  auto val_content = var::visit(unprotect, msg.message);
   if (!verify(val_content.content_auth)) {
     throw InvalidParameterError("Message signature failed to verify");
   }
@@ -1455,8 +1455,8 @@ State::unprotect(const MLSMessage& ct)
   }
 
   return {
-    std::move(content_auth.content.authenticated_data),
-    std::move(var::get<ApplicationData>(content_auth.content.content).data),
+    content_auth.content.authenticated_data,
+    var::get<ApplicationData>(content_auth.content.content).data,
   };
 }
 
