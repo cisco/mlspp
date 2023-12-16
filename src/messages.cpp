@@ -464,6 +464,23 @@ AuthenticatedContent::AuthenticatedContent(WireFormat wire_format_in,
 {
 }
 
+const AuthenticatedContent&
+ValidatedContent::authenticated_content() const
+{
+  return content_auth;
+}
+
+ValidatedContent::ValidatedContent(AuthenticatedContent content_auth_in)
+  : content_auth(std::move(content_auth_in))
+{
+}
+
+bool
+operator==(const ValidatedContent& lhs, const ValidatedContent& rhs)
+{
+  return lhs.content_auth == rhs.content_auth;
+}
+
 struct GroupContentTBS
 {
   WireFormat wire_format = WireFormat::reserved;
@@ -526,7 +543,7 @@ PublicMessage::protect(AuthenticatedContent content_auth,
   return pt;
 }
 
-std::optional<AuthenticatedContent>
+std::optional<ValidatedContent>
 PublicMessage::unprotect(CipherSuite suite,
                          const std::optional<bytes>& membership_key,
                          const std::optional<GroupContext>& context) const
@@ -545,11 +562,11 @@ PublicMessage::unprotect(CipherSuite suite,
       break;
   }
 
-  return AuthenticatedContent{
+  return { { AuthenticatedContent{
     WireFormat::mls_public_message,
     content,
     auth,
-  };
+  } } };
 }
 
 bool
@@ -756,7 +773,7 @@ PrivateMessage::protect(AuthenticatedContent content_auth,
   };
 }
 
-std::optional<AuthenticatedContent>
+std::optional<ValidatedContent>
 PrivateMessage::unprotect(CipherSuite suite,
                           GroupKeySource& keys,
                           const bytes& sender_data_secret) const
@@ -813,11 +830,11 @@ PrivateMessage::unprotect(CipherSuite suite,
 
   unmarshal_ciphertext_content(opt::get(content_pt), content, auth);
 
-  return AuthenticatedContent{
+  return { { AuthenticatedContent{
     WireFormat::mls_private_message,
     std::move(content),
     std::move(auth),
-  };
+  } } };
 }
 
 PrivateMessage::PrivateMessage(GroupContent content,
@@ -830,6 +847,21 @@ PrivateMessage::PrivateMessage(GroupContent content,
   , encrypted_sender_data(std::move(encrypted_sender_data_in))
   , ciphertext(std::move(ciphertext_in))
 {
+}
+
+bytes
+MLSMessage::group_id() const
+{
+  return var::visit(
+    overloaded{
+      [](const PublicMessage& pt) -> bytes { return pt.get_group_id(); },
+      [](const PrivateMessage& ct) -> bytes { return ct.get_group_id(); },
+      [](const GroupInfo& gi) -> bytes { return gi.group_context.group_id; },
+      [](const auto& /* unused */) -> bytes {
+        throw InvalidParameterError("MLSMessage has no group_id");
+      },
+    },
+    message);
 }
 
 epoch_t

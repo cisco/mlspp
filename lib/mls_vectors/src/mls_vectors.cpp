@@ -872,25 +872,26 @@ MessageProtectionTestVector::protect_priv(
 std::optional<GroupContent>
 MessageProtectionTestVector::unprotect(const MLSMessage& message)
 {
-  auto do_unprotect = overloaded{
-    [&](const PublicMessage& pt) {
-      return pt.unprotect(cipher_suite, membership_key, group_context());
-    },
-    [&](const PrivateMessage& ct) {
-      auto keys = group_keys();
-      return ct.unprotect(cipher_suite, keys, sender_data_secret);
-    },
-    [](const auto& /* other */) -> std::optional<AuthenticatedContent> {
-      return std::nullopt;
-    }
-  };
+  auto do_unprotect =
+    overloaded{ [&](const PublicMessage& pt) {
+                 return pt.unprotect(
+                   cipher_suite, membership_key, group_context());
+               },
+                [&](const PrivateMessage& ct) {
+                  auto keys = group_keys();
+                  return ct.unprotect(cipher_suite, keys, sender_data_secret);
+                },
+                [](const auto& /* other */) -> std::optional<ValidatedContent> {
+                  return std::nullopt;
+                } };
 
   auto maybe_auth_content = var::visit(do_unprotect, message.message);
   if (!maybe_auth_content) {
     return std::nullopt;
   }
 
-  auto auth_content = opt::get(maybe_auth_content);
+  auto val_content = opt::get(maybe_auth_content);
+  const auto& auth_content = val_content.authenticated_content();
   if (!auth_content.verify(cipher_suite, signature_pub, group_context())) {
     return std::nullopt;
   }

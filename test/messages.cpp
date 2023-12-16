@@ -129,7 +129,9 @@ TEST_CASE_METHOD(MLSMessageTest, "PublicMessage Protect/Unprotect")
 
   auto pt = PublicMessage::protect(
     content_auth_original, suite, membership_key, context);
-  auto content_auth_unprotected = pt.unprotect(suite, membership_key, context);
+  auto val_auth_unprotected = pt.unprotect(suite, membership_key, context);
+  const auto& content_auth_unprotected =
+    opt::get(val_auth_unprotected).authenticated_content();
   REQUIRE(content_auth_unprotected == content_auth_original);
 }
 
@@ -145,7 +147,9 @@ TEST_CASE_METHOD(MLSMessageTest, "PrivateMessage Protect/Unprotect")
 
   auto ct = PrivateMessage::protect(
     content_auth_original, suite, keys, sender_data_secret, padding_size);
-  auto content_auth_unprotected = ct.unprotect(suite, keys, sender_data_secret);
+  auto val_auth_unprotected = ct.unprotect(suite, keys, sender_data_secret);
+  const auto& content_auth_unprotected =
+    opt::get(val_auth_unprotected).authenticated_content();
   REQUIRE(content_auth_unprotected == content_auth_original);
 }
 

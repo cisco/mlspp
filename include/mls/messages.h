@@ -570,17 +570,35 @@ private:
   friend struct PrivateMessage;
 };
 
+struct ValidatedContent
+{
+  const AuthenticatedContent& authenticated_content() const;
+
+  friend bool operator==(const ValidatedContent& lhs,
+                         const ValidatedContent& rhs);
+
+private:
+  AuthenticatedContent content_auth;
+
+  ValidatedContent(AuthenticatedContent content_auth_in);
+
+  friend struct PublicMessage;
+  friend struct PrivateMessage;
+  friend class State;
+};
+
 struct PublicMessage
 {
   PublicMessage() = default;
 
+  bytes get_group_id() const { return content.group_id; }
   epoch_t get_epoch() const { return content.epoch; }
 
   static PublicMessage protect(AuthenticatedContent content_auth,
                                CipherSuite suite,
                                const std::optional<bytes>& membership_key,
                                const std::optional<GroupContext>& context);
-  std::optional<AuthenticatedContent> unprotect(
+  std::optional<ValidatedContent> unprotect(
     CipherSuite suite,
     const std::optional<bytes>& membership_key,
     const std::optional<GroupContext>& context) const;
@@ -611,6 +629,7 @@ struct PrivateMessage
 {
   PrivateMessage() = default;
 
+  bytes get_group_id() const { return group_id; }
   epoch_t get_epoch() const { return epoch; }
 
   static PrivateMessage protect(AuthenticatedContent content_auth,
@@ -618,7 +637,7 @@ struct PrivateMessage
                                 GroupKeySource& keys,
                                 const bytes& sender_data_secret,
                                 size_t padding_size);
-  std::optional<AuthenticatedContent> unprotect(
+  std::optional<ValidatedContent> unprotect(
     CipherSuite suite,
     GroupKeySource& keys,
     const bytes& sender_data_secret) const;
@@ -649,6 +668,7 @@ struct MLSMessage
   var::variant<PublicMessage, PrivateMessage, Welcome, GroupInfo, KeyPackage>
     message;
 
+  bytes group_id() const;
   epoch_t epoch() const;
   WireFormat wire_format() const;
 

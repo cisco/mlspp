@@ -117,11 +117,16 @@ public:
     const MessageOpts& msg_opts);
 
   ///
-  /// Generic handshake message handler
+  /// Generic handshake message handlers
   ///
   std::optional<State> handle(const MLSMessage& msg);
   std::optional<State> handle(const MLSMessage& msg,
                               std::optional<State> cached_state);
+
+  std::optional<State> handle(const ValidatedContent& content_auth);
+  std::optional<State> handle(const ValidatedContent& content_auth,
+                              std::optional<State> cached_state);
+
   ///
   /// PSK management
   ///
@@ -150,6 +155,11 @@ public:
   std::vector<LeafNode> roster() const;
 
   bytes epoch_authenticator() const;
+
+  ///
+  /// Unwrap messages so that applications can inspect them
+  ///
+  ValidatedContent unwrap(const MLSMessage& msg);
 
   ///
   /// Application encryption and decryption
@@ -318,7 +328,7 @@ protected:
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
   std::optional<State> handle(
-    const AuthenticatedContent& content_auth,
+    const ValidatedContent& val_content,
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
 
@@ -333,8 +343,6 @@ protected:
 
   template<typename Inner>
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
-
-  AuthenticatedContent unprotect_to_content_auth(const MLSMessage& msg);
 
   // Apply the changes requested by various messages
   LeafIndex apply(const Add& add);
