@@ -3,20 +3,39 @@
 MLS++
 =====
 
-Implementation of the proposed [Messaging Layer
-Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md)
-protocol in C++.  Depends on C++17, STL for data structures, and
-OpenSSL or BoringSSL for crypto.
+Implementation of the proposed [Messaging Layer Security](https://github.com/mlswg/mls-protocol/blob/master/draft-ietf-mls-protocol.md) protocol in C++.  Depends on C++17, STL for data structures, and OpenSSL or BoringSSL for crypto.
+
+Prerequisites
+-------------
+
+MLSPP requires a few prerequisite libraries in order to fully build.
+
+* [nlohmann::json](https://github.com/nlohmann/json) - Tested with latest versions.
+* Cryptography Library - OpenSSL 1.1.1, OpenSSL 3.0, BoringSSL compatible (see details below)
+* [doctest](https://github.com/doctest/doctest) - Tested with latest versions.  Only required when building the test suite.
+
+### Installing Prerequisites 
+
+The following should satisfy the prerequisites for these popular platforms. However, [vcpkg](https://vcpkg.io/en/) is recommended for developer builds.
+
+```sh
+# Linux - Ubuntu 20.04, Ubuntu 22.04
+$ sudo apt install libssl-dev nlohmann-json3-dev doctest-dev
+
+# MacOs - Homebrew
+$ brew install nlohmann-json doctest
+```
 
 Quickstart
 ----------
 
-A convenience Makefile is included to avoid the need to remember a bunch of
-CMake parameters.
+A convenience Makefile is included to avoid the need to remember a bunch of CMake parameters. It will use [vcpkg](https://vcpkg.io/en/) to satisfy all dependencies.
 
 ```
 > make        # Configures and builds the library 
-> make dev    # Configure a "developer" build with tests and checks
+> make dev    # Configure a "developer" build with tests and checks using OpenSSL 1.1
+> make dev3   # Configure a "developer" build with tests and checks using OpenSSL 3.0
+> make devB   # Configure a "developer" build with tests and checks using OpenSSL 3.0
 > make test   # Builds and runs tests
 > make format # Runs clang-format over the source
 ```
