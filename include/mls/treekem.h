@@ -119,7 +119,7 @@ struct TreeKEMPublicKey
 {
   CipherSuite suite;
   LeafCount size{ 0 };
-  std::vector<OptionalNode> nodes;
+  std::map<NodeIndex, OptionalNode> nodes;
 
   explicit TreeKEMPublicKey(CipherSuite suite);
 
