@@ -47,8 +47,13 @@ LeafCount::full(const LeafCount n)
 }
 
 NodeCount::NodeCount(const LeafCount n)
-  : UInt32(2 * (n.val - 1) + 1)
+  : UInt32(0)
 {
+  if (n.val == 0) {
+    val = 0;
+  } else {
+    val = 2 * (n.val - 1) + 1;
+  }
 }
 
 LeafIndex::LeafIndex(NodeIndex x)

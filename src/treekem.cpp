@@ -392,12 +392,17 @@ TreeKEMPublicKey::allocate_leaf()
 
   // Extend the tree if necessary
   if (index.val >= size.val) {
+    const auto prev_width = NodeCount(size);
+
     if (size.val == 0) {
       size.val = 1;
-      nodes.resize(1);
     } else {
       size.val *= 2;
-      nodes.resize(2 * nodes.size() + 1);
+    }
+
+    const auto new_width = NodeCount(size);
+    for (auto i = NodeIndex(prev_width.val); i < new_width; i.val++) {
+      nodes.insert_or_assign(i, OptionalNode{});
     }
   }
 
@@ -736,41 +741,31 @@ TreeKEMPublicKey::truncate()
     return;
   }
 
-  // Remove the right subtree until the tree is of minimal size
+  // Find the new size of the tree
   while (size.val / 2 > index.val) {
-    nodes.resize(nodes.size() / 2);
     size.val /= 2;
+  }
+
+  // Delete nodes to right of the new smaller edge of the tree
+  const auto node_size = NodeCount(size);
+  const auto start = std::find_if(nodes.begin(), nodes.end(), [node_size](const auto& n) {
+    return !(n.first < node_size);
+  });
+  if (start != nodes.end()) {
+    nodes.erase(start, nodes.end());
   }
 }
 
 OptionalNode&
 TreeKEMPublicKey::node_at(NodeIndex n)
 {
-  auto width = NodeCount(size);
-  if (n.val >= width.val) {
-    throw InvalidParameterError("Node index not in tree");
-  }
-
-  if (n.val >= nodes.size()) {
-    return blank_node;
-  }
-
-  return nodes.at(n.val);
+  return nodes.at(n);
 }
 
 const OptionalNode&
 TreeKEMPublicKey::node_at(NodeIndex n) const
 {
-  auto width = NodeCount(size);
-  if (n.val >= width.val) {
-    throw InvalidParameterError("Node index not in tree");
-  }
-
-  if (n.val >= nodes.size()) {
-    return blank_node;
-  }
-
-  return nodes.at(n.val);
+  return nodes.at(n);
 }
 
 OptionalNode&
@@ -1068,9 +1063,14 @@ operator<<(tls::ostream& str, const TreeKEMPublicKey& obj)
     cut.val -= 1;
   }
 
-  const auto begin = obj.nodes.begin();
-  const auto end = begin + NodeIndex(cut).val + 1;
-  const auto view = std::vector<OptionalNode>(begin, end);
+  auto node_cut = NodeIndex(cut);
+  node_cut.val += 1;
+
+  auto view = std::vector<OptionalNode>(node_cut.val);
+  for (auto i = NodeIndex(0); i < node_cut; i.val++) {
+    view.at(i.val) = obj.nodes.at(i);
+  }
+
   return str << view;
 }
 
@@ -1078,37 +1078,46 @@ tls::istream&
 operator>>(tls::istream& str, TreeKEMPublicKey& obj)
 {
   // Read the node list
-  str >> obj.nodes;
-  if (obj.nodes.empty()) {
+  std::vector<OptionalNode> nodes;
+  str >> nodes;
+  if (nodes.empty()) {
     return str;
   }
 
   // Verify that the tree is well-formed and minimal
-  if (obj.nodes.size() % 2 == 0) {
+  if (nodes.size() % 2 == 0) {
     throw ProtocolError("Malformed ratchet tree: even number of nodes");
   }
 
-  if (obj.nodes.back().blank()) {
+  if (nodes.back().blank()) {
     throw ProtocolError("Ratchet tree does not use minimal encoding");
   }
 
   // Adjust the size value to fit the non-blank nodes
   obj.size.val = 1;
-  while (NodeCount(obj.size).val < obj.nodes.size()) {
+  while (NodeCount(obj.size).val < nodes.size()) {
     obj.size.val *= 2;
   }
 
-  // Add blank nodes to the end
-  obj.nodes.resize(NodeCount(obj.size).val);
+  // Copy nodes to `obj` and add blank nodes to the end
+  for (uint32_t i = 0; i < nodes.size(); i++) {
+    obj.nodes.insert_or_assign(NodeIndex(i), std::move(nodes.at(i)));
+  }
+
+  const auto node_size = NodeCount(obj.size);
+  for (uint32_t i = nodes.size(); i < node_size.val; i++) {
+    obj.nodes.insert_or_assign(NodeIndex(i), OptionalNode{});
+  }
 
   // Verify the basic structure of the tree is sane
-  for (size_t i = 0; i < obj.nodes.size(); i++) {
-    if (obj.nodes[i].blank()) {
+  for (auto i = NodeIndex{ 0 }; i < node_size; i.val++) {
+    const auto& maybe_node = obj.node_at(i);
+    if (maybe_node.blank()) {
       continue;
     }
 
-    const auto& node = opt::get(obj.nodes[i].node).node;
-    auto at_leaf = (i % 2 == 0);
+    const auto& node = opt::get(maybe_node.node).node;
+    auto at_leaf = (i.val % 2 == 0);
     auto holds_leaf = var::holds_alternative<LeafNode>(node);
     auto holds_parent = var::holds_alternative<ParentNode>(node);
 
