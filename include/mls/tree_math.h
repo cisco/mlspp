@@ -99,8 +99,8 @@ struct NodeIndex : public UInt32
   // of `ancestor` that is not in the direct path of this node.
   NodeIndex sibling(NodeIndex ancestor) const;
 
-  std::vector<NodeIndex> dirpath(LeafCount n);
-  std::vector<NodeIndex> copath(LeafCount n);
+  std::vector<NodeIndex> dirpath(LeafCount n) const;
+  std::vector<NodeIndex> copath(LeafCount n) const;
 
   uint32_t level() const;
 };

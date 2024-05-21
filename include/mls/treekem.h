@@ -59,6 +59,18 @@ struct OptionalNode
   TLS_SERIALIZABLE(node)
 };
 
+struct TreeSlice
+{
+  LeafIndex leaf_index;
+  LeafCount n_leaves;
+  std::vector<OptionalNode> direct_path_nodes;
+  std::vector<bytes> copath_hashes;
+
+  bytes tree_hash(CipherSuite suite) const;
+
+  TLS_SERIALIZABLE(leaf_index, n_leaves, direct_path_nodes, copath_hashes);
+};
+
 struct TreeKEMPublicKey;
 
 struct TreeKEMPrivateKey
@@ -122,6 +134,7 @@ struct TreeKEMPublicKey
   std::map<NodeIndex, OptionalNode> nodes;
 
   explicit TreeKEMPublicKey(CipherSuite suite);
+  TreeKEMPublicKey(CipherSuite suite, const TreeSlice& slice);
 
   TreeKEMPublicKey() = default;
   TreeKEMPublicKey(const TreeKEMPublicKey& other) = default;
@@ -155,6 +168,9 @@ struct TreeKEMPublicKey
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
+
+  TreeSlice extract_slice(LeafIndex leaf) const;
+  void implant_slice(const TreeSlice& slice);
 
   struct DecapCoords
   {
@@ -244,6 +260,8 @@ private:
                       std::optional<LeafIndex> except) const;
   bool exists_in_tree(const SignaturePublicKey& key,
                       std::optional<LeafIndex> except) const;
+
+  void implant_slice_unchecked(const TreeSlice& slice);
 
   OptionalNode blank_node;
 
