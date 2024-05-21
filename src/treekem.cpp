@@ -58,6 +58,15 @@ Node::parent_hash() const
 }
 
 ///
+/// TreeSlice
+///
+bytes
+TreeSlice::tree_hash(CipherSuite suite) const
+{
+  return TreeKEMPublicKey(suite, *this).root_hash();
+}
+
+///
 /// TreeKEMPrivateKey
 ///
 
@@ -209,8 +218,13 @@ TreeKEMPublicKey::dump() const
   std::cout << "Tree:" << std::endl;
   auto width = NodeCount(size);
   for (auto i = NodeIndex{ 0 }; i.val < width.val; i.val++) {
+    const auto known = nodes.count(i) > 0;
+    const auto blank = known && node_at(i).blank();
+
     printf("  %03d : ", i.val); // NOLINT
-    if (!node_at(i).blank()) {
+    if (!known) {
+      std::cout << "????????";
+    } else if (!blank) {
       auto pkRm = to_hex(opt::get(node_at(i).node).public_key().data);
       std::cout << pkRm.substr(0, 8);
     } else {
@@ -222,7 +236,9 @@ TreeKEMPublicKey::dump() const
       std::cout << "  ";
     }
 
-    if (!node_at(i).blank()) {
+    if (!known) {
+      std::cout << "?";
+    } else if (!blank) {
       std::cout << "X";
 
       if (!i.is_leaf()) {
@@ -379,6 +395,14 @@ TreeKEMPrivateKey::consistent(const TreeKEMPublicKey& other) const
 TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
   : suite(suite_in)
 {
+}
+
+TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in, const TreeSlice& slice)
+  : suite(suite_in)
+  , size(slice.n_leaves)
+{
+  implant_slice_unchecked(slice);
+  set_hash_all();
 }
 
 LeafIndex
@@ -591,6 +615,65 @@ TreeKEMPublicKey::resolve(NodeIndex index) const
   return l;
 }
 
+TreeSlice
+TreeKEMPublicKey::extract_slice(LeafIndex leaf) const
+{
+  if (!(leaf < size)) {
+    throw InvalidParameterError("Invalid leaf index");
+  }
+
+  const auto n = NodeIndex(leaf);
+  auto dirpath = n.dirpath(size);
+  dirpath.insert(dirpath.begin(), n);
+  const auto dirpath_nodes = stdx::transform<OptionalNode>(
+    dirpath, [this](const auto& n) { return node_at(n); });
+
+  const auto copath = n.copath(size);
+  const auto copath_hashes = stdx::transform<bytes>(
+    copath, [this](const auto& n) { return hashes.at(n); });
+
+  return { leaf, size, dirpath_nodes, copath_hashes };
+}
+
+void
+TreeKEMPublicKey::implant_slice(const TreeSlice& slice)
+{
+  if (slice.n_leaves != size) {
+    throw InvalidParameterError("Slice tree size does not match tree size");
+  }
+
+  if (slice.tree_hash(suite) != root_hash()) {
+    throw InvalidParameterError("Slice tree hash does not match tree hash");
+  }
+
+  implant_slice_unchecked(slice);
+}
+
+void
+TreeKEMPublicKey::implant_slice_unchecked(const TreeSlice& slice)
+{
+  const auto n = NodeIndex(slice.leaf_index);
+  auto dirpath = n.dirpath(size);
+  dirpath.insert(dirpath.begin(), n);
+  const auto copath = n.copath(size);
+
+  if (slice.direct_path_nodes.size() != dirpath.size()) {
+    throw InvalidParameterError("Malformed tree slice (bad direct path size)");
+  }
+
+  if (slice.copath_hashes.size() != copath.size()) {
+    throw InvalidParameterError("Malformed tree slice (bad copath size)");
+  }
+
+  for (auto i = size_t(0); i < dirpath.size(); i++) {
+    nodes.insert_or_assign(dirpath.at(i), slice.direct_path_nodes.at(i));
+  }
+
+  for (auto i = size_t(0); i < copath.size(); i++) {
+    hashes.insert_or_assign(copath.at(i), slice.copath_hashes.at(i));
+  }
+}
+
 TreeKEMPublicKey::FilteredDirectPath
 TreeKEMPublicKey::filtered_direct_path(NodeIndex index) const
 {
@@ -748,9 +831,10 @@ TreeKEMPublicKey::truncate()
 
   // Delete nodes to right of the new smaller edge of the tree
   const auto node_size = NodeCount(size);
-  const auto start = std::find_if(nodes.begin(), nodes.end(), [node_size](const auto& n) {
-    return !(n.first < node_size);
-  });
+  const auto start =
+    std::find_if(nodes.begin(), nodes.end(), [node_size](const auto& n) {
+      return !(n.first < node_size);
+    });
   if (start != nodes.end()) {
     nodes.erase(start, nodes.end());
   }
