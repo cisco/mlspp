@@ -43,6 +43,20 @@ struct ExternalSendersExtension
   TLS_SERIALIZABLE(senders);
 };
 
+struct FlagsExtension
+{
+  std::vector<uint8_t> flag_data;
+
+  void set(size_t pos);
+  void unset(size_t pos);
+  bool get(size_t pos) const;
+
+  static const uint16_t type;
+
+  // XXX(RLB): This should check for extra zero bytes on deserialize.
+  TLS_SERIALIZABLE(flag_data);
+};
+
 struct SFrameParameters
 {
   uint16_t cipher_suite;
