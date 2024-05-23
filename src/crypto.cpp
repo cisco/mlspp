@@ -461,19 +461,31 @@ SignaturePrivateKey::sign(const CipherSuite& suite,
 {
   auto label_plus = mls_1_0_plus(label);
   const auto content = tls::marshal(SignContent{ label_plus, message });
+
+  if (_sign_func) {
+    return _sign_func(content);
+  }
+
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().sign(content, *priv);
 }
 
-SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
+SignaturePrivateKey::SignaturePrivateKey(bytes priv_data,
+                                         bytes pub_data,
+                                         SignerFunc func)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
+  , _sign_func{ std::move(func) }
 {
 }
 
 void
 SignaturePrivateKey::set_public_key(CipherSuite suite)
 {
+  if (_sign_func) {
+    throw std::runtime_error("not implemented");
+  }
+
   const auto priv = suite.sig().deserialize_private(data);
   auto pub = priv->public_key();
   public_key.data = suite.sig().serialize(*pub);
@@ -489,9 +501,19 @@ SignaturePrivateKey::from_jwk(CipherSuite suite, const std::string& json_str)
   return { priv_data, pub_data };
 }
 
+SignaturePrivateKey
+SignaturePrivateKey::from_func(SignerFunc func, bytes pub_data)
+{
+  return { bytes(), std::move(pub_data), std::move(func) };
+}
+
 std::string
 SignaturePrivateKey::to_jwk(CipherSuite suite) const
 {
+  if (_sign_func) {
+    throw std::runtime_error("not implemented");
+  }
+
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().export_jwk_private(*priv);
 }
