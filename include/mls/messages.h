@@ -27,6 +27,14 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
+struct MembershipProofExtension
+{
+  std::vector<TreeSlice> slices;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(slices)
+};
+
 struct ExternalSender
 {
   SignaturePublicKey signature_key;

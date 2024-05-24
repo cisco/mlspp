@@ -19,9 +19,20 @@ struct RosterIndex : public UInt32
 
 struct CommitOpts
 {
+  // Include these proposals in the commit by value
   std::vector<Proposal> extra_proposals;
-  bool inline_tree;
-  bool force_path;
+
+  // Send a ratchet_tree extension in the Welcome
+  bool inline_tree = false;
+
+  // Send an UpdatePath even if none is required
+  bool force_path = false;
+
+  // Send a membership_proof extension in the Welcome covering the committer and
+  // the new joiners
+  bool membership_proof = false;
+
+  // Update the committer's LeafNode in the following way
   LeafNodeOptions leaf_node_opts;
 };
 
@@ -145,6 +156,7 @@ public:
   const ExtensionList& extensions() const { return _extensions; }
   const TreeKEMPublicKey& tree() const { return _tree; }
   const bytes& resumption_psk() const { return _key_schedule.resumption_psk; }
+  bool is_full_client() const { return _tree.is_complete(); }
 
   bytes do_export(const std::string& label,
                   const bytes& context,

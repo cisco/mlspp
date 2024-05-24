@@ -605,6 +605,12 @@ TreeKEMPublicKey::parent_hash_valid() const
   return true;
 }
 
+bool
+TreeKEMPublicKey::is_complete() const
+{
+  return nodes.size() == NodeCount{size}.val;
+}
+
 std::vector<NodeIndex>
 TreeKEMPublicKey::resolve(NodeIndex index) const
 {
@@ -766,6 +772,11 @@ std::optional<LeafIndex>
 TreeKEMPublicKey::find(const LeafNode& leaf) const
 {
   for (LeafIndex i{ 0 }; i < size; i.val++) {
+    if (nodes.count(NodeIndex{ i }) == 0) {
+      // Unknown leaf node
+      continue;
+    }
+
     const auto& node = node_at(i);
     if (!node.blank() && node.leaf_node() == leaf) {
       return i;
