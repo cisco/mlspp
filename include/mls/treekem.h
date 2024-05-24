@@ -67,6 +67,7 @@ struct TreeSlice
   std::vector<bytes> copath_hashes;
 
   bytes tree_hash(CipherSuite suite) const;
+  void add(const TreeSlice& other);
 
   TLS_SERIALIZABLE(leaf_index, n_leaves, direct_path_nodes, copath_hashes);
 };
@@ -157,6 +158,7 @@ struct TreeKEMPublicKey
 
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
+  bool is_complete() const;
 
   bool has_leaf(LeafIndex index) const;
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
