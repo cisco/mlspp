@@ -42,6 +42,7 @@ struct ExtensionType
   static constexpr Extension::Type external_senders = 5;
 
   static constexpr Extension::Type flags = 6;
+  static constexpr Extension::Type membership_proof = 7;
 
   // XXX(RLB) There is no IANA-registered type for this extension yet, so we use
   // a value from the vendor-specific space

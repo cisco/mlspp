@@ -52,10 +52,19 @@ State::import_tree(const bytes& tree_hash,
 {
   auto tree = TreeKEMPublicKey(_suite);
   auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
+  auto maybe_membership_proof_extn = extensions.find<MembershipProofExtension>();
+
   if (external) {
     tree = opt::get(external);
   } else if (maybe_tree_extn) {
     tree = opt::get(maybe_tree_extn).tree;
+  } else if (maybe_membership_proof_extn) {
+    const auto& membership_proof = opt::get(maybe_membership_proof_extn);
+
+    tree = TreeKEMPublicKey(_suite, membership_proof.slices.at(0));
+    for (auto i = size_t(0); i < membership_proof.slices.size(); i++) {
+      tree.implant_slice(membership_proof.slices.at(i));
+    }
   } else {
     throw InvalidParameterError("No tree available");
   }
@@ -73,6 +82,12 @@ State::import_tree(const bytes& tree_hash,
 bool
 State::validate_tree() const
 {
+  // If we don't have a full tree, then we can't verify any properties
+  // TODO(RLB) We can in fact verify that the leaf node signatures are valid.
+  if (!_tree.is_complete()) {
+    return true;
+  }
+
   // The functionality here is somewhat duplicative of State::valid(const
   // LeafNode&).  Simply calling that method, however, would result in this
   // method having quadratic scaling, since each call to valid() does a linear
@@ -1136,6 +1151,7 @@ State::create_branch(bytes group_id,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
+    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -1214,6 +1230,7 @@ State::Tombstone::create_welcome(HPKEPrivateKey enc_priv,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
+    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -2076,12 +2093,12 @@ operator==(const State& lhs, const State& rhs)
   auto suite = (lhs._suite == rhs._suite);
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
-  auto tree = (lhs._tree == rhs._tree);
+  auto tree_hash = (lhs._tree.root_hash() == rhs._tree.root_hash());
   auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
   auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
   auto extensions = (lhs._extensions == rhs._extensions);
 
-  return suite && group_id && epoch && tree && transcript_hash &&
+  return suite && group_id && epoch && tree_hash && transcript_hash &&
          key_schedule && extensions;
 }
 
