@@ -120,6 +120,9 @@ struct TreeKEMPrivateKey
   void implant(const TreeKEMPublicKey& pub,
                NodeIndex start,
                const bytes& path_secret);
+  void implant_matching(const TreeKEMPublicKey& pub,
+                        NodeIndex start,
+                        const bytes& path_secret);
 };
 
 struct TreeKEMPublicKey
@@ -167,6 +170,9 @@ struct TreeKEMPublicKey
 
   TreeSlice extract_slice(LeafIndex leaf) const;
   void implant_slice(const TreeSlice& slice);
+  std::tuple<HPKECiphertext, NodeIndex> slice_path(UpdatePath path,
+                                                   LeafIndex from,
+                                                   LeafIndex to) const;
 
   template<typename UnaryPredicate>
   bool all_leaves(const UnaryPredicate& pred) const
