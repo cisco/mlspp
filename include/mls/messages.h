@@ -279,6 +279,15 @@ private:
     const std::vector<PSKWithSecret>& psks);
 };
 
+struct LightCommit
+{
+  GroupContext group_context;
+  bytes confirmation_tag;
+  TreeSlice sender_membership_proof;
+  std::optional<HPKECiphertext> encrypted_path_secret;
+  std::optional<NodeIndex> decryption_node_index;
+};
+
 ///
 /// Proposals & Commit
 ///
@@ -645,6 +654,10 @@ private:
   bytes membership_mac(CipherSuite suite,
                        const bytes& membership_key,
                        const std::optional<GroupContext>& context) const;
+
+  // XXX(RLB) This is a hack to avoid unwrapping across epochs.  We should do
+  // something more elegant, like unchecked_content()
+  friend class State;
 };
 
 struct PrivateMessage

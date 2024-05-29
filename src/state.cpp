@@ -29,13 +29,13 @@ State::State(bytes group_id,
   }
 
   _index = _tree.add_leaf(leaf_node);
-  _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, _index, std::move(enc_priv));
   if (!_tree_priv.consistent(_tree)) {
     throw InvalidParameterError("LeafNode inconsistent with private key");
   }
 
   // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
+  _tree.set_hash_all();
   auto ctx = tls::marshal(group_context());
   _key_schedule =
     KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
@@ -52,7 +52,8 @@ State::import_tree(const bytes& tree_hash,
 {
   auto tree = TreeKEMPublicKey(_suite);
   auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
-  auto maybe_membership_proof_extn = extensions.find<MembershipProofExtension>();
+  auto maybe_membership_proof_extn =
+    extensions.find<MembershipProofExtension>();
 
   if (external) {
     tree = opt::get(external);
@@ -1108,6 +1109,97 @@ State::ratchet(TreeKEMPublicKey new_tree,
   if (next._key_schedule.confirmation_tag != confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
+
+  return next;
+}
+
+LightCommit
+State::lighten_for(LeafIndex leaf, const MLSMessage& commit_msg) const
+{
+  // Check that the current epoch is one higher than commit.epoch
+  if (_epoch != commit_msg.epoch() + 1) {
+    throw InvalidParameterError("Invalid epoch for lightening operation");
+  }
+
+  // Pull the GroupContext for the current state
+  const auto ctx = group_context();
+
+  // Make a memberhsip proof
+  const auto& public_msg = var::get<PublicMessage>(commit_msg.message);
+  const auto& sender =
+    var::get<MemberSender>(public_msg.content.sender.sender).sender;
+
+  const auto confirmation_tag = opt::get(public_msg.auth.confirmation_tag);
+  const auto sender_membership_proof = _tree.extract_slice(sender);
+
+  // Extract the correct path secret for the recipient
+  const auto& commit = var::get<Commit>(public_msg.content.content);
+  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
+  auto decryption_node_index = std::optional<NodeIndex>{};
+  if (commit.path) {
+    const auto [secret, index] =
+      _tree.slice_path(opt::get(commit.path), sender, leaf);
+    encrypted_path_secret = secret;
+    decryption_node_index = index;
+  }
+
+  return {
+    ctx,
+    confirmation_tag,
+    sender_membership_proof,
+    encrypted_path_secret,
+    decryption_node_index,
+  };
+}
+
+State
+State::handle(const LightCommit& light_commit) const
+{
+  // Verify the membership proof
+  // TODO(RLB) Also verify the signature (?)
+  // XXX(RLB) Should this use the new or old tree hash?
+  if (light_commit.sender_membership_proof.tree_hash(_suite) !=
+      light_commit.group_context.tree_hash) {
+    throw ProtocolError("Invalid sender membership proof");
+  }
+
+  // Import the GroupContext
+  // TODO(RLB) Verify that version, cipher_suite, group_id, epoch are as
+  // expected
+  auto next = successor();
+  next._epoch += 1;
+  next._tree =
+    TreeKEMPublicKey(next._suite, light_commit.sender_membership_proof);
+  next._extensions = light_commit.group_context.extensions;
+
+  // Decrypt the commit secret
+  auto commit_secret = _suite.zero();
+  if (light_commit.encrypted_path_secret) {
+    const auto& encrypted_path_secret =
+      opt::get(light_commit.encrypted_path_secret);
+    const auto& decryption_node_index =
+      opt::get(light_commit.decryption_node_index);
+
+    const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
+    const auto context = tls::marshal(next.group_context());
+    const auto path_secret = priv.decrypt(next._suite,
+                                          encrypt_label::update_path_node,
+                                          context,
+                                          encrypted_path_secret);
+    const auto ancestor =
+      next._index.ancestor(light_commit.sender_membership_proof.leaf_index);
+    next._tree_priv.implant_matching(next._tree, ancestor, path_secret);
+
+    commit_secret = next._tree_priv.update_secret;
+  }
+
+  // Update the key schedule
+  // TODO(RLB) Need to accommodate PSKs for light clients
+  next._transcript_hash =
+    TranscriptHash(next._suite,
+                   light_commit.group_context.confirmed_transcript_hash,
+                   light_commit.confirmation_tag);
+  next.update_epoch_secrets(commit_secret, {}, std::nullopt);
 
   return next;
 }

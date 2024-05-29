@@ -68,7 +68,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
   const auto priv2 = HPKEPrivateKey::generate(suite);
   const auto hash_size = suite.digest().hash_size;
 
-  // Create a tree with N blank leaves
+  // Create a tree with N leaves, blank otherwise
   auto pub = TreeKEMPublicKey(suite);
   for (auto i = uint32_t(0); i < size.val; i++) {
     auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();

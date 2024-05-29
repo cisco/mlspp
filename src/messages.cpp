@@ -12,7 +12,8 @@ namespace MLS_NAMESPACE {
 
 const Extension::Type ExternalPubExtension::type = ExtensionType::external_pub;
 const Extension::Type RatchetTreeExtension::type = ExtensionType::ratchet_tree;
-const Extension::Type MembershipProofExtension::type = ExtensionType::membership_proof;
+const Extension::Type MembershipProofExtension::type =
+  ExtensionType::membership_proof;
 const Extension::Type ExternalSendersExtension::type =
   ExtensionType::external_senders;
 const Extension::Type FlagsExtension::type = ExtensionType::flags;
