@@ -125,6 +125,30 @@ TreeKEMPrivateKey::implant(const TreeKEMPublicKey& pub,
   update_secret = pub.suite.derive_secret(secret, "path");
 }
 
+void
+TreeKEMPrivateKey::implant_matching(const TreeKEMPublicKey& pub,
+                                    NodeIndex start,
+                                    const bytes& path_secret)
+{
+  auto secret = path_secret;
+
+  path_secrets.insert_or_assign(start, secret);
+  private_key_cache.erase(start);
+
+  const auto dp = start.dirpath(pub.size);
+  for (const auto& n : dp) {
+    if (pub.node_at(n).blank()) {
+      continue;
+    }
+
+    secret = pub.suite.derive_secret(secret, "path");
+    path_secrets.insert_or_assign(n, secret);
+    private_key_cache.erase(n);
+  }
+
+  update_secret = pub.suite.derive_secret(secret, "path");
+}
+
 std::optional<HPKEPrivateKey>
 TreeKEMPrivateKey::private_key(NodeIndex n) const
 {
@@ -608,7 +632,7 @@ TreeKEMPublicKey::parent_hash_valid() const
 bool
 TreeKEMPublicKey::is_complete() const
 {
-  return nodes.size() == NodeCount{size}.val;
+  return nodes.size() == NodeCount{ size }.val;
 }
 
 std::vector<NodeIndex>
@@ -672,6 +696,34 @@ TreeKEMPublicKey::implant_slice(const TreeSlice& slice)
   }
 
   implant_slice_unchecked(slice);
+}
+
+std::tuple<HPKECiphertext, NodeIndex>
+TreeKEMPublicKey::slice_path(UpdatePath path,
+                             LeafIndex from,
+                             LeafIndex to) const
+{
+  const auto toi = NodeIndex(to);
+  const auto fdp = filtered_direct_path(NodeIndex(from));
+
+  for (auto i = size_t(0); i < fdp.size(); i++) {
+    const auto& [dpi, res] = fdp.at(i);
+
+    if (!toi.is_below(dpi)) {
+      continue;
+    }
+
+    for (auto j = size_t(0); j < res.size(); j++) {
+      const auto resi = res.at(j);
+      if (!toi.is_below(resi)) {
+        continue;
+      }
+
+      return { path.nodes.at(i).encrypted_path_secret.at(j), resi };
+    }
+  }
+
+  throw ProtocolError("Decryption node not found");
 }
 
 void

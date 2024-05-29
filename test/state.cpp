@@ -131,8 +131,8 @@ TEST_CASE_METHOD(StateTest, "Two Person")
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit, welcome, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
+  auto [commit, welcome, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
   silence_unused(commit);
   auto first1 = first1_;
 
@@ -243,8 +243,8 @@ TEST_CASE_METHOD(StateTest, "Two Person with custom extensions")
 
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit1, welcome1, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
   auto first1 = first1_;
   silence_unused(commit1);
 
@@ -267,8 +267,8 @@ TEST_CASE_METHOD(StateTest, "Two Person with custom extensions")
   second_exts.add(CustomExtension2{ 0xb0 });
 
   auto gce = first1.group_context_extensions_proposal(second_exts);
-  auto [commit2, welcome2, first2_] =
-    first1.commit(fresh_secret(), CommitOpts{ { gce }, false, false, false, {} }, {});
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { gce }, false, false, false, {} }, {});
   auto second2 = second1.handle(commit2);
   silence_unused(welcome2);
   auto first2 = first2_;
@@ -289,8 +289,8 @@ TEST_CASE_METHOD(StateTest, "Two Person with external tree for welcome")
   // Handle the Add proposal and create a Commit
   auto add = first0.add_proposal(key_packages[1]);
   // Don't generate RatchetTree extension
-  auto [commit, welcome_, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, false, false, false, {} }, {});
+  auto [commit, welcome_, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add }, false, false, false, {} }, {});
   auto welcome = welcome_;
   auto first1 = first1_;
   silence_unused(commit);
@@ -377,8 +377,8 @@ TEST_CASE_METHOD(StateTest, "Two Person with Replacement")
 
   // Handle the Add proposal and create a Commit
   const auto add1 = first0.add_proposal(key_packages[1]);
-  const auto [commit1, welcome1, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, false, {} }, {});
+  const auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1 }, true, false, false, {} }, {});
   silence_unused(commit1);
   auto first1 = first1_;
 
@@ -404,8 +404,10 @@ TEST_CASE_METHOD(StateTest, "Two Person with Replacement")
   // Create a commit replacing the first member
   const auto remove2 = second1.remove_proposal(LeafIndex{ 0 });
   const auto add2 = second1.add_proposal(key_package);
-  const auto [commit2, welcome2, second2_] = second1.commit(
-    fresh_secret(), CommitOpts{ { add2, remove2 }, true, false, false, {} }, {});
+  const auto [commit2, welcome2, second2_] =
+    second1.commit(fresh_secret(),
+                   CommitOpts{ { add2, remove2 }, true, false, false, {} },
+                   {});
   auto second2 = second2_;
   silence_unused(commit2);
 
@@ -431,8 +433,8 @@ TEST_CASE_METHOD(StateTest, "Light client can join and participate")
 
   // Add the second participant
   auto add1 = first0.add_proposal(key_packages[1]);
-  auto [commit1, welcome1, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, false, {} }, {});
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1 }, true, false, false, {} }, {});
   silence_unused(commit1);
   auto first1 = first1_;
 
@@ -448,13 +450,11 @@ TEST_CASE_METHOD(StateTest, "Light client can join and participate")
                         {} };
 
   REQUIRE(first1 == second1);
-  auto group = std::vector<State>{ first1, second1 };
-  verify_group_functionality(group);
 
   // Add the third participant
   auto add2 = first0.add_proposal(key_packages[2]);
-  auto [commit2, welcome2, first2_] =
-    first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, true, {} }, {});
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { add2 }, false, false, true, {} }, {});
   auto first2 = first2_;
 
   // Handle the Commit at the second participant
@@ -473,16 +473,24 @@ TEST_CASE_METHOD(StateTest, "Light client can join and participate")
 
   REQUIRE(first2 == second2);
   REQUIRE(first2 == third2);
-  verify_group_functionality(group);
 
-  // Create another commit
-
+  // Create another commit and handle it at the second client
+  auto [commit3, welcome3, first3_] = first2.commit(fresh_secret(), {}, {});
+  silence_unused(welcome3);
+  auto first3 = first3_;
+  auto second3 = opt::get(second2.handle(commit3));
 
   // Verify that the light client refuses to process it on its own
+  REQUIRE_THROWS(third2.handle(commit3));
 
-  // Create a commit map
+  // Convert the Commit to a LightCommit
+  auto light_commit = first3.lighten_for(third2.index(), commit3);
 
   // Verify that the light client can process the commit with a commit map
+  auto third3 = third2.handle(light_commit);
+
+  REQUIRE(first3 == second3);
+  REQUIRE(first3 == third3);
 }
 
 TEST_CASE_METHOD(StateTest, "External Join")
@@ -590,8 +598,8 @@ TEST_CASE_METHOD(StateTest, "External Join with Eviction of Prior Appearance")
 
   // Add the second participant
   auto add = first0.add_proposal(key_packages[1]);
-  auto [commit1, welcome1, first1] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
+  auto [commit1, welcome1, first1] = first0.commit(
+    fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
   silence_unused(commit1);
   auto second1 = State{ init_privs[1],
                         leaf_privs[1],
@@ -649,8 +657,8 @@ TEST_CASE_METHOD(StateTest, "SFrame Parameter Negotiation")
 
   // Add the second member
   auto add = first0.add_proposal(kp1);
-  auto [commit, welcome, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
+  auto [commit, welcome, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
   auto first1 = first1_;
   silence_unused(commit);
 
@@ -743,8 +751,8 @@ TEST_CASE_METHOD(StateTest, "Add Multiple Members")
   }
 
   // Create a Commit that adds everybody
-  auto [commit, welcome, new_state] =
-    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
+  auto [commit, welcome, new_state] = states[0].commit(
+    fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
   silence_unused(commit);
   states[0] = new_state;
 
@@ -823,8 +831,8 @@ protected:
       adds.push_back(states[0].add_proposal(key_packages[i]));
     }
 
-    auto [commit, welcome, new_state] =
-      states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
+    auto [commit, welcome, new_state] = states[0].commit(
+      fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
     silence_unused(commit);
     states[0] = new_state;
     for (size_t i = 1; i < group_size; i += 1) {

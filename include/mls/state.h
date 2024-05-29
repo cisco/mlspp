@@ -139,6 +139,12 @@ public:
                               std::optional<State> cached_state);
 
   ///
+  /// Light MLS
+  ///
+  LightCommit lighten_for(LeafIndex leaf, const MLSMessage& commit) const;
+  State handle(const LightCommit& light_commit) const;
+
+  ///
   /// PSK management
   ///
   void add_resumption_psk(const bytes& group_id, epoch_t epoch, bytes secret);
