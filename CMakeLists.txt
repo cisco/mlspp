@@ -100,42 +100,6 @@ endif()
 # Configure vcpkg to only build release libraries
 set(VCPKG_BUILD_TYPE release)
 
-# External libraries
-find_package(OpenSSL REQUIRED)
-if ( OPENSSL_FOUND )
-    find_path(BORINGSSL_INCLUDE_DIR openssl/is_boringssl.h HINTS ${OPENSSL_INCLUDE_DIR} NO_DEFAULT_PATH)
-
-    if (BORINGSSL_INCLUDE_DIR)
-      message(STATUS "Found OpenSSL includes are for BoringSSL")
-      
-      add_compile_definitions(WITH_BORINGSSL)
-
-      if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-        add_compile_options(-Wno-gnu-anonymous-struct -Wno-nested-anon-types)
-      endif ()
-
-      file(STRINGS "${OPENSSL_INCLUDE_DIR}/openssl/crypto.h" boringssl_version_str
-           REGEX "^#[\t ]*define[\t ]+OPENSSL_VERSION_TEXT[\t ]+\"OpenSSL ([0-9])+\\.([0-9])+\\.([0-9])+ .+")
-      
-      string(REGEX REPLACE "^.*OPENSSL_VERSION_TEXT[\t ]+\"OpenSSL ([0-9]+\\.[0-9]+\\.[0-9])+ .+$"
-             "\\1" OPENSSL_VERSION "${boringssl_version_str}")
-
-    elseif (REQUIRE_BORINGSSL)
-      message(FATAL_ERROR "BoringSSL required but not found")
-    endif ()
-
-    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-      add_compile_definitions(WITH_OPENSSL3)
-    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
-      message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
-    endif()
-    message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
-    message(STATUS "OpenSSL Include: ${OPENSSL_INCLUDE_DIR}")
-    message(STATUS "OpenSSL Libraries: ${OPENSSL_LIBRARIES}")
-else()
-  message(FATAL_ERROR "No OpenSSL library found")
-endif()
-
 # Internal libraries
 add_subdirectory(lib)
 
@@ -159,8 +123,6 @@ target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
-  PRIVATE
-    ${OPENSSL_INCLUDE_DIR}
 )
 
 install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
