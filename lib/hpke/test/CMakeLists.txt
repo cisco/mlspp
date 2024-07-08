@@ -10,4 +10,4 @@ target_link_libraries(${TEST_APP_NAME} PRIVATE ${CURRENT_LIB_NAME}
   Catch2::Catch2WithMain OpenSSL::Crypto)
 
 # Enable CTest
-catch_discover_tests(${TEST_APP_NAME})
+catch_discover_tests(${TEST_APP_NAME} PROPERTIES SKIP_RETURN_CODE 4)
