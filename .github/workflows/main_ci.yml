@@ -38,7 +38,6 @@ jobs:
         crypto: [openssl_1.1, openssl_3, boringssl]
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
@@ -55,12 +54,12 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
 
     - name: Unit Test
       run: |
-        ctest --test-dir "${{ env.BUILD_DIR }}"
+        ctest --test-dir "${{ runner.temp }}/build_${{ matrix.crypto }}"
 
   interop-test:
     if: github.event.pull_request.draft == false
@@ -69,7 +68,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_openssl_1.1"
       CRYPTO_DIR: "./alternatives/openssl_1.1"
 
     steps:
@@ -86,8 +84,8 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_openssl_1.1" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+        cmake --build "${{ runner.temp }}/build_openssl_1.1"
 
     - name: Build (Interop Harness)
       run: |
@@ -118,7 +116,6 @@ jobs:
         crypto: [openssl_1.1, openssl_3, boringssl]
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
@@ -135,6 +132,6 @@ jobs:
 
     - name: Build with clang-tidy
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
-                                        -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
+                                                                 -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
