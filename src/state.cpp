@@ -29,13 +29,13 @@ State::State(bytes group_id,
   }
 
   _index = _tree.add_leaf(leaf_node);
-  _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, _index, std::move(enc_priv));
   if (!_tree_priv.consistent(_tree)) {
     throw InvalidParameterError("LeafNode inconsistent with private key");
   }
 
   // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
+  _tree.set_hash_all();
   auto ctx = tls::marshal(group_context());
   _key_schedule =
     KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
@@ -53,10 +53,20 @@ State::import_tree(const bytes& tree_hash,
 {
   auto tree = TreeKEMPublicKey(_suite);
   auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
+  auto maybe_membership_proof_extn =
+    extensions.find<MembershipProofExtension>();
+
   if (external) {
     tree = opt::get(external);
   } else if (maybe_tree_extn) {
     tree = opt::get(maybe_tree_extn).tree;
+  } else if (maybe_membership_proof_extn) {
+    const auto& membership_proof = opt::get(maybe_membership_proof_extn);
+
+    tree = TreeKEMPublicKey(_suite, membership_proof.slices.at(0));
+    for (auto i = size_t(0); i < membership_proof.slices.size(); i++) {
+      tree.implant_slice(membership_proof.slices.at(i));
+    }
   } else {
     throw InvalidParameterError("No tree available");
   }
@@ -74,6 +84,12 @@ State::import_tree(const bytes& tree_hash,
 bool
 State::validate_tree() const
 {
+  // If we don't have a full tree, then we can't verify any properties
+  // TODO(RLB) We can in fact verify that the leaf node signatures are valid.
+  if (!_tree.is_complete()) {
+    return true;
+  }
+
   // The functionality here is somewhat duplicative of State::valid(const
   // LeafNode&).  Simply calling that method, however, would result in this
   // method having quadratic scaling, since each call to valid() does a linear
@@ -640,6 +656,11 @@ State::commit(const bytes& leaf_secret,
               const MessageOpts& msg_opts,
               CommitParams params)
 {
+  // If we are not a full client, we can't handle commits
+  if (!is_full_client()) {
+    throw ProtocolError("Light clients can't create commits");
+  }
+
   // Construct a commit from cached proposals
   // TODO(rlb) ignore some proposals:
   // * Update after Update
@@ -757,6 +778,26 @@ State::commit(const bytes& leaf_secret,
   auto commit_message =
     protect(std::move(commit_content_auth), msg_opts.padding_size);
 
+  // If we are adding membership proofs, add one covering this client and the
+  // joiners.
+  auto group_info_extensions = ExtensionList{};
+  if (opts && opt::get(opts).membership_proof) {
+    auto slices = std::vector<TreeSlice>{};
+    slices.reserve(joiner_locations.size() + 1);
+
+    slices.push_back(next._tree.extract_slice(next._index));
+    for (const auto& loc : joiner_locations) {
+      slices.push_back(next._tree.extract_slice(loc));
+    }
+
+    group_info_extensions.add(MembershipProofExtension{ std::move(slices) });
+  }
+
+  // If we are sending the whole tree, add that extension
+  if (opts && opt::get(opts).inline_tree) {
+    group_info_extensions.add(RatchetTreeExtension{ next._tree });
+  }
+
   // Complete the GroupInfo and form the Welcome
   auto group_info = GroupInfo{
     {
@@ -767,12 +808,9 @@ State::commit(const bytes& leaf_secret,
       next._transcript_hash.confirmed,
       next._extensions,
     },
-    { /* No other extensions */ },
+    { group_info_extensions },
     { confirmation_tag },
   };
-  if (opts && opt::get(opts).inline_tree) {
-    group_info.extensions.add(RatchetTreeExtension{ next._tree });
-  }
   group_info.sign(next._tree, next._index, next._identity_priv);
 
   auto welcome =
@@ -855,6 +893,11 @@ State::handle(const ValidatedContent& val_content,
     // Any other content type in this method is an error
     default:
       throw InvalidParameterError("Invalid content type");
+  }
+
+  // If we are not a full client, we can't handle commits
+  if (!is_full_client()) {
+    throw ProtocolError("Light clients can't handle commits");
   }
 
   switch (content.sender.sender_type()) {
@@ -968,6 +1011,97 @@ State::handle(const ValidatedContent& val_content,
   return next;
 }
 
+LightCommit
+State::lighten_for(LeafIndex leaf, const MLSMessage& commit_msg) const
+{
+  // Check that the current epoch is one higher than commit.epoch
+  if (_epoch != commit_msg.epoch() + 1) {
+    throw InvalidParameterError("Invalid epoch for lightening operation");
+  }
+
+  // Pull the GroupContext for the current state
+  const auto ctx = group_context();
+
+  // Make a memberhsip proof
+  const auto& public_msg = var::get<PublicMessage>(commit_msg.message);
+  const auto& sender =
+    var::get<MemberSender>(public_msg.content.sender.sender).sender;
+
+  const auto confirmation_tag = opt::get(public_msg.auth.confirmation_tag);
+  const auto sender_membership_proof = _tree.extract_slice(sender);
+
+  // Extract the correct path secret for the recipient
+  const auto& commit = var::get<Commit>(public_msg.content.content);
+  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
+  auto decryption_node_index = std::optional<NodeIndex>{};
+  if (commit.path) {
+    const auto [secret, index] =
+      _tree.slice_path(opt::get(commit.path), sender, leaf);
+    encrypted_path_secret = secret;
+    decryption_node_index = index;
+  }
+
+  return {
+    ctx,
+    confirmation_tag,
+    sender_membership_proof,
+    encrypted_path_secret,
+    decryption_node_index,
+  };
+}
+
+State
+State::handle(const LightCommit& light_commit) const
+{
+  // Verify the membership proof
+  // TODO(RLB) Also verify the signature (?)
+  // XXX(RLB) Should this use the new or old tree hash?
+  if (light_commit.sender_membership_proof.tree_hash(_suite) !=
+      light_commit.group_context.tree_hash) {
+    throw ProtocolError("Invalid sender membership proof");
+  }
+
+  // Import the GroupContext
+  // TODO(RLB) Verify that version, cipher_suite, group_id, epoch are as
+  // expected
+  auto next = successor();
+  next._epoch += 1;
+  next._tree =
+    TreeKEMPublicKey(next._suite, light_commit.sender_membership_proof);
+  next._extensions = light_commit.group_context.extensions;
+
+  // Decrypt the commit secret
+  auto commit_secret = _suite.zero();
+  if (light_commit.encrypted_path_secret) {
+    const auto& encrypted_path_secret =
+      opt::get(light_commit.encrypted_path_secret);
+    const auto& decryption_node_index =
+      opt::get(light_commit.decryption_node_index);
+
+    const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
+    const auto context = tls::marshal(next.group_context());
+    const auto path_secret = priv.decrypt(next._suite,
+                                          encrypt_label::update_path_node,
+                                          context,
+                                          encrypted_path_secret);
+    const auto ancestor =
+      next._index.ancestor(light_commit.sender_membership_proof.leaf_index);
+    next._tree_priv.implant_matching(next._tree, ancestor, path_secret);
+
+    commit_secret = next._tree_priv.update_secret;
+  }
+
+  // Update the key schedule
+  // TODO(RLB) Need to accommodate PSKs for light clients
+  next._transcript_hash =
+    TranscriptHash(next._suite,
+                   light_commit.group_context.confirmed_transcript_hash,
+                   light_commit.confirmation_tag);
+  next.update_epoch_secrets(commit_secret, {}, std::nullopt);
+
+  return next;
+}
+
 ///
 /// Subgroup branching
 ///
@@ -1007,6 +1141,7 @@ State::create_branch(bytes group_id,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
+    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -1085,6 +1220,7 @@ State::Tombstone::create_welcome(HPKEPrivateKey enc_priv,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
+    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -1985,12 +2121,12 @@ operator==(const State& lhs, const State& rhs)
   auto suite = (lhs._suite == rhs._suite);
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
-  auto tree = (lhs._tree == rhs._tree);
+  auto tree_hash = (lhs._tree.root_hash() == rhs._tree.root_hash());
   auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
   auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
   auto extensions = (lhs._extensions == rhs._extensions);
 
-  return suite && group_id && epoch && tree && transcript_hash &&
+  return suite && group_id && epoch && tree_hash && transcript_hash &&
          key_schedule && extensions;
 }
 
@@ -2013,6 +2149,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
     _transcript_hash.confirmed,
     _extensions,
   });
+
   _key_schedule =
     _key_schedule.next(commit_secret, psks, force_init_secret, ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);

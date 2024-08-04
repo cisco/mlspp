@@ -47,8 +47,13 @@ LeafCount::full(const LeafCount n)
 }
 
 NodeCount::NodeCount(const LeafCount n)
-  : UInt32(2 * (n.val - 1) + 1)
+  : UInt32(0)
 {
+  if (n.val == 0) {
+    val = 0;
+  } else {
+    val = 2 * (n.val - 1) + 1;
+  }
 }
 
 LeafIndex::LeafIndex(NodeIndex x)
@@ -165,7 +170,7 @@ NodeIndex::sibling(NodeIndex ancestor) const
 }
 
 std::vector<NodeIndex>
-NodeIndex::dirpath(LeafCount n)
+NodeIndex::dirpath(LeafCount n) const
 {
   if (val >= NodeCount(n).val) {
     throw InvalidParameterError("Request for dirpath outside of tree");
@@ -193,7 +198,7 @@ NodeIndex::dirpath(LeafCount n)
 }
 
 std::vector<NodeIndex>
-NodeIndex::copath(LeafCount n)
+NodeIndex::copath(LeafCount n) const
 {
   auto d = dirpath(n);
   if (d.empty()) {

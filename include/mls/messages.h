@@ -27,6 +27,14 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
+struct MembershipProofExtension
+{
+  std::vector<TreeSlice> slices;
+
+  static const uint16_t type;
+  TLS_SERIALIZABLE(slices)
+};
+
 struct ExternalSender
 {
   SignaturePublicKey signature_key;
@@ -41,6 +49,20 @@ struct ExternalSendersExtension
 
   static const uint16_t type;
   TLS_SERIALIZABLE(senders);
+};
+
+struct FlagsExtension
+{
+  std::vector<uint8_t> flag_data;
+
+  void set(size_t pos);
+  void unset(size_t pos);
+  bool get(size_t pos) const;
+
+  static const uint16_t type;
+
+  // XXX(RLB): This should check for extra zero bytes on deserialize.
+  TLS_SERIALIZABLE(flag_data);
 };
 
 struct SFrameParameters
@@ -255,6 +277,15 @@ private:
     CipherSuite suite,
     const bytes& joiner_secret,
     const std::vector<PSKWithSecret>& psks);
+};
+
+struct LightCommit
+{
+  GroupContext group_context;
+  bytes confirmation_tag;
+  TreeSlice sender_membership_proof;
+  std::optional<HPKECiphertext> encrypted_path_secret;
+  std::optional<NodeIndex> decryption_node_index;
 };
 
 ///
@@ -623,6 +654,10 @@ private:
   bytes membership_mac(CipherSuite suite,
                        const bytes& membership_key,
                        const std::optional<GroupContext>& context) const;
+
+  // XXX(RLB) This is a hack to avoid unwrapping across epochs.  We should do
+  // something more elegant, like unchecked_content()
+  friend class State;
 };
 
 struct PrivateMessage
