@@ -397,7 +397,7 @@ protected:
   static bool valid_restart(const std::vector<CachedProposal>& proposals,
                             ResumptionPSKUsage allowed_usage);
 
-  static bool valid_external_proposal_type(const Proposal::Type proposal_type);                  
+  static bool valid_external_proposal_type(const Proposal::Type proposal_type);
 
   CommitParams infer_commit_type(
     const std::optional<LeafIndex>& sender,

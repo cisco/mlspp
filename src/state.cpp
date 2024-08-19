@@ -1251,8 +1251,8 @@ State::cache_proposal(AuthenticatedContent content_auth)
 
   const auto& proposal = var::get<Proposal>(content_auth.content.content);
 
-  if (content_auth.content.sender.sender_type() == SenderType::external 
-  && !valid_external_proposal_type(proposal.proposal_type())) {
+  if (content_auth.content.sender.sender_type() == SenderType::external &&
+      !valid_external_proposal_type(proposal.proposal_type())) {
     throw ProtocolError("Invalid external proposal");
   }
 
@@ -1875,7 +1875,8 @@ State::valid_restart(const std::vector<CachedProposal>& proposals,
   return acceptable_psks && found_allowed;
 }
 
-bool State::valid_external_proposal_type(const Proposal::Type proposal_type)
+bool
+State::valid_external_proposal_type(const Proposal::Type proposal_type)
 {
   switch (proposal_type) {
     case ProposalType::add:
