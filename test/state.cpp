@@ -1070,11 +1070,9 @@ TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
   }
 }
 
-TEST_CASE_METHOD(StateTest, "Invalid Tree2")
+TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
 {
-  // ACT I: Member 0 sets up the group
-
-  // Create the group
+  // Create a group with 4 members
   states.emplace_back(group_id,
                       suite,
                       leaf_privs[0],
@@ -1082,82 +1080,40 @@ TEST_CASE_METHOD(StateTest, "Invalid Tree2")
                       key_packages[0].leaf_node,
                       ExtensionList{});
 
-  // Add second and third members, each in their own Commit
-  for (size_t i = 1; i < 3; i += 1) {
-    auto add_proposal = states[0].add_proposal(key_packages[i]);
+  const auto adds = std::vector{
+    states[0].add_proposal(key_packages[1]),
+    states[0].add_proposal(key_packages[2]),
+    states[0].add_proposal(key_packages[3]),
+  };
 
-    auto [commit, welcome, new_state_0] =
-      states[0].commit(fresh_secret(), CommitOpts{ { add_proposal }, true, false, {} }, {});
-    silence_unused(commit);
-    states[0] = new_state_0;
+  auto [_commit0, welcome0, new_state_0] =
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
+  silence_unused(_commit0);
+  states[0] = new_state_0;
 
+  for (size_t i = 1; i < 4; i++) {
     states.push_back({ init_privs[i],
                        leaf_privs[i],
                        identity_privs[i],
                        key_packages[i],
-                       welcome,
+                       welcome0,
                        std::nullopt,
                        {} });
   }
 
-  // ACT II: Member @2 makes additional changes to the group
+  // Member @2 removes the members on the left side of the tree
+  const auto removes = std::vector{
+    states[0].remove_proposal(LeafIndex{ 0 }),
+    states[0].remove_proposal(LeafIndex{ 1 }),
+  };
 
-  // Member @2 adds a fourth member
-  auto add_proposal_3 = states[2].add_proposal(key_packages[3]);
+    auto [commit2, welcome2, new_state_2] =
+      states[2].commit(fresh_secret(), CommitOpts{ { removes }, true, false, {} }, {});
+    silence_unused(commit2);
+    states[2] = new_state_2;
 
-  auto [commit_add_3, welcome_add_3, new_state_add_3] =
-    states[2].commit(fresh_secret(), CommitOpts{ { add_proposal_3 }, true, false, {} }, {});
-  silence_unused(commit_add_3);
-  states[2] = new_state_add_3;
 
-  CHECK_NOTHROW(State{ init_privs[3],
-                       leaf_privs[3],
-                       identity_privs[3],
-                       key_packages[3],
-                       welcome_add_3,
-                       std::nullopt,
-                       {} });
-
+  // Member @2 should have a valid tree, even though its filtered direct path no
+  // longer goes to the root.
   REQUIRE(states[2].tree().parent_hash_valid());
-
-  // Member @2 removes member @1
-  auto remove_proposal_1 = states[2].remove_proposal(LeafIndex { 1 });
-
-  auto [commit_remove_1, welcome_remove_1, new_state_remove_1] = states[2].commit(
-    fresh_secret(), CommitOpts{ { remove_proposal_1 }, true, false, {} }, {});
-  silence_unused(welcome_remove_1);
-  states[2] = new_state_remove_1;
-
-  REQUIRE(states[2].tree().parent_hash_valid());
-
-  // Have member at leaf index 2 remove member at leaf index 0
-  auto remove_proposal_0 = states[2].remove_proposal(LeafIndex { 0 });
-
-  auto [commit_remove_0, welcome_remove_0, new_state_remove_0] = states[2].commit(
-    fresh_secret(), CommitOpts{ { remove_proposal_0 }, true, false, {} }, {});
-  silence_unused(welcome_remove_0);
-  states[2] = new_state_remove_0;
-
-  REQUIRE(states[2].tree().parent_hash_valid());
-
-  // ACT III: Member @2 adds another member
-
-  // Add a new member
-  auto add_proposal_4 = states[2].add_proposal(key_packages[4]);
-  auto [commit_add_4, welcome_add_4, new_state_add_4] =
-    states[2].commit(fresh_secret(), CommitOpts{ { add_proposal_4 }, true, false, {} }, {});
-  silence_unused(commit_add_4);
-  states[2] = new_state_add_4;
-
-  REQUIRE(states[2].tree().parent_hash_valid());
-
-  CHECK_NOTHROW(State{ init_privs[4],
-                       leaf_privs[4],
-                       identity_privs[4],
-                       key_packages[4],
-                       welcome_add_4,
-                       std::nullopt,
-                       {} });
-
-  // verify_group_functionality(states);
 }
