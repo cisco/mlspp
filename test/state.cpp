@@ -1098,8 +1098,16 @@ protected:
     auto [commit, welcome, new_state] = states[0].commit(
       fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
     states[0] = new_state;
+
     silence_unused(commit);
-    silence_unused(welcome);
+
+    states.push_back({ init_privs[1],
+                       leaf_privs[1],
+                       identity_privs[1],
+                       key_packages[1],
+                       welcome,
+                       std::nullopt,
+                       {} });
   }
 
   PublicMessage GenerateExternalSenderProposal(const Proposal& proposal)
@@ -1131,7 +1139,7 @@ TEST_CASE_METHOD(ExternalSenderTest,
   // proposal does not throw an exception.
 
   // Add
-  auto add_proposal = Proposal{ Add{ key_packages[1] } };
+  auto add_proposal = Proposal{ Add{ key_packages[2] } };
   auto ext_add_message = GenerateExternalSenderProposal(add_proposal);
 
   REQUIRE(!states[0].handle(ext_add_message).has_value());
