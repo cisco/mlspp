@@ -906,6 +906,7 @@ TreeKEMPublicKey::parent_hashes(
   // excluding root, including leaf
   auto from_node = NodeIndex(from);
   auto dp = fdp;
+  auto [last, _res_last] = dp.back();
   dp.pop_back();
   dp.insert(dp.begin(), { from_node, {} });
 
@@ -914,7 +915,6 @@ TreeKEMPublicKey::parent_hashes(
   }
 
   // Parent hash for all the parents, starting from the root
-  auto last = NodeIndex::root(size);
   auto last_hash = bytes{};
   auto ph = std::vector<bytes>(dp.size());
   for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
