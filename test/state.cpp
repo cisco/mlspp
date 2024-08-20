@@ -1107,6 +1107,7 @@ TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
   auto [commit2, welcome2, new_state_2] =
     state_2.commit(fresh_secret(), CommitOpts{ removes, true, false, {} }, {});
   silence_unused(commit2);
+  silence_unused(welcome2);
   state_2 = new_state_2;
 
   // Member @2 should have a valid tree, even though its filtered direct path no
