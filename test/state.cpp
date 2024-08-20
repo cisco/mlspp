@@ -1073,46 +1073,43 @@ TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
 TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
 {
   // Create a group with 4 members
-  states.emplace_back(group_id,
-                      suite,
-                      leaf_privs[0],
-                      identity_privs[0],
-                      key_packages[0].leaf_node,
-                      ExtensionList{});
+  auto state_0 = State(group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       ExtensionList{});
 
   const auto adds = std::vector{
-    states[0].add_proposal(key_packages[1]),
-    states[0].add_proposal(key_packages[2]),
-    states[0].add_proposal(key_packages[3]),
+    state_0.add_proposal(key_packages[1]),
+    state_0.add_proposal(key_packages[2]),
+    state_0.add_proposal(key_packages[3]),
   };
 
   auto [_commit0, welcome0, new_state_0] =
-    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
+    state_0.commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
   silence_unused(_commit0);
-  states[0] = new_state_0;
+  state_0 = new_state_0;
 
-  for (size_t i = 1; i < 4; i++) {
-    states.push_back({ init_privs[i],
-                       leaf_privs[i],
-                       identity_privs[i],
-                       key_packages[i],
+  auto state_2 = State(init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
                        welcome0,
                        std::nullopt,
-                       {} });
-  }
-
+                       {});
   // Member @2 removes the members on the left side of the tree
   const auto removes = std::vector{
-    states[0].remove_proposal(LeafIndex{ 0 }),
-    states[0].remove_proposal(LeafIndex{ 1 }),
+    state_2.remove_proposal(LeafIndex{ 0 }),
+    state_2.remove_proposal(LeafIndex{ 1 }),
   };
 
-  auto [commit2, welcome2, new_state_2] = states[2].commit(
-    fresh_secret(), CommitOpts{ { removes }, true, false, {} }, {});
+  auto [commit2, welcome2, new_state_2] =
+    state_2.commit(fresh_secret(), CommitOpts{ removes, true, false, {} }, {});
   silence_unused(commit2);
-  states[2] = new_state_2;
+  state_2 = new_state_2;
 
   // Member @2 should have a valid tree, even though its filtered direct path no
   // longer goes to the root.
-  REQUIRE(states[2].tree().parent_hash_valid());
+  REQUIRE(state_2.tree().parent_hash_valid());
 }
