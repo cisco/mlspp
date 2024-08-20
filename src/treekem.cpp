@@ -914,7 +914,8 @@ TreeKEMPublicKey::parent_hashes(
     throw ProtocolError("Malformed UpdatePath");
   }
 
-  // Parent hash for all the parents, starting from the root
+  // Parent hash for all the parents, starting from the last entry of the
+  // filtered direct path
   auto last_hash = bytes{};
   auto ph = std::vector<bytes>(dp.size());
   for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
