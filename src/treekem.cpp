@@ -903,7 +903,7 @@ TreeKEMPublicKey::parent_hashes(
   }
 
   // The list of nodes for whom parent hashes are computed, namely: Direct path
-  // excluding root, including leaf
+  // excluding the last entry, including leaf
   auto from_node = NodeIndex(from);
   auto dp = fdp;
   auto [last, _res_last] = dp.back();
