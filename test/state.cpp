@@ -1069,3 +1069,87 @@ TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
     REQUIRE(state == new_states[0]);
   }
 }
+
+TEST_CASE_METHOD(StateTest, "Invalid Tree2")
+{
+  // ACT I: Member 0 sets up the group
+
+  // Create the group
+  states.emplace_back(group_id,
+                      suite,
+                      leaf_privs[0],
+                      identity_privs[0],
+                      key_packages[0].leaf_node,
+                      ExtensionList{});
+
+  // Add second and third members, each in their own Commit
+  for (size_t i = 1; i < 3; i += 1) {
+    auto add_proposal = states[0].add_proposal(key_packages[i]);
+
+    auto [commit, welcome, new_state_0] =
+      states[0].commit(fresh_secret(), CommitOpts{ { add_proposal }, true, false, {} }, {});
+    silence_unused(commit);
+    states[0] = new_state_0;
+
+    states.push_back({ init_privs[i],
+                       leaf_privs[i],
+                       identity_privs[i],
+                       key_packages[i],
+                       welcome,
+                       std::nullopt,
+                       {} });
+  }
+
+  // ACT II: Member @2 makes additional changes to the group
+
+  // Member @2 adds a fourth member
+  auto add_proposal_3 = states[2].add_proposal(key_packages[3]);
+
+  auto [commit_add_3, welcome_add_3, new_state_add_3] =
+    states[2].commit(fresh_secret(), CommitOpts{ { add_proposal_3 }, true, false, {} }, {});
+  silence_unused(commit_add_3);
+  states[2] = new_state_add_3;
+
+  CHECK_NOTHROW(State{ init_privs[3],
+                       leaf_privs[3],
+                       identity_privs[3],
+                       key_packages[3],
+                       welcome_add_3,
+                       std::nullopt,
+                       {} });
+
+  // Member @2 removes member @1
+  auto remove_proposal_1 = states[2].remove_proposal(LeafIndex { 1 });
+
+  auto [commit_remove_1, welcome_remove_1, new_state_remove_1] = states[2].commit(
+    fresh_secret(), CommitOpts{ { remove_proposal_1 }, true, false, {} }, {});
+  silence_unused(welcome_remove_1);
+  states[2] = new_state_remove_1;
+
+  // Have member at leaf index 2 remove member at leaf index 0
+  auto remove_proposal_0 = states[2].remove_proposal(LeafIndex { 0 });
+
+  auto [commit_remove_0, welcome_remove_0, new_state_remove_0] = states[2].commit(
+    fresh_secret(), CommitOpts{ { remove_proposal_0 }, true, false, {} }, {});
+  silence_unused(welcome_remove_0);
+  states[2] = new_state_remove_0;
+
+  // ACT III: Member @2 adds another member
+
+  // Add a new member
+  auto add_proposal_4 = states[2].add_proposal(key_packages[4]);
+  auto [commit_add_4, welcome_add_4, new_state_add_4] =
+    states[2].commit(fresh_secret(), CommitOpts{ { add_proposal_4 }, true, false, {} }, {});
+  silence_unused(commit_add_4);
+  states[2] = new_state_add_4;
+
+  CHECK_NOTHROW(State{ init_privs[4],
+                       leaf_privs[4],
+                       identity_privs[4],
+                       key_packages[4],
+                       welcome_add_4,
+                       std::nullopt,
+                       {} });
+
+  // verify_group_functionality(states);
+}
