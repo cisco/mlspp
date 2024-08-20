@@ -1118,6 +1118,8 @@ TEST_CASE_METHOD(StateTest, "Invalid Tree2")
                        std::nullopt,
                        {} });
 
+  REQUIRE(states[2].tree().parent_hash_valid());
+
   // Member @2 removes member @1
   auto remove_proposal_1 = states[2].remove_proposal(LeafIndex { 1 });
 
@@ -1125,6 +1127,8 @@ TEST_CASE_METHOD(StateTest, "Invalid Tree2")
     fresh_secret(), CommitOpts{ { remove_proposal_1 }, true, false, {} }, {});
   silence_unused(welcome_remove_1);
   states[2] = new_state_remove_1;
+
+  REQUIRE(states[2].tree().parent_hash_valid());
 
   // Have member at leaf index 2 remove member at leaf index 0
   auto remove_proposal_0 = states[2].remove_proposal(LeafIndex { 0 });
@@ -1134,6 +1138,8 @@ TEST_CASE_METHOD(StateTest, "Invalid Tree2")
   silence_unused(welcome_remove_0);
   states[2] = new_state_remove_0;
 
+  REQUIRE(states[2].tree().parent_hash_valid());
+
   // ACT III: Member @2 adds another member
 
   // Add a new member
@@ -1142,6 +1148,8 @@ TEST_CASE_METHOD(StateTest, "Invalid Tree2")
     states[2].commit(fresh_secret(), CommitOpts{ { add_proposal_4 }, true, false, {} }, {});
   silence_unused(commit_add_4);
   states[2] = new_state_add_4;
+
+  REQUIRE(states[2].tree().parent_hash_valid());
 
   CHECK_NOTHROW(State{ init_privs[4],
                        leaf_privs[4],
