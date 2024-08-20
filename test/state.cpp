@@ -1069,3 +1069,48 @@ TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
     REQUIRE(state == new_states[0]);
   }
 }
+
+TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
+{
+  // Create a group with 4 members
+  auto state_0 = State(group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       ExtensionList{});
+
+  const auto adds = std::vector{
+    state_0.add_proposal(key_packages[1]),
+    state_0.add_proposal(key_packages[2]),
+    state_0.add_proposal(key_packages[3]),
+  };
+
+  auto [_commit0, welcome0, new_state_0] =
+    state_0.commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
+  silence_unused(_commit0);
+  state_0 = new_state_0;
+
+  auto state_2 = State(init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       welcome0,
+                       std::nullopt,
+                       {});
+  // Member @2 removes the members on the left side of the tree
+  const auto removes = std::vector{
+    state_2.remove_proposal(LeafIndex{ 0 }),
+    state_2.remove_proposal(LeafIndex{ 1 }),
+  };
+
+  auto [commit2, welcome2, new_state_2] =
+    state_2.commit(fresh_secret(), CommitOpts{ removes, true, false, {} }, {});
+  silence_unused(commit2);
+  silence_unused(welcome2);
+  state_2 = new_state_2;
+
+  // Member @2 should have a valid tree, even though its filtered direct path no
+  // longer goes to the root.
+  REQUIRE(state_2.tree().parent_hash_valid());
+}
