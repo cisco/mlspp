@@ -279,6 +279,8 @@ private:
     const std::vector<PSKWithSecret>& psks);
 };
 
+struct MLSMessage;
+
 struct LightCommit
 {
   GroupContext group_context;
@@ -286,6 +288,13 @@ struct LightCommit
   TreeSlice sender_membership_proof;
   std::optional<HPKECiphertext> encrypted_path_secret;
   std::optional<NodeIndex> decryption_node_index;
+
+  // Produce a LightCommt for the specified member, assuming that that the
+  // specified tree is the tree for the epoch after this Commit.
+  static LightCommit from(LeafIndex leaf,
+                          const MLSMessage& commit_msg,
+                          const GroupContext& group_context,
+                          const TreeKEMPublicKey& tree);
 };
 
 ///
@@ -655,9 +664,10 @@ private:
                        const bytes& membership_key,
                        const std::optional<GroupContext>& context) const;
 
-  // XXX(RLB) This is a hack to avoid unwrapping across epochs.  We should do
-  // something more elegant, like unchecked_content()
-  friend class State;
+  // XXX(RLB) This is a hack to avoid complicated unwrapping and cross-epoch
+  // issues when creating a LightCommit.  We should do something more elegant,
+  // maybe something like unchecked_content()
+  friend struct LightCommit;
 };
 
 struct PrivateMessage

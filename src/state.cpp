@@ -1113,44 +1113,9 @@ State::ratchet(TreeKEMPublicKey new_tree,
   return next;
 }
 
-LightCommit
-State::lighten_for(LeafIndex leaf, const MLSMessage& commit_msg) const
-{
-  // Check that the current epoch is one higher than commit.epoch
-  if (_epoch != commit_msg.epoch() + 1) {
-    throw InvalidParameterError("Invalid epoch for lightening operation");
-  }
-
-  // Pull the GroupContext for the current state
-  const auto ctx = group_context();
-
-  // Make a memberhsip proof
-  const auto& public_msg = var::get<PublicMessage>(commit_msg.message);
-  const auto& sender =
-    var::get<MemberSender>(public_msg.content.sender.sender).sender;
-
-  const auto confirmation_tag = opt::get(public_msg.auth.confirmation_tag);
-  const auto sender_membership_proof = _tree.extract_slice(sender);
-
-  // Extract the correct path secret for the recipient
-  const auto& commit = var::get<Commit>(public_msg.content.content);
-  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
-  auto decryption_node_index = std::optional<NodeIndex>{};
-  if (commit.path) {
-    const auto [secret, index] =
-      _tree.slice_path(opt::get(commit.path), sender, leaf);
-    encrypted_path_secret = secret;
-    decryption_node_index = index;
-  }
-
-  return {
-    ctx,
-    confirmation_tag,
-    sender_membership_proof,
-    encrypted_path_secret,
-    decryption_node_index,
-  };
-}
+///
+/// Light MLS
+///
 
 State
 State::handle(const LightCommit& light_commit) const
@@ -1202,6 +1167,18 @@ State::handle(const LightCommit& light_commit) const
   next.update_epoch_secrets(commit_secret, {}, std::nullopt);
 
   return next;
+}
+
+void
+State::upgrade_to_full_client(TreeKEMPublicKey tree)
+{
+  // Verify that the tree has the expected tree hash
+  tree.set_hash_all();
+  if (tree.root_hash() != _tree.root_hash()) {
+    throw ProtocolError("Invalid tree hash");
+  }
+
+  _tree = tree;
 }
 
 ///
