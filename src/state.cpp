@@ -1250,6 +1250,12 @@ State::cache_proposal(AuthenticatedContent content_auth)
   }
 
   const auto& proposal = var::get<Proposal>(content_auth.content.content);
+
+  if (content_auth.content.sender.sender_type() == SenderType::external &&
+      !valid_external_proposal_type(proposal.proposal_type())) {
+    throw ProtocolError("Invalid external proposal");
+  }
+
   if (!valid(sender_location, proposal)) {
     throw ProtocolError("Invalid proposal");
   }
@@ -1632,7 +1638,6 @@ State::valid(std::optional<LeafIndex> sender, const Proposal& proposal) const
 {
   const auto specifically_valid = overloaded{
     [&](const Update& update) { return valid(opt::get(sender), update); },
-
     [&](const auto& proposal) { return valid(proposal); },
   };
   return var::visit(specifically_valid, proposal.content);
@@ -1868,6 +1873,22 @@ State::valid_restart(const std::vector<CachedProposal>& proposals,
   });
 
   return acceptable_psks && found_allowed;
+}
+
+bool
+State::valid_external_proposal_type(const Proposal::Type proposal_type)
+{
+  switch (proposal_type) {
+    case ProposalType::add:
+    case ProposalType::remove:
+    case ProposalType::psk:
+    case ProposalType::reinit:
+    case ProposalType::group_context_extensions:
+      return true;
+
+    default:
+      return false;
+  }
 }
 
 bool

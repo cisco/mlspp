@@ -1114,3 +1114,152 @@ TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
   // longer goes to the root.
   REQUIRE(state_2.tree().parent_hash_valid());
 }
+
+class ExternalSenderTest : public StateTest
+{
+protected:
+  const SignaturePrivateKey external_sig_priv =
+    SignaturePrivateKey::generate(suite);
+  const Credential external_sender_cred = Credential::basic({ 0 });
+  const bytes psk_id = from_ascii("psk ID");
+  ExtensionList group_extensions;
+
+  ExternalSenderTest()
+  {
+    group_extensions.add(ExternalSendersExtension{ {
+      { external_sig_priv.public_key, external_sender_cred },
+    } });
+
+    // Initialize the creator's state
+    states.emplace_back(group_id,
+                        suite,
+                        leaf_privs[0],
+                        identity_privs[0],
+                        key_packages[0].leaf_node,
+                        group_extensions);
+
+    // Add a second member so that we can test removal proposal
+    auto add = states[0].add_proposal(key_packages[1]);
+    auto [commit, welcome, new_state] = states[0].commit(
+      fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
+    states[0] = new_state;
+
+    silence_unused(commit);
+
+    states.push_back({ init_privs[1],
+                       leaf_privs[1],
+                       identity_privs[1],
+                       key_packages[1],
+                       welcome,
+                       std::nullopt,
+                       {} });
+  }
+
+  PublicMessage GenerateExternalSenderProposal(const Proposal& proposal)
+  {
+    auto group_context = states[0].group_context();
+
+    auto proposal_content = GroupContent{ group_context.group_id,
+                                          group_context.epoch,
+                                          { ExternalSenderIndex{ 0 } },
+                                          {},
+                                          proposal };
+
+    auto content_auth_original =
+      AuthenticatedContent::sign(WireFormat::mls_public_message,
+                                 proposal_content,
+                                 suite,
+                                 external_sig_priv,
+                                 group_context);
+
+    return PublicMessage::protect(
+      content_auth_original, suite, std::nullopt, group_context);
+  }
+};
+
+TEST_CASE_METHOD(ExternalSenderTest,
+                 "Allows Expected Proposals from External Sender")
+{
+  // For expected proposals, we ensure that calling State::handle with the
+  // proposal does not throw an exception.
+
+  // Add
+  auto add_proposal = Proposal{ Add{ key_packages[2] } };
+  auto ext_add_message = GenerateExternalSenderProposal(add_proposal);
+
+  REQUIRE(!states[0].handle(ext_add_message).has_value());
+
+  // Remove
+  auto remove_proposal = Proposal{ Remove{ LeafIndex{ 1 } } };
+  auto ext_remove_message = GenerateExternalSenderProposal(remove_proposal);
+
+  REQUIRE(!states[0].handle(ext_remove_message).has_value());
+
+  // PSK
+  auto group_context = states[0].group_context();
+  auto psk_proposal =
+    Proposal{ PreSharedKey{ ResumptionPSK{ ResumptionPSKUsage::application,
+                                           group_context.group_id,
+                                           group_context.epoch },
+                            random_bytes(suite.secret_size()) } };
+  auto ext_psk_message = GenerateExternalSenderProposal(psk_proposal);
+
+  REQUIRE(!states[0].handle(ext_psk_message).has_value());
+
+  // ReInit
+  auto updated_extensions = group_extensions;
+  updated_extensions.add(CustomExtension{ 0xa0 });
+
+  auto reinit_proposal = Proposal{ ReInit{ group_context.group_id,
+                                           ProtocolVersion::mls10,
+                                           group_context.cipher_suite,
+                                           updated_extensions } };
+  auto ext_reinit_message = GenerateExternalSenderProposal(reinit_proposal);
+
+  REQUIRE(!states[0].handle(ext_reinit_message).has_value());
+
+  // GroupContextExtensions
+
+  auto group_context_proposal =
+    Proposal{ GroupContextExtensions{ updated_extensions } };
+  auto ext_group_context_message =
+    GenerateExternalSenderProposal(group_context_proposal);
+
+  REQUIRE(!states[0].handle(ext_group_context_message).has_value());
+}
+
+TEST_CASE_METHOD(ExternalSenderTest,
+                 "Refuses Unexpected Proposals from External Sender")
+{
+  // For unexpected proposals, we ensure that calling State::handle with the
+  // throws the expected exception.
+
+  // The proposals throw bad_optional_access since the validation calls
+  // opt::get(sender) on a nullopt sender
+
+  // Update
+  auto update_proposal = Proposal{ Update{ key_packages[1].leaf_node } };
+  auto ext_update_message = GenerateExternalSenderProposal(update_proposal);
+
+  REQUIRE_THROWS_WITH(states[0].handle(ext_update_message),
+                      "Invalid external proposal");
+
+  // ExternalInit
+  auto group_info = states[0].group_info(false);
+  auto maybe_external_pub = group_info.extensions.find<ExternalPubExtension>();
+
+  REQUIRE(maybe_external_pub.has_value());
+
+  const auto& external_pub = opt::get(maybe_external_pub).external_pub;
+
+  auto [kem_output, force_init_secret] =
+    KeyScheduleEpoch::external_init(suite, external_pub);
+  silence_unused(force_init_secret);
+
+  auto external_init_proposal = Proposal{ ExternalInit{ kem_output } };
+  auto external_init_message =
+    GenerateExternalSenderProposal(external_init_proposal);
+
+  REQUIRE_THROWS_WITH(states[0].handle(external_init_message),
+                      "Invalid external proposal");
+}
