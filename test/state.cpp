@@ -1160,8 +1160,8 @@ TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
     state_0.add_proposal(key_packages[3]),
   };
 
-  auto [_commit0, welcome0, new_state_0] =
-    state_0.commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
+  auto [_commit0, welcome0, new_state_0] = state_0.commit(
+    fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
   silence_unused(_commit0);
   state_0 = new_state_0;
 
@@ -1178,8 +1178,8 @@ TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
     state_2.remove_proposal(LeafIndex{ 1 }),
   };
 
-  auto [commit2, welcome2, new_state_2] =
-    state_2.commit(fresh_secret(), CommitOpts{ removes, true, false, {} }, {});
+  auto [commit2, welcome2, new_state_2] = state_2.commit(
+    fresh_secret(), CommitOpts{ removes, true, false, false, {} }, {});
   silence_unused(commit2);
   silence_unused(welcome2);
   state_2 = new_state_2;
@@ -1215,7 +1215,7 @@ protected:
     // Add a second member so that we can test removal proposal
     auto add = states[0].add_proposal(key_packages[1]);
     auto [commit, welcome, new_state] = states[0].commit(
-      fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
+      fresh_secret(), CommitOpts{ { add }, true, false, false, {} }, {});
     states[0] = new_state;
 
     silence_unused(commit);
