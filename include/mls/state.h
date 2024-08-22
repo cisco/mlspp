@@ -141,8 +141,9 @@ public:
   ///
   /// Light MLS
   ///
-  LightCommit lighten_for(LeafIndex leaf, const MLSMessage& commit) const;
   State handle(const LightCommit& light_commit) const;
+  bool is_full_client() const { return _tree.is_complete(); }
+  void upgrade_to_full_client(TreeKEMPublicKey tree);
 
   ///
   /// PSK management
@@ -162,7 +163,6 @@ public:
   const ExtensionList& extensions() const { return _extensions; }
   const TreeKEMPublicKey& tree() const { return _tree; }
   const bytes& resumption_psk() const { return _key_schedule.resumption_psk; }
-  bool is_full_client() const { return _tree.is_complete(); }
 
   bytes do_export(const std::string& label,
                   const bytes& context,

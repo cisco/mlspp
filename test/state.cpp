@@ -449,6 +449,7 @@ TEST_CASE_METHOD(StateTest, "Light client can join and participate")
                         std::nullopt,
                         {} };
 
+  REQUIRE(second1.is_full_client());
   REQUIRE(first1 == second1);
 
   // Add the third participant
@@ -484,13 +485,28 @@ TEST_CASE_METHOD(StateTest, "Light client can join and participate")
   REQUIRE_THROWS(third2.handle(commit3));
 
   // Convert the Commit to a LightCommit
-  auto light_commit = first3.lighten_for(third2.index(), commit3);
+  auto light_commit = LightCommit::from(
+    third2.index(), commit3, first3.group_context(), first3.tree());
 
   // Verify that the light client can process the commit with a commit map
   auto third3 = third2.handle(light_commit);
 
   REQUIRE(first3 == second3);
   REQUIRE(first3 == third3);
+
+  // Upgrade the third client to be a full client
+  third3.upgrade_to_full_client(first3.tree());
+  REQUIRE(third3.is_full_client());
+
+  // Verify that all three clients can now process a normal Commit
+  auto [commit4, welcome4, first4_] = first3.commit(fresh_secret(), {}, {});
+  silence_unused(welcome4);
+  auto first4 = first4_;
+  auto second4 = opt::get(second3.handle(commit4));
+  auto third4 = opt::get(third3.handle(commit4));
+
+  REQUIRE(first4 == second4);
+  REQUIRE(first4 == third4);
 }
 
 TEST_CASE_METHOD(StateTest, "External Join")
