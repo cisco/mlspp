@@ -2,6 +2,8 @@
 #include <namespace.h>
 #include <set>
 
+#include <iostream>
+
 namespace MLS_NAMESPACE {
 
 ///
@@ -1195,7 +1197,7 @@ State::handle(const AnnotatedCommit& annotated_commit)
   }
 
   // XXX(RLB) This could fail if the receiver could have sent Update
-  const auto& my_leaf = opt::get(_tree.leaf_node(_index));
+  const auto my_leaf = opt::get(_tree.leaf_node(_index));
   const auto& proof_node = opt::get(
     annotated_commit.receiver_membership_proof_after.direct_path_nodes[0].node);
   const auto& proof_leaf = var::get<LeafNode>(proof_node.node);
@@ -1247,7 +1249,9 @@ State::handle(const AnnotatedCommit& annotated_commit)
 
     // Find the next non-blank node in my new direct path below the common
     // ancestor
-    const auto receiver_dp = NodeIndex(next._index).dirpath(next._tree.size);
+    auto receiver_dp = NodeIndex(next._index).dirpath(next._tree.size);
+    receiver_dp.push_back(NodeIndex(next._index));
+
     const auto decryption_node_index =
       stdx::filter<NodeIndex>(receiver_dp, [&next, &ancestor](const auto& n) {
         return n != ancestor && n.is_below(ancestor) &&
