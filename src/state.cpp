@@ -1214,13 +1214,14 @@ State::handle(const AnnotatedCommit& annotated_commit)
     throw ProtocolError("Incorrect commit sender");
   }
 
+  // TODO: Look up PSKs and extensions from Commit
+
   // Update the GroupContext
   auto next = successor();
   next._epoch += 1;
   next._tree = TreeKEMPublicKey(next._suite,
                                 annotated_commit.sender_membership_proof_after);
   next._tree.implant_slice(annotated_commit.receiver_membership_proof_after);
-  next._extensions = annotated_commit.extensions;
 
   // Decrypt the commit secret
   auto commit_secret = _suite.zero();
@@ -1240,9 +1241,9 @@ State::handle(const AnnotatedCommit& annotated_commit)
 
     // From the list of encrypted path secrets at that index in the UpdatePath,
     // take the one at resolution_index
+    const auto resolution_index = opt::get(annotated_commit.resolution_index);
     const auto encrypted_path_secret =
-      path.nodes.at(ancestor_index)
-        .encrypted_path_secret.at(annotated_commit.resolution_index);
+      path.nodes.at(ancestor_index).encrypted_path_secret.at(resolution_index);
 
     // Find the next non-blank node in my new direct path below the common
     // ancestor
@@ -1266,12 +1267,16 @@ State::handle(const AnnotatedCommit& annotated_commit)
     commit_secret = next._tree_priv.update_secret;
   }
 
-  // Look up any specified PSKs
-  const auto psks = resolve(annotated_commit.psks);
-
   // Update the key schedule
   next._transcript_hash.update(content_auth);
-  next.update_epoch_secrets(commit_secret, { psks }, std::nullopt);
+  next.update_epoch_secrets(commit_secret, { /* TODO psks */ }, std::nullopt);
+
+  // Verify the confirmation MAC
+  const auto confirmation_tag =
+    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
+  if (!content_auth.check_confirmation_tag(confirmation_tag)) {
+    throw ProtocolError("Confirmation failed to verify");
+  }
 
   return next;
 }

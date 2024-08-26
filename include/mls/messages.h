@@ -743,16 +743,6 @@ external_proposal(CipherSuite suite,
                   uint32_t signer_index,
                   const SignaturePrivateKey& sig_priv);
 
-/*
-struct AnnotatedCommit {
-  MLSMessage commit;
-  TreeSlice sender_membership_proof; // relative to the old tree hash
-  TreeSlice recipient_membership_proof; // relative to the new tree hash
-  uint32 resolution_index;
-  PreSharedKeyID psks<V>;
-  Extension extensions<V>;
-};
-*/
 struct AnnotatedCommit
 {
   MLSMessage commit_message;
@@ -762,14 +752,10 @@ struct AnnotatedCommit
   TreeSlice sender_membership_proof_after;
   TreeSlice receiver_membership_proof_after;
 
-  uint32_t resolution_index;
+  std::optional<uint32_t> resolution_index;
 
-  std::vector<PreSharedKeyID> psks;
-  ExtensionList extensions;
-
-  static AnnotatedCommit from(LeafIndex leaf,
-                              const MLSMessage& commit_msg,
-                              const GroupContext& group_context,
+  static AnnotatedCommit from(LeafIndex receiver,
+                              const MLSMessage& commit_message,
                               const TreeKEMPublicKey& tree_before,
                               const TreeKEMPublicKey& tree_after);
 };

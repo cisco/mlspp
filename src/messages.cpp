@@ -308,6 +308,59 @@ LightCommit::from(LeafIndex leaf,
 }
 
 ///
+/// LightCommit
+///
+
+AnnotatedCommit
+AnnotatedCommit::from(LeafIndex receiver,
+                      const MLSMessage& commit_message,
+                      const TreeKEMPublicKey& tree_before,
+                      const TreeKEMPublicKey& tree_after)
+{
+  // Unpack the commit message
+  // XXX(RLB) There's some cheating here using authenticated_content()
+  const auto public_message = var::get<PublicMessage>(commit_message.message);
+  const auto content_auth = public_message.authenticated_content();
+  const auto sender =
+    var::get<MemberSender>(content_auth.content.sender.sender).sender;
+  const auto& commit = var::get<Commit>(content_auth.content.content);
+
+  // Extract the appropriate memberhsip proofs
+  const auto tree_hash_after = tree_after.root_hash();
+  const auto sender_membership_proof_before = tree_before.extract_slice(sender);
+  const auto sender_membership_proof_after = tree_after.extract_slice(sender);
+  const auto receiver_membership_proof_after =
+    tree_after.extract_slice(receiver);
+
+  // If there is a path, identify which node the receiver should decrypt
+  auto resolution_index = std::optional<uint32_t>{};
+  if (commit.path) {
+    const auto ancestor = sender.ancestor(receiver);
+    const auto receiver_node = NodeIndex(receiver);
+
+    auto copath_child = ancestor.left();
+    if (!receiver_node.is_below(copath_child)) {
+      copath_child = ancestor.right();
+    }
+
+    const auto copath_resolution = tree_after.resolve(copath_child);
+    const auto resolution_iter =
+      stdx::find_if(copath_resolution,
+                    [&](const auto& n) { return receiver_node.is_below(n); });
+    resolution_index = resolution_iter - copath_resolution.begin();
+  }
+
+  return {
+    commit_message,
+    tree_hash_after,
+    sender_membership_proof_before,
+    sender_membership_proof_after,
+    receiver_membership_proof_after,
+    resolution_index,
+  };
+}
+
+///
 /// Commit
 ///
 std::optional<bytes>
