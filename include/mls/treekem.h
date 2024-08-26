@@ -67,7 +67,6 @@ struct TreeSlice
   std::vector<bytes> copath_hashes;
 
   bytes tree_hash(CipherSuite suite) const;
-  void add(const TreeSlice& other);
 
   TLS_SERIALIZABLE(leaf_index, n_leaves, direct_path_nodes, copath_hashes);
 };

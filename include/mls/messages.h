@@ -281,6 +281,13 @@ private:
 
 struct MLSMessage;
 
+///
+/// Light MLS
+///
+
+// XXX(RLB) This structure is not secure, because the GroupContext is not
+// signed.  We need to have the sender authenticate the GroupContext, e.g., by
+// sending as GroupInfo with a `tree_info` extension.
 struct LightCommit
 {
   GroupContext group_context;
@@ -735,6 +742,37 @@ external_proposal(CipherSuite suite,
                   const Proposal& proposal,
                   uint32_t signer_index,
                   const SignaturePrivateKey& sig_priv);
+
+/*
+struct AnnotatedCommit {
+  MLSMessage commit;
+  TreeSlice sender_membership_proof; // relative to the old tree hash
+  TreeSlice recipient_membership_proof; // relative to the new tree hash
+  uint32 resolution_index;
+  PreSharedKeyID psks<V>;
+  Extension extensions<V>;
+};
+*/
+struct AnnotatedCommit
+{
+  MLSMessage commit_message;
+
+  bytes tree_hash_after;
+  TreeSlice sender_membership_proof_before;
+  TreeSlice sender_membership_proof_after;
+  TreeSlice receiver_membership_proof_after;
+
+  uint32_t resolution_index;
+
+  std::vector<PreSharedKeyID> psks;
+  ExtensionList extensions;
+
+  static AnnotatedCommit from(LeafIndex leaf,
+                              const MLSMessage& commit_msg,
+                              const GroupContext& group_context,
+                              const TreeKEMPublicKey& tree_before,
+                              const TreeKEMPublicKey& tree_after);
+};
 
 } // namespace MLS_NAMESPACE
 

@@ -142,6 +142,7 @@ public:
   /// Light MLS
   ///
   State handle(const LightCommit& light_commit) const;
+  State handle(const AnnotatedCommit& annotated_commit);
   bool is_full_client() const { return _tree.is_complete(); }
   void upgrade_to_full_client(TreeKEMPublicKey tree);
 

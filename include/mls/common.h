@@ -216,8 +216,18 @@ std::vector<Value>
 transform(const Container& c, const UnaryOperation& op)
 {
   auto out = std::vector<Value>{};
-  auto ins = std::inserter(out, out.begin());
+  auto ins = std::back_inserter(out);
   std::transform(c.begin(), c.end(), ins, op);
+  return out;
+}
+
+template<typename Value, typename Container, typename UnaryOperation>
+std::vector<Value>
+filter(const Container& c, const UnaryOperation& op)
+{
+  auto out = std::vector<Value>{};
+  auto ins = std::back_inserter(out);
+  std::copy_if(c.begin(), c.end(), ins, op);
   return out;
 }
 
