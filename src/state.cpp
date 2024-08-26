@@ -1169,6 +1169,113 @@ State::handle(const LightCommit& light_commit) const
   return next;
 }
 
+State
+State::handle(const AnnotatedCommit& annotated_commit)
+{
+  // Verify the membership proofs are consistent
+  if (annotated_commit.sender_membership_proof_before.tree_hash(_suite) !=
+      _tree.root_hash()) {
+    throw ProtocolError("Invalid sender membership proof");
+  }
+
+  if (annotated_commit.sender_membership_proof_before.leaf_index !=
+      annotated_commit.sender_membership_proof_after.leaf_index) {
+    throw ProtocolError("Inconsistent sender membership proofs before/after");
+  }
+
+  const auto tree_hash_after =
+    annotated_commit.sender_membership_proof_after.tree_hash(_suite);
+  if (tree_hash_after !=
+      annotated_commit.receiver_membership_proof_after.tree_hash(_suite)) {
+    throw ProtocolError("Inconsistent sender and receiver membership proofs");
+  }
+
+  if (_index != annotated_commit.receiver_membership_proof_after.leaf_index) {
+    throw ProtocolError("Receiver membership proof is not for this node");
+  }
+
+  // XXX(RLB) This could fail if the receiver could have sent Update
+  const auto& my_leaf = opt::get(_tree.leaf_node(_index));
+  const auto& proof_node = opt::get(
+    annotated_commit.receiver_membership_proof_after.direct_path_nodes[0].node);
+  const auto& proof_leaf = var::get<LeafNode>(proof_node.node);
+  if (my_leaf != proof_leaf) {
+    throw ProtocolError("Incorrect leaf node in receiver membership proof");
+  }
+
+  // Unwrap the commit
+  const auto val_content = unwrap(annotated_commit.commit_message);
+  const auto& content_auth = val_content.authenticated_content();
+  const auto& content = content_auth.content;
+  const auto& commit = var::get<Commit>(content.content);
+
+  const auto sender = var::get<MemberSender>(content.sender.sender).sender;
+  if (sender != annotated_commit.sender_membership_proof_before.leaf_index) {
+    throw ProtocolError("Incorrect commit sender");
+  }
+
+  // Update the GroupContext
+  auto next = successor();
+  next._epoch += 1;
+  next._tree = TreeKEMPublicKey(next._suite,
+                                annotated_commit.sender_membership_proof_after);
+  next._tree.implant_slice(annotated_commit.receiver_membership_proof_after);
+  next._extensions = annotated_commit.extensions;
+
+  // Decrypt the commit secret
+  auto commit_secret = _suite.zero();
+  if (commit.path) {
+    const auto& path = opt::get(commit.path);
+
+    // Find index of the common ancestor with the committer
+    const auto sender_dp = NodeIndex(sender).dirpath(next._tree.size);
+    const auto sender_fdp =
+      stdx::filter<NodeIndex>(sender_dp, [&next](const auto& n) {
+        return !next._tree.node_at(n).blank();
+      });
+
+    const auto ancestor = sender.ancestor(next._index);
+    const auto ancestor_iter = stdx::find(sender_fdp, ancestor);
+    const auto ancestor_index = ancestor_iter - sender_fdp.begin();
+
+    // From the list of encrypted path secrets at that index in the UpdatePath,
+    // take the one at resolution_index
+    const auto encrypted_path_secret =
+      path.nodes.at(ancestor_index)
+        .encrypted_path_secret.at(annotated_commit.resolution_index);
+
+    // Find the next non-blank node in my new direct path below the common
+    // ancestor
+    const auto receiver_dp = NodeIndex(next._index).dirpath(next._tree.size);
+    const auto decryption_node_index =
+      stdx::filter<NodeIndex>(receiver_dp, [&next, &ancestor](const auto& n) {
+        return n != ancestor && n.is_below(ancestor) &&
+               !next._tree.node_at(n).blank();
+      }).at(0);
+
+    // Decrypt the path secret with the private key at that node
+    const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
+    const auto context = tls::marshal(next.group_context());
+    const auto path_secret = priv.decrypt(next._suite,
+                                          encrypt_label::update_path_node,
+                                          context,
+                                          encrypted_path_secret);
+
+    // Implant the path secret in the private tree
+    next._tree_priv.implant_matching(next._tree, ancestor, path_secret);
+    commit_secret = next._tree_priv.update_secret;
+  }
+
+  // Look up any specified PSKs
+  const auto psks = resolve(annotated_commit.psks);
+
+  // Update the key schedule
+  next._transcript_hash.update(content_auth);
+  next.update_epoch_secrets(commit_secret, { psks }, std::nullopt);
+
+  return next;
+}
+
 void
 State::upgrade_to_full_client(TreeKEMPublicKey tree)
 {
