@@ -755,6 +755,7 @@ struct AnnotatedCommit
   std::optional<uint32_t> resolution_index;
 
   static AnnotatedCommit from(LeafIndex receiver,
+                              const std::vector<MLSMessage>& proposals,
                               const MLSMessage& commit_message,
                               const TreeKEMPublicKey& tree_before,
                               const TreeKEMPublicKey& tree_after);

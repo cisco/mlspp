@@ -17,6 +17,14 @@ using nlohmann::json;
 using namespace mls_client;
 using namespace mls_vectors;
 
+#define NO_U64 0xffffffffffffffff
+DEFINE_uint64(gen, NO_U64, "Generate test vectors of a given type");
+DEFINE_uint64(ver, NO_U64, "Verify test vectors of a given type");
+DEFINE_uint64(live,
+              NO_U64,
+              "Run a gRPC live-testing server on the specified port");
+DEFINE_bool(light, false, "Run passive client tests as a light client");
+
 // Values used on the command line to indicate the type of test vector to be
 // generated / verified
 enum struct TestVectorClass
@@ -191,6 +199,22 @@ verify_test_vector(const json& j)
   return std::nullopt;
 }
 
+template<>
+std::optional<std::string>
+verify_test_vector<PassiveClientTestVector>(const json& j)
+{
+  auto cases = j.get<std::vector<PassiveClientTestVector>>();
+  for (auto& tc : cases) {
+    tc.light_client = FLAGS_light;
+    auto result = tc.verify();
+    if (result) {
+      return result;
+    }
+  }
+
+  return std::nullopt;
+}
+
 static std::optional<std::string>
 verify_test_vector(uint64_t type)
 {
@@ -240,13 +264,6 @@ verify_test_vector(uint64_t type)
       return "Invalid test vector type";
   }
 }
-
-#define NO_U64 0xffffffffffffffff
-DEFINE_uint64(gen, NO_U64, "Generate test vectors of a given type");
-DEFINE_uint64(ver, NO_U64, "Verify test vectors of a given type");
-DEFINE_uint64(live,
-              NO_U64,
-              "Run a gRPC live-testing server on the specified port");
 
 int
 main(int argc, char* argv[])

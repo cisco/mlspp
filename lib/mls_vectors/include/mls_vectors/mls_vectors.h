@@ -570,6 +570,8 @@ struct PassiveClientTestVector : PseudoRandom
 
   std::vector<Epoch> epochs;
 
+  bool light_client = false;
+
   PassiveClientTestVector() = default;
   std::optional<std::string> verify();
 };

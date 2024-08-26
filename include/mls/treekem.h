@@ -194,6 +194,13 @@ struct TreeKEMPublicKey
   bool all_leaves(const UnaryPredicate& pred) const
   {
     for (LeafIndex i{ 0 }; i < size; i.val++) {
+      // Only test known nodes
+      // XXX(RLB) This could be dangerous, since it allows for nodes to fail the
+      // predicate as long as they are unknown.
+      if (nodes.count(NodeIndex(i)) == 0) {
+        continue;
+      }
+
       const auto& node = node_at(i);
       if (node.blank()) {
         continue;

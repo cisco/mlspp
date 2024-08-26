@@ -141,6 +141,7 @@ public:
   ///
   /// Light MLS
   ///
+  void implant_tree_slice(const TreeSlice& slice);
   State handle(const LightCommit& light_commit) const;
   State handle(const AnnotatedCommit& annotated_commit);
   bool is_full_client() const { return _tree.is_complete(); }
