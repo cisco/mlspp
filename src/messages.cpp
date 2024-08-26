@@ -308,11 +308,12 @@ LightCommit::from(LeafIndex leaf,
 }
 
 ///
-/// LightCommit
+/// AnnotatedCommit
 ///
 
 AnnotatedCommit
 AnnotatedCommit::from(LeafIndex receiver,
+                      const std::vector<MLSMessage>& proposals,
                       const MLSMessage& commit_message,
                       const TreeKEMPublicKey& tree_before,
                       const TreeKEMPublicKey& tree_after)
@@ -335,6 +336,37 @@ AnnotatedCommit::from(LeafIndex receiver,
   // If there is a path, identify which node the receiver should decrypt
   auto resolution_index = std::optional<uint32_t>{};
   if (commit.path) {
+    // Find add proposals by reference or by value
+    auto cache = std::map<ProposalRef, Proposal>{};
+    for (const auto& proposal_msg : proposals) {
+      const auto& public_message = var::get<PublicMessage>(proposal_msg.message);
+      const auto content_auth = public_message.authenticated_content();
+      const auto proposal = var::get<Proposal>(content_auth.content.content);
+
+      const auto ref = tree_before.suite.ref(content_auth);
+      cache.insert_or_assign(ref, proposal);
+    }
+
+    const auto committed_proposals = stdx::transform<Proposal>(commit.proposals, [&](const auto& p_or_r) {
+      const auto resolve = overloaded {
+        [&](const ProposalRef& r) { return cache.at(r); },
+        [](const Proposal& p) { return p; },
+      };
+      return var::visit(resolve, p_or_r.content);
+    });
+
+    const auto committed_adds = stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
+      return p.proposal_type() == ProposalType::add;
+    });
+
+    // Find where the joiners are
+    const auto joiner_locations = stdx::transform<LeafIndex>(committed_adds, [&](const auto& p) {
+      const auto& add = var::get<Add>(p.content);
+      const auto maybe_loc = tree_after.find(add.key_package.leaf_node);
+      return opt::get(maybe_loc);
+    });
+
+    // Compute the required copath resolution
     const auto ancestor = sender.ancestor(receiver);
     const auto receiver_node = NodeIndex(receiver);
 
@@ -343,10 +375,24 @@ AnnotatedCommit::from(LeafIndex receiver,
       copath_child = ancestor.right();
     }
 
-    const auto copath_resolution = tree_after.resolve(copath_child);
+    auto copath_resolution = tree_after.resolve(copath_child);
+
+    // Remove any joiners from the copath resolution
+    for (const auto leaf : joiner_locations) {
+      const auto it = stdx::find(copath_resolution, NodeIndex(leaf));
+      if (it != copath_resolution.end()) {
+        copath_resolution.erase(it);
+      }
+    }
+
+    // Locate the required node in the copath resolution
     const auto resolution_iter =
       stdx::find_if(copath_resolution,
                     [&](const auto& n) { return receiver_node.is_below(n); });
+    if (resolution_iter == copath_resolution.end()) {
+      throw ProtocolError("Receiver node not found in copath resolution");
+    }
+
     resolution_index = resolution_iter - copath_resolution.begin();
   }
 

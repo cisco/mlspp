@@ -574,7 +574,7 @@ TEST_CASE_METHOD(StateTest, "Light client can participate [AnnotatedCommit]")
 
   // Convert the Commit to an AnnotatedCommit
   auto annotated_commit = AnnotatedCommit::from(
-    third2.index(), commit3, first2.tree(), first3.tree());
+    third2.index(), {}, commit3, first2.tree(), first3.tree());
 
   // Verify that the light client can process the commit with a commit map
   auto third3 = third2.handle(annotated_commit);

@@ -2,8 +2,6 @@
 #include <namespace.h>
 #include <set>
 
-#include <iostream>
-
 namespace MLS_NAMESPACE {
 
 ///
@@ -1119,6 +1117,12 @@ State::ratchet(TreeKEMPublicKey new_tree,
 /// Light MLS
 ///
 
+void
+State::implant_tree_slice(const TreeSlice& slice)
+{
+  _tree.implant_slice(slice);
+}
+
 State
 State::handle(const LightCommit& light_commit) const
 {
@@ -1206,6 +1210,7 @@ State::handle(const AnnotatedCommit& annotated_commit)
   }
 
   // Unwrap the commit
+  _tree.implant_slice(annotated_commit.sender_membership_proof_before);
   const auto val_content = unwrap(annotated_commit.commit_message);
   const auto& content_auth = val_content.authenticated_content();
   const auto& content = content_auth.content;
@@ -1218,13 +1223,13 @@ State::handle(const AnnotatedCommit& annotated_commit)
 
   // Apply the commit as much as we can
   auto next = successor();
+  next._epoch += 1;
   const auto proposals = must_resolve(commit.proposals, sender);
-  // TODO(RLB) Validate proposals?  Is this even possible?
+  // XXX(RLB) Validating proposals is not really possible
 
   const auto [_joiner_locations, psks] = next.apply(proposals);
 
   // Update the GroupContext
-  next._epoch += 1;
   next._tree = TreeKEMPublicKey(next._suite,
                                 annotated_commit.sender_membership_proof_after);
   next._tree.implant_slice(annotated_commit.receiver_membership_proof_after);
@@ -1243,6 +1248,10 @@ State::handle(const AnnotatedCommit& annotated_commit)
 
     const auto ancestor = sender.ancestor(next._index);
     const auto ancestor_iter = stdx::find(sender_fdp, ancestor);
+    if (ancestor_iter == sender_fdp.end()) {
+      throw ProtocolError("Common ancestor not found in sender filtered direct path");
+    }
+
     const auto ancestor_index = ancestor_iter - sender_fdp.begin();
 
     // From the list of encrypted path secrets at that index in the UpdatePath,
@@ -1254,13 +1263,14 @@ State::handle(const AnnotatedCommit& annotated_commit)
     // Find the next non-blank node in my new direct path below the common
     // ancestor
     auto receiver_dp = NodeIndex(next._index).dirpath(next._tree.size);
-    receiver_dp.push_back(NodeIndex(next._index));
+    receiver_dp.insert(receiver_dp.begin(), NodeIndex(next._index));
 
-    const auto decryption_node_index =
+    const auto decryption_nodes =
       stdx::filter<NodeIndex>(receiver_dp, [&next, &ancestor](const auto& n) {
         return n != ancestor && n.is_below(ancestor) &&
                !next._tree.node_at(n).blank();
-      }).at(0);
+      });
+    const auto decryption_node_index = decryption_nodes.at(decryption_nodes.size() - 1);
 
     // Decrypt the path secret with the private key at that node
     const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
