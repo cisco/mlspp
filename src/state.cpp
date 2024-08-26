@@ -1216,10 +1216,14 @@ State::handle(const AnnotatedCommit& annotated_commit)
     throw ProtocolError("Incorrect commit sender");
   }
 
-  // TODO: Look up PSKs and extensions from Commit
+  // Apply the commit as much as we can
+  auto next = successor();
+  const auto proposals = must_resolve(commit.proposals, sender);
+  // TODO(RLB) Validate proposals?  Is this even possible?
+
+  const auto [_joiner_locations, psks] = next.apply(proposals);
 
   // Update the GroupContext
-  auto next = successor();
   next._epoch += 1;
   next._tree = TreeKEMPublicKey(next._suite,
                                 annotated_commit.sender_membership_proof_after);
@@ -1273,7 +1277,7 @@ State::handle(const AnnotatedCommit& annotated_commit)
 
   // Update the key schedule
   next._transcript_hash.update(content_auth);
-  next.update_epoch_secrets(commit_secret, { /* TODO psks */ }, std::nullopt);
+  next.update_epoch_secrets(commit_secret, { psks }, std::nullopt);
 
   // Verify the confirmation MAC
   const auto confirmation_tag =
