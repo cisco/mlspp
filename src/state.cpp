@@ -1249,7 +1249,8 @@ State::handle(const AnnotatedCommit& annotated_commit)
     const auto ancestor = sender.ancestor(next._index);
     const auto ancestor_iter = stdx::find(sender_fdp, ancestor);
     if (ancestor_iter == sender_fdp.end()) {
-      throw ProtocolError("Common ancestor not found in sender filtered direct path");
+      throw ProtocolError(
+        "Common ancestor not found in sender filtered direct path");
     }
 
     const auto ancestor_index = ancestor_iter - sender_fdp.begin();
@@ -1270,7 +1271,8 @@ State::handle(const AnnotatedCommit& annotated_commit)
         return n != ancestor && n.is_below(ancestor) &&
                !next._tree.node_at(n).blank();
       });
-    const auto decryption_node_index = decryption_nodes.at(decryption_nodes.size() - 1);
+    const auto decryption_node_index =
+      decryption_nodes.at(decryption_nodes.size() - 1);
 
     // Decrypt the path secret with the private key at that node
     const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
