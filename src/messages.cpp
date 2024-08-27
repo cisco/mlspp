@@ -339,7 +339,8 @@ AnnotatedCommit::from(LeafIndex receiver,
     // Find add proposals by reference or by value
     auto cache = std::map<ProposalRef, Proposal>{};
     for (const auto& proposal_msg : proposals) {
-      const auto& public_message = var::get<PublicMessage>(proposal_msg.message);
+      const auto& public_message =
+        var::get<PublicMessage>(proposal_msg.message);
       const auto content_auth = public_message.authenticated_content();
       const auto proposal = var::get<Proposal>(content_auth.content.content);
 
@@ -347,24 +348,27 @@ AnnotatedCommit::from(LeafIndex receiver,
       cache.insert_or_assign(ref, proposal);
     }
 
-    const auto committed_proposals = stdx::transform<Proposal>(commit.proposals, [&](const auto& p_or_r) {
-      const auto resolve = overloaded {
-        [&](const ProposalRef& r) { return cache.at(r); },
-        [](const Proposal& p) { return p; },
-      };
-      return var::visit(resolve, p_or_r.content);
-    });
+    const auto committed_proposals =
+      stdx::transform<Proposal>(commit.proposals, [&](const auto& p_or_r) {
+        const auto resolve = overloaded{
+          [&](const ProposalRef& r) { return cache.at(r); },
+          [](const Proposal& p) { return p; },
+        };
+        return var::visit(resolve, p_or_r.content);
+      });
 
-    const auto committed_adds = stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
-      return p.proposal_type() == ProposalType::add;
-    });
+    const auto committed_adds =
+      stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
+        return p.proposal_type() == ProposalType::add;
+      });
 
     // Find where the joiners are
-    const auto joiner_locations = stdx::transform<LeafIndex>(committed_adds, [&](const auto& p) {
-      const auto& add = var::get<Add>(p.content);
-      const auto maybe_loc = tree_after.find(add.key_package.leaf_node);
-      return opt::get(maybe_loc);
-    });
+    const auto joiner_locations =
+      stdx::transform<LeafIndex>(committed_adds, [&](const auto& p) {
+        const auto& add = var::get<Add>(p.content);
+        const auto maybe_loc = tree_after.find(add.key_package.leaf_node);
+        return opt::get(maybe_loc);
+      });
 
     // Compute the required copath resolution
     const auto ancestor = sender.ancestor(receiver);
