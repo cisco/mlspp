@@ -345,17 +345,19 @@ protected:
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
 
   // Apply the changes requested by various messages
-  LeafIndex apply(const Add& add);
-  void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target,
-             const Update& update,
-             const HPKEPrivateKey& leaf_priv);
-  LeafIndex apply(const Remove& remove);
-  void apply(const GroupContextExtensions& gce);
-  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
-                               Proposal::Type required_type);
-  std::tuple<std::vector<LeafIndex>, std::vector<PSKWithSecret>> apply(
-    const std::vector<CachedProposal>& proposals);
+  static LeafIndex apply(TreeKEMPublicKey& tree, const Add& add);
+  static void apply(TreeKEMPublicKey& tree,
+                    LeafIndex target,
+                    const Update& update);
+  static LeafIndex apply(TreeKEMPublicKey& tree, const Remove& remove);
+  std::vector<LeafIndex> apply(TreeKEMPublicKey& tree,
+                               const std::vector<CachedProposal>& proposals,
+                               Proposal::Type required_type) const;
+  std::tuple<TreeKEMPublicKey,
+             std::vector<LeafIndex>,
+             std::vector<PSKWithSecret>,
+             ExtensionList>
+  apply(const std::vector<CachedProposal>& proposals) const;
 
   // Verify that a specific key package or all members support a given set of
   // extensions

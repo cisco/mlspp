@@ -688,7 +688,10 @@ State::commit(const bytes& leaf_secret,
     throw ProtocolError("Invalid proposal list");
   }
 
-  const auto [joiner_locations, psks] = next.apply(proposals);
+  const auto [new_tree, joiner_locations, psks, extensions] =
+    next.apply(proposals);
+  next._tree = new_tree;
+  next._extensions = extensions;
 
   if (external_commit) {
     const auto& leaf_node =
@@ -893,14 +896,25 @@ State::handle(const ValidatedContent& val_content,
   const auto params = infer_commit_type(sender, proposals, expected_params);
   auto external_commit = var::holds_alternative<ExternalCommitParams>(params);
 
-  // Check that a path is present when required
-  if (path_required(proposals) && !commit.path) {
-    throw ProtocolError("Path required but not present");
-  }
-
   // Apply the proposals
-  auto next = successor();
-  auto [joiner_locations, psks] = next.apply(proposals);
+  auto [new_tree, joiner_locations, psks, extensions] = apply(proposals);
+  auto new_tree_priv = _tree_priv;
+  new_tree_priv.truncate(new_tree.size);
+
+  const auto my_leaf = opt::get(new_tree.leaf_node(_index));
+  const auto my_priv = new_tree_priv.private_key_cache.at(NodeIndex(_index));
+  if (my_leaf.encryption_key != my_priv.public_key) {
+    if (!_cached_update) {
+      throw ProtocolError("Self-update without cached update");
+    }
+
+    const auto cached_update = opt::get(_cached_update);
+    if (my_leaf != cached_update.proposal.leaf_node) {
+      throw ProtocolError("Self-update does not match cached leaf node");
+    }
+
+    new_tree_priv.set_leaf_priv(cached_update.update_priv);
+  }
 
   // If this is an external commit, add the joiner to the tree and note the
   // location where they were added.  Also, compute the "externally forced"
@@ -912,7 +926,7 @@ State::handle(const ValidatedContent& val_content,
     sender_location = opt::get(sender);
   } else {
     // Find where the joiner will be added
-    sender_location = next._tree.allocate_leaf();
+    sender_location = new_tree.allocate_leaf();
 
     // Extract the forced init secret
     auto kem_output = commit.valid_external();
@@ -924,8 +938,14 @@ State::handle(const ValidatedContent& val_content,
       _key_schedule.receive_external_init(opt::get(kem_output));
   }
 
-  // Decapsulate and apply the UpdatePath, if provided
-  auto commit_secret = _suite.zero();
+  // Check that a path is present when required
+  if (path_required(proposals) && !commit.path) {
+    throw ProtocolError("Path required but not present");
+  }
+
+  // Identify the encrypted path secret and how to decrypt it
+  auto path_secret_decrypt_node = std::optional<NodeIndex>{};
+  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
   if (commit.path) {
     const auto& path = opt::get(commit.path);
 
@@ -933,37 +953,59 @@ State::handle(const ValidatedContent& val_content,
       throw ProtocolError("Commit path has invalid leaf node");
     }
 
-    if (!next._tree.parent_hash_valid(sender_location, path)) {
+    if (!new_tree.parent_hash_valid(sender_location, path)) {
       throw ProtocolError("Commit path has invalid parent hash");
     }
 
-    next._tree.merge(sender_location, path);
+    new_tree.merge(sender_location, path);
 
+    const auto coords = new_tree.decap_coords(_index, sender_location, joiner_locations);
+    path_secret_decrypt_node = coords.resolution_node;
+    encrypted_path_secret = path.nodes.at(coords.ancestor_node_index).encrypted_path_secret.at(coords.resolution_node_index);
+  }
+
+  // Update the transcripth hash
+  auto new_transcript_hash = _transcript_hash;
+  new_transcript_hash.update_confirmed(content_auth);
+  const auto new_confirmed_transcript_hash = new_transcript_hash.confirmed;
+  const auto new_confirmation_tag = opt::get(content_auth.auth.confirmation_tag);
+
+  ////////// CUT //////////
+
+  // Compute the commit secret
+  auto commit_secret = _suite.zero();
+  if (path_secret_decrypt_node && encrypted_path_secret) {
     auto ctx = tls::marshal(GroupContext{
-      next._suite,
-      next._group_id,
-      next._epoch + 1,
-      next._tree.root_hash(),
-      next._transcript_hash.confirmed,
-      next._extensions,
+      _suite,
+      _group_id,
+      _epoch + 1,
+      new_tree.root_hash(),
+      _transcript_hash.confirmed,
+      extensions,
     });
-    next._tree_priv.decap(
-      sender_location, next._tree, ctx, path, joiner_locations);
 
-    commit_secret = next._tree_priv.update_secret;
+    new_tree_priv.decap(sender_location, new_tree, ctx, opt::get(path_secret_decrypt_node), opt::get(encrypted_path_secret));
+
+    commit_secret = new_tree_priv.update_secret;
   }
 
   // Update the transcripts and advance the key schedule
-  next._transcript_hash.update(content_auth);
+  auto next = successor();
+  next._tree = new_tree;
+  next._tree_priv = new_tree_priv;
+  next._extensions = extensions;
+  next._transcript_hash = TranscriptHash(_suite, new_confirmed_transcript_hash, new_confirmation_tag);
   next._epoch += 1;
   next.update_epoch_secrets(commit_secret, { psks }, force_init_secret);
 
   // Verify the confirmation MAC
   const auto confirmation_tag =
-    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
-  if (!content_auth.check_confirmation_tag(confirmation_tag)) {
+    next._key_schedule.confirmation_tag(new_confirmed_transcript_hash);
+  if (confirmation_tag != new_confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
+
+  // TODO ratchet
 
   return next;
 }
@@ -1183,47 +1225,119 @@ State::handle_reinit_commit(const MLSMessage& commit_msg)
 ///
 
 LeafIndex
-State::apply(const Add& add)
+State::apply(TreeKEMPublicKey& tree, const Add& add)
 {
-  return _tree.add_leaf(add.key_package.leaf_node);
+  return tree.add_leaf(add.key_package.leaf_node);
 }
 
 void
-State::apply(LeafIndex target, const Update& update)
+State::apply(TreeKEMPublicKey& tree, LeafIndex target, const Update& update)
 {
-  _tree.update_leaf(target, update.leaf_node);
-}
-
-void
-State::apply(LeafIndex target,
-             const Update& update,
-             const HPKEPrivateKey& leaf_priv)
-{
-  _tree.update_leaf(target, update.leaf_node);
-  _tree_priv.set_leaf_priv(leaf_priv);
+  tree.update_leaf(target, update.leaf_node);
 }
 
 LeafIndex
-State::apply(const Remove& remove)
+State::apply(TreeKEMPublicKey& tree, const Remove& remove)
 {
-  if (!_tree.has_leaf(remove.removed)) {
+  if (!tree.has_leaf(remove.removed)) {
     throw ProtocolError("Attempt to remove non-member");
   }
 
-  _tree.blank_path(remove.removed);
+  tree.blank_path(remove.removed);
   return remove.removed;
 }
 
-void
-State::apply(const GroupContextExtensions& gce)
+std::vector<LeafIndex>
+State::apply(TreeKEMPublicKey& tree,
+             const std::vector<CachedProposal>& proposals,
+             Proposal::Type required_type) const
 {
-  // TODO(RLB): Update spec to clarify that you MUST verify that the new
-  // extensions are compatible with all members.
-  if (!extensions_supported(gce.group_context_extensions)) {
-    throw ProtocolError("Unsupported extensions in GroupContextExtensions");
+  auto locations = std::vector<LeafIndex>{};
+  for (const auto& cached : proposals) {
+    auto proposal_type = cached.proposal.proposal_type();
+    if (proposal_type != required_type) {
+      continue;
+    }
+
+    switch (proposal_type) {
+      case ProposalType::add: {
+        const auto joiner_location =
+          apply(tree, var::get<Add>(cached.proposal.content));
+        locations.push_back(joiner_location);
+        break;
+      }
+
+      case ProposalType::update: {
+        const auto& update = var::get<Update>(cached.proposal.content);
+
+        if (!cached.sender) {
+          throw ProtocolError("Update without target leaf");
+        }
+
+        auto target = opt::get(cached.sender);
+        apply(tree, target, update);
+        break;
+      }
+
+      case ProposalType::remove: {
+        const auto& remove = var::get<Remove>(cached.proposal.content);
+        apply(tree, remove);
+        break;
+      }
+
+      default:
+        throw ProtocolError("Unsupported proposal type");
+    }
   }
 
-  _extensions = gce.group_context_extensions;
+  return locations;
+}
+
+std::tuple<TreeKEMPublicKey,
+           std::vector<LeafIndex>,
+           std::vector<PSKWithSecret>,
+           ExtensionList>
+State::apply(const std::vector<CachedProposal>& proposals) const
+{
+  auto tree = _tree;
+  apply(tree, proposals, ProposalType::update);
+  apply(tree, proposals, ProposalType::remove);
+  auto joiner_locations = apply(tree, proposals, ProposalType::add);
+
+  // Extract the GroupContextExtensions proposal, if present
+  auto extensions = _extensions;
+  for (const auto& cached : proposals) {
+    if (cached.proposal.proposal_type() !=
+        ProposalType::group_context_extensions) {
+      continue;
+    }
+
+    const auto& proposal =
+      var::get<GroupContextExtensions>(cached.proposal.content);
+    if (!extensions_supported(proposal.group_context_extensions)) {
+      throw ProtocolError("Unsupported extensions in GroupContextExtensions");
+    }
+
+    extensions = proposal.group_context_extensions;
+    break;
+  }
+
+  // Extract the PSK proposals and look up the secrets
+  auto psk_ids = std::vector<PreSharedKeyID>{};
+  for (const auto& cached : proposals) {
+    if (cached.proposal.proposal_type() != ProposalType::psk) {
+      continue;
+    }
+
+    const auto& proposal = var::get<PreSharedKey>(cached.proposal.content);
+    psk_ids.push_back(proposal.psk);
+  }
+  auto psks = resolve(psk_ids);
+
+  tree.truncate();
+  // TODO _tree_priv.truncate(_tree.size);
+  tree.set_hash_all();
+  return { tree, joiner_locations, psks, extensions };
 }
 
 bool
@@ -1330,103 +1444,6 @@ State::resolve(const std::vector<PreSharedKeyID>& psks) const
     auto secret = var::visit(get_secret, psk_id.content);
     return PSKWithSecret{ psk_id, secret };
   });
-}
-
-std::vector<LeafIndex>
-State::apply(const std::vector<CachedProposal>& proposals,
-             Proposal::Type required_type)
-{
-  auto locations = std::vector<LeafIndex>{};
-  for (const auto& cached : proposals) {
-    auto proposal_type = cached.proposal.proposal_type();
-    if (proposal_type != required_type) {
-      continue;
-    }
-
-    switch (proposal_type) {
-      case ProposalType::add: {
-        locations.push_back(apply(var::get<Add>(cached.proposal.content)));
-        break;
-      }
-
-      case ProposalType::update: {
-        const auto& update = var::get<Update>(cached.proposal.content);
-
-        if (!cached.sender) {
-          throw ProtocolError("Update without target leaf");
-        }
-
-        auto target = opt::get(cached.sender);
-        if (target != _index) {
-          apply(target, update);
-          break;
-        }
-
-        if (!_cached_update) {
-          throw ProtocolError("Self-update with no cached secret");
-        }
-
-        const auto& cached_update = opt::get(_cached_update);
-        if (update != cached_update.proposal) {
-          throw ProtocolError("Self-update does not match cached data");
-        }
-
-        apply(target, update, cached_update.update_priv);
-        locations.push_back(target);
-        break;
-      }
-
-      case ProposalType::remove: {
-        const auto& remove = var::get<Remove>(cached.proposal.content);
-        locations.push_back(apply(remove));
-        break;
-      }
-
-      case ProposalType::group_context_extensions: {
-        const auto& gce =
-          var::get<GroupContextExtensions>(cached.proposal.content);
-        apply(gce);
-        break;
-      }
-
-      default:
-        throw ProtocolError("Unsupported proposal type");
-    }
-  }
-
-  // The cached update needs to be reset after applying proposals, so that it is
-  // in a clean state for the next epoch.
-  _cached_update.reset();
-
-  return locations;
-}
-
-std::tuple<std::vector<LeafIndex>, std::vector<PSKWithSecret>>
-State::apply(const std::vector<CachedProposal>& proposals)
-{
-  apply(proposals, ProposalType::update);
-  apply(proposals, ProposalType::remove);
-  auto joiner_locations = apply(proposals, ProposalType::add);
-  apply(proposals, ProposalType::group_context_extensions);
-
-  // Extract the PSK proposals and look up the secrets
-  // TODO(RLB): Factor this out, and also factor the above methods into
-  // apply_update, apply_remove, etc.
-  auto psk_ids = std::vector<PreSharedKeyID>{};
-  for (const auto& cached : proposals) {
-    if (cached.proposal.proposal_type() != ProposalType::psk) {
-      continue;
-    }
-
-    const auto& proposal = var::get<PreSharedKey>(cached.proposal.content);
-    psk_ids.push_back(proposal.psk);
-  }
-  auto psks = resolve(psk_ids);
-
-  _tree.truncate();
-  _tree_priv.truncate(_tree.size);
-  _tree.set_hash_all();
-  return { joiner_locations, psks };
 }
 
 ///
