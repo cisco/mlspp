@@ -97,9 +97,11 @@ clean:
 cclean:
 	rm -rf ${BUILD_DIR}
 
+CLANG_FORMAT_EXCLUDE="test_vectors.cpp"
+
 format:
-	find include -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find lib -iname "*.h" -or -iname "*.cpp" | grep -v "test_vectors.cpp" |  xargs ${CLANG_FORMAT}
+	for dir in include src test lib; \
+	do \
+		find $${dir} -iname "*.h" -or -iname "*.cpp" | grep -v ${CLANG_FORMAT_EXCLUDE} \
+		| xargs ${CLANG_FORMAT}; \
+	done

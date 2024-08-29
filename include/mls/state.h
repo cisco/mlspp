@@ -323,6 +323,15 @@ protected:
     const MessageOpts& msg_opts,
     CommitParams params);
 
+  struct CommitMaterials;
+  CommitMaterials prepare_commit(const bytes& leaf_secret,
+                                 const std::optional<CommitOpts>& opts,
+                                 CommitParams params) const;
+  Welcome welcome(bool inline_tree,
+                  const std::vector<PSKWithSecret>& psks,
+                  const std::vector<KeyPackage>& joiners,
+                  const std::vector<std::optional<bytes>>& path_secrets) const;
+
   std::optional<State> handle(
     const ValidatedContent& val_content,
     std::optional<State> cached_state,
@@ -437,8 +446,15 @@ protected:
   // Convert a Roster entry into LeafIndex
   LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 
-  // Create a draft successor state
-  State successor() const;
+  // Create a successor state
+  State successor(LeafIndex index,
+                  TreeKEMPublicKey tree,
+                  TreeKEMPrivateKey tree_priv,
+                  ExtensionList extensions,
+                  const bytes& confirmed_transcript_hash,
+                  const bytes& commit_secret,
+                  const std::vector<PSKWithSecret> psks,
+                  const std::optional<bytes> force_init_secret) const;
 };
 
 } // namespace MLS_NAMESPACE

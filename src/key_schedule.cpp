@@ -301,14 +301,20 @@ KeyScheduleEpoch
 KeyScheduleEpoch::joiner(CipherSuite suite_in,
                          const bytes& joiner_secret,
                          const std::vector<PSKWithSecret>& psks,
+                         const bytes& confirmed_transcript_hash,
                          const bytes& context)
 {
-  return { suite_in, joiner_secret, make_psk_secret(suite_in, psks), context };
+  return { suite_in,
+           joiner_secret,
+           make_psk_secret(suite_in, psks),
+           confirmed_transcript_hash,
+           context };
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& joiner_secret,
                                    const bytes& psk_secret,
+                                   const bytes& confirmed_transcript_hash,
                                    const bytes& context)
   : suite(suite_in)
   , joiner_secret(joiner_secret)
@@ -325,6 +331,8 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
   , init_secret(suite.derive_secret(epoch_secret, "init"))
   , external_priv(HPKEPrivateKey::derive(suite, external_secret))
 {
+  confirmation_tag =
+    suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
 }
 
 KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in)
@@ -339,6 +347,7 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
       suite_in,
       make_joiner_secret(suite_in, context, init_secret, suite_in.zero()),
       { /* no PSKs */ },
+      { /* confirmed transcript hash is the zero-length octet string */ },
       context)
 {
 }
@@ -347,11 +356,13 @@ KeyScheduleEpoch::KeyScheduleEpoch(CipherSuite suite_in,
                                    const bytes& init_secret,
                                    const bytes& commit_secret,
                                    const bytes& psk_secret,
+                                   const bytes& confirmed_transcript_hash,
                                    const bytes& context)
   : KeyScheduleEpoch(
       suite_in,
       make_joiner_secret(suite_in, context, init_secret, commit_secret),
       psk_secret,
+      confirmed_transcript_hash,
       context)
 {
 }
@@ -377,16 +388,21 @@ KeyScheduleEpoch
 KeyScheduleEpoch::next(const bytes& commit_secret,
                        const std::vector<PSKWithSecret>& psks,
                        const std::optional<bytes>& force_init_secret,
+                       const bytes& confirmed_transcript_hash,
                        const bytes& context) const
 {
-  return next_raw(
-    commit_secret, make_psk_secret(suite, psks), force_init_secret, context);
+  return next_raw(commit_secret,
+                  make_psk_secret(suite, psks),
+                  force_init_secret,
+                  confirmed_transcript_hash,
+                  context);
 }
 
 KeyScheduleEpoch
 KeyScheduleEpoch::next_raw(const bytes& commit_secret,
                            const bytes& psk_secret,
                            const std::optional<bytes>& force_init_secret,
+                           const bytes& confirmed_transcript_hash,
                            const bytes& context) const
 {
   auto actual_init_secret = init_secret;
@@ -394,19 +410,14 @@ KeyScheduleEpoch::next_raw(const bytes& commit_secret,
     actual_init_secret = opt::get(force_init_secret);
   }
 
-  return { suite, actual_init_secret, commit_secret, psk_secret, context };
+  return { suite,      actual_init_secret,        commit_secret,
+           psk_secret, confirmed_transcript_hash, context };
 }
 
 GroupKeySource
 KeyScheduleEpoch::encryption_keys(LeafCount size) const
 {
   return { suite, size, encryption_secret };
-}
-
-bytes
-KeyScheduleEpoch::confirmation_tag(const bytes& confirmed_transcript_hash) const
-{
-  return suite.digest().hmac(confirmation_key, confirmed_transcript_hash);
 }
 
 bytes

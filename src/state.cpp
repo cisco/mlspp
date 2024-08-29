@@ -42,8 +42,7 @@ State::State(bytes group_id,
   _keys = _key_schedule.encryption_keys(_tree.size);
 
   // Update the interim transcript hash with a virtual confirmation tag
-  _transcript_hash.update_interim(
-    _key_schedule.confirmation_tag(_transcript_hash.confirmed));
+  _transcript_hash.update_interim(_key_schedule.confirmation_tag);
 }
 
 TreeKEMPublicKey
@@ -268,14 +267,12 @@ State::State(const HPKEPrivateKey& init_priv,
 
   // Ratchet forward into the current epoch
   auto group_ctx = tls::marshal(group_context());
-  _key_schedule =
-    KeyScheduleEpoch::joiner(_suite, secrets.joiner_secret, psks, group_ctx);
+  _key_schedule = KeyScheduleEpoch::joiner(
+    _suite, secrets.joiner_secret, psks, _transcript_hash.confirmed, group_ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);
 
   // Verify the confirmation
-  const auto confirmation_tag =
-    _key_schedule.confirmation_tag(_transcript_hash.confirmed);
-  if (confirmation_tag != group_info.confirmation_tag) {
+  if (_key_schedule.confirmation_tag != group_info.confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
 }
@@ -634,18 +631,32 @@ State::commit(const bytes& leaf_secret,
   return commit(leaf_secret, opts, msg_opts, NormalCommitParams{});
 }
 
-std::tuple<MLSMessage, Welcome, State>
-State::commit(const bytes& leaf_secret,
-              const std::optional<CommitOpts>& opts,
-              const MessageOpts& msg_opts,
-              CommitParams params)
+struct State::CommitMaterials
 {
-  // Construct a commit from cached proposals
-  // TODO(rlb) ignore some proposals:
-  // * Update after Update
-  // * Update after Remove
-  // * Remove after Remove
-  Commit commit;
+  // To be used locally
+  LeafIndex index;
+  TreeKEMPublicKey new_tree;
+  TreeKEMPrivateKey new_tree_priv;
+  ExtensionList extensions;
+  std::optional<bytes> force_init_secret;
+
+  // To be sent to other members
+  std::vector<ProposalOrRef> proposals;
+  std::optional<UpdatePath> path;
+
+  // To be used in forming Welcome messages
+  std::vector<KeyPackage> joiners;
+  std::vector<std::optional<bytes>> path_secrets;
+  std::vector<PSKWithSecret> psks;
+};
+
+State::CommitMaterials
+State::prepare_commit(const bytes& leaf_secret,
+                      const std::optional<CommitOpts>& opts,
+                      CommitParams params) const
+{
+  // Construct a proposal list from cached proposals
+  auto proposals = std::vector<ProposalOrRef>{};
   auto joiners = std::vector<KeyPackage>{};
   for (const auto& cached : _pending_proposals) {
     if (var::holds_alternative<Add>(cached.proposal.content)) {
@@ -653,7 +664,7 @@ State::commit(const bytes& leaf_secret,
       joiners.push_back(add.key_package);
     }
 
-    commit.proposals.push_back({ cached.ref });
+    proposals.push_back({ cached.ref });
   }
 
   // Add the extra proposals to those we had cached
@@ -665,7 +676,7 @@ State::commit(const bytes& leaf_secret,
         joiners.push_back(add.key_package);
       }
 
-      commit.proposals.push_back({ proposal });
+      proposals.push_back({ proposal });
     }
   }
 
@@ -681,61 +692,48 @@ State::commit(const bytes& leaf_secret,
   }
 
   // Apply proposals
-  State next = successor();
-
-  const auto proposals = must_resolve(commit.proposals, _index);
-  if (!valid(proposals, _index, params)) {
+  const auto cached_proposals = must_resolve(proposals, _index);
+  if (!valid(cached_proposals, _index, params)) {
     throw ProtocolError("Invalid proposal list");
   }
 
-  const auto [new_tree, joiner_locations, psks, extensions] =
-    next.apply(proposals);
-  next._tree = new_tree;
-  next._extensions = extensions;
+  auto [new_tree, joiner_locations, psks, extensions] = apply(cached_proposals);
 
+  auto index = _index;
   if (external_commit) {
     const auto& leaf_node =
       opt::get(external_commit).joiner_key_package.leaf_node;
-    next._index = next._tree.add_leaf(leaf_node);
-  }
-
-  // If this is an external commit, indicate it in the sender field
-  auto sender = Sender{ MemberSender{ _index } };
-  if (external_commit) {
-    sender = Sender{ NewMemberCommitSender{} };
+    index = new_tree.add_leaf(leaf_node);
   }
 
   // KEM new entropy to the group and the new joiners
-  auto commit_secret = _suite.zero();
+  auto new_tree_priv = _tree_priv;
+  auto path = std::optional<UpdatePath>{};
   auto path_secrets =
     std::vector<std::optional<bytes>>(joiner_locations.size());
   auto force_path = opts && opt::get(opts).force_path;
-  if (force_path || path_required(proposals)) {
+  if (force_path || path_required(cached_proposals)) {
     auto leaf_node_opts = LeafNodeOptions{};
     if (opts) {
       leaf_node_opts = opt::get(opts).leaf_node_opts;
     }
 
-    auto new_priv = next._tree.update(
-      next._index, leaf_secret, next._group_id, _identity_priv, leaf_node_opts);
+    new_tree_priv = new_tree.update(
+      index, leaf_secret, _group_id, _identity_priv, leaf_node_opts);
 
     auto ctx = tls::marshal(GroupContext{
-      next._suite,
-      next._group_id,
-      next._epoch + 1,
-      next._tree.root_hash(),
-      next._transcript_hash.confirmed,
-      next._extensions,
+      _suite,
+      _group_id,
+      _epoch + 1,
+      new_tree.root_hash(),
+      _transcript_hash.confirmed,
+      extensions,
     });
-    auto path = next._tree.encap(new_priv, ctx, joiner_locations);
-
-    next._tree_priv = new_priv;
-    commit.path = path;
-    commit_secret = new_priv.update_secret;
+    path = new_tree.encap(new_tree_priv, ctx, joiner_locations);
 
     for (size_t i = 0; i < joiner_locations.size(); i++) {
       auto [overlap, shared_path_secret, ok] =
-        new_priv.shared_path_secret(joiner_locations[i]);
+        new_tree_priv.shared_path_secret(joiner_locations[i]);
       silence_unused(overlap);
       silence_unused(ok);
 
@@ -743,46 +741,84 @@ State::commit(const bytes& leaf_secret,
     }
   }
 
-  // Create the Commit message and advance the transcripts / key schedule
-  auto commit_content_auth =
-    sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
-
-  next._transcript_hash.update_confirmed(commit_content_auth);
-  next._epoch += 1;
-  next.update_epoch_secrets(commit_secret, psks, force_init_secret);
-
-  const auto confirmation_tag =
-    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
-  commit_content_auth.set_confirmation_tag(confirmation_tag);
-
-  next._transcript_hash.update_interim(commit_content_auth);
-
-  auto commit_message =
-    protect(std::move(commit_content_auth), msg_opts.padding_size);
-
-  // Complete the GroupInfo and form the Welcome
-  auto group_info = GroupInfo{
-    {
-      next._suite,
-      next._group_id,
-      next._epoch,
-      next._tree.root_hash(),
-      next._transcript_hash.confirmed,
-      next._extensions,
-    },
-    { /* No other extensions */ },
-    { confirmation_tag },
+  return {
+    index,     new_tree, new_tree_priv, extensions,   force_init_secret,
+    proposals, path,     joiners,       path_secrets, psks,
   };
-  if (opts && opt::get(opts).inline_tree) {
-    group_info.extensions.add(RatchetTreeExtension{ next._tree });
-  }
-  group_info.sign(next._tree, next._index, next._identity_priv);
+}
+
+Welcome
+State::welcome(bool inline_tree,
+               const std::vector<PSKWithSecret>& psks,
+               const std::vector<KeyPackage>& joiners,
+               const std::vector<std::optional<bytes>>& path_secrets) const
+{
+  // TODO(RLB) Suppress external_pub in this GroupInfo
+  auto group_info_obj = group_info(inline_tree);
 
   auto welcome =
-    Welcome{ _suite, next._key_schedule.joiner_secret, psks, group_info };
+    Welcome{ _suite, _key_schedule.joiner_secret, psks, group_info_obj };
   for (size_t i = 0; i < joiners.size(); i++) {
     welcome.encrypt(joiners[i], path_secrets[i]);
   }
+
+  return welcome;
+}
+
+std::tuple<MLSMessage, Welcome, State>
+State::commit(const bytes& leaf_secret,
+              const std::optional<CommitOpts>& opts,
+              const MessageOpts& msg_opts,
+              CommitParams params)
+{
+  auto commit_materials = prepare_commit(leaf_secret, opts, params);
+
+  // Form the AuthenticatedContent (with signature, but not confirmation tag)
+  const auto commit = Commit{
+    commit_materials.proposals,
+    commit_materials.path,
+  };
+
+  auto sender = Sender{ MemberSender{ _index } };
+  if (commit_materials.force_init_secret) {
+    sender = Sender{ NewMemberCommitSender{} };
+  }
+
+  auto preliminary_commit =
+    sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
+
+  // Update confirmed transcript hash and ratchet the key schedule forward
+  auto transcript_hash = _transcript_hash;
+  transcript_hash.update_confirmed(preliminary_commit);
+
+  auto commit_secret = _suite.zero();
+  if (commit_materials.path) {
+    commit_secret = commit_materials.new_tree_priv.update_secret;
+  }
+
+  const auto next = successor(commit_materials.index,
+                              std::move(commit_materials.new_tree),
+                              std::move(commit_materials.new_tree_priv),
+                              std::move(commit_materials.extensions),
+                              transcript_hash.confirmed,
+                              commit_secret,
+                              commit_materials.psks,
+                              commit_materials.force_init_secret);
+
+  const auto confirmation_tag = next._key_schedule.confirmation_tag;
+
+  // Complete the AuthenticatedContent and encapsulate as MLSMessage
+  preliminary_commit.set_confirmation_tag(confirmation_tag);
+  const auto commit_message =
+    protect(std::move(preliminary_commit), msg_opts.padding_size);
+
+  ////////// CUT //////////
+
+  const auto inline_tree = opts && opt::get(opts).inline_tree;
+  const auto welcome = next.welcome(inline_tree,
+                                    commit_materials.psks,
+                                    commit_materials.joiners,
+                                    commit_materials.path_secrets);
 
   return std::make_tuple(commit_message, welcome, next);
 }
@@ -1052,19 +1088,17 @@ State::ratchet(TreeKEMPublicKey new_tree,
   }
 
   // Update the transcripts and advance the key schedule
-  auto next = successor();
-  next._tree = std::move(new_tree);
-  next._tree_priv = new_tree_priv;
-  next._extensions = extensions;
-  next._transcript_hash =
-    TranscriptHash(_suite, confirmed_transcript_hash, confirmation_tag);
-  next._epoch += 1;
-  next.update_epoch_secrets(commit_secret, { psks }, force_init_secret);
+  auto next = successor(_index,
+                        std::move(new_tree),
+                        std::move(new_tree_priv),
+                        std::move(extensions),
+                        confirmed_transcript_hash,
+                        commit_secret,
+                        psks,
+                        force_init_secret);
 
   // Verify the confirmation MAC
-  const auto computed_confirmation_tag =
-    next._key_schedule.confirmation_tag(confirmed_transcript_hash);
-  if (computed_confirmation_tag != confirmation_tag) {
+  if (next._key_schedule.confirmation_tag != confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
 
@@ -1456,7 +1490,7 @@ State::resolve(const std::vector<PreSharedKeyID>& psks) const
       },
 
       [&](const ResumptionPSK& res_psk) {
-        if (res_psk.psk_epoch == _epoch) {
+        if (res_psk.psk_group_id == _group_id && res_psk.psk_epoch == _epoch) {
           return _key_schedule.resumption_psk;
         }
 
@@ -2071,7 +2105,7 @@ State::update_epoch_secrets(const bytes& commit_secret,
                             const std::vector<PSKWithSecret>& psks,
                             const std::optional<bytes>& force_init_secret)
 {
-  auto ctx = tls::marshal(GroupContext{
+  const auto ctx = tls::marshal(GroupContext{
     _suite,
     _group_id,
     _epoch,
@@ -2079,9 +2113,10 @@ State::update_epoch_secrets(const bytes& commit_secret,
     _transcript_hash.confirmed,
     _extensions,
   });
-  _key_schedule =
-    _key_schedule.next(commit_secret, psks, force_init_secret, ctx);
+  _key_schedule = _key_schedule.next(
+    commit_secret, psks, force_init_secret, _transcript_hash.confirmed, ctx);
   _keys = _key_schedule.encryption_keys(_tree.size);
+  _transcript_hash.update_interim(_key_schedule.confirmation_tag);
 }
 
 ///
@@ -2197,7 +2232,7 @@ State::group_info(bool inline_tree) const
       _extensions,
     },
     { /* No other extensions */ },
-    _key_schedule.confirmation_tag(_transcript_hash.confirmed),
+    _key_schedule.confirmation_tag,
   };
 
   group_info.extensions.add(
@@ -2250,14 +2285,30 @@ State::leaf_for_roster_entry(RosterIndex index) const
 }
 
 State
-State::successor() const
+State::successor(LeafIndex index,
+                 TreeKEMPublicKey tree,
+                 TreeKEMPrivateKey tree_priv,
+                 ExtensionList extensions,
+                 const bytes& confirmed_transcript_hash,
+                 const bytes& commit_secret,
+                 const std::vector<PSKWithSecret> psks,
+                 const std::optional<bytes> force_init_secret) const
 {
-  // Copy everything, then clear things that shouldn't be copied
+  // Initialize a clone with updates, clear things that shouldn't be copied
   auto next = *this;
+  next._epoch += 1;
+  next._index = index;
+  next._tree = std::move(tree);
+  next._tree_priv = std::move(tree_priv);
+  next._extensions = extensions;
   next._pending_proposals.clear();
 
   // Copy forward a resumption PSK
   next.add_resumption_psk(_group_id, _epoch, _key_schedule.resumption_psk);
+
+  // Ratchet forward the key schedule
+  next._transcript_hash.confirmed = confirmed_transcript_hash;
+  next.update_epoch_secrets(commit_secret, psks, force_init_secret);
 
   return next;
 }
