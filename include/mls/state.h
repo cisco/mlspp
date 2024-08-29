@@ -324,13 +324,14 @@ protected:
     CommitParams params);
 
   std::optional<State> handle(
-    const MLSMessage& msg,
-    std::optional<State> cached_state,
-    const std::optional<CommitParams>& expected_params);
-  std::optional<State> handle(
     const ValidatedContent& val_content,
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
+
+  void handle_proposal(const AuthenticatedContent& content_auth);
+  State handle_commit(const AuthenticatedContent& content_auth,
+                      std::optional<State> cached_state,
+                      const std::optional<CommitParams>& expected_params) const;
 
   State ratchet(TreeKEMPublicKey new_tree,
                 LeafIndex committer,
@@ -340,7 +341,7 @@ protected:
                 const std::vector<PSKWithSecret>& psks,
                 const std::optional<bytes>& force_init_secret,
                 const bytes& confirmed_transcript_hash,
-                const bytes& confirmation_tag);
+                const bytes& confirmation_tag) const;
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
@@ -374,7 +375,6 @@ protected:
   bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract proposals and PSKs from cache
-  void cache_proposal(AuthenticatedContent content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
     std::optional<LeafIndex> sender_index) const;

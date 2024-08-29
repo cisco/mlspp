@@ -830,36 +830,67 @@ State::handle(const ValidatedContent& content_auth,
 }
 
 std::optional<State>
-State::handle(const MLSMessage& msg,
-              std::optional<State> cached_state,
-              const std::optional<CommitParams>& expected_params)
-{
-  return handle(unwrap(msg), std::move(cached_state), expected_params);
-}
-
-std::optional<State>
 State::handle(const ValidatedContent& val_content,
               std::optional<State> cached_state,
               const std::optional<CommitParams>& expected_params)
 {
   // Dispatch on content type
   const auto& content_auth = val_content.authenticated_content();
-  const auto& content = content_auth.content;
-  switch (content.content_type()) {
+  switch (content_auth.content.content_type()) {
     // Proposals get queued, do not result in a state transition
     case ContentType::proposal:
-      cache_proposal(content_auth);
+      handle_proposal(content_auth);
       return std::nullopt;
 
     // Commits are handled in the remainder of this method
     case ContentType::commit:
-      break;
+      return handle_commit(content_auth, cached_state, expected_params);
 
     // Any other content type in this method is an error
     default:
       throw InvalidParameterError("Invalid content type");
   }
+}
 
+void
+State::handle_proposal(const AuthenticatedContent& content_auth)
+{
+  auto ref = _suite.ref(content_auth);
+  if (stdx::any_of(_pending_proposals,
+                   [&](const auto& cached) { return cached.ref == ref; })) {
+    return;
+  }
+
+  auto sender_location = std::optional<LeafIndex>();
+  if (content_auth.content.sender.sender_type() == SenderType::member) {
+    const auto& sender = content_auth.content.sender.sender;
+    sender_location = var::get<MemberSender>(sender).sender;
+  }
+
+  const auto& proposal = var::get<Proposal>(content_auth.content.content);
+
+  if (content_auth.content.sender.sender_type() == SenderType::external &&
+      !valid_external_proposal_type(proposal.proposal_type())) {
+    throw ProtocolError("Invalid external proposal");
+  }
+
+  if (!valid(sender_location, proposal)) {
+    throw ProtocolError("Invalid proposal");
+  }
+
+  _pending_proposals.push_back({
+    _suite.ref(content_auth),
+    proposal,
+    sender_location,
+  });
+}
+
+State
+State::handle_commit(const AuthenticatedContent& content_auth,
+                     std::optional<State> cached_state,
+                     const std::optional<CommitParams>& expected_params) const
+{
+  const auto& content = content_auth.content;
   switch (content.sender.sender_type()) {
     case SenderType::member:
     case SenderType::new_member_commit:
@@ -889,15 +920,16 @@ State::handle(const ValidatedContent& val_content,
     throw InvalidParameterError("Handle own commits with caching");
   }
 
-  // Apply the commit
+  // Unwrap the Commit itself
   const auto& commit = var::get<Commit>(content.content);
-  const auto proposals = must_resolve(commit.proposals, sender);
 
+  // Apply the proposals attached to the commit
+  const auto proposals = must_resolve(commit.proposals, sender);
+  auto [new_tree, joiner_locations, psks, extensions] = apply(proposals);
+
+  // Determine what type of Commit this is
   const auto params = infer_commit_type(sender, proposals, expected_params);
   auto external_commit = var::holds_alternative<ExternalCommitParams>(params);
-
-  // Apply the proposals
-  auto [new_tree, joiner_locations, psks, extensions] = apply(proposals);
 
   // If this is an external commit, add the joiner to the tree and note the
   // location where they were added.  Also, compute the "externally forced"
@@ -977,7 +1009,7 @@ State::ratchet(TreeKEMPublicKey new_tree,
                const std::vector<PSKWithSecret>& psks,
                const std::optional<bytes>& force_init_secret,
                const bytes& confirmed_transcript_hash,
-               const bytes& confirmation_tag)
+               const bytes& confirmation_tag) const
 {
   // Update the TreeKEM private key to match the public key
   auto new_tree_priv = _tree_priv;
@@ -1374,39 +1406,6 @@ State::extensions_supported(const ExtensionList& exts) const
 {
   return _tree.all_leaves([&](auto /* i */, const auto& leaf_node) {
     return leaf_node.verify_extension_support(exts);
-  });
-}
-
-void
-State::cache_proposal(AuthenticatedContent content_auth)
-{
-  auto ref = _suite.ref(content_auth);
-  if (stdx::any_of(_pending_proposals,
-                   [&](const auto& cached) { return cached.ref == ref; })) {
-    return;
-  }
-
-  auto sender_location = std::optional<LeafIndex>();
-  if (content_auth.content.sender.sender_type() == SenderType::member) {
-    const auto& sender = content_auth.content.sender.sender;
-    sender_location = var::get<MemberSender>(sender).sender;
-  }
-
-  const auto& proposal = var::get<Proposal>(content_auth.content.content);
-
-  if (content_auth.content.sender.sender_type() == SenderType::external &&
-      !valid_external_proposal_type(proposal.proposal_type())) {
-    throw ProtocolError("Invalid external proposal");
-  }
-
-  if (!valid(sender_location, proposal)) {
-    throw ProtocolError("Invalid proposal");
-  }
-
-  _pending_proposals.push_back({
-    _suite.ref(content_auth),
-    proposal,
-    sender_location,
   });
 }
 
