@@ -332,6 +332,16 @@ protected:
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
 
+  State ratchet(TreeKEMPublicKey new_tree,
+                LeafIndex committer,
+                const std::optional<NodeIndex>& path_secret_decrypt_node,
+                const std::optional<HPKECiphertext>& encrypted_path_secret,
+                const ExtensionList& extensions,
+                const std::vector<PSKWithSecret>& psks,
+                const std::optional<bytes>& force_init_secret,
+                const bytes& confirmed_transcript_hash,
+                const bytes& confirmation_tag);
+
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
   AuthenticatedContent sign(const Sender& sender,

@@ -898,23 +898,6 @@ State::handle(const ValidatedContent& val_content,
 
   // Apply the proposals
   auto [new_tree, joiner_locations, psks, extensions] = apply(proposals);
-  auto new_tree_priv = _tree_priv;
-  new_tree_priv.truncate(new_tree.size);
-
-  const auto my_leaf = opt::get(new_tree.leaf_node(_index));
-  const auto my_priv = new_tree_priv.private_key_cache.at(NodeIndex(_index));
-  if (my_leaf.encryption_key != my_priv.public_key) {
-    if (!_cached_update) {
-      throw ProtocolError("Self-update without cached update");
-    }
-
-    const auto cached_update = opt::get(_cached_update);
-    if (my_leaf != cached_update.proposal.leaf_node) {
-      throw ProtocolError("Self-update does not match cached leaf node");
-    }
-
-    new_tree_priv.set_leaf_priv(cached_update.update_priv);
-  }
 
   // If this is an external commit, add the joiner to the tree and note the
   // location where they were added.  Also, compute the "externally forced"
@@ -959,18 +942,61 @@ State::handle(const ValidatedContent& val_content,
 
     new_tree.merge(sender_location, path);
 
-    const auto coords = new_tree.decap_coords(_index, sender_location, joiner_locations);
+    const auto coords =
+      new_tree.decap_coords(_index, sender_location, joiner_locations);
     path_secret_decrypt_node = coords.resolution_node;
-    encrypted_path_secret = path.nodes.at(coords.ancestor_node_index).encrypted_path_secret.at(coords.resolution_node_index);
+    encrypted_path_secret =
+      path.nodes.at(coords.ancestor_node_index)
+        .encrypted_path_secret.at(coords.resolution_node_index);
   }
 
-  // Update the transcripth hash
+  // Update the transcript hash
   auto new_transcript_hash = _transcript_hash;
   new_transcript_hash.update_confirmed(content_auth);
   const auto new_confirmed_transcript_hash = new_transcript_hash.confirmed;
-  const auto new_confirmation_tag = opt::get(content_auth.auth.confirmation_tag);
+  const auto new_confirmation_tag =
+    opt::get(content_auth.auth.confirmation_tag);
 
-  ////////// CUT //////////
+  return ratchet(std::move(new_tree),
+                 sender_location,
+                 path_secret_decrypt_node,
+                 encrypted_path_secret,
+                 extensions,
+                 psks,
+                 force_init_secret,
+                 new_confirmed_transcript_hash,
+                 new_confirmation_tag);
+}
+
+State
+State::ratchet(TreeKEMPublicKey new_tree,
+               LeafIndex committer,
+               const std::optional<NodeIndex>& path_secret_decrypt_node,
+               const std::optional<HPKECiphertext>& encrypted_path_secret,
+               const ExtensionList& extensions,
+               const std::vector<PSKWithSecret>& psks,
+               const std::optional<bytes>& force_init_secret,
+               const bytes& confirmed_transcript_hash,
+               const bytes& confirmation_tag)
+{
+  // Update the TreeKEM private key to match the public key
+  auto new_tree_priv = _tree_priv;
+  new_tree_priv.truncate(new_tree.size);
+
+  const auto my_leaf = opt::get(new_tree.leaf_node(_index));
+  const auto my_priv = new_tree_priv.private_key_cache.at(NodeIndex(_index));
+  if (my_leaf.encryption_key != my_priv.public_key) {
+    if (!_cached_update) {
+      throw ProtocolError("Self-update without cached update");
+    }
+
+    const auto cached_update = opt::get(_cached_update);
+    if (my_leaf != cached_update.proposal.leaf_node) {
+      throw ProtocolError("Self-update does not match cached leaf node");
+    }
+
+    new_tree_priv.set_leaf_priv(cached_update.update_priv);
+  }
 
   // Compute the commit secret
   auto commit_secret = _suite.zero();
@@ -984,28 +1010,31 @@ State::handle(const ValidatedContent& val_content,
       extensions,
     });
 
-    new_tree_priv.decap(sender_location, new_tree, ctx, opt::get(path_secret_decrypt_node), opt::get(encrypted_path_secret));
+    new_tree_priv.decap(committer,
+                        new_tree,
+                        ctx,
+                        opt::get(path_secret_decrypt_node),
+                        opt::get(encrypted_path_secret));
 
     commit_secret = new_tree_priv.update_secret;
   }
 
   // Update the transcripts and advance the key schedule
   auto next = successor();
-  next._tree = new_tree;
+  next._tree = std::move(new_tree);
   next._tree_priv = new_tree_priv;
   next._extensions = extensions;
-  next._transcript_hash = TranscriptHash(_suite, new_confirmed_transcript_hash, new_confirmation_tag);
+  next._transcript_hash =
+    TranscriptHash(_suite, confirmed_transcript_hash, confirmation_tag);
   next._epoch += 1;
   next.update_epoch_secrets(commit_secret, { psks }, force_init_secret);
 
   // Verify the confirmation MAC
-  const auto confirmation_tag =
-    next._key_schedule.confirmation_tag(new_confirmed_transcript_hash);
-  if (confirmation_tag != new_confirmation_tag) {
+  const auto computed_confirmation_tag =
+    next._key_schedule.confirmation_tag(confirmed_transcript_hash);
+  if (computed_confirmation_tag != confirmation_tag) {
     throw ProtocolError("Confirmation failed to verify");
   }
-
-  // TODO ratchet
 
   return next;
 }
