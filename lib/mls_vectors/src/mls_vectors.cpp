@@ -989,7 +989,7 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
     sig_priv,
     group_context);
 
-  const auto new_confirmed = transcript.new_confirmed(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(authenticated_content.confirmed_transcript_hash_input());
   transcript.set_confirmed(new_confirmed);
 
   group_context.confirmed_transcript_hash = transcript.confirmed;
@@ -999,10 +999,8 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
                              std::nullopt,
                              transcript.confirmed,
                              tls::marshal(group_context));
-  authenticated_content.set_confirmation_tag(
-    key_schedule_after.confirmation_tag);
 
-  transcript.update_interim(authenticated_content);
+  transcript.update_interim(key_schedule_after.confirmation_tag);
 
   // Store the required data
   confirmation_key = key_schedule_after.confirmation_key;
@@ -1016,9 +1014,11 @@ TranscriptTestVector::verify() const
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
 
-  const auto new_confirmed = transcript.new_confirmed(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(authenticated_content.confirmed_transcript_hash_input());
   transcript.set_confirmed(new_confirmed);
-  transcript.update_interim(authenticated_content);
+
+  const auto input_confirmation_tag = opt::get(authenticated_content.auth.confirmation_tag);
+  transcript.update_interim(input_confirmation_tag);
 
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);

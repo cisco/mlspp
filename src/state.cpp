@@ -653,7 +653,7 @@ struct State::CommitMaterials
 State::CommitMaterials
 State::prepare_commit(const bytes& leaf_secret,
                       const std::optional<CommitOpts>& opts,
-                      CommitParams params) const
+                      const CommitParams& params) const
 {
   // Construct a proposal list from cached proposals
   auto proposals = std::vector<ProposalOrRef>{};
@@ -769,7 +769,7 @@ std::tuple<MLSMessage, Welcome, State>
 State::commit(const bytes& leaf_secret,
               const std::optional<CommitOpts>& opts,
               const MessageOpts& msg_opts,
-              CommitParams params)
+              const CommitParams& params)
 {
   // Compute the new group state
   auto commit_materials = prepare_commit(leaf_secret, opts, params);
@@ -789,8 +789,8 @@ State::commit(const bytes& leaf_secret,
     sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
 
   // Update confirmed transcript hash and ratchet the key schedule forward
-  const auto confirmed_transcript_hash =
-    _transcript_hash.new_confirmed(preliminary_commit);
+  const auto confirmed_transcript_hash = _transcript_hash.new_confirmed(
+    preliminary_commit.confirmed_transcript_hash_input());
 
   const auto next = successor(commit_materials.index,
                               std::move(commit_materials.new_tree),
@@ -874,7 +874,7 @@ State::handle(const ValidatedContent& val_content,
 
     // Commits are handled in the remainder of this method
     case ContentType::commit:
-      return handle_commit(content_auth, cached_state, expected_params);
+      return handle_commit(content_auth, std::move(cached_state), expected_params);
 
     // Any other content type in this method is an error
     default:
@@ -1013,8 +1013,8 @@ State::handle_commit(const AuthenticatedContent& content_auth,
   }
 
   // Update the transcript hash
-  const auto new_confirmed_transcript_hash =
-    _transcript_hash.new_confirmed(content_auth);
+  const auto new_confirmed_transcript_hash = _transcript_hash.new_confirmed(
+    content_auth.confirmed_transcript_hash_input());
   const auto new_confirmation_tag =
     opt::get(content_auth.auth.confirmation_tag);
 
@@ -1034,7 +1034,7 @@ State::ratchet(TreeKEMPublicKey new_tree,
                LeafIndex committer,
                const std::optional<NodeIndex>& path_secret_decrypt_node,
                const std::optional<HPKECiphertext>& encrypted_path_secret,
-               const ExtensionList& extensions,
+               ExtensionList extensions,
                const std::vector<PSKWithSecret>& psks,
                const std::optional<bytes>& force_init_secret,
                const bytes& confirmed_transcript_hash,
@@ -1421,7 +1421,6 @@ State::apply(const std::vector<CachedProposal>& proposals) const
   auto psks = resolve(psk_ids);
 
   tree.truncate();
-  // TODO _tree_priv.truncate(_tree.size);
   tree.set_hash_all();
   return { tree, joiner_locations, psks, extensions };
 }
@@ -2263,8 +2262,8 @@ State::successor(LeafIndex index,
                  ExtensionList extensions,
                  const bytes& confirmed_transcript_hash,
                  bool has_path,
-                 const std::vector<PSKWithSecret> psks,
-                 const std::optional<bytes> force_init_secret) const
+                 const std::vector<PSKWithSecret>& psks,
+                 const std::optional<bytes>& force_init_secret) const
 {
   // Initialize a clone with updates, clear things that shouldn't be copied
   auto next = *this;
@@ -2272,7 +2271,7 @@ State::successor(LeafIndex index,
   next._index = index;
   next._tree = std::move(tree);
   next._tree_priv = std::move(tree_priv);
-  next._extensions = extensions;
+  next._extensions = std::move(extensions);
   next._pending_proposals.clear();
 
   // Copy forward a resumption PSK

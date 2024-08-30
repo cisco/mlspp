@@ -551,11 +551,9 @@ TranscriptHash::TranscriptHash(CipherSuite suite_in,
 }
 
 bytes
-TranscriptHash::new_confirmed(const AuthenticatedContent& content_auth) const
+TranscriptHash::new_confirmed(const bytes& transcript_hash_input) const
 {
-  const auto transcript =
-    interim + content_auth.confirmed_transcript_hash_input();
-  return suite.digest().hash(transcript);
+  return suite.digest().hash(interim + transcript_hash_input);
 }
 
 void
@@ -567,16 +565,7 @@ TranscriptHash::set_confirmed(bytes confirmed_transcript_hash)
 void
 TranscriptHash::update_interim(const bytes& confirmation_tag)
 {
-  const auto transcript = confirmed + tls::marshal(confirmation_tag);
-  interim = suite.digest().hash(transcript);
-}
-
-void
-TranscriptHash::update_interim(const AuthenticatedContent& content_auth)
-{
-  const auto transcript =
-    confirmed + content_auth.interim_transcript_hash_input();
-  interim = suite.digest().hash(transcript);
+  interim = suite.digest().hash(confirmed + tls::marshal(confirmation_tag));
 }
 
 bool

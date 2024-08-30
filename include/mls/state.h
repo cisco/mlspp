@@ -321,12 +321,12 @@ protected:
     const bytes& leaf_secret,
     const std::optional<CommitOpts>& opts,
     const MessageOpts& msg_opts,
-    CommitParams params);
+    const CommitParams& params);
 
   struct CommitMaterials;
   CommitMaterials prepare_commit(const bytes& leaf_secret,
                                  const std::optional<CommitOpts>& opts,
-                                 CommitParams params) const;
+                                 const CommitParams& params) const;
   Welcome welcome(bool inline_tree,
                   const std::vector<PSKWithSecret>& psks,
                   const std::vector<KeyPackage>& joiners,
@@ -346,7 +346,7 @@ protected:
                 LeafIndex committer,
                 const std::optional<NodeIndex>& path_secret_decrypt_node,
                 const std::optional<HPKECiphertext>& encrypted_path_secret,
-                const ExtensionList& extensions,
+                ExtensionList extensions,
                 const std::vector<PSKWithSecret>& psks,
                 const std::optional<bytes>& force_init_secret,
                 const bytes& confirmed_transcript_hash,
@@ -448,8 +448,8 @@ protected:
                   ExtensionList extensions,
                   const bytes& confirmed_transcript_hash,
                   bool has_path,
-                  const std::vector<PSKWithSecret> psks,
-                  const std::optional<bytes> force_init_secret) const;
+                  const std::vector<PSKWithSecret>& psks,
+                  const std::optional<bytes>& force_init_secret) const;
 };
 
 } // namespace MLS_NAMESPACE

@@ -200,10 +200,9 @@ struct TranscriptHash
                  const bytes& confirmation_tag);
 
   // Updating hashes
-  bytes new_confirmed(const AuthenticatedContent& content_auth) const;
+  bytes new_confirmed(const bytes& transcript_hash_input) const;
   void set_confirmed(bytes confirmed_transcript_hash);
   void update_interim(const bytes& confirmation_tag);
-  void update_interim(const AuthenticatedContent& content_auth);
 };
 
 bool
