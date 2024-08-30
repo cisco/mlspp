@@ -989,7 +989,8 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
     sig_priv,
     group_context);
 
-  transcript.update_confirmed(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(authenticated_content);
+  transcript.set_confirmed(new_confirmed);
 
   group_context.confirmed_transcript_hash = transcript.confirmed;
   auto key_schedule_after =
@@ -1015,7 +1016,10 @@ TranscriptTestVector::verify() const
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
 
-  transcript.update(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(authenticated_content);
+  transcript.set_confirmed(new_confirmed);
+  transcript.update_interim(authenticated_content);
+
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);

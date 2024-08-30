@@ -789,14 +789,14 @@ State::commit(const bytes& leaf_secret,
     sign(sender, commit, msg_opts.authenticated_data, msg_opts.encrypt);
 
   // Update confirmed transcript hash and ratchet the key schedule forward
-  auto transcript_hash = _transcript_hash;
-  transcript_hash.update_confirmed(preliminary_commit);
+  const auto confirmed_transcript_hash =
+    _transcript_hash.new_confirmed(preliminary_commit);
 
   const auto next = successor(commit_materials.index,
                               std::move(commit_materials.new_tree),
                               std::move(commit_materials.new_tree_priv),
                               std::move(commit_materials.extensions),
-                              transcript_hash.confirmed,
+                              confirmed_transcript_hash,
                               commit_materials.path.has_value(),
                               commit_materials.psks,
                               commit_materials.force_init_secret);
@@ -1013,9 +1013,8 @@ State::handle_commit(const AuthenticatedContent& content_auth,
   }
 
   // Update the transcript hash
-  auto new_transcript_hash = _transcript_hash;
-  new_transcript_hash.update_confirmed(content_auth);
-  const auto new_confirmed_transcript_hash = new_transcript_hash.confirmed;
+  const auto new_confirmed_transcript_hash =
+    _transcript_hash.new_confirmed(content_auth);
   const auto new_confirmation_tag =
     opt::get(content_auth.auth.confirmation_tag);
 
@@ -2286,7 +2285,7 @@ State::successor(LeafIndex index,
   }
 
   // Ratchet forward the key schedule
-  next._transcript_hash.confirmed = confirmed_transcript_hash;
+  next._transcript_hash.set_confirmed(confirmed_transcript_hash);
 
   const auto ctx = tls::marshal(next.group_context());
   next._key_schedule = _key_schedule.next(commit_secret,
