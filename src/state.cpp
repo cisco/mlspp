@@ -771,6 +771,7 @@ State::commit(const bytes& leaf_secret,
               const MessageOpts& msg_opts,
               CommitParams params)
 {
+  // Compute the new group state
   auto commit_materials = prepare_commit(leaf_secret, opts, params);
 
   // Form the AuthenticatedContent (with signature, but not confirmation tag)
@@ -791,29 +792,22 @@ State::commit(const bytes& leaf_secret,
   auto transcript_hash = _transcript_hash;
   transcript_hash.update_confirmed(preliminary_commit);
 
-  auto commit_secret = _suite.zero();
-  if (commit_materials.path) {
-    commit_secret = commit_materials.new_tree_priv.update_secret;
-  }
-
   const auto next = successor(commit_materials.index,
                               std::move(commit_materials.new_tree),
                               std::move(commit_materials.new_tree_priv),
                               std::move(commit_materials.extensions),
                               transcript_hash.confirmed,
-                              commit_secret,
+                              commit_materials.path.has_value(),
                               commit_materials.psks,
                               commit_materials.force_init_secret);
 
-  const auto confirmation_tag = next._key_schedule.confirmation_tag;
-
   // Complete the AuthenticatedContent and encapsulate as MLSMessage
+  const auto confirmation_tag = next._key_schedule.confirmation_tag;
   preliminary_commit.set_confirmation_tag(confirmation_tag);
   const auto commit_message =
     protect(std::move(preliminary_commit), msg_opts.padding_size);
 
-  ////////// CUT //////////
-
+  // Create the welcome message
   const auto inline_tree = opts && opt::get(opts).inline_tree;
   const auto welcome = next.welcome(inline_tree,
                                     commit_materials.psks,
@@ -1066,9 +1060,9 @@ State::ratchet(TreeKEMPublicKey new_tree,
     new_tree_priv.set_leaf_priv(cached_update.update_priv);
   }
 
-  // Compute the commit secret
-  auto commit_secret = _suite.zero();
-  if (path_secret_decrypt_node && encrypted_path_secret) {
+  // Compute the new TreeKEM private key
+  const auto has_path = path_secret_decrypt_node && encrypted_path_secret;
+  if (has_path) {
     auto ctx = tls::marshal(GroupContext{
       _suite,
       _group_id,
@@ -1083,8 +1077,6 @@ State::ratchet(TreeKEMPublicKey new_tree,
                         ctx,
                         opt::get(path_secret_decrypt_node),
                         opt::get(encrypted_path_secret));
-
-    commit_secret = new_tree_priv.update_secret;
   }
 
   // Update the transcripts and advance the key schedule
@@ -1093,7 +1085,7 @@ State::ratchet(TreeKEMPublicKey new_tree,
                         std::move(new_tree_priv),
                         std::move(extensions),
                         confirmed_transcript_hash,
-                        commit_secret,
+                        has_path,
                         psks,
                         force_init_secret);
 
@@ -2100,25 +2092,6 @@ operator!=(const State& lhs, const State& rhs)
   return !(lhs == rhs);
 }
 
-void
-State::update_epoch_secrets(const bytes& commit_secret,
-                            const std::vector<PSKWithSecret>& psks,
-                            const std::optional<bytes>& force_init_secret)
-{
-  const auto ctx = tls::marshal(GroupContext{
-    _suite,
-    _group_id,
-    _epoch,
-    _tree.root_hash(),
-    _transcript_hash.confirmed,
-    _extensions,
-  });
-  _key_schedule = _key_schedule.next(
-    commit_secret, psks, force_init_secret, _transcript_hash.confirmed, ctx);
-  _keys = _key_schedule.encryption_keys(_tree.size);
-  _transcript_hash.update_interim(_key_schedule.confirmation_tag);
-}
-
 ///
 /// Message encryption and decryption
 ///
@@ -2290,7 +2263,7 @@ State::successor(LeafIndex index,
                  TreeKEMPrivateKey tree_priv,
                  ExtensionList extensions,
                  const bytes& confirmed_transcript_hash,
-                 const bytes& commit_secret,
+                 bool has_path,
                  const std::vector<PSKWithSecret> psks,
                  const std::optional<bytes> force_init_secret) const
 {
@@ -2306,9 +2279,23 @@ State::successor(LeafIndex index,
   // Copy forward a resumption PSK
   next.add_resumption_psk(_group_id, _epoch, _key_schedule.resumption_psk);
 
+  // Compute the commit secret
+  auto commit_secret = next._suite.zero();
+  if (has_path) {
+    commit_secret = next._tree_priv.update_secret;
+  }
+
   // Ratchet forward the key schedule
   next._transcript_hash.confirmed = confirmed_transcript_hash;
-  next.update_epoch_secrets(commit_secret, psks, force_init_secret);
+
+  const auto ctx = tls::marshal(next.group_context());
+  next._key_schedule = _key_schedule.next(commit_secret,
+                                          psks,
+                                          force_init_secret,
+                                          next._transcript_hash.confirmed,
+                                          ctx);
+  next._keys = next._key_schedule.encryption_keys(next._tree.size);
+  next._transcript_hash.update_interim(next._key_schedule.confirmation_tag);
 
   return next;
 }

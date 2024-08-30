@@ -430,11 +430,6 @@ protected:
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
-  // Derive and set the secrets for an epoch, given some new entropy
-  void update_epoch_secrets(const bytes& commit_secret,
-                            const std::vector<PSKWithSecret>& psks,
-                            const std::optional<bytes>& force_init_secret);
-
   // Signature verification over a handshake message
   bool verify_internal(const AuthenticatedContent& content_auth) const;
   bool verify_external(const AuthenticatedContent& content_auth) const;
@@ -452,7 +447,7 @@ protected:
                   TreeKEMPrivateKey tree_priv,
                   ExtensionList extensions,
                   const bytes& confirmed_transcript_hash,
-                  const bytes& commit_secret,
+                  bool has_path,
                   const std::vector<PSKWithSecret> psks,
                   const std::optional<bytes> force_init_secret) const;
 };
