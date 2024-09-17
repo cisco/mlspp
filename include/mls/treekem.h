@@ -94,6 +94,12 @@ struct TreeKEMPrivateKey
              const UpdatePath& path,
              const std::vector<LeafIndex>& except);
 
+  void decap(LeafIndex from,
+             const TreeKEMPublicKey& pub,
+             const bytes& context,
+             const NodeIndex& decrypt_node,
+             const HPKECiphertext& encrypted_path_secret);
+
   void truncate(LeafCount size);
 
   bool consistent(const TreeKEMPrivateKey& other) const;
@@ -149,6 +155,17 @@ struct TreeKEMPublicKey
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
+
+  struct DecapCoords
+  {
+    size_t ancestor_node_index;
+    size_t resolution_node_index;
+    NodeIndex resolution_node;
+  };
+  DecapCoords decap_coords(
+    LeafIndex to,
+    LeafIndex from,
+    const std::vector<LeafIndex>& joiner_locations) const;
 
   template<typename UnaryPredicate>
   bool all_leaves(const UnaryPredicate& pred) const

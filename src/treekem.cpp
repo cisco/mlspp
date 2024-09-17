@@ -247,6 +247,25 @@ void
 TreeKEMPrivateKey::decap(LeafIndex from,
                          const TreeKEMPublicKey& pub,
                          const bytes& context,
+                         const NodeIndex& decrypt_node,
+                         const HPKECiphertext& encrypted_path_secret)
+{
+  const auto overlap_node = from.ancestor(index);
+  const auto priv = opt::get(private_key(decrypt_node));
+  const auto path_secret = priv.decrypt(
+    suite, encrypt_label::update_path_node, context, encrypted_path_secret);
+  implant(pub, overlap_node, path_secret);
+
+  // Check that the resulting state is consistent with the public key
+  if (!consistent(pub)) {
+    throw ProtocolError("TreeKEMPublicKey inconsistent with TreeKEMPrivateKey");
+  }
+}
+
+void
+TreeKEMPrivateKey::decap(LeafIndex from,
+                         const TreeKEMPublicKey& pub,
+                         const bytes& context,
                          const UpdatePath& path,
                          const std::vector<LeafIndex>& except)
 {
@@ -584,6 +603,48 @@ TreeKEMPublicKey::resolve(NodeIndex index) const
   auto r = resolve(index.right());
   l.insert(l.end(), r.begin(), r.end());
   return l;
+}
+
+TreeKEMPublicKey::DecapCoords
+TreeKEMPublicKey::decap_coords(
+  LeafIndex to,
+  LeafIndex from,
+  const std::vector<LeafIndex>& joiner_locations) const
+{
+  const auto to_node = NodeIndex(to);
+  const auto from_node = NodeIndex(from);
+
+  // Find the index of the common ancestor in the filtered direct path
+  const auto ancestor = to.ancestor(from);
+  const auto from_fdp = filtered_direct_path(from_node);
+  const auto ancestor_node_it = stdx::find_if(from_fdp, [&](const auto& pair) {
+    const auto& [node, _resolution] = pair;
+    return node == ancestor;
+  });
+  const auto ancestor_node_index =
+    static_cast<size_t>(ancestor_node_it - from_fdp.begin());
+
+  // Find the appropriate node in the copath resolution
+  auto copath_child = ancestor.left();
+  if (!from_node.is_below(copath_child)) {
+    copath_child = ancestor.right();
+  }
+
+  auto resolution = std::get<1>(*ancestor_node_it);
+  for (const auto& j : joiner_locations) {
+    const auto it = stdx::find(resolution, NodeIndex(j));
+    if (it != resolution.end()) {
+      resolution.erase(it);
+    }
+  }
+
+  const auto resolution_node_it = stdx::find_if(
+    resolution, [&](const auto i) { return to_node.is_below(i); });
+  const auto resolution_node_index =
+    static_cast<size_t>(resolution_node_it - resolution.begin());
+  const auto resolution_node = *resolution_node_it;
+
+  return { ancestor_node_index, resolution_node_index, resolution_node };
 }
 
 TreeKEMPublicKey::FilteredDirectPath
