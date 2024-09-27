@@ -751,6 +751,42 @@ TreeKEMPublicKey::implant_slice_unchecked(const TreeSlice& slice)
   }
 }
 
+TreeKEMPublicKey::AncestorIndex
+TreeKEMPublicKey::ancestor_index(LeafIndex to, LeafIndex from) const
+{
+  // Find the index of the common ancestor in the filtered direct path
+  //
+  // XXX(RLB): This calculation is only guaranteed to be accurate immediately
+  // after a commit from `to`.  But it has the advantage of being computable by
+  // a light client, and is only used when a light client processes a commit.
+  const auto from_dp = NodeIndex(from).dirpath(size);
+  const auto fdp = stdx::filter<NodeIndex>(
+    from_dp, [&](const auto& n) { return !node_at(n).blank(); });
+
+  const auto ancestor = to.ancestor(from);
+  const auto it = stdx::find(fdp, ancestor);
+  if (it == fdp.end()) {
+    throw ProtocolError("Blank common ancestor node");
+  }
+  const auto ancestor_node_index = static_cast<size_t>(it - fdp.begin());
+
+  // Find the nex non-blank node underneath the ancestor node
+  const auto to_dp = NodeIndex(to).dirpath(size);
+  const auto candidates = stdx::filter<NodeIndex>(to_dp, [&](const auto& n) {
+    return n.is_below(ancestor) && n != ancestor && !node_at(n).blank();
+  });
+
+  auto resolution_node = NodeIndex(to);
+  if (!candidates.empty()) {
+    resolution_node = candidates.back();
+  }
+
+  return {
+    ancestor_node_index,
+    resolution_node,
+  };
+}
+
 TreeKEMPublicKey::DecapCoords
 TreeKEMPublicKey::decap_coords(
   LeafIndex to,

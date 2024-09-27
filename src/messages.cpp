@@ -273,41 +273,6 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 }
 
 ///
-/// LightCommit
-///
-
-LightCommit
-LightCommit::from(LeafIndex leaf,
-                  const MLSMessage& commit_msg,
-                  const GroupContext& group_context,
-                  const TreeKEMPublicKey& tree)
-{
-  // Make a memberhsip proof
-  const auto& public_msg = var::get<PublicMessage>(commit_msg.message);
-  const auto& sender =
-    var::get<MemberSender>(public_msg.content.sender.sender).sender;
-
-  const auto confirmation_tag = opt::get(public_msg.auth.confirmation_tag);
-  const auto sender_membership_proof = tree.extract_slice(sender);
-
-  // Extract the correct path secret for the recipient
-  const auto& commit = var::get<Commit>(public_msg.content.content);
-  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
-  auto decryption_node_index = std::optional<NodeIndex>{};
-  if (commit.path) {
-    const auto [secret, index] =
-      tree.slice_path(opt::get(commit.path), sender, leaf);
-    encrypted_path_secret = secret;
-    decryption_node_index = index;
-  }
-
-  return {
-    group_context,         confirmation_tag,      sender_membership_proof,
-    encrypted_path_secret, decryption_node_index,
-  };
-}
-
-///
 /// AnnotatedCommit
 ///
 
@@ -333,72 +298,70 @@ AnnotatedCommit::from(LeafIndex receiver,
   const auto receiver_membership_proof_after =
     tree_after.extract_slice(receiver);
 
+  // Compute the list of committed proposals
+  auto cache = std::map<ProposalRef, Proposal>{};
+  for (const auto& proposal_msg : proposals) {
+    const auto& public_message = var::get<PublicMessage>(proposal_msg.message);
+    const auto content_auth = public_message.authenticated_content();
+    const auto proposal = var::get<Proposal>(content_auth.content.content);
+
+    const auto ref = tree_before.suite.ref(content_auth);
+    cache.insert_or_assign(ref, proposal);
+  }
+
+  const auto committed_proposals =
+    stdx::transform<Proposal>(commit.proposals, [&](const auto& p_or_r) {
+      const auto resolve = overloaded{
+        [&](const ProposalRef& r) { return cache.at(r); },
+        [](const Proposal& p) { return p; },
+      };
+      return var::visit(resolve, p_or_r.content);
+    });
+
   // If there is a path, identify which node the receiver should decrypt
   auto resolution_index = std::optional<uint32_t>{};
   if (commit.path) {
-    // Find add proposals by reference or by value
-    auto cache = std::map<ProposalRef, Proposal>{};
-    for (const auto& proposal_msg : proposals) {
-      const auto& public_message =
-        var::get<PublicMessage>(proposal_msg.message);
-      const auto content_auth = public_message.authenticated_content();
-      const auto proposal = var::get<Proposal>(content_auth.content.content);
-
-      const auto ref = tree_before.suite.ref(content_auth);
-      cache.insert_or_assign(ref, proposal);
-    }
-
-    const auto committed_proposals =
-      stdx::transform<Proposal>(commit.proposals, [&](const auto& p_or_r) {
-        const auto resolve = overloaded{
-          [&](const ProposalRef& r) { return cache.at(r); },
-          [](const Proposal& p) { return p; },
-        };
-        return var::visit(resolve, p_or_r.content);
-      });
-
-    const auto committed_adds =
+    // Find where the joiners are
+    const auto add_proposals =
       stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
         return p.proposal_type() == ProposalType::add;
       });
-
-    // Find where the joiners are
     const auto joiner_locations =
-      stdx::transform<LeafIndex>(committed_adds, [&](const auto& p) {
+      stdx::transform<LeafIndex>(add_proposals, [&](const auto& p) {
         const auto& add = var::get<Add>(p.content);
         const auto maybe_loc = tree_after.find(add.key_package.leaf_node);
         return opt::get(maybe_loc);
       });
 
-    // Compute the required copath resolution
-    const auto ancestor = sender.ancestor(receiver);
-    const auto receiver_node = NodeIndex(receiver);
-
-    auto copath_child = ancestor.left();
-    if (!receiver_node.is_below(copath_child)) {
-      copath_child = ancestor.right();
-    }
-
-    auto copath_resolution = tree_after.resolve(copath_child);
-
-    // Remove any joiners from the copath resolution
-    for (const auto leaf : joiner_locations) {
-      const auto it = stdx::find(copath_resolution, NodeIndex(leaf));
-      if (it != copath_resolution.end()) {
-        copath_resolution.erase(it);
-      }
-    }
-
-    // Locate the required node in the copath resolution
-    const auto resolution_iter =
-      stdx::find_if(copath_resolution,
-                    [&](const auto& n) { return receiver_node.is_below(n); });
-    if (resolution_iter == copath_resolution.end()) {
-      throw ProtocolError("Receiver node not found in copath resolution");
-    }
-
-    resolution_index = resolution_iter - copath_resolution.begin();
+    // Compute the required coordinates
+    const auto coords =
+      tree_after.decap_coords(receiver, sender, joiner_locations);
+    resolution_index = coords.resolution_node_index;
   }
+
+  // Provide new extensions if present
+  const auto gce_proposals =
+    stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
+      return p.proposal_type() == ProposalType::group_context_extensions;
+    });
+
+  auto extensions = std::optional<ExtensionList>{};
+  if (!gce_proposals.empty()) {
+    const auto& gce =
+      var::get<GroupContextExtensions>(gce_proposals.front().content);
+    extensions = gce.group_context_extensions;
+  }
+
+  // Identify any PSK proposals
+  const auto psk_proposals =
+    stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
+      return p.proposal_type() == ProposalType::psk;
+    });
+
+  const auto psks =
+    stdx::transform<PreSharedKeyID>(psk_proposals, [&](const auto& p) {
+      return var::get<PreSharedKey>(p.content).psk;
+    });
 
   return {
     commit_message,
@@ -407,6 +370,8 @@ AnnotatedCommit::from(LeafIndex receiver,
     sender_membership_proof_after,
     receiver_membership_proof_after,
     resolution_index,
+    extensions,
+    psks,
   };
 }
 

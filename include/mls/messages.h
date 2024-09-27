@@ -282,29 +282,6 @@ private:
 struct MLSMessage;
 
 ///
-/// Light MLS
-///
-
-// XXX(RLB) This structure is not secure, because the GroupContext is not
-// signed.  We need to have the sender authenticate the GroupContext, e.g., by
-// sending as GroupInfo with a `tree_info` extension.
-struct LightCommit
-{
-  GroupContext group_context;
-  bytes confirmation_tag;
-  TreeSlice sender_membership_proof;
-  std::optional<HPKECiphertext> encrypted_path_secret;
-  std::optional<NodeIndex> decryption_node_index;
-
-  // Produce a LightCommt for the specified member, assuming that that the
-  // specified tree is the tree for the epoch after this Commit.
-  static LightCommit from(LeafIndex leaf,
-                          const MLSMessage& commit_msg,
-                          const GroupContext& group_context,
-                          const TreeKEMPublicKey& tree);
-};
-
-///
 /// Proposals & Commit
 ///
 
@@ -670,11 +647,6 @@ private:
   bytes membership_mac(CipherSuite suite,
                        const bytes& membership_key,
                        const std::optional<GroupContext>& context) const;
-
-  // XXX(RLB) This is a hack to avoid complicated unwrapping and cross-epoch
-  // issues when creating a LightCommit.  We should do something more elegant,
-  // maybe something like unchecked_content()
-  friend struct LightCommit;
 };
 
 struct PrivateMessage
@@ -753,6 +725,8 @@ struct AnnotatedCommit
   TreeSlice receiver_membership_proof_after;
 
   std::optional<uint32_t> resolution_index;
+  std::optional<ExtensionList> extensions;
+  std::vector<PreSharedKeyID> psks;
 
   static AnnotatedCommit from(LeafIndex receiver,
                               const std::vector<MLSMessage>& proposals,

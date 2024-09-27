@@ -179,6 +179,13 @@ struct TreeKEMPublicKey
                                                    LeafIndex from,
                                                    LeafIndex to) const;
 
+  struct AncestorIndex
+  {
+    size_t ancestor_node_index;
+    NodeIndex resolution_node;
+  };
+  AncestorIndex ancestor_index(LeafIndex to, LeafIndex from) const;
+
   struct DecapCoords
   {
     size_t ancestor_node_index;

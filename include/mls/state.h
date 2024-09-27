@@ -142,7 +142,6 @@ public:
   /// Light MLS
   ///
   void implant_tree_slice(const TreeSlice& slice);
-  State handle(const LightCommit& light_commit) const;
   State handle(const AnnotatedCommit& annotated_commit);
   bool is_full_client() const { return _tree.is_complete(); }
   void upgrade_to_full_client(TreeKEMPublicKey tree);
@@ -347,7 +346,11 @@ protected:
   CommitMaterials prepare_commit(const bytes& leaf_secret,
                                  const std::optional<CommitOpts>& opts,
                                  const CommitParams& params) const;
+  GroupInfo group_info(bool external_pub,
+                       bool inline_tree,
+                       const std::vector<LeafIndex>& membership_proofs) const;
   Welcome welcome(bool inline_tree,
+                  bool membership_proof,
                   const std::vector<PSKWithSecret>& psks,
                   const std::vector<KeyPackage>& joiners,
                   const std::vector<std::optional<bytes>>& path_secrets) const;
