@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
-#include <mls_ds/tree_follower.h>
 #include <mls/state.h>
+#include <mls_ds/tree_follower.h>
 
 using namespace mls_ds;
 using namespace MLS_NAMESPACE;
@@ -112,7 +112,8 @@ TEST_CASE_METHOD(TreeFollowerTest, "DS Follows Tree through Group Lifecycle")
     }
   }
 
-  auto [commit2, welcome2, new_state2] = states[0].commit(fresh_secret(), {}, {});
+  auto [commit2, welcome2, new_state2] =
+    states[0].commit(fresh_secret(), {}, {});
   states[0] = new_state2;
   for (size_t i = 1; i < group_size; i += 1) {
     states[i] = opt::get(states[i].handle(commit2));

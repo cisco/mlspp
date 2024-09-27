@@ -1,8 +1,8 @@
 #include <mls/key_schedule.h>
 #include <mls/state.h>
 #include <mls/tree_math.h>
-#include <mls_vectors/mls_vectors.h>
 #include <mls_ds/tree_follower.h>
+#include <mls_vectors/mls_vectors.h>
 
 namespace mls_vectors {
 

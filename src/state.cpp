@@ -765,12 +765,20 @@ State::prepare_commit(const bytes& leaf_secret,
 
 Welcome
 State::welcome(bool inline_tree,
+               bool membership_proof,
                const std::vector<PSKWithSecret>& psks,
                const std::vector<KeyPackage>& joiners,
                const std::vector<std::optional<bytes>>& path_secrets) const
 {
-  // TODO(RLB) Suppress external_pub in this GroupInfo
-  auto group_info_obj = group_info(inline_tree);
+  auto membership_proofs = std::vector<LeafIndex>{};
+  if (membership_proof) {
+    membership_proofs =
+      stdx::transform<LeafIndex>(joiners, [&](const auto& kp) {
+        return opt::get(_tree.find(kp.leaf_node));
+      });
+    membership_proofs.push_back(_index);
+  }
+  auto group_info_obj = group_info(false, inline_tree, membership_proofs);
 
   auto welcome =
     Welcome{ _suite, _key_schedule.joiner_secret, psks, group_info_obj };
@@ -825,7 +833,9 @@ State::commit(const bytes& leaf_secret,
 
   // Create the welcome message
   const auto inline_tree = opts && opt::get(opts).inline_tree;
+  const auto membership_proof = opts && opt::get(opts).membership_proof;
   const auto welcome = next.welcome(inline_tree,
+                                    membership_proof,
                                     commit_materials.psks,
                                     commit_materials.joiners,
                                     commit_materials.path_secrets);
@@ -1124,58 +1134,6 @@ State::implant_tree_slice(const TreeSlice& slice)
 }
 
 State
-State::handle(const LightCommit& light_commit) const
-{
-  // Verify the membership proof
-  // TODO(RLB) Also verify the signature (?)
-  // XXX(RLB) Should this use the new or old tree hash?
-  if (light_commit.sender_membership_proof.tree_hash(_suite) !=
-      light_commit.group_context.tree_hash) {
-    throw ProtocolError("Invalid sender membership proof");
-  }
-
-  // Import the GroupContext
-  // TODO(RLB) Verify that version, cipher_suite, group_id, epoch are as
-  // expected
-  auto next = successor();
-  next._epoch += 1;
-  next._tree =
-    TreeKEMPublicKey(next._suite, light_commit.sender_membership_proof);
-  next._extensions = light_commit.group_context.extensions;
-
-  // Decrypt the commit secret
-  auto commit_secret = _suite.zero();
-  if (light_commit.encrypted_path_secret) {
-    const auto& encrypted_path_secret =
-      opt::get(light_commit.encrypted_path_secret);
-    const auto& decryption_node_index =
-      opt::get(light_commit.decryption_node_index);
-
-    const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
-    const auto context = tls::marshal(next.group_context());
-    const auto path_secret = priv.decrypt(next._suite,
-                                          encrypt_label::update_path_node,
-                                          context,
-                                          encrypted_path_secret);
-    const auto ancestor =
-      next._index.ancestor(light_commit.sender_membership_proof.leaf_index);
-    next._tree_priv.implant_matching(next._tree, ancestor, path_secret);
-
-    commit_secret = next._tree_priv.update_secret;
-  }
-
-  // Update the key schedule
-  // TODO(RLB) Need to accommodate PSKs for light clients
-  next._transcript_hash =
-    TranscriptHash(next._suite,
-                   light_commit.group_context.confirmed_transcript_hash,
-                   light_commit.confirmation_tag);
-  next.update_epoch_secrets(commit_secret, {}, std::nullopt);
-
-  return next;
-}
-
-State
 State::handle(const AnnotatedCommit& annotated_commit)
 {
   // Verify the membership proofs are consistent
@@ -1216,89 +1174,87 @@ State::handle(const AnnotatedCommit& annotated_commit)
   const auto& content = content_auth.content;
   const auto& commit = var::get<Commit>(content.content);
 
-  const auto sender = var::get<MemberSender>(content.sender.sender).sender;
-  if (sender != annotated_commit.sender_membership_proof_before.leaf_index) {
+  const auto sender_location =
+    annotated_commit.sender_membership_proof_after.leaf_index;
+  if (var::holds_alternative<MemberSender>(content.sender.sender) &&
+      var::get<MemberSender>(content.sender.sender).sender != sender_location) {
     throw ProtocolError("Incorrect commit sender");
   }
 
-  // Apply the commit as much as we can
-  auto next = successor();
-  next._epoch += 1;
-  const auto proposals = must_resolve(commit.proposals, sender);
-  // XXX(RLB) Validating proposals is not really possible
-
-  const auto [_joiner_locations, psks] = next.apply(proposals);
-
-  // Update the GroupContext
-  next._tree = TreeKEMPublicKey(next._suite,
-                                annotated_commit.sender_membership_proof_after);
-  next._tree.implant_slice(annotated_commit.receiver_membership_proof_after);
-
-  // Decrypt the commit secret
-  auto commit_secret = _suite.zero();
-  if (commit.path) {
-    const auto& path = opt::get(commit.path);
-
-    // Find index of the common ancestor with the committer
-    const auto sender_dp = NodeIndex(sender).dirpath(next._tree.size);
-    const auto sender_fdp =
-      stdx::filter<NodeIndex>(sender_dp, [&next](const auto& n) {
-        return !next._tree.node_at(n).blank();
-      });
-
-    const auto ancestor = sender.ancestor(next._index);
-    const auto ancestor_iter = stdx::find(sender_fdp, ancestor);
-    if (ancestor_iter == sender_fdp.end()) {
-      throw ProtocolError(
-        "Common ancestor not found in sender filtered direct path");
+  // If this is an external commit, extract the forced init secret
+  auto force_init_secret = std::optional<bytes>{};
+  if (var::holds_alternative<NewMemberCommitSender>(content.sender.sender)) {
+    const auto kem_output = commit.valid_external();
+    if (!kem_output) {
+      throw ProtocolError("Invalid external commit");
     }
 
-    const auto ancestor_index = ancestor_iter - sender_fdp.begin();
-
-    // From the list of encrypted path secrets at that index in the UpdatePath,
-    // take the one at resolution_index
-    const auto resolution_index = opt::get(annotated_commit.resolution_index);
-    const auto encrypted_path_secret =
-      path.nodes.at(ancestor_index).encrypted_path_secret.at(resolution_index);
-
-    // Find the next non-blank node in my new direct path below the common
-    // ancestor
-    auto receiver_dp = NodeIndex(next._index).dirpath(next._tree.size);
-    receiver_dp.insert(receiver_dp.begin(), NodeIndex(next._index));
-
-    const auto decryption_nodes =
-      stdx::filter<NodeIndex>(receiver_dp, [&next, &ancestor](const auto& n) {
-        return n != ancestor && n.is_below(ancestor) &&
-               !next._tree.node_at(n).blank();
-      });
-    const auto decryption_node_index =
-      decryption_nodes.at(decryption_nodes.size() - 1);
-
-    // Decrypt the path secret with the private key at that node
-    const auto priv = opt::get(_tree_priv.private_key(decryption_node_index));
-    const auto context = tls::marshal(next.group_context());
-    const auto path_secret = priv.decrypt(next._suite,
-                                          encrypt_label::update_path_node,
-                                          context,
-                                          encrypted_path_secret);
-
-    // Implant the path secret in the private tree
-    next._tree_priv.implant_matching(next._tree, ancestor, path_secret);
-    commit_secret = next._tree_priv.update_secret;
+    force_init_secret =
+      _key_schedule.receive_external_init(opt::get(kem_output));
   }
 
-  // Update the key schedule
-  next._transcript_hash.update(content_auth);
-  next.update_epoch_secrets(commit_secret, { psks }, std::nullopt);
+  // Update the GroupContext
+  auto new_tree =
+    TreeKEMPublicKey(_suite, annotated_commit.sender_membership_proof_after);
+  new_tree.implant_slice(annotated_commit.receiver_membership_proof_after);
 
-  // Verify the confirmation MAC
-  const auto confirmation_tag =
-    next._key_schedule.confirmation_tag(next._transcript_hash.confirmed);
-  if (!content_auth.check_confirmation_tag(confirmation_tag)) {
-    throw ProtocolError("Confirmation failed to verify");
+  // Identify the encrypted path secret and how to decrypt it
+  auto path_secret_decrypt_node = std::optional<NodeIndex>{};
+  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
+  if (commit.path) {
+    if (!annotated_commit.resolution_index) {
+      throw ProtocolError("Commit path present without resolution index");
+    }
+
+    const auto& path = opt::get(commit.path);
+
+    if (!valid(path.leaf_node, LeafNodeSource::commit, sender_location)) {
+      throw ProtocolError("Commit path has invalid leaf node");
+    }
+
+    // XXX(RLB) We can't use this logic to check the parent-hash validity,
+    // because it needs to compute the filtered direct path, which requires
+    // resolutions.  But it seems like if we had a "check parent hashes within
+    // the tree" method, we could use that here.
+#if 0
+    if (!new_tree.parent_hash_valid(sender_location, path)) {
+      throw ProtocolError("Commit path has invalid parent hash");
+    }
+#endif
+
+    const auto resolution_node_index =
+      opt::get(annotated_commit.resolution_index);
+    const auto coords = new_tree.ancestor_index(_index, sender_location);
+
+    path_secret_decrypt_node = coords.resolution_node;
+    encrypted_path_secret = path.nodes.at(coords.ancestor_node_index)
+                              .encrypted_path_secret.at(resolution_node_index);
   }
 
-  return next;
+  // Update the transcript hash
+  const auto new_confirmed_transcript_hash = _transcript_hash.new_confirmed(
+    content_auth.confirmed_transcript_hash_input());
+  const auto new_confirmation_tag =
+    opt::get(content_auth.auth.confirmation_tag);
+
+  // Import the extensions
+  auto extensions = _extensions;
+  if (annotated_commit.extensions) {
+    extensions = opt::get(annotated_commit.extensions);
+  }
+
+  // Resolve PSKs
+  const auto psks = resolve(annotated_commit.psks);
+
+  return ratchet(std::move(new_tree),           // OK
+                 sender_location,               // OK
+                 path_secret_decrypt_node,      // OK
+                 encrypted_path_secret,         // OK
+                 extensions,                    // OK
+                 psks,                          // OK
+                 force_init_secret,             // OK
+                 new_confirmed_transcript_hash, // OK
+                 new_confirmation_tag);         // OK
 }
 
 void
@@ -2412,6 +2368,14 @@ State::do_export(const std::string& label,
 GroupInfo
 State::group_info(bool inline_tree) const
 {
+  return group_info(true, inline_tree, {});
+}
+
+GroupInfo
+State::group_info(bool external_pub,
+                  bool inline_tree,
+                  const std::vector<LeafIndex>& membership_proofs) const
+{
   auto group_info = GroupInfo{
     {
       _suite,
@@ -2425,11 +2389,23 @@ State::group_info(bool inline_tree) const
     _key_schedule.confirmation_tag,
   };
 
-  group_info.extensions.add(
-    ExternalPubExtension{ _key_schedule.external_priv.public_key });
+  if (external_pub) {
+    group_info.extensions.add(
+      ExternalPubExtension{ _key_schedule.external_priv.public_key });
+  }
 
   if (inline_tree) {
     group_info.extensions.add(RatchetTreeExtension{ _tree });
+  }
+
+  if (!membership_proofs.empty()) {
+    auto membership_proof_extn = MembershipProofExtension{};
+    membership_proof_extn.slices =
+      stdx::transform<TreeSlice>(membership_proofs, [&](const auto& leaf) {
+        return _tree.extract_slice(leaf);
+      });
+
+    group_info.extensions.add(membership_proof_extn);
   }
 
   group_info.sign(_tree, _index, _identity_priv);
