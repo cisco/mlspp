@@ -718,9 +718,9 @@ external_proposal(CipherSuite suite,
 struct AnnotatedCommit
 {
   MLSMessage commit_message;
-
   bytes tree_hash_after;
-  TreeSlice sender_membership_proof_before;
+
+  std::optional<TreeSlice> sender_membership_proof_before;
   TreeSlice sender_membership_proof_after;
   TreeSlice receiver_membership_proof_after;
 
@@ -733,6 +733,15 @@ struct AnnotatedCommit
                               const MLSMessage& commit_message,
                               const TreeKEMPublicKey& tree_before,
                               const TreeKEMPublicKey& tree_after);
+
+  TLS_SERIALIZABLE(commit_message,
+                   tree_hash_after,
+                   sender_membership_proof_before,
+                   sender_membership_proof_after,
+                   receiver_membership_proof_after,
+                   resolution_index,
+                   extensions,
+                   psks);
 };
 
 } // namespace MLS_NAMESPACE

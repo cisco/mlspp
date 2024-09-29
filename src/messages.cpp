@@ -320,9 +320,10 @@ AnnotatedCommit::from(LeafIndex receiver,
 
   // Identify the sender
   const auto& sender_var = content_auth.content.sender.sender;
-  const auto external_commit = var::holds_alternative<NewMemberCommitSender>(sender_var);
+  const auto external_commit =
+    var::holds_alternative<NewMemberCommitSender>(sender_var);
 
-  auto sender = LeafIndex{0};
+  auto sender = LeafIndex{ 0 };
   if (external_commit) {
     // The committer's LeafNode is in the commit path
     const auto& path = opt::get(commit.path);
@@ -334,7 +335,12 @@ AnnotatedCommit::from(LeafIndex receiver,
 
   // Extract the appropriate memberhsip proofs
   const auto tree_hash_after = tree_after.root_hash();
-  const auto sender_membership_proof_before = tree_before.extract_slice(sender);
+
+  auto sender_membership_proof_before = std::optional<TreeSlice>{};
+  if (!external_commit) {
+    sender_membership_proof_before = tree_before.extract_slice(sender);
+  }
+
   const auto sender_membership_proof_after = tree_after.extract_slice(sender);
   const auto receiver_membership_proof_after =
     tree_after.extract_slice(receiver);

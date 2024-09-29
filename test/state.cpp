@@ -563,17 +563,16 @@ TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
   REQUIRE(first2 == second2);
   REQUIRE(first2 == third2);
 
-
   // The fourth participant joins via an external commit
   const auto group_info = first2.group_info(true);
   const auto [commit3, fourth3] = State::external_join(fresh_secret(),
-                                                      identity_privs[3],
-                                                      key_packages[3],
-                                                      group_info,
-                                                      std::nullopt,
-                                                      {},
-                                                      std::nullopt,
-                                                      {});
+                                                       identity_privs[3],
+                                                       key_packages[3],
+                                                       group_info,
+                                                       std::nullopt,
+                                                       {},
+                                                       std::nullopt,
+                                                       {});
 
   // Process the commit at the normal clients
   const auto first3 = opt::get(first2.handle(commit3));

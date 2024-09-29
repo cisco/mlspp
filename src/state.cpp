@@ -1136,17 +1136,28 @@ State::implant_tree_slice(const TreeSlice& slice)
 State
 State::handle(const AnnotatedCommit& annotated_commit)
 {
+  const auto external_commit =
+    !bool(annotated_commit.sender_membership_proof_before);
+  if (!external_commit) {
+    // If this is not an external commit, verify that the sender is a member of
+    // the group ...
+    const auto& proof =
+      opt::get(annotated_commit.sender_membership_proof_before);
+    if (proof.tree_hash(_suite) != _tree.root_hash()) {
+      throw ProtocolError("Invalid sender membership proof");
+    }
+
+    // ... and verify that the same leaf is proved before and after
+    if (proof.leaf_index !=
+        annotated_commit.sender_membership_proof_after.leaf_index) {
+      throw ProtocolError("Inconsistent sender membership proofs before/after");
+    }
+
+    // Then remember that the sender is a part of the tree
+    _tree.implant_slice(proof);
+  }
+
   // Verify the membership proofs are consistent
-  if (annotated_commit.sender_membership_proof_before.tree_hash(_suite) !=
-      _tree.root_hash()) {
-    throw ProtocolError("Invalid sender membership proof");
-  }
-
-  if (annotated_commit.sender_membership_proof_before.leaf_index !=
-      annotated_commit.sender_membership_proof_after.leaf_index) {
-    throw ProtocolError("Inconsistent sender membership proofs before/after");
-  }
-
   const auto tree_hash_after =
     annotated_commit.sender_membership_proof_after.tree_hash(_suite);
   if (tree_hash_after !=
@@ -1168,7 +1179,6 @@ State::handle(const AnnotatedCommit& annotated_commit)
   }
 
   // Unwrap the commit
-  _tree.implant_slice(annotated_commit.sender_membership_proof_before);
   const auto val_content = unwrap(annotated_commit.commit_message);
   const auto& content_auth = val_content.authenticated_content();
   const auto& content = content_auth.content;
