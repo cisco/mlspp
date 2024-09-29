@@ -509,6 +509,86 @@ TEST_CASE_METHOD(StateTest, "Light client can participate")
   REQUIRE(first4 == third4);
 }
 
+TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Add the second participant
+  auto add1 = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1 }, true, false, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome.  Note that the second
+  // participant is always a full client, because the membership proofs cover
+  // the whole tree.
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  REQUIRE(second1.is_full_client());
+  REQUIRE(first1 == second1);
+
+  // Add the third participant
+  auto add2 = first0.add_proposal(key_packages[2]);
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { add2 }, false, false, true, {} }, {});
+  auto first2 = first2_;
+
+  // Handle the Commit at the second participant
+  auto second2 = opt::get(second1.handle(commit2));
+
+  // Initialize the third participant as a light client, by only including
+  // membership proofs in the Welcome, not the full tree
+  auto third2 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       welcome2,
+                       std::nullopt,
+                       {} };
+  REQUIRE_FALSE(third2.is_full_client());
+
+  REQUIRE(first2 == second2);
+  REQUIRE(first2 == third2);
+
+
+  // The fourth participant joins via an external commit
+  const auto group_info = first2.group_info(true);
+  const auto [commit3, fourth3] = State::external_join(fresh_secret(),
+                                                      identity_privs[3],
+                                                      key_packages[3],
+                                                      group_info,
+                                                      std::nullopt,
+                                                      {},
+                                                      std::nullopt,
+                                                      {});
+
+  // Process the commit at the normal clients
+  const auto first3 = opt::get(first2.handle(commit3));
+  const auto second3 = opt::get(second2.handle(commit3));
+
+  // Annotate the commit and handle it at the third client
+  const auto annotated_commit = AnnotatedCommit::from(
+    third2.index(), {}, commit3, first2.tree(), first3.tree());
+  const auto third3 = third2.handle(annotated_commit);
+
+  REQUIRE(first3 == second3);
+  REQUIRE(first3 == third3);
+  REQUIRE(first3 == fourth3);
+}
+
 TEST_CASE_METHOD(StateTest, "External Join")
 {
   // Initialize the creator's state
