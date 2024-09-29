@@ -294,7 +294,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   const auto priv = opt::get(private_key(decrypt_node));
   const auto path_secret = priv.decrypt(
     suite, encrypt_label::update_path_node, context, encrypted_path_secret);
-  implant(pub, overlap_node, path_secret);
+  implant_matching(pub, overlap_node, path_secret);
 
   // Check that the resulting state is consistent with the public key
   if (!consistent(pub)) {

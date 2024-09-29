@@ -287,16 +287,16 @@ AnnotatedCommit::from(LeafIndex receiver,
   // XXX(RLB) There's some cheating here using authenticated_content()
   const auto public_message = var::get<PublicMessage>(commit_message.message);
   const auto content_auth = public_message.authenticated_content();
-  const auto sender =
-    var::get<MemberSender>(content_auth.content.sender.sender).sender;
-  const auto& commit = var::get<Commit>(content_auth.content.content);
+  switch (content_auth.content.sender.sender_type()) {
+    case SenderType::member:
+    case SenderType::new_member_commit:
+      break;
 
-  // Extract the appropriate memberhsip proofs
-  const auto tree_hash_after = tree_after.root_hash();
-  const auto sender_membership_proof_before = tree_before.extract_slice(sender);
-  const auto sender_membership_proof_after = tree_after.extract_slice(sender);
-  const auto receiver_membership_proof_after =
-    tree_after.extract_slice(receiver);
+    default:
+      throw ProtocolError("Invalid commit sender type");
+  }
+
+  const auto& commit = var::get<Commit>(content_auth.content.content);
 
   // Compute the list of committed proposals
   auto cache = std::map<ProposalRef, Proposal>{};
@@ -318,6 +318,27 @@ AnnotatedCommit::from(LeafIndex receiver,
       return var::visit(resolve, p_or_r.content);
     });
 
+  // Identify the sender
+  const auto& sender_var = content_auth.content.sender.sender;
+  const auto external_commit = var::holds_alternative<NewMemberCommitSender>(sender_var);
+
+  auto sender = LeafIndex{0};
+  if (external_commit) {
+    // The committer's LeafNode is in the commit path
+    const auto& path = opt::get(commit.path);
+    sender = opt::get(tree_after.find(path.leaf_node));
+  } else {
+    // Must be member sender
+    sender = var::get<MemberSender>(sender_var).sender;
+  }
+
+  // Extract the appropriate memberhsip proofs
+  const auto tree_hash_after = tree_after.root_hash();
+  const auto sender_membership_proof_before = tree_before.extract_slice(sender);
+  const auto sender_membership_proof_after = tree_after.extract_slice(sender);
+  const auto receiver_membership_proof_after =
+    tree_after.extract_slice(receiver);
+
   // If there is a path, identify which node the receiver should decrypt
   auto resolution_index = std::optional<uint32_t>{};
   if (commit.path) {
@@ -326,6 +347,7 @@ AnnotatedCommit::from(LeafIndex receiver,
       stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
         return p.proposal_type() == ProposalType::add;
       });
+
     const auto joiner_locations =
       stdx::transform<LeafIndex>(add_proposals, [&](const auto& p) {
         const auto& add = var::get<Add>(p.content);
