@@ -12,7 +12,7 @@ MLSPP requires a few prerequisite libraries in order to fully build.
 
 * [nlohmann::json](https://github.com/nlohmann/json) - Tested with latest versions.
 * Cryptography Library - OpenSSL 1.1.1, OpenSSL 3.0, BoringSSL compatible (see details below)
-* [doctest](https://github.com/doctest/doctest) - Tested with latest versions.  Only required when building the test suite.
+* [Catch2](https://github.com/catchorg/Catch2) - Only required when building the test suite.
 
 ### Installing Prerequisites 
 
