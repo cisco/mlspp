@@ -305,10 +305,8 @@ Session::commit()
 {
   auto commit_secret = inner->fresh_secret();
   auto encrypt = inner->encrypt_handshake;
-  auto [commit, welcome, new_state] =
-    inner->history.front().commit(commit_secret,
-                                  CommitOpts{ {}, true, encrypt, false, {} },
-                                  { encrypt, {}, 0 });
+  auto [commit, welcome, new_state] = inner->history.front().commit(
+    commit_secret, CommitOpts{ {}, true, encrypt, {} }, { encrypt, {}, 0 });
 
   auto commit_msg = tls::marshal(commit);
   auto welcome_msg = tls::marshal(welcome);
