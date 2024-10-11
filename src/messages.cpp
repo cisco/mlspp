@@ -12,11 +12,8 @@ namespace MLS_NAMESPACE {
 
 const Extension::Type ExternalPubExtension::type = ExtensionType::external_pub;
 const Extension::Type RatchetTreeExtension::type = ExtensionType::ratchet_tree;
-const Extension::Type MembershipProofExtension::type =
-  ExtensionType::membership_proof;
 const Extension::Type ExternalSendersExtension::type =
   ExtensionType::external_senders;
-const Extension::Type FlagsExtension::type = ExtensionType::flags;
 const Extension::Type SFrameParameters::type = ExtensionType::sframe_parameters;
 const Extension::Type SFrameCapabilities::type =
   ExtensionType::sframe_parameters;
@@ -270,6 +267,33 @@ Welcome::group_info_key_nonce(CipherSuite suite,
   auto nonce =
     suite.expand_with_label(welcome_secret, "nonce", {}, suite.nonce_size());
   return { std::move(key), std::move(nonce) };
+}
+
+///
+/// AnnotatedWelcome
+///
+
+AnnotatedWelcome
+AnnotatedWelcome::from(Welcome welcome,
+                       const TreeKEMPublicKey& tree,
+                       const LeafIndex sender,
+                       const LeafNode& joiner_leaf_node)
+{
+  const auto joiner = opt::get(tree.find(joiner_leaf_node));
+  return {
+    std::move(welcome),
+    tree.extract_slice(sender),
+    tree.extract_slice(joiner),
+  };
+}
+
+TreeKEMPublicKey
+AnnotatedWelcome::tree() const
+{
+  auto tree = TreeKEMPublicKey{ welcome.cipher_suite };
+  tree.implant_slice(sender_membership_proof);
+  tree.implant_slice(receiver_membership_proof);
+  return tree;
 }
 
 ///

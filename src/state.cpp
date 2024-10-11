@@ -52,20 +52,11 @@ State::import_tree(const bytes& tree_hash,
 {
   auto tree = TreeKEMPublicKey(_suite);
   auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
-  auto maybe_membership_proof_extn =
-    extensions.find<MembershipProofExtension>();
 
   if (external) {
     tree = opt::get(external);
   } else if (maybe_tree_extn) {
     tree = opt::get(maybe_tree_extn).tree;
-  } else if (maybe_membership_proof_extn) {
-    const auto& membership_proof = opt::get(maybe_membership_proof_extn);
-
-    tree = TreeKEMPublicKey(_suite, membership_proof.slices.at(0));
-    for (auto i = size_t(0); i < membership_proof.slices.size(); i++) {
-      tree.implant_slice(membership_proof.slices.at(i));
-    }
   } else {
     throw InvalidParameterError("No tree available");
   }
@@ -765,20 +756,11 @@ State::prepare_commit(const bytes& leaf_secret,
 
 Welcome
 State::welcome(bool inline_tree,
-               bool membership_proof,
                const std::vector<PSKWithSecret>& psks,
                const std::vector<KeyPackage>& joiners,
                const std::vector<std::optional<bytes>>& path_secrets) const
 {
-  auto membership_proofs = std::vector<LeafIndex>{};
-  if (membership_proof) {
-    membership_proofs =
-      stdx::transform<LeafIndex>(joiners, [&](const auto& kp) {
-        return opt::get(_tree.find(kp.leaf_node));
-      });
-    membership_proofs.push_back(_index);
-  }
-  auto group_info_obj = group_info(false, inline_tree, membership_proofs);
+  auto group_info_obj = group_info(false, inline_tree);
 
   auto welcome =
     Welcome{ _suite, _key_schedule.joiner_secret, psks, group_info_obj };
@@ -833,9 +815,7 @@ State::commit(const bytes& leaf_secret,
 
   // Create the welcome message
   const auto inline_tree = opts && opt::get(opts).inline_tree;
-  const auto membership_proof = opts && opt::get(opts).membership_proof;
   const auto welcome = next.welcome(inline_tree,
-                                    membership_proof,
                                     commit_materials.psks,
                                     commit_materials.joiners,
                                     commit_materials.path_secrets);
@@ -1318,7 +1298,6 @@ State::create_branch(bytes group_id,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
-    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -1397,7 +1376,6 @@ State::Tombstone::create_welcome(HPKEPrivateKey enc_priv,
     proposals,
     commit_opts.inline_tree,
     commit_opts.force_path,
-    commit_opts.membership_proof,
     commit_opts.leaf_node_opts,
   };
   auto [_commit, welcome, state] = new_group.commit(
@@ -2378,13 +2356,11 @@ State::do_export(const std::string& label,
 GroupInfo
 State::group_info(bool inline_tree) const
 {
-  return group_info(true, inline_tree, {});
+  return group_info(true, inline_tree);
 }
 
 GroupInfo
-State::group_info(bool external_pub,
-                  bool inline_tree,
-                  const std::vector<LeafIndex>& membership_proofs) const
+State::group_info(bool external_pub, bool inline_tree) const
 {
   auto group_info = GroupInfo{
     {
@@ -2406,16 +2382,6 @@ State::group_info(bool external_pub,
 
   if (inline_tree) {
     group_info.extensions.add(RatchetTreeExtension{ _tree });
-  }
-
-  if (!membership_proofs.empty()) {
-    auto membership_proof_extn = MembershipProofExtension{};
-    membership_proof_extn.slices =
-      stdx::transform<TreeSlice>(membership_proofs, [&](const auto& leaf) {
-        return _tree.extract_slice(leaf);
-      });
-
-    group_info.extensions.add(membership_proof_extn);
   }
 
   group_info.sign(_tree, _index, _identity_priv);

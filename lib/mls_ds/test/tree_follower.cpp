@@ -82,8 +82,8 @@ TEST_CASE_METHOD(TreeFollowerTest, "DS Follows Tree through Group Lifecycle")
     adds.push_back(states[0].add_proposal(key_packages[i]));
   }
 
-  auto [commit1, welcome1, new_state1] = states[0].commit(
-    fresh_secret(), CommitOpts{ adds, true, false, false, {} }, {});
+  auto [commit1, welcome1, new_state1] =
+    states[0].commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
   silence_unused(commit1);
   states[0] = new_state1;
 
@@ -127,7 +127,7 @@ TEST_CASE_METHOD(TreeFollowerTest, "DS Follows Tree through Group Lifecycle")
     const auto remove = states[group_size - 1].remove_proposal(LeafIndex{ i });
 
     auto [commit, welcome, new_state] = states[group_size - 1].commit(
-      fresh_secret(), CommitOpts{ { remove }, false, false, false, {} }, {});
+      fresh_secret(), CommitOpts{ { remove }, false, false, {} }, {});
     silence_unused(commit);
     silence_unused(welcome);
     states[group_size - 1] = new_state;

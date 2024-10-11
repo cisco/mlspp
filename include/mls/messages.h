@@ -27,14 +27,6 @@ struct RatchetTreeExtension
   TLS_SERIALIZABLE(tree)
 };
 
-struct MembershipProofExtension
-{
-  std::vector<TreeSlice> slices;
-
-  static const uint16_t type;
-  TLS_SERIALIZABLE(slices)
-};
-
 struct ExternalSender
 {
   SignaturePublicKey signature_key;
@@ -714,6 +706,21 @@ external_proposal(CipherSuite suite,
                   const Proposal& proposal,
                   uint32_t signer_index,
                   const SignaturePrivateKey& sig_priv);
+
+struct AnnotatedWelcome
+{
+  Welcome welcome;
+
+  TreeSlice sender_membership_proof;
+  TreeSlice receiver_membership_proof;
+
+  static AnnotatedWelcome from(Welcome welcome,
+                               const TreeKEMPublicKey& tree,
+                               const LeafIndex sender,
+                               const LeafNode& joiner_leaf_node);
+
+  TreeKEMPublicKey tree() const;
+};
 
 struct AnnotatedCommit
 {

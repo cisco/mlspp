@@ -28,10 +28,6 @@ struct CommitOpts
   // Send an UpdatePath even if none is required
   bool force_path = false;
 
-  // Send a membership_proof extension in the Welcome covering the committer and
-  // the new joiners
-  bool membership_proof = false;
-
   // Update the committer's LeafNode in the following way
   LeafNodeOptions leaf_node_opts;
 };
@@ -346,11 +342,8 @@ protected:
   CommitMaterials prepare_commit(const bytes& leaf_secret,
                                  const std::optional<CommitOpts>& opts,
                                  const CommitParams& params) const;
-  GroupInfo group_info(bool external_pub,
-                       bool inline_tree,
-                       const std::vector<LeafIndex>& membership_proofs) const;
+  GroupInfo group_info(bool external_pub, bool inline_tree) const;
   Welcome welcome(bool inline_tree,
-                  bool membership_proof,
                   const std::vector<PSKWithSecret>& psks,
                   const std::vector<KeyPackage>& joiners,
                   const std::vector<std::optional<bytes>>& path_secrets) const;
