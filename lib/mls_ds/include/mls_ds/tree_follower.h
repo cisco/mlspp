@@ -4,9 +4,11 @@
 #include <mls/treekem.h>
 #include <vector>
 
+namespace MLS_NAMESPACE {
+
 namespace mls_ds {
 
-namespace mls = MLS_NAMESPACE;
+namespace mls = ::MLS_NAMESPACE;
 
 class TreeFollower
 {
@@ -31,3 +33,5 @@ private:
 };
 
 } // namespace mls_ds
+
+} // namespace MLS_NAMESPACE
