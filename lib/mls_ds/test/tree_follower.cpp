@@ -2,8 +2,8 @@
 #include <mls/state.h>
 #include <mls_ds/tree_follower.h>
 
-using namespace mls_ds;
 using namespace MLS_NAMESPACE;
+using namespace MLS_NAMESPACE::mls_ds;
 
 class TreeFollowerTest
 {

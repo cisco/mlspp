@@ -290,8 +290,7 @@ AnnotatedWelcome::from(Welcome welcome,
 TreeKEMPublicKey
 AnnotatedWelcome::tree() const
 {
-  auto tree = TreeKEMPublicKey{ welcome.cipher_suite };
-  tree.implant_slice(sender_membership_proof);
+  auto tree = TreeKEMPublicKey{ welcome.cipher_suite, sender_membership_proof };
   tree.implant_slice(receiver_membership_proof);
   return tree;
 }

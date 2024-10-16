@@ -2,8 +2,10 @@
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/state.h>
+#include <mls_ds/tree_follower.h>
 
 using namespace MLS_NAMESPACE;
+using namespace MLS_NAMESPACE::mls_ds;
 
 struct CustomExtension
 {
@@ -456,7 +458,7 @@ TEST_CASE_METHOD(StateTest, "Light client can participate")
     first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
   auto first2 = first2_;
   const auto annotated_welcome = AnnotatedWelcome::from(
-    welcome2, first2.tree(), LeafIndex{ 2 }, key_packages[2].leaf_node);
+    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
 
   // Handle the Commit at the second participant
   auto second2 = opt::get(second1.handle(commit2));
@@ -507,6 +509,95 @@ TEST_CASE_METHOD(StateTest, "Light client can participate")
 
   REQUIRE(first4 == second4);
   REQUIRE(first4 == third4);
+}
+
+TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
+{
+  // Initialize the first two users
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  auto add1 = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  REQUIRE(second1.is_full_client());
+  REQUIRE(first1 == second1);
+
+  // Add the third participant as a light client, remembering the tree at this
+  // point.
+  auto add2 = first0.add_proposal(key_packages[2]);
+  auto [commit2, welcome2, first2_] =
+    first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
+  auto first2 = first2_;
+  const auto annotated_welcome = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
+
+  auto second2 = opt::get(second1.handle(commit2));
+
+  auto third2 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       annotated_welcome.welcome,
+                       annotated_welcome.tree(),
+                       {} };
+  REQUIRE_FALSE(third2.is_full_client());
+
+  REQUIRE(first2 == second2);
+  REQUIRE(first2 == third2);
+
+  const auto tree2 = first2.tree();
+
+  // Client 1 makes a bunch of commits, and the other two members follow along.
+  auto first = first2;
+  auto second = second2;
+  auto third = third2;
+
+  auto commits = std::vector<MLSMessage>{};
+  const auto n_commits = size_t(5);
+  for (auto i = size_t(0); i < n_commits; i++) {
+    const auto [commit, welcome, next_first] = first.commit(fresh_secret(), {}, {});
+    silence_unused(welcome);
+    const auto annotated_commit = AnnotatedCommit::from(
+      third.index(), {}, commit, first.tree(), next_first.tree());
+
+    commits.push_back(commit);
+
+    first = next_first;
+    second = opt::get(second.handle(commit));
+    third = third.handle(annotated_commit);
+
+    REQUIRE(first == second);
+    REQUIRE(first == third);
+  }
+
+  // Client 3 finally finishes downloading the tree, fast-forwards it using the
+  // commit queue, and upgrades to being a full client.
+  auto follower = TreeFollower(tree2);
+  for (const auto& commit : commits) {
+    follower.update(commit, {});
+  }
+
+  third.upgrade_to_full_client(follower.tree());
+  REQUIRE(third.is_full_client());
+
+  REQUIRE(first == second);
+  REQUIRE(first == third);
 }
 
 TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")

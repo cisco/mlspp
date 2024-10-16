@@ -1,8 +1,8 @@
 #include <mls_ds/tree_follower.h>
 
-namespace mls_ds {
+namespace MLS_NAMESPACE {
 
-using namespace MLS_NAMESPACE;
+namespace mls_ds {
 
 ///
 /// Resolving & Applying Proposals
@@ -166,3 +166,5 @@ TreeFollower::update(const mls::MLSMessage& commit_message,
 }
 
 } // namespace mls_vectors
+
+} // namespace MLS_NAMESPACE
