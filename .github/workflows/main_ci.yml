@@ -41,16 +41,6 @@ jobs:
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
-    # Only run non-OpenSSL-3 libraries if there's a change in the HPKE code
-    - uses: dorny/paths-filter@v3
-      if: matrix.crypto != "openssl_3"
-      with:
-        filters: |
-          src:
-            - "lib/hpke/include/**"
-            - "lib/hpke/src/**"
-            - "lib/hpke/test/**"
-
     - uses: actions/checkout@v4
       with:
         submodules: recursive
@@ -129,16 +119,6 @@ jobs:
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
-    # Only run non-OpenSSL-3 libraries if there's a change in the HPKE code
-    - uses: dorny/paths-filter@v3
-      if: matrix.crypto != "openssl_3"
-      with:
-        filters: |
-          src:
-            - "lib/hpke/include/**"
-            - "lib/hpke/src/**"
-            - "lib/hpke/test/**"
-
     - uses: actions/checkout@v4
       with:
         submodules: recursive
