@@ -103,6 +103,9 @@ set(VCPKG_BUILD_TYPE release)
 # Internal libraries
 add_subdirectory(lib)
 
+# External libraries
+find_package(nlohmann_json REQUIRED)
+
 # Third-Party libraries in tree
 add_subdirectory(third_party)
 
@@ -118,7 +121,11 @@ file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src
 
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
 add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
-target_link_libraries(${LIB_NAME} bytes tls_syntax hpke)
+target_link_libraries(${LIB_NAME} 
+  PRIVATE
+    nlohmann_json::nlohmann_json
+  PUBLIC
+    bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
