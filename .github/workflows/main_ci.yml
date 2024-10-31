@@ -4,9 +4,17 @@ on:
   push:
     branches:
       - main
+    paths:
+      - **/src/**
+      - **/include/**
+      - **/test/**
   pull_request:
     branches:
       - main
+    paths:
+      - **/src/**
+      - **/include/**
+      - **/test/**
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
@@ -119,6 +127,14 @@ jobs:
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
+    # Only run non-OpenSSL 3 libraries if there's a change in the HPKE code
+    - uses: dorny/paths-filter@v3
+      if: matrix.crypto != "openssl_3"
+      with:
+        filters: |
+          src:
+            - 'lib/hpke/**'
+
     - uses: actions/checkout@v4
       with:
         submodules: recursive
