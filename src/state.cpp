@@ -874,7 +874,8 @@ State::handle(const ValidatedContent& val_content,
 
     // Commits are handled in the remainder of this method
     case ContentType::commit:
-      return handle_commit(content_auth, std::move(cached_state), expected_params);
+      return handle_commit(
+        content_auth, std::move(cached_state), expected_params);
 
     // Any other content type in this method is an error
     default:
