@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - ".github/**"
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
