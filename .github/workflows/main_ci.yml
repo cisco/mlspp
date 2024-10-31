@@ -54,7 +54,7 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         crypto: ${{ fromJson(needs.choose_crypto_matrix.outputs.matrix )}}
     steps:
-    - run: echo "Hello ${{ matrix.someValue }}"
+    - run: echo "Hello ${{ matrix.crypto }}"
 
 #   formatting-check:
 #     name: Formatting Check

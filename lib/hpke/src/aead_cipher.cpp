@@ -10,6 +10,8 @@
 
 namespace MLS_NAMESPACE::hpke {
 
+static void unused() {}
+
 ///
 /// ExportOnlyCipher
 ///
