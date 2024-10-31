@@ -47,7 +47,7 @@ jobs:
         fi
 
   build-n-test:
-    needs: matrix_prep
+    needs: choose_crypto_matrix
     runs-on: ${{ matrix.runs_on }}
     strategy:
       matrix: 
