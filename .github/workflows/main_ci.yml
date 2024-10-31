@@ -5,12 +5,14 @@ on:
     branches:
       - main
     paths:
+      - ".github/**"
       - "**.cpp"
       - "**.h"
   pull_request:
     branches:
       - main
     paths:
+      - ".github/**"
       - "**.cpp"
       - "**.h"
 
