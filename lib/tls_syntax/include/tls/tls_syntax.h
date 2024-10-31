@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
@@ -9,19 +10,17 @@
 #include <optional>
 #include <stdexcept>
 #include <vector>
-#include <cstdint>
-#include <cstddef>
 
 #include <tls/compat.h>
 
 namespace MLS_NAMESPACE::tls {
 
+using std::ptrdiff_t;
 using std::size_t;
-using std::uint8_t;
 using std::uint16_t;
 using std::uint32_t;
 using std::uint64_t;
-using std::ptrdiff_t;
+using std::uint8_t;
 
 // For indicating no min or max in vector definitions
 const size_t none = std::numeric_limits<size_t>::max();
