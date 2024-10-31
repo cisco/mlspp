@@ -903,9 +903,10 @@ TreeKEMPublicKey::parent_hashes(
   }
 
   // The list of nodes for whom parent hashes are computed, namely: Direct path
-  // excluding root, including leaf
+  // excluding the last entry, including leaf
   auto from_node = NodeIndex(from);
   auto dp = fdp;
+  auto [last, _res_last] = dp.back();
   dp.pop_back();
   dp.insert(dp.begin(), { from_node, {} });
 
@@ -913,8 +914,8 @@ TreeKEMPublicKey::parent_hashes(
     throw ProtocolError("Malformed UpdatePath");
   }
 
-  // Parent hash for all the parents, starting from the root
-  auto last = NodeIndex::root(size);
+  // Parent hash for all the parents, starting from the last entry of the
+  // filtered direct path
   auto last_hash = bytes{};
   auto ph = std::vector<bytes>(dp.size());
   for (int i = static_cast<int>(dp.size()) - 1; i >= 0; i--) {
