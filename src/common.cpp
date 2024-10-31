@@ -4,6 +4,7 @@
 namespace MLS_NAMESPACE {
 
 static void unused() {}
+static void unused2() {}
 
 uint64_t
 seconds_since_epoch()
