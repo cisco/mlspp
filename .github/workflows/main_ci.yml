@@ -48,7 +48,7 @@ jobs:
 
   build-n-test:
     needs: choose_crypto_matrix
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix: 
         os: [windows-latest, ubuntu-latest, macos-latest]
