@@ -35,7 +35,7 @@ A convenience Makefile is included to avoid the need to remember a bunch of CMak
 > make        # Configures and builds the library 
 > make dev    # Configure a "developer" build with tests and checks using OpenSSL 1.1
 > make dev3   # Configure a "developer" build with tests and checks using OpenSSL 3.0
-> make devB   # Configure a "developer" build with tests and checks using OpenSSL 3.0
+> make devB   # Configure a "developer" build with tests and checks using BoringSSL
 > make test   # Builds and runs tests
 > make format # Runs clang-format over the source
 ```
