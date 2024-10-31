@@ -5,16 +5,14 @@ on:
     branches:
       - main
     paths:
-      - **/src/**
-      - **/include/**
-      - **/test/**
+      - **.cpp
+      - **.h
   pull_request:
     branches:
       - main
     paths:
-      - **/src/**
-      - **/include/**
-      - **/test/**
+      - **.cpp
+      - **.h
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
@@ -133,7 +131,9 @@ jobs:
       with:
         filters: |
           src:
-            - 'lib/hpke/**'
+            - 'lib/hpke/include/**'
+            - 'lib/hpke/src/**'
+            - 'lib/hpke/test/**'
 
     - uses: actions/checkout@v4
       with:
