@@ -992,6 +992,7 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
   const auto new_confirmed = transcript.new_confirmed(
     authenticated_content.confirmed_transcript_hash_input());
   transcript.set_confirmed(new_confirmed);
+  ;
 
   group_context.confirmed_transcript_hash = transcript.confirmed;
   auto key_schedule_after =
@@ -1001,6 +1002,8 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
                              transcript.confirmed,
                              tls::marshal(group_context));
 
+  authenticated_content.set_confirmation_tag(
+    key_schedule_after.confirmation_tag);
   transcript.update_interim(key_schedule_after.confirmation_tag);
 
   // Store the required data
