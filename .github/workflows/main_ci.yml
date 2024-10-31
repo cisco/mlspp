@@ -24,6 +24,7 @@ env:
 
 jobs:
   choose_crypto_matrix:
+    name: Choose crypto libraries to test with
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -61,7 +62,7 @@ jobs:
         fallback-style: 'Mozilla'
 
   build-and-unit-test:
-    needs: formatting-check
+    needs: [formatting-check, choose_crypto_matrix]
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -135,7 +136,7 @@ jobs:
 
   clang-tidy:
     if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
+    needs: [build-and-unit-test, choose_crypto_matrix]
     name: Build with clang-tidy
     runs-on: ubuntu-latest
     strategy:
