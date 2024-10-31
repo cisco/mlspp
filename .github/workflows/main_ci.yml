@@ -4,11 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "**.cpp"
+      - "**.h"
   pull_request:
     branches:
       - main
     paths:
       - "**.cpp"
+      - "**.h"
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
