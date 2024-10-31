@@ -8,7 +8,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/**"
+      - "**.cpp"
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
