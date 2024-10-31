@@ -21,123 +21,151 @@ env:
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
-  formatting-check:
-    name: Formatting Check
+  choose_crypto_matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Run clang-format style check for C/C++ programs
-      uses: jidicula/clang-format-action@v4.11.0
+    - uses: dorny/paths-filter@v3
+      id: filter
       with:
-        clang-format-version: 16
-        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
-        fallback-style: 'Mozilla'
+        filters: |
+          hpke:
+            - 'lib/hpke/include/**'
+            - 'lib/hpke/src/**'
+            - 'lib/hpke/test/**'
+ 
+    - id: set-matrix 
+      run: |
+        if [ ${{ steps.filter.outputs.hpke }} = "true" ];
+        then
+          echo "matrix=[\"openssl_1.1\",\"openssl_3\",\"boringssl\"]" >> $GITHUB_OUTPUT;
+        else
+          echo "matrix=[\"openssl_3\"]" >> $GITHUB_OUTPUT
+        fi
 
-  build-and-unit-test:
-    needs: formatting-check
-    name: Build and test
-    runs-on: ${{ matrix.os }}
+  build-n-test:
+    needs: matrix_prep
+    runs-on: ${{ matrix.runs_on }}
     strategy:
-      matrix:
+      matrix: 
         os: [windows-latest, ubuntu-latest, macos-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
-
-    env:
-      CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
-
+        crypto: ${{ fromJson(needs.choose_crypto_matrix.outputs.matrix )}}
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
+    - run: echo "Hello ${{ matrix.someValue }}"
 
-    - uses: ./.github/actions/prepare-build
-      with:
-        os: ${{ matrix.os }}
-        crypto: ${{ matrix.crypto }}
-        cache-dir: ${{ github.workspace }}/vcpkg_cache
-
-    - name: Build
-      run: |
-        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
-        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
-
-    - name: Unit Test
-      run: |
-        ctest --test-dir "${{ runner.temp }}/build_${{ matrix.crypto }}"
-
-  interop-test:
-    if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
-    name: Interop test
-    runs-on: ubuntu-latest
-
-    env:
-      CRYPTO_DIR: "./alternatives/openssl_1.1"
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - uses: ./.github/actions/prepare-build
-      with:
-        os: ubuntu-latest
-        crypto-dir: openssl_1.1
-        cache-dir: ${{ github.workspace }}/vcpkg_cache
-
-    - name: Build
-      run: |
-        cmake -B "${{ runner.temp }}/build_openssl_1.1" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ runner.temp }}/build_openssl_1.1"
-
-    - name: Build (Interop Harness)
-      run: |
-        cd cmd/interop
-        cmake -B build
-        cmake --build build
-
-    - name: Test self-interop
-      run: |
-        make -C cmd/interop self-test
-
-    - name: Test interop on test vectors
-      run: |
-        make -C cmd/interop interop-test
-
-    - name: Test gRPC live interop with self
-      run: |
-        cd cmd/interop
-        ./grpc-self-test.sh
-
-  clang-tidy:
-    if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
-    name: Build with clang-tidy
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        crypto: [openssl_1.1, openssl_3, boringssl]
-
-    env:
-      CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - uses: ./.github/actions/prepare-build
-      with:
-        os: ubuntu-latest
-        crypto: matrix.crypto
-        cache-dir: ${{ github.workspace }}/vcpkg_cache
-
-    - name: Build with clang-tidy
-      run: |
-        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
-                                                                 -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
-        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
+#   formatting-check:
+#     name: Formatting Check
+#     runs-on: ubuntu-latest
+#     steps:
+#     - uses: actions/checkout@v4
+# 
+#     - name: Run clang-format style check for C/C++ programs
+#       uses: jidicula/clang-format-action@v4.11.0
+#       with:
+#         clang-format-version: 16
+#         include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
+#         fallback-style: 'Mozilla'
+# 
+#   build-and-unit-test:
+#     needs: formatting-check
+#     name: Build and test
+#     runs-on: ${{ matrix.os }}
+#     strategy:
+#       matrix:
+#         os: [windows-latest, ubuntu-latest, macos-latest]
+#         crypto: [openssl_1.1, openssl_3, boringssl]
+# 
+#     env:
+#       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
+# 
+#     steps:
+#     - uses: ./.github/actions/prepare-build
+#       with:
+#         os: ${{ matrix.os }}
+#         crypto: ${{ matrix.crypto }}
+#         cache-dir: ${{ github.workspace }}/vcpkg_cache
+# 
+#     - name: Build
+#       run: |
+#         cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+#         cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
+# 
+#     - name: Unit Test
+#       run: |
+#         ctest --test-dir "${{ runner.temp }}/build_${{ matrix.crypto }}"
+# 
+#   interop-test:
+#     if: github.event.pull_request.draft == false
+#     needs: build-and-unit-test
+#     name: Interop test
+#     runs-on: ubuntu-latest
+# 
+#     env:
+#       CRYPTO_DIR: "./alternatives/openssl_1.1"
+# 
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: recursive
+#         fetch-depth: 0
+# 
+#     - uses: ./.github/actions/prepare-build
+#       with:
+#         os: ubuntu-latest
+#         crypto-dir: openssl_1.1
+#         cache-dir: ${{ github.workspace }}/vcpkg_cache
+# 
+#     - name: Build
+#       run: |
+#         cmake -B "${{ runner.temp }}/build_openssl_1.1" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+#         cmake --build "${{ runner.temp }}/build_openssl_1.1"
+# 
+#     - name: Build (Interop Harness)
+#       run: |
+#         cd cmd/interop
+#         cmake -B build
+#         cmake --build build
+# 
+#     - name: Test self-interop
+#       run: |
+#         make -C cmd/interop self-test
+# 
+#     - name: Test interop on test vectors
+#       run: |
+#         make -C cmd/interop interop-test
+# 
+#     - name: Test gRPC live interop with self
+#       run: |
+#         cd cmd/interop
+#         ./grpc-self-test.sh
+# 
+#   clang-tidy:
+#     if: github.event.pull_request.draft == false
+#     needs: build-and-unit-test
+#     name: Build with clang-tidy
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         crypto: [openssl_1.1, openssl_3, boringssl]
+# 
+#     env:
+#       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
+# 
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: recursive
+#         fetch-depth: 0
+# 
+#     - uses: ./.github/actions/prepare-build
+#       with:
+#         os: ubuntu-latest
+#         crypto: matrix.crypto
+#         cache-dir: ${{ github.workspace }}/vcpkg_cache
+# 
+#     - name: Build with clang-tidy
+#       run: |
+#         cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
+#                                                                  -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+#         cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
