@@ -5,12 +5,14 @@ on:
     branches:
       - main
     paths:
+      - "src/common.cpp"
       - "**.cpp"
       - "**.h"
   pull_request:
     branches:
       - main
     paths:
+      - "src/common.cpp"
       - "**.cpp"
       - "**.h"
 
