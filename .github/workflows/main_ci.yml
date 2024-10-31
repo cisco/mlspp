@@ -30,7 +30,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
     - uses: dorny/paths-filter@v3
-      id: filter
+      id: filterV
       with:
         filters: |
           hpke:
@@ -74,6 +74,11 @@ jobs:
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
     - uses: ./.github/actions/prepare-build
       with:
         os: ${{ matrix.os }}
