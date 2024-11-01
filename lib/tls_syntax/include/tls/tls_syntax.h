@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
@@ -13,6 +14,13 @@
 #include <tls/compat.h>
 
 namespace MLS_NAMESPACE::tls {
+
+using std::ptrdiff_t;
+using std::size_t;
+using std::uint16_t;
+using std::uint32_t;
+using std::uint64_t;
+using std::uint8_t;
 
 // For indicating no min or max in vector definitions
 const size_t none = std::numeric_limits<size_t>::max();
@@ -288,8 +296,9 @@ operator>>(istream& str, std::vector<T>& vec)
   // NB: Remember that we store the vector in reverse order
   // NB: This requires that T be default-constructible
   istream r;
+  const auto size_diff = static_cast<ptrdiff_t>(size);
   r._buffer =
-    std::vector<uint8_t>{ str._buffer.end() - size, str._buffer.end() };
+    std::vector<uint8_t>{ str._buffer.end() - size_diff, str._buffer.end() };
 
   vec.clear();
   while (r._buffer.size() > 0) {
@@ -298,7 +307,7 @@ operator>>(istream& str, std::vector<T>& vec)
   }
 
   // Truncate the primary buffer
-  str._buffer.erase(str._buffer.end() - size, str._buffer.end());
+  str._buffer.erase(str._buffer.end() - size_diff, str._buffer.end());
 
   return str;
 }
