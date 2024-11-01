@@ -243,7 +243,7 @@ GroupKeySource::get(ContentType type,
 void
 GroupKeySource::erase(ContentType type, LeafIndex sender, uint32_t generation)
 {
-  return chain(type, sender).erase(generation);
+  chain(type, sender).erase(generation);
 }
 
 // struct {

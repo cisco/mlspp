@@ -1337,7 +1337,7 @@ State::apply(TreeKEMPublicKey& tree, const Remove& remove)
 std::vector<LeafIndex>
 State::apply(TreeKEMPublicKey& tree,
              const std::vector<CachedProposal>& proposals,
-             Proposal::Type required_type) const
+             Proposal::Type required_type)
 {
   auto locations = std::vector<LeafIndex>{};
   for (const auto& cached : proposals) {
@@ -2224,7 +2224,7 @@ State::roster() const
   auto leaves = std::vector<LeafNode>{};
   leaves.reserve(_tree.size.val);
 
-  _tree.all_leaves([&](auto /* i */, auto leaf) {
+  _tree.all_leaves([&](auto /* i */, const auto& leaf) {
     leaves.push_back(leaf);
     return true;
   });

@@ -57,7 +57,7 @@ to_base64url(const bytes& data)
 bytes
 from_base64(const std::string& enc)
 {
-  if (enc.length() == 0) {
+  if (enc.empty()) {
     return {};
   }
 

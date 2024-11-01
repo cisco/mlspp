@@ -370,9 +370,9 @@ protected:
                     LeafIndex target,
                     const Update& update);
   static LeafIndex apply(TreeKEMPublicKey& tree, const Remove& remove);
-  std::vector<LeafIndex> apply(TreeKEMPublicKey& tree,
+  static std::vector<LeafIndex> apply(TreeKEMPublicKey& tree,
                                const std::vector<CachedProposal>& proposals,
-                               Proposal::Type required_type) const;
+                               Proposal::Type required_type);
   std::tuple<TreeKEMPublicKey,
              std::vector<LeafIndex>,
              std::vector<PSKWithSecret>,

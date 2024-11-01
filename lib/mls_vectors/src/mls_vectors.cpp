@@ -13,8 +13,10 @@ using namespace MLS_NAMESPACE;
 /// Assertions for verifying test vectors
 ///
 
+// For some reason, clang-tidy lints about C arrays are firing on this line.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 template<typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const T& obj)
 {
   auto u = static_cast<std::underlying_type_t<T>>(obj);
@@ -75,7 +77,7 @@ operator<<(std::ostream& str, const GroupContent::RawContent& obj)
 }
 
 template<typename T>
-inline std::enable_if_t<T::_tls_serializable, std::ostream&>
+static inline std::enable_if_t<T::_tls_serializable, std::ostream&>
 operator<<(std::ostream& str, const T& obj)
 {
   return str << to_hex(tls::marshal(obj));
