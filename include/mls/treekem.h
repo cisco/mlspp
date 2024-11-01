@@ -164,6 +164,7 @@ struct TreeKEMPublicKey
   const bytes& get_hash(NodeIndex index);
   bytes root_hash() const;
 
+  bool parent_hash_valid(LeafIndex from) const;
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
   bool is_complete() const;
@@ -238,8 +239,8 @@ struct TreeKEMPublicKey
     return false;
   }
 
-  using FilteredDirectPath =
-    std::vector<std::tuple<NodeIndex, std::vector<NodeIndex>>>;
+  using FilteredDirectPathEntry = std::tuple<NodeIndex, std::vector<NodeIndex>>;
+  using FilteredDirectPath = std::vector<FilteredDirectPathEntry>;
   FilteredDirectPath filtered_direct_path(NodeIndex index) const;
 
   void truncate();
@@ -262,6 +263,9 @@ private:
   void clear_hash_path(LeafIndex index);
 
   bool has_parent_hash(NodeIndex child, const bytes& target_ph) const;
+  bool parent_hash_valid(LeafIndex from,
+                                    const UpdatePath& path,
+                                    const FilteredDirectPath& fdp) const;
 
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(

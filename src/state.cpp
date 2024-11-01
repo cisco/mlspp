@@ -1202,15 +1202,9 @@ State::handle(const AnnotatedCommit& annotated_commit)
       throw ProtocolError("Commit path has invalid leaf node");
     }
 
-    // XXX(RLB) We can't use this logic to check the parent-hash validity,
-    // because it needs to compute the filtered direct path, which requires
-    // resolutions.  But it seems like if we had a "check parent hashes within
-    // the tree" method, we could use that here.
-#if 0
-    if (!new_tree.parent_hash_valid(sender_location, path)) {
+    if (!new_tree.parent_hash_valid(sender_location)) {
       throw ProtocolError("Commit path has invalid parent hash");
     }
-#endif
 
     const auto resolution_node_index =
       opt::get(annotated_commit.resolution_index);

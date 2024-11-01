@@ -1254,10 +1254,40 @@ TreeKEMPublicKey::original_parent_hash(TreeHashCache& cache,
 }
 
 bool
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from) const
+{
+  // Synthesize a filtered direct path and UpdatePath from the non-blank
+  // ancestors.  Since this is checking for a whole path, we don't need to check
+  // that the resolution is non-empty.
+  auto dp = NodeIndex(from).dirpath(size);
+  auto fdpn = stdx::filter<NodeIndex>(dp, [&](auto n) {
+    return !node_at(n).blank();
+  });
+  auto fdp = stdx::transform<FilteredDirectPathEntry>(fdpn, [&](auto n) {
+    return std::make_tuple(n, std::vector<NodeIndex>{});
+  });
+
+  auto path_nodes = stdx::transform<UpdatePathNode>(fdpn, [&](auto n) {
+    return UpdatePathNode{ node_at(n).parent_node().public_key, {} };
+  });
+  auto path = UpdatePath{ node_at(from).leaf_node(), path_nodes };
+
+  return parent_hash_valid(from, path, fdp);
+}
+
+bool
 TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
                                     const UpdatePath& path) const
 {
   auto fdp = filtered_direct_path(NodeIndex(from));
+  return parent_hash_valid(from, path, fdp);
+}
+
+bool
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
+                                    const UpdatePath& path,
+                                    const FilteredDirectPath& fdp) const
+{
   auto hash_chain = parent_hashes(from, fdp, path.nodes);
   auto leaf_ph =
     var::visit(overloaded{
