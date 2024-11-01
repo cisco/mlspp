@@ -276,10 +276,9 @@ Welcome::group_info_key_nonce(CipherSuite suite,
 AnnotatedWelcome
 AnnotatedWelcome::from(Welcome welcome,
                        const TreeKEMPublicKey& tree,
-                       const LeafIndex sender,
-                       const LeafNode& joiner_leaf_node)
+                       LeafIndex sender,
+                       LeafIndex joiner)
 {
-  const auto joiner = opt::get(tree.find(joiner_leaf_node));
   return {
     std::move(welcome),
     tree.extract_slice(sender),

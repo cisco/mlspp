@@ -716,10 +716,14 @@ struct AnnotatedWelcome
 
   static AnnotatedWelcome from(Welcome welcome,
                                const TreeKEMPublicKey& tree,
-                               const LeafIndex sender,
-                               const LeafNode& joiner_leaf_node);
+                               LeafIndex sender,
+                               LeafIndex joiner);
 
   TreeKEMPublicKey tree() const;
+
+  TLS_SERIALIZABLE(welcome,
+                   sender_membership_proof,
+                   receiver_membership_proof);
 };
 
 struct AnnotatedCommit

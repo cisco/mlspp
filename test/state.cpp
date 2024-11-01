@@ -458,7 +458,7 @@ TEST_CASE_METHOD(StateTest, "Light client can participate")
     first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
   auto first2 = first2_;
   const auto annotated_welcome = AnnotatedWelcome::from(
-    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
 
   // Handle the Commit at the second participant
   auto second2 = opt::get(second1.handle(commit2));
@@ -545,7 +545,7 @@ TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
     first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
   auto first2 = first2_;
   const auto annotated_welcome = AnnotatedWelcome::from(
-    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
 
   auto second2 = opt::get(second1.handle(commit2));
 
@@ -633,7 +633,7 @@ TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
     first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
   auto first2 = first2_;
   const auto annotated_welcome = AnnotatedWelcome::from(
-    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
 
   auto second2 = opt::get(second1.handle(commit2));
 
