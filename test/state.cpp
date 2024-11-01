@@ -602,7 +602,7 @@ TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
 
 TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
 {
-  // Initialize the creator's state
+  // Initialize the first two users
   auto first0 = State{ group_id,
                        suite,
                        leaf_privs[0],
@@ -610,16 +610,12 @@ TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
                        key_packages[0].leaf_node,
                        {} };
 
-  // Add the second participant
   auto add1 = first0.add_proposal(key_packages[1]);
   auto [commit1, welcome1, first1_] =
     first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
   silence_unused(commit1);
   auto first1 = first1_;
 
-  // Initialize the second participant from the Welcome.  Note that the second
-  // participant is always a full client, because the membership proofs cover
-  // the whole tree.
   auto second1 = State{ init_privs[1],
                         leaf_privs[1],
                         identity_privs[1],
@@ -631,19 +627,16 @@ TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
   REQUIRE(second1.is_full_client());
   REQUIRE(first1 == second1);
 
-  // Add the third participant
+  // Add the third participant as a light client
   auto add2 = first0.add_proposal(key_packages[2]);
   auto [commit2, welcome2, first2_] =
     first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
   auto first2 = first2_;
   const auto annotated_welcome = AnnotatedWelcome::from(
-    welcome2, first2.tree(), LeafIndex{ 2 }, key_packages[2].leaf_node);
+    welcome2, first2.tree(), LeafIndex{ 0 }, key_packages[2].leaf_node);
 
-  // Handle the Commit at the second participant
   auto second2 = opt::get(second1.handle(commit2));
 
-  // Initialize the third participant as a light client, by only including
-  // membership proofs in the Welcome, not the full tree
   auto third2 = State{ init_privs[2],
                        leaf_privs[2],
                        identity_privs[2],
