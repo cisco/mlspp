@@ -30,8 +30,6 @@ bytes::operator==(const std::vector<uint8_t>& other) const
 
   unsigned char diff = 0;
   for (size_t i = 0; i < size; ++i) {
-    // Not sure why the linter thinks `diff` is signed
-    // NOLINTNEXTLINE(hicpp-signed-bitwise)
     diff |= (_data.at(i) ^ other.at(i));
   }
   return (diff == 0);

@@ -1,8 +1,6 @@
 #include <mls_ds/tree_follower.h>
 
-namespace MLS_NAMESPACE {
-
-namespace mls_ds {
+namespace MLS_NAMESPACE::mls_ds {
 
 ///
 /// Resolving & Applying Proposals
@@ -123,7 +121,7 @@ apply(TreeKEMPublicKey& tree,
 /// TreeFollower
 ///
 
-TreeFollower::TreeFollower(KeyPackage key_package)
+TreeFollower::TreeFollower(const KeyPackage& key_package)
   : _suite(key_package.cipher_suite)
   , _tree(key_package.cipher_suite)
 {
@@ -165,6 +163,4 @@ TreeFollower::update(const mls::MLSMessage& commit_message,
   }
 }
 
-} // namespace mls_vectors
-
-} // namespace MLS_NAMESPACE
+} // namespace MLS_NAMESPACE::mls_ds

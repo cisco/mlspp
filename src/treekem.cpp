@@ -949,7 +949,7 @@ TreeKEMPublicKey::encap(const TreeKEMPrivateKey& priv,
 
     auto ct = stdx::transform<HPKECiphertext>(res, [&](auto nr) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
-      const auto ct = node_pub.encrypt(
+      auto ct = node_pub.encrypt(
         suite, encrypt_label::update_path_node, context, path_secret);
       return ct;
     });

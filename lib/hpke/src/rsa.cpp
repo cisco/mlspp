@@ -31,7 +31,6 @@ RSASignature::generate_key_pair(size_t bits)
     throw openssl_error();
   }
 
-  // NOLINTNEXTLINE(hicpp-signed-bitwise)
   if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx.get(), static_cast<int>(bits)) <=
       0) {
     throw openssl_error();

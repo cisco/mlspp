@@ -4,34 +4,30 @@
 #include <mls/treekem.h>
 #include <vector>
 
-namespace MLS_NAMESPACE {
+namespace MLS_NAMESPACE::mls_ds {
 
-namespace mls_ds {
-
-namespace mls = ::MLS_NAMESPACE;
+using namespace MLS_NAMESPACE;
 
 class TreeFollower
 {
 public:
   // Construct a one-member tree
-  TreeFollower(mls::KeyPackage key_package);
+  TreeFollower(const KeyPackage& key_package);
 
   // Import a tree as a starting point for future updates
-  TreeFollower(mls::TreeKEMPublicKey tree);
+  TreeFollower(TreeKEMPublicKey tree);
 
   // Update the tree with a set of proposals applied by a commit
-  void update(const mls::MLSMessage& commit_message,
-              const std::vector<mls::MLSMessage>& extra_proposals);
+  void update(const MLSMessage& commit_message,
+              const std::vector<MLSMessage>& extra_proposals);
 
   // Accessors
-  mls::CipherSuite cipher_suite() const { return _suite; }
-  const mls::TreeKEMPublicKey& tree() const { return _tree; }
+  CipherSuite cipher_suite() const { return _suite; }
+  const TreeKEMPublicKey& tree() const { return _tree; }
 
 private:
-  mls::CipherSuite _suite;
-  mls::TreeKEMPublicKey _tree;
+  CipherSuite _suite;
+  TreeKEMPublicKey _tree;
 };
 
-} // namespace mls_ds
-
-} // namespace MLS_NAMESPACE
+} // namespace MLS_NAMESPACE::mls_ds
