@@ -13,8 +13,10 @@ using namespace MLS_NAMESPACE;
 /// Assertions for verifying test vectors
 ///
 
+// For some reason, clang-tidy lints about C arrays are firing on this line.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 template<typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
-std::ostream&
+static std::ostream&
 operator<<(std::ostream& str, const T& obj)
 {
   auto u = static_cast<std::underlying_type_t<T>>(obj);
@@ -75,7 +77,7 @@ operator<<(std::ostream& str, const GroupContent::RawContent& obj)
 }
 
 template<typename T>
-inline std::enable_if_t<T::_tls_serializable, std::ostream&>
+static inline std::enable_if_t<T::_tls_serializable, std::ostream&>
 operator<<(std::ostream& str, const T& obj)
 {
   return str << to_hex(tls::marshal(obj));
@@ -587,7 +589,11 @@ KeyScheduleTestVector::KeyScheduleTestVector(CipherSuite suite,
     // TODO(RLB) Add Test case for externally-driven epoch change
     auto commit_secret = epoch_prg.secret("commit_secret");
     auto psk_secret = epoch_prg.secret("psk_secret");
-    epoch = epoch.next_raw(commit_secret, psk_secret, std::nullopt, ctx);
+    epoch = epoch.next_raw(commit_secret,
+                           psk_secret,
+                           std::nullopt,
+                           group_context.confirmed_transcript_hash,
+                           ctx);
 
     auto welcome_secret = KeyScheduleEpoch::welcome_secret_raw(
       cipher_suite, epoch.joiner_secret, psk_secret);
@@ -645,8 +651,11 @@ KeyScheduleTestVector::verify() const
     auto ctx = tls::marshal(group_context);
     VERIFY_EQUAL("group context", ctx, tve.group_context);
 
-    epoch =
-      epoch.next_raw(tve.commit_secret, tve.psk_secret, std::nullopt, ctx);
+    epoch = epoch.next_raw(tve.commit_secret,
+                           tve.psk_secret,
+                           std::nullopt,
+                           group_context.confirmed_transcript_hash,
+                           ctx);
 
     // Verify the rest of the epoch
     VERIFY_EQUAL("joiner secret", epoch.joiner_secret, tve.joiner_secret);
@@ -959,17 +968,17 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
 
   auto group_id = prg.secret("group_id");
   auto epoch = prg.uint64("epoch");
-  auto group_context_obj =
+  auto group_context =
     GroupContext{ suite,
                   group_id,
                   epoch,
                   prg.secret("tree_hash_before"),
                   prg.secret("confirmed_transcript_hash_before"),
                   {} };
-  auto group_context = tls::marshal(group_context_obj);
 
   auto init_secret = prg.secret("init_secret");
-  auto ks_epoch = KeyScheduleEpoch(suite, init_secret, group_context);
+  auto key_schedule_before =
+    KeyScheduleEpoch(suite, init_secret, tls::marshal(group_context));
 
   auto sig_priv = prg.signature_key("sig_priv");
   auto leaf_index = LeafIndex{ 0 };
@@ -980,17 +989,27 @@ TranscriptTestVector::TranscriptTestVector(CipherSuite suite)
       group_id, epoch, { MemberSender{ leaf_index } }, {}, Commit{} },
     suite,
     sig_priv,
-    group_context_obj);
+    group_context);
 
-  transcript.update_confirmed(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(
+    authenticated_content.confirmed_transcript_hash_input());
+  transcript.set_confirmed(new_confirmed);
+  ;
 
-  const auto confirmation_tag = ks_epoch.confirmation_tag(transcript.confirmed);
-  authenticated_content.set_confirmation_tag(confirmation_tag);
+  group_context.confirmed_transcript_hash = transcript.confirmed;
+  auto key_schedule_after =
+    key_schedule_before.next(suite.zero(),
+                             {},
+                             std::nullopt,
+                             transcript.confirmed,
+                             tls::marshal(group_context));
 
-  transcript.update_interim(authenticated_content);
+  authenticated_content.set_confirmation_tag(
+    key_schedule_after.confirmation_tag);
+  transcript.update_interim(key_schedule_after.confirmation_tag);
 
   // Store the required data
-  confirmation_key = ks_epoch.confirmation_key;
+  confirmation_key = key_schedule_after.confirmation_key;
   confirmed_transcript_hash_after = transcript.confirmed;
   interim_transcript_hash_after = transcript.interim;
 }
@@ -1001,7 +1020,14 @@ TranscriptTestVector::verify() const
   auto transcript = TranscriptHash(cipher_suite);
   transcript.interim = interim_transcript_hash_before;
 
-  transcript.update(authenticated_content);
+  const auto new_confirmed = transcript.new_confirmed(
+    authenticated_content.confirmed_transcript_hash_input());
+  transcript.set_confirmed(new_confirmed);
+
+  const auto input_confirmation_tag =
+    opt::get(authenticated_content.auth.confirmation_tag);
+  transcript.update_interim(input_confirmation_tag);
+
   VERIFY_EQUAL(
     "confirmed", transcript.confirmed, confirmed_transcript_hash_after);
   VERIFY_EQUAL("interim", transcript.interim, interim_transcript_hash_after);
@@ -1055,15 +1081,16 @@ WelcomeTestVector::WelcomeTestVector(CipherSuite suite)
     cipher_suite, group_id, epoch, tree_hash, confirmed_transcript_hash, {}
   };
 
-  auto key_schedule = KeyScheduleEpoch::joiner(
-    cipher_suite, joiner_secret, {}, tls::marshal(group_context));
-  auto confirmation_tag =
-    key_schedule.confirmation_tag(confirmed_transcript_hash);
+  auto key_schedule = KeyScheduleEpoch::joiner(cipher_suite,
+                                               joiner_secret,
+                                               {},
+                                               confirmed_transcript_hash,
+                                               tls::marshal(group_context));
 
   auto group_info = GroupInfo{
     group_context,
     {},
-    confirmation_tag,
+    key_schedule.confirmation_tag,
   };
   group_info.sign(signer_index, signer_priv);
 
@@ -1098,10 +1125,15 @@ WelcomeTestVector::verify() const
 
   // Verify confirmation tag
   const auto& group_context = group_info.group_context;
-  auto key_schedule = KeyScheduleEpoch::joiner(
-    cipher_suite, group_secrets.joiner_secret, {}, tls::marshal(group_context));
-  auto confirmation_tag =
-    key_schedule.confirmation_tag(group_context.confirmed_transcript_hash);
+  auto key_schedule =
+    KeyScheduleEpoch::joiner(cipher_suite,
+                             group_secrets.joiner_secret,
+                             {},
+                             group_context.confirmed_transcript_hash,
+                             tls::marshal(group_context));
+  VERIFY_EQUAL("confirmation tag",
+               key_schedule.confirmation_tag,
+               group_info.confirmation_tag);
 
   return std::nullopt;
 }

@@ -106,6 +106,7 @@ public:
   bytes epoch_authenticator;
   bytes external_secret;
   bytes confirmation_key;
+  bytes confirmation_tag;
   bytes membership_key;
   bytes resumption_psk;
   bytes init_secret;
@@ -118,6 +119,7 @@ public:
   static KeyScheduleEpoch joiner(CipherSuite suite_in,
                                  const bytes& joiner_secret,
                                  const std::vector<PSKWithSecret>& psks,
+                                 const bytes& confirmed_transcript_hash,
                                  const bytes& context);
 
   // Ciphersuite-only initializer, used by external joiner
@@ -136,10 +138,10 @@ public:
   KeyScheduleEpoch next(const bytes& commit_secret,
                         const std::vector<PSKWithSecret>& psks,
                         const std::optional<bytes>& force_init_secret,
+                        const bytes& confirmed_transcript_hash,
                         const bytes& context) const;
 
   GroupKeySource encryption_keys(LeafCount size) const;
-  bytes confirmation_tag(const bytes& confirmed_transcript_hash) const;
   bytes do_export(const std::string& label,
                   const bytes& context,
                   size_t size) const;
@@ -161,10 +163,12 @@ public:
                    const bytes& init_secret,
                    const bytes& commit_secret,
                    const bytes& psk_secret,
+                   const bytes& confirmed_transcript_hash,
                    const bytes& context);
   KeyScheduleEpoch next_raw(const bytes& commit_secret,
                             const bytes& psk_secret,
                             const std::optional<bytes>& force_init_secret,
+                            const bytes& confirmed_transcript_hash,
                             const bytes& context) const;
   static bytes welcome_secret_raw(CipherSuite suite,
                                   const bytes& joiner_secret,
@@ -174,6 +178,7 @@ private:
   KeyScheduleEpoch(CipherSuite suite_in,
                    const bytes& joiner_secret,
                    const bytes& psk_secret,
+                   const bytes& confirmed_transcript_hash,
                    const bytes& context);
 };
 
@@ -194,10 +199,10 @@ struct TranscriptHash
                  bytes confirmed_in,
                  const bytes& confirmation_tag);
 
-  void update(const AuthenticatedContent& content_auth);
-  void update_confirmed(const AuthenticatedContent& content_auth);
+  // Updating hashes
+  bytes new_confirmed(const bytes& transcript_hash_input) const;
+  void set_confirmed(bytes confirmed_transcript_hash);
   void update_interim(const bytes& confirmation_tag);
-  void update_interim(const AuthenticatedContent& content_auth);
 };
 
 bool

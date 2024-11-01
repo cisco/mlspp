@@ -728,7 +728,7 @@ private:
   }
 #endif
 
-  static inline int group_to_nid(Group::ID group_id)
+  static int group_to_nid(Group::ID group_id)
   {
     switch (group_id) {
       case Group::ID::P256:
@@ -862,7 +862,7 @@ struct RawKeyGroup : public EVPGroup
 private:
   const int evp_type;
 
-  static inline int group_to_evp(Group::ID group_id)
+  static int group_to_evp(Group::ID group_id)
   {
     switch (group_id) {
       case Group::ID::X25519:

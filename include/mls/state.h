@@ -321,16 +321,36 @@ protected:
     const bytes& leaf_secret,
     const std::optional<CommitOpts>& opts,
     const MessageOpts& msg_opts,
-    CommitParams params);
+    const CommitParams& params);
 
-  std::optional<State> handle(
-    const MLSMessage& msg,
-    std::optional<State> cached_state,
-    const std::optional<CommitParams>& expected_params);
+  struct CommitMaterials;
+  CommitMaterials prepare_commit(const bytes& leaf_secret,
+                                 const std::optional<CommitOpts>& opts,
+                                 const CommitParams& params) const;
+  Welcome welcome(bool inline_tree,
+                  const std::vector<PSKWithSecret>& psks,
+                  const std::vector<KeyPackage>& joiners,
+                  const std::vector<std::optional<bytes>>& path_secrets) const;
+
   std::optional<State> handle(
     const ValidatedContent& val_content,
     std::optional<State> cached_state,
     const std::optional<CommitParams>& expected_params);
+
+  void handle_proposal(const AuthenticatedContent& content_auth);
+  State handle_commit(const AuthenticatedContent& content_auth,
+                      std::optional<State> cached_state,
+                      const std::optional<CommitParams>& expected_params) const;
+
+  State ratchet(TreeKEMPublicKey new_tree,
+                LeafIndex committer,
+                const std::optional<NodeIndex>& path_secret_decrypt_node,
+                const std::optional<HPKECiphertext>& encrypted_path_secret,
+                ExtensionList extensions,
+                const std::vector<PSKWithSecret>& psks,
+                const std::optional<bytes>& force_init_secret,
+                const bytes& confirmed_transcript_hash,
+                const bytes& confirmation_tag) const;
 
   // Create an MLSMessage encapsulating some content
   template<typename Inner>
@@ -345,24 +365,26 @@ protected:
   MLSMessage protect_full(Inner&& content, const MessageOpts& msg_opts);
 
   // Apply the changes requested by various messages
-  LeafIndex apply(const Add& add);
-  void apply(LeafIndex target, const Update& update);
-  void apply(LeafIndex target,
-             const Update& update,
-             const HPKEPrivateKey& leaf_priv);
-  LeafIndex apply(const Remove& remove);
-  void apply(const GroupContextExtensions& gce);
-  std::vector<LeafIndex> apply(const std::vector<CachedProposal>& proposals,
-                               Proposal::Type required_type);
-  std::tuple<std::vector<LeafIndex>, std::vector<PSKWithSecret>> apply(
-    const std::vector<CachedProposal>& proposals);
+  static LeafIndex apply(TreeKEMPublicKey& tree, const Add& add);
+  static void apply(TreeKEMPublicKey& tree,
+                    LeafIndex target,
+                    const Update& update);
+  static LeafIndex apply(TreeKEMPublicKey& tree, const Remove& remove);
+  static std::vector<LeafIndex> apply(
+    TreeKEMPublicKey& tree,
+    const std::vector<CachedProposal>& proposals,
+    Proposal::Type required_type);
+  std::tuple<TreeKEMPublicKey,
+             std::vector<LeafIndex>,
+             std::vector<PSKWithSecret>,
+             ExtensionList>
+  apply(const std::vector<CachedProposal>& proposals) const;
 
   // Verify that a specific key package or all members support a given set of
   // extensions
   bool extensions_supported(const ExtensionList& exts) const;
 
   // Extract proposals and PSKs from cache
-  void cache_proposal(AuthenticatedContent content_auth);
   std::optional<CachedProposal> resolve(
     const ProposalOrRef& id,
     std::optional<LeafIndex> sender_index) const;
@@ -409,11 +431,6 @@ protected:
   friend bool operator==(const State& lhs, const State& rhs);
   friend bool operator!=(const State& lhs, const State& rhs);
 
-  // Derive and set the secrets for an epoch, given some new entropy
-  void update_epoch_secrets(const bytes& commit_secret,
-                            const std::vector<PSKWithSecret>& psks,
-                            const std::optional<bytes>& force_init_secret);
-
   // Signature verification over a handshake message
   bool verify_internal(const AuthenticatedContent& content_auth) const;
   bool verify_external(const AuthenticatedContent& content_auth) const;
@@ -425,8 +442,15 @@ protected:
   // Convert a Roster entry into LeafIndex
   LeafIndex leaf_for_roster_entry(RosterIndex index) const;
 
-  // Create a draft successor state
-  State successor() const;
+  // Create a successor state
+  State successor(LeafIndex index,
+                  TreeKEMPublicKey tree,
+                  TreeKEMPrivateKey tree_priv,
+                  ExtensionList extensions,
+                  const bytes& confirmed_transcript_hash,
+                  bool has_path,
+                  const std::vector<PSKWithSecret>& psks,
+                  const std::optional<bytes>& force_init_secret) const;
 };
 
 } // namespace MLS_NAMESPACE

@@ -266,7 +266,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM encap/decap")
   }
 }
 
-TEST_CASE("TreeKEM Interop")
+TEST_CASE("TreeKEM Interop", "[.][all]")
 {
   for (auto suite : all_supported_suites) {
     for (auto structure : treekem_test_tree_structures) {
