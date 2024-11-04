@@ -1062,16 +1062,14 @@ MLSClientImpl::commit(CachedState& entry,
     by_value.emplace_back(std::move(proposal));
   }
 
-  const auto force_path = request->force_path();
-  const auto inline_tree = !request->external_tree();
-  const auto include_membership_proof = false;
+  auto force_path = request->force_path();
+  auto inline_tree = !request->external_tree();
 
   auto leaf_secret =
     MLS_NAMESPACE::random_bytes(entry.state.cipher_suite().secret_size());
   auto [commit, welcome, next] = entry.state.commit(
     leaf_secret,
-    MLS_NAMESPACE::CommitOpts{
-      by_value, inline_tree, force_path, include_membership_proof, {} },
+    MLS_NAMESPACE::CommitOpts{ by_value, inline_tree, force_path, {} },
     entry.message_opts());
 
   if (!inline_tree) {
@@ -1339,13 +1337,10 @@ MLSClientImpl::reinit_commit(CachedState& entry,
     throw std::runtime_error("Commit included among proposals");
   }
 
-  const auto include_membership_proof = false;
-
   const auto leaf_secret =
     MLS_NAMESPACE::random_bytes(entry.state.cipher_suite().secret_size());
-  const auto commit_opts = MLS_NAMESPACE::CommitOpts{
-    {}, inline_tree, force_path, include_membership_proof, {}
-  };
+  const auto commit_opts =
+    MLS_NAMESPACE::CommitOpts{ {}, inline_tree, force_path, {} };
   auto [tombstone, commit] =
     entry.state.reinit_commit(leaf_secret, commit_opts, entry.message_opts());
 
@@ -1455,17 +1450,16 @@ MLSClientImpl::reinit_welcome(const ReInitWelcomeRequest* request,
   // Create the Welcome
   const auto inline_tree = !request->external_tree();
   const auto force_path = request->force_path();
-  const auto include_membership_proof = false;
   const auto cipher_suite = reinit->tombstone.reinit.cipher_suite;
   const auto leaf_secret =
     MLS_NAMESPACE::random_bytes(cipher_suite.secret_size());
-  auto [state, welcome] = reinit->tombstone.create_welcome(
-    reinit->kp_priv.encryption_priv,
-    reinit->kp_priv.signature_priv,
-    reinit->kp_priv.key_package.leaf_node,
-    key_packages,
-    leaf_secret,
-    { {}, inline_tree, force_path, include_membership_proof, {} });
+  auto [state, welcome] =
+    reinit->tombstone.create_welcome(reinit->kp_priv.encryption_priv,
+                                     reinit->kp_priv.signature_priv,
+                                     reinit->kp_priv.key_package.leaf_node,
+                                     key_packages,
+                                     leaf_secret,
+                                     { {}, inline_tree, force_path, {} });
 
   const auto welcome_data =
     MLS_NAMESPACE::tls::marshal(MLS_NAMESPACE::MLSMessage{ welcome });
@@ -1558,21 +1552,20 @@ MLSClientImpl::create_branch(CachedState& entry,
 
   const auto inline_tree = !request->external_tree();
   const auto force_path = request->force_path();
-  const auto include_membership_proof = false;
   const auto group_id = string_to_bytes(request->group_id());
   const auto cipher_suite = entry.state.cipher_suite();
   const auto kp_priv = new_key_package(cipher_suite, identity);
   const auto leaf_secret =
     MLS_NAMESPACE::random_bytes(cipher_suite.secret_size());
-  auto [next, welcome] = entry.state.create_branch(
-    group_id,
-    kp_priv.encryption_priv,
-    kp_priv.signature_priv,
-    kp_priv.key_package.leaf_node,
-    ext_list,
-    key_packages,
-    leaf_secret,
-    { {}, inline_tree, force_path, include_membership_proof, {} });
+  auto [next, welcome] =
+    entry.state.create_branch(group_id,
+                              kp_priv.encryption_priv,
+                              kp_priv.signature_priv,
+                              kp_priv.key_package.leaf_node,
+                              ext_list,
+                              key_packages,
+                              leaf_secret,
+                              { {}, inline_tree, force_path, {} });
 
   const auto epoch_authenticator = next.epoch_authenticator();
 

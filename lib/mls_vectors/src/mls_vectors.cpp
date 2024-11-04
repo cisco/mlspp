@@ -1,8 +1,9 @@
 #include <mls/key_schedule.h>
 #include <mls/state.h>
 #include <mls/tree_math.h>
-#include <mls_ds/tree_follower.h>
 #include <mls_vectors/mls_vectors.h>
+
+#include <iostream> // XXX
 
 namespace mls_vectors {
 
@@ -2056,7 +2057,7 @@ PassiveClientTestVector::verify()
     ext_psks.insert_or_assign(id, psk);
   }
 
-  // Join the group
+  // Join the group and follow along
   auto state = State(init_priv,
                      encryption_priv,
                      signature_priv,
@@ -2067,39 +2068,12 @@ PassiveClientTestVector::verify()
   VERIFY_EQUAL(
     "initial epoch", state.epoch_authenticator(), initial_epoch_authenticator);
 
-  // Enable the DS to follow along based on commits
-  auto follower = mls_ds::TreeFollower{ state.tree() };
-
-  // Follow along as Commits are sent
   for (const auto& tve : epochs) {
-    for (const auto& proposal_message : tve.proposals) {
-      if (light_client) {
-        // Ensure that the light client is able to verify the message
-        const auto& public_message =
-          var::get<PublicMessage>(proposal_message.message);
-        const auto content_auth = public_message.authenticated_content();
-        const auto sender = content_auth.content.sender.sender;
-        if (var::holds_alternative<MemberSender>(sender)) {
-          const auto& sender_index = var::get<MemberSender>(sender).sender;
-          const auto sender_slice = follower.tree().extract_slice(sender_index);
-          state.implant_tree_slice(sender_slice);
-        }
-      }
-
-      state.handle(proposal_message);
+    for (const auto& proposal : tve.proposals) {
+      state.handle(proposal);
     }
 
-    const auto last_tree = follower.tree();
-    follower.update(tve.commit, tve.proposals);
-
-    if (light_client) {
-      const auto annotated_commit = AnnotatedCommit::from(
-        state.index(), tve.proposals, tve.commit, last_tree, follower.tree());
-      state = state.handle(annotated_commit);
-    } else {
-      state = opt::get(state.handle(tve.commit));
-    }
-
+    state = opt::get(state.handle(tve.commit));
     VERIFY_EQUAL(
       "epoch auth", state.epoch_authenticator(), tve.epoch_authenticator)
   }
