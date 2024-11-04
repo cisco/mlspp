@@ -389,7 +389,7 @@ AnnotatedCommit::from(LeafIndex receiver,
     // Compute the required coordinates
     const auto coords =
       tree_after.decap_coords(receiver, sender, joiner_locations);
-    resolution_index = coords.resolution_node_index;
+    resolution_index = static_cast<uint32_t>(coords.resolution_node_index);
   }
 
   // Provide new extensions if present

@@ -1379,7 +1379,8 @@ operator>>(tls::istream& str, TreeKEMPublicKey& obj)
   }
 
   const auto node_size = NodeCount(obj.size);
-  for (uint32_t i = nodes.size(); i < node_size.val; i++) {
+  const auto provided_node_count = static_cast<uint32_t>(nodes.size());
+  for (uint32_t i = provided_node_count; i < node_size.val; i++) {
     obj.nodes.insert_or_assign(NodeIndex(i), OptionalNode{});
   }
 
