@@ -323,9 +323,12 @@ AnnotatedCommit::from(LeafIndex receiver,
   // Compute the list of committed proposals
   auto cache = std::map<ProposalRef, Proposal>{};
   for (const auto& proposal_msg : proposals) {
-    const auto& proposal_public_message = var::get<PublicMessage>(proposal_msg.message);
-    const auto proposal_content_auth = proposal_public_message.authenticated_content();
-    const auto proposal = var::get<Proposal>(proposal_content_auth.content.content);
+    const auto& proposal_public_message =
+      var::get<PublicMessage>(proposal_msg.message);
+    const auto proposal_content_auth =
+      proposal_public_message.authenticated_content();
+    const auto proposal =
+      var::get<Proposal>(proposal_content_auth.content.content);
 
     const auto ref = tree_before.suite.ref(content_auth);
     cache.insert_or_assign(ref, proposal);
