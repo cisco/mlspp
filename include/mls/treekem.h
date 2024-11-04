@@ -264,8 +264,8 @@ private:
 
   bool has_parent_hash(NodeIndex child, const bytes& target_ph) const;
   bool parent_hash_valid(LeafIndex from,
-                                    const UpdatePath& path,
-                                    const FilteredDirectPath& fdp) const;
+                         const UpdatePath& path,
+                         const FilteredDirectPath& fdp) const;
 
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(

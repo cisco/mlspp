@@ -721,9 +721,7 @@ struct AnnotatedWelcome
 
   TreeKEMPublicKey tree() const;
 
-  TLS_SERIALIZABLE(welcome,
-                   sender_membership_proof,
-                   receiver_membership_proof);
+  TLS_SERIALIZABLE(welcome, sender_membership_proof, receiver_membership_proof);
 };
 
 struct AnnotatedCommit

@@ -1260,12 +1260,10 @@ TreeKEMPublicKey::parent_hash_valid(LeafIndex from) const
   // ancestors.  Since this is checking for a whole path, we don't need to check
   // that the resolution is non-empty.
   auto dp = NodeIndex(from).dirpath(size);
-  auto fdpn = stdx::filter<NodeIndex>(dp, [&](auto n) {
-    return !node_at(n).blank();
-  });
-  auto fdp = stdx::transform<FilteredDirectPathEntry>(fdpn, [&](auto n) {
-    return std::make_tuple(n, std::vector<NodeIndex>{});
-  });
+  auto fdpn =
+    stdx::filter<NodeIndex>(dp, [&](auto n) { return !node_at(n).blank(); });
+  auto fdp = stdx::transform<FilteredDirectPathEntry>(
+    fdpn, [&](auto n) { return std::make_tuple(n, std::vector<NodeIndex>{}); });
 
   auto path_nodes = stdx::transform<UpdatePathNode>(fdpn, [&](auto n) {
     return UpdatePathNode{ node_at(n).parent_node().public_key, {} };

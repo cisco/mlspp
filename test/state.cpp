@@ -571,7 +571,8 @@ TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
   auto commits = std::vector<MLSMessage>{};
   const auto n_commits = size_t(5);
   for (auto i = size_t(0); i < n_commits; i++) {
-    const auto [commit, welcome, next_first] = first.commit(fresh_secret(), {}, {});
+    const auto [commit, welcome, next_first] =
+      first.commit(fresh_secret(), {}, {});
     silence_unused(welcome);
     const auto annotated_commit = AnnotatedCommit::from(
       third.index(), {}, commit, first.tree(), next_first.tree());
