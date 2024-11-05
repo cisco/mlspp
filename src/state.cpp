@@ -29,13 +29,13 @@ State::State(bytes group_id,
   }
 
   _index = _tree.add_leaf(leaf_node);
-  _tree.set_hash_all();
   _tree_priv = TreeKEMPrivateKey::solo(suite, _index, std::move(enc_priv));
   if (!_tree_priv.consistent(_tree)) {
     throw InvalidParameterError("LeafNode inconsistent with private key");
   }
 
   // XXX(RLB): Convert KeyScheduleEpoch to take GroupContext?
+  _tree.set_hash_all();
   auto ctx = tls::marshal(group_context());
   _key_schedule =
     KeyScheduleEpoch(_suite, random_bytes(_suite.secret_size()), ctx);
@@ -52,6 +52,7 @@ State::import_tree(const bytes& tree_hash,
 {
   auto tree = TreeKEMPublicKey(_suite);
   auto maybe_tree_extn = extensions.find<RatchetTreeExtension>();
+
   if (external) {
     tree = opt::get(external);
   } else if (maybe_tree_extn) {
@@ -73,6 +74,12 @@ State::import_tree(const bytes& tree_hash,
 bool
 State::validate_tree() const
 {
+  // If we don't have a full tree, then we can't verify any properties
+  // TODO(RLB) We can in fact verify that the leaf node signatures are valid.
+  if (!_tree.is_complete()) {
+    return true;
+  }
+
   // The functionality here is somewhat duplicative of State::valid(const
   // LeafNode&).  Simply calling that method, however, would result in this
   // method having quadratic scaling, since each call to valid() does a linear
@@ -753,8 +760,7 @@ State::welcome(bool inline_tree,
                const std::vector<KeyPackage>& joiners,
                const std::vector<std::optional<bytes>>& path_secrets) const
 {
-  // TODO(RLB) Suppress external_pub in this GroupInfo
-  auto group_info_obj = group_info(inline_tree);
+  auto group_info_obj = group_info(false, inline_tree);
 
   auto welcome =
     Welcome{ _suite, _key_schedule.joiner_secret, psks, group_info_obj };
@@ -1095,6 +1101,166 @@ State::ratchet(TreeKEMPublicKey new_tree,
   }
 
   return next;
+}
+
+///
+/// Light MLS
+///
+
+void
+State::implant_tree_slice(const TreeSlice& slice)
+{
+  _tree.implant_slice(slice);
+}
+
+State
+State::handle(const AnnotatedCommit& annotated_commit)
+{
+  const auto external_commit =
+    !bool(annotated_commit.sender_membership_proof_before);
+  if (!external_commit) {
+    // If this is not an external commit, verify that the sender is a member of
+    // the group ...
+    const auto& proof =
+      opt::get(annotated_commit.sender_membership_proof_before);
+    if (proof.tree_hash(_suite) != _tree.root_hash()) {
+      throw ProtocolError("Invalid sender membership proof");
+    }
+
+    // ... and verify that the same leaf is proved before and after
+    if (proof.leaf_index !=
+        annotated_commit.sender_membership_proof_after.leaf_index) {
+      throw ProtocolError("Inconsistent sender membership proofs before/after");
+    }
+
+    // Then remember that the sender is a part of the tree
+    _tree.implant_slice(proof);
+  }
+
+  // Verify the membership proofs are consistent
+  const auto tree_hash_after =
+    annotated_commit.sender_membership_proof_after.tree_hash(_suite);
+  if (tree_hash_after !=
+      annotated_commit.receiver_membership_proof_after.tree_hash(_suite)) {
+    throw ProtocolError("Inconsistent sender and receiver membership proofs");
+  }
+
+  if (_index != annotated_commit.receiver_membership_proof_after.leaf_index) {
+    throw ProtocolError("Receiver membership proof is not for this node");
+  }
+
+  // XXX(RLB) This could fail if the receiver could have sent Update
+  const auto my_leaf = opt::get(_tree.leaf_node(_index));
+  const auto& proof_node = opt::get(
+    annotated_commit.receiver_membership_proof_after.direct_path_nodes[0].node);
+  const auto& proof_leaf = var::get<LeafNode>(proof_node.node);
+  if (my_leaf != proof_leaf) {
+    throw ProtocolError("Incorrect leaf node in receiver membership proof");
+  }
+
+  // Unwrap the commit
+  const auto val_content = unwrap(annotated_commit.commit_message);
+  const auto& content_auth = val_content.authenticated_content();
+  const auto& content = content_auth.content;
+  const auto& commit = var::get<Commit>(content.content);
+
+  const auto sender_location =
+    annotated_commit.sender_membership_proof_after.leaf_index;
+  if (var::holds_alternative<MemberSender>(content.sender.sender) &&
+      var::get<MemberSender>(content.sender.sender).sender != sender_location) {
+    throw ProtocolError("Incorrect commit sender");
+  }
+
+  // If this is an external commit, extract the forced init secret
+  auto force_init_secret = std::optional<bytes>{};
+  if (var::holds_alternative<NewMemberCommitSender>(content.sender.sender)) {
+    const auto kem_output = commit.valid_external();
+    if (!kem_output) {
+      throw ProtocolError("Invalid external commit");
+    }
+
+    force_init_secret =
+      _key_schedule.receive_external_init(opt::get(kem_output));
+  }
+
+  // Update the GroupContext
+  auto new_tree =
+    TreeKEMPublicKey(_suite, annotated_commit.sender_membership_proof_after);
+  new_tree.implant_slice(annotated_commit.receiver_membership_proof_after);
+
+  // Identify the encrypted path secret and how to decrypt it
+  auto path_secret_decrypt_node = std::optional<NodeIndex>{};
+  auto encrypted_path_secret = std::optional<HPKECiphertext>{};
+  if (commit.path) {
+    if (!annotated_commit.resolution_index) {
+      throw ProtocolError("Commit path present without resolution index");
+    }
+
+    const auto& path = opt::get(commit.path);
+
+    if (!valid(path.leaf_node, LeafNodeSource::commit, sender_location)) {
+      throw ProtocolError("Commit path has invalid leaf node");
+    }
+
+    if (!new_tree.parent_hash_valid(sender_location)) {
+      throw ProtocolError("Commit path has invalid parent hash");
+    }
+
+    const auto resolution_node_index =
+      opt::get(annotated_commit.resolution_index);
+    const auto coords = new_tree.ancestor_index(_index, sender_location);
+
+    path_secret_decrypt_node = coords.resolution_node;
+    encrypted_path_secret = path.nodes.at(coords.ancestor_node_index)
+                              .encrypted_path_secret.at(resolution_node_index);
+  }
+
+  // Update the transcript hash
+  const auto new_confirmed_transcript_hash = _transcript_hash.new_confirmed(
+    content_auth.confirmed_transcript_hash_input());
+  const auto new_confirmation_tag =
+    opt::get(content_auth.auth.confirmation_tag);
+
+  // Identify GCE or PSK proposals
+  const auto proposals = must_resolve(commit.proposals, sender_location);
+  auto extensions = _extensions;
+  auto psk_ids = std::vector<PreSharedKeyID>{};
+  for (const auto& p : proposals) {
+    if (p.proposal.proposal_type() == ProposalType::psk) {
+      const auto& psk_proposal = var::get<PreSharedKey>(p.proposal.content);
+      psk_ids.push_back(psk_proposal.psk);
+    }
+
+    if (p.proposal.proposal_type() == ProposalType::group_context_extensions) {
+      const auto& gce_proposal =
+        var::get<GroupContextExtensions>(p.proposal.content);
+      extensions = gce_proposal.group_context_extensions;
+    }
+  }
+
+  const auto psks = resolve(psk_ids);
+
+  return ratchet(std::move(new_tree),
+                 sender_location,
+                 path_secret_decrypt_node,
+                 encrypted_path_secret,
+                 extensions,
+                 psks,
+                 force_init_secret,
+                 new_confirmed_transcript_hash,
+                 new_confirmation_tag);
+}
+
+void
+State::upgrade_to_full_client(TreeKEMPublicKey tree)
+{
+  // Verify that the tree has the expected tree hash
+  tree.set_hash_all();
+  if (tree.root_hash() != _tree.root_hash()) {
+    throw ProtocolError("Invalid tree hash");
+  }
+
+  _tree = tree;
 }
 
 ///
@@ -2076,12 +2242,12 @@ operator==(const State& lhs, const State& rhs)
   auto suite = (lhs._suite == rhs._suite);
   auto group_id = (lhs._group_id == rhs._group_id);
   auto epoch = (lhs._epoch == rhs._epoch);
-  auto tree = (lhs._tree == rhs._tree);
+  auto tree_hash = (lhs._tree.root_hash() == rhs._tree.root_hash());
   auto transcript_hash = (lhs._transcript_hash == rhs._transcript_hash);
   auto key_schedule = (lhs._key_schedule == rhs._key_schedule);
   auto extensions = (lhs._extensions == rhs._extensions);
 
-  return suite && group_id && epoch && tree && transcript_hash &&
+  return suite && group_id && epoch && tree_hash && transcript_hash &&
          key_schedule && extensions;
 }
 
@@ -2194,6 +2360,12 @@ State::do_export(const std::string& label,
 GroupInfo
 State::group_info(bool inline_tree) const
 {
+  return group_info(true, inline_tree);
+}
+
+GroupInfo
+State::group_info(bool external_pub, bool inline_tree) const
+{
   auto group_info = GroupInfo{
     {
       _suite,
@@ -2207,8 +2379,10 @@ State::group_info(bool inline_tree) const
     _key_schedule.confirmation_tag,
   };
 
-  group_info.extensions.add(
-    ExternalPubExtension{ _key_schedule.external_priv.public_key });
+  if (external_pub) {
+    group_info.extensions.add(
+      ExternalPubExtension{ _key_schedule.external_priv.public_key });
+  }
 
   if (inline_tree) {
     group_info.extensions.add(RatchetTreeExtension{ _tree });

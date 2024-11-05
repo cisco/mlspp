@@ -19,9 +19,16 @@ struct RosterIndex : public UInt32
 
 struct CommitOpts
 {
+  // Include these proposals in the commit by value
   std::vector<Proposal> extra_proposals;
-  bool inline_tree;
-  bool force_path;
+
+  // Send a ratchet_tree extension in the Welcome
+  bool inline_tree = false;
+
+  // Send an UpdatePath even if none is required
+  bool force_path = false;
+
+  // Update the committer's LeafNode in the following way
   LeafNodeOptions leaf_node_opts;
 };
 
@@ -126,6 +133,14 @@ public:
   std::optional<State> handle(const ValidatedContent& content_auth);
   std::optional<State> handle(const ValidatedContent& content_auth,
                               std::optional<State> cached_state);
+
+  ///
+  /// Light MLS
+  ///
+  void implant_tree_slice(const TreeSlice& slice);
+  State handle(const AnnotatedCommit& annotated_commit);
+  bool is_full_client() const { return _tree.is_complete(); }
+  void upgrade_to_full_client(TreeKEMPublicKey tree);
 
   ///
   /// PSK management
@@ -327,6 +342,7 @@ protected:
   CommitMaterials prepare_commit(const bytes& leaf_secret,
                                  const std::optional<CommitOpts>& opts,
                                  const CommitParams& params) const;
+  GroupInfo group_info(bool external_pub, bool inline_tree) const;
   Welcome welcome(bool inline_tree,
                   const std::vector<PSKWithSecret>& psks,
                   const std::vector<KeyPackage>& joiners,

@@ -68,7 +68,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
   const auto priv2 = HPKEPrivateKey::generate(suite);
   const auto hash_size = suite.digest().hash_size;
 
-  // Create a tree with N blank leaves
+  // Create a tree with N leaves, blank otherwise
   auto pub = TreeKEMPublicKey(suite);
   for (auto i = uint32_t(0); i < size.val; i++) {
     auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();
@@ -264,6 +264,32 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM encap/decap")
       REQUIRE(privs[j].consistent(pubs[j]));
     }
   }
+
+  // XXX(RLB) The below test probably doesn't belong here, but we have a nice
+  // properly-created tree here, so it's convenient to use it for testing tree
+  // slices.
+
+  // Verify that all slices of the tree have the correct tree hash
+  auto original = pubs[0];
+  original.set_hash_all();
+  const auto tree_hash = original.root_hash();
+  auto slices = std::vector<TreeSlice>{};
+  for (uint32_t i = 0; i < original.size.val; i++) {
+    auto slice = original.extract_slice(LeafIndex{ i });
+    REQUIRE(slice.tree_hash(suite) == tree_hash);
+
+    slices.push_back(slice);
+  }
+
+  // Verify that the tree can be reassembled from the slices
+  auto reconstructed = TreeKEMPublicKey(suite, slices[0]);
+  for (uint32_t i = 1; i < slices.size(); i++) {
+    reconstructed.implant_slice(slices[i]);
+  }
+
+  reconstructed.set_hash_all();
+  REQUIRE(reconstructed.root_hash() == tree_hash);
+  REQUIRE(reconstructed.parent_hash_valid());
 }
 
 TEST_CASE("TreeKEM Interop", "[.][all]")

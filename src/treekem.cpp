@@ -58,6 +58,15 @@ Node::parent_hash() const
 }
 
 ///
+/// TreeSlice
+///
+bytes
+TreeSlice::tree_hash(CipherSuite suite) const
+{
+  return TreeKEMPublicKey(suite, *this).root_hash();
+}
+
+///
 /// TreeKEMPrivateKey
 ///
 
@@ -108,6 +117,30 @@ TreeKEMPrivateKey::implant(const TreeKEMPublicKey& pub,
   private_key_cache.erase(start);
 
   for (const auto& [n, _res] : fdp) {
+    secret = pub.suite.derive_secret(secret, "path");
+    path_secrets.insert_or_assign(n, secret);
+    private_key_cache.erase(n);
+  }
+
+  update_secret = pub.suite.derive_secret(secret, "path");
+}
+
+void
+TreeKEMPrivateKey::implant_matching(const TreeKEMPublicKey& pub,
+                                    NodeIndex start,
+                                    const bytes& path_secret)
+{
+  auto secret = path_secret;
+
+  path_secrets.insert_or_assign(start, secret);
+  private_key_cache.erase(start);
+
+  const auto dp = start.dirpath(pub.size);
+  for (const auto& n : dp) {
+    if (pub.node_at(n).blank()) {
+      continue;
+    }
+
     secret = pub.suite.derive_secret(secret, "path");
     path_secrets.insert_or_assign(n, secret);
     private_key_cache.erase(n);
@@ -209,8 +242,13 @@ TreeKEMPublicKey::dump() const
   std::cout << "Tree:" << std::endl;
   auto width = NodeCount(size);
   for (auto i = NodeIndex{ 0 }; i.val < width.val; i.val++) {
+    const auto known = nodes.count(i) > 0;
+    const auto blank = known && node_at(i).blank();
+
     printf("  %03d : ", i.val); // NOLINT
-    if (!node_at(i).blank()) {
+    if (!known) {
+      std::cout << "????????";
+    } else if (!blank) {
       auto pkRm = to_hex(opt::get(node_at(i).node).public_key().data);
       std::cout << pkRm.substr(0, 8);
     } else {
@@ -222,7 +260,9 @@ TreeKEMPublicKey::dump() const
       std::cout << "  ";
     }
 
-    if (!node_at(i).blank()) {
+    if (!known) {
+      std::cout << "?";
+    } else if (!blank) {
       std::cout << "X";
 
       if (!i.is_leaf()) {
@@ -254,7 +294,7 @@ TreeKEMPrivateKey::decap(LeafIndex from,
   const auto priv = opt::get(private_key(decrypt_node));
   const auto path_secret = priv.decrypt(
     suite, encrypt_label::update_path_node, context, encrypted_path_secret);
-  implant(pub, overlap_node, path_secret);
+  implant_matching(pub, overlap_node, path_secret);
 
   // Check that the resulting state is consistent with the public key
   if (!consistent(pub)) {
@@ -400,6 +440,14 @@ TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in)
 {
 }
 
+TreeKEMPublicKey::TreeKEMPublicKey(CipherSuite suite_in, const TreeSlice& slice)
+  : suite(suite_in)
+  , size(slice.n_leaves)
+{
+  implant_slice_unchecked(slice);
+  set_hash_all();
+}
+
 LeafIndex
 TreeKEMPublicKey::allocate_leaf()
 {
@@ -411,12 +459,17 @@ TreeKEMPublicKey::allocate_leaf()
 
   // Extend the tree if necessary
   if (index.val >= size.val) {
+    const auto prev_width = NodeCount(size);
+
     if (size.val == 0) {
       size.val = 1;
-      nodes.resize(1);
     } else {
       size.val *= 2;
-      nodes.resize(2 * nodes.size() + 1);
+    }
+
+    const auto new_width = NodeCount(size);
+    for (auto i = NodeIndex(prev_width.val); i < new_width; i.val++) {
+      nodes.insert_or_assign(i, OptionalNode{});
     }
   }
 
@@ -576,6 +629,12 @@ TreeKEMPublicKey::parent_hash_valid() const
   return true;
 }
 
+bool
+TreeKEMPublicKey::is_complete() const
+{
+  return nodes.size() == NodeCount{ size }.val;
+}
+
 std::vector<NodeIndex>
 TreeKEMPublicKey::resolve(NodeIndex index) const
 {
@@ -603,6 +662,129 @@ TreeKEMPublicKey::resolve(NodeIndex index) const
   auto r = resolve(index.right());
   l.insert(l.end(), r.begin(), r.end());
   return l;
+}
+
+TreeSlice
+TreeKEMPublicKey::extract_slice(LeafIndex leaf) const
+{
+  if (!(leaf < size)) {
+    throw InvalidParameterError("Invalid leaf index");
+  }
+
+  const auto n = NodeIndex(leaf);
+  auto dirpath = n.dirpath(size);
+  dirpath.insert(dirpath.begin(), n);
+  const auto dirpath_nodes = stdx::transform<OptionalNode>(
+    dirpath, [this](const auto& n) { return node_at(n); });
+
+  const auto copath = n.copath(size);
+  const auto copath_hashes = stdx::transform<bytes>(
+    copath, [this](const auto& n) { return hashes.at(n); });
+
+  return { leaf, size, dirpath_nodes, copath_hashes };
+}
+
+void
+TreeKEMPublicKey::implant_slice(const TreeSlice& slice)
+{
+  if (slice.n_leaves != size) {
+    throw InvalidParameterError("Slice tree size does not match tree size");
+  }
+
+  if (slice.tree_hash(suite) != root_hash()) {
+    throw InvalidParameterError("Slice tree hash does not match tree hash");
+  }
+
+  implant_slice_unchecked(slice);
+}
+
+std::tuple<HPKECiphertext, NodeIndex>
+TreeKEMPublicKey::slice_path(UpdatePath path,
+                             LeafIndex from,
+                             LeafIndex to) const
+{
+  const auto toi = NodeIndex(to);
+  const auto fdp = filtered_direct_path(NodeIndex(from));
+
+  for (auto i = size_t(0); i < fdp.size(); i++) {
+    const auto& [dpi, res] = fdp.at(i);
+
+    if (!toi.is_below(dpi)) {
+      continue;
+    }
+
+    for (auto j = size_t(0); j < res.size(); j++) {
+      const auto resi = res.at(j);
+      if (!toi.is_below(resi)) {
+        continue;
+      }
+
+      return { path.nodes.at(i).encrypted_path_secret.at(j), resi };
+    }
+  }
+
+  throw ProtocolError("Decryption node not found");
+}
+
+void
+TreeKEMPublicKey::implant_slice_unchecked(const TreeSlice& slice)
+{
+  const auto n = NodeIndex(slice.leaf_index);
+  auto dirpath = n.dirpath(size);
+  dirpath.insert(dirpath.begin(), n);
+  const auto copath = n.copath(size);
+
+  if (slice.direct_path_nodes.size() != dirpath.size()) {
+    throw InvalidParameterError("Malformed tree slice (bad direct path size)");
+  }
+
+  if (slice.copath_hashes.size() != copath.size()) {
+    throw InvalidParameterError("Malformed tree slice (bad copath size)");
+  }
+
+  for (auto i = size_t(0); i < dirpath.size(); i++) {
+    nodes.insert_or_assign(dirpath.at(i), slice.direct_path_nodes.at(i));
+  }
+
+  for (auto i = size_t(0); i < copath.size(); i++) {
+    hashes.insert_or_assign(copath.at(i), slice.copath_hashes.at(i));
+  }
+}
+
+TreeKEMPublicKey::AncestorIndex
+TreeKEMPublicKey::ancestor_index(LeafIndex to, LeafIndex from) const
+{
+  // Find the index of the common ancestor in the filtered direct path
+  //
+  // XXX(RLB): This calculation is only guaranteed to be accurate immediately
+  // after a commit from `to`.  But it has the advantage of being computable by
+  // a light client, and is only used when a light client processes a commit.
+  const auto from_dp = NodeIndex(from).dirpath(size);
+  const auto fdp = stdx::filter<NodeIndex>(
+    from_dp, [&](const auto& n) { return !node_at(n).blank(); });
+
+  const auto ancestor = to.ancestor(from);
+  const auto it = stdx::find(fdp, ancestor);
+  if (it == fdp.end()) {
+    throw ProtocolError("Blank common ancestor node");
+  }
+  const auto ancestor_node_index = static_cast<size_t>(it - fdp.begin());
+
+  // Find the nex non-blank node underneath the ancestor node
+  const auto to_dp = NodeIndex(to).dirpath(size);
+  const auto candidates = stdx::filter<NodeIndex>(to_dp, [&](const auto& n) {
+    return n.is_below(ancestor) && n != ancestor && !node_at(n).blank();
+  });
+
+  auto resolution_node = NodeIndex(to);
+  if (!candidates.empty()) {
+    resolution_node = candidates.back();
+  }
+
+  return {
+    ancestor_node_index,
+    resolution_node,
+  };
 }
 
 TreeKEMPublicKey::DecapCoords
@@ -678,6 +860,11 @@ std::optional<LeafIndex>
 TreeKEMPublicKey::find(const LeafNode& leaf) const
 {
   for (LeafIndex i{ 0 }; i < size; i.val++) {
+    if (nodes.count(NodeIndex{ i }) == 0) {
+      // Unknown leaf node
+      continue;
+    }
+
     const auto& node = node_at(i);
     if (!node.blank() && node.leaf_node() == leaf) {
       return i;
@@ -762,8 +949,9 @@ TreeKEMPublicKey::encap(const TreeKEMPrivateKey& priv,
 
     auto ct = stdx::transform<HPKECiphertext>(res, [&](auto nr) {
       const auto& node_pub = opt::get(node_at(nr).node).public_key();
-      return node_pub.encrypt(
+      auto ct = node_pub.encrypt(
         suite, encrypt_label::update_path_node, context, path_secret);
+      return ct;
     });
 
     return UpdatePathNode{ node_priv.public_key, std::move(ct) };
@@ -797,41 +985,32 @@ TreeKEMPublicKey::truncate()
     return;
   }
 
-  // Remove the right subtree until the tree is of minimal size
+  // Find the new size of the tree
   while (size.val / 2 > index.val) {
-    nodes.resize(nodes.size() / 2);
     size.val /= 2;
+  }
+
+  // Delete nodes to right of the new smaller edge of the tree
+  const auto node_size = NodeCount(size);
+  const auto start =
+    std::find_if(nodes.begin(), nodes.end(), [node_size](const auto& n) {
+      return !(n.first < node_size);
+    });
+  if (start != nodes.end()) {
+    nodes.erase(start, nodes.end());
   }
 }
 
 OptionalNode&
 TreeKEMPublicKey::node_at(NodeIndex n)
 {
-  auto width = NodeCount(size);
-  if (n.val >= width.val) {
-    throw InvalidParameterError("Node index not in tree");
-  }
-
-  if (n.val >= nodes.size()) {
-    return blank_node;
-  }
-
-  return nodes.at(n.val);
+  return nodes.at(n);
 }
 
 const OptionalNode&
 TreeKEMPublicKey::node_at(NodeIndex n) const
 {
-  auto width = NodeCount(size);
-  if (n.val >= width.val) {
-    throw InvalidParameterError("Node index not in tree");
-  }
-
-  if (n.val >= nodes.size()) {
-    return blank_node;
-  }
-
-  return nodes.at(n.val);
+  return nodes.at(n);
 }
 
 OptionalNode&
@@ -1075,10 +1254,38 @@ TreeKEMPublicKey::original_parent_hash(TreeHashCache& cache,
 }
 
 bool
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from) const
+{
+  // Synthesize a filtered direct path and UpdatePath from the non-blank
+  // ancestors.  Since this is checking for a whole path, we don't need to check
+  // that the resolution is non-empty.
+  auto dp = NodeIndex(from).dirpath(size);
+  auto fdpn =
+    stdx::filter<NodeIndex>(dp, [&](auto n) { return !node_at(n).blank(); });
+  auto fdp = stdx::transform<FilteredDirectPathEntry>(
+    fdpn, [&](auto n) { return std::make_tuple(n, std::vector<NodeIndex>{}); });
+
+  auto path_nodes = stdx::transform<UpdatePathNode>(fdpn, [&](auto n) {
+    return UpdatePathNode{ node_at(n).parent_node().public_key, {} };
+  });
+  auto path = UpdatePath{ node_at(from).leaf_node(), path_nodes };
+
+  return parent_hash_valid(from, path, fdp);
+}
+
+bool
 TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
                                     const UpdatePath& path) const
 {
   auto fdp = filtered_direct_path(NodeIndex(from));
+  return parent_hash_valid(from, path, fdp);
+}
+
+bool
+TreeKEMPublicKey::parent_hash_valid(LeafIndex from,
+                                    const UpdatePath& path,
+                                    const FilteredDirectPath& fdp) const
+{
   auto hash_chain = parent_hashes(from, fdp, path.nodes);
   auto leaf_ph =
     var::visit(overloaded{
@@ -1130,9 +1337,14 @@ operator<<(tls::ostream& str, const TreeKEMPublicKey& obj)
     cut.val -= 1;
   }
 
-  const auto begin = obj.nodes.begin();
-  const auto end = begin + NodeIndex(cut).val + 1;
-  const auto view = std::vector<OptionalNode>(begin, end);
+  auto node_cut = NodeIndex(cut);
+  node_cut.val += 1;
+
+  auto view = std::vector<OptionalNode>(node_cut.val);
+  for (auto i = NodeIndex(0); i < node_cut; i.val++) {
+    view.at(i.val) = obj.nodes.at(i);
+  }
+
   return str << view;
 }
 
@@ -1140,37 +1352,47 @@ tls::istream&
 operator>>(tls::istream& str, TreeKEMPublicKey& obj)
 {
   // Read the node list
-  str >> obj.nodes;
-  if (obj.nodes.empty()) {
+  std::vector<OptionalNode> nodes;
+  str >> nodes;
+  if (nodes.empty()) {
     return str;
   }
 
   // Verify that the tree is well-formed and minimal
-  if (obj.nodes.size() % 2 == 0) {
+  if (nodes.size() % 2 == 0) {
     throw ProtocolError("Malformed ratchet tree: even number of nodes");
   }
 
-  if (obj.nodes.back().blank()) {
+  if (nodes.back().blank()) {
     throw ProtocolError("Ratchet tree does not use minimal encoding");
   }
 
   // Adjust the size value to fit the non-blank nodes
   obj.size.val = 1;
-  while (NodeCount(obj.size).val < obj.nodes.size()) {
+  while (NodeCount(obj.size).val < nodes.size()) {
     obj.size.val *= 2;
   }
 
-  // Add blank nodes to the end
-  obj.nodes.resize(NodeCount(obj.size).val);
+  // Copy nodes to `obj` and add blank nodes to the end
+  for (uint32_t i = 0; i < nodes.size(); i++) {
+    obj.nodes.insert_or_assign(NodeIndex(i), std::move(nodes.at(i)));
+  }
+
+  const auto node_size = NodeCount(obj.size);
+  const auto provided_node_count = static_cast<uint32_t>(nodes.size());
+  for (uint32_t i = provided_node_count; i < node_size.val; i++) {
+    obj.nodes.insert_or_assign(NodeIndex(i), OptionalNode{});
+  }
 
   // Verify the basic structure of the tree is sane
-  for (size_t i = 0; i < obj.nodes.size(); i++) {
-    if (obj.nodes[i].blank()) {
+  for (auto i = NodeIndex{ 0 }; i < node_size; i.val++) {
+    const auto& maybe_node = obj.node_at(i);
+    if (maybe_node.blank()) {
       continue;
     }
 
-    const auto& node = opt::get(obj.nodes[i].node).node;
-    auto at_leaf = (i % 2 == 0);
+    const auto& node = opt::get(maybe_node.node).node;
+    auto at_leaf = (i.val % 2 == 0);
     auto holds_leaf = var::holds_alternative<LeafNode>(node);
     auto holds_parent = var::holds_alternative<ParentNode>(node);
 
