@@ -8,7 +8,7 @@ namespace opt = MLS_NAMESPACE::tls::opt;
 using namespace MLS_NAMESPACE::hpke;
 using namespace std::string_literals;
 
-namespace mls::hpke {
+namespace MLS_NAMESPACE::hpke {
 
 static bool
 operator==(const Signature::PublicJWK& lhs, const Signature::PublicJWK& rhs)
