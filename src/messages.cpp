@@ -18,62 +18,6 @@ const Extension::Type SFrameParameters::type = ExtensionType::sframe_parameters;
 const Extension::Type SFrameCapabilities::type =
   ExtensionType::sframe_parameters;
 
-void
-FlagsExtension::set(size_t pos)
-{
-  const auto byte_pos = pos >> 3;
-  const auto bit_pos = pos & 0x07;
-
-  // Ensure space
-  if (byte_pos >= flag_data.size()) {
-    flag_data.resize(byte_pos + 1);
-  }
-
-  // Set the bit
-  flag_data.at(byte_pos) |= uint8_t(1 << bit_pos);
-}
-
-void
-FlagsExtension::unset(size_t pos)
-{
-  const auto byte_pos = pos >> 3;
-  const auto bit_pos = pos & 0x07;
-
-  if (byte_pos >= flag_data.size()) {
-    return;
-  }
-
-  // Unset the bit
-  flag_data.at(byte_pos) &= ~uint8_t(1 << bit_pos);
-
-  // Trim any zero bytes
-  auto cut = flag_data.size() - 1;
-  while (cut > 0 && flag_data.at(cut) == 0) {
-    cut -= 1;
-  }
-
-  if (flag_data.at(cut) == 0) {
-    flag_data.clear();
-    return;
-  }
-
-  flag_data.resize(cut + 1);
-}
-
-bool
-FlagsExtension::get(size_t pos) const
-{
-  const auto byte_pos = pos >> 3;
-  const auto bit_pos = pos & 0x07;
-
-  if (byte_pos >= flag_data.size()) {
-    return false;
-  }
-
-  const auto bit = (flag_data.at(byte_pos) >> bit_pos) & 0x01;
-  return bit == 1;
-}
-
 bool
 SFrameCapabilities::compatible(const SFrameParameters& params) const
 {

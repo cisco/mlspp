@@ -23,35 +23,6 @@ TEST_CASE("Extensions")
   REQUIRE(tree0 == tree1);
 }
 
-TEST_CASE("Flags Extension")
-{
-  auto flags = FlagsExtension{};
-
-  const auto flag_data_3 = from_hex("08");
-  const auto flag_data_3_5 = from_hex("28");
-  const auto flag_data_3_5_23 = from_hex("280080");
-
-  // Following the example from TLS:
-  // https://datatracker.ietf.org/doc/html/draft-ietf-tls-tlsflags-13#section-2
-  flags.set(3);
-  REQUIRE(flags.flag_data == flag_data_3);
-
-  flags.set(5);
-  REQUIRE(flags.flag_data == flag_data_3_5);
-
-  flags.set(23);
-  REQUIRE(flags.flag_data == flag_data_3_5_23);
-
-  flags.unset(23);
-  REQUIRE(flags.flag_data == flag_data_3_5);
-
-  flags.unset(5);
-  REQUIRE(flags.flag_data == flag_data_3);
-
-  flags.unset(3);
-  REQUIRE(flags.flag_data.empty());
-}
-
 // TODO(RLB) Verify sign/verify on:
 // * KeyPackage
 // * GroupInfo
