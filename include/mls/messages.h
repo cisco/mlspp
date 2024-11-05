@@ -257,8 +257,6 @@ private:
     const std::vector<PSKWithSecret>& psks);
 };
 
-struct MLSMessage;
-
 ///
 /// Proposals & Commit
 ///
@@ -713,15 +711,12 @@ struct AnnotatedWelcome
 struct AnnotatedCommit
 {
   MLSMessage commit_message;
-  bytes tree_hash_after;
-
   std::optional<TreeSlice> sender_membership_proof_before;
+  std::optional<uint32_t> resolution_index;
+
+  bytes tree_hash_after;
   TreeSlice sender_membership_proof_after;
   TreeSlice receiver_membership_proof_after;
-
-  std::optional<uint32_t> resolution_index;
-  std::optional<ExtensionList> extensions;
-  std::vector<PreSharedKeyID> psks;
 
   static AnnotatedCommit from(LeafIndex receiver,
                               const std::vector<MLSMessage>& proposals,
@@ -730,13 +725,11 @@ struct AnnotatedCommit
                               const TreeKEMPublicKey& tree_after);
 
   TLS_SERIALIZABLE(commit_message,
-                   tree_hash_after,
                    sender_membership_proof_before,
-                   sender_membership_proof_after,
-                   receiver_membership_proof_after,
                    resolution_index,
-                   extensions,
-                   psks);
+                   tree_hash_after,
+                   sender_membership_proof_after,
+                   receiver_membership_proof_after);
 };
 
 } // namespace MLS_NAMESPACE

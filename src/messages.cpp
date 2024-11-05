@@ -302,7 +302,7 @@ AnnotatedCommit::from(LeafIndex receiver,
     sender = var::get<MemberSender>(sender_var).sender;
   }
 
-  // Extract the appropriate memberhsip proofs
+  // Extract the appropriate membership proofs
   const auto tree_hash_after = tree_after.root_hash();
 
   auto sender_membership_proof_before = std::optional<TreeSlice>{};
@@ -336,39 +336,13 @@ AnnotatedCommit::from(LeafIndex receiver,
     resolution_index = static_cast<uint32_t>(coords.resolution_node_index);
   }
 
-  // Provide new extensions if present
-  const auto gce_proposals =
-    stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
-      return p.proposal_type() == ProposalType::group_context_extensions;
-    });
-
-  auto extensions = std::optional<ExtensionList>{};
-  if (!gce_proposals.empty()) {
-    const auto& gce =
-      var::get<GroupContextExtensions>(gce_proposals.front().content);
-    extensions = gce.group_context_extensions;
-  }
-
-  // Identify any PSK proposals
-  const auto psk_proposals =
-    stdx::filter<Proposal>(committed_proposals, [](const auto& p) {
-      return p.proposal_type() == ProposalType::psk;
-    });
-
-  const auto psks =
-    stdx::transform<PreSharedKeyID>(psk_proposals, [&](const auto& p) {
-      return var::get<PreSharedKey>(p.content).psk;
-    });
-
   return {
     commit_message,
-    tree_hash_after,
     sender_membership_proof_before,
+    resolution_index,
+    tree_hash_after,
     sender_membership_proof_after,
     receiver_membership_proof_after,
-    resolution_index,
-    extensions,
-    psks,
   };
 }
 

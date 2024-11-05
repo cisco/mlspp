@@ -1221,24 +1221,33 @@ State::handle(const AnnotatedCommit& annotated_commit)
   const auto new_confirmation_tag =
     opt::get(content_auth.auth.confirmation_tag);
 
-  // Import the extensions
+  // Identify GCE or PSK proposals
+  const auto proposals = must_resolve(commit.proposals, sender_location);
   auto extensions = _extensions;
-  if (annotated_commit.extensions) {
-    extensions = opt::get(annotated_commit.extensions);
+  auto psk_ids = std::vector<PreSharedKeyID>{};
+  for (const auto& p : proposals) {
+    if (p.proposal.proposal_type() == ProposalType::psk) {
+      const auto& psk_proposal = var::get<PreSharedKey>(p.proposal.content);
+      psk_ids.push_back(psk_proposal.psk);
+    }
+
+    if (p.proposal.proposal_type() == ProposalType::group_context_extensions) {
+      const auto& gce_proposal = var::get<GroupContextExtensions>(p.proposal.content);
+      extensions = gce_proposal.group_context_extensions;
+    }
   }
 
-  // Resolve PSKs
-  const auto psks = resolve(annotated_commit.psks);
+  const auto psks = resolve(psk_ids);
 
-  return ratchet(std::move(new_tree),           // OK
-                 sender_location,               // OK
-                 path_secret_decrypt_node,      // OK
-                 encrypted_path_secret,         // OK
-                 extensions,                    // OK
-                 psks,                          // OK
-                 force_init_secret,             // OK
-                 new_confirmed_transcript_hash, // OK
-                 new_confirmation_tag);         // OK
+  return ratchet(std::move(new_tree),
+                 sender_location,
+                 path_secret_decrypt_node,
+                 encrypted_path_secret,
+                 extensions,
+                 psks,
+                 force_init_secret,
+                 new_confirmed_transcript_hash,
+                 new_confirmation_tag);
 }
 
 void
