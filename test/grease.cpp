@@ -3,7 +3,7 @@
 #include <mls/core_types.h>
 #include <mls/messages.h>
 
-using namespace mls;
+using namespace MLS_NAMESPACE;
 
 TEST_CASE("GREASE capabilities")
 {
