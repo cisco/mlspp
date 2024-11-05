@@ -1232,7 +1232,8 @@ State::handle(const AnnotatedCommit& annotated_commit)
     }
 
     if (p.proposal.proposal_type() == ProposalType::group_context_extensions) {
-      const auto& gce_proposal = var::get<GroupContextExtensions>(p.proposal.content);
+      const auto& gce_proposal =
+        var::get<GroupContextExtensions>(p.proposal.content);
       extensions = gce_proposal.group_context_extensions;
     }
   }
