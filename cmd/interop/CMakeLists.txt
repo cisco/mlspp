@@ -38,6 +38,7 @@ find_package(OpenSSL 1.1 REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 find_package(gflags REQUIRED)
+find_package(ICU REQUIRED COMPONENTS uc data)
 
 # mlspp
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
@@ -50,7 +51,7 @@ find_package(nlohmann_json 3.2 REQUIRED)
 ### Protobuf generation
 ###
 
-# Get the proto file from the interop repo 
+# Get the proto file from the interop repo
 include( ExternalProject )
 find_package( Git REQUIRED )
 set( MLS_IMPLEMENTATIONS_REPO_URL https://github.com/mlswg/mls-implementations.git )
@@ -99,7 +100,7 @@ file(GLOB_RECURSE BIN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_executable(${APP_NAME} ${BIN_SOURCES} ${PB_SRC} ${GRPC_SRC})
 add_dependencies(${APP_NAME} mls-interop-extern)
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(${APP_NAME} 
-  gflags 
-  gRPC::grpc++ protobuf::libprotobuf 
+target_link_libraries(${APP_NAME}
+  gflags ICU::uc ICU::data
+  gRPC::grpc++ protobuf::libprotobuf
   MLSPP::mlspp MLSPP::mls_vectors MLSPP::tls_syntax)

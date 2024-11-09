@@ -242,6 +242,7 @@ struct SignaturePrivateKey
 {
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
+  static SignaturePrivateKey parse_der(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
   static SignaturePrivateKey from_jwk(CipherSuite suite,
                                       const std::string& json_str);
