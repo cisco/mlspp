@@ -119,17 +119,21 @@ set(LIB_NAME "${PROJECT_NAME}")
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15415#note_334852
+# Warning: this will fail once nlohman_json stops being header-only!
+get_target_property(JSON_INCLUDE_INTERFACE nlohmann_json::nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+
 add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
 add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
 target_link_libraries(${LIB_NAME} 
-  PRIVATE
-    nlohmann_json::nlohmann_json
   PUBLIC
     bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+  PRIVATE
+    ${JSON_INCLUDE_INTERFACE}
 )
 
 install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
