@@ -30,7 +30,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/namespace.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/include/namespace.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/include/namespace.h"
   @ONLY
 )
 
@@ -117,9 +117,10 @@ add_subdirectory(third_party)
 set(LIB_NAME "${PROJECT_NAME}")
 
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE LIB_GENERATED_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_GENERATED_HEADERS} ${LIB_SOURCES})
 add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
 target_link_libraries(${LIB_NAME} 
   PRIVATE
@@ -128,7 +129,8 @@ target_link_libraries(${LIB_NAME}
     bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 
@@ -180,7 +182,8 @@ install(
 
 install(
   DIRECTORY
-    include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    ${CMAKE_CURRENT_BINARY_DIR}/include/
   DESTINATION
     ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
 
