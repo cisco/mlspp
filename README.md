@@ -31,7 +31,7 @@ Quickstart
 
 A convenience Makefile is included to avoid the need to remember a bunch of CMake parameters. It will use [vcpkg](https://vcpkg.io/en/) to satisfy all dependencies.
 
-Note that on Windows the commands should be run in PowerShell, otherwise, vcpkg will report the error 'error: in triplet x64-windows: Unable to find a valid Visual Studio instance'.
+Note that on Windows the commands should be run in PowerShell instead of Command Prompt or Terminal app, otherwise, vcpkg will report the error 'error: in triplet x64-windows: Unable to find a valid Visual Studio instance'.
 
 ```
 > make        # Configures and builds the library 
