@@ -145,7 +145,7 @@ jobs:
     if: github.event.pull_request.draft == false
     needs: [build-and-unit-test, choose_crypto_matrix]
     name: Build with clang-tidy
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       matrix:
         crypto: ${{ fromJson(needs.choose_crypto_matrix.outputs.matrix )}}
