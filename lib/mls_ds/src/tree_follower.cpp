@@ -97,7 +97,7 @@ apply(TreeKEMPublicKey& tree,
       continue;
     }
 
-    std::visit([&](const auto& pr) { apply(tree, sender, pr); },
+    var::visit([&](const auto& pr) { apply(tree, sender, pr); },
                proposal.content);
   }
 }
