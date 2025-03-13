@@ -40,8 +40,14 @@ include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+
+message("Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  # -Wno-dangling-reference because GCC apparently has some bugs in its implementation
+  # https://stackoverflow.com/questions/78759847/gcc-14-possibly-dangling-reference-to-a-temporary-warning-or-not-depending-on
+  add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations -Wno-dangling-reference)
 elseif(MSVC)
   add_compile_options(/W4 /WX)
   add_definitions(-DWINDOWS)
