@@ -40,7 +40,7 @@ include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   # -Wno-dangling-reference because GCC apparently has some bugs in its implementation
