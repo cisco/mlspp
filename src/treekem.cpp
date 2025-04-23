@@ -100,7 +100,7 @@ TreeKEMPrivateKey::joiner(const TreeKEMPublicKey& pub,
   auto priv = TreeKEMPrivateKey{ pub.suite, index, {}, {}, {} };
   priv.private_key_cache.insert({ NodeIndex(index), std::move(leaf_priv) });
   if (path_secret) {
-    priv.implant(pub, intersect, opt::get(path_secret));
+    priv.implant_matching(pub, intersect, opt::get(path_secret));
   }
   return priv;
 }
