@@ -27,21 +27,21 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 ${TOOLCHAIN_FILE}:
 	git submodule update --init --recursive
 
+# Only enable testing, not clang-tidy/sanitizers; the latter make the build
+# too slow, and we can run them in CI
 dev: ${TOOLCHAIN_FILE}
-	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
-	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `dev`, but using OpenSSL 3
 dev3: ${TOOLCHAIN_FILE}
-	# Like `dev`, but using OpenSSL 3
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `dev`, but using BoringSSL
 devB: ${TOOLCHAIN_FILE}
-	# Like `dev`, but using BoringSSL
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
@@ -80,14 +80,14 @@ ci: ${TOOLCHAIN_FILE}
 		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `ci`, but using OpenSSL 3
 ci3: ${TOOLCHAIN_FILE}
-	# Like `ci`, but using OpenSSL 3
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `ci`, but using BoringSSL
 ciB: ${TOOLCHAIN_FILE}
-	# Like `ci`, but using BoringSSL
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}

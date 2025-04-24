@@ -40,4 +40,3 @@ Checks:            '*,
                     '
 WarningsAsErrors:  '*'
 HeaderFilterRegex: '*'
-ExcludeHeaderFilterRegex: 'catch_test_macros.hpp'

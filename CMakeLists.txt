@@ -30,7 +30,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/namespace.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/include/namespace.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/include/namespace.h"
   @ONLY
 )
 
@@ -40,8 +40,14 @@ include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+
+message("Compiler ID: ${CMAKE_CXX_COMPILER_ID}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  # -Wno-dangling-reference because GCC apparently has some bugs in its implementation
+  # https://stackoverflow.com/questions/78759847/gcc-14-possibly-dangling-reference-to-a-temporary-warning-or-not-depending-on
+  add_compile_options(-Wall -pedantic -Wextra -Werror -Wmissing-declarations -Wno-dangling-reference)
 elseif(MSVC)
   add_compile_options(/W4 /WX)
   add_definitions(-DWINDOWS)
@@ -117,20 +123,22 @@ add_subdirectory(third_party)
 set(LIB_NAME "${PROJECT_NAME}")
 
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE LIB_GENERATED_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/include/*.h")
 file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 # https://gitlab.kitware.com/cmake/cmake/-/issues/15415#note_334852
 # Warning: this will fail once nlohman_json stops being header-only!
 get_target_property(JSON_INCLUDE_INTERFACE nlohmann_json::nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
 
-add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_SOURCES})
+add_library(${LIB_NAME} ${LIB_HEADERS} ${LIB_GENERATED_HEADERS} ${LIB_SOURCES})
 add_dependencies(${LIB_NAME} bytes tls_syntax hpke)
 target_link_libraries(${LIB_NAME} 
   PUBLIC
     bytes tls_syntax hpke)
 target_include_directories(${LIB_NAME}
   PUBLIC
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
   PRIVATE
     ${JSON_INCLUDE_INTERFACE}
@@ -184,7 +192,8 @@ install(
 
 install(
   DIRECTORY
-    include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    ${CMAKE_CURRENT_BINARY_DIR}/include/
   DESTINATION
     ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
 
