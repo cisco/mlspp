@@ -524,8 +524,8 @@ TEST_CASE_METHOD(StateTest, "Light client can rejoin")
   // Add the second and third participants
   auto add1a = first0.add_proposal(key_packages[1]);
   auto add1b = first0.add_proposal(key_packages[2]);
-  auto [commit1, welcome1, first1_] =
-    first0.commit(fresh_secret(), CommitOpts{ { add1a, add1b }, true, false, {} }, {});
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1a, add1b }, true, false, {} }, {});
   silence_unused(commit1);
   auto first1 = first1_;
 
@@ -542,8 +542,8 @@ TEST_CASE_METHOD(StateTest, "Light client can rejoin")
   // Remove the second participant and re-add them in the same commit
   auto remove2 = first1.remove_proposal(LeafIndex{ 1 });
   auto add2 = first1.add_proposal(key_packages[1]);
-  auto [commit2, welcome2, first2_] =
-    first1.commit(fresh_secret(), CommitOpts{ { remove2, add2 }, false, false, {} }, {});
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { remove2, add2 }, false, false, {} }, {});
   silence_unused(welcome2);
   auto first2 = first2_;
 

@@ -95,8 +95,8 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
-  auto priv_joiner =
-    TreeKEMPrivateKey::joiner(pub, joiner_index, priv, joiner_index.ancestor(adder_index), random);
+  auto priv_joiner = TreeKEMPrivateKey::joiner(
+    pub, joiner_index, priv, joiner_index.ancestor(adder_index), random);
   REQUIRE(priv_joiner.private_key(NodeIndex(4)));
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
