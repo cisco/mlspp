@@ -31,6 +31,8 @@ Quickstart
 
 A convenience Makefile is included to avoid the need to remember a bunch of CMake parameters. It will use [vcpkg](https://vcpkg.io/en/) to satisfy all dependencies.
 
+Note that on Windows the make commands should be run in PowerShell instead of cmd.exe, otherwise, vcpkg will report the error 'error: in triplet x64-windows: Unable to find a valid Visual Studio instance'.
+
 ```
 > make        # Configures and builds the library 
 > make dev    # Configure a "developer" build with tests and checks using OpenSSL 1.1
