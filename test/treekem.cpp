@@ -63,7 +63,6 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
   const auto size = LeafCount{ 5 };
   const auto adder_index = LeafIndex{ 1 };
   const auto joiner_index = LeafIndex{ 2 };
-  const auto intersect = NodeIndex{ 3 };
   const auto random = random_bytes(32);
   const auto priv = HPKEPrivateKey::derive(suite, random);
   const auto priv2 = HPKEPrivateKey::generate(suite);
