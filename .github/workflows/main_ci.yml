@@ -1,6 +1,9 @@
 name: MLSPP CI
 
 on:
+  workflow_dispatch:
+    branches:
+      - main
   push:
     branches:
       - main
