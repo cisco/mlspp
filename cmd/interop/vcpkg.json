@@ -12,7 +12,7 @@
     "gflags",
     "nlohmann-json"
   ],
-  "builtin-baseline": "3b3bd424827a1f7f4813216f6b32b6c61e386b2e",
+  "builtin-baseline": "0d5cae153065957df7f382de7c1549ccc88027e5",
   "overrides": [
     {
       "name": "openssl",
