@@ -511,6 +511,62 @@ TEST_CASE_METHOD(StateTest, "Light client can participate")
   REQUIRE(first4 == third4);
 }
 
+TEST_CASE_METHOD(StateTest, "Light client can rejoin")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Add the second and third participants
+  auto add1a = first0.add_proposal(key_packages[1]);
+  auto add1b = first0.add_proposal(key_packages[2]);
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1a, add1b }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  auto third1 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       welcome1,
+                       std::nullopt,
+                       {} };
+
+  REQUIRE(first1 == third1);
+
+  // Remove the second participant and re-add them in the same commit
+  auto remove2 = first1.remove_proposal(LeafIndex{ 1 });
+  auto add2 = first1.add_proposal(key_packages[1]);
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { remove2, add2 }, false, false, {} }, {});
+  silence_unused(welcome2);
+  auto first2 = first2_;
+
+  auto third2 = opt::get(third1.handle(commit2));
+
+  REQUIRE(first2 == third2);
+
+  // Second participant (re-)joins as a light client
+  const auto annotated_welcome_2 = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 1 });
+
+  auto second2 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        annotated_welcome_2.welcome,
+                        annotated_welcome_2.tree(),
+                        {} };
+
+  REQUIRE(first2 == second2);
+  REQUIRE_FALSE(second2.is_full_client());
+}
+
 TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
 {
   // Initialize the first two users

@@ -61,8 +61,8 @@ TEST_CASE_METHOD(TreeKEMTest, "Node public key")
 TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 {
   const auto size = LeafCount{ 5 };
-  const auto index = LeafIndex{ 2 };
-  const auto intersect = NodeIndex{ 3 };
+  const auto adder_index = LeafIndex{ 1 };
+  const auto joiner_index = LeafIndex{ 2 };
   const auto random = random_bytes(32);
   const auto priv = HPKEPrivateKey::derive(suite, random);
   const auto priv2 = HPKEPrivateKey::generate(suite);
@@ -75,11 +75,11 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
     pub.add_leaf(leaf_node);
   }
 
-  // create() populates the direct path
-  auto priv_create = TreeKEMPrivateKey::create(pub, index, random);
-  REQUIRE(priv_create.path_secrets.find(NodeIndex(4)) !=
+  // create() populates the direct path in the private key
+  auto priv_create = TreeKEMPrivateKey::create(pub, adder_index, random);
+  REQUIRE(priv_create.path_secrets.find(NodeIndex(2)) !=
           priv_create.path_secrets.end());
-  REQUIRE(priv_create.path_secrets.find(NodeIndex(5)) !=
+  REQUIRE(priv_create.path_secrets.find(NodeIndex(1)) !=
           priv_create.path_secrets.end());
   REQUIRE(priv_create.path_secrets.find(NodeIndex(3)) !=
           priv_create.path_secrets.end());
@@ -87,10 +87,15 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
           priv_create.path_secrets.end());
   REQUIRE(priv_create.update_secret.size() == hash_size);
 
+  // Populate the direct path from the  into the public key manually
+  pub.node_at(NodeIndex{ 1 }) = OptionalNode{ Node{ ParentNode{} } };
+  pub.node_at(NodeIndex{ 3 }) = OptionalNode{ Node{ ParentNode{} } };
+  pub.node_at(NodeIndex{ 7 }) = OptionalNode{ Node{ ParentNode{} } };
+
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
-  auto priv_joiner =
-    TreeKEMPrivateKey::joiner(pub, index, priv, intersect, random);
+  auto priv_joiner = TreeKEMPrivateKey::joiner(
+    pub, joiner_index, priv, joiner_index.ancestor(adder_index), random);
   REQUIRE(priv_joiner.private_key(NodeIndex(4)));
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
@@ -103,7 +108,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 
   // set_leaf_priv() properly sets the leaf secret
   priv_joiner.set_leaf_priv(priv2);
-  REQUIRE(priv_joiner.private_key(NodeIndex(index)) == priv2);
+  REQUIRE(priv_joiner.private_key(NodeIndex(joiner_index)) == priv2);
   REQUIRE(priv_joiner.update_secret.size() == hash_size);
   REQUIRE(priv_joiner.update_secret == last_update_secret);
 

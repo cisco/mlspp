@@ -145,8 +145,7 @@ TreeFollower::update(const MLSMessage& commit_message,
   const auto commit_auth_content =
     commit_public_message.authenticated_content();
   const auto group_content = commit_auth_content.content;
-  const auto& commit =
-    var::get<Commit>(commit_auth_content.content.content);
+  const auto& commit = var::get<Commit>(commit_auth_content.content.content);
 
   // Apply proposals
   apply(_tree, _suite, group_content.sender, commit.proposals, extra_proposals);
@@ -155,8 +154,7 @@ TreeFollower::update(const MLSMessage& commit_message,
 
   // Merge the update path
   if (commit.path) {
-    const auto sender =
-      var::get<MemberSender>(group_content.sender.sender);
+    const auto sender = var::get<MemberSender>(group_content.sender.sender);
     const auto from = LeafIndex(sender.sender);
     const auto& path = opt::get(commit.path);
     _tree.merge(from, path);
