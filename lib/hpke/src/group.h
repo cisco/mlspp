@@ -58,6 +58,8 @@ struct Group
   virtual bytes serialize_private(const PrivateKey& sk) const = 0;
   virtual std::unique_ptr<PrivateKey> deserialize_private(
     const bytes& skm) const = 0;
+  virtual std::unique_ptr<PrivateKey> deserialize_private_der(
+    const bytes& der) const = 0;
 
   virtual bytes dh(const PrivateKey& sk, const PublicKey& pk) const = 0;
 
