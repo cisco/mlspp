@@ -28,7 +28,7 @@ resolve(CipherSuite suite,
   // Resolve the proposals vector
   return stdx::transform<SenderAndProposal>(
     proposals, [&](const auto& proposal_or_ref) {
-      static const auto resolver =
+      const auto resolver =
         overloaded{ [&](const Proposal& proposal) -> SenderAndProposal {
                      return { commit_sender, proposal };
                    },
