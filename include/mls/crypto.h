@@ -240,11 +240,14 @@ struct PublicJWK
 
 struct SignaturePrivateKey
 {
+  using SignerFunc = std::function<bytes(const std::vector<uint8_t>&)>;
+
   static SignaturePrivateKey generate(CipherSuite suite);
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
   static SignaturePrivateKey from_jwk(CipherSuite suite,
                                       const std::string& json_str);
+  static SignaturePrivateKey from_func(SignerFunc func, bytes pub_data);
 
   SignaturePrivateKey() = default;
 
@@ -261,7 +264,11 @@ struct SignaturePrivateKey
   TLS_SERIALIZABLE(data)
 
 private:
-  SignaturePrivateKey(bytes priv_data, bytes pub_data);
+  SignerFunc _sign_func;
+
+  SignaturePrivateKey(bytes priv_data,
+                      bytes pub_data,
+                      SignerFunc func = SignerFunc());
 };
 
 } // namespace MLS_NAMESPACE
