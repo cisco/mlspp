@@ -445,6 +445,16 @@ SignaturePrivateKey::parse(CipherSuite suite, const bytes& data)
 }
 
 SignaturePrivateKey
+SignaturePrivateKey::parse_der(CipherSuite suite, const bytes& data)
+{
+  auto priv = suite.sig().deserialize_private_der(data);
+  auto pub = priv->public_key();
+  auto pub_data = suite.sig().serialize(*pub);
+  auto priv_data = suite.sig().serialize_private(*priv);
+  return { priv_data, pub_data };
+}
+
+SignaturePrivateKey
 SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 {
   auto priv = suite.sig().derive_key_pair(secret);
