@@ -108,12 +108,14 @@ if ( OPENSSL_FOUND )
       string(REGEX REPLACE "^.*OPENSSL_VERSION_TEXT[\t ]+\"OpenSSL ([0-9]+\\.[0-9]+\\.[0-9])+ .+$"
              "\\1" OPENSSL_VERSION "${boringssl_version_str}")
 
+      set(MLSPP_USING_LIBOQS ON)
     elseif (REQUIRE_BORINGSSL)
       message(FATAL_ERROR "BoringSSL required but not found")
     endif ()
 
     if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
       target_compile_definitions(${CURRENT_LIB_NAME} PUBLIC WITH_OPENSSL3)
+      set(MLSPP_USING_LIBOQS ON)
     elseif(${OPENSSL_VERSION} VERSION_GREATER_EQUAL 1.1.1)
       set(MLSPP_USING_LIBOQS ON)
     else()
