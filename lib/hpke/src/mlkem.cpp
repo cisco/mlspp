@@ -1,25 +1,27 @@
 #include "mlkem.h"
 
-#include <hpke/random.h>
 #include "common.h"
 #include "openssl_common.h"
-#include <namespace.h>
 #include <cassert>
+#include <hpke/random.h>
+#include <namespace.h>
 
-#include <oqs/oqs.h>
 #include "openssl/evp.h"
+#include <oqs/oqs.h>
 
 namespace MLS_NAMESPACE::hpke {
 
 MLKEM::PublicKey::PublicKey(bytes pk_in)
   : pk(std::move(pk_in))
-{}
+{
+}
 
 MLKEM::PrivateKey::PrivateKey(bytes sk_in, bytes expanded_sk_in, bytes pk_in)
   : sk(std::move(sk_in))
   , expanded_sk(std::move(expanded_sk_in))
   , pk(std::move(pk_in))
-{}
+{
+}
 
 std::unique_ptr<KEM::PublicKey>
 MLKEM::PrivateKey::public_key() const
@@ -27,39 +29,63 @@ MLKEM::PrivateKey::public_key() const
   return std::make_unique<MLKEM::PublicKey>(pk);
 }
 
-size_t get_enc_size(KEM::ID kem_id) {
+size_t
+get_enc_size(KEM::ID kem_id)
+{
   switch (kem_id) {
-    case KEM::ID::MLKEM512: return OQS_KEM_ml_kem_512_length_ciphertext;
-    case KEM::ID::MLKEM768: return OQS_KEM_ml_kem_768_length_ciphertext;
-    case KEM::ID::MLKEM1024: return OQS_KEM_ml_kem_1024_length_ciphertext;
-    default: throw std::runtime_error("unreachable");
+    case KEM::ID::MLKEM512:
+      return OQS_KEM_ml_kem_512_length_ciphertext;
+    case KEM::ID::MLKEM768:
+      return OQS_KEM_ml_kem_768_length_ciphertext;
+    case KEM::ID::MLKEM1024:
+      return OQS_KEM_ml_kem_1024_length_ciphertext;
+    default:
+      throw std::runtime_error("unreachable");
   }
 }
 
-size_t get_expanded_sk_size(KEM::ID kem_id) {
+size_t
+get_expanded_sk_size(KEM::ID kem_id)
+{
   switch (kem_id) {
-    case KEM::ID::MLKEM512: return OQS_KEM_ml_kem_512_length_secret_key;
-    case KEM::ID::MLKEM768: return OQS_KEM_ml_kem_768_length_secret_key;
-    case KEM::ID::MLKEM1024: return OQS_KEM_ml_kem_1024_length_secret_key;
-    default: throw std::runtime_error("unreachable");
+    case KEM::ID::MLKEM512:
+      return OQS_KEM_ml_kem_512_length_secret_key;
+    case KEM::ID::MLKEM768:
+      return OQS_KEM_ml_kem_768_length_secret_key;
+    case KEM::ID::MLKEM1024:
+      return OQS_KEM_ml_kem_1024_length_secret_key;
+    default:
+      throw std::runtime_error("unreachable");
   }
 }
 
-size_t get_pk_size(KEM::ID kem_id) {
+size_t
+get_pk_size(KEM::ID kem_id)
+{
   switch (kem_id) {
-    case KEM::ID::MLKEM512: return OQS_KEM_ml_kem_512_length_public_key;
-    case KEM::ID::MLKEM768: return OQS_KEM_ml_kem_768_length_public_key;
-    case KEM::ID::MLKEM1024: return OQS_KEM_ml_kem_1024_length_public_key;
-    default: throw std::runtime_error("unreachable");
+    case KEM::ID::MLKEM512:
+      return OQS_KEM_ml_kem_512_length_public_key;
+    case KEM::ID::MLKEM768:
+      return OQS_KEM_ml_kem_768_length_public_key;
+    case KEM::ID::MLKEM1024:
+      return OQS_KEM_ml_kem_1024_length_public_key;
+    default:
+      throw std::runtime_error("unreachable");
   }
 }
 
-OQS_KEM* get_oqs_kem(KEM::ID kem_id) {
+OQS_KEM*
+get_oqs_kem(KEM::ID kem_id)
+{
   switch (kem_id) {
-    case KEM::ID::MLKEM512: return OQS_KEM_new(OQS_KEM_alg_ml_kem_512);
-    case KEM::ID::MLKEM768: return OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
-    case KEM::ID::MLKEM1024: return OQS_KEM_new(OQS_KEM_alg_ml_kem_1024);
-    default: throw std::runtime_error("unreachable");
+    case KEM::ID::MLKEM512:
+      return OQS_KEM_new(OQS_KEM_alg_ml_kem_512);
+    case KEM::ID::MLKEM768:
+      return OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
+    case KEM::ID::MLKEM1024:
+      return OQS_KEM_new(OQS_KEM_alg_ml_kem_1024);
+    default:
+      throw std::runtime_error("unreachable");
   }
 }
 
