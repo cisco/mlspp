@@ -6,6 +6,7 @@
 #include "common.h"
 #include "dhkem.h"
 #include "hkdf.h"
+#include "mlkem.h"
 
 #include <limits>
 #include <stdexcept>
@@ -133,6 +134,27 @@ KEM::get<KEM::ID::DHKEM_X448_SHA512>()
   return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 }
 #endif
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM512>()
+{
+  return MLKEM::get<KEM::ID::MLKEM512>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768>()
+{
+  return MLKEM::get<KEM::ID::MLKEM768>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM1024>()
+{
+  return MLKEM::get<KEM::ID::MLKEM1024>();
+}
 
 bytes
 KEM::serialize_private(const KEM::PrivateKey& /* unused */) const
@@ -359,6 +381,12 @@ select_kem(KEM::ID id)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
 #endif
+    case KEM::ID::MLKEM512:
+      return KEM::get<KEM::ID::MLKEM512>();
+    case KEM::ID::MLKEM768:
+      return KEM::get<KEM::ID::MLKEM768>();
+    case KEM::ID::MLKEM1024:
+      return KEM::get<KEM::ID::MLKEM1024>();
     default:
       throw std::runtime_error("Unsupported algorithm");
   }
