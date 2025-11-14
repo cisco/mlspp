@@ -24,6 +24,9 @@ openssl_digest_type(Digest::ID digest)
     case Digest::ID::SHA512:
       return EVP_sha512();
 
+    case Digest::ID::SHA3_256:
+      return EVP_sha3_256();
+
     default:
       throw std::runtime_error("Unsupported ciphersuite");
   }
@@ -42,6 +45,9 @@ openssl_digest_name(Digest::ID digest)
 
     case Digest::ID::SHA512:
       return OSSL_DIGEST_NAME_SHA2_512;
+
+    case Digest::ID::SHA3_256:
+      return OSSL_DIGEST_NAME_SHA3_256;
 
     default:
       throw std::runtime_error("Unsupported digest algorithm");
@@ -70,6 +76,14 @@ const Digest&
 Digest::get<Digest::ID::SHA512>()
 {
   static const Digest instance(Digest::ID::SHA512);
+  return instance;
+}
+
+template<>
+const Digest&
+Digest::get<Digest::ID::SHA3_256>()
+{
+  static const Digest instance(Digest::ID::SHA3_256);
   return instance;
 }
 

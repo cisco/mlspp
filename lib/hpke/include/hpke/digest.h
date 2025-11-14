@@ -16,6 +16,7 @@ struct Digest
     SHA256,
     SHA384,
     SHA512,
+    SHA3_256,
   };
 
   template<ID id>
