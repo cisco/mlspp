@@ -5,6 +5,7 @@
 #include "common.h"
 #include "openssl_common.h"
 #include <cassert>
+#include <hpke/digest.h>
 #include <hpke/random.h>
 #include <namespace.h>
 
@@ -330,45 +331,6 @@ do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
 
 #endif
 
-static bytes
-labeled_derive(KEM::ID kem_id,
-               const bytes& ikm,
-               const std::string& label,
-               const bytes& context,
-               size_t length)
-{
-  const auto hpke_version = from_ascii("HPKE-v1");
-  const auto label_kem = from_ascii("KEM");
-  const auto suite_id = label_kem + i2osp(uint16_t(kem_id), 2);
-  const auto label_bytes = from_ascii(label);
-  const auto label_len = i2osp(uint16_t(label_bytes.size()), 2);
-  const auto length_bytes = i2osp(uint16_t(length), 2);
-
-  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes +
-                     length_bytes + context;
-
-  auto ctx = make_typed_unique(EVP_MD_CTX_new());
-  if (!ctx) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestUpdate(ctx.get(), labeled_ikm.data(), labeled_ikm.size()) !=
-      1) {
-    throw openssl_error();
-  }
-
-  auto out = bytes(length);
-  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
-    throw openssl_error();
-  }
-
-  return out;
-}
-
 MLKEM::MLKEM(KEM::ID kem_id_in)
   : KEM(kem_id_in,
         MLKEM::secret_size,
@@ -398,7 +360,7 @@ MLKEM::derive_key_pair(const bytes& ikm) const
 {
   const auto empty_context = bytes{};
   auto sk =
-    labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
+    SHAKE256::labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
   auto [expanded_sk, pk] = expand_secret_key(kem_id, sk);
   return std::make_unique<MLKEM::PrivateKey>(sk, expanded_sk, pk);
 }

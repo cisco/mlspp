@@ -7,6 +7,7 @@
 #include <openssl/core_names.h>
 #endif
 
+#include "common.h"
 #include "openssl_common.h"
 
 namespace MLS_NAMESPACE::hpke {
@@ -198,5 +199,52 @@ Digest::hmac_for_hkdf_extract(const bytes& key, const bytes& data) const
 
   return md;
 }
+
+#if !defined(WITH_BORINGSSL)
+bytes
+SHAKE256::derive(const bytes& ikm, size_t length)
+{
+  auto ctx = make_typed_unique(EVP_MD_CTX_new());
+  if (!ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestUpdate(ctx.get(), ikm.data(), ikm.size()) !=
+      1) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(length);
+  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
+    throw openssl_error();
+  }
+
+  return out;
+}
+
+bytes
+SHAKE256::labeled_derive(KEM::ID kem_id,
+               const bytes& ikm,
+               const std::string& label,
+               const bytes& context,
+               size_t length)
+{
+  const auto hpke_version = from_ascii("HPKE-v1");
+  const auto label_kem = from_ascii("KEM");
+  const auto suite_id = label_kem + i2osp(uint16_t(kem_id), 2);
+  const auto label_bytes = from_ascii(label);
+  const auto label_len = i2osp(uint16_t(label_bytes.size()), 2);
+  const auto length_bytes = i2osp(uint16_t(length), 2);
+
+  return derive(ikm + hpke_version + suite_id + label_len + label_bytes +
+                     length_bytes + context, length);
+}
+
+#endif // !defined(WITH_BORINGSSL)
+
 
 } // namespace MLS_NAMESPACE::hpke
