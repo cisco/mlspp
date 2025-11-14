@@ -114,6 +114,40 @@ supported_kem(KEM::ID id)
   }
 }
 
+bool
+supported_kdf(KDF::ID id)
+{
+  switch (id) {
+    case KDF::ID::HKDF_SHA256:
+    case KDF::ID::HKDF_SHA384:
+    case KDF::ID::HKDF_SHA512:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool
+supported_aead(AEAD::ID id)
+{
+  switch (id) {
+    case AEAD::ID::AES_128_GCM:
+    case AEAD::ID::AES_256_GCM:
+    case AEAD::ID::CHACHA20_POLY1305:
+    case AEAD::ID::export_only:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool
+supported(KEM::ID kem, KDF::ID kdf, AEAD::ID aead) {
+  return supported_kem(kem) && supported_kdf(kdf) && supported_aead(aead);
+}
+
 const KEM&
 select_kem(KEM::ID id)
 {
