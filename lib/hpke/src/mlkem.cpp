@@ -116,30 +116,6 @@ get_algorithm_name(KEM::ID kem_id)
   }
 }
 
-static bytes
-shake256(const bytes& input, size_t output_len)
-{
-  auto ctx = make_typed_unique(EVP_MD_CTX_new());
-  if (!ctx) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestUpdate(ctx.get(), input.data(), input.size()) != 1) {
-    throw openssl_error();
-  }
-
-  auto out = bytes(output_len);
-  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
-    throw openssl_error();
-  }
-
-  return out;
-}
-
 static typed_unique_ptr<EVP_PKEY>
 evp_pkey_from_seed(KEM::ID kem_id, const bytes& sk)
 {
@@ -310,30 +286,6 @@ get_oqs_kem(KEM::ID kem_id)
   return make_typed_unique(kem_ptr);
 }
 
-static bytes
-shake256(const bytes& input, size_t output_len)
-{
-  auto ctx = make_typed_unique(EVP_MD_CTX_new());
-  if (!ctx) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestUpdate(ctx.get(), input.data(), input.size()) != 1) {
-    throw openssl_error();
-  }
-
-  auto out = bytes(output_len);
-  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
-    throw openssl_error();
-  }
-
-  return out;
-}
-
 static std::tuple<bytes, bytes>
 expand_secret_key(KEM::ID kem_id, const bytes& sk)
 {
@@ -390,13 +342,29 @@ labeled_derive(KEM::ID kem_id,
   const auto suite_id = label_kem + i2osp(uint16_t(kem_id), 2);
   const auto label_bytes = from_ascii(label);
   const auto label_len = i2osp(uint16_t(label_bytes.size()), 2);
-  const auto context_len = i2osp(uint16_t(context.size()), 2);
   const auto length_bytes = i2osp(uint16_t(length), 2);
 
-  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes +
-                     context_len + context + length_bytes;
+  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes + length_bytes + context;
 
-  return shake256(labeled_ikm, length);
+  auto ctx = make_typed_unique(EVP_MD_CTX_new());
+  if (!ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestUpdate(ctx.get(), labeled_ikm.data(), labeled_ikm.size()) != 1) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(length);
+  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
+    throw openssl_error();
+  }
+
+  return out;
 }
 
 MLKEM::MLKEM(KEM::ID kem_id_in)
