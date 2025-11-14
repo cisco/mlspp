@@ -96,7 +96,7 @@ if ( OPENSSL_FOUND )
 
     if (BORINGSSL_INCLUDE_DIR)
       message(STATUS "Found OpenSSL includes are for BoringSSL")
-      target_compile_definitions(${CURRENT_LIB_NAME} PUBLIC WITH_BORINGSSL)
+      add_compile_definitions(${CURRENT_LIB_NAME} PUBLIC WITH_BORINGSSL)
 
       if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         add_compile_options(-Wno-gnu-anonymous-struct -Wno-nested-anon-types)
@@ -108,14 +108,12 @@ if ( OPENSSL_FOUND )
       string(REGEX REPLACE "^.*OPENSSL_VERSION_TEXT[\t ]+\"OpenSSL ([0-9]+\\.[0-9]+\\.[0-9])+ .+$"
              "\\1" OPENSSL_VERSION "${boringssl_version_str}")
 
-      set(MLSPP_USING_LIBOQS ON)
     elseif (REQUIRE_BORINGSSL)
       message(FATAL_ERROR "BoringSSL required but not found")
     endif ()
 
     if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
-      target_compile_definitions(${CURRENT_LIB_NAME} PUBLIC WITH_OPENSSL3)
-      set(MLSPP_USING_LIBOQS ON)
+      add_compile_definitions(WITH_OPENSSL3)
     elseif(${OPENSSL_VERSION} VERSION_GREATER_EQUAL 1.1.1)
       set(MLSPP_USING_LIBOQS ON)
     else()
