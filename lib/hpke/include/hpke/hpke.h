@@ -19,10 +19,10 @@ struct KEM
     DHKEM_X25519_SHA256 = 0x0020,
 #if !defined(WITH_BORINGSSL)
     DHKEM_X448_SHA512 = 0x0021,
-#endif
     MLKEM512 = 0x0040,
     MLKEM768 = 0x0041,
     MLKEM1024 = 0x0042,
+#endif
   };
 
   template<KEM::ID>

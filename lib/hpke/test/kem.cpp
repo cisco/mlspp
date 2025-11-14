@@ -9,8 +9,8 @@ static const auto ids = std::vector<KEM::ID>
     KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
 #if !defined(WITH_BORINGSSL)
     KEM::ID::DHKEM_X448_SHA512,
-#endif
     KEM::ID::MLKEM512, KEM::ID::MLKEM768, KEM::ID::MLKEM1024,
+#endif
 };
 
 static const auto plaintext = from_hex("00010203");
@@ -50,9 +50,11 @@ TEST_CASE("AuthKEM round-trip")
   ensure_fips_if_required();
 
   static const auto no_auth = std::vector<KEM::ID>{
+#if !defined(WITH_BORINGSSL)
     KEM::ID::MLKEM512,
     KEM::ID::MLKEM768,
     KEM::ID::MLKEM1024,
+#endif
   };
 
   for (const auto& id : ids) {

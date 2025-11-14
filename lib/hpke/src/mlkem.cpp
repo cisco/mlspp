@@ -1,3 +1,5 @@
+#if !defined(WITH_BORINGSSL)
+
 #include "mlkem.h"
 
 #include "common.h"
@@ -6,9 +8,7 @@
 #include <hpke/random.h>
 #include <namespace.h>
 
-#if defined(WITH_BORINGSSL)
-#include <openssl/mlkem.h>
-#elif defined(WITH_OPENSSL3)
+#if defined(WITH_OPENSSL3)
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
 #include <openssl/params.h>
@@ -99,178 +99,7 @@ MLKEM::get<KEM::ID::MLKEM1024>()
   return instance;
 }
 
-#if defined(WITH_BORINGSSL)
-
-// Forward declaration for BORINGSSL_keccak
-// XXX(RLB) This is a bit of a hack, but is required because BoringSSL doesn't
-// expose SHA3 functions publicly.  Seemingly because Adam Langly hates SHA3.
-//    https://www.imperialviolet.org/2017/05/31/skipsha3.html
-extern "C" {
-void BORINGSSL_keccak(uint8_t* out,
-                      size_t out_len,
-                      const uint8_t* in,
-                      size_t in_len,
-                      uint8_t pad,
-                      size_t r);
-static const uint8_t boringssl_shake256 = 0x1f;
-}
-
-static bytes
-shake256(const bytes& input, size_t output_len)
-{
-  auto out = bytes(output_len);
-  BORINGSSL_keccak(out.data(), out.size(),
-                   input.data(), input.size(),
-                   boringssl_shake256, 136);
-  return out;
-}
-
-static std::tuple<bytes, bytes>
-expand_secret_key_768(const bytes& sk)
-{
-  auto priv_key = MLKEM768_private_key{};
-  if (!MLKEM768_private_key_from_seed(&priv_key, sk.data(), sk.size())) {
-    throw std::runtime_error("MLKEM768_private_key_from_seed failed");
-  }
-
-  auto pub_key = MLKEM768_public_key{};
-  MLKEM768_public_from_private(&pub_key, &priv_key);
-
-  auto expanded_sk = bytes(sizeof(priv_key));
-  std::memcpy(expanded_sk.data(), &priv_key, sizeof(priv_key));
-
-  auto pk_encoded = bytes(MLKEM768_PUBLIC_KEY_BYTES);
-  auto cbb = CBB{};
-  CBB_init_fixed(&cbb, pk_encoded.data(), pk_encoded.size());
-  if (!MLKEM768_marshal_public_key(&cbb, &pub_key) || CBB_len(&cbb) != MLKEM768_PUBLIC_KEY_BYTES) {
-    CBB_cleanup(&cbb);
-    throw std::runtime_error("MLKEM768_marshal_public_key failed");
-  }
-  CBB_cleanup(&cbb);
-
-  return { expanded_sk, pk_encoded };
-}
-
-static std::tuple<bytes, bytes>
-expand_secret_key_1024(const bytes& sk)
-{
-  auto priv_key = MLKEM1024_private_key{};
-  if (!MLKEM1024_private_key_from_seed(&priv_key, sk.data(), sk.size())) {
-    throw std::runtime_error("MLKEM1024_private_key_from_seed failed");
-  }
-
-  auto pub_key = MLKEM1024_public_key{};
-  MLKEM1024_public_from_private(&pub_key, &priv_key);
-
-  auto expanded_sk = bytes(sizeof(priv_key));
-  std::memcpy(expanded_sk.data(), &priv_key, sizeof(priv_key));
-
-  auto pk_encoded = bytes(MLKEM1024_PUBLIC_KEY_BYTES);
-  auto cbb = CBB{};
-  CBB_init_fixed(&cbb, pk_encoded.data(), pk_encoded.size());
-  if (!MLKEM1024_marshal_public_key(&cbb, &pub_key) || CBB_len(&cbb) != MLKEM1024_PUBLIC_KEY_BYTES) {
-    CBB_cleanup(&cbb);
-    throw std::runtime_error("MLKEM1024_marshal_public_key failed");
-  }
-  CBB_cleanup(&cbb);
-
-  return { expanded_sk, pk_encoded };
-}
-
-static std::tuple<bytes, bytes>
-expand_secret_key(KEM::ID kem_id, const bytes& sk)
-{
-  switch (kem_id) {
-    case KEM::ID::MLKEM512:
-      throw std::runtime_error("ML-KEM-512 not supported");
-    case KEM::ID::MLKEM768:
-      return expand_secret_key_768(sk);
-    case KEM::ID::MLKEM1024:
-      return expand_secret_key_1024(sk);
-    default:
-      throw std::runtime_error("unreachable");
-  }
-}
-
-static std::pair<bytes, bytes>
-do_encap(KEM::ID kem_id, const bytes& pk_bytes)
-{
-  switch (kem_id) {
-    case KEM::ID::MLKEM512:
-      throw std::runtime_error("ML-KEM-512 not supported");
-
-    case KEM::ID::MLKEM768: {
-      auto pub_key = MLKEM768_public_key{};
-      auto cbs = CBS{};
-      CBS_init(&cbs, pk_bytes.data(), pk_bytes.size());
-      if (!MLKEM768_parse_public_key(&pub_key, &cbs) || CBS_len(&cbs) != 0) {
-        throw openssl_error();
-      }
-
-      auto ct = bytes(MLKEM768_CIPHERTEXT_BYTES);
-      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
-      MLKEM768_encap(ct.data(), ss.data(), &pub_key);
-
-      return { ss, ct };
-    }
-
-    case KEM::ID::MLKEM1024: {
-      auto pub_key = MLKEM1024_public_key{};
-      auto cbs = CBS{};
-      CBS_init(&cbs, pk_bytes.data(), pk_bytes.size());
-      if (!MLKEM1024_parse_public_key(&pub_key, &cbs) || CBS_len(&cbs) != 0) {
-        throw openssl_error();
-      }
-
-      auto ct = bytes(MLKEM1024_CIPHERTEXT_BYTES);
-      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
-      MLKEM1024_encap(ct.data(), ss.data(), &pub_key);
-
-      return { ss, ct };
-    }
-
-    default:
-      throw std::runtime_error("unreachable");
-  }
-}
-
-static bytes
-do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
-{
-  switch (kem_id) {
-    case KEM::ID::MLKEM512:
-      throw std::runtime_error("ML-KEM-512 not supported");
-
-    case KEM::ID::MLKEM768: {
-      auto priv_key = MLKEM768_private_key{};
-      std::memcpy(&priv_key, expanded_sk.data(), sizeof(priv_key));
-
-      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
-      if (!MLKEM768_decap(ss.data(), enc.data(), enc.size(), &priv_key)) {
-        throw openssl_error();
-      }
-
-      return ss;
-    }
-
-    case KEM::ID::MLKEM1024: {
-      auto priv_key = MLKEM1024_private_key{};
-      std::memcpy(&priv_key, expanded_sk.data(), sizeof(priv_key));
-
-      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
-      if (!MLKEM1024_decap(ss.data(), enc.data(), enc.size(), &priv_key)) {
-        throw openssl_error();
-      }
-
-      return ss;
-    }
-
-    default:
-      throw std::runtime_error("unreachable");
-  }
-}
-
-#elif defined(WITH_OPENSSL3)
+#if defined(WITH_OPENSSL3)
 
 static const char*
 get_algorithm_name(KEM::ID kem_id)
@@ -567,6 +396,10 @@ MLKEM::MLKEM(KEM::ID kem_id_in)
         MLKEM::sk_size)
   , kem_id(kem_id_in)
 {
+#if defined(WITH_BORINGSSL)
+  throw std::runtime_error("ML-KEM is not supported with BoringSSL");
+#endif
+
   static const auto label_kem = from_ascii("KEM");
   suite_id = label_kem + i2osp(uint16_t(kem_id_in), 2);
 }
@@ -630,3 +463,5 @@ MLKEM::decap(const bytes& enc, const KEM::PrivateKey& skR) const
 }
 
 } // namespace MLS_NAMESPACE::hpke
+
+#endif // !defined(WITH_BORINGSSL)

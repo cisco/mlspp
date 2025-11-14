@@ -103,10 +103,10 @@ supported_kem(KEM::ID id)
     case KEM::ID::DHKEM_X25519_SHA256:
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
-#endif
     case KEM::ID::MLKEM512:
     case KEM::ID::MLKEM768:
     case KEM::ID::MLKEM1024:
+#endif
       return true;
 
     default:
@@ -133,7 +133,6 @@ select_kem(KEM::ID id)
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
-#endif
 
     case KEM::ID::MLKEM512:
       return KEM::get<KEM::ID::MLKEM512>();
@@ -143,6 +142,7 @@ select_kem(KEM::ID id)
 
     case KEM::ID::MLKEM1024:
       return KEM::get<KEM::ID::MLKEM1024>();
+#endif
 
     default:
       throw std::runtime_error("Unknown algorithm");
