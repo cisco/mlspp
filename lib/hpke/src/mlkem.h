@@ -3,8 +3,6 @@
 #include <hpke/hpke.h>
 #include <namespace.h>
 
-struct OQS_KEM;
-
 namespace MLS_NAMESPACE::hpke {
 
 struct MLKEM : public KEM
@@ -48,7 +46,6 @@ struct MLKEM : public KEM
 
 private:
   const KEM::ID kem_id;
-  const std::unique_ptr<OQS_KEM> kem;
   bytes suite_id;
 
   MLKEM(KEM::ID kem_id_in);

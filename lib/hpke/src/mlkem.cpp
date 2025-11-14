@@ -6,8 +6,18 @@
 #include <hpke/random.h>
 #include <namespace.h>
 
-#include "openssl/evp.h"
+#if defined(WITH_BORINGSSL)
+#include <openssl/mlkem.h>
+#elif defined(WITH_OPENSSL3)
+#include <openssl/evp.h>
+#include <openssl/core_names.h>
+#include <openssl/params.h>
+#include <openssl/ml_kem.h>
+#include <openssl/err.h>
+#else
+#include <openssl/evp.h>
 #include <oqs/oqs.h>
+#endif
 
 namespace MLS_NAMESPACE::hpke {
 
@@ -29,61 +39,31 @@ MLKEM::PrivateKey::public_key() const
   return std::make_unique<MLKEM::PublicKey>(pk);
 }
 
-size_t
+static size_t
 get_enc_size(KEM::ID kem_id)
 {
   switch (kem_id) {
     case KEM::ID::MLKEM512:
-      return OQS_KEM_ml_kem_512_length_ciphertext;
+      return 768;
     case KEM::ID::MLKEM768:
-      return OQS_KEM_ml_kem_768_length_ciphertext;
+      return 1088;
     case KEM::ID::MLKEM1024:
-      return OQS_KEM_ml_kem_1024_length_ciphertext;
+      return 1568;
     default:
       throw std::runtime_error("unreachable");
   }
 }
 
-size_t
-get_expanded_sk_size(KEM::ID kem_id)
-{
-  switch (kem_id) {
-    case KEM::ID::MLKEM512:
-      return OQS_KEM_ml_kem_512_length_secret_key;
-    case KEM::ID::MLKEM768:
-      return OQS_KEM_ml_kem_768_length_secret_key;
-    case KEM::ID::MLKEM1024:
-      return OQS_KEM_ml_kem_1024_length_secret_key;
-    default:
-      throw std::runtime_error("unreachable");
-  }
-}
-
-size_t
+static size_t
 get_pk_size(KEM::ID kem_id)
 {
   switch (kem_id) {
     case KEM::ID::MLKEM512:
-      return OQS_KEM_ml_kem_512_length_public_key;
+      return 800;
     case KEM::ID::MLKEM768:
-      return OQS_KEM_ml_kem_768_length_public_key;
+      return 1184;
     case KEM::ID::MLKEM1024:
-      return OQS_KEM_ml_kem_1024_length_public_key;
-    default:
-      throw std::runtime_error("unreachable");
-  }
-}
-
-OQS_KEM*
-get_oqs_kem(KEM::ID kem_id)
-{
-  switch (kem_id) {
-    case KEM::ID::MLKEM512:
-      return OQS_KEM_new(OQS_KEM_alg_ml_kem_512);
-    case KEM::ID::MLKEM768:
-      return OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
-    case KEM::ID::MLKEM1024:
-      return OQS_KEM_new(OQS_KEM_alg_ml_kem_1024);
+      return 1568;
     default:
       throw std::runtime_error("unreachable");
   }
@@ -119,6 +99,466 @@ MLKEM::get<KEM::ID::MLKEM1024>()
   return instance;
 }
 
+#if defined(WITH_BORINGSSL)
+
+// Forward declaration for BORINGSSL_keccak
+// XXX(RLB) This is a bit of a hack, but is required because BoringSSL doesn't
+// expose SHA3 functions publicly.  Seemingly because Adam Langly hates SHA3.
+//    https://www.imperialviolet.org/2017/05/31/skipsha3.html
+extern "C" {
+void BORINGSSL_keccak(uint8_t* out,
+                      size_t out_len,
+                      const uint8_t* in,
+                      size_t in_len,
+                      uint8_t pad,
+                      size_t r);
+static const uint8_t boringssl_shake256 = 0x1f;
+}
+
+static bytes
+shake256(const bytes& input, size_t output_len)
+{
+  auto out = bytes(output_len);
+  BORINGSSL_keccak(out.data(), out.size(),
+                   input.data(), input.size(),
+                   boringssl_shake256, 136);
+  return out;
+}
+
+static std::tuple<bytes, bytes>
+expand_secret_key_768(const bytes& sk)
+{
+  auto priv_key = MLKEM768_private_key{};
+  if (!MLKEM768_private_key_from_seed(&priv_key, sk.data(), sk.size())) {
+    throw std::runtime_error("MLKEM768_private_key_from_seed failed");
+  }
+
+  auto pub_key = MLKEM768_public_key{};
+  MLKEM768_public_from_private(&pub_key, &priv_key);
+
+  auto expanded_sk = bytes(sizeof(priv_key));
+  std::memcpy(expanded_sk.data(), &priv_key, sizeof(priv_key));
+
+  auto pk_encoded = bytes(MLKEM768_PUBLIC_KEY_BYTES);
+  auto cbb = CBB{};
+  CBB_init_fixed(&cbb, pk_encoded.data(), pk_encoded.size());
+  if (!MLKEM768_marshal_public_key(&cbb, &pub_key) || CBB_len(&cbb) != MLKEM768_PUBLIC_KEY_BYTES) {
+    CBB_cleanup(&cbb);
+    throw std::runtime_error("MLKEM768_marshal_public_key failed");
+  }
+  CBB_cleanup(&cbb);
+
+  return { expanded_sk, pk_encoded };
+}
+
+static std::tuple<bytes, bytes>
+expand_secret_key_1024(const bytes& sk)
+{
+  auto priv_key = MLKEM1024_private_key{};
+  if (!MLKEM1024_private_key_from_seed(&priv_key, sk.data(), sk.size())) {
+    throw std::runtime_error("MLKEM1024_private_key_from_seed failed");
+  }
+
+  auto pub_key = MLKEM1024_public_key{};
+  MLKEM1024_public_from_private(&pub_key, &priv_key);
+
+  auto expanded_sk = bytes(sizeof(priv_key));
+  std::memcpy(expanded_sk.data(), &priv_key, sizeof(priv_key));
+
+  auto pk_encoded = bytes(MLKEM1024_PUBLIC_KEY_BYTES);
+  auto cbb = CBB{};
+  CBB_init_fixed(&cbb, pk_encoded.data(), pk_encoded.size());
+  if (!MLKEM1024_marshal_public_key(&cbb, &pub_key) || CBB_len(&cbb) != MLKEM1024_PUBLIC_KEY_BYTES) {
+    CBB_cleanup(&cbb);
+    throw std::runtime_error("MLKEM1024_marshal_public_key failed");
+  }
+  CBB_cleanup(&cbb);
+
+  return { expanded_sk, pk_encoded };
+}
+
+static std::tuple<bytes, bytes>
+expand_secret_key(KEM::ID kem_id, const bytes& sk)
+{
+  switch (kem_id) {
+    case KEM::ID::MLKEM512:
+      throw std::runtime_error("ML-KEM-512 not supported");
+    case KEM::ID::MLKEM768:
+      return expand_secret_key_768(sk);
+    case KEM::ID::MLKEM1024:
+      return expand_secret_key_1024(sk);
+    default:
+      throw std::runtime_error("unreachable");
+  }
+}
+
+static std::pair<bytes, bytes>
+do_encap(KEM::ID kem_id, const bytes& pk_bytes)
+{
+  switch (kem_id) {
+    case KEM::ID::MLKEM512:
+      throw std::runtime_error("ML-KEM-512 not supported");
+
+    case KEM::ID::MLKEM768: {
+      auto pub_key = MLKEM768_public_key{};
+      auto cbs = CBS{};
+      CBS_init(&cbs, pk_bytes.data(), pk_bytes.size());
+      if (!MLKEM768_parse_public_key(&pub_key, &cbs) || CBS_len(&cbs) != 0) {
+        throw openssl_error();
+      }
+
+      auto ct = bytes(MLKEM768_CIPHERTEXT_BYTES);
+      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
+      MLKEM768_encap(ct.data(), ss.data(), &pub_key);
+
+      return { ss, ct };
+    }
+
+    case KEM::ID::MLKEM1024: {
+      auto pub_key = MLKEM1024_public_key{};
+      auto cbs = CBS{};
+      CBS_init(&cbs, pk_bytes.data(), pk_bytes.size());
+      if (!MLKEM1024_parse_public_key(&pub_key, &cbs) || CBS_len(&cbs) != 0) {
+        throw openssl_error();
+      }
+
+      auto ct = bytes(MLKEM1024_CIPHERTEXT_BYTES);
+      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
+      MLKEM1024_encap(ct.data(), ss.data(), &pub_key);
+
+      return { ss, ct };
+    }
+
+    default:
+      throw std::runtime_error("unreachable");
+  }
+}
+
+static bytes
+do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
+{
+  switch (kem_id) {
+    case KEM::ID::MLKEM512:
+      throw std::runtime_error("ML-KEM-512 not supported");
+
+    case KEM::ID::MLKEM768: {
+      auto priv_key = MLKEM768_private_key{};
+      std::memcpy(&priv_key, expanded_sk.data(), sizeof(priv_key));
+
+      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
+      if (!MLKEM768_decap(ss.data(), enc.data(), enc.size(), &priv_key)) {
+        throw openssl_error();
+      }
+
+      return ss;
+    }
+
+    case KEM::ID::MLKEM1024: {
+      auto priv_key = MLKEM1024_private_key{};
+      std::memcpy(&priv_key, expanded_sk.data(), sizeof(priv_key));
+
+      auto ss = bytes(MLKEM_SHARED_SECRET_BYTES);
+      if (!MLKEM1024_decap(ss.data(), enc.data(), enc.size(), &priv_key)) {
+        throw openssl_error();
+      }
+
+      return ss;
+    }
+
+    default:
+      throw std::runtime_error("unreachable");
+  }
+}
+
+#elif defined(WITH_OPENSSL3)
+
+static const char*
+get_algorithm_name(KEM::ID kem_id)
+{
+  switch (kem_id) {
+    case KEM::ID::MLKEM512:
+      return "ML-KEM-512";
+    case KEM::ID::MLKEM768:
+      return "ML-KEM-768";
+    case KEM::ID::MLKEM1024:
+      return "ML-KEM-1024";
+    default:
+      throw std::runtime_error("unreachable");
+  }
+}
+
+static bytes
+shake256(const bytes& input, size_t output_len)
+{
+  auto ctx = make_typed_unique(EVP_MD_CTX_new());
+  if (!ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestUpdate(ctx.get(), input.data(), input.size()) != 1) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(output_len);
+  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
+    throw openssl_error();
+  }
+
+  return out;
+}
+
+static typed_unique_ptr<EVP_PKEY>
+evp_pkey_from_seed(KEM::ID kem_id, const bytes& sk)
+{
+  auto fromdata_ctx = make_typed_unique(EVP_PKEY_CTX_new_from_name(nullptr, get_algorithm_name(kem_id), nullptr));
+  if (!fromdata_ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_fromdata_init(fromdata_ctx.get()) <= 0) {
+    throw openssl_error();
+  }
+
+  auto fromdata_params = std::array{
+    OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED,
+                                     const_cast<uint8_t*>(sk.data()), sk.size()),
+    OSSL_PARAM_construct_end()
+  };
+
+  auto* raw_pkey = static_cast<EVP_PKEY*>(nullptr);
+  if (EVP_PKEY_fromdata(fromdata_ctx.get(), &raw_pkey, EVP_PKEY_KEYPAIR, fromdata_params.data()) <= 0) {
+    throw openssl_error();
+  }
+
+  return make_typed_unique(raw_pkey);
+}
+
+static std::tuple<bytes, bytes>
+expand_secret_key(KEM::ID kem_id, const bytes& sk)
+{
+  auto pkey = evp_pkey_from_seed(kem_id, sk);
+
+  // Extract public key
+  auto pk_size = get_pk_size(kem_id);
+  auto pk = bytes(pk_size);
+  auto pk_len = pk.size();
+
+  if (EVP_PKEY_get_raw_public_key(pkey.get(), pk.data(), &pk_len) <= 0) {
+    throw openssl_error();
+  }
+
+  // Extract raw private key
+  size_t priv_len = 0;
+  if (EVP_PKEY_get_raw_private_key(pkey.get(), nullptr, &priv_len) <= 0) {
+    throw openssl_error();
+  }
+
+  auto expanded_sk = bytes(priv_len);
+  if (EVP_PKEY_get_raw_private_key(pkey.get(), expanded_sk.data(), &priv_len) <= 0) {
+    throw openssl_error();
+  }
+
+  return { expanded_sk, pk };
+}
+
+static std::pair<bytes, bytes>
+do_encap(KEM::ID kem_id, const bytes& pk_bytes)
+{
+  // Create EVP_PKEY from public key bytes
+  auto pkey = make_typed_unique(EVP_PKEY_new_raw_public_key_ex(
+    nullptr, get_algorithm_name(kem_id), nullptr,
+    pk_bytes.data(), pk_bytes.size()));
+
+  if (!pkey) {
+    throw openssl_error();
+  }
+
+  auto encap_ctx = make_typed_unique(EVP_PKEY_CTX_new(pkey.get(), nullptr));
+  if (!encap_ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_encapsulate_init(encap_ctx.get(), nullptr) <= 0) {
+    throw openssl_error();
+  }
+
+  auto ct_len = size_t{ 0 };
+  auto ss_len = size_t{ 0 };
+  if (EVP_PKEY_encapsulate(encap_ctx.get(), nullptr, &ct_len, nullptr, &ss_len) <= 0) {
+    throw openssl_error();
+  }
+
+  auto ct = bytes(ct_len);
+  auto ss = bytes(ss_len);
+
+  if (EVP_PKEY_encapsulate(encap_ctx.get(), ct.data(), &ct_len, ss.data(), &ss_len) <= 0) {
+    throw openssl_error();
+  }
+
+  return { ss, ct };
+}
+
+static bytes
+do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
+{
+  auto* raw_pkey = EVP_PKEY_new_raw_private_key_ex(
+    nullptr,
+    get_algorithm_name(kem_id),
+    nullptr,
+    expanded_sk.data(),
+    expanded_sk.size());
+
+  if (!raw_pkey) {
+    throw openssl_error();
+  }
+
+  auto pkey = make_typed_unique(raw_pkey);
+
+  auto decap_ctx = make_typed_unique(EVP_PKEY_CTX_new(pkey.get(), nullptr));
+  if (!decap_ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_PKEY_decapsulate_init(decap_ctx.get(), nullptr) <= 0) {
+    throw openssl_error();
+  }
+
+  auto ss_len = size_t{ 0 };
+  if (EVP_PKEY_decapsulate(decap_ctx.get(), nullptr, &ss_len, enc.data(), enc.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  auto ss = bytes(ss_len);
+
+  if (EVP_PKEY_decapsulate(decap_ctx.get(), ss.data(), &ss_len, enc.data(), enc.size()) <= 0) {
+    throw openssl_error();
+  }
+
+  return ss;
+}
+
+#else
+
+template<>
+void
+typed_delete(OQS_KEM* ptr)
+{
+  OQS_KEM_free(ptr);
+}
+
+static typed_unique_ptr<OQS_KEM>
+get_oqs_kem(KEM::ID kem_id)
+{
+  OQS_KEM* kem_ptr = nullptr;
+  switch (kem_id) {
+    case KEM::ID::MLKEM512:
+      kem_ptr = OQS_KEM_new(OQS_KEM_alg_ml_kem_512);
+      break;
+    case KEM::ID::MLKEM768:
+      kem_ptr = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
+      break;
+    case KEM::ID::MLKEM1024:
+      kem_ptr = OQS_KEM_new(OQS_KEM_alg_ml_kem_1024);
+      break;
+    default:
+      throw std::runtime_error("unreachable");
+  }
+  return make_typed_unique(kem_ptr);
+}
+
+static bytes
+shake256(const bytes& input, size_t output_len)
+{
+  auto ctx = make_typed_unique(EVP_MD_CTX_new());
+  if (!ctx) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), nullptr) != 1) {
+    throw openssl_error();
+  }
+
+  if (EVP_DigestUpdate(ctx.get(), input.data(), input.size()) != 1) {
+    throw openssl_error();
+  }
+
+  auto out = bytes(output_len);
+  if (EVP_DigestFinalXOF(ctx.get(), out.data(), out.size()) != 1) {
+    throw openssl_error();
+  }
+
+  return out;
+}
+
+static std::tuple<bytes, bytes>
+expand_secret_key(KEM::ID kem_id, const bytes& sk)
+{
+  auto kem = get_oqs_kem(kem_id);
+  assert(sk.size() == kem->length_keypair_seed);
+  auto expanded_sk = bytes(kem->length_secret_key);
+  auto pk = bytes(kem->length_public_key);
+  const auto rv = kem->keypair_derand(pk.data(), expanded_sk.data(), sk.data());
+  if (rv != OQS_SUCCESS) {
+    throw std::runtime_error(std::to_string(rv));
+  }
+
+  return { expanded_sk, pk };
+}
+
+static std::pair<bytes, bytes>
+do_encap(KEM::ID kem_id, const bytes& pk_bytes)
+{
+  auto kem = get_oqs_kem(kem_id);
+  auto ct = bytes(kem->length_ciphertext);
+  auto ss = bytes(kem->length_shared_secret);
+  const auto rv = kem->encaps(ct.data(), ss.data(), pk_bytes.data());
+  if (rv != OQS_SUCCESS) {
+    throw std::runtime_error(std::to_string(rv));
+  }
+
+  return { ss, ct };
+}
+
+static bytes
+do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
+{
+  auto kem = get_oqs_kem(kem_id);
+  auto ss = bytes(kem->length_shared_secret);
+  const auto rv = kem->decaps(ss.data(), enc.data(), expanded_sk.data());
+  if (rv != OQS_SUCCESS) {
+    throw std::runtime_error(std::to_string(rv));
+  }
+
+  return ss;
+}
+
+#endif
+
+static bytes
+labeled_derive(KEM::ID kem_id,
+               const bytes& ikm,
+               const std::string& label,
+               const bytes& context,
+               size_t length)
+{
+  const auto hpke_version = from_ascii("HPKE-v1");
+  const auto label_kem = from_ascii("KEM");
+  const auto suite_id = label_kem + i2osp(uint16_t(kem_id), 2);
+  const auto label_bytes = from_ascii(label);
+  const auto label_len = i2osp(uint16_t(label_bytes.size()), 2);
+  const auto context_len = i2osp(uint16_t(context.size()), 2);
+  const auto length_bytes = i2osp(uint16_t(length), 2);
+
+  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes +
+                     context_len + context + length_bytes;
+
+  return shake256(labeled_ikm, length);
+}
+
 MLKEM::MLKEM(KEM::ID kem_id_in)
   : KEM(kem_id_in,
         MLKEM::secret_size,
@@ -126,59 +566,25 @@ MLKEM::MLKEM(KEM::ID kem_id_in)
         get_pk_size(kem_id_in),
         MLKEM::sk_size)
   , kem_id(kem_id_in)
-  , kem(get_oqs_kem(kem_id_in))
 {
   static const auto label_kem = from_ascii("KEM");
   suite_id = label_kem + i2osp(uint16_t(kem_id_in), 2);
 }
 
-static std::tuple<bytes, bytes>
-expand_secret_key(const OQS_KEM* kem, const bytes& sk)
-{
-  assert(sk.size() == kem->length_keypair_seed);
-  auto expanded_sk = bytes(kem->length_secret_key);
-  auto pk = bytes(kem->length_public_key);
-  const auto rv = kem->keypair_derand(pk.data(), expanded_sk.data(), sk.data());
-  if (rv != OQS_SUCCESS) {
-    throw std::runtime_error(std::to_string(rv)); // XXX
-  }
-
-  return { expanded_sk, pk };
-}
-
 std::unique_ptr<KEM::PrivateKey>
 MLKEM::generate_key_pair() const
 {
-  auto sk = random_bytes(kem->length_keypair_seed);
-  auto [expanded_sk, pk] = expand_secret_key(kem.get(), sk);
+  auto sk = random_bytes(MLKEM::sk_size);
+  auto [expanded_sk, pk] = expand_secret_key(kem_id, sk);
   return std::make_unique<MLKEM::PrivateKey>(sk, expanded_sk, pk);
 }
 
 std::unique_ptr<KEM::PrivateKey>
 MLKEM::derive_key_pair(const bytes& ikm) const
 {
-  // Derive seed with SHAKE
-  // TODO(RLB) Actually use LabeledDerive
-  auto ctx = make_typed_unique(EVP_MD_CTX_new());
-  if (ctx == nullptr) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestInit_ex(ctx.get(), EVP_shake256(), NULL) != 1) {
-    throw openssl_error();
-  }
-
-  if (EVP_DigestUpdate(ctx.get(), ikm.data(), ikm.size()) != 1) {
-    throw openssl_error();
-  }
-
-  auto sk = bytes(kem->length_keypair_seed);
-  if (EVP_DigestFinalXOF(ctx.get(), sk.data(), sk.size()) != 1) {
-    throw openssl_error();
-  }
-
-  // Expand seed into full key pair
-  auto [expanded_sk, pk] = expand_secret_key(kem.get(), sk);
+  const auto empty_context = bytes{};
+  auto sk = labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
+  auto [expanded_sk, pk] = expand_secret_key(kem_id, sk);
   return std::make_unique<MLKEM::PrivateKey>(sk, expanded_sk, pk);
 }
 
@@ -205,37 +611,22 @@ MLKEM::serialize_private(const KEM::PrivateKey& sk) const
 std::unique_ptr<KEM::PrivateKey>
 MLKEM::deserialize_private(const bytes& skm) const
 {
-  auto [expanded_sk, pk] = expand_secret_key(kem.get(), skm);
+  auto [expanded_sk, pk] = expand_secret_key(kem_id, skm);
   return std::make_unique<MLKEM::PrivateKey>(skm, expanded_sk, pk);
 }
 
 std::pair<bytes, bytes>
 MLKEM::encap(const KEM::PublicKey& pkR) const
 {
-  const auto pk = dynamic_cast<const PublicKey&>(pkR);
-
-  auto ct = bytes(kem->length_ciphertext);
-  auto ss = bytes(kem->length_shared_secret);
-  const auto rv = kem->encaps(ct.data(), ss.data(), pk.pk.data());
-  if (rv != OQS_SUCCESS) {
-    throw std::runtime_error(std::to_string(rv)); // XXX
-  }
-
-  return { ss, ct };
+  const auto& pk = dynamic_cast<const PublicKey&>(pkR);
+  return do_encap(kem_id, pk.pk);
 }
 
 bytes
 MLKEM::decap(const bytes& enc, const KEM::PrivateKey& skR) const
 {
-  const auto sk = dynamic_cast<const PrivateKey&>(skR);
-
-  auto ss = bytes(kem->length_shared_secret);
-  const auto rv = kem->decaps(ss.data(), enc.data(), sk.expanded_sk.data());
-  if (rv != OQS_SUCCESS) {
-    throw std::runtime_error(std::to_string(rv)); // XXX
-  }
-
-  return ss;
+  const auto& sk = dynamic_cast<const PrivateKey&>(skR);
+  return do_decap(kem_id, enc, sk.expanded_sk);
 }
 
 } // namespace MLS_NAMESPACE::hpke

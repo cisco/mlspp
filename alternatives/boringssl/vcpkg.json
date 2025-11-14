@@ -5,12 +5,12 @@
   "dependencies": [
     {
       "name": "boringssl",
-      "version>=": "2023-10-13"
+      "version>=": "2025-08-18"
     },
     "catch2",
     "nlohmann-json"
   ],
-  "builtin-baseline": "eb33d2f7583405fca184bcdf7fdd5828ec88ac05",
+  "builtin-baseline": "beace5bfdd71f78d402122fa5b4d72babfdc9585",
   "overrides": [
     {
       "name": "catch2",
