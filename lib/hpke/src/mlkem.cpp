@@ -344,7 +344,8 @@ labeled_derive(KEM::ID kem_id,
   const auto label_len = i2osp(uint16_t(label_bytes.size()), 2);
   const auto length_bytes = i2osp(uint16_t(length), 2);
 
-  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes + length_bytes + context;
+  auto labeled_ikm = ikm + hpke_version + suite_id + label_len + label_bytes +
+                     length_bytes + context;
 
   auto ctx = make_typed_unique(EVP_MD_CTX_new());
   if (!ctx) {
@@ -355,7 +356,8 @@ labeled_derive(KEM::ID kem_id,
     throw openssl_error();
   }
 
-  if (EVP_DigestUpdate(ctx.get(), labeled_ikm.data(), labeled_ikm.size()) != 1) {
+  if (EVP_DigestUpdate(ctx.get(), labeled_ikm.data(), labeled_ikm.size()) !=
+      1) {
     throw openssl_error();
   }
 

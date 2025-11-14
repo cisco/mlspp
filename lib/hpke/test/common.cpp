@@ -144,7 +144,8 @@ supported_aead(AEAD::ID id)
 }
 
 bool
-supported(KEM::ID kem, KDF::ID kdf, AEAD::ID aead) {
+supported(KEM::ID kem, KDF::ID kdf, AEAD::ID aead)
+{
   return supported_kem(kem) && supported_kdf(kdf) && supported_aead(aead);
 }
 
