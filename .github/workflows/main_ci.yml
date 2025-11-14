@@ -35,7 +35,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
     - uses: dorny/paths-filter@v3
-      id: filterV
+      id: filter_version
       with:
         filters: |
           hpke:
@@ -45,7 +45,7 @@ jobs:
  
     - id: set-matrix 
       run: |
-        if [ ${{ steps.filter.outputs.hpke }} = "true" ];
+        if [ ${{ steps.filter_version.outputs.hpke }} = "true" ];
         then
           echo "matrix=[\"openssl_1.1\",\"openssl_3\",\"boringssl\"]" >> $GITHUB_OUTPUT;
         else
@@ -63,7 +63,7 @@ jobs:
       uses: jidicula/clang-format-action@v4.11.0
       with:
         clang-format-version: 16
-        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
+        include-regex: '^\./(src|include|test|cmd|lib)/.*\.(cpp|h)$'
         fallback-style: 'Mozilla'
 
   build-and-unit-test:
@@ -81,7 +81,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: true
         fetch-depth: 0
 
     - uses: ./.github/actions/prepare-build
