@@ -9,11 +9,11 @@
 #include <namespace.h>
 
 #if defined(WITH_OPENSSL3)
-#include <openssl/evp.h>
 #include <openssl/core_names.h>
-#include <openssl/params.h>
-#include <openssl/ml_kem.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/ml_kem.h>
+#include <openssl/params.h>
 #else
 #include <openssl/evp.h>
 #include <oqs/oqs.h>
@@ -143,7 +143,8 @@ shake256(const bytes& input, size_t output_len)
 static typed_unique_ptr<EVP_PKEY>
 evp_pkey_from_seed(KEM::ID kem_id, const bytes& sk)
 {
-  auto fromdata_ctx = make_typed_unique(EVP_PKEY_CTX_new_from_name(nullptr, get_algorithm_name(kem_id), nullptr));
+  auto fromdata_ctx = make_typed_unique(
+    EVP_PKEY_CTX_new_from_name(nullptr, get_algorithm_name(kem_id), nullptr));
   if (!fromdata_ctx) {
     throw openssl_error();
   }
@@ -153,13 +154,16 @@ evp_pkey_from_seed(KEM::ID kem_id, const bytes& sk)
   }
 
   auto fromdata_params = std::array{
-    OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ML_KEM_SEED,
-                                     const_cast<uint8_t*>(sk.data()), sk.size()),
+    OSSL_PARAM_construct_octet_string(
+      OSSL_PKEY_PARAM_ML_KEM_SEED, const_cast<uint8_t*>(sk.data()), sk.size()),
     OSSL_PARAM_construct_end()
   };
 
   auto* raw_pkey = static_cast<EVP_PKEY*>(nullptr);
-  if (EVP_PKEY_fromdata(fromdata_ctx.get(), &raw_pkey, EVP_PKEY_KEYPAIR, fromdata_params.data()) <= 0) {
+  if (EVP_PKEY_fromdata(fromdata_ctx.get(),
+                        &raw_pkey,
+                        EVP_PKEY_KEYPAIR,
+                        fromdata_params.data()) <= 0) {
     throw openssl_error();
   }
 
@@ -187,7 +191,8 @@ expand_secret_key(KEM::ID kem_id, const bytes& sk)
   }
 
   auto expanded_sk = bytes(priv_len);
-  if (EVP_PKEY_get_raw_private_key(pkey.get(), expanded_sk.data(), &priv_len) <= 0) {
+  if (EVP_PKEY_get_raw_private_key(pkey.get(), expanded_sk.data(), &priv_len) <=
+      0) {
     throw openssl_error();
   }
 
@@ -198,9 +203,12 @@ static std::pair<bytes, bytes>
 do_encap(KEM::ID kem_id, const bytes& pk_bytes)
 {
   // Create EVP_PKEY from public key bytes
-  auto pkey = make_typed_unique(EVP_PKEY_new_raw_public_key_ex(
-    nullptr, get_algorithm_name(kem_id), nullptr,
-    pk_bytes.data(), pk_bytes.size()));
+  auto pkey =
+    make_typed_unique(EVP_PKEY_new_raw_public_key_ex(nullptr,
+                                                     get_algorithm_name(kem_id),
+                                                     nullptr,
+                                                     pk_bytes.data(),
+                                                     pk_bytes.size()));
 
   if (!pkey) {
     throw openssl_error();
@@ -217,14 +225,16 @@ do_encap(KEM::ID kem_id, const bytes& pk_bytes)
 
   auto ct_len = size_t{ 0 };
   auto ss_len = size_t{ 0 };
-  if (EVP_PKEY_encapsulate(encap_ctx.get(), nullptr, &ct_len, nullptr, &ss_len) <= 0) {
+  if (EVP_PKEY_encapsulate(
+        encap_ctx.get(), nullptr, &ct_len, nullptr, &ss_len) <= 0) {
     throw openssl_error();
   }
 
   auto ct = bytes(ct_len);
   auto ss = bytes(ss_len);
 
-  if (EVP_PKEY_encapsulate(encap_ctx.get(), ct.data(), &ct_len, ss.data(), &ss_len) <= 0) {
+  if (EVP_PKEY_encapsulate(
+        encap_ctx.get(), ct.data(), &ct_len, ss.data(), &ss_len) <= 0) {
     throw openssl_error();
   }
 
@@ -234,12 +244,11 @@ do_encap(KEM::ID kem_id, const bytes& pk_bytes)
 static bytes
 do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
 {
-  auto* raw_pkey = EVP_PKEY_new_raw_private_key_ex(
-    nullptr,
-    get_algorithm_name(kem_id),
-    nullptr,
-    expanded_sk.data(),
-    expanded_sk.size());
+  auto* raw_pkey = EVP_PKEY_new_raw_private_key_ex(nullptr,
+                                                   get_algorithm_name(kem_id),
+                                                   nullptr,
+                                                   expanded_sk.data(),
+                                                   expanded_sk.size());
 
   if (!raw_pkey) {
     throw openssl_error();
@@ -257,13 +266,15 @@ do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
   }
 
   auto ss_len = size_t{ 0 };
-  if (EVP_PKEY_decapsulate(decap_ctx.get(), nullptr, &ss_len, enc.data(), enc.size()) <= 0) {
+  if (EVP_PKEY_decapsulate(
+        decap_ctx.get(), nullptr, &ss_len, enc.data(), enc.size()) <= 0) {
     throw openssl_error();
   }
 
   auto ss = bytes(ss_len);
 
-  if (EVP_PKEY_decapsulate(decap_ctx.get(), ss.data(), &ss_len, enc.data(), enc.size()) <= 0) {
+  if (EVP_PKEY_decapsulate(
+        decap_ctx.get(), ss.data(), &ss_len, enc.data(), enc.size()) <= 0) {
     throw openssl_error();
   }
 
@@ -416,7 +427,8 @@ std::unique_ptr<KEM::PrivateKey>
 MLKEM::derive_key_pair(const bytes& ikm) const
 {
   const auto empty_context = bytes{};
-  auto sk = labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
+  auto sk =
+    labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
   auto [expanded_sk, pk] = expand_secret_key(kem_id, sk);
   return std::make_unique<MLKEM::PrivateKey>(sk, expanded_sk, pk);
 }
