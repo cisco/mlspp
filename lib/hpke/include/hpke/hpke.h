@@ -22,6 +22,9 @@ struct KEM
     MLKEM512 = 0x0040,
     MLKEM768 = 0x0041,
     MLKEM1024 = 0x0042,
+    MLKEM768_P256 = 0x0050,
+    MLKEM1024_P384 = 0x0051,
+    MLKEM768_X25519 = 0x647a,
 #endif
   };
 
