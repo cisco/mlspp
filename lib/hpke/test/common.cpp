@@ -106,6 +106,9 @@ supported_kem(KEM::ID id)
     case KEM::ID::MLKEM512:
     case KEM::ID::MLKEM768:
     case KEM::ID::MLKEM1024:
+    case KEM::ID::MLKEM768_P256:
+    case KEM::ID::MLKEM1024_P384:
+    case KEM::ID::MLKEM768_X25519:
 #endif
       return true;
 
@@ -177,6 +180,15 @@ select_kem(KEM::ID id)
 
     case KEM::ID::MLKEM1024:
       return KEM::get<KEM::ID::MLKEM1024>();
+
+    case KEM::ID::MLKEM768_P256:
+      return KEM::get<KEM::ID::MLKEM768_P256>();
+
+    case KEM::ID::MLKEM1024_P384:
+      return KEM::get<KEM::ID::MLKEM1024_P384>();
+
+    case KEM::ID::MLKEM768_X25519:
+      return KEM::get<KEM::ID::MLKEM768_X25519>();
 #endif
 
     default:

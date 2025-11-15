@@ -6,6 +6,7 @@
 #include "common.h"
 #include "dhkem.h"
 #include "hkdf.h"
+#include "hybrid_kem.h"
 #include "mlkem.h"
 
 #include <limits>
@@ -155,6 +156,27 @@ const KEM&
 KEM::get<KEM::ID::MLKEM1024>()
 {
   return MLKEM::get<KEM::ID::MLKEM1024>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768_P256>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM768_P256>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM1024_P384>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM1024_P384>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768_X25519>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM768_X25519>();
 }
 #endif
 
@@ -388,6 +410,12 @@ select_kem(KEM::ID id)
       return KEM::get<KEM::ID::MLKEM768>();
     case KEM::ID::MLKEM1024:
       return KEM::get<KEM::ID::MLKEM1024>();
+    case KEM::ID::MLKEM768_P256:
+      return KEM::get<KEM::ID::MLKEM768_P256>();
+    case KEM::ID::MLKEM1024_P384:
+      return KEM::get<KEM::ID::MLKEM1024_P384>();
+    case KEM::ID::MLKEM768_X25519:
+      return KEM::get<KEM::ID::MLKEM768_X25519>();
 #endif
     default:
       throw std::runtime_error("Unsupported algorithm");

@@ -213,8 +213,7 @@ SHAKE256::derive(const bytes& ikm, size_t length)
     throw openssl_error();
   }
 
-  if (EVP_DigestUpdate(ctx.get(), ikm.data(), ikm.size()) !=
-      1) {
+  if (EVP_DigestUpdate(ctx.get(), ikm.data(), ikm.size()) != 1) {
     throw openssl_error();
   }
 
@@ -228,10 +227,10 @@ SHAKE256::derive(const bytes& ikm, size_t length)
 
 bytes
 SHAKE256::labeled_derive(KEM::ID kem_id,
-               const bytes& ikm,
-               const std::string& label,
-               const bytes& context,
-               size_t length)
+                         const bytes& ikm,
+                         const std::string& label,
+                         const bytes& context,
+                         size_t length)
 {
   const auto hpke_version = from_ascii("HPKE-v1");
   const auto label_kem = from_ascii("KEM");
@@ -241,10 +240,10 @@ SHAKE256::labeled_derive(KEM::ID kem_id,
   const auto length_bytes = i2osp(uint16_t(length), 2);
 
   return derive(ikm + hpke_version + suite_id + label_len + label_bytes +
-                     length_bytes + context, length);
+                  length_bytes + context,
+                length);
 }
 
 #endif // !defined(WITH_BORINGSSL)
-
 
 } // namespace MLS_NAMESPACE::hpke

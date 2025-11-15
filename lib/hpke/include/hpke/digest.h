@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include <hpke/hpke.h>
 #include <bytes/bytes.h>
+#include <hpke/hpke.h>
 #include <namespace.h>
 
 using namespace MLS_NAMESPACE::bytes_ns;
@@ -38,13 +38,14 @@ private:
 };
 
 #if !defined(WITH_BORINGSSL)
-struct SHAKE256 {
+struct SHAKE256
+{
   static bytes derive(const bytes& ikm, size_t length);
   static bytes labeled_derive(KEM::ID kem_id,
-               const bytes& ikm,
-               const std::string& label,
-               const bytes& context,
-               size_t length);
+                              const bytes& ikm,
+                              const std::string& label,
+                              const bytes& context,
+                              size_t length);
 };
 #endif
 

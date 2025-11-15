@@ -52,7 +52,7 @@ private:
   friend MLKEM make_mlkem(KEM::ID kem_id_in);
 
   friend struct HybridKEM;
-  static constexpr auto seed_size = size_t(32);
+  static constexpr auto seed_size = size_t(64);
   static constexpr auto secret_size = size_t(32);
   static constexpr auto sk_size = size_t(64);
 };

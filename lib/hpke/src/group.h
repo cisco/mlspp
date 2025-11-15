@@ -48,13 +48,12 @@ struct Group
   const std::string jwk_key_type;
   const std::string jwk_curve_name;
 
-  // TODO make this pure virtual and implement it
-  virtual std::unique_ptr<PrivateKey> random_scalar(const bytes& seed) const;
-
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
     const bytes& suite_id,
     const bytes& ikm) const = 0;
+  virtual std::unique_ptr<PrivateKey> random_scalar(
+    const bytes& seed) const = 0;
 
   virtual bytes serialize(const PublicKey& pk) const = 0;
   virtual std::unique_ptr<PublicKey> deserialize(const bytes& enc) const = 0;
