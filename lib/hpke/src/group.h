@@ -41,11 +41,15 @@ struct Group
   virtual ~Group() = default;
 
   const ID id;
+  const size_t seed_size;
   const size_t dh_size;
   const size_t pk_size;
   const size_t sk_size;
   const std::string jwk_key_type;
   const std::string jwk_curve_name;
+
+  // TODO make this pure virtual and implement it
+  virtual std::unique_ptr<PrivateKey> random_scalar(const bytes& seed) const;
 
   virtual std::unique_ptr<PrivateKey> generate_key_pair() const = 0;
   virtual std::unique_ptr<PrivateKey> derive_key_pair(

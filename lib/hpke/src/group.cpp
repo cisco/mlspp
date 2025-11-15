@@ -953,6 +953,32 @@ Group::get<Group::ID::Ed448>()
 }
 
 static inline size_t
+group_seed_size(Group::ID group_id)
+{
+  switch (group_id) {
+    case Group::ID::P256:
+      return 128;
+    case Group::ID::P384:
+      return 48;
+    case Group::ID::P521:
+      // XXX(RLB): This may be wrong, but we're never going to use it
+      return 66;
+    case Group::ID::X25519:
+      return 32;
+    case Group::ID::X448:
+      return 56;
+
+    // Non-DH groups
+    case Group::ID::Ed25519:
+    case Group::ID::Ed448:
+      return 0;
+
+    default:
+      throw std::runtime_error("Unknown group");
+  }
+}
+
+static inline size_t
 group_dh_size(Group::ID group_id)
 {
   switch (group_id) {
@@ -1066,6 +1092,7 @@ group_jwk_key_type(Group::ID group_id)
 
 Group::Group(ID group_id_in, const KDF& kdf_in)
   : id(group_id_in)
+  , seed_size(group_seed_size(group_id_in))
   , dh_size(group_dh_size(group_id_in))
   , pk_size(group_pk_size(group_id_in))
   , sk_size(group_sk_size(group_id_in))

@@ -333,6 +333,7 @@ do_decap(KEM::ID kem_id, const bytes& enc, const bytes& expanded_sk)
 
 MLKEM::MLKEM(KEM::ID kem_id_in)
   : KEM(kem_id_in,
+        MLKEM::seed_size,
         MLKEM::secret_size,
         get_enc_size(kem_id_in),
         get_pk_size(kem_id_in),
@@ -358,9 +359,8 @@ MLKEM::generate_key_pair() const
 std::unique_ptr<KEM::PrivateKey>
 MLKEM::derive_key_pair(const bytes& ikm) const
 {
-  const auto empty_context = bytes{};
   auto sk =
-    SHAKE256::labeled_derive(kem_id, ikm, "DeriveKeyPair", empty_context, MLKEM::sk_size);
+    SHAKE256::labeled_derive(kem_id, ikm, "DeriveKeyPair", {}, MLKEM::sk_size);
   auto [expanded_sk, pk] = expand_secret_key(kem_id, sk);
   return std::make_unique<MLKEM::PrivateKey>(sk, expanded_sk, pk);
 }

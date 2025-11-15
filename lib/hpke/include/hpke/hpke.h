@@ -45,6 +45,7 @@ struct KEM
   };
 
   const ID id;
+  const size_t seed_size;
   const size_t secret_size;
   const size_t enc_size;
   const size_t pk_size;
@@ -74,6 +75,7 @@ struct KEM
 
 protected:
   KEM(ID id_in,
+      size_t seed_size_in,
       size_t secret_size_in,
       size_t enc_size_in,
       size_t pk_size_in,
