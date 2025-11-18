@@ -62,8 +62,6 @@ func (b ByteString) MarhsalTLS() ([]byte, error) {
 	return addVarintHeader(b.Data), nil
 }
 
-// XXX(RLB) The fields here must be ct/pt for PQ test vectors, and
-// ciphertext/plaintext for the RFC 9180 test vectors.
 type EncryptionTestVector struct {
 	Plaintext  ByteString `json:"pt"`
 	AAD        ByteString `json:"aad"`

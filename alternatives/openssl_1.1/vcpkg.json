@@ -8,9 +8,10 @@
       "version>=": "1.1.1n"
     },
     "catch2",
+    "liboqs",
     "nlohmann-json"
   ],
-  "builtin-baseline": "eb33d2f7583405fca184bcdf7fdd5828ec88ac05",
+  "builtin-baseline": "4d752d34f1b1cfd088524665eeaca7034dfb455f",
   "overrides": [
     {
       "name": "openssl",

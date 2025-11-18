@@ -286,14 +286,16 @@ get_oqs_kem(KEM::ID kem_id)
   return make_typed_unique(kem_ptr);
 }
 
+// XXX Revert comments here once vcpkg updates their version of boringssl
 static std::tuple<bytes, bytes>
-expand_secret_key(KEM::ID kem_id, const bytes& sk)
+expand_secret_key(KEM::ID kem_id, const bytes& /* XXX sk */)
 {
   auto kem = get_oqs_kem(kem_id);
-  assert(sk.size() == kem->length_keypair_seed);
+  // XXX assert(sk.size() == kem->length_keypair_seed);
   auto expanded_sk = bytes(kem->length_secret_key);
   auto pk = bytes(kem->length_public_key);
-  const auto rv = kem->keypair_derand(pk.data(), expanded_sk.data(), sk.data());
+  // XXX const auto rv = kem->keypair_derand(pk.data(), expanded_sk.data(), sk.data());
+  const auto rv = kem->keypair(pk.data(), expanded_sk.data()); // XXX
   if (rv != OQS_SUCCESS) {
     throw std::runtime_error(std::to_string(rv));
   }
