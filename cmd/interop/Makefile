@@ -1,13 +1,15 @@
 BUILD_DIR=build
 TEST_VECTOR_DIR=${BUILD_DIR}/third_party/src/mls-interop-extern/test-vectors
 APP_NAME=mlspp_client
+TOOLCHAIN_FILE=../../vcpkg/scripts/buildsystems/vcpkg.cmake
 
 .PHONY: all run format clean cclean
 
 all: ${BUILD_DIR}/${APP_NAME}
 
 ${BUILD_DIR}:
-	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug .
+	cmake -B${BUILD_DIR} -DCMAKE_BUILD_TYPE=Debug . \
+				-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
 ${BUILD_DIR}/${APP_NAME}: ${BUILD_DIR} src/*.cpp
 	cmake --build ${BUILD_DIR} --target ${APP_NAME}

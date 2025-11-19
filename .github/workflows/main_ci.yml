@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      CRYPTO_DIR: "./alternatives/openssl_1.1"
+      CRYPTO_DIR: "./alternatives/openssl_3"
 
     steps:
     - uses: actions/checkout@v4
@@ -117,13 +117,13 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
-        crypto-dir: openssl_1.1
+        crypto-dir: openssl_3
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
       run: |
-        cmake -B "${{ runner.temp }}/build_openssl_1.1" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ runner.temp }}/build_openssl_1.1"
+        cmake -B "${{ runner.temp }}/build_openssl_3" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+        cmake --build "${{ runner.temp }}/build_openssl_3"
 
     - name: Build (Interop Harness)
       run: |
