@@ -11,7 +11,7 @@
     "liboqs",
     "nlohmann-json"
   ],
-  "builtin-baseline": "4d752d34f1b1cfd088524665eeaca7034dfb455f",
+  "builtin-baseline": "3bbc2809d3625cb83a0d7cbd413bd6ad769d46d4",
   "overrides": [
     {
       "name": "openssl",
