@@ -492,10 +492,6 @@ State::add_proposal(const KeyPackage& key_package) const
 Proposal
 State::update_proposal(HPKEPrivateKey leaf_priv, const LeafNodeOptions& opts)
 {
-  if (_cached_update) {
-    throw ProtocolError("Only one update may be generated per epoch");
-  }
-
   auto leaf = opt::get(_tree.leaf_node(_index));
 
   auto new_leaf = leaf.for_update(

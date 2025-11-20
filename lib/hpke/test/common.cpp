@@ -103,12 +103,50 @@ supported_kem(KEM::ID id)
     case KEM::ID::DHKEM_X25519_SHA256:
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
+    case KEM::ID::MLKEM512:
+    case KEM::ID::MLKEM768:
+    case KEM::ID::MLKEM1024:
 #endif
       return true;
 
     default:
       return false;
   }
+}
+
+bool
+supported_kdf(KDF::ID id)
+{
+  switch (id) {
+    case KDF::ID::HKDF_SHA256:
+    case KDF::ID::HKDF_SHA384:
+    case KDF::ID::HKDF_SHA512:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool
+supported_aead(AEAD::ID id)
+{
+  switch (id) {
+    case AEAD::ID::AES_128_GCM:
+    case AEAD::ID::AES_256_GCM:
+    case AEAD::ID::CHACHA20_POLY1305:
+    case AEAD::ID::export_only:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool
+supported(KEM::ID kem, KDF::ID kdf, AEAD::ID aead)
+{
+  return supported_kem(kem) && supported_kdf(kdf) && supported_aead(aead);
 }
 
 const KEM&
@@ -130,6 +168,15 @@ select_kem(KEM::ID id)
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+
+    case KEM::ID::MLKEM512:
+      return KEM::get<KEM::ID::MLKEM512>();
+
+    case KEM::ID::MLKEM768:
+      return KEM::get<KEM::ID::MLKEM768>();
+
+    case KEM::ID::MLKEM1024:
+      return KEM::get<KEM::ID::MLKEM1024>();
 #endif
 
     default:

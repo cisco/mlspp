@@ -35,7 +35,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
     - uses: dorny/paths-filter@v3
-      id: filterV
+      id: filter_version
       with:
         filters: |
           hpke:
@@ -45,7 +45,7 @@ jobs:
  
     - id: set-matrix 
       run: |
-        if [ ${{ steps.filter.outputs.hpke }} = "true" ];
+        if [ ${{ steps.filter_version.outputs.hpke }} = "true" ];
         then
           echo "matrix=[\"openssl_1.1\",\"openssl_3\",\"boringssl\"]" >> $GITHUB_OUTPUT;
         else
@@ -63,7 +63,7 @@ jobs:
       uses: jidicula/clang-format-action@v4.11.0
       with:
         clang-format-version: 16
-        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
+        include-regex: '^\./(src|include|test|cmd|lib)/.*\.(cpp|h)$'
         fallback-style: 'Mozilla'
 
   build-and-unit-test:
@@ -81,7 +81,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: true
         fetch-depth: 0
 
     - uses: ./.github/actions/prepare-build
@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      CRYPTO_DIR: "./alternatives/openssl_1.1"
+      CRYPTO_DIR: "./alternatives/openssl_3"
 
     steps:
     - uses: actions/checkout@v4
@@ -117,13 +117,13 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
-        crypto-dir: openssl_1.1
+        crypto-dir: openssl_3
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
       run: |
-        cmake -B "${{ runner.temp }}/build_openssl_1.1" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ runner.temp }}/build_openssl_1.1"
+        cmake -B "${{ runner.temp }}/build_openssl_3" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+        cmake --build "${{ runner.temp }}/build_openssl_3"
 
     - name: Build (Interop Harness)
       run: |

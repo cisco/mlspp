@@ -1,6 +1,8 @@
 module main
 
-go 1.16
+go 1.23.0
+
+toolchain go1.24.10
 
 require (
 	github.com/cisco/go-tls-syntax v0.0.0-20200617162716-46b0cfb76b9b

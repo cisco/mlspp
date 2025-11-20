@@ -3,24 +3,23 @@
 
 #include "common.h"
 
-// TODO(RLB): Add known-answer tests
+static const auto ids = std::vector<KEM::ID>
+{
+  KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
+    KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
+#if !defined(WITH_BORINGSSL)
+    KEM::ID::DHKEM_X448_SHA512, KEM::ID::MLKEM512, KEM::ID::MLKEM768,
+    KEM::ID::MLKEM1024,
+#endif
+};
+
+static const auto plaintext = from_hex("00010203");
+static const auto seedS = from_hex("A0A0A0A0");
+static const auto seedR = from_hex("B0B0B0B0");
 
 TEST_CASE("KEM round-trip")
 {
   ensure_fips_if_required();
-
-  const std::vector<KEM::ID> ids
-  {
-    KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
-      KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
-#if !defined(WITH_BORINGSSL)
-      KEM::ID::DHKEM_X448_SHA512,
-#endif
-  };
-
-  const auto plaintext = from_hex("00010203");
-  const auto seedS = from_hex("A0A0A0A0");
-  const auto seedR = from_hex("B0B0B0B0");
 
   for (const auto& id : ids) {
     const auto& kem = select_kem(id);
@@ -34,30 +33,53 @@ TEST_CASE("KEM round-trip")
     auto pkSm = kem.serialize(*pkS);
     REQUIRE(pkSm.size() == kem.pk_size);
 
-    SECTION("Encap/Decap")
-    {
-      auto [secretS_, enc_] = kem.encap(*pkR);
-      auto secretS = secretS_;
-      auto enc = enc_;
+    auto [secretS_, enc_] = kem.encap(*pkR);
+    auto secretS = secretS_;
+    auto enc = enc_;
 
-      REQUIRE(enc.size() == kem.enc_size);
-      REQUIRE(secretS.size() == kem.secret_size);
+    REQUIRE(enc.size() == kem.enc_size);
+    REQUIRE(secretS.size() == kem.secret_size);
 
-      auto secretR = kem.decap(enc, *skR);
-      REQUIRE(secretR == secretS);
+    auto secretR = kem.decap(enc, *skR);
+    REQUIRE(secretR == secretS);
+  }
+}
+
+TEST_CASE("AuthKEM round-trip")
+{
+  ensure_fips_if_required();
+
+  static const auto no_auth = std::vector<KEM::ID>
+  {
+#if !defined(WITH_BORINGSSL)
+    KEM::ID::MLKEM512, KEM::ID::MLKEM768, KEM::ID::MLKEM1024,
+#endif
+  };
+
+  for (const auto& id : ids) {
+    if (std::find(no_auth.begin(), no_auth.end(), id) != no_auth.end()) {
+      continue;
     }
 
-    SECTION("AuthEncap/AuthDecap")
-    {
-      auto [secretS_, enc_] = kem.auth_encap(*pkR, *skS);
-      auto secretS = secretS_;
-      auto enc = enc_;
+    const auto& kem = select_kem(id);
 
-      REQUIRE(enc.size() == kem.enc_size);
-      REQUIRE(secretS.size() == kem.secret_size);
+    auto skS = kem.derive_key_pair(seedS);
+    auto skR = kem.derive_key_pair(seedR);
 
-      auto secretR = kem.auth_decap(enc, *pkS, *skR);
-      REQUIRE(secretR == secretS);
-    }
+    auto pkS = skS->public_key();
+    auto pkR = skR->public_key();
+
+    auto pkSm = kem.serialize(*pkS);
+    REQUIRE(pkSm.size() == kem.pk_size);
+
+    auto [secretS_, enc_] = kem.auth_encap(*pkR, *skS);
+    auto secretS = secretS_;
+    auto enc = enc_;
+
+    REQUIRE(enc.size() == kem.enc_size);
+    REQUIRE(secretS.size() == kem.secret_size);
+
+    auto secretR = kem.auth_decap(enc, *pkS, *skR);
+    REQUIRE(secretR == secretS);
   }
 }

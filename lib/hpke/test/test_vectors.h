@@ -87,3 +87,4 @@ struct HPKETestVectors
 };
 
 extern const std::array<uint8_t, 2555172> test_vector_data;
+extern const std::array<uint8_t, 51427> test_vector_data_pq;

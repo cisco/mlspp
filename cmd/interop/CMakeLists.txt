@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   # XXX(RLB) -Wmissing-declarations causes gRPC generated code not to build
-  add_compile_options(-Wall -pedantic -Wextra -Werror)
+  add_compile_options(-Wall -pedantic -Wextra -Werror -Wno-nullability-extension)
 elseif(MSVC)
   # XXX(RLB) Protobuf and gRPC cannot build with these additional errors enabled
   # add_compile_options(/W4 /WX)

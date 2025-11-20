@@ -5,18 +5,18 @@
   "dependencies": [
    {
       "name": "openssl",
-      "version>=": "1.1.1n"
+      "version>=": "3.5.0"
     },
     "protobuf",
     "grpc",
     "gflags",
     "nlohmann-json"
   ],
-  "builtin-baseline": "0d5cae153065957df7f382de7c1549ccc88027e5",
+  "builtin-baseline": "3bbc2809d3625cb83a0d7cbd413bd6ad769d46d4",
   "overrides": [
     {
       "name": "openssl",
-      "version-string": "1.1.1n"
+      "version-string": "3.5.0"
     }
   ]
 }

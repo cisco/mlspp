@@ -42,11 +42,11 @@ if ( OPENSSL_FOUND )
 
     elseif (REQUIRE_BORINGSSL)
       message(FATAL_ERROR "BoringSSL required but not found")
-    endif ()
-
-    if (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
+    elseif (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 3)
       target_compile_definitions(${CURRENT_LIB_NAME} PUBLIC WITH_OPENSSL3)
-    elseif(${OPENSSL_VERSION} VERSION_LESS 1.1.1)
+    elseif (${OPENSSL_VERSION} VERSION_GREATER_EQUAL 1.1.1)
+      set(USING_LIBOQS ON)
+    else()
       message(FATAL_ERROR "OpenSSL 1.1.1 or greater is required")
     endif()
     message(STATUS "OpenSSL Found: ${OPENSSL_VERSION}")
@@ -62,6 +62,12 @@ target_link_libraries(${CURRENT_LIB_NAME}
   PRIVATE
     OpenSSL::Crypto
 )
+
+# LibOQS as needed.
+if(USING_LIBOQS)
+  find_package(liboqs)
+  target_link_libraries(${CURRENT_LIB_NAME} PRIVATE OQS::oqs)
+endif()
 
 target_include_directories(${CURRENT_LIB_NAME}
   PUBLIC
