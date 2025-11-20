@@ -215,10 +215,10 @@ HybridKEM::c2pri_combiner(const bytes& ss_pq,
                           const bytes& ss_t,
                           const bytes& ct_t,
                           const bytes& ek_t,
-                          const char* label) const
+                          const std::string& label) const
 {
   static const auto kdf = Digest::get<Digest::ID::SHA3_256>();
-  const auto label_bytes = std::vector<uint8_t>(label, label + strlen(label));
+  const auto label_bytes = from_ascii(label);
   return kdf.hash(ss_pq + ss_t + ct_t + ek_t + label_bytes);
 }
 

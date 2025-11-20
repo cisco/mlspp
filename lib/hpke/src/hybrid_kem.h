@@ -6,6 +6,8 @@
 #include "group.h"
 #include "mlkem.h"
 
+#include <string>
+
 namespace MLS_NAMESPACE::hpke {
 
 struct HybridKEM : public KEM
@@ -63,7 +65,7 @@ private:
                        const bytes& ss_t,
                        const bytes& ct_t,
                        const bytes& ek_t,
-                       const char* label) const;
+                       const std::string& label) const;
 
   HybridKEM(KEM::ID kem_id_in, const MLKEM& mlkem_in, const Group& group_in);
   friend HybridKEM make_hybrid_kem(KEM::ID kem_id_in,
