@@ -1,4 +1,4 @@
-#if !defined(WITH_BORINGSSL)
+#ifdef WITH_PQ
 
 #include "mlkem.h"
 
@@ -408,4 +408,4 @@ MLKEM::decap(const bytes& enc, const KEM::PrivateKey& skR) const
 
 } // namespace MLS_NAMESPACE::hpke
 
-#endif // !defined(WITH_BORINGSSL)
+#endif // def WITH_PQ

@@ -17,7 +17,9 @@ struct Digest
     SHA256,
     SHA384,
     SHA512,
+#if !defined(WITH_BORINGSSL)
     SHA3_256,
+#endif
   };
 
   template<ID id>

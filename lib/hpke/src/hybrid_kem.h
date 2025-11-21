@@ -1,3 +1,4 @@
+#ifdef WITH_PQ
 #pragma once
 
 #include <hpke/hpke.h>
@@ -74,3 +75,4 @@ private:
 };
 
 } // namespace MLS_NAMESPACE::hpke
+#endif // def WITH_PQ

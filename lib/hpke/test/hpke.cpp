@@ -219,6 +219,14 @@ TEST_CASE("HPKE Round-Trip")
 #if !defined(WITH_BORINGSSL)
       KEM::ID::DHKEM_X448_SHA512
 #endif
+#if defined(WITH_PQ)
+      KEM::ID::MLKEM512,
+      KEM::ID::MLKEM768,
+      KEM::ID::MLKEM1024,
+      KEM::ID::MLKEM768_P256,
+      KEM::ID::MLKEM768_X25519,
+      KEM::ID::MLKEM1024_P384,
+#endif
   };
   const std::vector<KDF::ID> kdfs{ KDF::ID::HKDF_SHA256,
                                    KDF::ID::HKDF_SHA384,

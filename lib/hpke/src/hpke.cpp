@@ -136,7 +136,9 @@ KEM::get<KEM::ID::DHKEM_X448_SHA512>()
 {
   return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 }
+#endif // !defined(WITH_BORINGSSL)
 
+#if defined(WITH_PQ)
 template<>
 const KEM&
 KEM::get<KEM::ID::MLKEM512>()
@@ -178,7 +180,7 @@ KEM::get<KEM::ID::MLKEM768_X25519>()
 {
   return HybridKEM::get<KEM::ID::MLKEM768_X25519>();
 }
-#endif
+#endif // defined(WITH_PQ)
 
 bytes
 KEM::serialize_private(const KEM::PrivateKey& /* unused */) const
@@ -404,6 +406,8 @@ select_kem(KEM::ID id)
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+#endif
+#if defined(WITH_PQ)
     case KEM::ID::MLKEM512:
       return KEM::get<KEM::ID::MLKEM512>();
     case KEM::ID::MLKEM768:

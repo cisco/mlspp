@@ -1,3 +1,4 @@
+#ifdef WITH_PQ
 #include "hybrid_kem.h"
 
 #include "common.h"
@@ -223,3 +224,4 @@ HybridKEM::c2pri_combiner(const bytes& ss_pq,
 }
 
 } // namespace MLS_NAMESPACE::hpke
+#endif // def WITH_PQ

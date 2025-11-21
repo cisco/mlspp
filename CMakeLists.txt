@@ -11,6 +11,7 @@ option(SANITIZERS "Enable sanitizers" OFF)
 option(MLS_NAMESPACE_SUFFIX "Namespace Suffix for CXX and CMake Export")
 option(DISABLE_GREASE "Disables the inclusion of MLS protocol recommended GREASE values" OFF)
 option(REQUIRE_BORINGSSL "Require BoringSSL instead of OpenSSL" OFF)
+option(DISABLE_PQ "Disables support for PQ algorithms even when they would otherwise be enabled" OFF)
 
 if(MLS_NAMESPACE_SUFFIX)
     set(MLS_CXX_NAMESPACE "mls_${MLS_NAMESPACE_SUFFIX}" CACHE STRING "Top-level Namespace for CXX")

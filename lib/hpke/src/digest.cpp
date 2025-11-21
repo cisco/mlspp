@@ -25,8 +25,10 @@ openssl_digest_type(Digest::ID digest)
     case Digest::ID::SHA512:
       return EVP_sha512();
 
+#if !defined(WITH_BORINGSSL)
     case Digest::ID::SHA3_256:
       return EVP_sha3_256();
+#endif
 
     default:
       throw std::runtime_error("Unsupported ciphersuite");
@@ -80,6 +82,7 @@ Digest::get<Digest::ID::SHA512>()
   return instance;
 }
 
+#if !defined(WITH_BORINGSSL)
 template<>
 const Digest&
 Digest::get<Digest::ID::SHA3_256>()
@@ -87,6 +90,7 @@ Digest::get<Digest::ID::SHA3_256>()
   static const Digest instance(Digest::ID::SHA3_256);
   return instance;
 }
+#endif
 
 Digest::Digest(Digest::ID id_in)
   : id(id_in)
