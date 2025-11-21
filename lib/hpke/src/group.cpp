@@ -387,7 +387,8 @@ struct ECKeyGroup : public EVPGroup
     auto start = size_t(0);
     auto end = sk_size;
     auto candidate = seed.slice(start, end);
-    sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
+    auto candidate_size = static_cast<int>(candidate.size());
+    sk.reset(BN_bin2bn(candidate.data(), candidate_size, nullptr));
 
     while (BN_is_zero(sk.get()) != 0 || BN_cmp(sk.get(), order.get()) != -1) {
       start = end;
@@ -397,7 +398,7 @@ struct ECKeyGroup : public EVPGroup
       }
 
       candidate = seed.slice(start, end);
-      sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
+      sk.reset(BN_bin2bn(candidate.data(), candidate_size, nullptr));
     }
 
 #if defined(WITH_OPENSSL3)
