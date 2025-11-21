@@ -384,7 +384,7 @@ struct ECKeyGroup : public EVPGroup
     auto sk = make_typed_unique(BN_new());
     BN_zero(sk.get());
 
-    auto start = 0;
+    auto start = size_t(0);
     auto end = sk_size;
     auto candidate = seed.slice(start, end);
     sk.reset(BN_bin2bn(candidate.data(), candidate.size(), nullptr));
