@@ -52,6 +52,9 @@ struct CipherSuite
     P521_AES256GCM_SHA512_P521 = 0x0005,
     X448_CHACHA20POLY1305_SHA512_Ed448 = 0x0006,
     P384_AES256GCM_SHA384_P384 = 0x0007,
+    MLKEM768X25519_AES256GCM_SHA384_Ed25519 = 0x0008,
+    MLKEM768P256_AES256GCM_SHA384_P256 = 0x0009,
+    MLKEM1024P384_AES256GCM_SHA384_P384 = 0x000a,
 
     // GREASE values, included here mainly so that debugger output looks nice
     GREASE_0 = 0x0A0A,
@@ -133,11 +136,22 @@ private:
   static const bytes& reference_label();
 };
 
-#if WITH_BORINGSSL
-extern const std::array<CipherSuite::ID, 5> all_supported_suites;
+#if defined(WITH_BORINGSSL)
+static constexpr size_t n_supported_x448_suites = 0;
 #else
-extern const std::array<CipherSuite::ID, 7> all_supported_suites;
+static constexpr size_t n_supported_x448_suites = 2;
 #endif
+
+#if defined(WITH_PQ)
+static constexpr size_t n_supported_pq_suites = 3;
+#else
+static constexpr size_t n_supported_pq_suites = 0;
+#endif
+
+static constexpr size_t n_supported_suites =
+  5 + n_supported_x448_suites + n_supported_pq_suites;
+extern const std::array<CipherSuite::ID, n_supported_suites>
+  all_supported_cipher_suites;
 
 // Utilities
 using MLS_NAMESPACE::hpke::random_bytes;
