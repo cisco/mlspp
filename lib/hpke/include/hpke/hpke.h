@@ -19,9 +19,14 @@ struct KEM
     DHKEM_X25519_SHA256 = 0x0020,
 #if !defined(WITH_BORINGSSL)
     DHKEM_X448_SHA512 = 0x0021,
+#endif
+#if defined(WITH_PQ)
     MLKEM512 = 0x0040,
     MLKEM768 = 0x0041,
     MLKEM1024 = 0x0042,
+    MLKEM768_P256 = 0x0050,
+    MLKEM1024_P384 = 0x0051,
+    MLKEM768_X25519 = 0x647a,
 #endif
   };
 
@@ -42,6 +47,7 @@ struct KEM
   };
 
   const ID id;
+  const size_t seed_size;
   const size_t secret_size;
   const size_t enc_size;
   const size_t pk_size;
@@ -71,6 +77,7 @@ struct KEM
 
 protected:
   KEM(ID id_in,
+      size_t seed_size_in,
       size_t secret_size_in,
       size_t enc_size_in,
       size_t pk_size_in,

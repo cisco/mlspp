@@ -103,9 +103,14 @@ supported_kem(KEM::ID id)
     case KEM::ID::DHKEM_X25519_SHA256:
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
+#endif
+#if defined(WITH_PQ)
     case KEM::ID::MLKEM512:
     case KEM::ID::MLKEM768:
     case KEM::ID::MLKEM1024:
+    case KEM::ID::MLKEM768_P256:
+    case KEM::ID::MLKEM1024_P384:
+    case KEM::ID::MLKEM768_X25519:
 #endif
       return true;
 
@@ -168,7 +173,9 @@ select_kem(KEM::ID id)
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+#endif
 
+#if defined(WITH_PQ)
     case KEM::ID::MLKEM512:
       return KEM::get<KEM::ID::MLKEM512>();
 
@@ -177,6 +184,15 @@ select_kem(KEM::ID id)
 
     case KEM::ID::MLKEM1024:
       return KEM::get<KEM::ID::MLKEM1024>();
+
+    case KEM::ID::MLKEM768_P256:
+      return KEM::get<KEM::ID::MLKEM768_P256>();
+
+    case KEM::ID::MLKEM1024_P384:
+      return KEM::get<KEM::ID::MLKEM1024_P384>();
+
+    case KEM::ID::MLKEM768_X25519:
+      return KEM::get<KEM::ID::MLKEM768_X25519>();
 #endif
 
     default:

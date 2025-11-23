@@ -41,6 +41,7 @@ struct Group
   virtual ~Group() = default;
 
   const ID id;
+  const size_t seed_size;
   const size_t dh_size;
   const size_t pk_size;
   const size_t sk_size;
@@ -51,6 +52,8 @@ struct Group
   virtual std::unique_ptr<PrivateKey> derive_key_pair(
     const bytes& suite_id,
     const bytes& ikm) const = 0;
+  virtual std::unique_ptr<PrivateKey> random_scalar(
+    const bytes& seed) const = 0;
 
   virtual bytes serialize(const PublicKey& pk) const = 0;
   virtual std::unique_ptr<PublicKey> deserialize(const bytes& enc) const = 0;

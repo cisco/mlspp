@@ -46,6 +46,13 @@ devB: ${TOOLCHAIN_FILE}
 		-DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `dev`, but using OpenSSL 3 with PQ disabled
+dev-no-pq:
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+		-DDISABLE_PQ=ON \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+
 test: ${BUILD_DIR} test/*
 	cmake --build ${BUILD_DIR} --target mlspp_test
 

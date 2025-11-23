@@ -8,8 +8,11 @@ static const auto ids = std::vector<KEM::ID>
   KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
     KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
 #if !defined(WITH_BORINGSSL)
-    KEM::ID::DHKEM_X448_SHA512, KEM::ID::MLKEM512, KEM::ID::MLKEM768,
-    KEM::ID::MLKEM1024,
+    KEM::ID::DHKEM_X448_SHA512,
+#endif
+#if defined(WITH_PQ)
+    KEM::ID::MLKEM512, KEM::ID::MLKEM768, KEM::ID::MLKEM1024,
+    KEM::ID::MLKEM768_P256, KEM::ID::MLKEM1024_P384, KEM::ID::MLKEM768_X25519,
 #endif
 };
 
@@ -51,8 +54,9 @@ TEST_CASE("AuthKEM round-trip")
 
   static const auto no_auth = std::vector<KEM::ID>
   {
-#if !defined(WITH_BORINGSSL)
+#if defined(WITH_PQ)
     KEM::ID::MLKEM512, KEM::ID::MLKEM768, KEM::ID::MLKEM1024,
+      KEM::ID::MLKEM768_P256, KEM::ID::MLKEM1024_P384, KEM::ID::MLKEM768_X25519
 #endif
   };
 
