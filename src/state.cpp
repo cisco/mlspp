@@ -1847,8 +1847,8 @@ State::valid(const ReInit& reinit)
 {
   // Check that the version and CipherSuite are ones we support
   auto supported_version = (reinit.version == ProtocolVersion::mls10);
-  auto supported_suite =
-    stdx::contains(all_supported_suites, reinit.cipher_suite.cipher_suite());
+  auto supported_suite = stdx::contains(all_supported_cipher_suites,
+                                        reinit.cipher_suite.cipher_suite());
 
   return supported_version && supported_suite;
 }

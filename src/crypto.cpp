@@ -130,7 +130,32 @@ CipherSuite::get() const
       Digest::get<Digest::ID::SHA512>(),
       Signature::get<Signature::ID::Ed448>(),
     };
-#endif
+#endif // !defined(WITH_BORINGSSL)
+
+#if defined(WITH_PQ)
+  static const auto ciphers_MLKEM768X25519_AES256GCM_SHA384_Ed25519 =
+    CipherSuite::Ciphers{
+      HPKE(
+        KEM::ID::MLKEM768_X25519, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+      Digest::get<Digest::ID::SHA384>(),
+      Signature::get<Signature::ID::Ed25519>(),
+    };
+
+  static const auto ciphers_MLKEM768P256_AES256GCM_SHA384_P256 =
+    CipherSuite::Ciphers{
+      HPKE(KEM::ID::MLKEM768_P256, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+      Digest::get<Digest::ID::SHA384>(),
+      Signature::get<Signature::ID::P256_SHA256>(),
+    };
+
+  static const auto ciphers_MLKEM1024P384_AES256GCM_SHA384_P384 =
+    CipherSuite::Ciphers{
+      HPKE(
+        KEM::ID::MLKEM1024_P384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
+      Digest::get<Digest::ID::SHA384>(),
+      Signature::get<Signature::ID::P384_SHA384>(),
+    };
+#endif // defined(WITH_PQ)
 
   switch (id) {
     case ID::unknown:
@@ -157,6 +182,17 @@ CipherSuite::get() const
 
     case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
       return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
+#endif
+
+#if !defined(P256_SHA256)
+    case ID::MLKEM768X25519_AES256GCM_SHA384_Ed25519:
+      return ciphers_MLKEM768X25519_AES256GCM_SHA384_Ed25519;
+
+    case ID::MLKEM768P256_AES256GCM_SHA384_P256:
+      return ciphers_MLKEM768P256_AES256GCM_SHA384_P256;
+
+    case ID::MLKEM1024P384_AES256GCM_SHA384_P384:
+      return ciphers_MLKEM1024P384_AES256GCM_SHA384_P384;
 #endif
 
     default:
@@ -200,25 +236,23 @@ CipherSuite::derive_tree_secret(const bytes& secret,
   return expand_with_label(secret, label, tls::marshal(generation), length);
 }
 
-#if WITH_BORINGSSL
-const std::array<CipherSuite::ID, 5> all_supported_suites = {
-  CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
-  CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-  CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
-  CipherSuite::ID::P521_AES256GCM_SHA512_P521,
-  CipherSuite::ID::P384_AES256GCM_SHA384_P384,
-};
-#else
-const std::array<CipherSuite::ID, 7> all_supported_suites = {
-  CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
-  CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-  CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
-  CipherSuite::ID::P521_AES256GCM_SHA512_P521,
-  CipherSuite::ID::P384_AES256GCM_SHA384_P384,
-  CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
-  CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
-};
+const std::array<CipherSuite::ID, n_supported_suites>
+  all_supported_cipher_suites = {
+    CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256,
+    CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
+    CipherSuite::ID::P521_AES256GCM_SHA512_P521,
+    CipherSuite::ID::P384_AES256GCM_SHA384_P384,
+#if !defined(WITH_BORINGSSL)
+    CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
+    CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
 #endif
+#if defined(WITH_PQ)
+    CipherSuite::ID::MLKEM768X25519_AES256GCM_SHA384_Ed25519,
+    CipherSuite::ID::MLKEM768P256_AES256GCM_SHA384_P256,
+    CipherSuite::ID::MLKEM1024P384_AES256GCM_SHA384_P384,
+#endif
+  };
 
 // MakeKeyPackageRef(value) = KDF.expand(
 //   KDF.extract("", value), "MLS 1.0 KeyPackage Reference", 16)
