@@ -87,6 +87,11 @@ target_include_directories(${CURRENT_LIB_NAME}
   PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
+#ifdef =mlspp
+set_target_properties(${CURRENT_LIB_NAME} PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR})
+#endif
 
 ###
 ### Install

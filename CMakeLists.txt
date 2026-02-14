@@ -144,6 +144,11 @@ target_include_directories(${LIB_NAME}
   PRIVATE
     ${JSON_INCLUDE_INTERFACE}
 )
+#ifdef =mlspp
+set_target_properties(${LIB_NAME} PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR})
+#endif
 
 install(TARGETS ${LIB_NAME} EXPORT mlspp-targets)
 
