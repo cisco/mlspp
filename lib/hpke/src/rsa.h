@@ -79,6 +79,9 @@ struct RSASignature : public Signature
               const bytes& sig,
               const Signature::PublicKey& pk) const override;
 
+  bytes sign_external(const bytes& data,
+                      const Signature::ExternalPrivateKey& sk) const override;
+
   std::unique_ptr<Signature::PrivateKey> import_jwk_private(
     const std::string& json_str) const override;
   std::unique_ptr<Signature::PublicKey> import_jwk(

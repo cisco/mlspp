@@ -123,6 +123,28 @@ RSASignature::sign(const bytes& data, const Signature::PrivateKey& sk) const
   return sig;
 }
 
+bytes
+RSASignature::sign_external(const bytes& data,
+                            const Signature::ExternalPrivateKey& sk) const
+{
+  // RSA external keys are not currently supported via EVP_PKEY providers
+  // in the same way as EC keys. For now, we only support callback-based
+  // external keys.
+
+  // Try callback-based key (defined in signature.cpp)
+  // We need to use a workaround since we can't include the full definition here
+  if (!sk.exportable()) {
+    // If it's not exportable and we got here, assume it's a callback key
+    // This will be properly handled once we have a better type hierarchy
+    throw std::runtime_error(
+      "Non-exportable RSA keys must use callback-based signing");
+  }
+
+  // If exportable, convert and use regular sign
+  auto priv = sk.to_exportable(*this);
+  return sign(data, *priv);
+}
+
 bool
 RSASignature::verify(const bytes& data,
                      const bytes& sig,

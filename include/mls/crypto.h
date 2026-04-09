@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 #include <hpke/random.h>
@@ -254,28 +255,83 @@ struct PublicJWK
 
 struct SignaturePrivateKey
 {
+  /// Generate a new random signature key pair
   static SignaturePrivateKey generate(CipherSuite suite);
+
+  /// Parse an exportable private key from serialized form
   static SignaturePrivateKey parse(CipherSuite suite, const bytes& data);
+
+  /// Derive a signature key pair from a secret
   static SignaturePrivateKey derive(CipherSuite suite, const bytes& secret);
+
+  /// Import from JWK format
   static SignaturePrivateKey from_jwk(CipherSuite suite,
                                       const std::string& json_str);
 
+  /// Create from an external (possibly non-exportable) key loaded from a URI.
+  /// Supported URI schemes depend on the crypto backend:
+  /// - OpenSSL 3.x: "pkcs11:", "file:", provider-specific URIs
+  /// - OpenSSL 1.1.x: "engine:<engine_id>:<key_id>"
+  /// - BoringSSL: Use from_external_callback() instead
+  static SignaturePrivateKey from_external(CipherSuite suite,
+                                           const std::string& key_uri);
+
+  /// Create from an external key using a signing callback.
+  /// This is useful for BoringSSL and custom secure enclave integrations.
+  /// The callback receives data to sign and returns the signature.
+  static SignaturePrivateKey from_external_callback(
+    CipherSuite suite,
+    SignaturePublicKey pub_key,
+    std::function<bytes(const bytes&)> sign_callback);
+
   SignaturePrivateKey() = default;
 
+  /// Raw private key data (empty for non-exportable keys)
   bytes data;
+
+  /// The corresponding public key
   SignaturePublicKey public_key;
 
+  /// Sign a message with the given label
   bytes sign(const CipherSuite& suite,
              const std::string& label,
              const bytes& message) const;
 
+  /// Check if this key's private material can be exported
+  bool exportable() const;
+
+  /// Set the public key from the private key data (only for exportable keys)
   void set_public_key(CipherSuite suite);
+
+  /// Export to JWK format (throws if !exportable())
   std::string to_jwk(CipherSuite suite) const;
 
-  TLS_SERIALIZABLE(data)
+  // Note: SignaturePrivateKey is intentionally NOT TLS serializable.
+  // Non-exportable keys cannot be serialized, and applications should
+  // handle key persistence separately (e.g., storing key URIs).
+
+  /// Equality comparison based on public keys.
+  /// For cryptographic keys, the public key uniquely identifies the key pair.
+  friend bool operator==(const SignaturePrivateKey& lhs,
+                         const SignaturePrivateKey& rhs)
+  {
+    return lhs.public_key.data == rhs.public_key.data;
+  }
+
+  friend bool operator!=(const SignaturePrivateKey& lhs,
+                         const SignaturePrivateKey& rhs)
+  {
+    return !(lhs == rhs);
+  }
 
 private:
+  /// Handle to external (possibly non-exportable) key
+  std::shared_ptr<hpke::Signature::ExternalPrivateKey> external_key_;
+
   SignaturePrivateKey(bytes priv_data, bytes pub_data);
+  SignaturePrivateKey(
+    std::shared_ptr<hpke::Signature::ExternalPrivateKey> external_key,
+    bytes pub_data);
 };
 
 } // namespace MLS_NAMESPACE

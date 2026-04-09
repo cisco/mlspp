@@ -5,6 +5,7 @@
 #include <string>
 
 #include "dhkem.h"
+#include "group.h"
 #include "rsa.h"
 
 #include <nlohmann/json.hpp>
@@ -17,6 +18,46 @@
 using nlohmann::json;
 
 namespace MLS_NAMESPACE::hpke {
+
+/// CallbackExternalPrivateKey wraps a signing callback for use as an
+/// ExternalPrivateKey. This is useful for BoringSSL and custom secure enclave
+/// integrations where the signing is done externally.
+struct CallbackExternalPrivateKey : public Signature::ExternalPrivateKey
+{
+  CallbackExternalPrivateKey(std::unique_ptr<Signature::PublicKey> pub_in,
+                             Signature::ExternalSignCallback callback_in)
+    : pub(std::move(pub_in))
+    , callback(std::move(callback_in))
+  {
+  }
+
+  std::unique_ptr<Signature::PublicKey> public_key() const override
+  {
+    // We need to clone the public key, but we don't have a clone method.
+    // For now, this returns nullptr and callers should use get_public_key()
+    // This is a limitation that could be addressed by adding a clone method
+    // to PublicKey, or by storing the serialized form.
+    throw std::runtime_error(
+      "Cannot clone public key from CallbackExternalPrivateKey");
+  }
+
+  bool exportable() const override { return false; }
+
+  std::unique_ptr<Signature::PrivateKey> to_exportable(
+    const Signature& /* sig */) const override
+  {
+    throw std::runtime_error("Callback-based keys are not exportable");
+  }
+
+  // Direct access to public key for callers that need it
+  const Signature::PublicKey& get_public_key() const { return *pub; }
+
+  // Direct access to callback for signing
+  bytes do_sign(const bytes& data) const { return callback(data); }
+
+  std::unique_ptr<Signature::PublicKey> pub;
+  Signature::ExternalSignCallback callback;
+};
 
 struct GroupSignature : public Signature
 {
@@ -110,6 +151,29 @@ struct GroupSignature : public Signature
   {
     const auto& rpk = dynamic_cast<const Group::PublicKey&>(pk);
     return group.verify(data, sig, rpk);
+  }
+
+  bytes sign_external(const bytes& data,
+                      const Signature::ExternalPrivateKey& sk) const override
+  {
+    // Check if this is a callback-based key first
+    const auto* callback_key =
+      dynamic_cast<const CallbackExternalPrivateKey*>(&sk);
+    if (callback_key != nullptr) {
+      return callback_key->do_sign(data);
+    }
+
+    // Otherwise, try EVPGroup::ExternalPrivateKey
+    const auto& evp_group = dynamic_cast<const EVPGroup&>(group);
+    const auto& esk = dynamic_cast<const EVPGroup::ExternalPrivateKey&>(sk);
+    return evp_group.sign_external(data, esk);
+  }
+
+  std::unique_ptr<Signature::ExternalPrivateKey> load_external_key(
+    const std::string& uri) const override
+  {
+    const auto& evp_group = dynamic_cast<const EVPGroup&>(group);
+    return evp_group.load_external_key(uri);
   }
 
   std::unique_ptr<Signature::PrivateKey> import_jwk_private(
@@ -340,6 +404,23 @@ Signature::parse_jwk(const std::string& jwk_json)
   }
 
   return { sig, kid, std::move(pub) };
+}
+
+// Default implementations for external key support
+
+std::unique_ptr<Signature::ExternalPrivateKey>
+Signature::load_external_key(const std::string& /* uri */) const
+{
+  // Base implementation returns nullptr - subclasses override for actual support
+  return nullptr;
+}
+
+std::unique_ptr<Signature::ExternalPrivateKey>
+Signature::external_key_from_callback(std::unique_ptr<PublicKey> pub,
+                                      ExternalSignCallback callback) const
+{
+  return std::make_unique<CallbackExternalPrivateKey>(std::move(pub),
+                                                      std::move(callback));
 }
 
 } // namespace MLS_NAMESPACE::hpke

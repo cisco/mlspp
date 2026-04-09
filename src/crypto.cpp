@@ -488,6 +488,37 @@ SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
   return { priv_data, pub_data };
 }
 
+SignaturePrivateKey
+SignaturePrivateKey::from_external(CipherSuite suite, const std::string& key_uri)
+{
+  auto external_key = suite.sig().load_external_key(key_uri);
+  if (external_key == nullptr) {
+    throw InvalidParameterError("Unsupported external key URI: " + key_uri);
+  }
+
+  auto pub = external_key->public_key();
+  auto pub_data = suite.sig().serialize(*pub);
+
+  return { std::shared_ptr<hpke::Signature::ExternalPrivateKey>(
+             external_key.release()),
+           pub_data };
+}
+
+SignaturePrivateKey
+SignaturePrivateKey::from_external_callback(
+  CipherSuite suite,
+  SignaturePublicKey pub_key,
+  std::function<bytes(const bytes&)> sign_callback)
+{
+  auto pub = suite.sig().deserialize(pub_key.data);
+  auto external_key =
+    suite.sig().external_key_from_callback(std::move(pub), std::move(sign_callback));
+
+  return { std::shared_ptr<hpke::Signature::ExternalPrivateKey>(
+             external_key.release()),
+           pub_key.data };
+}
+
 bytes
 SignaturePrivateKey::sign(const CipherSuite& suite,
                           const std::string& label,
@@ -495,19 +526,52 @@ SignaturePrivateKey::sign(const CipherSuite& suite,
 {
   auto label_plus = mls_1_0_plus(label);
   const auto content = tls::marshal(SignContent{ label_plus, message });
+
+  if (external_key_) {
+    // Use external key for signing
+    return suite.sig().sign_external(content, *external_key_);
+  }
+
+  // Use exportable key (deserialize from data)
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().sign(content, *priv);
+}
+
+bool
+SignaturePrivateKey::exportable() const
+{
+  if (external_key_) {
+    return external_key_->exportable();
+  }
+  // If we have data and no external key, it's exportable
+  return !data.empty();
 }
 
 SignaturePrivateKey::SignaturePrivateKey(bytes priv_data, bytes pub_data)
   : data(std::move(priv_data))
   , public_key{ std::move(pub_data) }
+  , external_key_(nullptr)
+{
+}
+
+SignaturePrivateKey::SignaturePrivateKey(
+  std::shared_ptr<hpke::Signature::ExternalPrivateKey> external_key,
+  bytes pub_data)
+  : data()
+  , public_key{ std::move(pub_data) }
+  , external_key_(std::move(external_key))
 {
 }
 
 void
 SignaturePrivateKey::set_public_key(CipherSuite suite)
 {
+  if (external_key_) {
+    auto pub = external_key_->public_key();
+    public_key.data = suite.sig().serialize(*pub);
+    return;
+  }
+
   const auto priv = suite.sig().deserialize_private(data);
   auto pub = priv->public_key();
   public_key.data = suite.sig().serialize(*pub);
@@ -526,6 +590,10 @@ SignaturePrivateKey::from_jwk(CipherSuite suite, const std::string& json_str)
 std::string
 SignaturePrivateKey::to_jwk(CipherSuite suite) const
 {
+  if (!exportable()) {
+    throw InvalidParameterError("Cannot export non-exportable key to JWK");
+  }
+
   const auto priv = suite.sig().deserialize_private(data);
   return suite.sig().export_jwk_private(*priv);
 }

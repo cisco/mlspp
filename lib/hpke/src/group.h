@@ -106,6 +106,31 @@ struct EVPGroup : public Group
     typed_unique_ptr<EVP_PKEY> pkey;
   };
 
+  /// ExternalPrivateKey holds an EVP_PKEY that may be backed by an HSM,
+  /// secure enclave, or other non-exportable key store.
+  struct ExternalPrivateKey : public Signature::ExternalPrivateKey
+  {
+    ExternalPrivateKey(EVP_PKEY* pkey_in,
+                       bool is_exportable,
+                       bytes serialized_priv = {});
+    ~ExternalPrivateKey() override = default;
+
+    std::unique_ptr<Signature::PublicKey> public_key() const override;
+    bool exportable() const override;
+    std::unique_ptr<Signature::PrivateKey> to_exportable(
+      const Signature& sig) const override;
+
+    // Sign using the external key - used by Group::sign_external
+    bytes sign(const bytes& data, const EVPGroup& group) const;
+
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    typed_unique_ptr<EVP_PKEY> pkey;
+
+  private:
+    bool is_exportable_;
+    bytes serialized_private_key_;  // Stored for exportable keys
+  };
+
   std::unique_ptr<Group::PrivateKey> generate_key_pair() const override;
 
   bytes dh(const Group::PrivateKey& sk,
@@ -115,6 +140,14 @@ struct EVPGroup : public Group
   bool verify(const bytes& data,
               const bytes& sig,
               const Group::PublicKey& pk) const override;
+
+  /// Sign using an external (possibly non-exportable) key
+  bytes sign_external(const bytes& data,
+                      const ExternalPrivateKey& sk) const;
+
+  /// Load an external key from a provider URI (OpenSSL 3.x) or ENGINE (1.1.x)
+  std::unique_ptr<ExternalPrivateKey> load_external_key(
+    const std::string& uri) const;
 };
 
 } // namespace MLS_NAMESPACE::hpke

@@ -13,6 +13,9 @@
 #if defined(WITH_OPENSSL3)
 #include "openssl/core_names.h"
 #include "openssl/param_build.h"
+#include "openssl/store.h"
+#elif !defined(WITH_BORINGSSL)
+#include "openssl/engine.h"
 #endif
 
 namespace MLS_NAMESPACE::hpke {
@@ -1161,6 +1164,199 @@ Group::Group(ID group_id_in, const KDF& kdf_in)
   , jwk_curve_name(group_jwk_curve_name(group_id_in))
   , kdf(kdf_in)
 {
+}
+
+///
+/// ExternalPrivateKey implementation for EVPGroup
+///
+
+EVPGroup::ExternalPrivateKey::ExternalPrivateKey(EVP_PKEY* pkey_in,
+                                                  bool is_exportable,
+                                                  bytes serialized_priv)
+  : pkey(pkey_in, typed_delete<EVP_PKEY>)
+  , is_exportable_(is_exportable)
+  , serialized_private_key_(std::move(serialized_priv))
+{
+}
+
+std::unique_ptr<Signature::PublicKey>
+EVPGroup::ExternalPrivateKey::public_key() const
+{
+  if (1 != EVP_PKEY_up_ref(pkey.get())) {
+    throw openssl_error();
+  }
+  return std::make_unique<EVPGroup::PublicKey>(pkey.get());
+}
+
+bool
+EVPGroup::ExternalPrivateKey::exportable() const
+{
+  return is_exportable_;
+}
+
+std::unique_ptr<Signature::PrivateKey>
+EVPGroup::ExternalPrivateKey::to_exportable(const Signature& sig) const
+{
+  if (!is_exportable_) {
+    throw std::runtime_error("Key is not exportable");
+  }
+
+  if (serialized_private_key_.empty()) {
+    throw std::runtime_error("Exportable key has no serialized data");
+  }
+
+  // Use the Signature interface to deserialize into the proper wrapper type
+  return sig.deserialize_private(serialized_private_key_);
+}
+
+bytes
+EVPGroup::ExternalPrivateKey::sign(const bytes& data,
+                                    const EVPGroup& group) const
+{
+  auto ctx = make_typed_unique(EVP_MD_CTX_create());
+  if (ctx == nullptr) {
+    throw openssl_error();
+  }
+
+  const auto* digest = group_sig_digest(group.id);
+  if (1 !=
+      EVP_DigestSignInit(ctx.get(), nullptr, digest, nullptr, pkey.get())) {
+    throw openssl_error();
+  }
+
+  size_t siglen = EVP_PKEY_size(pkey.get());
+  bytes sig(siglen);
+  if (1 != EVP_DigestSign(
+             ctx.get(), sig.data(), &siglen, data.data(), data.size())) {
+    throw openssl_error();
+  }
+
+  sig.resize(siglen);
+  return sig;
+}
+
+bytes
+EVPGroup::sign_external(const bytes& data, const ExternalPrivateKey& sk) const
+{
+  return sk.sign(data, *this);
+}
+
+std::unique_ptr<EVPGroup::ExternalPrivateKey>
+EVPGroup::load_external_key(const std::string& uri) const
+{
+#if defined(WITH_OPENSSL3)
+  // Helper to try to serialize an EVP_PKEY to bytes
+  auto try_serialize_evp_pkey = [](EVP_PKEY* pkey) -> bytes {
+    // Try raw key extraction first (works for Ed25519, X25519, Ed448, X448)
+    size_t len = 0;
+    if (EVP_PKEY_get_raw_private_key(pkey, nullptr, &len) == 1 && len > 0) {
+      bytes result(len);
+      if (EVP_PKEY_get_raw_private_key(pkey, result.data(), &len) == 1) {
+        return result;
+      }
+    }
+
+    // For EC keys and other types, we would need more complex extraction.
+    // For now, return empty to indicate we couldn't serialize.
+    // Users wanting exportable EC keys should use SignaturePrivateKey::parse()
+    // with key data instead of load_external_key().
+    return {};
+  };
+  // OpenSSL 3.x: Use OSSL_STORE to load keys from providers
+  // Supported URI schemes depend on loaded providers:
+  // - file: for PEM/DER files
+  // - pkcs11: for PKCS#11 tokens (requires pkcs11-provider)
+  // - tpmkey: for TPM keys (requires tpm2-openssl)
+
+  auto* store_ctx =
+    OSSL_STORE_open(uri.c_str(), nullptr, nullptr, nullptr, nullptr);
+  if (store_ctx == nullptr) {
+    throw std::runtime_error("Failed to open key store: " + uri);
+  }
+
+  auto store_guard =
+    std::unique_ptr<OSSL_STORE_CTX, decltype(&OSSL_STORE_close)>(
+      store_ctx, OSSL_STORE_close);
+
+  while (!OSSL_STORE_eof(store_ctx)) {
+    auto* info = OSSL_STORE_load(store_ctx);
+    if (info == nullptr) {
+      continue;
+    }
+
+    auto info_guard =
+      std::unique_ptr<OSSL_STORE_INFO, decltype(&OSSL_STORE_INFO_free)>(
+        info, OSSL_STORE_INFO_free);
+
+    if (OSSL_STORE_INFO_get_type(info) == OSSL_STORE_INFO_PKEY) {
+      auto* pkey = OSSL_STORE_INFO_get1_PKEY(info);
+      if (pkey == nullptr) {
+        throw openssl_error();
+      }
+
+      // Try to serialize the key to determine if it's exportable
+      auto serialized = try_serialize_evp_pkey(pkey);
+      bool is_exportable = !serialized.empty();
+
+      return std::make_unique<ExternalPrivateKey>(
+        pkey, is_exportable, std::move(serialized));
+    }
+  }
+
+  throw std::runtime_error("No private key found at URI: " + uri);
+
+#elif !defined(WITH_BORINGSSL)
+  // OpenSSL 1.1.x: Use ENGINE API for external keys
+  // URI format: "engine:<engine_id>:<key_id>"
+  // Example: "engine:pkcs11:slot_0-id_01"
+
+  static const std::string engine_prefix = "engine:";
+  if (uri.rfind(engine_prefix, 0) != 0) {
+    throw std::runtime_error("Unsupported key URI scheme. Expected 'engine:': " +
+                             uri);
+  }
+
+  auto remainder = uri.substr(engine_prefix.size());
+  auto colon_pos = remainder.find(':');
+  if (colon_pos == std::string::npos) {
+    throw std::runtime_error("Invalid engine URI format: " + uri);
+  }
+
+  auto engine_id = remainder.substr(0, colon_pos);
+  auto key_id = remainder.substr(colon_pos + 1);
+
+  auto* engine = ENGINE_by_id(engine_id.c_str());
+  if (engine == nullptr) {
+    throw std::runtime_error("Failed to load ENGINE: " + engine_id);
+  }
+
+  if (1 != ENGINE_init(engine)) {
+    ENGINE_free(engine);
+    throw std::runtime_error("Failed to initialize ENGINE: " + engine_id);
+  }
+
+  auto* pkey =
+    ENGINE_load_private_key(engine, key_id.c_str(), nullptr, nullptr);
+
+  // ENGINE_finish but keep the key
+  ENGINE_finish(engine);
+  ENGINE_free(engine);
+
+  if (pkey == nullptr) {
+    throw openssl_error();
+  }
+
+  // ENGINE-backed keys are typically not exportable
+  return std::make_unique<ExternalPrivateKey>(pkey, false);
+
+#else
+  // BoringSSL: No built-in support for external key stores
+  // Use external_key_from_callback() instead
+  throw std::runtime_error(
+    "External key loading not supported with BoringSSL. "
+    "Use external_key_from_callback() instead: " +
+    uri);
+#endif
 }
 
 } // namespace MLS_NAMESPACE::hpke

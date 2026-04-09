@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <string>
 
 #include <bytes/bytes.h>
 #include <namespace.h>
@@ -39,6 +41,27 @@ struct Signature
     virtual ~PrivateKey() = default;
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
   };
+
+  /// ExternalPrivateKey represents a private key that may not be exportable.
+  /// This is used for keys stored in secure enclaves, HSMs, or other secure
+  /// storage that can perform signing operations but won't reveal key material.
+  struct ExternalPrivateKey
+  {
+    virtual ~ExternalPrivateKey() = default;
+
+    /// Get the public key corresponding to this private key
+    virtual std::unique_ptr<PublicKey> public_key() const = 0;
+
+    /// Check if the key material can be exported
+    virtual bool exportable() const = 0;
+
+    /// Export the key as a serializable PrivateKey (throws if !exportable())
+    virtual std::unique_ptr<PrivateKey> to_exportable(
+      const Signature& sig) const = 0;
+  };
+
+  /// Type for external signing callbacks (used by BoringSSL and custom backends)
+  using ExternalSignCallback = std::function<bytes(const bytes& data)>;
 
   const ID id;
 
@@ -80,6 +103,21 @@ struct Signature
   virtual bool verify(const bytes& data,
                       const bytes& sig,
                       const PublicKey& pk) const = 0;
+
+  /// Sign using an external (possibly non-exportable) private key
+  virtual bytes sign_external(const bytes& data,
+                              const ExternalPrivateKey& sk) const = 0;
+
+  /// Load an external private key from a URI (e.g., "pkcs11:...", "engine:...")
+  /// Returns nullptr if the URI scheme is not supported.
+  virtual std::unique_ptr<ExternalPrivateKey> load_external_key(
+    const std::string& uri) const;
+
+  /// Create an external key from a signing callback and public key.
+  /// This is useful for BoringSSL and custom secure enclave integrations.
+  virtual std::unique_ptr<ExternalPrivateKey> external_key_from_callback(
+    std::unique_ptr<PublicKey> pub,
+    ExternalSignCallback callback) const;
 
   static std::unique_ptr<PrivateKey> generate_rsa(size_t bits);
 
