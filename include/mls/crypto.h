@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <hpke/digest.h>
 #include <hpke/hpke.h>
 #include <hpke/random.h>
