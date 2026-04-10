@@ -3,6 +3,11 @@
 #include <mls_vectors/mls_vectors.h>
 #include <string>
 
+#if defined(HAVE_SECURITY_FRAMEWORK)
+#include <CoreFoundation/CoreFoundation.h>
+#include <Security/Security.h>
+#endif
+
 using namespace MLS_NAMESPACE;
 using namespace mls_vectors;
 
@@ -133,3 +138,154 @@ TEST_CASE("Crypto Interop")
     REQUIRE(tv.verify() == std::nullopt);
   }
 }
+
+TEST_CASE("External Signer - OpenSSL Wrapper")
+{
+  // This test creates a signing callback that wraps an HPKE-layer private key.
+  // It demonstrates how an application could wrap any external signing
+  // mechanism.
+
+  for (auto suite_id : all_supported_suites) {
+    auto suite = CipherSuite{ suite_id };
+
+    // Create a key at the HPKE layer (simulating an external key store)
+    const auto& sig = suite.sig();
+    auto backend_priv = sig.generate_key_pair();
+    auto backend_pub = backend_priv->public_key();
+    auto backend_pub_data = sig.serialize(*backend_pub);
+
+    // Create an external signer that delegates to the backend key
+    auto external_key = SignaturePrivateKey::from_func(
+      [&](const std::vector<uint8_t>& data) {
+        return sig.sign(data, *backend_priv);
+      },
+      backend_pub_data);
+
+    // Verify the external key has correct public key
+    REQUIRE(external_key.public_key.data == backend_pub_data);
+
+    // Verify signing works
+    const auto label = "test_label"s;
+    auto message = from_hex("deadbeef");
+    auto signature = external_key.sign(suite, label, message);
+    REQUIRE(external_key.public_key.verify(suite, label, message, signature));
+
+    // Verify to_jwk throws for external signers
+    REQUIRE_THROWS(external_key.to_jwk(suite));
+  }
+}
+
+#if defined(HAVE_SECURITY_FRAMEWORK)
+
+// Helper RAII wrapper for CFRelease
+template<typename T>
+struct CFReleaser
+{
+  T ref;
+  explicit CFReleaser(T r)
+    : ref(r)
+  {
+  }
+  ~CFReleaser()
+  {
+    if (ref) {
+      CFRelease(ref);
+    }
+  }
+  CFReleaser(const CFReleaser&) = delete;
+  CFReleaser& operator=(const CFReleaser&) = delete;
+  operator T() const { return ref; }
+  T get() const { return ref; }
+};
+
+TEST_CASE("External Signer - macOS Keychain")
+{
+  // This test creates a P-256 key using macOS Security.framework and
+  // uses it for signing via SignaturePrivateKey::from_func().
+
+  auto suite = CipherSuite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
+
+  // Generate a temporary key using Security.framework
+  CFReleaser<CFMutableDictionaryRef> attributes(
+    CFDictionaryCreateMutable(kCFAllocatorDefault,
+                              0,
+                              &kCFTypeDictionaryKeyCallBacks,
+                              &kCFTypeDictionaryValueCallBacks));
+  REQUIRE(attributes.get() != nullptr);
+
+  CFDictionarySetValue(
+    attributes, kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom);
+  int keySize = 256;
+  CFReleaser<CFNumberRef> keySizeNum(
+    CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &keySize));
+  CFDictionarySetValue(attributes, kSecAttrKeySizeInBits, keySizeNum);
+
+  // Create a temporary key (not persisted to Keychain for test isolation)
+  CFErrorRef error = nullptr;
+  CFReleaser<SecKeyRef> privateKey(SecKeyCreateRandomKey(attributes, &error));
+  if (error) {
+    CFReleaser<CFStringRef> desc(CFErrorCopyDescription(error));
+    char buf[256];
+    CFStringGetCString(desc, buf, sizeof(buf), kCFStringEncodingUTF8);
+    CFRelease(error);
+    FAIL("Failed to create SecKey: " << buf);
+  }
+  REQUIRE(privateKey.get() != nullptr);
+
+  // Get public key
+  CFReleaser<SecKeyRef> publicKey(SecKeyCopyPublicKey(privateKey));
+  REQUIRE(publicKey.get() != nullptr);
+
+  // Export public key to get bytes for MLS
+  CFReleaser<CFDataRef> pubKeyData(
+    SecKeyCopyExternalRepresentation(publicKey, &error));
+  if (error) {
+    CFRelease(error);
+    FAIL("Failed to export public key");
+  }
+
+  // The exported format is ANSI X9.63 (04 || x || y), which is what MLS expects
+  bytes pub_bytes(CFDataGetLength(pubKeyData));
+  memcpy(pub_bytes.data(), CFDataGetBytePtr(pubKeyData), pub_bytes.size());
+
+  // Create external signer using SecKey
+  SecKeyRef privKeyRef = privateKey.get();
+  auto external_key = SignaturePrivateKey::from_func(
+    [privKeyRef](const std::vector<uint8_t>& data) -> bytes {
+      CFReleaser<CFDataRef> dataRef(
+        CFDataCreate(kCFAllocatorDefault, data.data(), data.size()));
+
+      CFErrorRef signError = nullptr;
+      CFReleaser<CFDataRef> signature(
+        SecKeyCreateSignature(privKeyRef,
+                              kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
+                              dataRef,
+                              &signError));
+
+      if (signError || !signature.get()) {
+        if (signError) {
+          CFRelease(signError);
+        }
+        throw std::runtime_error("SecKey signing failed");
+      }
+
+      bytes sig(CFDataGetLength(signature));
+      memcpy(sig.data(), CFDataGetBytePtr(signature), sig.size());
+      return sig;
+    },
+    pub_bytes);
+
+  // Verify the external key has correct public key
+  REQUIRE(external_key.public_key.data == pub_bytes);
+
+  // Verify signing works
+  const auto label = "keychain_test"s;
+  auto message = from_hex("cafebabe");
+  auto signature = external_key.sign(suite, label, message);
+  REQUIRE(external_key.public_key.verify(suite, label, message, signature));
+
+  // Verify to_jwk throws for external signers
+  REQUIRE_THROWS(external_key.to_jwk(suite));
+}
+
+#endif // HAVE_SECURITY_FRAMEWORK
