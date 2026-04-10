@@ -162,7 +162,7 @@ TEST_CASE("Messages Interop")
 
 TEST_CASE("Message Protection Interop")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     auto tv = MessageProtectionTestVector{ suite };
     REQUIRE(tv.verify() == std::nullopt);
   }

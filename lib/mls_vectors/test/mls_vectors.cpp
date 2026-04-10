@@ -78,7 +78,7 @@ TEST_CASE("Welcome")
   }
 }
 
-TEST_CASE("Tree Hashes")
+TEST_CASE("Tree Hashes", "[.][all]")
 {
   for (auto suite : supported_suites) {
     for (auto structure : all_tree_structures) {
@@ -97,7 +97,7 @@ TEST_CASE("Tree Operations")
   }
 }
 
-TEST_CASE("TreeKEM")
+TEST_CASE("TreeKEM", "[.][all]")
 {
   for (auto suite : supported_suites) {
     for (auto structure : treekem_test_tree_structures) {

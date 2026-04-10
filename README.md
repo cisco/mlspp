@@ -12,7 +12,7 @@ MLSPP requires a few prerequisite libraries in order to fully build.
 
 * [nlohmann::json](https://github.com/nlohmann/json) - Tested with latest versions.
 * Cryptography Library - OpenSSL 1.1.1, OpenSSL 3.0, BoringSSL compatible (see details below)
-* [doctest](https://github.com/doctest/doctest) - Tested with latest versions.  Only required when building the test suite.
+* [Catch2](https://github.com/catchorg/Catch2) - Only required when building the test suite.
 
 ### Installing Prerequisites 
 
@@ -31,11 +31,13 @@ Quickstart
 
 A convenience Makefile is included to avoid the need to remember a bunch of CMake parameters. It will use [vcpkg](https://vcpkg.io/en/) to satisfy all dependencies.
 
+Note that on Windows the make commands should be run in PowerShell instead of cmd.exe, otherwise, vcpkg will report the error 'error: in triplet x64-windows: Unable to find a valid Visual Studio instance'.
+
 ```
 > make        # Configures and builds the library 
 > make dev    # Configure a "developer" build with tests and checks using OpenSSL 1.1
 > make dev3   # Configure a "developer" build with tests and checks using OpenSSL 3.0
-> make devB   # Configure a "developer" build with tests and checks using OpenSSL 3.0
+> make devB   # Configure a "developer" build with tests and checks using BoringSSL
 > make test   # Builds and runs tests
 > make format # Runs clang-format over the source
 ```

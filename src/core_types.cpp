@@ -1,4 +1,5 @@
 #include "mls/core_types.h"
+#include "mls/crypto.h"
 #include "mls/messages.h"
 #include <namespace.h>
 
@@ -37,15 +38,6 @@ const std::array<ProtocolVersion, 1> all_supported_versions = {
   ProtocolVersion::mls10
 };
 
-const std::array<CipherSuite::ID, 6> all_supported_ciphersuites = {
-  CipherSuite::ID::X25519_AES128GCM_SHA256_Ed25519,
-  CipherSuite::ID::P256_AES128GCM_SHA256_P256,
-  CipherSuite::ID::X25519_CHACHA20POLY1305_SHA256_Ed25519,
-  CipherSuite::ID::X448_AES256GCM_SHA512_Ed448,
-  CipherSuite::ID::P521_AES256GCM_SHA512_P521,
-  CipherSuite::ID::X448_CHACHA20POLY1305_SHA512_Ed448,
-};
-
 const std::array<CredentialType, 4> all_supported_credentials = {
   CredentialType::basic,
   CredentialType::x509,
@@ -58,7 +50,7 @@ Capabilities::create_default()
 {
   return {
     { all_supported_versions.begin(), all_supported_versions.end() },
-    { all_supported_ciphersuites.begin(), all_supported_ciphersuites.end() },
+    { all_supported_cipher_suites.begin(), all_supported_cipher_suites.end() },
     { /* No non-default extensions */ },
     { /* No non-default proposals */ },
     { all_supported_credentials.begin(), all_supported_credentials.end() },

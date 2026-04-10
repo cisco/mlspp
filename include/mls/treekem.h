@@ -59,6 +59,18 @@ struct OptionalNode
   TLS_SERIALIZABLE(node)
 };
 
+struct TreeSlice
+{
+  LeafIndex leaf_index;
+  LeafCount n_leaves;
+  std::vector<OptionalNode> direct_path_nodes;
+  std::vector<bytes> copath_hashes;
+
+  bytes tree_hash(CipherSuite suite) const;
+
+  TLS_SERIALIZABLE(leaf_index, n_leaves, direct_path_nodes, copath_hashes);
+};
+
 struct TreeKEMPublicKey;
 
 struct TreeKEMPrivateKey
@@ -94,6 +106,12 @@ struct TreeKEMPrivateKey
              const UpdatePath& path,
              const std::vector<LeafIndex>& except);
 
+  void decap(LeafIndex from,
+             const TreeKEMPublicKey& pub,
+             const bytes& context,
+             const NodeIndex& decrypt_node,
+             const HPKECiphertext& encrypted_path_secret);
+
   void truncate(LeafCount size);
 
   bool consistent(const TreeKEMPrivateKey& other) const;
@@ -107,15 +125,19 @@ struct TreeKEMPrivateKey
   void implant(const TreeKEMPublicKey& pub,
                NodeIndex start,
                const bytes& path_secret);
+  void implant_matching(const TreeKEMPublicKey& pub,
+                        NodeIndex start,
+                        const bytes& path_secret);
 };
 
 struct TreeKEMPublicKey
 {
   CipherSuite suite;
   LeafCount size{ 0 };
-  std::vector<OptionalNode> nodes;
+  std::map<NodeIndex, OptionalNode> nodes;
 
   explicit TreeKEMPublicKey(CipherSuite suite);
+  TreeKEMPublicKey(CipherSuite suite, const TreeSlice& slice);
 
   TreeKEMPublicKey() = default;
   TreeKEMPublicKey(const TreeKEMPublicKey& other) = default;
@@ -142,18 +164,51 @@ struct TreeKEMPublicKey
   const bytes& get_hash(NodeIndex index);
   bytes root_hash() const;
 
+  bool parent_hash_valid(LeafIndex from) const;
   bool parent_hash_valid(LeafIndex from, const UpdatePath& path) const;
   bool parent_hash_valid() const;
+  bool is_complete() const;
 
   bool has_leaf(LeafIndex index) const;
   std::optional<LeafIndex> find(const LeafNode& leaf) const;
   std::optional<LeafNode> leaf_node(LeafIndex index) const;
   std::vector<NodeIndex> resolve(NodeIndex index) const;
 
+  TreeSlice extract_slice(LeafIndex leaf) const;
+  void implant_slice(const TreeSlice& slice);
+  std::tuple<HPKECiphertext, NodeIndex> slice_path(UpdatePath path,
+                                                   LeafIndex from,
+                                                   LeafIndex to) const;
+
+  struct AncestorIndex
+  {
+    size_t ancestor_node_index;
+    NodeIndex resolution_node;
+  };
+  AncestorIndex ancestor_index(LeafIndex to, LeafIndex from) const;
+
+  struct DecapCoords
+  {
+    size_t ancestor_node_index;
+    size_t resolution_node_index;
+    NodeIndex resolution_node;
+  };
+  DecapCoords decap_coords(
+    LeafIndex to,
+    LeafIndex from,
+    const std::vector<LeafIndex>& joiner_locations) const;
+
   template<typename UnaryPredicate>
   bool all_leaves(const UnaryPredicate& pred) const
   {
     for (LeafIndex i{ 0 }; i < size; i.val++) {
+      // Only test known nodes
+      // XXX(RLB) This could be dangerous, since it allows for nodes to fail the
+      // predicate as long as they are unknown.
+      if (nodes.count(NodeIndex(i)) == 0) {
+        continue;
+      }
+
       const auto& node = node_at(i);
       if (node.blank()) {
         continue;
@@ -184,8 +239,8 @@ struct TreeKEMPublicKey
     return false;
   }
 
-  using FilteredDirectPath =
-    std::vector<std::tuple<NodeIndex, std::vector<NodeIndex>>>;
+  using FilteredDirectPathEntry = std::tuple<NodeIndex, std::vector<NodeIndex>>;
+  using FilteredDirectPath = std::vector<FilteredDirectPathEntry>;
   FilteredDirectPath filtered_direct_path(NodeIndex index) const;
 
   void truncate();
@@ -208,6 +263,9 @@ private:
   void clear_hash_path(LeafIndex index);
 
   bool has_parent_hash(NodeIndex child, const bytes& target_ph) const;
+  bool parent_hash_valid(LeafIndex from,
+                         const UpdatePath& path,
+                         const FilteredDirectPath& fdp) const;
 
   bytes parent_hash(const ParentNode& parent, NodeIndex copath_child) const;
   std::vector<bytes> parent_hashes(
@@ -227,6 +285,8 @@ private:
                       std::optional<LeafIndex> except) const;
   bool exists_in_tree(const SignaturePublicKey& key,
                       std::optional<LeafIndex> except) const;
+
+  void implant_slice_unchecked(const TreeSlice& slice);
 
   OptionalNode blank_node;
 

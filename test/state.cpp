@@ -2,8 +2,10 @@
 #include <hpke/random.h>
 #include <mls/common.h>
 #include <mls/state.h>
+#include <mls_ds/tree_follower.h>
 
 using namespace MLS_NAMESPACE;
+using namespace MLS_NAMESPACE::mls_ds;
 
 struct CustomExtension
 {
@@ -417,6 +419,316 @@ TEST_CASE_METHOD(StateTest, "Two Person with Replacement")
 
   auto group = std::vector<State>{ first2, second2 };
   verify_group_functionality(group);
+}
+
+TEST_CASE_METHOD(StateTest, "Light client can participate")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Add the second participant
+  auto add1 = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  // Initialize the second participant from the Welcome.  Note that the second
+  // participant is always a full client, because the membership proofs cover
+  // the whole tree.
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  REQUIRE(second1.is_full_client());
+  REQUIRE(first1 == second1);
+
+  // Add the third participant
+  auto add2 = first0.add_proposal(key_packages[2]);
+  auto [commit2, welcome2, first2_] =
+    first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
+  auto first2 = first2_;
+  const auto annotated_welcome = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
+
+  // Handle the Commit at the second participant
+  auto second2 = opt::get(second1.handle(commit2));
+
+  // Initialize the third participant as a light client, by only including
+  // membership proofs in the Welcome, not the full tree
+  auto third2 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       annotated_welcome.welcome,
+                       annotated_welcome.tree(),
+                       {} };
+  REQUIRE_FALSE(third2.is_full_client());
+
+  REQUIRE(first2 == second2);
+  REQUIRE(first2 == third2);
+
+  // Create another commit and handle it at the second client
+  auto [commit3, welcome3, first3_] = first2.commit(fresh_secret(), {}, {});
+  silence_unused(welcome3);
+  auto first3 = first3_;
+  auto second3 = opt::get(second2.handle(commit3));
+
+  // Verify that the light client refuses to process it on its own
+  REQUIRE_THROWS(third2.handle(commit3));
+
+  // Convert the Commit to an AnnotatedCommit
+  auto annotated_commit = AnnotatedCommit::from(
+    third2.index(), {}, commit3, first2.tree(), first3.tree());
+
+  // Verify that the light client can process the commit with a commit map
+  auto third3 = third2.handle(annotated_commit);
+
+  REQUIRE(first3 == second3);
+  REQUIRE(first3 == third3);
+
+  // Upgrade the third client to be a full client
+  third3.upgrade_to_full_client(first3.tree());
+  REQUIRE(third3.is_full_client());
+
+  // Verify that all three clients can now process a normal Commit
+  auto [commit4, welcome4, first4_] = first3.commit(fresh_secret(), {}, {});
+  silence_unused(welcome4);
+  auto first4 = first4_;
+  auto second4 = opt::get(second3.handle(commit4));
+  auto third4 = opt::get(third3.handle(commit4));
+
+  REQUIRE(first4 == second4);
+  REQUIRE(first4 == third4);
+}
+
+TEST_CASE_METHOD(StateTest, "Light client can rejoin")
+{
+  // Initialize the creator's state
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  // Add the second and third participants
+  auto add1a = first0.add_proposal(key_packages[1]);
+  auto add1b = first0.add_proposal(key_packages[2]);
+  auto [commit1, welcome1, first1_] = first0.commit(
+    fresh_secret(), CommitOpts{ { add1a, add1b }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  auto third1 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       welcome1,
+                       std::nullopt,
+                       {} };
+
+  REQUIRE(first1 == third1);
+
+  // Remove the second participant and re-add them in the same commit
+  auto remove2 = first1.remove_proposal(LeafIndex{ 1 });
+  auto add2 = first1.add_proposal(key_packages[1]);
+  auto [commit2, welcome2, first2_] = first1.commit(
+    fresh_secret(), CommitOpts{ { remove2, add2 }, false, false, {} }, {});
+  silence_unused(welcome2);
+  auto first2 = first2_;
+
+  auto third2 = opt::get(third1.handle(commit2));
+
+  REQUIRE(first2 == third2);
+
+  // Second participant (re-)joins as a light client
+  const auto annotated_welcome_2 = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 1 });
+
+  auto second2 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        annotated_welcome_2.welcome,
+                        annotated_welcome_2.tree(),
+                        {} };
+
+  REQUIRE(first2 == second2);
+  REQUIRE_FALSE(second2.is_full_client());
+}
+
+TEST_CASE_METHOD(StateTest, "Light client can upgrade after several commits")
+{
+  // Initialize the first two users
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  auto add1 = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  REQUIRE(second1.is_full_client());
+  REQUIRE(first1 == second1);
+
+  // Add the third participant as a light client, remembering the tree at this
+  // point.
+  auto add2 = first0.add_proposal(key_packages[2]);
+  auto [commit2, welcome2, first2_] =
+    first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
+  auto first2 = first2_;
+  const auto annotated_welcome = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
+
+  auto second2 = opt::get(second1.handle(commit2));
+
+  auto third2 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       annotated_welcome.welcome,
+                       annotated_welcome.tree(),
+                       {} };
+  REQUIRE_FALSE(third2.is_full_client());
+
+  REQUIRE(first2 == second2);
+  REQUIRE(first2 == third2);
+
+  const auto tree2 = first2.tree();
+
+  // Client 1 makes a bunch of commits, and the other two members follow along.
+  auto first = first2;
+  auto second = second2;
+  auto third = third2;
+
+  auto commits = std::vector<MLSMessage>{};
+  const auto n_commits = size_t(5);
+  for (auto i = size_t(0); i < n_commits; i++) {
+    const auto [commit, welcome, next_first] =
+      first.commit(fresh_secret(), {}, {});
+    silence_unused(welcome);
+    const auto annotated_commit = AnnotatedCommit::from(
+      third.index(), {}, commit, first.tree(), next_first.tree());
+
+    commits.push_back(commit);
+
+    first = next_first;
+    second = opt::get(second.handle(commit));
+    third = third.handle(annotated_commit);
+
+    REQUIRE(first == second);
+    REQUIRE(first == third);
+  }
+
+  // Client 3 finally finishes downloading the tree, fast-forwards it using the
+  // commit queue, and upgrades to being a full client.
+  auto follower = TreeFollower(tree2);
+  for (const auto& commit : commits) {
+    follower.update(commit, {});
+  }
+
+  third.upgrade_to_full_client(follower.tree());
+  REQUIRE(third.is_full_client());
+
+  REQUIRE(first == second);
+  REQUIRE(first == third);
+}
+
+TEST_CASE_METHOD(StateTest, "Light client can handle an external commit")
+{
+  // Initialize the first two users
+  auto first0 = State{ group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       {} };
+
+  auto add1 = first0.add_proposal(key_packages[1]);
+  auto [commit1, welcome1, first1_] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+  silence_unused(commit1);
+  auto first1 = first1_;
+
+  auto second1 = State{ init_privs[1],
+                        leaf_privs[1],
+                        identity_privs[1],
+                        key_packages[1],
+                        welcome1,
+                        std::nullopt,
+                        {} };
+
+  REQUIRE(second1.is_full_client());
+  REQUIRE(first1 == second1);
+
+  // Add the third participant as a light client
+  auto add2 = first0.add_proposal(key_packages[2]);
+  auto [commit2, welcome2, first2_] =
+    first1.commit(fresh_secret(), CommitOpts{ { add2 }, false, false, {} }, {});
+  auto first2 = first2_;
+  const auto annotated_welcome = AnnotatedWelcome::from(
+    welcome2, first2.tree(), LeafIndex{ 0 }, LeafIndex{ 2 });
+
+  auto second2 = opt::get(second1.handle(commit2));
+
+  auto third2 = State{ init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       annotated_welcome.welcome,
+                       annotated_welcome.tree(),
+                       {} };
+  REQUIRE_FALSE(third2.is_full_client());
+
+  REQUIRE(first2 == second2);
+  REQUIRE(first2 == third2);
+
+  // The fourth participant joins via an external commit
+  const auto group_info = first2.group_info(true);
+  const auto [commit3, fourth3] = State::external_join(fresh_secret(),
+                                                       identity_privs[3],
+                                                       key_packages[3],
+                                                       group_info,
+                                                       std::nullopt,
+                                                       {},
+                                                       std::nullopt,
+                                                       {});
+
+  // Process the commit at the normal clients
+  const auto first3 = opt::get(first2.handle(commit3));
+  const auto second3 = opt::get(second2.handle(commit3));
+
+  // Annotate the commit and handle it at the third client
+  const auto annotated_commit = AnnotatedCommit::from(
+    third2.index(), {}, commit3, first2.tree(), first3.tree());
+  const auto third3 = third2.handle(annotated_commit);
+
+  REQUIRE(first3 == second3);
+  REQUIRE(first3 == third3);
+  REQUIRE(first3 == fourth3);
 }
 
 TEST_CASE_METHOD(StateTest, "External Join")
@@ -1068,4 +1380,198 @@ TEST_CASE_METHOD(RelatedGroupTest, "Reinitialize the group")
   for (const auto& state : new_states) {
     REQUIRE(state == new_states[0]);
   }
+}
+
+TEST_CASE_METHOD(StateTest, "Parent Hash with Empty Left Subtree")
+{
+  // Create a group with 4 members
+  auto state_0 = State(group_id,
+                       suite,
+                       leaf_privs[0],
+                       identity_privs[0],
+                       key_packages[0].leaf_node,
+                       ExtensionList{});
+
+  const auto adds = std::vector{
+    state_0.add_proposal(key_packages[1]),
+    state_0.add_proposal(key_packages[2]),
+    state_0.add_proposal(key_packages[3]),
+  };
+
+  auto [_commit0, welcome0, new_state_0] =
+    state_0.commit(fresh_secret(), CommitOpts{ adds, true, false, {} }, {});
+  silence_unused(_commit0);
+  state_0 = new_state_0;
+
+  auto state_2 = State(init_privs[2],
+                       leaf_privs[2],
+                       identity_privs[2],
+                       key_packages[2],
+                       welcome0,
+                       std::nullopt,
+                       {});
+  // Member @2 removes the members on the left side of the tree
+  const auto removes = std::vector{
+    state_2.remove_proposal(LeafIndex{ 0 }),
+    state_2.remove_proposal(LeafIndex{ 1 }),
+  };
+
+  auto [commit2, welcome2, new_state_2] =
+    state_2.commit(fresh_secret(), CommitOpts{ removes, true, false, {} }, {});
+  silence_unused(commit2);
+  silence_unused(welcome2);
+  state_2 = new_state_2;
+
+  // Member @2 should have a valid tree, even though its filtered direct path no
+  // longer goes to the root.
+  REQUIRE(state_2.tree().parent_hash_valid());
+}
+
+class ExternalSenderTest : public StateTest
+{
+protected:
+  const SignaturePrivateKey external_sig_priv =
+    SignaturePrivateKey::generate(suite);
+  const Credential external_sender_cred = Credential::basic({ 0 });
+  const bytes psk_id = from_ascii("psk ID");
+  ExtensionList group_extensions;
+
+  ExternalSenderTest()
+  {
+    group_extensions.add(ExternalSendersExtension{ {
+      { external_sig_priv.public_key, external_sender_cred },
+    } });
+
+    // Initialize the creator's state
+    states.emplace_back(group_id,
+                        suite,
+                        leaf_privs[0],
+                        identity_privs[0],
+                        key_packages[0].leaf_node,
+                        group_extensions);
+
+    // Add a second member so that we can test removal proposal
+    auto add = states[0].add_proposal(key_packages[1]);
+    auto [commit, welcome, new_state] = states[0].commit(
+      fresh_secret(), CommitOpts{ { add }, true, false, {} }, {});
+    states[0] = new_state;
+
+    silence_unused(commit);
+
+    states.push_back({ init_privs[1],
+                       leaf_privs[1],
+                       identity_privs[1],
+                       key_packages[1],
+                       welcome,
+                       std::nullopt,
+                       {} });
+  }
+
+  PublicMessage GenerateExternalSenderProposal(const Proposal& proposal)
+  {
+    auto group_context = states[0].group_context();
+
+    auto proposal_content = GroupContent{ group_context.group_id,
+                                          group_context.epoch,
+                                          { ExternalSenderIndex{ 0 } },
+                                          {},
+                                          proposal };
+
+    auto content_auth_original =
+      AuthenticatedContent::sign(WireFormat::mls_public_message,
+                                 proposal_content,
+                                 suite,
+                                 external_sig_priv,
+                                 group_context);
+
+    return PublicMessage::protect(
+      content_auth_original, suite, std::nullopt, group_context);
+  }
+};
+
+TEST_CASE_METHOD(ExternalSenderTest,
+                 "Allows Expected Proposals from External Sender")
+{
+  // For expected proposals, we ensure that calling State::handle with the
+  // proposal does not throw an exception.
+
+  // Add
+  auto add_proposal = Proposal{ Add{ key_packages[2] } };
+  auto ext_add_message = GenerateExternalSenderProposal(add_proposal);
+
+  REQUIRE(!states[0].handle(ext_add_message).has_value());
+
+  // Remove
+  auto remove_proposal = Proposal{ Remove{ LeafIndex{ 1 } } };
+  auto ext_remove_message = GenerateExternalSenderProposal(remove_proposal);
+
+  REQUIRE(!states[0].handle(ext_remove_message).has_value());
+
+  // PSK
+  auto group_context = states[0].group_context();
+  auto psk_proposal =
+    Proposal{ PreSharedKey{ ResumptionPSK{ ResumptionPSKUsage::application,
+                                           group_context.group_id,
+                                           group_context.epoch },
+                            random_bytes(suite.secret_size()) } };
+  auto ext_psk_message = GenerateExternalSenderProposal(psk_proposal);
+
+  REQUIRE(!states[0].handle(ext_psk_message).has_value());
+
+  // ReInit
+  auto updated_extensions = group_extensions;
+  updated_extensions.add(CustomExtension{ 0xa0 });
+
+  auto reinit_proposal = Proposal{ ReInit{ group_context.group_id,
+                                           ProtocolVersion::mls10,
+                                           group_context.cipher_suite,
+                                           updated_extensions } };
+  auto ext_reinit_message = GenerateExternalSenderProposal(reinit_proposal);
+
+  REQUIRE(!states[0].handle(ext_reinit_message).has_value());
+
+  // GroupContextExtensions
+
+  auto group_context_proposal =
+    Proposal{ GroupContextExtensions{ updated_extensions } };
+  auto ext_group_context_message =
+    GenerateExternalSenderProposal(group_context_proposal);
+
+  REQUIRE(!states[0].handle(ext_group_context_message).has_value());
+}
+
+TEST_CASE_METHOD(ExternalSenderTest,
+                 "Refuses Unexpected Proposals from External Sender")
+{
+  // For unexpected proposals, we ensure that calling State::handle with the
+  // throws the expected exception.
+
+  // The proposals throw bad_optional_access since the validation calls
+  // opt::get(sender) on a nullopt sender
+
+  // Update
+  auto update_proposal = Proposal{ Update{ key_packages[1].leaf_node } };
+  auto ext_update_message = GenerateExternalSenderProposal(update_proposal);
+
+  REQUIRE_THROWS_WITH(states[0].handle(ext_update_message),
+                      "Invalid external proposal");
+
+  // ExternalInit
+  auto group_info = states[0].group_info(false);
+  auto maybe_external_pub = group_info.extensions.find<ExternalPubExtension>();
+
+  REQUIRE(maybe_external_pub.has_value());
+
+  const auto& external_pub = opt::get(maybe_external_pub).external_pub;
+
+  auto [kem_output, force_init_secret] =
+    KeyScheduleEpoch::external_init(suite, external_pub);
+  silence_unused(force_init_secret);
+
+  auto external_init_proposal = Proposal{ ExternalInit{ kem_output } };
+  auto external_init_message =
+    GenerateExternalSenderProposal(external_init_proposal);
+
+  REQUIRE_THROWS_WITH(states[0].handle(external_init_message),
+                      "Invalid external proposal");
 }

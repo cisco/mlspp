@@ -7,6 +7,7 @@
 BUILD_DIR=build
 TEST_DIR=build/test
 CLANG_FORMAT=clang-format -i
+CLANG_FORMAT_EXCLUDE="test_vectors.cpp"
 CLANG_TIDY=OFF
 OPENSSL11_MANIFEST=alternatives/openssl_1.1
 OPENSSL3_MANIFEST=alternatives/openssl_3
@@ -26,23 +27,30 @@ ${BUILD_DIR}: CMakeLists.txt test/CMakeLists.txt
 ${TOOLCHAIN_FILE}:
 	git submodule update --init --recursive
 
+# Only enable testing, not clang-tidy/sanitizers; the latter make the build
+# too slow, and we can run them in CI
 dev: ${TOOLCHAIN_FILE}
-	# Only enable testing, not clang-tidy/sanitizers; the latter make the build
-	# too slow, and we can run them in CI
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `dev`, but using OpenSSL 3
 dev3: ${TOOLCHAIN_FILE}
-	# Like `dev`, but using OpenSSL 3
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `dev`, but using BoringSSL
 devB: ${TOOLCHAIN_FILE}
-	# Like `dev`, but using BoringSSL
 	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST} \
+		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+
+# Like `dev`, but using OpenSSL 3 with PQ disabled
+dev-no-pq:
+	cmake -B${BUILD_DIR} -DTESTING=ON -DCMAKE_BUILD_TYPE=Debug \
+		-DDISABLE_PQ=ON \
+		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
 test: ${BUILD_DIR} test/*
@@ -79,14 +87,14 @@ ci: ${TOOLCHAIN_FILE}
 		-DVCPKG_MANIFEST_DIR=${OPENSSL11_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `ci`, but using OpenSSL 3
 ci3: ${TOOLCHAIN_FILE}
-	# Like `ci`, but using OpenSSL 3
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${OPENSSL3_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
 
+# Like `ci`, but using BoringSSL
 ciB: ${TOOLCHAIN_FILE}
-	# Like `ci`, but using BoringSSL
 	cmake -B ${BUILD_DIR} -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug \
 		-DVCPKG_MANIFEST_DIR=${BORINGSSL_MANIFEST} \
 		-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
@@ -98,8 +106,8 @@ cclean:
 	rm -rf ${BUILD_DIR}
 
 format:
-	find include -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find src -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find test -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find cmd -iname "*.h" -or -iname "*.cpp" | xargs ${CLANG_FORMAT}
-	find lib -iname "*.h" -or -iname "*.cpp" | grep -v "test_vectors.cpp" |  xargs ${CLANG_FORMAT}
+	for dir in include src test lib; \
+	do \
+		find $${dir} -iname "*.h" -or -iname "*.cpp" | grep -v ${CLANG_FORMAT_EXCLUDE} \
+		| xargs ${CLANG_FORMAT}; \
+	done

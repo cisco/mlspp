@@ -17,7 +17,7 @@ TEST_CASE("Basic HPKE")
   auto context = random_bytes(100);
   auto original = random_bytes(100);
 
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
     auto s = bytes{ 0, 1, 2, 3 };
 
@@ -43,7 +43,7 @@ TEST_CASE("Basic HPKE")
 
 TEST_CASE("HPKE Key Serialization")
 {
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
     auto x = HPKEPrivateKey::derive(suite, { 0, 1, 2, 3 });
     auto gX = x.public_key;
@@ -59,7 +59,7 @@ TEST_CASE("HPKE Key Serialization")
 
 TEST_CASE("Basic Signature")
 {
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
     auto a = SignaturePrivateKey::generate(suite);
     auto b = SignaturePrivateKey::generate(suite);
@@ -82,7 +82,7 @@ TEST_CASE("Basic Signature")
 
 TEST_CASE("Signature Key Serializion")
 {
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
     auto x = SignaturePrivateKey::generate(suite);
     auto gX = x.public_key;
@@ -97,7 +97,7 @@ TEST_CASE("Signature Key Serializion")
 
 TEST_CASE("Signature Key JWK Import/Export")
 {
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     const auto suite = CipherSuite{ suite_id };
     const auto priv = SignaturePrivateKey::generate(suite);
     const auto pub = priv.public_key;
@@ -133,7 +133,7 @@ TEST_CASE("Signature Key JWK Import/Export")
 
 TEST_CASE("Crypto Interop")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     auto tv = CryptoBasicsTestVector{ suite };
     REQUIRE(tv.verify() == std::nullopt);
   }

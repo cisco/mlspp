@@ -17,7 +17,11 @@ struct bytes
   bytes& operator=(bytes&&) = default;
 
   // Zeroize on drop
-  ~bytes() { std::fill(_data.begin(), _data.end(), uint8_t(0)); }
+  ~bytes()
+  {
+    auto ptr = static_cast<volatile uint8_t*>(_data.data());
+    std::fill(ptr, ptr + _data.size(), uint8_t(0));
+  }
 
   // Mimic std::vector ctors
   bytes(size_t count, const uint8_t& value = 0)

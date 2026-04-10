@@ -61,25 +61,25 @@ TEST_CASE_METHOD(TreeKEMTest, "Node public key")
 TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 {
   const auto size = LeafCount{ 5 };
-  const auto index = LeafIndex{ 2 };
-  const auto intersect = NodeIndex{ 3 };
+  const auto adder_index = LeafIndex{ 1 };
+  const auto joiner_index = LeafIndex{ 2 };
   const auto random = random_bytes(32);
   const auto priv = HPKEPrivateKey::derive(suite, random);
   const auto priv2 = HPKEPrivateKey::generate(suite);
   const auto hash_size = suite.digest().hash_size;
 
-  // Create a tree with N blank leaves
+  // Create a tree with N leaves, blank otherwise
   auto pub = TreeKEMPublicKey(suite);
   for (auto i = uint32_t(0); i < size.val; i++) {
     auto [_leaf_priv, _sig_priv, leaf_node] = new_leaf_node();
     pub.add_leaf(leaf_node);
   }
 
-  // create() populates the direct path
-  auto priv_create = TreeKEMPrivateKey::create(pub, index, random);
-  REQUIRE(priv_create.path_secrets.find(NodeIndex(4)) !=
+  // create() populates the direct path in the private key
+  auto priv_create = TreeKEMPrivateKey::create(pub, adder_index, random);
+  REQUIRE(priv_create.path_secrets.find(NodeIndex(2)) !=
           priv_create.path_secrets.end());
-  REQUIRE(priv_create.path_secrets.find(NodeIndex(5)) !=
+  REQUIRE(priv_create.path_secrets.find(NodeIndex(1)) !=
           priv_create.path_secrets.end());
   REQUIRE(priv_create.path_secrets.find(NodeIndex(3)) !=
           priv_create.path_secrets.end());
@@ -87,10 +87,15 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
           priv_create.path_secrets.end());
   REQUIRE(priv_create.update_secret.size() == hash_size);
 
+  // Populate the direct path from the  into the public key manually
+  pub.node_at(NodeIndex{ 1 }) = OptionalNode{ Node{ ParentNode{} } };
+  pub.node_at(NodeIndex{ 3 }) = OptionalNode{ Node{ ParentNode{} } };
+  pub.node_at(NodeIndex{ 7 }) = OptionalNode{ Node{ ParentNode{} } };
+
   // joiner() populates the leaf and the path above the ancestor,
   // but not the direct path in the middle
-  auto priv_joiner =
-    TreeKEMPrivateKey::joiner(pub, index, priv, intersect, random);
+  auto priv_joiner = TreeKEMPrivateKey::joiner(
+    pub, joiner_index, priv, joiner_index.ancestor(adder_index), random);
   REQUIRE(priv_joiner.private_key(NodeIndex(4)));
   REQUIRE(priv_joiner.path_secrets.find(NodeIndex(3)) !=
           priv_joiner.path_secrets.end());
@@ -103,7 +108,7 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM Private Key")
 
   // set_leaf_priv() properly sets the leaf secret
   priv_joiner.set_leaf_priv(priv2);
-  REQUIRE(priv_joiner.private_key(NodeIndex(index)) == priv2);
+  REQUIRE(priv_joiner.private_key(NodeIndex(joiner_index)) == priv2);
   REQUIRE(priv_joiner.update_secret.size() == hash_size);
   REQUIRE(priv_joiner.update_secret == last_update_secret);
 
@@ -264,11 +269,37 @@ TEST_CASE_METHOD(TreeKEMTest, "TreeKEM encap/decap")
       REQUIRE(privs[j].consistent(pubs[j]));
     }
   }
+
+  // XXX(RLB) The below test probably doesn't belong here, but we have a nice
+  // properly-created tree here, so it's convenient to use it for testing tree
+  // slices.
+
+  // Verify that all slices of the tree have the correct tree hash
+  auto original = pubs[0];
+  original.set_hash_all();
+  const auto tree_hash = original.root_hash();
+  auto slices = std::vector<TreeSlice>{};
+  for (uint32_t i = 0; i < original.size.val; i++) {
+    auto slice = original.extract_slice(LeafIndex{ i });
+    REQUIRE(slice.tree_hash(suite) == tree_hash);
+
+    slices.push_back(slice);
+  }
+
+  // Verify that the tree can be reassembled from the slices
+  auto reconstructed = TreeKEMPublicKey(suite, slices[0]);
+  for (uint32_t i = 1; i < slices.size(); i++) {
+    reconstructed.implant_slice(slices[i]);
+  }
+
+  reconstructed.set_hash_all();
+  REQUIRE(reconstructed.root_hash() == tree_hash);
+  REQUIRE(reconstructed.parent_hash_valid());
 }
 
-TEST_CASE("TreeKEM Interop")
+TEST_CASE("TreeKEM Interop", "[.][all]")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     for (auto structure : treekem_test_tree_structures) {
       auto tv = TreeKEMTestVector{ suite, structure };
       REQUIRE(tv.verify() == std::nullopt);

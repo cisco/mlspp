@@ -12,6 +12,7 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/rsa.h>
 
 using nlohmann::json;
@@ -96,6 +97,13 @@ struct GroupSignature : public Signature
   {
     return std::make_unique<PrivateKey>(
       group.deserialize_private(skm).release());
+  }
+
+  std::unique_ptr<Signature::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    return std::make_unique<PrivateKey>(
+      group.deserialize_private_der(der).release());
   }
 
   bytes sign(const bytes& data, const Signature::PrivateKey& sk) const override
@@ -273,6 +281,12 @@ Signature::get<Signature::ID::RSA_SHA512>()
 Signature::Signature(Signature::ID id_in)
   : id(id_in)
 {
+}
+
+std::unique_ptr<Signature::PrivateKey>
+Signature::deserialize_private_der(const bytes&) const
+{
+  throw std::runtime_error("Not implemented");
 }
 
 std::unique_ptr<Signature::PrivateKey>

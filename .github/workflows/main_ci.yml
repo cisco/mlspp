@@ -1,12 +1,25 @@
 name: MLSPP CI
 
 on:
+  workflow_dispatch:
+    branches:
+      - main
   push:
     branches:
       - main
+    paths:
+      - "**/CMakeLists.txt"
+      - ".github/**"
+      - "**.cpp"
+      - "**.h"
   pull_request:
     branches:
       - main
+    paths:
+      - "**/CMakeLists.txt"
+      - ".github/**"
+      - "**.cpp"
+      - "**.h"
 
 env:
   CMAKE_BUILD_PARALLEL_LEVEL: 3
@@ -15,8 +28,33 @@ env:
   CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 jobs:
+  choose_crypto_matrix:
+    name: Choose crypto libraries to test with
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - uses: dorny/paths-filter@v3
+      id: filter_version
+      with:
+        filters: |
+          hpke:
+            - 'lib/hpke/include/**'
+            - 'lib/hpke/src/**'
+            - 'lib/hpke/test/**'
+ 
+    - id: set-matrix 
+      run: |
+        if [ ${{ steps.filter_version.outputs.hpke }} = "true" ];
+        then
+          echo "matrix=[\"openssl_1.1\",\"openssl_3\",\"boringssl\"]" >> $GITHUB_OUTPUT;
+        else
+          echo "matrix=[\"openssl_3\"]" >> $GITHUB_OUTPUT
+        fi
+
   formatting-check:
     name: Formatting Check
+    needs: choose_crypto_matrix
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -25,26 +63,25 @@ jobs:
       uses: jidicula/clang-format-action@v4.11.0
       with:
         clang-format-version: 16
-        include-regex: '^\./(src|include|test|cmd)/.*\.(cpp|h)$'
+        include-regex: '^\./(src|include|test|cmd|lib)/.*\.(cpp|h)$'
         fallback-style: 'Mozilla'
 
   build-and-unit-test:
-    needs: formatting-check
+    needs: [formatting-check, choose_crypto_matrix]
     name: Build and test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        crypto: [openssl_1.1, openssl_3, boringssl]
+        crypto: ${{ fromJson(needs.choose_crypto_matrix.outputs.matrix )}}
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: true
         fetch-depth: 0
 
     - uses: ./.github/actions/prepare-build
@@ -55,18 +92,12 @@ jobs:
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" -DTESTING=ON
+        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"
 
-    - name: Unit Test (non-Windows)
-      if: matrix.os != 'windows-latest'
+    - name: Unit Test
       run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target test
-
-    - name: Unit Test (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cmake --build "${{ env.BUILD_DIR }}" --target RUN_TESTS
+        ctest --test-dir "${{ runner.temp }}/build_${{ matrix.crypto }}"
 
   interop-test:
     if: github.event.pull_request.draft == false
@@ -75,8 +106,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_openssl_1.1"
-      CRYPTO_DIR: "./alternatives/openssl_1.1"
+      CRYPTO_DIR: "./alternatives/openssl_3"
 
     steps:
     - uses: actions/checkout@v4
@@ -87,13 +117,13 @@ jobs:
     - uses: ./.github/actions/prepare-build
       with:
         os: ubuntu-latest
-        crypto-dir: openssl_1.1
+        crypto-dir: openssl_3
         cache-dir: ${{ github.workspace }}/vcpkg_cache
 
     - name: Build
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_openssl_3" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}"
+        cmake --build "${{ runner.temp }}/build_openssl_3"
 
     - name: Build (Interop Harness)
       run: |
@@ -116,15 +146,14 @@ jobs:
 
   clang-tidy:
     if: github.event.pull_request.draft == false
-    needs: build-and-unit-test
+    needs: [build-and-unit-test, choose_crypto_matrix]
     name: Build with clang-tidy
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       matrix:
-        crypto: [openssl_1.1, openssl_3, boringssl]
+        crypto: ${{ fromJson(needs.choose_crypto_matrix.outputs.matrix )}}
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
@@ -141,6 +170,6 @@ jobs:
 
     - name: Build with clang-tidy
       run: |
-        cmake -B "${{ env.BUILD_DIR }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
-                                        -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
-        cmake --build "${{ env.BUILD_DIR }}"
+        cmake -B "${{ runner.temp }}/build_${{ matrix.crypto }}" -DVCPKG_MANIFEST_DIR="${{ env.CRYPTO_DIR }}" \
+                                                                 -DTESTING=ON -DCLANG_TIDY=ON -DSANITIZERS=ON
+        cmake --build "${{ runner.temp }}/build_${{ matrix.crypto }}"

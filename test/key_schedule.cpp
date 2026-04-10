@@ -7,7 +7,7 @@ using namespace mls_vectors;
 
 TEST_CASE("Secret Tree Interop")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     const auto tv = SecretTreeTestVector{ suite, 15, { 1, 10 } };
     REQUIRE(tv.verify() == std::nullopt);
   }
@@ -15,7 +15,7 @@ TEST_CASE("Secret Tree Interop")
 
 TEST_CASE("PSK Secret Interop")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     const auto tv = PSKSecretTestVector{ suite, 5 };
     REQUIRE(tv.verify() == std::nullopt);
   }
@@ -23,7 +23,7 @@ TEST_CASE("PSK Secret Interop")
 
 TEST_CASE("Key Schedule Interop")
 {
-  for (auto suite : all_supported_suites) {
+  for (auto suite : all_supported_cipher_suites) {
     auto tv = KeyScheduleTestVector{ suite, 15 };
     REQUIRE(tv.verify() == std::nullopt);
   }

@@ -10,6 +10,7 @@
 #include "openssl/ec.h"
 #include "openssl/evp.h"
 #include "openssl/obj_mac.h"
+#include "openssl/pem.h"
 #if defined(WITH_OPENSSL3)
 #include "openssl/core_names.h"
 #include "openssl/param_build.h"
@@ -348,6 +349,57 @@ struct ECKeyGroup : public EVPGroup
       if (counter > retry_limit) {
         throw std::runtime_error("DeriveKeyPair iteration limit exceeded");
       }
+    }
+
+#if defined(WITH_OPENSSL3)
+    auto key = keypair_evp_key(sk);
+    return std::make_unique<EVPGroup::PrivateKey>(key.release());
+#else
+    auto pt = make_typed_unique(EC_POINT_new(group));
+    EC_POINT_mul(group, pt.get(), sk.get(), nullptr, nullptr, nullptr);
+
+    EC_KEY_set_private_key(eckey.get(), sk.get());
+    EC_KEY_set_public_key(eckey.get(), pt.get());
+
+    auto pkey = to_pkey(eckey.release());
+    return std::make_unique<PrivateKey>(pkey.release());
+#endif
+  }
+
+  std::unique_ptr<Group::PrivateKey> random_scalar(
+    const bytes& seed) const override
+  {
+#if defined(WITH_OPENSSL3)
+    auto* group = EC_GROUP_new_by_curve_name_ex(nullptr, nullptr, curve_nid);
+    auto group_ptr = make_typed_unique(group);
+#else
+    auto eckey = new_ec_key();
+    const auto* group = EC_KEY_get0_group(eckey.get());
+#endif
+
+    auto order = make_typed_unique(BN_new());
+    if (1 != EC_GROUP_get_order(group, order.get(), nullptr)) {
+      throw openssl_error();
+    }
+
+    auto sk = make_typed_unique(BN_new());
+    BN_zero(sk.get());
+
+    auto start = size_t(0);
+    auto end = sk_size;
+    auto candidate = seed.slice(start, end);
+    auto candidate_size = static_cast<int>(candidate.size());
+    sk.reset(BN_bin2bn(candidate.data(), candidate_size, nullptr));
+
+    while (BN_is_zero(sk.get()) != 0 || BN_cmp(sk.get(), order.get()) != -1) {
+      start = end;
+      end = end + sk_size;
+      if (end > seed.size()) {
+        throw std::runtime_error("Rejection sampling failed");
+      }
+
+      candidate = seed.slice(start, end);
+      sk.reset(BN_bin2bn(candidate.data(), candidate_size, nullptr));
     }
 
 #if defined(WITH_OPENSSL3)
@@ -710,6 +762,22 @@ struct ECKeyGroup : public EVPGroup
 #endif
   }
 
+  std::unique_ptr<Group::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    BIO* mem = BIO_new_mem_buf(der.data(), static_cast<int>(der.size()));
+    if (!mem) {
+      throw openssl_error();
+    }
+    EVP_PKEY* pkey = d2i_PrivateKey_bio(mem, NULL);
+    BIO_free(mem);
+    if (!pkey) {
+      throw openssl_error();
+    }
+
+    return std::make_unique<EVPGroup::PrivateKey>(pkey);
+  }
+
 private:
   int curve_nid;
 
@@ -728,7 +796,7 @@ private:
   }
 #endif
 
-  static inline int group_to_nid(Group::ID group_id)
+  static int group_to_nid(Group::ID group_id)
   {
     switch (group_id) {
       case Group::ID::P256:
@@ -785,6 +853,16 @@ struct RawKeyGroup : public EVPGroup
     return deserialize_private(skm);
   }
 
+  std::unique_ptr<Group::PrivateKey> random_scalar(
+    const bytes& seed) const override
+  {
+    if (seed.size() != sk_size) {
+      throw std::runtime_error("Invalid seed");
+    }
+
+    return deserialize_private(seed);
+  }
+
   bytes serialize(const Group::PublicKey& pk) const override
   {
     const auto& rpk = dynamic_cast<const PublicKey&>(pk);
@@ -835,6 +913,22 @@ struct RawKeyGroup : public EVPGroup
     return std::make_unique<EVPGroup::PrivateKey>(pkey);
   }
 
+  std::unique_ptr<Group::PrivateKey> deserialize_private_der(
+    const bytes& der) const override
+  {
+    BIO* mem = BIO_new_mem_buf(der.data(), static_cast<int>(der.size()));
+    if (!mem) {
+      throw openssl_error();
+    }
+    EVP_PKEY* pkey = d2i_PrivateKey_bio(mem, NULL);
+    BIO_free(mem);
+    if (!pkey) {
+      throw openssl_error();
+    }
+
+    return std::make_unique<RawKeyGroup::PrivateKey>(pkey);
+  }
+
   // Raw Key
   std::tuple<bytes, bytes> coordinates(
     const Group::PublicKey& pk) const override
@@ -862,7 +956,7 @@ struct RawKeyGroup : public EVPGroup
 private:
   const int evp_type;
 
-  static inline int group_to_evp(Group::ID group_id)
+  static int group_to_evp(Group::ID group_id)
   {
     switch (group_id) {
       case Group::ID::X25519:
@@ -950,6 +1044,32 @@ Group::get<Group::ID::Ed448>()
   static const RawKeyGroup instance(Group::ID::Ed448,
                                     KDF::get<KDF::ID::HKDF_SHA512>());
   return instance;
+}
+
+static inline size_t
+group_seed_size(Group::ID group_id)
+{
+  switch (group_id) {
+    case Group::ID::P256:
+      return 128;
+    case Group::ID::P384:
+      return 48;
+    case Group::ID::P521:
+      // XXX(RLB): This may be wrong, but we're never going to use it
+      return 66;
+    case Group::ID::X25519:
+      return 32;
+    case Group::ID::X448:
+      return 56;
+
+    // Non-DH groups
+    case Group::ID::Ed25519:
+    case Group::ID::Ed448:
+      return 0;
+
+    default:
+      throw std::runtime_error("Unknown group");
+  }
 }
 
 static inline size_t
@@ -1066,6 +1186,7 @@ group_jwk_key_type(Group::ID group_id)
 
 Group::Group(ID group_id_in, const KDF& kdf_in)
   : id(group_id_in)
+  , seed_size(group_seed_size(group_id_in))
   , dh_size(group_dh_size(group_id_in))
   , pk_size(group_pk_size(group_id_in))
   , sk_size(group_sk_size(group_id_in))

@@ -6,6 +6,8 @@
 #include "common.h"
 #include "dhkem.h"
 #include "hkdf.h"
+#include "hybrid_kem.h"
+#include "mlkem.h"
 
 #include <limits>
 #include <stdexcept>
@@ -85,11 +87,13 @@ label_secret()
 ///
 
 KEM::KEM(ID id_in,
+         size_t seed_size_in,
          size_t secret_size_in,
          size_t enc_size_in,
          size_t pk_size_in,
          size_t sk_size_in)
   : id(id_in)
+  , seed_size(seed_size_in)
   , secret_size(secret_size_in)
   , enc_size(enc_size_in)
   , pk_size(pk_size_in)
@@ -132,7 +136,51 @@ KEM::get<KEM::ID::DHKEM_X448_SHA512>()
 {
   return DHKEM::get<KEM::ID::DHKEM_X448_SHA512>();
 }
-#endif
+#endif // !defined(WITH_BORINGSSL)
+
+#if defined(WITH_PQ)
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM512>()
+{
+  return MLKEM::get<KEM::ID::MLKEM512>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768>()
+{
+  return MLKEM::get<KEM::ID::MLKEM768>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM1024>()
+{
+  return MLKEM::get<KEM::ID::MLKEM1024>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768_P256>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM768_P256>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM1024_P384>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM1024_P384>();
+}
+
+template<>
+const KEM&
+KEM::get<KEM::ID::MLKEM768_X25519>()
+{
+  return HybridKEM::get<KEM::ID::MLKEM768_X25519>();
+}
+#endif // defined(WITH_PQ)
 
 bytes
 KEM::serialize_private(const KEM::PrivateKey& /* unused */) const
@@ -358,6 +406,20 @@ select_kem(KEM::ID id)
 #if !defined(WITH_BORINGSSL)
     case KEM::ID::DHKEM_X448_SHA512:
       return KEM::get<KEM::ID::DHKEM_X448_SHA512>();
+#endif
+#if defined(WITH_PQ)
+    case KEM::ID::MLKEM512:
+      return KEM::get<KEM::ID::MLKEM512>();
+    case KEM::ID::MLKEM768:
+      return KEM::get<KEM::ID::MLKEM768>();
+    case KEM::ID::MLKEM1024:
+      return KEM::get<KEM::ID::MLKEM1024>();
+    case KEM::ID::MLKEM768_P256:
+      return KEM::get<KEM::ID::MLKEM768_P256>();
+    case KEM::ID::MLKEM1024_P384:
+      return KEM::get<KEM::ID::MLKEM1024_P384>();
+    case KEM::ID::MLKEM768_X25519:
+      return KEM::get<KEM::ID::MLKEM768_X25519>();
 #endif
     default:
       throw std::runtime_error("Unsupported algorithm");

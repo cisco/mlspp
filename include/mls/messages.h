@@ -691,6 +691,47 @@ external_proposal(CipherSuite suite,
                   uint32_t signer_index,
                   const SignaturePrivateKey& sig_priv);
 
+struct AnnotatedWelcome
+{
+  Welcome welcome;
+
+  TreeSlice sender_membership_proof;
+  TreeSlice receiver_membership_proof;
+
+  static AnnotatedWelcome from(Welcome welcome,
+                               const TreeKEMPublicKey& tree,
+                               LeafIndex sender,
+                               LeafIndex joiner);
+
+  TreeKEMPublicKey tree() const;
+
+  TLS_SERIALIZABLE(welcome, sender_membership_proof, receiver_membership_proof);
+};
+
+struct AnnotatedCommit
+{
+  MLSMessage commit_message;
+  std::optional<TreeSlice> sender_membership_proof_before;
+  std::optional<uint32_t> resolution_index;
+
+  bytes tree_hash_after;
+  TreeSlice sender_membership_proof_after;
+  TreeSlice receiver_membership_proof_after;
+
+  static AnnotatedCommit from(LeafIndex receiver,
+                              const std::vector<MLSMessage>& proposals,
+                              const MLSMessage& commit_message,
+                              const TreeKEMPublicKey& tree_before,
+                              const TreeKEMPublicKey& tree_after);
+
+  TLS_SERIALIZABLE(commit_message,
+                   sender_membership_proof_before,
+                   resolution_index,
+                   tree_hash_after,
+                   sender_membership_proof_after,
+                   receiver_membership_proof_after);
+};
+
 } // namespace MLS_NAMESPACE
 
 namespace MLS_NAMESPACE::tls {

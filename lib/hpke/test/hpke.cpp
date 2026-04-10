@@ -45,7 +45,7 @@ test_context(ReceiverContext& ctxR, const HPKETestVector& tv)
 static void
 test_base_vector(const HPKETestVector& tv)
 {
-  if (!supported_kem(tv.kem_id)) {
+  if (!supported(tv.kem_id, tv.kdf_id, tv.aead_id)) {
     return;
   }
 
@@ -180,6 +180,34 @@ TEST_CASE("HPKE Test Vectors")
   }
 }
 
+TEST_CASE("HPKE PQ Test Vectors")
+{
+  ensure_fips_if_required();
+
+  auto test_vector_bytes = bytes(test_vector_data_pq);
+  auto test_vectors =
+    MLS_NAMESPACE::tls::get<HPKETestVectors>(test_vector_bytes);
+
+  for (const auto& tv : test_vectors.vectors) {
+    if (fips() && fips_disable(tv.aead_id)) {
+      continue;
+    }
+
+    switch (tv.mode) {
+      case HPKE::Mode::base:
+        test_base_vector(tv);
+        break;
+
+      case HPKE::Mode::psk:
+        test_psk_vector(tv);
+        break;
+
+      default:
+        REQUIRE(false);
+    }
+  }
+}
+
 TEST_CASE("HPKE Round-Trip")
 {
   ensure_fips_if_required();
@@ -189,7 +217,11 @@ TEST_CASE("HPKE Round-Trip")
     KEM::ID::DHKEM_P256_SHA256, KEM::ID::DHKEM_P384_SHA384,
       KEM::ID::DHKEM_P384_SHA384, KEM::ID::DHKEM_P521_SHA512,
 #if !defined(WITH_BORINGSSL)
-      KEM::ID::DHKEM_X448_SHA512
+      KEM::ID::DHKEM_X448_SHA512,
+#endif
+#if defined(WITH_PQ)
+      KEM::ID::MLKEM512, KEM::ID::MLKEM768, KEM::ID::MLKEM1024,
+      KEM::ID::MLKEM768_P256, KEM::ID::MLKEM768_X25519, KEM::ID::MLKEM1024_P384,
 #endif
   };
   const std::vector<KDF::ID> kdfs{ KDF::ID::HKDF_SHA256,

@@ -21,6 +21,15 @@ select_signature(Signature::ID id);
 bool
 supported_kem(KEM::ID id);
 
+bool
+supported_kdf(KDF::ID id);
+
+bool
+supported_aead(AEAD::ID id);
+
+bool
+supported(KEM::ID kem, KDF::ID kdf, AEAD::ID aead);
+
 const KEM&
 select_kem(KEM::ID id);
 

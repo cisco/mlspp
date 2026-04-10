@@ -97,8 +97,8 @@ protected:
 };
 
 template<typename T>
-void
-ostream_test(T val, const std::vector<uint8_t>& enc)
+static void
+ostream_test(const T& val, const std::vector<uint8_t>& enc)
 {
   MLS_NAMESPACE::tls::ostream w; // NOLINT(misc-const-correctness)
   w << val;
@@ -127,8 +127,8 @@ TEST_CASE_METHOD(TLSSyntaxTest, "TLS ostream")
 }
 
 template<typename T>
-void
-istream_test(T val, T& data, const std::vector<uint8_t>& enc)
+static void
+istream_test(const T& val, T& data, const std::vector<uint8_t>& enc)
 {
   MLS_NAMESPACE::tls::istream r(enc); // NOLINT(misc-const-correctness)
   r >> data;

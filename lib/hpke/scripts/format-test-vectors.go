@@ -63,10 +63,10 @@ func (b ByteString) MarhsalTLS() ([]byte, error) {
 }
 
 type EncryptionTestVector struct {
-	Plaintext  ByteString `json:"plaintext"`
+	Plaintext  ByteString `json:"pt"`
 	AAD        ByteString `json:"aad"`
 	Nonce      ByteString `json:"nonce"`
-	Ciphertext ByteString `json:"ciphertext"`
+	Ciphertext ByteString `json:"ct"`
 }
 
 type EncryptionTestVectors []EncryptionTestVector

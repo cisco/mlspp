@@ -76,6 +76,7 @@ DHKEM::get<KEM::ID::DHKEM_X448_SHA512>()
 
 DHKEM::DHKEM(KEM::ID kem_id_in, const Group& group_in, const KDF& kdf_in)
   : KEM(kem_id_in,
+        group_in.seed_size,
         kdf_in.hash_size,
         group_in.pk_size,
         group_in.pk_size,
