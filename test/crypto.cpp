@@ -145,7 +145,7 @@ TEST_CASE("External Signer - OpenSSL Wrapper")
   // It demonstrates how an application could wrap any external signing
   // mechanism.
 
-  for (auto suite_id : all_supported_suites) {
+  for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
 
     // Create a key at the HPKE layer (simulating an external key store)
