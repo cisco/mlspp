@@ -164,6 +164,9 @@ TEST_CASE("External Signer - OpenSSL Wrapper")
     // Verify the external key has correct public key
     REQUIRE(external_key.public_key.data == backend_pub_data);
 
+    // Verify it's not exportable
+    REQUIRE_FALSE(external_key.exportable());
+
     // Verify signing works
     const auto label = "test_label"s;
     auto message = from_hex("deadbeef");
@@ -172,6 +175,17 @@ TEST_CASE("External Signer - OpenSSL Wrapper")
 
     // Verify to_jwk throws for external signers
     REQUIRE_THROWS(external_key.to_jwk(suite));
+
+    // Verify serialization throws for non-exportable keys
+    REQUIRE_THROWS(tls::marshal(external_key));
+
+    // Verify a normal key is exportable and serializable
+    auto normal_key = SignaturePrivateKey::generate(suite);
+    REQUIRE(normal_key.exportable());
+    auto serialized = tls::marshal(normal_key);
+    auto deserialized = tls::get<SignaturePrivateKey>(serialized);
+    REQUIRE(deserialized.exportable());
+    REQUIRE(deserialized.data == normal_key.data);
   }
 }
 

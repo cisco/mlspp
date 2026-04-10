@@ -261,7 +261,37 @@ struct SignaturePrivateKey
   void set_public_key(CipherSuite suite);
   std::string to_jwk(CipherSuite suite) const;
 
-  TLS_SERIALIZABLE(data)
+  /// Returns true if this key can be serialized/exported
+  bool exportable() const { return !_sign_func; }
+
+  /// TLS serialization - throws if key is not exportable
+  friend tls::ostream& operator<<(tls::ostream& str,
+                                  const SignaturePrivateKey& obj)
+  {
+    if (!obj.exportable()) {
+      throw std::runtime_error(
+        "Cannot serialize non-exportable SignaturePrivateKey");
+    }
+    return str << obj.data;
+  }
+
+  friend tls::istream& operator>>(tls::istream& str, SignaturePrivateKey& obj)
+  {
+    obj._sign_func = nullptr;
+    return str >> obj.data;
+  }
+
+  friend bool operator==(const SignaturePrivateKey& lhs,
+                         const SignaturePrivateKey& rhs)
+  {
+    return lhs.data == rhs.data;
+  }
+
+  friend bool operator!=(const SignaturePrivateKey& lhs,
+                         const SignaturePrivateKey& rhs)
+  {
+    return !(lhs == rhs);
+  }
 
 private:
   SignerFunc _sign_func;
