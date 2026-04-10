@@ -1179,6 +1179,16 @@ EVPGroup::ExternalPrivateKey::ExternalPrivateKey(EVP_PKEY* pkey_in,
 {
 }
 
+std::unique_ptr<Signature::ExternalPrivateKey>
+EVPGroup::ExternalPrivateKey::clone() const
+{
+  if (1 != EVP_PKEY_up_ref(pkey.get())) {
+    throw openssl_error();
+  }
+  return std::make_unique<EVPGroup::ExternalPrivateKey>(
+    pkey.get(), is_exportable_, serialized_private_key_);
+}
+
 std::unique_ptr<Signature::PublicKey>
 EVPGroup::ExternalPrivateKey::public_key() const
 {

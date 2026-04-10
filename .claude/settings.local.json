@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.ietf.org)",
+      "Bash(git -C /Users/richbarn/Projects/mlspp diff 6a0b31e^..6a0b31e -- include/mls/crypto.h | head -60)",
+      "Bash(git -C /Users/richbarn/Projects/mlspp show 61e4d76 --stat | head -40)",
+      "Bash(grep -n \"Interop\" /Users/richbarn/Projects/mlspp/test/*.cpp | head -20)",
+      "WebFetch(domain:datatracker.ietf.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(grep:*)",
+      "Bash(git checkout:*)",
+      "Bash(make:*)",
+      "Bash(./build/lib/hpke/test/hpke_test)",
+      "Bash(gh api:*)",
+      "Bash(./build/test/mlspp_test)"
+    ]
+  }
+}

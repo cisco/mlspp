@@ -49,6 +49,9 @@ struct Signature
   {
     virtual ~ExternalPrivateKey() = default;
 
+    /// Clone this external key
+    virtual std::unique_ptr<ExternalPrivateKey> clone() const = 0;
+
     /// Get the public key corresponding to this private key
     virtual std::unique_ptr<PublicKey> public_key() const = 0;
 

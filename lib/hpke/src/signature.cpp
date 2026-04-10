@@ -24,21 +24,23 @@ namespace MLS_NAMESPACE::hpke {
 /// integrations where the signing is done externally.
 struct CallbackExternalPrivateKey : public Signature::ExternalPrivateKey
 {
-  CallbackExternalPrivateKey(std::unique_ptr<Signature::PublicKey> pub_in,
+  CallbackExternalPrivateKey(const Signature& sig_in,
+                             bytes pub_data_in,
                              Signature::ExternalSignCallback callback_in)
-    : pub(std::move(pub_in))
+    : sig(sig_in)
+    , pub_data(std::move(pub_data_in))
     , callback(std::move(callback_in))
   {
   }
 
+  std::unique_ptr<Signature::ExternalPrivateKey> clone() const override
+  {
+    return std::make_unique<CallbackExternalPrivateKey>(sig, pub_data, callback);
+  }
+
   std::unique_ptr<Signature::PublicKey> public_key() const override
   {
-    // We need to clone the public key, but we don't have a clone method.
-    // For now, this returns nullptr and callers should use get_public_key()
-    // This is a limitation that could be addressed by adding a clone method
-    // to PublicKey, or by storing the serialized form.
-    throw std::runtime_error(
-      "Cannot clone public key from CallbackExternalPrivateKey");
+    return sig.deserialize(pub_data);
   }
 
   bool exportable() const override { return false; }
@@ -49,13 +51,11 @@ struct CallbackExternalPrivateKey : public Signature::ExternalPrivateKey
     throw std::runtime_error("Callback-based keys are not exportable");
   }
 
-  // Direct access to public key for callers that need it
-  const Signature::PublicKey& get_public_key() const { return *pub; }
-
   // Direct access to callback for signing
   bytes do_sign(const bytes& data) const { return callback(data); }
 
-  std::unique_ptr<Signature::PublicKey> pub;
+  const Signature& sig;
+  bytes pub_data;
   Signature::ExternalSignCallback callback;
 };
 
@@ -419,8 +419,9 @@ std::unique_ptr<Signature::ExternalPrivateKey>
 Signature::external_key_from_callback(std::unique_ptr<PublicKey> pub,
                                       ExternalSignCallback callback) const
 {
-  return std::make_unique<CallbackExternalPrivateKey>(std::move(pub),
-                                                      std::move(callback));
+  auto pub_data = serialize(*pub);
+  return std::make_unique<CallbackExternalPrivateKey>(
+    *this, std::move(pub_data), std::move(callback));
 }
 
 } // namespace MLS_NAMESPACE::hpke

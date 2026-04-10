@@ -148,25 +148,25 @@ TEST_CASE("External Signature Key - Callback")
   for (auto suite_id : all_supported_cipher_suites) {
     auto suite = CipherSuite{ suite_id };
 
-    // Create a "backend" key that will do the actual signing
+    // Create a "backend" key at the HPKE layer that will do the actual signing
     // In a real scenario, this would be in a secure enclave
-    auto backend_key = SignaturePrivateKey::generate(suite);
+    const auto& sig = suite.sig();
+    auto backend_priv = sig.generate_key_pair();
+    auto backend_pub = backend_priv->public_key();
+    auto backend_pub_data = sig.serialize(*backend_pub);
 
-    // Create an external key using a callback that delegates to backend_key
+    // Create an external key using a callback that delegates to backend_priv
     auto external_key = SignaturePrivateKey::from_external_callback(
       suite,
-      backend_key.public_key,
+      SignaturePublicKey{ backend_pub_data },
       [&](const bytes& data) {
         // In reality, this would call into secure enclave / HSM
         // For testing, we just sign with our backend key directly
-        // Note: we need to use the raw HPKE sign, not the labeled one
-        const auto& sig = suite.sig();
-        auto priv = sig.deserialize_private(backend_key.data);
-        return sig.sign(data, *priv);
+        return sig.sign(data, *backend_priv);
       });
 
     // Verify the external key has correct public key
-    REQUIRE(external_key.public_key == backend_key.public_key);
+    REQUIRE(external_key.public_key.data == backend_pub_data);
 
     // Verify it's not exportable
     REQUIRE_FALSE(external_key.exportable());

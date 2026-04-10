@@ -286,9 +286,6 @@ struct SignaturePrivateKey
 
   SignaturePrivateKey() = default;
 
-  /// Raw private key data (empty for non-exportable keys)
-  bytes data;
-
   /// The corresponding public key
   SignaturePublicKey public_key;
 
@@ -306,9 +303,25 @@ struct SignaturePrivateKey
   /// Export to JWK format (throws if !exportable())
   std::string to_jwk(CipherSuite suite) const;
 
-  // Note: SignaturePrivateKey is intentionally NOT TLS serializable.
-  // Non-exportable keys cannot be serialized, and applications should
-  // handle key persistence separately (e.g., storing key URIs).
+  /// TLS serialization - throws if key is not exportable
+  friend tls::ostream& operator<<(tls::ostream& str,
+                                  const SignaturePrivateKey& obj)
+  {
+    if (!obj.exportable()) {
+      throw std::runtime_error(
+        "Cannot serialize non-exportable SignaturePrivateKey");
+    }
+    return str << opt::get(obj.data_);
+  }
+
+  friend tls::istream& operator>>(tls::istream& str, SignaturePrivateKey& obj)
+  {
+    bytes data;
+    str >> data;
+    obj.data_ = std::move(data);
+    obj.external_key_ = nullptr;
+    return str;
+  }
 
   /// Equality comparison based on public keys.
   /// For cryptographic keys, the public key uniquely identifies the key pair.
@@ -325,13 +338,25 @@ struct SignaturePrivateKey
   }
 
 private:
+  /// Raw private key data (empty for non-exportable keys)
+  std::optional<bytes> data_;
+
   /// Handle to external (possibly non-exportable) key
-  std::shared_ptr<hpke::Signature::ExternalPrivateKey> external_key_;
+  std::unique_ptr<hpke::Signature::ExternalPrivateKey> external_key_;
 
   SignaturePrivateKey(bytes priv_data, bytes pub_data);
   SignaturePrivateKey(
-    std::shared_ptr<hpke::Signature::ExternalPrivateKey> external_key,
-    bytes pub_data);
+    std::unique_ptr<hpke::Signature::ExternalPrivateKey> external_key,
+    CipherSuite suite);
+
+public:
+  // Copy operations (clone external key if present)
+  SignaturePrivateKey(const SignaturePrivateKey& other);
+  SignaturePrivateKey& operator=(const SignaturePrivateKey& other);
+
+  // Move operations
+  SignaturePrivateKey(SignaturePrivateKey&& other) noexcept = default;
+  SignaturePrivateKey& operator=(SignaturePrivateKey&& other) noexcept = default;
 };
 
 } // namespace MLS_NAMESPACE

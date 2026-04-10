@@ -115,6 +115,7 @@ struct EVPGroup : public Group
                        bytes serialized_priv = {});
     ~ExternalPrivateKey() override = default;
 
+    std::unique_ptr<Signature::ExternalPrivateKey> clone() const override;
     std::unique_ptr<Signature::PublicKey> public_key() const override;
     bool exportable() const override;
     std::unique_ptr<Signature::PrivateKey> to_exportable(
