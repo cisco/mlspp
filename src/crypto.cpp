@@ -184,7 +184,7 @@ CipherSuite::get() const
       return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
 #endif
 
-#if !defined(P256_SHA256)
+#if defined(WITH_PQ)
     case ID::MLKEM768X25519_AES256GCM_SHA384_Ed25519:
       return ciphers_MLKEM768X25519_AES256GCM_SHA384_Ed25519;
 
