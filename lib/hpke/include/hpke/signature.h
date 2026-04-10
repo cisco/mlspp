@@ -63,7 +63,8 @@ struct Signature
       const Signature& sig) const = 0;
   };
 
-  /// Type for external signing callbacks (used by BoringSSL and custom backends)
+  /// Type for external signing callbacks (used by BoringSSL and custom
+  /// backends)
   using ExternalSignCallback = std::function<bytes(const bytes& data)>;
 
   const ID id;

@@ -356,7 +356,8 @@ public:
 
   // Move operations
   SignaturePrivateKey(SignaturePrivateKey&& other) noexcept = default;
-  SignaturePrivateKey& operator=(SignaturePrivateKey&& other) noexcept = default;
+  SignaturePrivateKey& operator=(SignaturePrivateKey&& other) noexcept =
+    default;
 };
 
 } // namespace MLS_NAMESPACE

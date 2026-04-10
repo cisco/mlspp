@@ -1171,8 +1171,8 @@ Group::Group(ID group_id_in, const KDF& kdf_in)
 ///
 
 EVPGroup::ExternalPrivateKey::ExternalPrivateKey(EVP_PKEY* pkey_in,
-                                                  bool is_exportable,
-                                                  bytes serialized_priv)
+                                                 bool is_exportable,
+                                                 bytes serialized_priv)
   : pkey(pkey_in, typed_delete<EVP_PKEY>)
   , is_exportable_(is_exportable)
   , serialized_private_key_(std::move(serialized_priv))
@@ -1221,7 +1221,7 @@ EVPGroup::ExternalPrivateKey::to_exportable(const Signature& sig) const
 
 bytes
 EVPGroup::ExternalPrivateKey::sign(const bytes& data,
-                                    const EVPGroup& group) const
+                                   const EVPGroup& group) const
 {
   auto ctx = make_typed_unique(EVP_MD_CTX_create());
   if (ctx == nullptr) {
@@ -1322,8 +1322,8 @@ EVPGroup::load_external_key(const std::string& uri) const
 
   static const std::string engine_prefix = "engine:";
   if (uri.rfind(engine_prefix, 0) != 0) {
-    throw std::runtime_error("Unsupported key URI scheme. Expected 'engine:': " +
-                             uri);
+    throw std::runtime_error(
+      "Unsupported key URI scheme. Expected 'engine:': " + uri);
   }
 
   auto remainder = uri.substr(engine_prefix.size());
@@ -1362,10 +1362,9 @@ EVPGroup::load_external_key(const std::string& uri) const
 #else
   // BoringSSL: No built-in support for external key stores
   // Use external_key_from_callback() instead
-  throw std::runtime_error(
-    "External key loading not supported with BoringSSL. "
-    "Use external_key_from_callback() instead: " +
-    uri);
+  throw std::runtime_error("External key loading not supported with BoringSSL. "
+                           "Use external_key_from_callback() instead: " +
+                           uri);
 #endif
 }
 

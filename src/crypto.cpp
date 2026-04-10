@@ -489,7 +489,8 @@ SignaturePrivateKey::derive(CipherSuite suite, const bytes& secret)
 }
 
 SignaturePrivateKey
-SignaturePrivateKey::from_external(CipherSuite suite, const std::string& key_uri)
+SignaturePrivateKey::from_external(CipherSuite suite,
+                                   const std::string& key_uri)
 {
   auto external_key = suite.sig().load_external_key(key_uri);
   if (external_key == nullptr) {
@@ -506,8 +507,8 @@ SignaturePrivateKey::from_external_callback(
   std::function<bytes(const bytes&)> sign_callback)
 {
   auto pub = suite.sig().deserialize(pub_key.data);
-  auto external_key =
-    suite.sig().external_key_from_callback(std::move(pub), std::move(sign_callback));
+  auto external_key = suite.sig().external_key_from_callback(
+    std::move(pub), std::move(sign_callback));
 
   return SignaturePrivateKey{ std::move(external_key), suite };
 }
@@ -575,7 +576,8 @@ SignaturePrivateKey::operator=(const SignaturePrivateKey& other)
   if (this != &other) {
     public_key = other.public_key;
     data_ = other.data_;
-    external_key_ = other.external_key_ ? other.external_key_->clone() : nullptr;
+    external_key_ =
+      other.external_key_ ? other.external_key_->clone() : nullptr;
   }
   return *this;
 }

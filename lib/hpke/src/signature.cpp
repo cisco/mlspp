@@ -35,7 +35,8 @@ struct CallbackExternalPrivateKey : public Signature::ExternalPrivateKey
 
   std::unique_ptr<Signature::ExternalPrivateKey> clone() const override
   {
-    return std::make_unique<CallbackExternalPrivateKey>(sig, pub_data, callback);
+    return std::make_unique<CallbackExternalPrivateKey>(
+      sig, pub_data, callback);
   }
 
   std::unique_ptr<Signature::PublicKey> public_key() const override
@@ -349,14 +350,13 @@ static const Signature&
 sig_from_jwk(const std::string& jwk_json)
 {
   using KeyTypeAndCurve = std::tuple<std::string, std::string>;
-  static const auto alg_sig_map = std::map<KeyTypeAndCurve, const Signature&>
-  {
+  static const auto alg_sig_map = std::map<KeyTypeAndCurve, const Signature&>{
     { { "EC", "P-256" }, Signature::get<Signature::ID::P256_SHA256>() },
-      { { "EC", "P-384" }, Signature::get<Signature::ID::P384_SHA384>() },
-      { { "EC", "P-512" }, Signature::get<Signature::ID::P521_SHA512>() },
-      { { "OKP", "Ed25519" }, Signature::get<Signature::ID::Ed25519>() },
+    { { "EC", "P-384" }, Signature::get<Signature::ID::P384_SHA384>() },
+    { { "EC", "P-512" }, Signature::get<Signature::ID::P521_SHA512>() },
+    { { "OKP", "Ed25519" }, Signature::get<Signature::ID::Ed25519>() },
 #if !defined(WITH_BORINGSSL)
-      { { "OKP", "Ed448" }, Signature::get<Signature::ID::Ed448>() },
+    { { "OKP", "Ed448" }, Signature::get<Signature::ID::Ed448>() },
 #endif
     // TODO(RLB): RSA
   };
@@ -411,7 +411,8 @@ Signature::parse_jwk(const std::string& jwk_json)
 std::unique_ptr<Signature::ExternalPrivateKey>
 Signature::load_external_key(const std::string& /* uri */) const
 {
-  // Base implementation returns nullptr - subclasses override for actual support
+  // Base implementation returns nullptr - subclasses override for actual
+  // support
   return nullptr;
 }
 

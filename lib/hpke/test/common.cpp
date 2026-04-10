@@ -49,8 +49,7 @@ fips_disable(AEAD::ID id)
 bool
 fips_disable(Signature::ID id)
 {
-  static const auto disabled = std::set<Signature::ID>
-  {
+  static const auto disabled = std::set<Signature::ID>{
 #if !defined(WITH_BORINGSSL)
     Signature::ID::Ed448,
 #endif

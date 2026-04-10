@@ -129,7 +129,7 @@ struct EVPGroup : public Group
 
   private:
     bool is_exportable_;
-    bytes serialized_private_key_;  // Stored for exportable keys
+    bytes serialized_private_key_; // Stored for exportable keys
   };
 
   std::unique_ptr<Group::PrivateKey> generate_key_pair() const override;
@@ -143,8 +143,7 @@ struct EVPGroup : public Group
               const Group::PublicKey& pk) const override;
 
   /// Sign using an external (possibly non-exportable) key
-  bytes sign_external(const bytes& data,
-                      const ExternalPrivateKey& sk) const;
+  bytes sign_external(const bytes& data, const ExternalPrivateKey& sk) const;
 
   /// Load an external key from a provider URI (OpenSSL 3.x) or ENGINE (1.1.x)
   std::unique_ptr<ExternalPrivateKey> load_external_key(

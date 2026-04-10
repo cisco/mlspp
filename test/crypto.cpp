@@ -157,9 +157,7 @@ TEST_CASE("External Signature Key - Callback")
 
     // Create an external key using a callback that delegates to backend_priv
     auto external_key = SignaturePrivateKey::from_external_callback(
-      suite,
-      SignaturePublicKey{ backend_pub_data },
-      [&](const bytes& data) {
+      suite, SignaturePublicKey{ backend_pub_data }, [&](const bytes& data) {
         // In reality, this would call into secure enclave / HSM
         // For testing, we just sign with our backend key directly
         return sig.sign(data, *backend_priv);
@@ -193,7 +191,8 @@ TEST_CASE("External Signature Key - Invalid URI")
 #elif defined(WITH_OPENSSL3)
   // OpenSSL 3: Invalid store URIs
   REQUIRE_THROWS(SignaturePrivateKey::from_external(suite, "invalid:"));
-  REQUIRE_THROWS(SignaturePrivateKey::from_external(suite, "file:///nonexistent"));
+  REQUIRE_THROWS(
+    SignaturePrivateKey::from_external(suite, "file:///nonexistent"));
 #else
   // OpenSSL 1.1.x: Engine URIs need proper format
   REQUIRE_THROWS(SignaturePrivateKey::from_external(suite, "invalid"));
@@ -217,8 +216,8 @@ TEST_CASE("External Signature Key - File URI", "[external-file]")
 
   // Create a temporary PEM file
   // For P-256, we need to create an EC key in PEM format
-  // We'll use the JWK export and then skip this test if we can't create the file
-  // Actually, let's just test with a pre-generated key file
+  // We'll use the JWK export and then skip this test if we can't create the
+  // file Actually, let's just test with a pre-generated key file
 
   // Check if a test key file is provided
   const char* key_file = std::getenv("MLSPP_TEST_KEY_FILE");
@@ -279,11 +278,15 @@ TEST_CASE("External Signature Key - macOS Keychain")
   auto suite = CipherSuite{ CipherSuite::ID::P256_AES128GCM_SHA256_P256 };
 
   // Generate a temporary key in the Keychain
-  CFReleaser<CFMutableDictionaryRef> attributes(CFDictionaryCreateMutable(
-    kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+  CFReleaser<CFMutableDictionaryRef> attributes(
+    CFDictionaryCreateMutable(kCFAllocatorDefault,
+                              0,
+                              &kCFTypeDictionaryKeyCallBacks,
+                              &kCFTypeDictionaryValueCallBacks));
   REQUIRE(attributes.get() != nullptr);
 
-  CFDictionarySetValue(attributes, kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom);
+  CFDictionarySetValue(
+    attributes, kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom);
   int keySize = 256;
   CFReleaser<CFNumberRef> keySizeNum(
     CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &keySize));
@@ -306,13 +309,15 @@ TEST_CASE("External Signature Key - macOS Keychain")
   REQUIRE(publicKey.get() != nullptr);
 
   // Export public key to get bytes for MLS
-  CFReleaser<CFDataRef> pubKeyData(SecKeyCopyExternalRepresentation(publicKey, &error));
+  CFReleaser<CFDataRef> pubKeyData(
+    SecKeyCopyExternalRepresentation(publicKey, &error));
   if (error) {
     CFRelease(error);
     FAIL("Failed to export public key");
   }
 
-  // The exported format is ANSI X9.63 (04 || x || y), which is what MLS expects for P-256
+  // The exported format is ANSI X9.63 (04 || x || y), which is what MLS expects
+  // for P-256
   bytes pub_bytes(CFDataGetLength(pubKeyData));
   memcpy(pub_bytes.data(), CFDataGetBytePtr(pubKeyData), pub_bytes.size());
 
@@ -327,8 +332,11 @@ TEST_CASE("External Signature Key - macOS Keychain")
         CFDataCreate(kCFAllocatorDefault, data.data(), data.size()));
 
       CFErrorRef signError = nullptr;
-      CFReleaser<CFDataRef> signature(SecKeyCreateSignature(
-        privKeyRef, kSecKeyAlgorithmECDSASignatureMessageX962SHA256, dataRef, &signError));
+      CFReleaser<CFDataRef> signature(
+        SecKeyCreateSignature(privKeyRef,
+                              kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
+                              dataRef,
+                              &signError));
 
       if (signError || !signature.get()) {
         if (signError) {
