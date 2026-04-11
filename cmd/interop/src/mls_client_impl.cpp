@@ -84,7 +84,7 @@ MLSClientImpl::SupportedCiphersuites(
   SupportedCiphersuitesResponse* reply)
 {
   reply->clear_ciphersuites();
-  for (const auto suite : MLS_NAMESPACE::all_supported_suites) {
+  for (const auto suite : MLS_NAMESPACE::all_supported_cipher_suites) {
     reply->add_ciphersuites(static_cast<uint32_t>(suite));
   }
   return Status::OK;
