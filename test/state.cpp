@@ -1575,3 +1575,172 @@ TEST_CASE_METHOD(ExternalSenderTest,
   REQUIRE_THROWS_WITH(states[0].handle(external_init_message),
                       "Invalid external proposal");
 }
+
+TEST_CASE_METHOD(StateTest, "Reject Commit with Duplicate ApplicationIDExtension")
+{
+  // This test verifies RFC 9420 Section 12.2 requirement:
+  // A commit must not contain an Add proposal with a KeyPackage that represents
+  // a client already in the group according to the application-level identity.
+
+  const auto app_id = from_ascii("duplicate-app-id");
+
+  // Create two key packages with the SAME ApplicationIDExtension
+  auto [init0, leaf0, id0, kp0] = make_client();
+  kp0.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp0.leaf_node.sign(suite, id0, std::nullopt);
+  kp0.sign(id0);
+
+  auto [init1, leaf1, id1, kp1] = make_client();
+  kp1.leaf_node.extensions.add(ApplicationIDExtension{ app_id });  // SAME app_id
+  kp1.leaf_node.sign(suite, id1, std::nullopt);
+  kp1.sign(id1);
+
+  // Initialize the creator's state with the first key package
+  auto first0 = State{ group_id, suite, leaf0, id0, kp0.leaf_node, {} };
+
+  // Try to add the second member with duplicate ApplicationIDExtension
+  auto add = first0.add_proposal(kp1);
+
+  // This commit should be rejected because kp1 has the same ApplicationIDExtension
+  // as the creator (kp0)
+  REQUIRE_THROWS_WITH(
+    first0.commit(fresh_secret(), CommitOpts{ { add }, true, false, {} }, {}),
+    "Invalid proposal list");
+}
+
+TEST_CASE_METHOD(StateTest, "Reject Commit with Duplicate ApplicationIDExtension Across Add Proposals")
+{
+  const auto app_id = from_ascii("dup-across-adds");
+
+  // Creator has a different app-id
+  auto [init0, leaf0, id0, kp0] = make_client();
+  kp0.leaf_node.extensions.add(ApplicationIDExtension{ from_ascii("creator-id") });
+  kp0.leaf_node.sign(suite, id0, std::nullopt);
+  kp0.sign(id0);
+
+  // Two new members with the SAME app-id (neither is in the tree)
+  auto [init1, leaf1, id1, kp1] = make_client();
+  kp1.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp1.leaf_node.sign(suite, id1, std::nullopt);
+  kp1.sign(id1);
+
+  auto [init2, leaf2, id2, kp2] = make_client();
+  kp2.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp2.leaf_node.sign(suite, id2, std::nullopt);
+  kp2.sign(id2);
+
+  auto first0 = State{ group_id, suite, leaf0, id0, kp0.leaf_node, {} };
+
+  auto add1 = first0.add_proposal(kp1);
+  auto add2 = first0.add_proposal(kp2);
+
+  REQUIRE_THROWS_WITH(
+    first0.commit(fresh_secret(), CommitOpts{ { add1, add2 }, true, false, {} }, {}),
+    "Invalid proposal list");
+}
+
+TEST_CASE_METHOD(StateTest, "Reject Commit with Update and Add of Same ApplicationIDExtension")
+{
+  const auto app_id = from_ascii("updated-member-id");
+
+  // Creator with an app-id
+  auto [init0, leaf0, id0, kp0] = make_client();
+  kp0.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp0.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
+  kp0.leaf_node.sign(suite, id0, std::nullopt);
+  kp0.sign(id0);
+
+  // Second member with a different app-id
+  auto [init1, leaf1, id1, kp1] = make_client();
+  kp1.leaf_node.extensions.add(ApplicationIDExtension{ from_ascii("other-id") });
+  kp1.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
+  kp1.leaf_node.sign(suite, id1, std::nullopt);
+  kp1.sign(id1);
+
+  auto first0 = State{ group_id, suite, leaf0, id0, kp0.leaf_node, {} };
+
+  auto add1 = first0.add_proposal(kp1);
+  auto [commit1, welcome1, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+
+  auto second1 = State{ init1, leaf1, id1, kp1, welcome1, std::nullopt, {} };
+
+  // Second member proposes an Update (they stay in the group)
+  auto update = second1.update(HPKEPrivateKey::derive( second1.cipher_suite(), fresh_secret()), {}, {});
+  first1.handle(update);
+
+  // Now try to add a new member with the SAME app-id as the member being updated
+  auto [init2, leaf2, id2, kp2] = make_client();
+  kp2.leaf_node.extensions.add(ApplicationIDExtension{ from_ascii("other-id") });
+  kp2.leaf_node.sign(suite, id2, std::nullopt);
+  kp2.sign(id2);
+
+  auto add2 = first1.add_proposal(kp2);
+
+  // Should be rejected: the updated member is still in the group with that app-id
+  REQUIRE_THROWS_WITH(
+    first1.commit(fresh_secret(), CommitOpts{ { add2 }, true, false, {} }, {}),
+    "Invalid proposal list");
+}
+
+TEST_CASE_METHOD(StateTest, "Allow Commit with Remove and Re-Add Same ApplicationIDExtension")
+{
+  // This test verifies that removing a member and adding a new member with the
+  // same ApplicationIDExtension in the same commit is allowed (e.g., device replacement)
+
+  const auto app_id = from_ascii("reused-app-id");
+
+  // Create first member with ApplicationIDExtension
+  auto [init0, leaf0, id0, kp0] = make_client();
+  kp0.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp0.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
+  kp0.leaf_node.sign(suite, id0, std::nullopt);
+  kp0.sign(id0);
+
+  // Create second member with DIFFERENT ApplicationIDExtension
+  auto [init1, leaf1, id1, kp1] = make_client();
+  auto different_app_id = from_ascii("different-app-id");
+  kp1.leaf_node.extensions.add(ApplicationIDExtension{ different_app_id });
+  kp1.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
+  kp1.leaf_node.sign(suite, id1, std::nullopt);
+  kp1.sign(id1);
+
+  // Initialize the group with first member
+  auto first0 = State{ group_id, suite, leaf0, id0, kp0.leaf_node, {} };
+
+  // Add second member
+  auto add1 = first0.add_proposal(kp1);
+  auto [commit1, welcome1, first1] =
+    first0.commit(fresh_secret(), CommitOpts{ { add1 }, true, false, {} }, {});
+
+  auto second1 = State{ init1, leaf1, id1, kp1, welcome1, std::nullopt, {} };
+
+  // Verify both members are in the group
+  REQUIRE(first1.roster().size() == 2);
+  REQUIRE(second1.roster().size() == 2);
+
+  // Create a replacement key package with the SAME ApplicationIDExtension as kp1
+  auto [init2, leaf2, id2, kp2] = make_client();
+  kp2.leaf_node.extensions.add(ApplicationIDExtension{ different_app_id });  // SAME as kp1
+  kp2.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
+  kp2.leaf_node.sign(suite, id2, std::nullopt);
+  kp2.sign(id2);
+
+  // Remove the second member and add replacement in the same commit
+  auto remove = first1.remove_proposal(LeafIndex{ 1 });
+  auto add2 = first1.add_proposal(kp2);
+
+  // This should succeed because we're removing the old member before adding the new one
+  auto [commit2, welcome2, first2] =
+    first1.commit(fresh_secret(), CommitOpts{ { remove, add2 }, true, false, {} }, {});
+
+  // Verify the replacement succeeded
+  REQUIRE(first2.roster().size() == 2);
+
+  auto third2 = State{ init2, leaf2, id2, kp2, welcome2, std::nullopt, {} };
+  REQUIRE(third2.roster().size() == 2);
+
+  // Verify group functionality
+  auto group = std::vector<State>{ first2, third2 };
+  verify_group_functionality(group);
+}

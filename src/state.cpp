@@ -1975,7 +1975,51 @@ State::valid_normal(const std::vector<CachedProposal>& proposals,
   // It contains an Add proposal with a KeyPackage that represents a client
   // already in the group according to the application, unless there is a Remove
   // proposal in the list removing the matching client from the group.
-  // TODO(RLB)
+  auto removed_leaves = std::set<LeafIndex>{};
+  for (const auto& cached : proposals) {
+    if (cached.proposal.proposal_type() == ProposalType::remove) {
+      removed_leaves.insert(var::get<Remove>(cached.proposal.content).removed);
+    }
+  }
+
+  auto current_app_ids = std::set<bytes>{};
+  _tree.all_leaves([&](auto index, const auto& leaf) {
+    if (removed_leaves.count(index) > 0) {
+      return true;
+    }
+    auto maybe_app_id = leaf.extensions.template find<ApplicationIDExtension>();
+    if (maybe_app_id) {
+      current_app_ids.insert(opt::get(maybe_app_id).id);
+    }
+    return true;
+  });
+
+  auto proposal_app_ids = std::set<bytes>{};
+  const auto has_dup_app_id = stdx::any_of(proposals, [&](const auto& cached) {
+    if (cached.proposal.proposal_type() != ProposalType::add) {
+      return false;
+    }
+
+    auto key_package = var::get<Add>(cached.proposal.content).key_package;
+    auto maybe_app_id =
+      key_package.leaf_node.extensions.template find<ApplicationIDExtension>();
+    if (!maybe_app_id) {
+      return false;
+    }
+
+    auto app_id = opt::get(maybe_app_id).id;
+
+    if (stdx::contains(current_app_ids, app_id)) {
+      return true;
+    }
+
+    if (stdx::contains(proposal_app_ids, app_id)) {
+      return true;
+    }
+
+    proposal_app_ids.insert(app_id);
+    return false;
+  });
 
   // It contains multiple PreSharedKey proposals that reference the same
   // PreSharedKeyID.
@@ -2058,7 +2102,7 @@ State::valid_normal(const std::vector<CachedProposal>& proposals,
   return !(has_invalid_proposal || has_self_update || has_self_remove ||
            has_dup_update_remove || has_dup_signature_key || has_dup_psk_id ||
            has_multiple_gce || has_reinit || has_external_init ||
-           has_dup_enc_key);
+           has_dup_enc_key || has_dup_app_id);
 }
 
 bool
