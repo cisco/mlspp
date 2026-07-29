@@ -1,0 +1,7 @@
+version: 2
+secret:
+  ignored_paths:
+    - '**/tests/**/*'
+    - '**/test_*.py'
+    - '**/scripts/**/*'
+    - 'spec/**/*.js'
