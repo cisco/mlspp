@@ -1592,8 +1592,7 @@ TEST_CASE_METHOD(StateTest,
   kp0.sign(id0);
 
   auto [init1, leaf1, id1, kp1] = make_client();
-  // SAME app_id
-  kp1.leaf_node.extensions.add(ApplicationIDExtension{ app_id });
+  kp1.leaf_node.extensions.add(ApplicationIDExtension{ app_id }); // SAME app_id
   kp1.leaf_node.sign(suite, id1, std::nullopt);
   kp1.sign(id1);
 
@@ -1700,9 +1699,9 @@ TEST_CASE_METHOD(
   StateTest,
   "Allow Commit with Remove and Re-Add Same ApplicationIDExtension")
 {
-  // This test verifies that removing a member and adding a new member with
-  // the same ApplicationIDExtension in the same commit is allowed (e.g.,
-  // device replacement)
+  // This test verifies that removing a member and adding a new member with the
+  // same ApplicationIDExtension in the same commit is allowed (e.g., device
+  // replacement)
 
   const auto app_id = from_ascii("reused-app-id");
 
@@ -1735,10 +1734,11 @@ TEST_CASE_METHOD(
   REQUIRE(first1.roster().size() == 2);
   REQUIRE(second1.roster().size() == 2);
 
-  // Create a replacement key package with the SAME ApplicationIDExtension
-  // as kp1
+  // Create a replacement key package with the SAME ApplicationIDExtension as
+  // kp1
   auto [init2, leaf2, id2, kp2] = make_client();
-  kp2.leaf_node.extensions.add(ApplicationIDExtension{ different_app_id });
+  kp2.leaf_node.extensions.add(
+    ApplicationIDExtension{ different_app_id }); // SAME as kp1
   kp2.leaf_node.capabilities.extensions.push_back(ApplicationIDExtension::type);
   kp2.leaf_node.sign(suite, id2, std::nullopt);
   kp2.sign(id2);
@@ -1747,8 +1747,8 @@ TEST_CASE_METHOD(
   auto remove = first1.remove_proposal(LeafIndex{ 1 });
   auto add2 = first1.add_proposal(kp2);
 
-  // This should succeed because we're removing the old member before adding
-  // the new one
+  // This should succeed because we're removing the old member before adding the
+  // new one
   auto [commit2, welcome2, first2] = first1.commit(
     fresh_secret(), CommitOpts{ { remove, add2 }, true, false, {} }, {});
 

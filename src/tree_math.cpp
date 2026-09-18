@@ -14,7 +14,7 @@ log2(uint32_t x)
   }
 
   uint32_t k = 0;
-  while ((x >> k) > 0) {
+  while (k < 32 && (x >> k) > 0) {
     k += 1;
   }
   return k - 1;

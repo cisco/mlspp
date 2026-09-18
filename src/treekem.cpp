@@ -729,6 +729,47 @@ TreeKEMPublicKey::slice_path(UpdatePath path,
 void
 TreeKEMPublicKey::implant_slice_unchecked(const TreeSlice& slice)
 {
+  // Validate TreeSlice parameters before any tree math operations to prevent
+  // malformed inputs from triggering undefined behavior in log2() or other
+  // tree operations. A genuine slice must have consistent n_leaves with the
+  // node vectors it carries.
+
+  // Check basic bounds
+  if (slice.n_leaves.val == 0 || slice.n_leaves.val > 100000) {
+    throw InvalidParameterError("Malformed tree slice (invalid n_leaves)");
+  }
+
+  if (slice.leaf_index.val >= slice.n_leaves.val) {
+    throw InvalidParameterError(
+      "Malformed tree slice (leaf index out of bounds)");
+  }
+
+  // Limit path sizes to prevent resource exhaustion
+  const auto max_depth = size_t(20);
+  if (slice.direct_path_nodes.size() > max_depth + 1 ||
+      slice.copath_hashes.size() > max_depth) {
+    throw InvalidParameterError("Malformed tree slice (oversized paths)");
+  }
+
+  // The direct path of a leaf in a tree of n leaves has log2(NodeCount(n))
+  // entries. Require the declared size to match the supplied vectors so a
+  // forged n_leaves cannot be larger than the evidence supplied for it.
+  {
+    const auto w = uint64_t{ 2 } * (uint64_t{ slice.n_leaves.val } - 1) + 1;
+    auto depth = size_t(0);
+    while ((w >> depth) > 1) {
+      depth += 1;
+    }
+    // dirpath includes the leaf itself after the insert below, so the
+    // serialized vector must have depth + 1 entries (or 1 for a
+    // single-leaf tree whose dirpath is empty).
+    const auto expected_dirpath = (slice.n_leaves.val == 1) ? 1 : depth + 1;
+    if (slice.direct_path_nodes.size() != expected_dirpath) {
+      throw InvalidParameterError(
+        "Malformed tree slice (direct path does not match declared size)");
+    }
+  }
+
   const auto n = NodeIndex(slice.leaf_index);
   auto dirpath = n.dirpath(size);
   dirpath.insert(dirpath.begin(), n);
