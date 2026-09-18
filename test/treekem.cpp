@@ -306,3 +306,133 @@ TEST_CASE("TreeKEM Interop", "[.][all]")
     }
   }
 }
+
+TEST_CASE_METHOD(TreeKEMTest,
+                 "Security: Reject malformed TreeSlice with zero n_leaves")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 0 };
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(TreeKEMTest,
+                 "Security: Reject malformed TreeSlice with excessive n_leaves")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 0x40000001u };
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(
+  TreeKEMTest,
+  "Security: Reject malformed TreeSlice with n_leaves exceeding limit")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 100001 };
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(
+  TreeKEMTest,
+  "Security: Accept well-formed TreeSlice at n_leaves limit boundary")
+{
+  const auto n_leaves = LeafCount{ 100000 };
+  const auto leaf_index = LeafIndex{ 0 };
+  const auto n = NodeIndex(leaf_index);
+
+  auto dirpath = n.dirpath(n_leaves);
+  dirpath.insert(dirpath.begin(), n);
+  const auto copath = n.copath(n_leaves);
+
+  TreeSlice slice;
+  slice.leaf_index = leaf_index;
+  slice.n_leaves = n_leaves;
+  slice.direct_path_nodes = std::vector<OptionalNode>(dirpath.size());
+  slice.copath_hashes = std::vector<bytes>(copath.size());
+
+  REQUIRE_NOTHROW(TreeKEMPublicKey(suite, slice));
+}
+
+TEST_CASE_METHOD(
+  TreeKEMTest,
+  "Security: Reject malformed TreeSlice with leaf_index out of bounds")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 10 };
+  slice.n_leaves = LeafCount{ 5 };
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(
+  TreeKEMTest,
+  "Security: Reject malformed TreeSlice with oversized direct_path")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 10 };
+
+  for (size_t i = 0; i < 22; ++i) {
+    slice.direct_path_nodes.push_back(OptionalNode{});
+  }
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(TreeKEMTest,
+                 "Security: Reject malformed TreeSlice with oversized copath")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 10 };
+
+  for (size_t i = 0; i < 21; ++i) {
+    slice.copath_hashes.push_back(bytes{});
+  }
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE_METHOD(TreeKEMTest,
+                 "Security: Reject TreeSlice with mismatched direct_path size")
+{
+  TreeSlice slice;
+  slice.leaf_index = LeafIndex{ 0 };
+  slice.n_leaves = LeafCount{ 100 };
+
+  for (size_t i = 0; i < 5; ++i) {
+    slice.direct_path_nodes.push_back(OptionalNode{});
+  }
+
+  REQUIRE_THROWS_AS(TreeKEMPublicKey(suite, slice), InvalidParameterError);
+}
+
+TEST_CASE("Security: log2 does not infinite loop on large values")
+{
+  auto root_index = NodeIndex::root(LeafCount{ 1000 });
+  REQUIRE(root_index.val > 0);
+
+  auto root_index2 = NodeIndex::root(LeafCount{ 99999 });
+  REQUIRE(root_index2.val > 0);
+}
+
+TEST_CASE("Security: log2 does not infinite loop when the shift count "
+          "reaches the type width")
+{
+  // NodeCount(LeafCount{0x40000001}) is 0x80000001, which has bit 31 set.
+  // Before the fix, log2() kept shifting past bit width 32, and on
+  // platforms where shifting a uint32_t by 32 wraps around (undefined
+  // behavior treated as shift-by-0), this caused an infinite loop.
+  auto root_index = NodeIndex::root(LeafCount{ 0x40000001u });
+  REQUIRE(root_index.val > 0);
+
+  // The theoretical maximum, to exercise the boundary case directly.
+  auto root_index2 = NodeIndex::root(LeafCount{ 0xFFFFFFFFu });
+  REQUIRE(root_index2.val > 0);
+}

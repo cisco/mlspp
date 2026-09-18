@@ -170,7 +170,7 @@ TEST_CASE("X509 Credential EC certificates")
   const std::vector<bytes> der_in{ cert };
 
   auto key = SignaturePrivateKey::parse_der(
-    mls::CipherSuite::ID::P256_AES128GCM_SHA256_P256, keydata);
+    CipherSuite::ID::P256_AES128GCM_SHA256_P256, keydata);
 
   auto cred = Credential::x509(der_in);
   auto x509 = cred.get<X509Credential>();
