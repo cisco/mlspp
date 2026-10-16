@@ -1279,6 +1279,7 @@ TEST_CASE_METHOD(UnmergedLeafTest, "Handle Commit at Unmerged Leaf")
                      std::nullopt,
                      {} });
   REQUIRE(states.back().index() == vacated);
+  check_consistency();
 
   auto [commit, new_state] = commit_from_outside();
   handle_from_outside(commit, new_state);
@@ -1299,6 +1300,7 @@ TEST_CASE_METHOD(UnmergedLeafTest, "Handle Commit at Unmerged Light Client")
                       {} };
   REQUIRE_FALSE(light.is_full_client());
   REQUIRE(light.index() == vacated);
+  REQUIRE(light == states[0]);
 
   const auto tree_before = states[0].tree();
   auto [commit, new_state] = commit_from_outside();
@@ -1308,6 +1310,25 @@ TEST_CASE_METHOD(UnmergedLeafTest, "Handle Commit at Unmerged Light Client")
 
   handle_from_outside(commit, new_state);
   REQUIRE(light == states[0]);
+}
+
+TEST_CASE_METHOD(UnmergedLeafTest, "Slice Path at Unmerged Leaf")
+{
+  add_unmerged_member(std::get<3>(make_client()), true);
+
+  auto [commit, new_state] = commit_from_outside();
+  const auto public_message = var::get<PublicMessage>(commit.message);
+  const auto content_auth = public_message.authenticated_content();
+  const auto& path =
+    opt::get(var::get<Commit>(content_auth.content.content).path);
+
+  // The root is the only node in the filtered direct path of leaf 4, and its
+  // copath resolution is node 3 followed by leaf 3.
+  const auto [ciphertext, decrypt_node] =
+    new_state.tree().slice_path(path, outside_committer, vacated);
+  REQUIRE(decrypt_node == NodeIndex(vacated));
+  REQUIRE(tls::marshal(ciphertext) ==
+          tls::marshal(path.nodes.at(0).encrypted_path_secret.at(1)));
 }
 
 TEST_CASE_METHOD(RunningGroupTest, "Roster Updates")
