@@ -1189,6 +1189,127 @@ TEST_CASE_METHOD(RunningGroupTest, "Remove Members from a Group")
   }
 }
 
+class UnmergedLeafTest : public RunningGroupTest
+{
+protected:
+  const LeafIndex vacated{ 3 };
+  const LeafIndex outside_committer{ 4 };
+
+  UnmergedLeafTest()
+  {
+    // Remove leaf 3 with a commit from leaf 0.  Leaf 0's UpdatePath sets node 3
+    // again, leaving leaf 3 as an empty slot under a non-blank node 3.
+    auto remove = states[0].remove_proposal(vacated);
+    auto [commit, welcome, new_state] = states[0].commit(
+      fresh_secret(), CommitOpts{ { remove }, false, false, {} }, {});
+    silence_unused(welcome);
+
+    states.erase(states.begin() + vacated.val);
+    for (auto& state : states) {
+      if (state.index().val == 0) {
+        state = new_state;
+      } else {
+        state = opt::get(state.handle(commit));
+      }
+    }
+
+    REQUIRE(states[0].tree().node_at(NodeIndex(vacated)).blank());
+    REQUIRE_FALSE(states[0].tree().node_at(NodeIndex{ 3 }).blank());
+  }
+
+  // Add a member with a commit that has no UpdatePath.  The new member fills
+  // the vacated leaf, so it is an unmerged leaf of node 3 and holds no private
+  // key for node 3.
+  Welcome add_unmerged_member(const KeyPackage& key_package, bool inline_tree)
+  {
+    auto add = states[0].add_proposal(key_package);
+    auto [commit, welcome, new_state] = states[0].commit(
+      fresh_secret(), CommitOpts{ { add }, inline_tree, false, {} }, {});
+
+    for (auto& state : states) {
+      if (state.index().val == 0) {
+        state = new_state;
+      } else {
+        state = opt::get(state.handle(commit));
+      }
+    }
+
+    const auto expected_resolution =
+      std::vector<NodeIndex>{ NodeIndex{ 3 }, NodeIndex(vacated) };
+    REQUIRE(states[0].tree().resolve(NodeIndex{ 3 }) == expected_resolution);
+    return welcome;
+  }
+
+  // Commit from leaf 4.  Its UpdatePath encrypts to the resolution of node 3,
+  // which is node 3 followed by its unmerged leaf 3.
+  std::tuple<MLSMessage, State> commit_from_outside()
+  {
+    auto& committer = *stdx::find_if(states, [&](const auto& state) {
+      return state.index() == outside_committer;
+    });
+    auto [commit, welcome, new_state] =
+      committer.commit(fresh_secret(), {}, {});
+    silence_unused(welcome);
+    return { commit, new_state };
+  }
+
+  void handle_from_outside(const MLSMessage& commit, const State& new_state)
+  {
+    for (auto& state : states) {
+      if (state.index() == outside_committer) {
+        state = new_state;
+      } else {
+        state = opt::get(state.handle(commit));
+      }
+    }
+
+    check_consistency();
+  }
+};
+
+TEST_CASE_METHOD(UnmergedLeafTest, "Handle Commit at Unmerged Leaf")
+{
+  auto [init_priv, leaf_priv, identity_priv, key_package] = make_client();
+  auto welcome = add_unmerged_member(key_package, true);
+  states.push_back({ init_priv,
+                     leaf_priv,
+                     identity_priv,
+                     key_package,
+                     welcome,
+                     std::nullopt,
+                     {} });
+  REQUIRE(states.back().index() == vacated);
+
+  auto [commit, new_state] = commit_from_outside();
+  handle_from_outside(commit, new_state);
+}
+
+TEST_CASE_METHOD(UnmergedLeafTest, "Handle Commit at Unmerged Light Client")
+{
+  auto [init_priv, leaf_priv, identity_priv, key_package] = make_client();
+  auto welcome = add_unmerged_member(key_package, false);
+  const auto annotated_welcome =
+    AnnotatedWelcome::from(welcome, states[0].tree(), LeafIndex{ 0 }, vacated);
+  auto light = State{ init_priv,
+                      leaf_priv,
+                      identity_priv,
+                      key_package,
+                      annotated_welcome.welcome,
+                      annotated_welcome.tree(),
+                      {} };
+  REQUIRE_FALSE(light.is_full_client());
+  REQUIRE(light.index() == vacated);
+
+  const auto tree_before = states[0].tree();
+  auto [commit, new_state] = commit_from_outside();
+  const auto annotated_commit = AnnotatedCommit::from(
+    light.index(), {}, commit, tree_before, new_state.tree());
+  light = light.handle(annotated_commit);
+
+  handle_from_outside(commit, new_state);
+  REQUIRE(light == states[0]);
+}
+
 TEST_CASE_METHOD(RunningGroupTest, "Roster Updates")
 {
   static const auto get_creds = [](const auto& kps) {
