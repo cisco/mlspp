@@ -713,14 +713,19 @@ TreeKEMPublicKey::slice_path(UpdatePath path,
       continue;
     }
 
-    for (auto j = size_t(0); j < res.size(); j++) {
-      const auto resi = res.at(j);
-      if (!toi.is_below(resi)) {
-        continue;
-      }
-
-      return { path.nodes.at(i).encrypted_path_secret.at(j), resi };
+    // An unmerged leaf holds no private key for the resolution node above it,
+    // so it decrypts with its own leaf, which the resolution also lists.
+    auto res_it = stdx::find(res, toi);
+    if (res_it == res.end()) {
+      res_it =
+        stdx::find_if(res, [&](const auto n) { return toi.is_below(n); });
     }
+    if (res_it == res.end()) {
+      continue;
+    }
+
+    const auto j = static_cast<size_t>(res_it - res.begin());
+    return { path.nodes.at(i).encrypted_path_secret.at(j), *res_it };
   }
 
   throw ProtocolError("Decryption node not found");
