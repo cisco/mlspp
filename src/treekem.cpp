@@ -713,14 +713,19 @@ TreeKEMPublicKey::slice_path(UpdatePath path,
       continue;
     }
 
-    for (auto j = size_t(0); j < res.size(); j++) {
-      const auto resi = res.at(j);
-      if (!toi.is_below(resi)) {
-        continue;
-      }
-
-      return { path.nodes.at(i).encrypted_path_secret.at(j), resi };
+    // An unmerged leaf holds no private key for the resolution node above it,
+    // so it decrypts with its own leaf, which the resolution also lists.
+    auto res_it = stdx::find(res, toi);
+    if (res_it == res.end()) {
+      res_it =
+        stdx::find_if(res, [&](const auto n) { return toi.is_below(n); });
     }
+    if (res_it == res.end()) {
+      continue;
+    }
+
+    const auto j = static_cast<size_t>(res_it - res.begin());
+    return { path.nodes.at(i).encrypted_path_secret.at(j), *res_it };
   }
 
   throw ProtocolError("Decryption node not found");
@@ -817,9 +822,15 @@ TreeKEMPublicKey::ancestor_index(LeafIndex to, LeafIndex from) const
     return n.is_below(ancestor) && n != ancestor && !node_at(n).blank();
   });
 
+  // An unmerged leaf holds no private key for that node, so it decrypts with
+  // its own leaf.
   auto resolution_node = NodeIndex(to);
   if (!candidates.empty()) {
-    resolution_node = candidates.back();
+    const auto candidate = candidates.back();
+    const auto& unmerged = node_at(candidate).parent_node().unmerged_leaves;
+    if (!stdx::contains(unmerged, to)) {
+      resolution_node = candidate;
+    }
   }
 
   return {
@@ -861,8 +872,13 @@ TreeKEMPublicKey::decap_coords(
     }
   }
 
-  const auto resolution_node_it = stdx::find_if(
-    resolution, [&](const auto i) { return to_node.is_below(i); });
+  // An unmerged leaf holds no private key for the resolution node above it,
+  // so it decrypts with its own leaf, which the resolution also lists.
+  auto resolution_node_it = stdx::find(resolution, to_node);
+  if (resolution_node_it == resolution.end()) {
+    resolution_node_it = stdx::find_if(
+      resolution, [&](const auto i) { return to_node.is_below(i); });
+  }
   const auto resolution_node_index =
     static_cast<size_t>(resolution_node_it - resolution.begin());
   const auto resolution_node = *resolution_node_it;
