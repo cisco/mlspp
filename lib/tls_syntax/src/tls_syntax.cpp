@@ -138,6 +138,10 @@ varint::encode(ostream& str, const uint64_t& val)
 istream&
 varint::decode(istream& str, uint64_t& val)
 {
+  if (str._buffer.empty()) {
+    throw ReadError("Attempt to read from empty buffer");
+  }
+
   auto log_size = size_t(str._buffer.back() >> VARINT_HEADER_OFFSET);
   if (log_size > 2) {
     throw ReadError("Malformed varint header");

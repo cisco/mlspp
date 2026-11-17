@@ -209,6 +209,16 @@ TEST_CASE("TLS varint failure cases")
     // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
     REQUIRE_THROWS(MLS_NAMESPACE::tls::varint::decode(r, val));
   }
+
+  // Empty buffer
+  {
+    auto val = uint64_t(0);
+    auto empty = bytes{};
+    auto r = MLS_NAMESPACE::tls::istream(empty);
+    // NOLINTNEXTLINE(llvm-else-after-return, readability-else-after-return)
+    REQUIRE_THROWS_AS(MLS_NAMESPACE::tls::varint::decode(r, val),
+                      MLS_NAMESPACE::tls::ReadError);
+  }
 }
 
 // TODO(rlb@ipv.sx) Test failure cases
